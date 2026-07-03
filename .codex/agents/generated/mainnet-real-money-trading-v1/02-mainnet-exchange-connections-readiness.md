@@ -2,73 +2,56 @@
 prompt_name: mainnet-real-money-trading-v1-02-mainnet-exchange-connections-readiness
 repo: /Users/daniildegtyarev/Projects/roehub.com
 branch: main
-scope: "Validate Binance/Bybit mainnet exchange connections read-only before any order submit."
+scope: "Mainnet exchange connections read-only readiness"
 language:
   implementation: python
   agent_report: ru
 context_sources:
   always_read:
     - path: .codex/AGENTS.md
-      why: "repo safety rules"
+      why: "repo workflow, proof-boundary, branch policy, scoped staging and redaction rules"
     - path: docs/architecture/live_execution/mainnet-real-money-trading-v1.md
-      why: "mainnet plan"
+      why: "source architecture plan for this prompt pack"
     - path: docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md
-      why: "stage gate"
+      why: "stage source of truth and previous-stage gate"
   task_entrypoints:
-    - path: docs/architecture/identity/identity-exchange-connections-live-trading-v1.md
-      why: "exchange connection lifecycle and permissions"
-      inspect_symbols: ["mainnet", "IP restriction", "trade"]
-    - path: docs/runbooks/exchange-secret-management.md
-      why: "custody and validation runbook"
-      inspect_symbols: ["exchange-control", "mainnet", "validation"]
-    - path: src/trading/contexts/live_execution/application
-      why: "account projection/readiness use cases"
-      inspect_symbols: ["ExchangeAccountProjectionService"]
-  conditional_bundles:
-    ui_settings:
-      read_when: "browser-visible settings readiness changes are needed"
-      paths:
-        - apps/api/dto/ui_account.py
-        - apps/web/templates/pages/settings.html
-        - apps/web/dist/js/pages/settings.js
-    exchange_adapters:
-      read_when: "mainnet read-only validation adapter changes are needed"
-      paths:
-        - apps/exchange_execution
-        - src/trading/contexts/exchange_control
-  consult_if_needed:
     - path: docs/runbooks/exchange-execution.md
-      read_when: "exchange-execution readiness interaction is unclear"
+      why: "exchange-execution runtime and safety contract"
+    - path: docs/runbooks/strategy-live-worker.md
+      why: "strategy producer runtime contract"
+    - path: docs/runbooks/prod-dashboard-metrics-reference-ru.md
+      why: "metrics reference when metrics are touched"
+  consult_if_needed:
+    - path: docs/architecture/README.md
+      read_when: "docs index or linked docs are ambiguous"
 style_references:
   - .codex/agents/stage_execution_ledger_template.md
 hard_requirements:
-  stage_01_must_be_accepted: true
-  read_only_only: true
-  no_order_submit: true
+  no_unscoped_mainnet_orders: true
+  stage_ledger_update_required: true
+  secrets_redaction_required: true
+  tests_only_acceptance_allowed: false
 task_toggles:
-  allow_mainnet_readonly_calls: true
+  allow_code_changes: true
+  allow_runtime_checks: true
   allow_mainnet_orders: false
 skill_routing:
   - skill: root-cause-debugging
-    use_when: "a mainnet connection fails readiness unexpectedly"
-    timing: if blocker
-    reason: "separate credential/IP/balance/provider failures"
+    use_when: "stage work crosses the root-cause-debugging boundary"
+    timing: during investigation or verification
+    reason: "required by this stage surface"
   - skill: browser-qa-evidence
-    use_when: "settings UI readiness changes are browser-visible"
-    timing: during verification
-    reason: "prove UI without secret leakage"
-  - skill: publish-ci-deploy
-    use_when: "accepted code/docs changes need delivery"
-    timing: before ship
-    reason: "main + CI/deploy + post-main proof"
+    use_when: "stage work crosses the browser-qa-evidence boundary"
+    timing: during investigation or verification
+    reason: "required by this stage surface"
 target_envs: ["local", "macstudio", "roehub.com"]
 required_literals:
-  - "No order submit"
-  - "withdrawals disabled"
-  - "IP allowlist required"
+  - "User required before start: Binance/Bybit mainnet keys connected, IP allowlist enabled, balances funded"
+  - "previous stage"
+  - "file manifest"
 non_goals:
-  - "Do not create or request raw API keys in chat."
-  - "Do not place orders."
+  - "Do not broaden mainnet access outside this stage scope."
+  - "Do not print secrets, tokens, raw API keys, signed payloads, cookies or sensitive provider payloads."
 branch_policy:
   default_branch: main
   separate_branch_allowed: false
@@ -79,44 +62,50 @@ branch_policy:
   approval_required_for_branch_or_worktree: true
 change_ownership:
   parallel_main_expected: true
-  owned_change_scope: ["Stage 02 readiness code/docs/UI/report/ledger only"]
-  foreign_changes_policy: "preserve unrelated changes"
-  mixed_file_policy: "stage only owned hunks"
+  owned_change_scope: ["Stage 02 scoped files/hunks only", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/02-mainnet-exchange-connections-readiness.md", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md"]
+  foreign_changes_policy: "preserve and exclude unrelated changes from other chats"
+  mixed_file_policy: "stage only owned hunks; block mixed file if safe hunk separation is impossible"
   forbidden_git_commands: ["git add .", "git add -A", "git add --all", "git commit -a", "git commit -am", "git reset ."]
   required_pre_commit_check: "git diff --cached --name-status"
   required_commit_push_marker: "ROEHUB_SCOPED_STAGING_REVIEWED=1"
 final_report_format:
   language: ru
-  sections: ["status", "readiness_matrix", "evidence", "files", "next_stage"]
+  sections: ["status", "user_required", "evidence", "files", "blockers", "next_stage"]
 quality_gates:
-  - cmd: "uv run ruff check src/trading/contexts/exchange_control src/trading/contexts/live_execution apps tests"
-    expect: "passes if code touched"
-  - cmd: "uv run pyright src/trading/contexts/exchange_control src/trading/contexts/live_execution apps tests"
-    expect: "passes if code touched"
-  - cmd: "uv run pytest -q tests/unit/contexts/live_execution tests/unit/contexts/identity tests/unit/apps"
-    expect: "passes if relevant"
   - cmd: "uv run python -m tools.docs.generate_docs_index --check"
-    expect: "passes if docs changed"
+    expect: "passes if Markdown docs changed"
+  - cmd: "git diff --check"
+    expect: "passes"
+  - cmd: "uv run ruff check apps src tests"
+    expect: "passes if Python code changed; use narrower targets first when possible"
+  - cmd: "uv run pyright apps src tests"
+    expect: "passes if typed Python code changed; use narrower targets first when possible"
+  - cmd: "uv run pytest -q tests/unit"
+    expect: "focused subset passes if code changed; broaden only when risk requires"
 validation_strategy:
   depth: target_runtime
   e2e_required: true
-  acceptance_surfaces: ["mainnet read-only provider calls", "API", "DB", "browser if UI changed", "Prometheus if metrics changed"]
+  acceptance_surfaces: ["mainnet read-only provider/API/DB/browser", "stage report", "stage ledger"]
   tests_only_allowed_reason: null
   evidence_target: docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/02-mainnet-exchange-connections-readiness.md
 proof_boundary:
-  required_when: "changed code is verified on Mac Studio"
-  label: post_main_production_runtime_proof
+  required_when: "Mac Studio or production runtime proof is collected"
+  label: post_main_production_runtime_proof if code changes; otherwise read_only_existing_runtime_smoke
   changed_code_production_claim_allowed: true
-  blocked_or_deferred_reason: "Requires target revision on origin/main, green CI, deploy/sync, then runtime proof."
+  blocked_or_deferred_reason: "Changed-code production proof requires origin/main, green CI, deploy/sync, then runtime verification."
 runtime_env_sources:
   roehub_env_file_order: ["$ROEHUB_ENV_FILE", "/Users/daniildegtyarev/.config/roehub/roehub.env", "/etc/roehub/roehub.env"]
   report_only_key_presence: true
-  forbidden_in_reports: ["API keys", "secrets", "tokens", "cookies", "raw provider payloads"]
+  forbidden_in_reports: ["API keys", "secrets", "tokens", "cookies", "signed payloads", "raw provider payloads", "Telegram token", "chat id"]
 remote_command_quoting:
-  applies_when: "SSH commands contain SQL or JSON"
-  required_pattern: "quoted heredoc/stdin"
-  forbidden_pattern: "nested inline SQL/JSON"
+  applies_when: "SSH commands contain SQL, JSON, multiline payloads, apostrophes, backticks, or dollar signs"
+  required_pattern: "quoted heredoc or stdin"
+  forbidden_pattern: "nested inline SQL/JSON or shell payloads"
   temporary_files_allowed_only_when_task_requires_durable_artifact: true
+browser_auth_contract:
+  username: smoke_e2e_keycloak
+  password_source: "macstudio env /Users/daniildegtyarev/.config/roehub/roehub.env key ROEHUB_SMOKE_E2E_PASSWORD"
+  redaction: "never print raw password, session cookies, screenshots with secrets, traces with credentials, or provider payloads"
 stage_execution_ledger:
   path: docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md
   plan_doc: docs/architecture/live_execution/mainnet-real-money-trading-v1.md
@@ -133,39 +122,25 @@ prompt_pack_execution:
 file_manifest:
   required_for_stage_prompts: true
   expected_groups:
-    code: ["src/trading/contexts/exchange_control/**", "src/trading/contexts/live_execution/**", "apps/api/**", "apps/web/**"]
-    docs_runbooks: ["docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/02-mainnet-exchange-connections-readiness.md", "docs/runbooks/exchange-secret-management.md", "docs/architecture/README.md"]
-    ledger_and_evidence: ["docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md"]
+    code: ["apps/**", "src/trading/contexts/**", "tests/**"]
+    config_infra_migrations: ["configs/prod/**", "infra/macos/**", "alembic/versions/**"]
+    docs_runbooks: ["docs/runbooks/**", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/02-mainnet-exchange-connections-readiness.md", "docs/architecture/README.md"]
+    ledger_and_evidence: ["docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md", "/opt/roehub/state/live_execution/mainnet-real-money-trading-v1/"]
   final_report_required_fields: ["created", "modified", "deleted", "outside_expected_paths", "outside_expected_paths_justification", "foreign_changes_excluded", "mixed_files"]
-expected_primary_touches:
-  - docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/02-mainnet-exchange-connections-readiness.md
-  - docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md
-possible_secondary_touches:
-  - src/trading/contexts/exchange_control
-  - src/trading/contexts/live_execution
-  - apps/api
-  - apps/web
-  - docs/runbooks/exchange-secret-management.md
-  - docs/architecture/README.md
+expected_primary_touches: ["docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/02-mainnet-exchange-connections-readiness.md", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md"]
+possible_secondary_touches: ["apps", "src/trading/contexts", "tests", "configs/prod", "infra/macos", "alembic/versions", "docs/runbooks", "docs/architecture/README.md"]
 safety_notes:
-  - "Read-only mainnet calls may verify permissions/balances; order submit is forbidden."
+  - "Readiness must not expose credentials or send orders"
+  - "No blind retry after unknown provider state."
 ---
 
 # Task
 
-Validate Binance/Bybit mainnet exchange connections in read-only mode for `spot` and `futures`.
-
-Done means:
-
-- Stage `01 accepted`;
-- user has connected/funded required mainnet credentials via UI/settings, without sharing secrets in chat;
-- Binance/Bybit spot/futures readiness is proven by real read-only calls;
-- trade permission, no-withdrawal expectation, IP restriction, and usable balance buckets are recorded safely;
-- no order submit occurred.
+Mainnet exchange connections read-only readiness.
 
 ## Context / Current State
 
-The existing exchange connection flow supports `mainnet`, but real-money readiness must be proven without exposing raw credentials or sending orders.
+This prompt belongs to `Mainnet Real-Money Trading v1`. The executor must use only `plan_doc`, `prompt_pack_dir`, and `stage_ledger` as the staged execution source of truth. Do not infer readiness from chat history.
 
 Execution anchors: `plan_doc=docs/architecture/live_execution/mainnet-real-money-trading-v1.md`, `prompt_pack_dir=.codex/agents/generated/mainnet-real-money-trading-v1/`, `stage_ledger=docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md`, `execution_mode=goal_driven`.
 
@@ -176,78 +151,82 @@ Execution anchors: `plan_doc=docs/architecture/live_execution/mainnet-real-money
 - `stage_ledger`: `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md`
 - `execution_mode`: `goal_driven`
 - previous-stage ledger gate / previous stage: before any implementation or runtime action, read `stage_ledger` and confirm Stage `01` is `accepted`. If not, update Stage `02` as `blocked`, write the blocker in `stage_ledger`, and stop.
-- Stage-gate instruction: do not infer exchange readiness from UI presence alone; use actual read-only provider/API/DB/browser evidence.
+- Stage-gate instruction: do not continue to the next stage unless this stage has real-boundary evidence and the ledger explicitly allows the next stage.
 - File manifest: final report must list `created`, `modified`, `deleted`, `outside_expected_paths`, `outside_expected_paths_justification`, `foreign_changes_excluded`, and `mixed_files`.
 
 ## Requirements (Must)
 
-- Before any implementation or runtime action, read the stage ledger and confirm Stage `01 accepted`; if not, write Stage `02 blocked`, update the ledger, and stop.
-- Record `User required before start: Binance/Bybit mainnet keys connected, IP allowlist enabled, balances funded`.
-- Fail closed if credentials, IP allowlist, trade permission, or balances are absent.
-- Prove both exchanges and both market types read-only.
-- Keep withdrawal permission disabled as a required safety expectation.
-- Use browser proof only if UI is changed or readiness is user-visible.
+- Record `User required before start: Binance/Bybit mainnet keys connected, IP allowlist enabled, balances funded` in the stage report and ledger.
+- Validate Binance and Bybit mainnet connections by read-only provider calls only.
+- Prove withdrawals are disabled, trade permission is present, IP allowlist is restricted, and balances are sufficient by pass/fail buckets.
+- Use /settings browser/API proof if UI/read-model changes are touched.
+- Do not create, request, print, or store raw API keys in reports.
+- Update `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/02-mainnet-exchange-connections-readiness.md` with evidence, blockers, file manifest, contract impact and next-stage handoff.
+- Update `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md` after validation and before final report.
 
 ## Requirements (Should)
 
-- Reuse existing exchange-control custody and validation paths.
-- Do not duplicate secret-handling logic in API/UI.
+- Keep changes narrowly scoped to this stage.
+- Prefer existing Roehub ports/adapters/runbook patterns over new abstractions unless the stage explicitly requires a new contract.
+- Use provider docs only as current contract references; do not copy raw provider payloads into reports.
 
 ## Requirements (Nice-to-have)
 
-- Record stable readiness reason codes for each market surface.
+- Add a compact table summarizing before/after state and residual risks.
 
 # Context acquisition protocol
 
-Read plan/ledger first, then exchange connection docs/runbook. Do not inspect adapter code unless readiness gaps require code changes.
+Read in this order: `.codex/AGENTS.md`, `docs/architecture/live_execution/mainnet-real-money-trading-v1.md`, `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md`, then only the task entrypoints required by this stage. Do not eagerly read the whole repository.
 
-Reading budget: target `<= 10 files` and `<= 55k tokens`. Expand only for failing readiness, missing DTO, UI drift, or provider-specific blocker.
-
-Stop when required connections, read-only validation path, touched files, and acceptance commands are clear.
-
-# Reading manifest
-
-Use `ui_settings` if readiness UI changes. Use `exchange_adapters` only for implementation gaps.
+Reading budget: target `<= 10` files before implementation. Expand only for blockers, failing gates, contract ambiguity, or runtime evidence gaps.
 
 # Work plan (agent should follow)
 
-1. Verify previous stage accepted.
-2. Gather read-only readiness inventory for Binance/Bybit spot/futures.
-3. Implement only missing readiness/custody/read-model pieces.
-4. Run local gates if code changed.
-5. Deliver to main if implementation changed; collect post-main production runtime proof.
-6. Run real read-only provider/API/DB/browser checks.
-7. Update report and ledger.
+1. Verify the previous stage status in `stage_ledger`.
+2. Confirm whether the user-required prerequisite is satisfied; if missing, mark blocked and stop.
+3. Classify affected contracts: API/DTO, persistence, config/env, browser-visible, ops/runtime, metrics, docs.
+4. Implement or verify only the stage-scoped behavior.
+5. Run local gates first, then collect the real-boundary evidence required by `validation_strategy`.
+6. Update the stage report and ledger with accepted/blocked status, evidence, residual risk and next-stage allowance.
+7. If publishing is required by the stage outcome, use scoped staging only and follow `publish-ci-deploy`; do not create branches or worktrees.
 
 # Acceptance criteria (Definition of Done)
 
-- Four required surfaces have explicit status: Binance spot, Binance futures, Bybit spot, Bybit futures.
-- No submit/cancel/market-order endpoint was called.
-- Stage report includes sanitized service calls and blockers.
-- Ledger opens Stage `03` only if all required readiness is accepted.
+- Stage `02` is not accepted unless: Read-only Binance/Bybit spot/futures readiness, trade permission, no withdrawal, IP restriction and balance buckets are proven; no order submit.
+- Tests-only acceptance is forbidden.
+- Secrets and raw provider payloads are absent from logs, reports, screenshots, traces and ledgers.
+- `stage_ledger` records status, evidence, blockers, touched contracts, file manifest and next-stage handoff.
+- No broad mainnet access is enabled outside this stage scope.
 
 # Implementation constraints
 
-- No raw secrets in logs/reports.
-- No fallback fake validation.
-- No broad staging.
+- Work on `main`; do not create branches, worktrees, stashes, temporary checkouts or auxiliary folders unless the user explicitly asks.
+- Preserve unrelated dirty files and foreign hunks.
+- Use quoted heredoc/stdin for SSH commands with SQL/JSON/multiline payloads.
+- For browser-visible work, use `smoke_e2e_keycloak` and the host-local `ROEHUB_SMOKE_E2E_PASSWORD` source; never print the password.
 
 # Files to indicate (expected touched areas)
 
-List exact code/docs/UI files touched and justify any outside paths.
-
-Final file manifest must include `created`, `modified`, `deleted`, `outside_expected_paths`, `outside_expected_paths_justification`, `foreign_changes_excluded`, and `mixed_files`.
+- Primary: `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/02-mainnet-exchange-connections-readiness.md`, `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md`.
+- Secondary only if the stage requires it: `apps/**`, `src/trading/contexts/**`, `tests/**`, `configs/prod/**`, `infra/macos/**`, `alembic/versions/**`, `docs/runbooks/**`, `docs/architecture/README.md`.
 
 # Non-goals
 
-- No risk policy implementation.
-- No futures config mutation.
-- No canary orders.
+- Do not execute later stage responsibilities.
+- Do not bypass user-required approval or Telegram gate.
+- Do not treat testnet evidence as mainnet acceptance.
 
 # Quality gates (must run and pass)
 
-Run focused `ruff`, `pyright`, relevant `pytest`, docs index, and browser/runtime checks matching touched surfaces.
+Run the commands listed in front matter when applicable. If a command is not applicable, explain why in the report. For runtime/provider stages, include actual API/DB/Redis/Prometheus/Monit/browser/exchange evidence as applicable.
 
 # Final output: report format (strict)
 
-Report in Russian: status, user prerequisites, readiness matrix, provider/API/DB/browser/metrics evidence, file manifest, next stage gate.
+Russian report with:
+- status: `accepted` or `blocked`;
+- user prerequisite result;
+- evidence with commands/artifacts;
+- file manifest;
+- contract impact;
+- residual risks;
+- exact next prompt if next stage is allowed.

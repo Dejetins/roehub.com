@@ -1,8 +1,8 @@
 ---
-prompt_name: mainnet-real-money-trading-v1-01-user-prerequisites-telegram-gate
+prompt_name: mainnet-real-money-trading-v1-11-ops-canary-bybit-spot-long
 repo: /Users/daniildegtyarev/Projects/roehub.com
 branch: main
-scope: "User prerequisite and Telegram gate"
+scope: "Real mainnet ops canary: Bybit spot long"
 language:
   implementation: python
   agent_report: ru
@@ -34,15 +34,19 @@ hard_requirements:
 task_toggles:
   allow_code_changes: true
   allow_runtime_checks: true
-  allow_mainnet_orders: false
+  allow_mainnet_orders: true
 skill_routing:
+  - skill: backend-performance-evidence
+    use_when: "stage work crosses the backend-performance-evidence boundary"
+    timing: during investigation or verification
+    reason: "required by this stage surface"
   - skill: root-cause-debugging
     use_when: "stage work crosses the root-cause-debugging boundary"
     timing: during investigation or verification
     reason: "required by this stage surface"
 target_envs: ["local", "macstudio", "roehub.com"]
 required_literals:
-  - "User required before start: user must state Telegram blocker is solved"
+  - "User required before start: Stage 10 accepted"
   - "previous stage"
   - "file manifest"
 non_goals:
@@ -58,7 +62,7 @@ branch_policy:
   approval_required_for_branch_or_worktree: true
 change_ownership:
   parallel_main_expected: true
-  owned_change_scope: ["Stage 01 scoped files/hunks only", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md"]
+  owned_change_scope: ["Stage 11 scoped files/hunks only", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/11-ops-canary-bybit-spot-long.md", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md"]
   foreign_changes_policy: "preserve and exclude unrelated changes from other chats"
   mixed_file_policy: "stage only owned hunks; block mixed file if safe hunk separation is impossible"
   forbidden_git_commands: ["git add .", "git add -A", "git add --all", "git commit -a", "git commit -am", "git reset ."]
@@ -81,12 +85,12 @@ quality_gates:
 validation_strategy:
   depth: target_runtime
   e2e_required: true
-  acceptance_surfaces: ["runtime/user prerequisite gate", "stage report", "stage ledger"]
+  acceptance_surfaces: ["real exchange order/fill/close/reconcile/alert/browser/API", "stage report", "stage ledger"]
   tests_only_allowed_reason: null
-  evidence_target: docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md
+  evidence_target: docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/11-ops-canary-bybit-spot-long.md
 proof_boundary:
   required_when: "Mac Studio or production runtime proof is collected"
-  label: read_only_existing_runtime_smoke until changed code exists
+  label: post_main_production_runtime_proof
   changed_code_production_claim_allowed: true
   blocked_or_deferred_reason: "Changed-code production proof requires origin/main, green CI, deploy/sync, then runtime verification."
 runtime_env_sources:
@@ -105,7 +109,7 @@ browser_auth_contract:
 stage_execution_ledger:
   path: docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md
   plan_doc: docs/architecture/live_execution/mainnet-real-money-trading-v1.md
-  current_stage: "01"
+  current_stage: "11"
   required_update: true
   template: .codex/agents/stage_execution_ledger_template.md
 prompt_pack_execution:
@@ -120,19 +124,19 @@ file_manifest:
   expected_groups:
     code: ["apps/**", "src/trading/contexts/**", "tests/**"]
     config_infra_migrations: ["configs/prod/**", "infra/macos/**", "alembic/versions/**"]
-    docs_runbooks: ["docs/runbooks/**", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md", "docs/architecture/README.md"]
+    docs_runbooks: ["docs/runbooks/**", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/11-ops-canary-bybit-spot-long.md", "docs/architecture/README.md"]
     ledger_and_evidence: ["docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md", "/opt/roehub/state/live_execution/mainnet-real-money-trading-v1/"]
   final_report_required_fields: ["created", "modified", "deleted", "outside_expected_paths", "outside_expected_paths_justification", "foreign_changes_excluded", "mixed_files"]
-expected_primary_touches: ["docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md"]
+expected_primary_touches: ["docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/11-ops-canary-bybit-spot-long.md", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md"]
 possible_secondary_touches: ["apps", "src/trading/contexts", "tests", "configs/prod", "infra/macos", "alembic/versions", "docs/runbooks", "docs/architecture/README.md"]
 safety_notes:
-  - "Telegram/VLESS setup is out of scope and must not be performed by executor"
+  - "real mainnet order; stop on unknown or close failure"
   - "No blind retry after unknown provider state."
 ---
 
 # Task
 
-User prerequisite and Telegram gate.
+Real mainnet ops canary: Bybit spot long.
 
 ## Context / Current State
 
@@ -146,18 +150,18 @@ Execution anchors: `plan_doc=docs/architecture/live_execution/mainnet-real-money
 - `prompt_pack_dir`: `.codex/agents/generated/mainnet-real-money-trading-v1/`
 - `stage_ledger`: `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md`
 - `execution_mode`: `goal_driven`
-- previous-stage ledger gate / previous stage: before any implementation or runtime action, read `stage_ledger` and confirm Stage `00` is `accepted`. If not, update Stage `01` as `blocked`, write the blocker in `stage_ledger`, and stop.
+- previous-stage ledger gate / previous stage: before any implementation or runtime action, read `stage_ledger` and confirm Stage `10` is `accepted`. If not, update Stage `11` as `blocked`, write the blocker in `stage_ledger`, and stop.
 - Stage-gate instruction: do not continue to the next stage unless this stage has real-boundary evidence and the ledger explicitly allows the next stage.
 - File manifest: final report must list `created`, `modified`, `deleted`, `outside_expected_paths`, `outside_expected_paths_justification`, `foreign_changes_excluded`, and `mixed_files`.
 
 ## Requirements (Must)
 
-- Record `User required before start: user must state Telegram blocker is solved` in the stage report and ledger.
-- Check the ledger for literal user confirmation that Telegram host access is solved.
-- Do not configure VLESS/VPN; only verify readiness after the user says it is solved.
-- Prove Telegram/user-alert readiness without printing bot tokens, chat ids or destinations.
-- Block the stage if user confirmation or runtime proof is missing.
-- Update `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md` with evidence, blockers, file manifest, contract impact and next-stage handoff.
+- Record `User required before start: Stage 10 accepted` in the stage report and ledger.
+- Run only this canary row, sequentially.
+- Submit Bybit spot buy market <=15 USDT only with accepted canary scope.
+- Close immediately by filled base quantity.
+- Verify provider fill, close fill, DB ledger, Redis pending=0, no DLQ/retry growth, alert delivered, latency/slippage recorded and no residual exposure.
+- Update `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/11-ops-canary-bybit-spot-long.md` with evidence, blockers, file manifest, contract impact and next-stage handoff.
 - Update `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md` after validation and before final report.
 
 ## Requirements (Should)
@@ -188,7 +192,7 @@ Reading budget: target `<= 10` files before implementation. Expand only for bloc
 
 # Acceptance criteria (Definition of Done)
 
-- Stage `01` is not accepted unless: User confirmation and runtime Telegram readiness are proven without secrets; if not, stage is blocked and all money stages stay closed.
+- Stage `11` is not accepted unless: Bybit spot buy market <=15 USDT opens, close sell by filled base qty, alert/reconciliation/latency/slippage pass, no residual exposure.
 - Tests-only acceptance is forbidden.
 - Secrets and raw provider payloads are absent from logs, reports, screenshots, traces and ledgers.
 - `stage_ledger` records status, evidence, blockers, touched contracts, file manifest and next-stage handoff.
@@ -203,7 +207,7 @@ Reading budget: target `<= 10` files before implementation. Expand only for bloc
 
 # Files to indicate (expected touched areas)
 
-- Primary: `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md`, `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md`.
+- Primary: `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/11-ops-canary-bybit-spot-long.md`, `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md`.
 - Secondary only if the stage requires it: `apps/**`, `src/trading/contexts/**`, `tests/**`, `configs/prod/**`, `infra/macos/**`, `alembic/versions/**`, `docs/runbooks/**`, `docs/architecture/README.md`.
 
 # Non-goals

@@ -1,8 +1,8 @@
 ---
-prompt_name: mainnet-real-money-trading-v1-01-user-prerequisites-telegram-gate
+prompt_name: mainnet-real-money-trading-v1-08-futures-config-market-order-guard
 repo: /Users/daniildegtyarev/Projects/roehub.com
 branch: main
-scope: "User prerequisite and Telegram gate"
+scope: "Futures account config and market-order guard"
 language:
   implementation: python
   agent_report: ru
@@ -42,7 +42,7 @@ skill_routing:
     reason: "required by this stage surface"
 target_envs: ["local", "macstudio", "roehub.com"]
 required_literals:
-  - "User required before start: user must state Telegram blocker is solved"
+  - "User required before start: user approves default isolated 1x or explicit safe futures config"
   - "previous stage"
   - "file manifest"
 non_goals:
@@ -58,7 +58,7 @@ branch_policy:
   approval_required_for_branch_or_worktree: true
 change_ownership:
   parallel_main_expected: true
-  owned_change_scope: ["Stage 01 scoped files/hunks only", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md"]
+  owned_change_scope: ["Stage 08 scoped files/hunks only", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/08-futures-config-market-order-guard.md", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md"]
   foreign_changes_policy: "preserve and exclude unrelated changes from other chats"
   mixed_file_policy: "stage only owned hunks; block mixed file if safe hunk separation is impossible"
   forbidden_git_commands: ["git add .", "git add -A", "git add --all", "git commit -a", "git commit -am", "git reset ."]
@@ -81,12 +81,12 @@ quality_gates:
 validation_strategy:
   depth: target_runtime
   e2e_required: true
-  acceptance_surfaces: ["runtime/user prerequisite gate", "stage report", "stage ledger"]
+  acceptance_surfaces: ["exchange config read-back plus no-submit guard", "stage report", "stage ledger"]
   tests_only_allowed_reason: null
-  evidence_target: docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md
+  evidence_target: docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/08-futures-config-market-order-guard.md
 proof_boundary:
   required_when: "Mac Studio or production runtime proof is collected"
-  label: read_only_existing_runtime_smoke until changed code exists
+  label: post_main_production_runtime_proof
   changed_code_production_claim_allowed: true
   blocked_or_deferred_reason: "Changed-code production proof requires origin/main, green CI, deploy/sync, then runtime verification."
 runtime_env_sources:
@@ -105,7 +105,7 @@ browser_auth_contract:
 stage_execution_ledger:
   path: docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md
   plan_doc: docs/architecture/live_execution/mainnet-real-money-trading-v1.md
-  current_stage: "01"
+  current_stage: "08"
   required_update: true
   template: .codex/agents/stage_execution_ledger_template.md
 prompt_pack_execution:
@@ -120,19 +120,19 @@ file_manifest:
   expected_groups:
     code: ["apps/**", "src/trading/contexts/**", "tests/**"]
     config_infra_migrations: ["configs/prod/**", "infra/macos/**", "alembic/versions/**"]
-    docs_runbooks: ["docs/runbooks/**", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md", "docs/architecture/README.md"]
+    docs_runbooks: ["docs/runbooks/**", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/08-futures-config-market-order-guard.md", "docs/architecture/README.md"]
     ledger_and_evidence: ["docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md", "/opt/roehub/state/live_execution/mainnet-real-money-trading-v1/"]
   final_report_required_fields: ["created", "modified", "deleted", "outside_expected_paths", "outside_expected_paths_justification", "foreign_changes_excluded", "mixed_files"]
-expected_primary_touches: ["docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md"]
+expected_primary_touches: ["docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/08-futures-config-market-order-guard.md", "docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md"]
 possible_secondary_touches: ["apps", "src/trading/contexts", "tests", "configs/prod", "infra/macos", "alembic/versions", "docs/runbooks", "docs/architecture/README.md"]
 safety_notes:
-  - "Telegram/VLESS setup is out of scope and must not be performed by executor"
+  - "Hidden config mutation inside submit is forbidden"
   - "No blind retry after unknown provider state."
 ---
 
 # Task
 
-User prerequisite and Telegram gate.
+Futures account config and market-order guard.
 
 ## Context / Current State
 
@@ -146,18 +146,20 @@ Execution anchors: `plan_doc=docs/architecture/live_execution/mainnet-real-money
 - `prompt_pack_dir`: `.codex/agents/generated/mainnet-real-money-trading-v1/`
 - `stage_ledger`: `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md`
 - `execution_mode`: `goal_driven`
-- previous-stage ledger gate / previous stage: before any implementation or runtime action, read `stage_ledger` and confirm Stage `00` is `accepted`. If not, update Stage `01` as `blocked`, write the blocker in `stage_ledger`, and stop.
+- previous-stage ledger gate / previous stage: before any implementation or runtime action, read `stage_ledger` and confirm Stage `07` is `accepted`. If not, update Stage `08` as `blocked`, write the blocker in `stage_ledger`, and stop.
 - Stage-gate instruction: do not continue to the next stage unless this stage has real-boundary evidence and the ledger explicitly allows the next stage.
 - File manifest: final report must list `created`, `modified`, `deleted`, `outside_expected_paths`, `outside_expected_paths_justification`, `foreign_changes_excluded`, and `mixed_files`.
 
 ## Requirements (Must)
 
-- Record `User required before start: user must state Telegram blocker is solved` in the stage report and ledger.
-- Check the ledger for literal user confirmation that Telegram host access is solved.
-- Do not configure VLESS/VPN; only verify readiness after the user says it is solved.
-- Prove Telegram/user-alert readiness without printing bot tokens, chat ids or destinations.
-- Block the stage if user confirmation or runtime proof is missing.
-- Update `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md` with evidence, blockers, file manifest, contract impact and next-stage handoff.
+- Record `User required before start: user approves default isolated 1x or explicit safe futures config` in the stage report and ledger.
+- Preflight connection ownership, environment=mainnet, market_type=futures and symbol=BTCUSDT.
+- Prove open orders=0 and existing position qty=0 before changing futures config.
+- Set/read back isolated 1x by default or user-selected safe config.
+- Require one-way/net position mode for v1.
+- Persist config observed_at and source_hash linked to readiness snapshot/canary token.
+- Prove submit path does not silently change leverage, margin or position mode.
+- Update `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/08-futures-config-market-order-guard.md` with evidence, blockers, file manifest, contract impact and next-stage handoff.
 - Update `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md` after validation and before final report.
 
 ## Requirements (Should)
@@ -188,7 +190,7 @@ Reading budget: target `<= 10` files before implementation. Expand only for bloc
 
 # Acceptance criteria (Definition of Done)
 
-- Stage `01` is not accepted unless: User confirmation and runtime Telegram readiness are proven without secrets; if not, stage is blocked and all money stages stay closed.
+- Stage `08` is not accepted unless: Binance/Bybit futures config is set/read back, no open orders/positions preflight passes, fresh config snapshot is linked to canary scope; no strategy order yet.
 - Tests-only acceptance is forbidden.
 - Secrets and raw provider payloads are absent from logs, reports, screenshots, traces and ledgers.
 - `stage_ledger` records status, evidence, blockers, touched contracts, file manifest and next-stage handoff.
@@ -203,7 +205,7 @@ Reading budget: target `<= 10` files before implementation. Expand only for bloc
 
 # Files to indicate (expected touched areas)
 
-- Primary: `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/01-user-prerequisites-telegram-gate.md`, `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md`.
+- Primary: `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/08-futures-config-market-order-guard.md`, `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/mainnet-real-money-trading-v1-stage-ledger.md`.
 - Secondary only if the stage requires it: `apps/**`, `src/trading/contexts/**`, `tests/**`, `configs/prod/**`, `infra/macos/**`, `alembic/versions/**`, `docs/runbooks/**`, `docs/architecture/README.md`.
 
 # Non-goals

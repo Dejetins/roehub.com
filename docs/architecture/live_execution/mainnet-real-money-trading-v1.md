@@ -67,10 +67,33 @@ stage блокируется, а следующий stage не стартует.
 | First canary max notional | `15 USDT` на один order | Любой order выше cap блокируется. |
 | Budget | Заявлено `20 USDT` на каждый рынок и `60 USDT` всего | До submit нужен explicit capital allocation manifest; пока действует более строгий global cap `60 USDT` и per-order cap `15 USDT`. |
 | Canary close | Обязательно немедленное закрытие | Spot buy закрывается sell; futures open закрывается reduce-only market. |
+| Canary lifecycle | Отдельная пара `open_order -> close_order` | `cancel_after_submit` не является close proof и не засчитывается для mainnet. |
+| Kill switch semantics | `kill_switch_active=true` означает аварийный stop | Текущий drift вокруг `kill_switch_open` должен быть исправлен до caps/submit stages. |
+| Private stream / fallback | Private order/fill stream обязателен или должен быть заменен явно ограниченным REST polling fallback | Testnet auth probe не считается полноценным mainnet private stream proof. |
+| Futures reconciliation | Fill/position reconciliation отделен от funding reconciliation | Short-lived canary не должен блокироваться только потому, что funding event еще не наступил. |
 | Strategy mode | Автоматический режим под присмотром агента | Нет ручного подтверждения каждого order; есть scoped allowlist, kill switch и hard caps. |
 | Sustained observation | Минимальная длительность | Не 6h; достаточно доказать факт signal -> execution на каждом required market. |
 | Telegram/user alert | В scope как обязательный user-alert proof | Stage execution blocked до явного подтверждения пользователя, что проблема Telegram на хосте решена. VLESS/VPN настройка вне scope. |
 | Mainnet approval | По stages, не общий вечный флаг | Каждый stage открывает только следующий bounded action. |
+
+## Adoption Диагностики GPT-5.5 Pro
+
+Все пункты диагностики приняты. Нет рекомендаций, с которыми этот план
+осознанно не согласен.
+
+| Пункт диагностики | Как учтен в плане |
+|---|---|
+| `kill_switch_open` имеет опасный semantic drift | Добавлен Stage `03`: переименование/инверсия в `kill_switch_active` или `execution_enabled`, обновление reason codes, docs, tests и runtime evidence. |
+| Auto-close отсутствует как модель исполнения | Добавлен Stage `07`: durable `open_order -> close_order` lifecycle, linkage, spot close by filled base qty, futures reduce-only close, terminal states and failure handling. |
+| Futures mainnet config не встроен в submit path | Stage `08` теперь требует pre-submit read-back guard: no open orders, no existing position, isolated `1x` or user-selected safe config, fresh config snapshot. |
+| Risk/caps слишком абстрактны | Stage `04` теперь требует persisted `mainnet_capital_manifest`, `mainnet_canary_scope`, order/open-exposure/gross-notional/daily-loss caps, one-shot approval token and audit math. |
+| Budget conflict blocks canaries | Stage `04` формализует `per_order_notional_cap`, `max_open_exposure_total`, `max_open_exposure_per_exchange_market`, `max_gross_submitted_notional_per_stage`, fees/slippage reserve. |
+| Private stream readiness не равен mainnet private stream | Добавлен Stage `09`: полноценный private stream lifecycle или явно принятый REST polling fallback with stricter limits. |
+| Futures funding blocks short canary reconciliation | Stage `09` разделяет order/fill, position and funding reconciliation; `funding_not_due_yet` не блокирует canary closure if fill/position matched. |
+| Strategy live-mode contract не описан | Stage `17` теперь проектирует sizing, profile binding, canary token propagation, fan-out guard, stop-after-first-canary and restart/dedup semantics before strategy orders. |
+| Stage `07` слишком крупный | Real ops canaries split into Stages `10`-`16`, one exchange/market/direction row at a time with stop/reconcile/alert/no residual state after every row. |
+| Metrics names use `_bucket` base names | Metrics section now uses base histogram names without `_bucket`; Prometheus-generated `_bucket/_sum/_count` series are only query outputs. Units are seconds. |
+| Stale UI/code reason codes | Stage `00` must inventory stale copy, and Stage `03` must repair reason semantics before risk/caps stages can accept. |
 
 ## Что Требуется От Пользователя
 
@@ -85,10 +108,10 @@ stage блокируется, а следующий stage не стартует.
 | Подключить Bybit mainnet API key без withdrawals | `02` | То же. |
 | Включить IP allowlist на публичный IP Mac Studio для mainnet ключей | `02` | Runtime validation/readiness доказывает restricted IP / trade-ready status; raw IP/keys не пишутся в docs. |
 | Пополнить реальные балансы | `02` | Минимум достаточно для canary: план исходит из `15 USDT` на order и stricter total cap `60 USDT`; точные balances не публикуются, только pass/fail buckets. |
-| Подтвердить capital allocation manifest | `03` | Нужно устранить неоднозначность `20 USDT` на каждый рынок vs `60 USDT` всего. До этого stage не может отправлять реальные orders. |
-| Подтвердить futures policy | `05` | Default `isolated 1x`; любые другие user-selected параметры должны быть явно записаны и пройти read-back. |
-| Подтвердить first real-money canary window | `06` | Пользователь разрешает bounded canary matrix по `15 USDT`, auto-close, no manual per-order approval. |
-| Подтвердить strategy-driven mainnet canary window | `07` | Пользователь разрешает scoped automatic strategy execution под наблюдением агента. |
+| Подтвердить capital allocation manifest | `04` | Нужно устранить неоднозначность `20 USDT` на каждый рынок vs `60 USDT` всего. До этого stage не может отправлять реальные orders. |
+| Подтвердить futures policy | `08` | Default `isolated 1x`; любые другие user-selected параметры должны быть явно записаны и пройти read-back. |
+| Подтвердить first real-money canary window | `10` | Пользователь разрешает sequential bounded canary matrix по `15 USDT`, auto-close, no manual per-order approval. |
+| Подтвердить strategy-driven mainnet canary window | `18` | Пользователь разрешает scoped automatic strategy execution под наблюдением агента. |
 
 ## Scope
 
@@ -99,7 +122,9 @@ stage блокируется, а следующий stage не стартует.
 | Mainnet credentials | Use existing exchange connection flow and custody boundary; raw credentials не передаются агенту. |
 | Binance/Bybit spot/futures | Readiness, account projection, market orders, status/fill/reconciliation. |
 | Futures account config | Explicit pre-submit command: set/read isolated `1x` by default, block if mismatch after read-back. |
-| Mainnet risk | Per-order, per-market, per-user, per-strategy caps; daily loss cap; open exposure cap; kill switch. |
+| Auto-close lifecycle | Durable open/close order pair, close linkage, reduce-only futures close, spot close by actual filled quantity, close failure handling. |
+| Mainnet risk | Per-order, open exposure, gross submitted notional, per-market, per-user, per-strategy caps; daily loss cap; fees/slippage reserve; kill switch. |
+| Private stream / reconciliation | Private order/fill stream lifecycle or explicit REST polling fallback; separate order/fill, position and funding reconciliation. |
 | User alerts | Outbox + real user-alert delivery proof only after Telegram host blocker resolved. |
 | Metrics | Dedicated Prometheus metrics for mainnet latency, slippage, unknown state, reconciliation, exposure, caps, alerts. |
 | UI | Mainnet blocked/ready/live status and user-visible warnings on `/settings` and `/strategies`. |
@@ -116,6 +141,7 @@ stage блокируется, а следующий stage не стартует.
 | Portfolio allocator | Достаточно строгих caps/reservations. |
 | ML agent real-money activation | Только compatibility contract; ML activation отдельным планом. |
 | Долгий 6h/24h money soak | В v1 нужен минимальный proof факта signal execution per market. |
+| Advanced private stream optimization | Fast execution streams and latency optimization beyond safe mainnet proof are later work. |
 
 ## Целевая Архитектура
 
@@ -163,7 +189,8 @@ flowchart LR
 | `apps/api` | `live_execution` | Source event, intent, risk/cap state | App identity + user ownership | Idempotency by source key | Read durable source/intent before retry |
 | `live_execution` | Redis | Dispatch accepted intent | Internal Redis ACL | Retry budget/backpressure/DLQ | DB remains source of truth |
 | `exchange-execution` | `exchange-control` | Resolve secret for scoped connection | Service identity; decrypt only in execution service | Bounded timeout; no submit if unavailable | Block submit, readiness degraded |
-| `exchange-execution` | Binance/Bybit | Market submit, reduce-only close, status, fills, private stream | Native signed exchange API | Per-exchange limiter; retry only safe failure classes | If provider state unknown, query/reconcile before any retry |
+| `exchange-execution` | Binance/Bybit REST | Server time, account state, futures config, market submit, close submit, order status, fills | Native signed exchange API | Per-exchange limiter; retry only safe failure classes | If provider state unknown, query/reconcile before any retry |
+| `exchange-execution` | Binance/Bybit private stream or REST fallback | Order/fill/position updates | Native signed exchange API; no raw secret in logs | Stream reconnect/keepalive/backfill or bounded polling | Stale stream/fallback blocks submit unless stage explicitly allows degraded no-submit mode |
 | Notification worker | Telegram API | User/operator alert delivery | Host-local bot config; no tokens in reports | Provider backoff; no blind replay for unknown critical delivery | Unknown delivery blocks closure until inspected |
 
 Official provider docs that must be rechecked by relevant stages:
@@ -184,9 +211,15 @@ Official provider docs that must be rechecked by relevant stages:
 | Binance futures `503` unknown execution status | Treat as `unknown`; first private stream/order-status lookup, then reconciliation, no blind second submit. |
 | Bybit async order ack | Ack means accepted, final status comes from websocket/status/reconciliation; do not mark filled without fill facts. |
 | Private stream stale | Block submit if private stream proof is required and stale/missing. |
+| Private stream unavailable but REST fallback accepted | Submit can proceed only if Stage `09` accepted explicit fallback with stricter polling/reconciliation thresholds and alerting. |
 | Redis message pending | Do not ack until durable state transition is written. |
 | Unknown order | Kill new dispatch for affected scope, alert user/operator, reconcile from provider before retry/cleanup. |
-| Auto-close failed | Critical alert, stop strategy scope, reconcile position, do not continue strategy canary. |
+| Auto-close required | Every real canary creates a durable open/close pair; `cancel_after_submit` is not accepted as close evidence for market orders. |
+| Spot close | Close quantity is based on actual filled base quantity minus dust/min-notional constraints; residual dust must be audited. |
+| Futures close | Close order must be reduce-only in one-way/net mode; if reduce-only is unavailable or rejected, stage blocks and opens critical incident. |
+| Partial fill | Close only confirmed filled quantity; unresolved partial/unknown fill stops the scope until provider status is reconciled. |
+| Auto-close failed | Critical alert, engage kill switch for affected scope, stop strategy scope, reconcile position, do not continue strategy canary. |
+| Futures funding pending | Does not block canary closure when order/fill and position are matched; funding remains separate ledger concern with `funding_not_due_yet` or equivalent reason. |
 | Notification unknown | Mainnet closure blocked until delivery row inspected or replay policy followed. |
 
 ## Mainnet Metrics
@@ -196,17 +229,19 @@ Official provider docs that must be rechecked by relevant stages:
 
 | Metric | Labels | Что измеряет |
 |---|---|---|
-| `mainnet_execution_latency_seconds_bucket` | `segment`, `exchange`, `market_type`, `source_type` | p50/p95/p99 по сегментам полного пути. |
-| `mainnet_signal_to_fill_latency_seconds_bucket` | `exchange`, `market_type`, `direction` | Время от сигнала до первого fill. |
-| `mainnet_exchange_submit_latency_seconds_bucket` | `exchange`, `market_type`, `order_type` | Native adapter submit latency. |
+| `mainnet_execution_latency_seconds` | `segment`, `exchange`, `market_type`, `source_type` | Histogram base name для p50/p95/p99 по сегментам полного пути. Prometheus создаст `_bucket`, `_sum`, `_count`. |
+| `mainnet_signal_to_fill_latency_seconds` | `exchange`, `market_type`, `direction` | Histogram base name для времени от сигнала до первого fill. |
+| `mainnet_exchange_submit_latency_seconds` | `exchange`, `market_type`, `order_type` | Histogram base name для native adapter submit latency. |
 | `mainnet_order_slippage_bps` | `exchange`, `market_type`, `direction` | Slippage в bps по canary/fill facts. |
-| `mainnet_reconciliation_lag_seconds_bucket` | `exchange`, `market_type` | Время до matched reconciliation. |
+| `mainnet_reconciliation_lag_seconds` | `exchange`, `market_type`, `reconciliation_type` | Histogram base name для времени до matched order/fill, position or funding reconciliation. |
 | `mainnet_unknown_state_total` | `exchange`, `market_type`, `reason` | Unknown provider/execution states. |
 | `mainnet_risk_rejections_total` | `reason`, `exchange`, `market_type` | Mainnet risk/cap/futures-config blocks. |
+| `mainnet_gross_submitted_notional_usd` | `exchange`, `market_type`, `stage_scope` | Gross submitted notional including close orders. |
 | `mainnet_open_exposure_usd` | `exchange`, `market_type`, `user_scope` | Текущая открытая экспозиция в mainnet. |
 | `mainnet_daily_loss_usd` | `exchange`, `market_type`, `user_scope` | Реализованный/оценочный дневной loss для caps. |
 | `mainnet_kill_switch_state` | `scope`, `reason` | Глобальный/per-user/per-strategy/per-exchange stop state. |
 | `mainnet_private_stream_age_seconds` | `exchange`, `market_type` | Freshness private order/fill stream. |
+| `mainnet_auto_close_total` | `exchange`, `market_type`, `direction`, `status` | Open/close pair outcomes. |
 | `mainnet_user_alert_delivery_total` | `event_type`, `status`, `channel` | User alert delivery outcomes. |
 
 Метрики не должны иметь high-cardinality labels вроде raw order id, user id,
@@ -216,13 +251,14 @@ API key suffix или provider payload.
 
 | Alert | Severity | Owner | Trigger | Action |
 |---|---|---|---|---|
-| `MainnetTradingKillSwitchOpen` | critical | live-execution | Kill switch active for mainnet scope | Stop dispatch, show UI blocked, do not clear without operator note. |
+| `MainnetTradingKillSwitchActive` | critical | live-execution | Kill switch active for mainnet scope | Stop dispatch, show UI blocked, do not clear without operator note. |
 | `MainnetUnknownOrderState` | critical | live-execution | Unknown provider/order/reconciliation state | Stop affected strategy/exchange, reconcile provider state before retry. |
 | `MainnetAutoCloseFailed` | critical | exchange-execution | Canary close failed or position remains open | Stop all mainnet canaries, reconcile/close manually if needed. |
 | `MainnetLatencyHigh` | warning/critical | live-execution | p99 segment threshold exceeded | Pause expansion; inspect Redis, adapter, provider, host resources. |
 | `MainnetSlippageHigh` | warning/critical | live-execution | Slippage exceeds configured bps threshold | Stop canary expansion; inspect spread/liquidity/order sizing. |
 | `MainnetRiskCapNearLimit` | warning | live-execution | Exposure/loss approaches cap | Stop new orders for scope if threshold crossed. |
 | `MainnetPrivateStreamStale` | critical | exchange-execution | Stream age above threshold | Block submit, reconnect/backfill/reconcile. |
+| `MainnetRestFallbackActive` | warning | exchange-execution | Stage accepted REST fallback instead of private stream | Keep canary scope small; verify reconciliation lag thresholds. |
 | `MainnetUserAlertDeliveryFailed` | critical | notifications | Critical trade alert unknown/failed | Block closure and inspect delivery route/provider. |
 | `MainnetTelegramUnavailable` | critical | notifications | Host cannot reach Telegram while mainnet enabled | Keep mainnet disabled or open kill switch. |
 
@@ -230,17 +266,26 @@ API key suffix или provider payload.
 
 | Stage | Назначение | User required before start | Acceptance / go-no-go |
 |---|---|---|---|
-| `00` | Baseline and hard-block manifest | Nothing. | Current paper/testnet/gateway foundation reconciled; mainnet hard-blocks listed; no runtime mutation. |
+| `00` | Baseline hard-block and stale-copy manifest | Nothing. | Current paper/testnet/gateway foundation reconciled; mainnet hard-blocks listed; stale reason/copy drift inventoried; prompt pack checked; no runtime mutation. |
 | `01` | User prerequisite and Telegram gate | Literal user confirmation that Telegram problem is solved; host Telegram readiness source available. | Runtime proves Telegram readiness without secrets; mainnet execution remains blocked if not proven. |
 | `02` | Mainnet exchange connections read-only readiness | Binance/Bybit mainnet keys connected, IP allowlist enabled, balances funded. | Real read-only Binance/Bybit spot/futures readiness, trade permission/no withdrawal/IP restriction/balance buckets; no order submit. |
-| `03` | Mainnet risk, caps, budget and kill-switch policy | Capital allocation manifest resolves `20 per market` vs `60 total`. | Durable risk/cap config, caps, daily loss, exposure, kill switches, UI blocked/ready states; no order submit. |
-| `04` | Mainnet metrics, alerts, dashboard and user-alert contract | Telegram gate accepted. | Prometheus rules, dashboard metrics reference, notification outbox/user delivery contract, runbooks updated and smoke-proven; no order submit. |
-| `05` | Mainnet adapter enablement behind fail-closed mode | Mainnet readiness/caps accepted. | `exchange-execution` can run in mainnet-capable mode but submit still blocked unless canary gate token/scope is active; no real order. |
-| `06` | Futures account config and market-order guard | User approves default or selected futures config. | Binance/Bybit futures set/read back isolated `1x` or user-selected safe config; market-order guard, min notional/precision and auto-close policy proven; no strategy order yet. |
-| `07` | Real mainnet ops canary matrix | User approves bounded canary window. | Binance spot long, Binance futures long/short, Bybit spot long, Bybit futures long/short market orders `<=15 USDT`, immediate close, fills/reconciliation/alerts/latency/slippage recorded. |
-| `08` | Strategy producer live-mode enablement | User approves scoped automatic strategy window. | `strategy-live-runner` supports scoped `live` mode with allowlists/caps/kill switch; no broad mainnet fan-out. |
-| `09` | Strategy-driven mainnet canaries per market | Stage `08` accepted and canary strategy/run selected. | Real strategy signal executes on required markets with auto-close and no manual per-order approval; latency path recorded from candle/signal to fill/reconciliation/alert. |
-| `10` | Closure, cleanup and go/no-go record | Nothing unless residual open position/unknown state needs operator action. | No unexpected open orders/positions, no unknown/DLQ/retry growth, metrics/dashboard/alerts verified, ledgers updated, mainnet expansion remains disabled outside accepted scopes. |
+| `03` | Kill-switch semantics and stale reason repair | Nothing beyond accepted `02`. | `kill_switch_active` / `execution_enabled` semantics fixed or explicitly mapped; stale `stage19_20`, `stage05`, `stage13` reason/copy drift repaired; tests/docs/runbooks updated; no order submit. |
+| `04` | Mainnet risk, caps, capital manifest and approval schema | Capital allocation manifest resolves `20 per market` vs `60 total`. | Durable manifest/scope/order/open-exposure/gross/daily-loss/fee-reserve caps, one-shot approval token, risk audit math, UI blocked/ready states; no order submit. |
+| `05` | Mainnet metrics, alerts, dashboard and user-alert contract | Telegram gate accepted. | Prometheus base histogram names in seconds, dashboard metrics reference, notification outbox/user delivery contract, runbooks updated and smoke-proven; no order submit. |
+| `06` | Mainnet adapter enablement behind fail-closed no-submit mode | Mainnet readiness/caps/alerts accepted. | `exchange-execution` can run in mainnet-capable no-submit mode; mainnet submit remains blocked without scoped one-shot canary approval; no real order. |
+| `07` | Open/close order-pair lifecycle and auto-close model | Nothing beyond accepted `06`. | Durable open/close pair model, close linkage, spot filled-qty close, futures reduce-only close, terminal states, partial-fill and close-failure handling proven without mainnet submit. |
+| `08` | Futures account config and market-order guard | User approves default or selected futures config. | Binance/Bybit futures set/read back isolated `1x` or user-selected safe config; no open orders/positions preflight; fresh config snapshot linked to canary scope; market-order guard; no strategy order yet. |
+| `09` | Private stream or REST fallback and reconciliation semantics | Nothing beyond accepted `08`. | Mainnet private order/fill stream lifecycle or explicit REST polling fallback accepted; order/fill, position and funding reconciliation separated; stale stream/fallback blocks submit as designed. |
+| `10` | Real mainnet ops canary: Binance spot long | User approves bounded canary window. | Binance spot buy market `<=15 USDT`, close sell by filled base qty, fills/reconciliation/alert/latency/slippage, no residual exposure. |
+| `11` | Real mainnet ops canary: Bybit spot long | Stage `10 accepted`. | Bybit spot buy market `<=15 USDT`, close sell by filled base qty, fills/reconciliation/alert/latency/slippage, no residual exposure. |
+| `12` | Real mainnet ops canary: Binance futures long | Stage `11 accepted`. | Binance futures long open/close reduce-only market `<=15 USDT`, isolated `1x`, matched fill/position reconciliation, funding not blocking. |
+| `13` | Real mainnet ops canary: Binance futures short | Stage `12 accepted`. | Binance futures short open/close reduce-only market `<=15 USDT`, isolated `1x`, matched fill/position reconciliation, funding not blocking. |
+| `14` | Real mainnet ops canary: Bybit futures long | Stage `13 accepted`. | Bybit futures long open/close reduce-only market `<=15 USDT`, isolated `1x`, matched fill/position reconciliation, funding not blocking. |
+| `15` | Real mainnet ops canary: Bybit futures short | Stage `14 accepted`. | Bybit futures short open/close reduce-only market `<=15 USDT`, isolated `1x`, matched fill/position reconciliation, funding not blocking. |
+| `16` | Ops canary matrix closure | Stage `15 accepted`. | Matrix-wide no residual orders/positions, no unknown/retry/DLQ growth, alerts delivered, metrics complete, budget/gross/fee audit recorded. |
+| `17` | Strategy producer live-mode contract and no-order enablement | Stage `16 accepted`. | Live-mode contract defines sizing, connection binding, canary token propagation, fan-out guard, stop-after-first-canary, restart/dedup semantics; no strategy-driven real order yet. |
+| `18` | Strategy-driven mainnet canaries per market | User approves scoped automatic strategy window. | One real strategy signal per required market surface executes automatically under allowlist/caps, auto-closes, records candle-to-fill-to-alert latency, and stops after first canary per scope. |
+| `19` | Closure, cleanup and go/no-go record | Nothing unless residual open position/unknown state needs operator action. | No unexpected open orders/positions, no unknown/DLQ/retry growth, metrics/dashboard/alerts verified, ledgers updated, mainnet expansion remains disabled outside accepted scopes. |
 
 ## Validation Ladder
 
@@ -256,6 +301,7 @@ API key suffix или provider payload.
 | Runtime | Mac Studio launchd/Monit/health/readiness proof after changed code reaches `main` and deploy/sync is complete. |
 | Performance | p50/p95/p99 latency per segment from durable timestamps; no reasoned estimate as acceptance. |
 | User alerts | Delivery proof for mainnet trade/incident notifications; if Telegram unavailable, stage blocked. |
+| Canary row | After every real canary row: provider status/fills, close proof, exposure zero, Redis pending `0`, no DLQ/retry growth, no unknown state, alert delivered. |
 
 Tests-only acceptance запрещена для всех stages этого плана.
 
@@ -269,7 +315,7 @@ Tests-only acceptance запрещена для всех stages этого пл�
 | Domain/application | `src/trading/contexts/live_execution/**`, `src/trading/contexts/strategy/**`, identity/exchange-control adapters as needed. |
 | Runtime | `apps/exchange_execution/**`, `apps/worker/strategy_live_runner/**`. |
 | Config/infra | `configs/prod/**`, `infra/macos/launchd/**`, `infra/scripts/monit/**`, `infra/macos/prometheus/**`. |
-| Migrations | `alembic/versions/**` for new risk/cap/latency/alert persistence. |
+| Migrations | `alembic/versions/**` for new risk/cap/approval, open/close pair, futures config audit, reconciliation and alert persistence. |
 | Runbooks | `docs/runbooks/exchange-execution.md`, `docs/runbooks/strategy-live-worker.md`, `docs/runbooks/prod-dashboard-metrics-reference-ru.md`, `docs/runbooks/notifications-admin-alerts.md`. |
 | Evidence | Stage reports under `docs/architecture/live_execution/mainnet-real-money-trading-v1-stage-reports/`; runtime artifacts under `/opt/roehub/state/live_execution/mainnet-real-money-trading-v1/` when created by execution stages. |
 
@@ -289,16 +335,21 @@ Tests-only acceptance запрещена для всех stages этого пл�
 | Blocker | Почему важно | Resolution required |
 |---|---|---|
 | Telegram host access to `api.telegram.org` | User alerts are mandatory for real-money v1. | User says the issue is solved; Stage `01` proves readiness. |
-| Capital allocation wording conflict | `20 USDT` per market across four market surfaces conflicts with `60 USDT` total. | Stage `03` must record explicit allocation manifest before any submit. |
-| Exact strategy for signal canary | A real strategy signal must happen with minimal observation time. | Stage `09` selects/creates a canary strategy/run that can produce a bounded signal on live candles without fake exchange side effects. |
+| Capital allocation wording conflict | `20 USDT` per market across four market surfaces conflicts with `60 USDT` total. | Stage `04` must record explicit allocation manifest before any submit. |
+| Kill switch semantic drift | Existing `kill_switch_open` wording can mean either allow or stop depending on context. | Stage `03` must fix or explicitly map semantics before caps and submit gates. |
+| Auto-close lifecycle missing | Market order can be filled before cancel; close requires an opposite/reduce-only order. | Stage `07` must add and prove open/close pair lifecycle before any real order. |
+| Private stream / fallback decision | Testnet auth probe is not enough for mainnet order/fill proof. | Stage `09` must accept full private stream lifecycle or explicit REST polling fallback with thresholds. |
+| Futures reconciliation semantics | Funding can be pending while fill/position already match. | Stage `09` must split order/fill, position and funding reconciliation. |
+| Exact strategy for signal canary | A real strategy signal must happen with minimal observation time. | Stage `18` selects/creates a canary strategy/run that can produce a bounded signal on live candles without fake exchange side effects. |
 | Telegram real delivery channel | Outbox exists, but actual provider reachability depends on host/VPN. | Stage `04` cannot accept without real delivery readiness/canary proof. |
 
 ## Definition Of Done For The Plan
 
 The plan is completed only when:
 
-- all stages `00`-`10` are `accepted` in the stage ledger;
+- all stages `00`-`19` are `accepted` in the stage ledger;
 - Binance/Bybit `spot/futures` mainnet canary matrix is completed with real orders and auto-close;
+- every ops canary row is accepted independently before the next row starts;
 - at least one strategy-driven real signal executes per required market surface;
 - no unexpected open order/position remains;
 - no unexplained retry/DLQ/unknown/reconciliation debt remains;
