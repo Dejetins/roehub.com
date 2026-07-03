@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from uuid import UUID
 
 from trading.contexts.live_execution.adapters.outbound import (
     InMemoryExecutionIntentRepository,
@@ -149,6 +150,85 @@ def test_paper_rl_hold_stays_source_event_only() -> None:
     assert paper_repository.orders == []
 
 
+def test_testnet_rl_inference_creates_accepted_intent_idempotently() -> None:
+    execution_repository = InMemoryExecutionIntentRepository()
+    producer = LiveExecutionRlInferenceProducer(
+        ingress_service=ExecutionIngressService(
+            repository=execution_repository,
+            clock=SystemLiveExecutionClock(),
+        ),
+        repository=execution_repository,
+    )
+    connection_id = UUID("00000000-0000-0000-0000-000000014001")
+    context = _context()
+    decision = _decision(action_id=1, action_name="open_long")
+
+    first = producer.record_testnet_decision(
+        context=context,
+        decision=decision,
+        risk_context=_testnet_risk_context(),
+        exchange_connection_id=connection_id,
+        quote_notional=Decimal("50"),
+    )
+    replay = producer.record_testnet_decision(
+        context=context,
+        decision=decision,
+        risk_context=_testnet_risk_context(),
+        exchange_connection_id=connection_id,
+        quote_notional=Decimal("50"),
+    )
+
+    assert first.intent is not None
+    assert replay.intent is not None
+    assert replay.duplicate is True
+    assert replay.event.source_event_id == first.event.source_event_id
+    assert replay.intent.intent_id == first.intent.intent_id
+    assert first.event.source_type == "ml_agent_decision"
+    assert first.event.outcome == "intent_created"
+    assert first.event.outcome_reason == "risk_gate_accepted"
+    assert first.event.source_ref_json["mode"] == "testnet"
+    assert first.event.source_ref_json["action"] == "open_long"
+    assert first.intent.status == "accepted"
+    assert first.intent.risk_reason == "risk_gate_accepted"
+    assert first.intent.side == "buy"
+    assert first.intent.quote_notional == Decimal("50")
+    assert len(execution_repository.source_events) == 1
+    assert len(execution_repository.intents) == 1
+
+
+def test_testnet_rl_spot_short_stays_source_event_only() -> None:
+    execution_repository = InMemoryExecutionIntentRepository()
+    producer = LiveExecutionRlInferenceProducer(
+        ingress_service=ExecutionIngressService(
+            repository=execution_repository,
+            clock=SystemLiveExecutionClock(),
+        ),
+        repository=execution_repository,
+    )
+    context = Stage13DecisionContext(
+        owner_user_id="00000000-0000-0000-0000-000000013001",
+        strategy_id="00000000-0000-0000-0000-000000013101",
+        strategy_run_id="00000000-0000-0000-0000-000000013201",
+        exchange="bybit",
+        market_type="spot",
+        symbol="BTCUSDT",
+        instrument_key="bybit:spot:BTCUSDT",
+    )
+
+    result = producer.record_testnet_decision(
+        context=context,
+        decision=_decision(action_id=2, action_name="open_short"),
+        risk_context=_testnet_risk_context(),
+        exchange_connection_id=UUID("00000000-0000-0000-0000-000000014002"),
+        quote_notional=Decimal("50"),
+    )
+
+    assert result.intent is None
+    assert result.event.outcome == "no_intent"
+    assert result.event.outcome_reason == "testnet_spot_short_not_supported"
+    assert execution_repository.intents == []
+
+
 def _context() -> Stage13DecisionContext:
     return Stage13DecisionContext(
         owner_user_id="00000000-0000-0000-0000-000000013001",
@@ -187,6 +267,29 @@ def _paper_risk_context() -> ExecutionRiskContext:
         capital_reservation_sufficient=True,
         paper_accounting_ready=True,
         paper_no_exchange_submit=True,
+        ml_agent_policy_active=True,
+        kill_switch_open=True,
+        environment_policy_allows=True,
+        max_order_size_ok=True,
+        daily_limit_ok=True,
+    )
+
+
+def _testnet_risk_context() -> ExecutionRiskContext:
+    return ExecutionRiskContext(
+        exchange_connection_active=True,
+        secret_custody_ready=True,
+        source_authorized=True,
+        strategy_variant_compatible=True,
+        market_data_state="ready",
+        strategy_binding_active=True,
+        strategy_live_profile_ready=True,
+        strategy_run_active=True,
+        exchange_config_verified=True,
+        account_state_fresh=True,
+        position_ownership_active=True,
+        capital_reservation_active=True,
+        capital_reservation_sufficient=True,
         ml_agent_policy_active=True,
         kill_switch_open=True,
         environment_policy_allows=True,

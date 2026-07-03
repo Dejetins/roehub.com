@@ -230,6 +230,22 @@ def test_paper_strategy_signal_records_no_dispatch_intent() -> None:
             "capital_reservation_insufficient",
         ),
         ("manual_request", {"manual_recent_auth": False}, "manual_recent_auth_required"),
+        (
+            "ml_agent_decision",
+            {"strategy_variant_compatible": False},
+            "strategy_variant_incompatible",
+        ),
+        ("ml_agent_decision", {"strategy_binding_active": False}, "strategy_binding_missing"),
+        (
+            "ml_agent_decision",
+            {"market_data_state": "stale"},
+            "market_data_stale",
+        ),
+        (
+            "ml_agent_decision",
+            {"capital_reservation_sufficient": False},
+            "capital_reservation_insufficient",
+        ),
         ("ml_agent_decision", {"ml_agent_policy_active": False}, "ml_agent_policy_missing"),
         ("ops_test", {"kill_switch_open": False}, "kill_switch_closed"),
         ("ops_test", {"environment_policy_allows": False}, "mainnet_canary_not_approved"),

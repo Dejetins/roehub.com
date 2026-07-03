@@ -4,11 +4,13 @@ import argparse
 import hashlib
 import json
 import logging
+import os
 import time
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, Mapping, cast
+from uuid import UUID
 
 from prometheus_client import CollectorRegistry
 
@@ -20,13 +22,24 @@ from apps.worker.rl_trading_inference.wiring.modules import (
 from trading.contexts.live_execution.adapters.outbound import (
     InMemoryExecutionIntentRepository,
     InMemoryPaperAccountingRepository,
+    PostgresExecutionIntentRepository,
+    RedisExecutionDispatchTransport,
+    RedisExecutionDispatchTransportConfig,
     SystemLiveExecutionClock,
 )
 from trading.contexts.live_execution.application import (
     CapitalReservationPaperAccountingService,
+    ExecutionDispatchConfig,
+    ExecutionDispatchResult,
+    ExecutionDispatchService,
     ExecutionIngressService,
 )
-from trading.contexts.live_execution.domain import ExecutionRiskContext
+from trading.contexts.live_execution.application.ports import (
+    ExecutionDispatchPublishResult,
+    ExecutionDispatchTransport,
+    ExecutionIntentRepository,
+)
+from trading.contexts.live_execution.domain import ExecutionIntent, ExecutionRiskContext
 from trading.contexts.rl_trading.adapters.outbound import LiveExecutionRlInferenceProducer
 from trading.contexts.rl_trading.domain import (
     STAGE13_SOURCE_EVENT_OUTCOME_REASON_V1,
@@ -40,6 +53,7 @@ from trading.contexts.rl_trading.domain import (
     offline_feature_window_from_candles_v1,
     preload_stage13_policy_from_candidate_manifest_v1,
 )
+from trading.contexts.strategy.adapters.outbound import PsycopgStrategyPostgresGateway
 
 log = logging.getLogger(__name__)
 
@@ -78,6 +92,28 @@ def _build_parser() -> argparse.ArgumentParser:
     paper.add_argument("--quote-notional", required=True)
     paper.add_argument("--reference-price", required=True)
 
+    testnet = subparsers.add_parser("testnet-once")
+    testnet.add_argument("--candidate-manifest", required=True)
+    testnet.add_argument("--feature-window-json", required=True)
+    testnet.add_argument("--owner-user-id", required=True)
+    testnet.add_argument("--strategy-id", required=True)
+    testnet.add_argument("--strategy-run-id", required=True)
+    testnet.add_argument("--exchange-connection-id", required=True)
+    testnet.add_argument("--quote-notional", required=True)
+    testnet.add_argument("--dispatch-mode", choices=("memory", "redis"), default="memory")
+    testnet.add_argument("--postgres-dsn-env", default="STRATEGY_PG_DSN")
+    testnet.add_argument("--redis-host", default="127.0.0.1")
+    testnet.add_argument("--redis-port", type=int, default=6379)
+    testnet.add_argument("--redis-db", type=int, default=0)
+    testnet.add_argument("--redis-password-env", default="ROEHUB_REDIS_PASSWORD")
+    testnet.add_argument("--redis-socket-timeout-s", type=float, default=2.0)
+    testnet.add_argument("--redis-connect-timeout-s", type=float, default=2.0)
+    testnet.add_argument("--request-stream", default="execution.requests.v1")
+    testnet.add_argument("--retry-stream", default="execution.requests.retry.v1")
+    testnet.add_argument("--dlq-stream", default="execution.requests.dlq.v1")
+    testnet.add_argument("--consumer-group", default="exchange-execution.v1")
+    testnet.add_argument("--backpressure-max-stream-length", type=int, default=10_000)
+
     serve = subparsers.add_parser("serve")
     serve.add_argument("--config", required=True)
     serve.add_argument("--duration-seconds", type=float, default=0.0)
@@ -113,6 +149,29 @@ def main(argv: list[str] | None = None) -> int:
                 strategy_run_id=args.strategy_run_id,
                 quote_notional=args.quote_notional,
                 reference_price=args.reference_price,
+            )
+        if args.command == "testnet-once":
+            return _run_testnet_once(
+                candidate_manifest=args.candidate_manifest,
+                feature_window_json=args.feature_window_json,
+                owner_user_id=args.owner_user_id,
+                strategy_id=args.strategy_id,
+                strategy_run_id=args.strategy_run_id,
+                exchange_connection_id=args.exchange_connection_id,
+                quote_notional=args.quote_notional,
+                dispatch_mode=args.dispatch_mode,
+                postgres_dsn_env=args.postgres_dsn_env,
+                redis_host=args.redis_host,
+                redis_port=args.redis_port,
+                redis_db=args.redis_db,
+                redis_password_env=args.redis_password_env,
+                redis_socket_timeout_s=args.redis_socket_timeout_s,
+                redis_connect_timeout_s=args.redis_connect_timeout_s,
+                request_stream=args.request_stream,
+                retry_stream=args.retry_stream,
+                dlq_stream=args.dlq_stream,
+                consumer_group=args.consumer_group,
+                backpressure_max_stream_length=args.backpressure_max_stream_length,
             )
         if args.command == "serve":
             return _run_serve(
@@ -309,6 +368,142 @@ def _run_paper_once(
     return 0 if _paper_result_accepted(result) else 2
 
 
+def _run_testnet_once(
+    *,
+    candidate_manifest: str,
+    feature_window_json: str,
+    owner_user_id: str,
+    strategy_id: str,
+    strategy_run_id: str,
+    exchange_connection_id: str,
+    quote_notional: str,
+    dispatch_mode: str,
+    postgres_dsn_env: str,
+    redis_host: str,
+    redis_port: int,
+    redis_db: int,
+    redis_password_env: str | None,
+    redis_socket_timeout_s: float,
+    redis_connect_timeout_s: float,
+    request_stream: str,
+    retry_stream: str,
+    dlq_stream: str,
+    consumer_group: str,
+    backpressure_max_stream_length: int,
+) -> int:
+    started_at = time.perf_counter()
+    manifest_path = Path(candidate_manifest)
+    manifest = _load_json_mapping(manifest_path)
+    manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    policy = preload_stage13_policy_from_candidate_manifest_v1(
+        candidate_manifest=manifest,
+        candidate_manifest_sha256=manifest_sha256,
+        loaded_at_utc=datetime.now(UTC),
+    )
+    window = _load_feature_window(Path(feature_window_json))
+    feature_ready_at = time.perf_counter()
+    feature_matrix, feature_hash = build_stage13_feature_matrix_v1(window)
+    decision = policy.decide(
+        feature_matrix=feature_matrix,
+        feature_hash=feature_hash,
+        window_ts_close_utc=window.ts_close_utc,
+    )
+    decision_ready_at = time.perf_counter()
+
+    execution_repository, dispatch_transport = _build_testnet_execution_runtime(
+        dispatch_mode=dispatch_mode,
+        postgres_dsn_env=postgres_dsn_env,
+        redis_host=redis_host,
+        redis_port=redis_port,
+        redis_db=redis_db,
+        redis_password_env=redis_password_env,
+        redis_socket_timeout_s=redis_socket_timeout_s,
+        redis_connect_timeout_s=redis_connect_timeout_s,
+        request_stream=request_stream,
+        retry_stream=retry_stream,
+        dlq_stream=dlq_stream,
+        consumer_group=consumer_group,
+    )
+    clock = SystemLiveExecutionClock()
+    ingress = ExecutionIngressService(repository=execution_repository, clock=clock)
+    producer = LiveExecutionRlInferenceProducer(
+        ingress_service=ingress,
+        repository=execution_repository,
+    )
+    dispatch = ExecutionDispatchService(
+        repository=execution_repository,
+        transport=dispatch_transport,
+        clock=clock,
+        config=ExecutionDispatchConfig(
+            backpressure_max_stream_length=backpressure_max_stream_length,
+        ),
+    )
+    context = Stage13DecisionContext(
+        owner_user_id=owner_user_id,
+        strategy_id=strategy_id,
+        strategy_run_id=strategy_run_id,
+        exchange=window.exchange,
+        market_type=window.market_type,
+        symbol=window.symbol,
+        instrument_key=window.instrument_key,
+    )
+    first = producer.record_testnet_decision(
+        context=context,
+        decision=decision,
+        risk_context=_testnet_risk_context(),
+        exchange_connection_id=UUID(exchange_connection_id),
+        quote_notional=Decimal(quote_notional),
+    )
+    intent_ready_at = time.perf_counter()
+    dispatch_result = dispatch.dispatch_intent(intent=first.intent) if first.intent else None
+    dispatch_ready_at = time.perf_counter()
+    replay = producer.record_testnet_decision(
+        context=context,
+        decision=decision,
+        risk_context=_testnet_risk_context(),
+        exchange_connection_id=UUID(exchange_connection_id),
+        quote_notional=Decimal(quote_notional),
+    )
+    replay_dispatch_result = (
+        dispatch.dispatch_intent(intent=replay.intent) if replay.intent is not None else None
+    )
+    result = {
+        "action": decision.action_name,
+        "decision_id": decision.decision_id,
+        "dispatch": _dispatch_payload(dispatch_result),
+        "dispatch_mode": dispatch_mode,
+        "duplicate_dispatch": _dispatch_payload(replay_dispatch_result),
+        "duplicate_replay": replay.duplicate,
+        "exchange_connection_id": exchange_connection_id,
+        "feature_hash": feature_hash,
+        "intent_id": str(first.intent.intent_id) if first.intent is not None else None,
+        "intent_status": (
+            dispatch_result.intent.status
+            if dispatch_result is not None
+            else first.intent.status
+            if first.intent is not None
+            else None
+        ),
+        "model_version_id": decision.model_version_id,
+        "outcome": first.event.outcome,
+        "outcome_reason": first.event.outcome_reason,
+        "risk_reason": first.intent.risk_reason if first.intent is not None else None,
+        "risk_status": first.intent.risk_status if first.intent is not None else None,
+        "source_event_ref": first.event.source_event_ref,
+        "source_event_id": str(first.event.source_event_id),
+        "source_type": first.event.source_type,
+        "memory_counts": _memory_repository_counts(execution_repository, dispatch_transport),
+        "latency_seconds": {
+            "candle_close_to_feature_ready": round(feature_ready_at - started_at, 12),
+            "feature_to_decision": round(decision_ready_at - feature_ready_at, 12),
+            "decision_to_intent": round(intent_ready_at - decision_ready_at, 12),
+            "intent_to_dispatch_attempt": round(dispatch_ready_at - intent_ready_at, 12),
+        },
+    }
+    print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+    return 0 if _testnet_result_accepted(result) else 2
+
+
 def _run_serve(
     *,
     config_path: str,
@@ -362,6 +557,101 @@ def _paper_result_accepted(result: Mapping[str, object]) -> bool:
     )
 
 
+def _testnet_result_accepted(result: Mapping[str, object]) -> bool:
+    if result.get("source_type") != "ml_agent_decision":
+        return False
+    if result.get("duplicate_replay") is not True:
+        return False
+    if result.get("intent_id") is None:
+        reason = str(result.get("outcome_reason") or "")
+        return result.get("outcome") == "no_intent" and reason.startswith("testnet_")
+    dispatch = result.get("dispatch")
+    duplicate_dispatch = result.get("duplicate_dispatch")
+    return (
+        result.get("outcome") == "intent_created"
+        and result.get("risk_status") == "accepted"
+        and result.get("risk_reason") == "risk_gate_accepted"
+        and isinstance(dispatch, Mapping)
+        and dispatch.get("result") == "dispatched"
+        and isinstance(duplicate_dispatch, Mapping)
+        and duplicate_dispatch.get("result") == "duplicate"
+    )
+
+
+def _build_testnet_execution_runtime(
+    *,
+    dispatch_mode: str,
+    postgres_dsn_env: str,
+    redis_host: str,
+    redis_port: int,
+    redis_db: int,
+    redis_password_env: str | None,
+    redis_socket_timeout_s: float,
+    redis_connect_timeout_s: float,
+    request_stream: str,
+    retry_stream: str,
+    dlq_stream: str,
+    consumer_group: str,
+) -> tuple[ExecutionIntentRepository, ExecutionDispatchTransport]:
+    if dispatch_mode == "memory":
+        return InMemoryExecutionIntentRepository(), _MemoryExecutionDispatchTransport(
+            request_stream=request_stream,
+        )
+    if dispatch_mode != "redis":
+        raise ValueError("dispatch_mode must be memory or redis")
+    dsn = os.environ.get(postgres_dsn_env, "").strip()
+    if not dsn:
+        raise ValueError(f"{postgres_dsn_env} is required for redis dispatch mode")
+    gateway = PsycopgStrategyPostgresGateway(dsn=dsn)
+    repository = PostgresExecutionIntentRepository(gateway=gateway)
+    transport = RedisExecutionDispatchTransport(
+        config=RedisExecutionDispatchTransportConfig(
+            host=redis_host,
+            port=redis_port,
+            db=redis_db,
+            password_env=(redis_password_env or None),
+            socket_timeout_s=redis_socket_timeout_s,
+            connect_timeout_s=redis_connect_timeout_s,
+            request_stream=request_stream,
+            retry_stream=retry_stream,
+            dlq_stream=dlq_stream,
+            consumer_group=consumer_group,
+        ),
+        environ=os.environ,
+    )
+    return repository, transport
+
+
+def _dispatch_payload(result: ExecutionDispatchResult | None) -> dict[str, object] | None:
+    if result is None:
+        return None
+    return {
+        "intent_status": result.intent.status,
+        "message_id": result.intent.dispatch_redis_message_id,
+        "reason": result.reason,
+        "result": result.result,
+        "stream_name": result.intent.dispatch_stream_name,
+    }
+
+
+def _memory_repository_counts(
+    repository: ExecutionIntentRepository,
+    transport: ExecutionDispatchTransport,
+) -> dict[str, int] | None:
+    if not isinstance(repository, InMemoryExecutionIntentRepository):
+        return None
+    message_count = (
+        transport.message_count
+        if isinstance(transport, _MemoryExecutionDispatchTransport)
+        else 0
+    )
+    return {
+        "dispatch_messages": message_count,
+        "intents": len(repository.intents),
+        "source_events": len(repository.source_events),
+    }
+
+
 def _paper_risk_context() -> ExecutionRiskContext:
     return ExecutionRiskContext(
         exchange_connection_active=True,
@@ -381,6 +671,74 @@ def _paper_risk_context() -> ExecutionRiskContext:
         max_order_size_ok=True,
         daily_limit_ok=True,
     )
+
+
+def _testnet_risk_context() -> ExecutionRiskContext:
+    return ExecutionRiskContext(
+        exchange_connection_active=True,
+        secret_custody_ready=True,
+        source_authorized=True,
+        strategy_variant_compatible=True,
+        market_data_state="ready",
+        strategy_binding_active=True,
+        strategy_live_profile_ready=True,
+        strategy_run_active=True,
+        exchange_config_verified=True,
+        account_state_fresh=True,
+        position_ownership_active=True,
+        capital_reservation_active=True,
+        capital_reservation_sufficient=True,
+        ml_agent_policy_active=True,
+        kill_switch_open=True,
+        environment_policy_allows=True,
+        max_order_size_ok=True,
+        daily_limit_ok=True,
+    )
+
+
+class _MemoryExecutionDispatchTransport:
+    def __init__(self, *, request_stream: str) -> None:
+        self._request_stream = request_stream
+        self._group_ready = False
+        self._messages: list[dict[str, str]] = []
+
+    @property
+    def message_count(self) -> int:
+        return len(self._messages)
+
+    def ensure_request_group(self) -> None:
+        self._group_ready = True
+
+    def request_stream_length(self) -> int:
+        return len(self._messages)
+
+    def publish_request(
+        self, *, intent: ExecutionIntent, attempt_count: int
+    ) -> ExecutionDispatchPublishResult:
+        self._messages.append({"intent_id": str(intent.intent_id)})
+        return ExecutionDispatchPublishResult(
+            stream_name=self._request_stream,
+            message_id=f"1-{len(self._messages)}",
+        )
+
+    def publish_retry(
+        self, *, intent: ExecutionIntent, reason: str, attempt_count: int
+    ) -> ExecutionDispatchPublishResult:
+        return ExecutionDispatchPublishResult(
+            stream_name=f"{self._request_stream}.retry",
+            message_id=f"1-{len(self._messages)}",
+        )
+
+    def publish_dlq(
+        self, *, intent: ExecutionIntent, reason: str, attempt_count: int
+    ) -> ExecutionDispatchPublishResult:
+        return ExecutionDispatchPublishResult(
+            stream_name=f"{self._request_stream}.dlq",
+            message_id=f"1-{len(self._messages)}",
+        )
+
+    def ack_after_durable_state_change(self, *, stream_name: str, message_id: str) -> None:
+        return None
 
 
 def _paper_parity_payload(

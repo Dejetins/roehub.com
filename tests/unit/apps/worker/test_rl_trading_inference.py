@@ -296,6 +296,147 @@ def test_paper_cli_records_intent_order_and_parity(
     }
 
 
+def test_testnet_cli_dispatches_intent_and_duplicate_dispatch(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    feature_path = tmp_path / "feature-window.json"
+    manifest_path = tmp_path / "candidate-manifest.json"
+    feature_path.write_text(
+        json.dumps(
+            {
+                "exchange": "binance",
+                "instrument_key": "binance:futures:BTCUSDT",
+                "market_type": "futures",
+                "payloads": [
+                    _redis_payload(ts_open="2026-07-03T12:00:00Z", close="102.0"),
+                    _redis_payload(ts_open="2026-07-03T12:01:00Z", close="103.0"),
+                ],
+                "symbol": "BTCUSDT",
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path.write_text(
+        json.dumps(
+            _candidate_manifest(feature_count=12, preferred_action="open_long"),
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        mi,
+        "STAGE09_ACCEPTED_CANDIDATE_MANIFEST_SHA256_V1",
+        hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+    )
+
+    assert inference_main.main(
+        [
+            "testnet-once",
+            "--candidate-manifest",
+            str(manifest_path),
+            "--feature-window-json",
+            str(feature_path),
+            "--owner-user-id",
+            "00000000-0000-0000-0000-000000013001",
+            "--strategy-id",
+            "00000000-0000-0000-0000-000000013101",
+            "--strategy-run-id",
+            "00000000-0000-0000-0000-000000013201",
+            "--exchange-connection-id",
+            "00000000-0000-0000-0000-000000014001",
+            "--quote-notional",
+            "50",
+        ]
+    ) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["source_type"] == "ml_agent_decision"
+    assert payload["action"] == "open_long"
+    assert payload["outcome"] == "intent_created"
+    assert payload["risk_status"] == "accepted"
+    assert payload["risk_reason"] == "risk_gate_accepted"
+    assert payload["intent_status"] == "dispatched"
+    assert payload["dispatch"]["result"] == "dispatched"
+    assert payload["duplicate_dispatch"]["result"] == "duplicate"
+    assert payload["duplicate_replay"] is True
+    assert payload["memory_counts"] == {
+        "dispatch_messages": 1,
+        "intents": 1,
+        "source_events": 1,
+    }
+
+
+def test_testnet_cli_blocks_spot_short_without_dispatch(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    feature_path = tmp_path / "feature-window.json"
+    manifest_path = tmp_path / "candidate-manifest.json"
+    feature_path.write_text(
+        json.dumps(
+            {
+                "candles": [
+                    _candle(close=102.0),
+                    _candle(close=103.0),
+                ],
+                "exchange": "bybit",
+                "instrument_key": "bybit:spot:BTCUSDT",
+                "market_type": "spot",
+                "symbol": "BTCUSDT",
+                "ts_close": "2026-07-03T12:02:00Z",
+                "ts_open": "2026-07-03T12:00:00Z",
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path.write_text(
+        json.dumps(
+            _candidate_manifest(feature_count=12, preferred_action="open_short"),
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        mi,
+        "STAGE09_ACCEPTED_CANDIDATE_MANIFEST_SHA256_V1",
+        hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+    )
+
+    assert inference_main.main(
+        [
+            "testnet-once",
+            "--candidate-manifest",
+            str(manifest_path),
+            "--feature-window-json",
+            str(feature_path),
+            "--owner-user-id",
+            "00000000-0000-0000-0000-000000013001",
+            "--strategy-id",
+            "00000000-0000-0000-0000-000000013101",
+            "--strategy-run-id",
+            "00000000-0000-0000-0000-000000013201",
+            "--exchange-connection-id",
+            "00000000-0000-0000-0000-000000014002",
+            "--quote-notional",
+            "50",
+        ]
+    ) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["source_type"] == "ml_agent_decision"
+    assert payload["action"] == "open_short"
+    assert payload["outcome"] == "no_intent"
+    assert payload["outcome_reason"] == "testnet_spot_short_not_supported"
+    assert payload["intent_id"] is None
+    assert payload["dispatch"] is None
+    assert payload["memory_counts"] == {
+        "dispatch_messages": 0,
+        "intents": 0,
+        "source_events": 1,
+    }
+
+
 class _FakeRedis:
     def __init__(self, *, rows: list[tuple[str, dict[str, str]]]) -> None:
         self.rows = rows
@@ -324,12 +465,26 @@ def _redis_payload(*, ts_open: str, close: str) -> dict[str, str]:
     }
 
 
+def _candle(*, close: float) -> dict[str, object]:
+    return {
+        "close": close,
+        "high": close + 1.0,
+        "low": close - 1.0,
+        "open": close - 0.5,
+        "trades_count": 42,
+        "volume_base": 10.0,
+        "volume_quote": close * 10.0,
+    }
+
+
 def _candidate_manifest(
     *, feature_count: int, preferred_action: str = "hold"
 ) -> dict[str, object]:
     weights = [[0.0, -0.1, -0.2] for _index in range(feature_count)]
     if preferred_action == "open_long":
         weights = [[0.0, 1.0, 0.0]] + [[0.0, 0.0, 0.0] for _index in range(feature_count)]
+    elif preferred_action == "open_short":
+        weights = [[0.0, 0.0, 1.0]] + [[0.0, 0.0, 0.0] for _index in range(feature_count)]
     return {
         "candidate_id": mi.STAGE09_ACCEPTED_CANDIDATE_ID_V1,
         "model_state_hash": "a" * 64,

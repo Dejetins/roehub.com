@@ -38,6 +38,13 @@ class RlPaperExecutionResult:
     duplicate: bool
 
 
+@dataclass(frozen=True, slots=True)
+class RlTestnetExecutionResult:
+    event: ExecutionSourceEvent
+    intent: ExecutionIntent | None
+    duplicate: bool
+
+
 class LiveExecutionRlInferenceProducer:
     def __init__(
         self,
@@ -157,6 +164,73 @@ class LiveExecutionRlInferenceProducer:
             duplicate=source.duplicate or intent.duplicate,
         )
 
+    def record_testnet_decision(
+        self,
+        *,
+        context: Stage13DecisionContext,
+        decision: Stage13InferenceDecision,
+        risk_context: ExecutionRiskContext,
+        exchange_connection_id: UUID,
+        quote_notional: Decimal,
+    ) -> RlTestnetExecutionResult:
+        owner_user_id = UserId.from_string(context.owner_user_id)
+        source = self._ingress_service.record_source_event(
+            command=RecordExecutionSourceEventCommand(
+                owner_user_id=owner_user_id,
+                source_type=STAGE13_SOURCE_TYPE_V1,
+                source_event_ref=f"rl:{decision.decision_id}",
+                source_ref_json=_testnet_source_ref_json(context=context, decision=decision),
+                strategy_signal_id=None,
+                idempotency_key=_testnet_source_idempotency_key(
+                    context=context,
+                    decision=decision,
+                ),
+            )
+        )
+        side = _testnet_side_for_action(context=context, action_name=decision.action_name)
+        if side is None:
+            updated = self._repository.update_source_event_outcome(
+                owner_user_id=owner_user_id,
+                source_event_id=source.event.source_event_id,
+                outcome="no_intent",
+                outcome_reason=_testnet_no_intent_reason(
+                    context=context,
+                    action_name=decision.action_name,
+                ),
+                intent_id=None,
+            )
+            return RlTestnetExecutionResult(
+                event=updated or source.event,
+                intent=None,
+                duplicate=source.duplicate,
+            )
+
+        intent = self._ingress_service.create_intent(
+            command=CreateExecutionIntentCommand(
+                owner_user_id=owner_user_id,
+                source_event_id=source.event.source_event_id,
+                idempotency_key=_testnet_intent_idempotency_key(
+                    context=context,
+                    decision=decision,
+                ),
+                exchange_connection_id=exchange_connection_id,
+                market_type=context.market_type,
+                instrument_key=context.instrument_key,
+                order_type="market",
+                side=side,
+                quantity=None,
+                quote_notional=quote_notional,
+                limit_price=None,
+                advanced_order_flags={},
+                risk_context=risk_context,
+            )
+        )
+        return RlTestnetExecutionResult(
+            event=intent.event,
+            intent=intent.intent,
+            duplicate=source.duplicate or intent.duplicate,
+        )
+
 
 def _paper_source_ref_json(
     *,
@@ -218,3 +292,87 @@ def _paper_no_intent_reason(action_name: str) -> str:
     if action_name == "close":
         return "paper_close_position_snapshot_required"
     return "paper_unsupported_rl_action"
+
+
+def _testnet_source_ref_json(
+    *,
+    context: Stage13DecisionContext,
+    decision: Stage13InferenceDecision,
+) -> Mapping[str, str]:
+    return {
+        "action": decision.action_name,
+        "action_id": str(decision.action_id),
+        "exchange": context.exchange,
+        "feature_hash": decision.feature_hash,
+        "instrument_key": context.instrument_key,
+        "market_type": context.market_type,
+        "mode": "testnet",
+        "model_version_id": decision.model_version_id,
+        "strategy_id": context.strategy_id,
+        "strategy_run_id": context.strategy_run_id,
+        "symbol": context.symbol,
+    }
+
+
+def _testnet_source_idempotency_key(
+    *,
+    context: Stage13DecisionContext,
+    decision: Stage13InferenceDecision,
+) -> str:
+    return "|".join(
+        (
+            STAGE13_SOURCE_TYPE_V1,
+            context.strategy_id,
+            context.strategy_run_id,
+            context.instrument_key,
+            decision.feature_hash,
+            decision.model_version_id,
+            "testnet",
+        )
+    )
+
+
+def _testnet_intent_idempotency_key(
+    *,
+    context: Stage13DecisionContext,
+    decision: Stage13InferenceDecision,
+) -> str:
+    return "|".join((_testnet_source_idempotency_key(context=context, decision=decision), "intent"))
+
+
+def _testnet_side_for_action(
+    *,
+    context: Stage13DecisionContext,
+    action_name: str,
+) -> str | None:
+    if action_name == "open_long" and _is_supported_testnet_market(context=context):
+        return "buy"
+    if (
+        action_name == "open_short"
+        and context.market_type == "futures"
+        and _is_supported_testnet_market(context=context)
+    ):
+        return "sell"
+    return None
+
+
+def _testnet_no_intent_reason(
+    *,
+    context: Stage13DecisionContext,
+    action_name: str,
+) -> str:
+    if action_name == "hold":
+        return "testnet_hold_no_intent"
+    if action_name == "close":
+        return "testnet_close_position_snapshot_required"
+    if context.exchange not in {"binance", "bybit"}:
+        return "testnet_unsupported_exchange"
+    if context.market_type not in {"spot", "futures"}:
+        return "testnet_unsupported_market_type"
+    if action_name == "open_short" and context.market_type == "spot":
+        return "testnet_spot_short_not_supported"
+    return "testnet_unsupported_rl_action"
+
+
+def _is_supported_testnet_market(*, context: Stage13DecisionContext) -> bool:
+    return context.exchange in {"binance", "bybit"} and context.market_type in {"spot", "futures"}

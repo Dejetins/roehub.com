@@ -119,11 +119,9 @@ def evaluate_execution_risk(
                 check_name="paper_no_exchange_submit",
                 reason="paper_no_exchange_submit",
             )
-        account_decision = _evaluate_account_context(context=context)
-        if account_decision is not None:
-            return account_decision
-        if not context.ml_agent_policy_active:
-            return _reject(check_name="ml_agent_policy", reason="ml_agent_policy_missing")
+        ml_testnet_decision = _evaluate_ml_agent_testnet_context(context=context)
+        if ml_testnet_decision is not None:
+            return ml_testnet_decision
     elif intent.source_type == "ops_test":
         ops_decision = _evaluate_account_context(context=context)
         if ops_decision is not None:
@@ -253,6 +251,54 @@ def _evaluate_ml_agent_paper_context(
             check_name="market_data_ready",
             reason=f"market_data_{context.market_data_state or 'missing'}",
         )
+    return _first_rejection(checks)
+
+
+def _evaluate_ml_agent_testnet_context(
+    *, context: ExecutionRiskContext
+) -> ExecutionRiskDecision | None:
+    checks: tuple[tuple[str, bool, str], ...] = (
+        (
+            "strategy_variant_compatible",
+            context.strategy_variant_compatible,
+            "strategy_variant_incompatible",
+        ),
+        (
+            "strategy_binding_active",
+            context.strategy_binding_active,
+            "strategy_binding_missing",
+        ),
+        (
+            "strategy_live_profile_ready",
+            context.strategy_live_profile_ready,
+            "strategy_live_profile_blocked",
+        ),
+        ("strategy_run_active", context.strategy_run_active, "strategy_run_inactive"),
+        (
+            "position_ownership_active",
+            context.position_ownership_active,
+            "position_ownership_conflict",
+        ),
+        (
+            "capital_reservation_active",
+            context.capital_reservation_active,
+            "capital_reservation_missing",
+        ),
+        (
+            "capital_reservation_sufficient",
+            context.capital_reservation_sufficient,
+            "capital_reservation_insufficient",
+        ),
+        ("ml_agent_policy_active", context.ml_agent_policy_active, "ml_agent_policy_missing"),
+    )
+    if context.market_data_state != "ready":
+        return _reject(
+            check_name="market_data_ready",
+            reason=f"market_data_{context.market_data_state or 'missing'}",
+        )
+    account_decision = _evaluate_account_context(context=context)
+    if account_decision is not None:
+        return account_decision
     return _first_rejection(checks)
 
 
