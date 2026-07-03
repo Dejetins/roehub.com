@@ -161,7 +161,7 @@ safety_notes:
 
 # Task
 
-Implement Stage 15 paper RL integration. Convert accepted RL decisions to paper intents/orders through the existing execution path and reconcile simulator versus paper accounting. This stage is blocked until classic producer Stage 05 is repaired and classic Stage 07 is accepted.
+Implement Stage 15 paper RL integration. Convert accepted RL decisions to paper intents/orders through the existing execution path and reconcile simulator versus paper accounting. This stage was originally blocked until classic producer Stage 05 was repaired and classic Stage 07 accepted; the executor must trust the current ledgers and re-verify those prerequisites before implementation.
 
 Done means:
 
@@ -202,7 +202,7 @@ Additional context:
 
 - Stage 01 is accepted: the RL architecture plan, stage ledger, ClickHouse/data snapshot, and docs index evidence exist.
 - Prompt generation snapshot: the ledger current_stage was 02A when this pack was authored; always trust the ledger value read during execution.
-- Classic strategy producer Stage 05 is currently blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`); RL paper/testnet execution remains gated until classic Stage 05 repair and downstream classic Stage 07/09 acceptance.
+- Historical prompt generation snapshot: classic strategy producer Stage 05 was previously blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`). Current execution must use the live ledgers instead of that stale snapshot. The 2026-07-03 prerequisite refresh found the classic strategy-producer ledger completed with Stage `05`, `07`, and `09` accepted, so Stage `15` may start if the executor's fresh pre-start ledger check still matches.
 
 ## Requirements (Must)
 
@@ -217,7 +217,7 @@ Additional context:
 - Preserve dependency direction: RL/ML code may produce decisions and source events, but exchange submission and secret custody stay in existing execution/exchange contexts.
 - Keep all large runtime artifacts outside git under `/opt/roehub/state/rl_trading/`; commit only sanitized summaries, manifests, hashes, and tests.
 - Do not log or document secrets, tokens, cookies, passphrases, ciphertext, raw provider payloads, raw signed requests, or model checkpoint contents.
-- If classic producer Stage 05 is still blocked or Stage 07 is not accepted, stop and mark Stage 15 blocked; do not implement around the dependency.
+- If the current classic producer ledger shows Stage 05 blocked again or Stage 07 not accepted, stop and mark Stage 15 blocked; do not implement around the dependency.
 - Do not call exchange SDK or exchange-execution directly from ML producer.
 - Unknown source event/intent write state requires idempotency lookup before retry.
 - Paper outcomes must stay strategy-run scoped and not close other strategies positions.

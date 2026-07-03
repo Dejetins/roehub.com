@@ -183,11 +183,11 @@ Next-stage state:
 
 | Stage | Allowed now | Reason |
 |---|---|---|
-| `15` Paper RL integration | `no` | RL `14` is accepted locally, but Stage `15` remains blocked by the classic strategy-producer Stage `07` prerequisite. |
-| `16` Testnet RL integration | `no` | Still blocked behind classic strategy-producer Stage `09` and Stage `15`. |
+| `15` Paper RL integration | `yes` | Prerequisite refresh on 2026-07-03 verified the classic strategy-producer ledger is completed and classic Stage `05`, `07`, and `09` are accepted. Stage `15` may start, but it has not been implemented or accepted yet. |
+| `16` Testnet RL integration | `no` | Classic Stage `09` is accepted, but RL testnet remains blocked until Stage `15` paper integration is accepted. |
 | Mainnet | `no` | Mainnet remains blocked until Stage `19` approval and Stage `20` prompt conditions. |
 
-Handoff for Stage `15` when prerequisites eventually open:
+Handoff for Stage `15` now that prerequisites are open:
 
 - Reuse `RlRiskSizingPolicyService` and saved policy records; do not duplicate sizing/risk rules in the paper executor.
 - Convert synthetic exits into later platform `close` intents through the existing execution boundary only.
