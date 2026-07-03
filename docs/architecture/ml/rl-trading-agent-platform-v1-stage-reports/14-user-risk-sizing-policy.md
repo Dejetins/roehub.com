@@ -151,7 +151,7 @@ Synthetic exit and no-submit proof:
 | Cache/request identity | `none` | No persisted cache key or request hash changed. |
 | External side effects | `none` | No exchange submit, paper order, testnet order, live order, provider call or Redis dispatch side effect is introduced. |
 | Browser-visible behavior | `compatible-change` | Additive RL/ML risk config rows on `/strategies`. |
-| Performance | `none` for runtime claims | No production runtime/performance claim is made; browser harness was local only. |
+| Performance | `none` for performance claims | No performance-sensitive path was changed and no throughput/latency claim is made. |
 
 Safety notes:
 
@@ -159,9 +159,21 @@ Safety notes:
 - A missing saved policy does not silently break existing classic live-profile flows; saved invalid RL policy blocks non-monitor activation.
 - Platform synthetic exits are not native exchange OCO/TP/SL/trailing fields.
 - Policy persistence is owner/strategy/exchange/market/symbol scoped and audited.
-- This stage is `local-only` and not `post_main_production_runtime_proof`.
+- Stage `14` reached `post_main_production_runtime_proof` only after direct `main` delivery, green GitHub workflows, `macstudio` checkout sync and production smoke. This proof does not approve paper/testnet/live/mainnet execution.
 
-Delivery state: `local-only`, not staged, not committed, not pushed, not deployed.
+Delivery state: delivered to `main`.
+
+Post-main delivery evidence:
+
+| Surface | Evidence |
+|---|---|
+| Implementation commit | `e086eb9f7721fd83768885bd2e23dd16075389b8` on `main` / `origin/main`. |
+| GitHub Actions | `CI` `28681177872` passed; `Deploy Backend` `28681255514` passed; `Publish App Image` `28681255516` passed; `Deploy Web` `28681255533` and follow-up `Deploy Web` `28681289201` passed. |
+| `macstudio` checkout | `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `e086eb9f7721fd83768885bd2e23dd16075389b8` and reported `## main...origin/main`. |
+| Runtime tree parity | `/opt/roehub/app` matched the `macstudio` checkout for `risk_sizing_policy.py`, `postgres_risk_sizing_policy.py`, Alembic migration `20260703_0042_rl_risk_sizing_policy_v1.py`, `apps/api/routes/strategies.py`, and `apps/web/dist/js/pages/strategies.js`. Stage report docs are present in the checkout; they are not part of the runtime bundle. |
+| Production smoke | `bash scripts/macos/smoke_prod.sh` passed from `/opt/roehub/app`. |
+| Public edge auth smoke | Local public-edge curl flow using host-local `ROEHUB_SMOKE_E2E_PASSWORD` reached `final_path=https://roehub.com/strategies`, `current_user_status=200`, `strategies_status=200`, `dashboard_http=200`, `strategies_js_http=200`, Stage `14` HTML hooks present, `logout_status=204`, `after_logout_status=401`. The password, cookies and callback body were not printed or stored in repo artifacts. |
+| Mac Studio public-edge caveat | The same optional auth flow from `macstudio` to `https://roehub.com:443` timed out; this was not used as delivery acceptance because GitHub `Deploy Web` edge smoke and the local public-edge auth smoke passed. |
 
 ## 5. Blockers and next-stage handoff
 
