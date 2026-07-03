@@ -172,6 +172,7 @@ class LiveExecutionRlInferenceProducer:
         risk_context: ExecutionRiskContext,
         exchange_connection_id: UUID,
         quote_notional: Decimal,
+        quantity: Decimal | None = None,
     ) -> RlTestnetExecutionResult:
         owner_user_id = UserId.from_string(context.owner_user_id)
         source = self._ingress_service.record_source_event(
@@ -218,8 +219,8 @@ class LiveExecutionRlInferenceProducer:
                 instrument_key=context.instrument_key,
                 order_type="market",
                 side=side,
-                quantity=None,
-                quote_notional=quote_notional,
+                quantity=quantity if context.market_type == "futures" else None,
+                quote_notional=quote_notional if context.market_type == "spot" else None,
                 limit_price=None,
                 advanced_order_flags={},
                 risk_context=risk_context,

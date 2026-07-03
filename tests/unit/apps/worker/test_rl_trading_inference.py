@@ -348,6 +348,8 @@ def test_testnet_cli_dispatches_intent_and_duplicate_dispatch(
             "00000000-0000-0000-0000-000000014001",
             "--quote-notional",
             "50",
+            "--quantity",
+            "0.001",
         ]
     ) == 0
     payload = json.loads(capsys.readouterr().out)

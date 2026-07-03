@@ -100,6 +100,7 @@ def _build_parser() -> argparse.ArgumentParser:
     testnet.add_argument("--strategy-run-id", required=True)
     testnet.add_argument("--exchange-connection-id", required=True)
     testnet.add_argument("--quote-notional", required=True)
+    testnet.add_argument("--quantity", default=None)
     testnet.add_argument("--dispatch-mode", choices=("memory", "redis"), default="memory")
     testnet.add_argument("--postgres-dsn-env", default="STRATEGY_PG_DSN")
     testnet.add_argument("--redis-host", default="127.0.0.1")
@@ -159,6 +160,7 @@ def main(argv: list[str] | None = None) -> int:
                 strategy_run_id=args.strategy_run_id,
                 exchange_connection_id=args.exchange_connection_id,
                 quote_notional=args.quote_notional,
+                quantity=args.quantity,
                 dispatch_mode=args.dispatch_mode,
                 postgres_dsn_env=args.postgres_dsn_env,
                 redis_host=args.redis_host,
@@ -377,6 +379,7 @@ def _run_testnet_once(
     strategy_run_id: str,
     exchange_connection_id: str,
     quote_notional: str,
+    quantity: str | None,
     dispatch_mode: str,
     postgres_dsn_env: str,
     redis_host: str,
@@ -453,6 +456,7 @@ def _run_testnet_once(
         risk_context=_testnet_risk_context(),
         exchange_connection_id=UUID(exchange_connection_id),
         quote_notional=Decimal(quote_notional),
+        quantity=Decimal(quantity) if quantity is not None else None,
     )
     intent_ready_at = time.perf_counter()
     dispatch_result = dispatch.dispatch_intent(intent=first.intent) if first.intent else None
@@ -463,6 +467,7 @@ def _run_testnet_once(
         risk_context=_testnet_risk_context(),
         exchange_connection_id=UUID(exchange_connection_id),
         quote_notional=Decimal(quote_notional),
+        quantity=Decimal(quantity) if quantity is not None else None,
     )
     replay_dispatch_result = (
         dispatch.dispatch_intent(intent=replay.intent) if replay.intent is not None else None

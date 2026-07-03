@@ -169,6 +169,7 @@ def test_testnet_rl_inference_creates_accepted_intent_idempotently() -> None:
         risk_context=_testnet_risk_context(),
         exchange_connection_id=connection_id,
         quote_notional=Decimal("50"),
+        quantity=Decimal("0.001"),
     )
     replay = producer.record_testnet_decision(
         context=context,
@@ -176,6 +177,7 @@ def test_testnet_rl_inference_creates_accepted_intent_idempotently() -> None:
         risk_context=_testnet_risk_context(),
         exchange_connection_id=connection_id,
         quote_notional=Decimal("50"),
+        quantity=Decimal("0.001"),
     )
 
     assert first.intent is not None
@@ -191,7 +193,8 @@ def test_testnet_rl_inference_creates_accepted_intent_idempotently() -> None:
     assert first.intent.status == "accepted"
     assert first.intent.risk_reason == "risk_gate_accepted"
     assert first.intent.side == "buy"
-    assert first.intent.quote_notional == Decimal("50")
+    assert first.intent.quantity == Decimal("0.001")
+    assert first.intent.quote_notional is None
     assert len(execution_repository.source_events) == 1
     assert len(execution_repository.intents) == 1
 
