@@ -30,6 +30,25 @@ def test_rl_ml_runtime_configs_are_fail_closed_and_host_local() -> None:
         assert config["runtime_artifacts"]["commit_to_git"] is False
         assert config["trainer"]["enabled"] is False
         assert config["inference"]["enabled"] is False
+        assert config["inference"]["mode"] == "monitor_only"
+        assert config["inference"]["metrics_port"] == 9213
+        assert config["inference"]["health_check_enabled"] is True
+        assert config["inference"]["source_events"]["enabled"] is False
+        assert config["inference"]["source_events"]["source_type"] == "ml_agent_decision"
+        assert config["inference"]["source_events"]["outcome"] == "no_intent"
+        assert (
+            config["inference"]["source_events"]["outcome_reason"]
+            == "monitor_only_no_intent"
+        )
+        assert config["inference"]["redis_streams"]["enabled"] is True
+        assert config["inference"]["redis_streams"]["stream_prefix"] == "md.candles.1m"
+        assert config["inference"]["redis_streams"]["window_size"] == 30
+        assert (
+            config["inference"]["latency_budget_ms"]["candle_close_to_feature_ready_p95"]
+            == 250
+        )
+        assert config["inference"]["latency_budget_ms"]["feature_to_decision_p95"] == 100
+        assert config["inference"]["latency_budget_ms"]["decision_to_source_event_p95"] == 50
         assert config["retraining"]["enabled"] is False
         assert config["retraining"]["manual_trigger"]["enabled"] is False
         assert config["retraining"]["manual_trigger"]["host_local_cli_only"] is True
