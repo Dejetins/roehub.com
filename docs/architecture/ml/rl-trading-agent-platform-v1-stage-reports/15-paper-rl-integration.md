@@ -2,7 +2,7 @@
 doc: rl-trading-agent-platform-v1-stage-15-paper-rl-integration
 status: accepted
 stage: 15
-updated_at: 2026-07-03
+updated_at: 2026-07-04
 ---
 
 # Stage 15: Paper RL Integration
@@ -46,6 +46,18 @@ Prompt evidence:
 
 The optional `.codex/agents/.context/promt_manager_state.yaml` still contains stale prompt-pack delivery wording from early RL stages. It was read and ignored for execution facts because the live ledger, current prompt and `.codex/AGENTS.md` supersede it.
 
+Delivery update:
+
+| Field | Value |
+|---|---|
+| Delivery status | `delivered-to-main` |
+| Implementation commit | `2f525f0fab0d4a3091d294b6492513ae4884b321` |
+| GitHub CI | `28683736317` success |
+| Deploy workflows | `Deploy Backend` `28683803021`, `Publish App Image` `28683803039`, `Deploy Web` `28683803028` and `28683809740` success |
+| Mac Studio checkout | `/Users/daniildegtyarev/Projects/roehub.com` fast-forwarded to `2f525f0fab0d4a3091d294b6492513ae4884b321` |
+| Runtime tree | `/opt/roehub/app` production-path parity checked for the changed worker/live-execution/RL ACL files |
+| Production smoke | `bash scripts/macos/smoke_prod.sh` passed on Mac Studio |
+
 ## 2. File manifest
 
 ### Created
@@ -66,7 +78,7 @@ The optional `.codex/agents/.context/promt_manager_state.yaml` still contains st
 | `tests/unit/contexts/live_execution/test_execution_ingress_service.py` | Cover `ml_agent_decision` paper no-dispatch risk branch and replay behavior. | `none` tests |
 | `tests/unit/contexts/live_execution/test_paper_accounting_service.py` | Cover RL paper accounting idempotency and simulator/accounting parity. | `none` tests |
 | `tests/unit/apps/worker/test_rl_trading_inference.py` | Cover the `paper-once` worker harness. | `none` tests |
-| `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` | Mark Stage `15` accepted and open Stage `16`. | `compatible-change` docs/ledger |
+| `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md` | Mark Stage `15` accepted/delivered and open Stage `16`. | `compatible-change` docs/ledger |
 | `docs/architecture/README.md` | Docs index regeneration after adding the Stage `15` report. | `compatible-change` docs index |
 
 ### Deleted
@@ -102,6 +114,16 @@ Prompt-level gates:
 
 The skipped tests are existing optional Torch gates in the default environment where `torch` is not installed.
 
+Pre-publish broad gates:
+
+| Command | Result |
+|---|---|
+| `uv run ruff check .` | passed |
+| `uv run pyright` | `0 errors, 0 warnings, 0 informations` |
+| `uv run pytest -q -ra` | `1550 passed, 16 skipped, 3 warnings` |
+| `uv run python -m tools.docs.generate_docs_index --check` | passed |
+| `git diff --cached --check` | passed before commit |
+
 Real-boundary local evidence, not tests-only:
 
 | Surface | Evidence |
@@ -113,14 +135,25 @@ Real-boundary local evidence, not tests-only:
 | Simulator/accounting parity | `simulator_parity.status=accepted`, `max_abs_diff=0E-8`, `tolerance=0`, diffs for `equity`, `fee_total`, and `position_quantity` all `0E-8`. |
 | Safety boundary | risk status `rejected`, risk reason `paper_no_exchange_submit`; no Redis dispatch, testnet, live, mainnet or exchange SDK path was invoked. |
 
+Post-main production runtime proof:
+
+| Surface | Evidence |
+|---|---|
+| Commit and push | `2f525f0fab0d4a3091d294b6492513ae4884b321` pushed to `origin/main`. |
+| GitHub CI | `CI` run `28683736317` passed. |
+| GitHub deploy workflows | `Deploy Backend` `28683803021`, `Publish App Image` `28683803039`, `Deploy Web` `28683803028` and `28683809740` passed. |
+| Mac Studio checkout | `git -C /Users/daniildegtyarev/Projects/roehub.com rev-parse HEAD` returned `2f525f0fab0d4a3091d294b6492513ae4884b321`; checkout status was `main...origin/main`. |
+| Runtime parity | `/opt/roehub/app` matched the Mac Studio checkout for `apps/worker/rl_trading_inference/main/main.py`, `src/trading/contexts/live_execution/application/use_cases/paper_accounting.py`, `src/trading/contexts/live_execution/domain/risk_gate.py`, and `src/trading/contexts/rl_trading/adapters/outbound/acl/live_execution_producer.py`. |
+| Production smoke | `bash scripts/macos/smoke_prod.sh` passed from `/opt/roehub/app`. |
+
 Proof boundary:
 
 | Boundary label | Stage `15` status |
 |---|---|
-| `local_in_process_worker_harness` | completed; this is the only runtime-like evidence claimed for this local-only stage. |
+| `local_in_process_worker_harness` | completed; this is the paper ledger/idempotency/parity evidence. |
 | `target_host_readiness_pre_main` | not run and not claimed. |
 | `read_only_existing_runtime_smoke` | not run and not claimed. |
-| `post_main_production_runtime_proof` | not run and not claimed. This proof requires the changed revision on `main`, green CI/GitHub Actions for that revision, deploy/sync to the target runtime, and then production smoke/runtime verification. |
+| `post_main_production_runtime_proof` | completed after `2f525f0fab0d4a3091d294b6492513ae4884b321` reached `main`, GitHub CI/deploy workflows passed, Mac Studio checkout was fast-forwarded, `/opt/roehub/app` runtime parity matched the changed production files, and `smoke_prod.sh` passed. |
 
 ## 4. Contract, safety, and delivery state
 
@@ -155,9 +188,9 @@ Operational notes:
 - Close behavior is fail-closed as `paper_close_position_snapshot_required` until a later stage owns strategy-position close accounting.
 - Large artifacts and temporary harness JSON remained outside git.
 
-Delivery state: `local-only`.
+Delivery state: `delivered-to-main`.
 
-No branch, commit, push, CI, deploy, Mac Studio sync, `target_host_readiness_pre_main`, `read_only_existing_runtime_smoke` or `post_main_production_runtime_proof` was performed for Stage `15` in this run. `post_main_production_runtime_proof` remains a future publish/deploy boundary and requires `main`, green CI/GitHub Actions, deploy/sync and production verification.
+Branch/PR delivery was not used. Direct-main delivery was completed through commit `2f525f0fab0d4a3091d294b6492513ae4884b321`, `origin/main` push, green GitHub CI/deploy workflows, Mac Studio checkout sync, runtime parity checks and `smoke_prod.sh`. `target_host_readiness_pre_main` and `read_only_existing_runtime_smoke` were not claimed because this run collected `post_main_production_runtime_proof` after `main`.
 
 ## 5. Blockers and next-stage handoff
 
@@ -177,4 +210,4 @@ Handoff for Stage `16`:
 - Preserve RL strategy-run scoping: `owner_user_id + strategy_run_id + exchange + market_type + symbol`.
 - Keep retry behavior idempotency-first: source and intent replay must look up existing records before any retry.
 
-Cold self-review fallback: completed. Verdict `Release after fixes`; fixes applied in this report/ledger include explicit redaction coverage, alert/runbook `N/A`, delivery state, docs index evidence and Stage `16` handoff. Residual risk: no production/main delivery or Mac Studio runtime proof has been claimed for this local-only stage.
+Cold self-review fallback: completed. Verdict `Release after fixes`; fixes applied in this report/ledger include explicit redaction coverage, alert/runbook `N/A`, direct-main delivery state, post-main proof boundary, docs index evidence and Stage `16` handoff. Residual risk: no testnet/live/mainnet exchange behavior is approved by Stage `15`; Stage `16` must collect separate real testnet evidence.
