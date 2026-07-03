@@ -95,7 +95,10 @@ def test_status_and_parity_cli_return_machine_readable_json(tmp_path: Path, caps
                 "exchange": "binance",
                 "instrument_key": "binance:futures:BTCUSDT",
                 "market_type": "futures",
-                "payloads": [_redis_payload(ts_open="2026-07-03T12:00:00Z", close="102.0")],
+                "payloads": [
+                    _redis_payload(ts_open="2026-07-03T12:00:00Z", close="102.0"),
+                    _redis_payload(ts_open="2026-07-03T12:01:00Z", close="103.0"),
+                ],
                 "symbol": "BTCUSDT",
             }
         ),
@@ -113,13 +116,22 @@ def test_status_and_parity_cli_return_machine_readable_json(tmp_path: Path, caps
                         "trades_count": 42,
                         "volume_base": 10.0,
                         "volume_quote": 1010.0,
+                    },
+                    {
+                        "close": 103.0,
+                        "high": 104.0,
+                        "low": 101.0,
+                        "open": 102.0,
+                        "trades_count": 37,
+                        "volume_base": 8.0,
+                        "volume_quote": 824.0,
                     }
                 ],
                 "exchange": "binance",
                 "instrument_key": "binance:futures:BTCUSDT",
                 "market_type": "futures",
                 "symbol": "BTCUSDT",
-                "ts_close": "2026-07-03T12:01:00Z",
+                "ts_close": "2026-07-03T12:02:00Z",
                 "ts_open": "2026-07-03T12:00:00Z",
             }
         ),
@@ -164,14 +176,17 @@ def test_canary_cli_records_source_event_without_intent(
                 "exchange": "binance",
                 "instrument_key": "binance:futures:BTCUSDT",
                 "market_type": "futures",
-                "payloads": [_redis_payload(ts_open="2026-07-03T12:00:00Z", close="102.0")],
+                "payloads": [
+                    _redis_payload(ts_open="2026-07-03T12:00:00Z", close="102.0"),
+                    _redis_payload(ts_open="2026-07-03T12:01:00Z", close="103.0"),
+                ],
                 "symbol": "BTCUSDT",
             }
         ),
         encoding="utf-8",
     )
     manifest_path.write_text(
-        json.dumps(_candidate_manifest(feature_count=7), sort_keys=True),
+        json.dumps(_candidate_manifest(feature_count=12), sort_keys=True),
         encoding="utf-8",
     )
     monkeypatch.setattr(

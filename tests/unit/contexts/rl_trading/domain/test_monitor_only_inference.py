@@ -8,6 +8,7 @@ from trading.contexts.live_execution.domain import validate_source_event_fields
 from trading.contexts.rl_trading.domain import (
     FEATURE_NAMES_V1,
     STAGE13_SOURCE_TYPE_V1,
+    STAGE13_STAGE08M_FEATURE_NAMES_V1,
     FeatureContractViolation,
     RlFeatureCandle,
     Stage13DecisionContext,
@@ -55,7 +56,7 @@ def test_missing_redis_required_feature_fails_closed() -> None:
     payload = dict(_redis_payloads()[0])
     payload["trades_count"] = ""
     window = feature_window_from_redis_payloads_v1(
-        payloads=[payload],
+        payloads=[payload, _redis_payloads()[1]],
         exchange="binance",
         market_type="futures",
         symbol="BTCUSDT",
@@ -96,10 +97,43 @@ def test_preloaded_policy_decides_without_reloading_model_state(
         window_ts_close_utc=window.ts_close_utc,
     )
 
-    assert policy.feature_count == len(FEATURE_NAMES_V1) * 2
+    assert policy.feature_count == len(STAGE13_STAGE08M_FEATURE_NAMES_V1)
     assert first == second
     assert first.action_name == "hold"
     assert first.window_ts_close_utc == window.ts_close_utc
+
+
+def test_preloaded_stage08m_policy_supports_intercept_weight_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    window = feature_window_from_redis_payloads_v1(
+        payloads=_redis_payloads(),
+        exchange="binance",
+        market_type="futures",
+        symbol="BTCUSDT",
+        instrument_key="binance:futures:BTCUSDT",
+    )
+    feature_matrix, feature_hash = build_stage13_feature_matrix_v1(window)
+    manifest_hash = "d" * 64
+    monkeypatch.setattr(mi, "STAGE09_ACCEPTED_CANDIDATE_MANIFEST_SHA256_V1", manifest_hash)
+    manifest = _candidate_manifest(feature_count=feature_matrix.size)
+    model_state = manifest["model_state"]
+    assert isinstance(model_state, dict)
+    model_state["weights"] = [[0.0, 1000.0, 0.0], *model_state["weights"]]  # intercept row
+    policy = preload_stage13_policy_from_candidate_manifest_v1(
+        candidate_manifest=manifest,
+        candidate_manifest_sha256=manifest_hash,
+        loaded_at_utc=datetime(2026, 7, 3, 12, 3, tzinfo=UTC),
+    )
+
+    decision = policy.decide(
+        feature_matrix=feature_matrix,
+        feature_hash=feature_hash,
+        window_ts_close_utc=window.ts_close_utc,
+    )
+
+    assert policy.uses_intercept is True
+    assert decision.action_name == "open_long"
 
 
 def test_source_event_payload_is_bounded_and_live_execution_compatible() -> None:
@@ -172,6 +206,21 @@ def test_latency_summary_reports_segment_p95() -> None:
         "decision_to_source_event": 0.03,
         "feature_to_decision": 0.02,
     }
+
+
+def test_stage13_feature_matrix_matches_stage08m_aggregate_shape() -> None:
+    window = feature_window_from_redis_payloads_v1(
+        payloads=_redis_payloads(),
+        exchange="binance",
+        market_type="futures",
+        symbol="BTCUSDT",
+        instrument_key="binance:futures:BTCUSDT",
+    )
+
+    feature_matrix, _feature_hash = build_stage13_feature_matrix_v1(window)
+
+    assert feature_matrix.shape == (1, len(STAGE13_STAGE08M_FEATURE_NAMES_V1))
+    assert len(FEATURE_NAMES_V1) == 7
 
 
 def _redis_payloads() -> list[dict[str, str]]:

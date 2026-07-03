@@ -30,6 +30,20 @@ STAGE13_SOURCE_EVENT_OUTCOME_REASON_V1 = "monitor_only_no_intent"
 STAGE13_MODE_V1 = "monitor_only"
 STAGE13_SOURCE_TYPE_V1 = "ml_agent_decision"
 STAGE13_ALLOWED_ACTIONS_V1: tuple[str, ...] = ("hold", "open_long", "open_short")
+STAGE13_STAGE08M_FEATURE_NAMES_V1: tuple[str, ...] = (
+    "history_return",
+    "mean_return",
+    "std_return",
+    "min_return",
+    "max_return",
+    "tail_return_sum",
+    "range_ratio",
+    "close_vwap_ratio",
+    "log_mean_volume",
+    "log_std_volume",
+    "log_mean_num_trades",
+    "log_std_num_trades",
+)
 
 Stage13MarketType = Literal["spot", "futures"]
 
@@ -177,7 +191,9 @@ class Stage13PreloadedSupervisedPolicy:
             raise Stage13MonitorOnlyInferenceError(reason="scaler_vectors_must_be_1d")
         if weights.ndim != 2:
             raise Stage13MonitorOnlyInferenceError(reason="weights_must_be_2d")
-        if weights.shape[0] != scaler_mean.shape[0] or scaler_std.shape[0] != scaler_mean.shape[0]:
+        if scaler_std.shape[0] != scaler_mean.shape[0]:
+            raise Stage13MonitorOnlyInferenceError(reason="model_feature_count_mismatch")
+        if weights.shape[0] not in {scaler_mean.shape[0], scaler_mean.shape[0] + 1}:
             raise Stage13MonitorOnlyInferenceError(reason="model_feature_count_mismatch")
         if weights.shape[1] < 1:
             raise Stage13MonitorOnlyInferenceError(reason="model_action_count_missing")
@@ -198,6 +214,7 @@ class Stage13PreloadedSupervisedPolicy:
         self.candidate_manifest_sha256 = candidate_manifest_sha256
         self.loaded_at_utc = loaded_at_utc
         self.feature_count = int(self.scaler_mean.shape[0])
+        self.uses_intercept = bool(self.weights.shape[0] == self.feature_count + 1)
 
     def decide(
         self,
@@ -216,7 +233,12 @@ class Stage13PreloadedSupervisedPolicy:
                 field=f"{flat.shape[0]} != {self.feature_count}",
             )
         normalized = (flat - self.scaler_mean) / self.scaler_std
-        logits = normalized @ self.weights
+        model_features = (
+            np.concatenate((np.asarray([1.0], dtype=np.float64), normalized))
+            if self.uses_intercept
+            else normalized
+        )
+        logits = model_features @ self.weights
         probabilities = _softmax(logits)
         label_id = int(np.argmax(probabilities))
         action_name = self.label_order.get(label_id)
@@ -363,16 +385,50 @@ def redis_payload_to_feature_candle_v1(payload: Mapping[str, object]) -> RlFeatu
 
 
 def build_stage13_feature_matrix_v1(window: Stage13FeatureWindow) -> tuple[np.ndarray, str]:
-    rows = [build_article_feature_vector_v1(candle) for candle in window.candles]
-    matrix = np.asarray(rows, dtype=np.float32)
+    matrix = _build_stage08m_feature_matrix(window)
     payload = {
         "feature_contract_hash": FEATURE_CONTRACT_HASH_V1,
-        "feature_names": list(FEATURE_NAMES_V1),
+        "feature_names": list(STAGE13_STAGE08M_FEATURE_NAMES_V1),
         "instrument_key": window.instrument_key,
         "rows": [[_round_float(float(value)) for value in row] for row in matrix.tolist()],
         "schema_version": STAGE13_SCHEMA_VERSION_V1,
     }
     return matrix, hash_json_payload_v1(payload)
+
+
+def _build_stage08m_feature_matrix(window: Stage13FeatureWindow) -> np.ndarray:
+    if len(window.candles) < 2:
+        raise Stage13MonitorOnlyInferenceError(reason="feature_window_too_short")
+    raw = np.asarray(
+        [build_article_feature_vector_v1(candle) for candle in window.candles],
+        dtype=np.float64,
+    )
+    close = np.maximum(raw[:, FEATURE_NAMES_V1.index("close")], 1e-12)
+    high = raw[:, FEATURE_NAMES_V1.index("high")]
+    low = raw[:, FEATURE_NAMES_V1.index("low")]
+    vwap = np.maximum(raw[:, FEATURE_NAMES_V1.index("volume_weighted_average")], 1e-12)
+    volume = raw[:, FEATURE_NAMES_V1.index("volume")]
+    num_trades = raw[:, FEATURE_NAMES_V1.index("num_trades")]
+    returns = np.diff(close) / close[:-1]
+    tail = min(10, returns.shape[0])
+    features = np.asarray(
+        [
+            (close[-1] / close[0]) - 1.0,
+            np.mean(returns),
+            np.std(returns),
+            np.min(returns),
+            np.max(returns),
+            np.sum(returns[-tail:]),
+            (np.max(high) - np.min(low)) / close[-1],
+            (close[-1] / vwap[-1]) - 1.0,
+            np.log1p(np.mean(volume)),
+            np.log1p(np.std(volume)),
+            np.log1p(np.mean(num_trades)),
+            np.log1p(np.std(num_trades)),
+        ],
+        dtype=np.float32,
+    )
+    return np.nan_to_num(features, nan=0.0, posinf=0.0, neginf=0.0).reshape(1, -1)
 
 
 def compare_stage13_train_live_feature_parity_v1(
@@ -396,7 +452,7 @@ def compare_stage13_train_live_feature_parity_v1(
     return {
         "kind": STAGE13_PARITY_KIND_V1,
         "feature_contract_hash": FEATURE_CONTRACT_HASH_V1,
-        "feature_names": list(FEATURE_NAMES_V1),
+        "feature_names": list(STAGE13_STAGE08M_FEATURE_NAMES_V1),
         "live_feature_hash": live_hash,
         "max_abs_diff": max_abs_diff,
         "offline_feature_hash": offline_hash,
