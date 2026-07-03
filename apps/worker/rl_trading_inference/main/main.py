@@ -6,6 +6,7 @@ import json
 import logging
 import time
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, Mapping, cast
 
@@ -18,9 +19,14 @@ from apps.worker.rl_trading_inference.wiring.modules import (
 )
 from trading.contexts.live_execution.adapters.outbound import (
     InMemoryExecutionIntentRepository,
+    InMemoryPaperAccountingRepository,
     SystemLiveExecutionClock,
 )
-from trading.contexts.live_execution.application import ExecutionIngressService
+from trading.contexts.live_execution.application import (
+    CapitalReservationPaperAccountingService,
+    ExecutionIngressService,
+)
+from trading.contexts.live_execution.domain import ExecutionRiskContext
 from trading.contexts.rl_trading.adapters.outbound import LiveExecutionRlInferenceProducer
 from trading.contexts.rl_trading.domain import (
     STAGE13_SOURCE_EVENT_OUTCOME_REASON_V1,
@@ -63,6 +69,15 @@ def _build_parser() -> argparse.ArgumentParser:
     canary.add_argument("--strategy-id", required=True)
     canary.add_argument("--strategy-run-id", required=True)
 
+    paper = subparsers.add_parser("paper-once")
+    paper.add_argument("--candidate-manifest", required=True)
+    paper.add_argument("--feature-window-json", required=True)
+    paper.add_argument("--owner-user-id", required=True)
+    paper.add_argument("--strategy-id", required=True)
+    paper.add_argument("--strategy-run-id", required=True)
+    paper.add_argument("--quote-notional", required=True)
+    paper.add_argument("--reference-price", required=True)
+
     serve = subparsers.add_parser("serve")
     serve.add_argument("--config", required=True)
     serve.add_argument("--duration-seconds", type=float, default=0.0)
@@ -88,6 +103,16 @@ def main(argv: list[str] | None = None) -> int:
                 owner_user_id=args.owner_user_id,
                 strategy_id=args.strategy_id,
                 strategy_run_id=args.strategy_run_id,
+            )
+        if args.command == "paper-once":
+            return _run_paper_once(
+                candidate_manifest=args.candidate_manifest,
+                feature_window_json=args.feature_window_json,
+                owner_user_id=args.owner_user_id,
+                strategy_id=args.strategy_id,
+                strategy_run_id=args.strategy_run_id,
+                quote_notional=args.quote_notional,
+                reference_price=args.reference_price,
             )
         if args.command == "serve":
             return _run_serve(
@@ -182,6 +207,108 @@ def _run_canary_once(
     return 0 if _canary_result_accepted(result) else 2
 
 
+def _run_paper_once(
+    *,
+    candidate_manifest: str,
+    feature_window_json: str,
+    owner_user_id: str,
+    strategy_id: str,
+    strategy_run_id: str,
+    quote_notional: str,
+    reference_price: str,
+) -> int:
+    started_at = time.perf_counter()
+    manifest_path = Path(candidate_manifest)
+    manifest = _load_json_mapping(manifest_path)
+    manifest_sha256 = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    policy = preload_stage13_policy_from_candidate_manifest_v1(
+        candidate_manifest=manifest,
+        candidate_manifest_sha256=manifest_sha256,
+        loaded_at_utc=datetime.now(UTC),
+    )
+    window = _load_feature_window(Path(feature_window_json))
+    feature_ready_at = time.perf_counter()
+    feature_matrix, feature_hash = build_stage13_feature_matrix_v1(window)
+    decision = policy.decide(
+        feature_matrix=feature_matrix,
+        feature_hash=feature_hash,
+        window_ts_close_utc=window.ts_close_utc,
+    )
+    decision_ready_at = time.perf_counter()
+
+    execution_repository = InMemoryExecutionIntentRepository()
+    paper_repository = InMemoryPaperAccountingRepository()
+    clock = SystemLiveExecutionClock()
+    ingress = ExecutionIngressService(repository=execution_repository, clock=clock)
+    paper_accounting = CapitalReservationPaperAccountingService(
+        repository=paper_repository,
+        account_projection_repository=None,
+        clock=clock,
+    )
+    producer = LiveExecutionRlInferenceProducer(
+        ingress_service=ingress,
+        repository=execution_repository,
+    )
+    context = Stage13DecisionContext(
+        owner_user_id=owner_user_id,
+        strategy_id=strategy_id,
+        strategy_run_id=strategy_run_id,
+        exchange=window.exchange,
+        market_type=window.market_type,
+        symbol=window.symbol,
+        instrument_key=window.instrument_key,
+    )
+    risk_context = _paper_risk_context()
+    first = producer.record_paper_decision(
+        context=context,
+        decision=decision,
+        risk_context=risk_context,
+        paper_accounting_service=paper_accounting,
+        quote_notional=Decimal(quote_notional),
+        reference_price=Decimal(reference_price),
+    )
+    replay = producer.record_paper_decision(
+        context=context,
+        decision=decision,
+        risk_context=risk_context,
+        paper_accounting_service=paper_accounting,
+        quote_notional=Decimal(quote_notional),
+        reference_price=Decimal(reference_price),
+    )
+    source_event_ready_at = time.perf_counter()
+    parity = _paper_parity_payload(
+        quote_notional=Decimal(quote_notional),
+        reference_price=Decimal(reference_price),
+        result=first,
+    )
+    result = {
+        "action": decision.action_name,
+        "decision_id": decision.decision_id,
+        "duplicate_replay": replay.duplicate,
+        "feature_hash": feature_hash,
+        "intents_created": len(execution_repository.intents),
+        "model_version_id": decision.model_version_id,
+        "outcome": first.event.outcome,
+        "outcome_reason": first.event.outcome_reason,
+        "paper_accounting_created": len(paper_repository.accounting),
+        "paper_fills_created": len(paper_repository.fills),
+        "paper_orders_created": len(paper_repository.orders),
+        "risk_reason": first.intent.risk_reason if first.intent is not None else None,
+        "risk_status": first.intent.risk_status if first.intent is not None else None,
+        "simulator_parity": parity,
+        "source_event_ref": first.event.source_event_ref,
+        "source_events_created": len(execution_repository.source_events),
+        "source_type": first.event.source_type,
+        "latency_seconds": {
+            "candle_close_to_feature_ready": round(feature_ready_at - started_at, 12),
+            "feature_to_decision": round(decision_ready_at - feature_ready_at, 12),
+            "decision_to_source_event": round(source_event_ready_at - decision_ready_at, 12),
+        },
+    }
+    print(json.dumps(result, ensure_ascii=True, sort_keys=True))
+    return 0 if _paper_result_accepted(result) else 2
+
+
 def _run_serve(
     *,
     config_path: str,
@@ -214,6 +341,74 @@ def _canary_result_accepted(result: Mapping[str, object]) -> bool:
         and result.get("outcome_reason") == STAGE13_SOURCE_EVENT_OUTCOME_REASON_V1
         and result.get("intents_created") == 0
     )
+
+
+def _paper_result_accepted(result: Mapping[str, object]) -> bool:
+    parity = result.get("simulator_parity")
+    return (
+        result.get("source_type") == "ml_agent_decision"
+        and result.get("outcome") == "risk_rejected"
+        and result.get("outcome_reason") == "paper_no_exchange_submit"
+        and result.get("risk_status") == "rejected"
+        and result.get("risk_reason") == "paper_no_exchange_submit"
+        and result.get("duplicate_replay") is True
+        and result.get("source_events_created") == 1
+        and result.get("intents_created") == 1
+        and result.get("paper_orders_created") == 1
+        and result.get("paper_fills_created") == 1
+        and result.get("paper_accounting_created") == 1
+        and isinstance(parity, Mapping)
+        and parity.get("status") == "accepted"
+    )
+
+
+def _paper_risk_context() -> ExecutionRiskContext:
+    return ExecutionRiskContext(
+        exchange_connection_active=True,
+        secret_custody_ready=True,
+        source_authorized=True,
+        strategy_live_profile_ready=True,
+        strategy_run_active=True,
+        market_data_state="ready",
+        position_ownership_active=True,
+        capital_reservation_active=True,
+        capital_reservation_sufficient=True,
+        paper_accounting_ready=True,
+        paper_no_exchange_submit=True,
+        ml_agent_policy_active=True,
+        kill_switch_open=True,
+        environment_policy_allows=True,
+        max_order_size_ok=True,
+        daily_limit_ok=True,
+    )
+
+
+def _paper_parity_payload(
+    *,
+    quote_notional: Decimal,
+    reference_price: Decimal,
+    result: object,
+) -> dict[str, object]:
+    accounting = getattr(result, "accounting", None)
+    if accounting is None:
+        return {"status": "blocked", "reason": "paper_accounting_missing"}
+    expected_quantity = (quote_notional / reference_price).quantize(Decimal("0.00000001"))
+    expected_fee = (quote_notional * Decimal("10") / Decimal("10000")).quantize(
+        Decimal("0.00000001")
+    )
+    expected_equity = (quote_notional - expected_fee).quantize(Decimal("0.00000001"))
+    diffs = {
+        "equity": abs(accounting.equity - expected_equity),
+        "fee_total": abs(accounting.fee_total - expected_fee),
+        "position_quantity": abs(accounting.position_quantity - expected_quantity),
+    }
+    max_abs_diff = max(diffs.values())
+    return {
+        "abs_diff": {key: str(value) for key, value in sorted(diffs.items())},
+        "max_abs_diff": str(max_abs_diff),
+        "status": "accepted" if max_abs_diff == Decimal("0") else "blocked",
+        "tolerance": "0",
+    }
 
 
 def _load_feature_window(path: Path) -> Stage13FeatureWindow:

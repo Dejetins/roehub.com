@@ -337,6 +337,70 @@ def test_manual_request_paper_no_exchange_submit_uses_no_dispatch_risk_branch() 
     assert repository.notifications[0].event_type == "producer_rejected"
 
 
+def test_ml_agent_decision_paper_no_exchange_submit_uses_no_dispatch_risk_branch() -> None:
+    repository = InMemoryExecutionIntentRepository()
+    service = ExecutionIngressService(repository=repository, clock=_Clock())
+    source = service.record_source_event(
+        command=RecordExecutionSourceEventCommand(
+            owner_user_id=_USER_ID,
+            source_type="ml_agent_decision",
+            source_event_ref="rl-paper-open-long",
+            source_ref_json={
+                "strategy_id": "00000000-0000-0000-0000-000000010301",
+                "strategy_run_id": "00000000-0000-0000-0000-000000010303",
+                "action": "open_long",
+                "mode": "paper",
+                "instrument_key": "binance:futures:BTCUSDT",
+            },
+            strategy_signal_id=None,
+            idempotency_key="rl-paper-source-key",
+        )
+    )
+
+    intent = service.create_intent(
+        command=_intent_command(
+            source.event.source_event_id,
+            idempotency_key="rl-paper-intent-key",
+            market_type="futures",
+            instrument_key="binance:futures:BTCUSDT",
+            risk_context=_accepted_context(
+                exchange_config_verified=False,
+                account_state_fresh=False,
+                paper_no_exchange_submit=True,
+            ),
+        )
+    )
+
+    assert intent.intent.status == "rejected"
+    assert intent.intent.risk_reason == "paper_no_exchange_submit"
+    assert repository.source_events[0].source_type == "ml_agent_decision"
+    assert repository.source_events[0].outcome == "risk_rejected"
+    assert repository.source_events[0].outcome_reason == "paper_no_exchange_submit"
+    assert repository.source_events[0].intent_id == intent.intent.intent_id
+
+    replay = service.create_intent(
+        command=_intent_command(
+            source.event.source_event_id,
+            idempotency_key="rl-paper-intent-key",
+            market_type="futures",
+            instrument_key="binance:futures:BTCUSDT",
+            risk_context=_accepted_context(
+                exchange_config_verified=False,
+                account_state_fresh=False,
+                paper_no_exchange_submit=True,
+            ),
+        )
+    )
+
+    assert replay.duplicate is True
+    assert replay.intent.intent_id == intent.intent.intent_id
+    assert repository.source_events[0].outcome == "intent_created"
+    assert repository.source_events[0].outcome_reason == "idempotent_replay"
+    assert len(repository.intents) == 1
+    assert len(repository.risk_audit_events) == 1
+    assert repository.notifications[0].event_type == "producer_rejected"
+
+
 def test_manual_exit_paper_no_exchange_submit_emits_manual_exit_notification() -> None:
     repository = InMemoryExecutionIntentRepository()
     service = ExecutionIngressService(repository=repository, clock=_Clock())
@@ -502,6 +566,8 @@ def _intent_command(
     *,
     idempotency_key: str = "intent-key",
     order_type: str = "market",
+    market_type: str = "spot",
+    instrument_key: str = "binance:spot:BTCUSDT",
     advanced_order_flags: dict[str, object] | None = None,
     risk_context: ExecutionRiskContext | None = None,
 ) -> CreateExecutionIntentCommand:
@@ -510,8 +576,8 @@ def _intent_command(
         source_event_id=source_event_id,
         idempotency_key=idempotency_key,
         exchange_connection_id=UUID("00000000-0000-0000-0000-000000010201"),
-        market_type="spot",
-        instrument_key="binance:spot:BTCUSDT",
+        market_type=market_type,
+        instrument_key=instrument_key,
         order_type=order_type,
         side="buy",
         quantity=Decimal("0.01"),

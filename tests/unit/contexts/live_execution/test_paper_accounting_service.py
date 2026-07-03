@@ -139,6 +139,74 @@ def test_manual_paper_execution_records_idempotent_order_fill_and_accounting() -
     assert len(accounting_repository.accounting) == 1
 
 
+def test_rl_paper_execution_records_idempotent_order_fill_and_accounting_parity() -> None:
+    accounting_repository = InMemoryPaperAccountingRepository()
+    service = CapitalReservationPaperAccountingService(
+        repository=accounting_repository,
+        account_projection_repository=None,
+        clock=_Clock(),
+    )
+    source_event_id = UUID("00000000-0000-0000-0000-000000009511")
+
+    first = service.record_rl_paper_execution(
+        owner_user_id=_USER_ID,
+        strategy_id=_STRATEGY_ID,
+        live_profile_id=_PROFILE_ID,
+        strategy_run_id=_RUN_ID,
+        source_event_id=source_event_id,
+        instrument_key="binance:futures:BTCUSDT",
+        market_type="futures",
+        side="buy",
+        quote_notional=Decimal("50"),
+        reference_price=Decimal("10000"),
+        now=_NOW,
+    )
+    replay = service.record_rl_paper_execution(
+        owner_user_id=_USER_ID,
+        strategy_id=_STRATEGY_ID,
+        live_profile_id=_PROFILE_ID,
+        strategy_run_id=_RUN_ID,
+        source_event_id=source_event_id,
+        instrument_key="binance:futures:BTCUSDT",
+        market_type="futures",
+        side="buy",
+        quote_notional=Decimal("50"),
+        reference_price=Decimal("10000"),
+        now=_NOW,
+    )
+
+    simulator_expected = {
+        "position_quantity": Decimal("0.00500000"),
+        "fee_total": Decimal("0.05000000"),
+        "equity": Decimal("49.95000000"),
+    }
+    parity_abs_diff = {
+        "position_quantity": abs(first.position_quantity - simulator_expected["position_quantity"]),
+        "fee_total": abs(first.fee_total - simulator_expected["fee_total"]),
+        "equity": abs(first.equity - simulator_expected["equity"]),
+    }
+
+    assert replay.accounting_id == first.accounting_id
+    assert first.reserved_budget == Decimal("50")
+    assert first.position_quantity == simulator_expected["position_quantity"]
+    assert first.average_entry_price == Decimal("10000")
+    assert first.fee_model == "paper_fixed_bps_10"
+    assert first.funding_model == "funding_unknown"
+    assert first.pnl_complete is False
+    assert first.completeness_reason == "paper_funding_unknown"
+    assert parity_abs_diff == {
+        "position_quantity": Decimal("0E-8"),
+        "fee_total": Decimal("0E-8"),
+        "equity": Decimal("0E-8"),
+    }
+    assert len(accounting_repository.reservations) == 1
+    assert len(accounting_repository.orders) == 1
+    assert accounting_repository.orders[0].source_event_id == source_event_id
+    assert accounting_repository.orders[0].reason == "paper_market_fill_from_ml_agent_decision"
+    assert len(accounting_repository.fills) == 1
+    assert len(accounting_repository.accounting) == 1
+
+
 @pytest.mark.parametrize(
     ("free", "observed_at", "reason"),
     (

@@ -218,6 +218,84 @@ def test_canary_cli_records_source_event_without_intent(
     assert payload["intents_created"] == 0
 
 
+def test_paper_cli_records_intent_order_and_parity(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    feature_path = tmp_path / "feature-window.json"
+    manifest_path = tmp_path / "candidate-manifest.json"
+    feature_path.write_text(
+        json.dumps(
+            {
+                "exchange": "binance",
+                "instrument_key": "binance:futures:BTCUSDT",
+                "market_type": "futures",
+                "payloads": [
+                    _redis_payload(ts_open="2026-07-03T12:00:00Z", close="102.0"),
+                    _redis_payload(ts_open="2026-07-03T12:01:00Z", close="103.0"),
+                ],
+                "symbol": "BTCUSDT",
+            }
+        ),
+        encoding="utf-8",
+    )
+    manifest_path.write_text(
+        json.dumps(
+            _candidate_manifest(feature_count=12, preferred_action="open_long"),
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        mi,
+        "STAGE09_ACCEPTED_CANDIDATE_MANIFEST_SHA256_V1",
+        hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
+    )
+
+    assert inference_main.main(
+        [
+            "paper-once",
+            "--candidate-manifest",
+            str(manifest_path),
+            "--feature-window-json",
+            str(feature_path),
+            "--owner-user-id",
+            "00000000-0000-0000-0000-000000013001",
+            "--strategy-id",
+            "00000000-0000-0000-0000-000000013101",
+            "--strategy-run-id",
+            "00000000-0000-0000-0000-000000013201",
+            "--quote-notional",
+            "50",
+            "--reference-price",
+            "10000",
+        ]
+    ) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["source_type"] == "ml_agent_decision"
+    assert payload["action"] == "open_long"
+    assert payload["outcome"] == "risk_rejected"
+    assert payload["outcome_reason"] == "paper_no_exchange_submit"
+    assert payload["risk_reason"] == "paper_no_exchange_submit"
+    assert payload["source_events_created"] == 1
+    assert payload["intents_created"] == 1
+    assert payload["paper_orders_created"] == 1
+    assert payload["paper_fills_created"] == 1
+    assert payload["paper_accounting_created"] == 1
+    assert payload["duplicate_replay"] is True
+    assert payload["simulator_parity"] == {
+        "abs_diff": {
+            "equity": "0E-8",
+            "fee_total": "0E-8",
+            "position_quantity": "0E-8",
+        },
+        "max_abs_diff": "0E-8",
+        "status": "accepted",
+        "tolerance": "0",
+    }
+
+
 class _FakeRedis:
     def __init__(self, *, rows: list[tuple[str, dict[str, str]]]) -> None:
         self.rows = rows
@@ -246,7 +324,12 @@ def _redis_payload(*, ts_open: str, close: str) -> dict[str, str]:
     }
 
 
-def _candidate_manifest(*, feature_count: int) -> dict[str, object]:
+def _candidate_manifest(
+    *, feature_count: int, preferred_action: str = "hold"
+) -> dict[str, object]:
+    weights = [[0.0, -0.1, -0.2] for _index in range(feature_count)]
+    if preferred_action == "open_long":
+        weights = [[0.0, 1.0, 0.0]] + [[0.0, 0.0, 0.0] for _index in range(feature_count)]
     return {
         "candidate_id": mi.STAGE09_ACCEPTED_CANDIDATE_ID_V1,
         "model_state_hash": "a" * 64,
@@ -255,7 +338,7 @@ def _candidate_manifest(*, feature_count: int) -> dict[str, object]:
             "label_order": {"0": "hold", "1": "open_long", "2": "open_short"},
             "scaler_mean": [0.0] * feature_count,
             "scaler_std": [1.0] * feature_count,
-            "weights": [[0.0, -0.1, -0.2] for _index in range(feature_count)],
+            "weights": weights,
         },
         "policy_name": mi.STAGE09_ACCEPTED_CANDIDATE_POLICY_V1,
         "stage": "08M",
