@@ -13,6 +13,7 @@ from apps.worker.rl_trading_inference.wiring.modules import (
     RlTradingInferenceRedisStreamsConfig,
     load_rl_trading_inference_runtime_config,
 )
+from scripts.rl_trading import stage17_multi_ticker_runtime_load as stage17_load
 from trading.contexts.rl_trading.domain import monitor_only_inference as mi
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
@@ -439,6 +440,89 @@ def test_testnet_cli_blocks_spot_short_without_dispatch(
     }
 
 
+def test_stage17_load_harness_exercises_quota_counts_without_dispatch_growth(
+    tmp_path: Path,
+    capsys,
+    monkeypatch,
+) -> None:
+    manifest_path = tmp_path / "candidate-manifest.json"
+    manifest_path.write_text(
+        json.dumps(_candidate_manifest(feature_count=12), sort_keys=True),
+        encoding="utf-8",
+    )
+    fake_redis = _Stage17FakeRedis(
+        streams={
+            f"md.candles.1m.binance:futures:TEST{index:02d}USDT": _stage17_rows(
+                symbol=f"TEST{index:02d}USDT"
+            )
+            for index in range(20)
+        },
+        lengths={
+            "execution.requests.dlq.v1": 2,
+            "execution.requests.retry.v1": 1,
+            "execution.requests.v1": 49,
+        },
+    )
+    monkeypatch.setattr(stage17_load, "_build_redis_client", lambda **_kwargs: fake_redis)
+
+    assert stage17_load.main(
+        [
+            "--config",
+            str(REPO_ROOT / "configs" / "test" / "rl_trading_ml_runtime.yaml"),
+            "--candidate-manifest",
+            str(manifest_path),
+            "--output-root",
+            str(tmp_path),
+            "--generated-at-utc",
+            "2026-07-05T18:30:00Z",
+            "--max-feed-lag-seconds",
+            "999999999",
+            "--allow-fixture-manifest-hash",
+        ]
+    ) == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    summary = json.loads(Path(payload["summary_path"]).read_text(encoding="utf-8"))
+
+    assert payload["status"] == "accepted"
+    assert payload["observations"] == 26
+    assert summary["quota_scenarios"] == [
+        {
+            "label": "free",
+            "observation_count": 1,
+            "observed_tickers": 1,
+            "paid_level": "free",
+            "product_label": "Free",
+            "quota_bypass_observed": False,
+            "requested_live_tickers": 1,
+        },
+        {
+            "label": "pro",
+            "observation_count": 5,
+            "observed_tickers": 5,
+            "paid_level": "pro",
+            "product_label": "Pro",
+            "quota_bypass_observed": False,
+            "requested_live_tickers": 5,
+        },
+        {
+            "label": "premium",
+            "observation_count": 20,
+            "observed_tickers": 20,
+            "paid_level": "ultra",
+            "product_label": "Premium",
+            "quota_bypass_observed": False,
+            "requested_live_tickers": 20,
+        },
+    ]
+    assert summary["redis_execution_streams"]["delta"] == {
+        "execution.requests.dlq.v1": 0,
+        "execution.requests.retry.v1": 0,
+        "execution.requests.v1": 0,
+    }
+    assert {item["outcome"] for item in summary["observations"]} == {"no_intent"}
+
+
 class _FakeRedis:
     def __init__(self, *, rows: list[tuple[str, dict[str, str]]]) -> None:
         self.rows = rows
@@ -447,6 +531,30 @@ class _FakeRedis:
     def xrevrange(self, name: str, *, count: int) -> list[tuple[str, dict[str, str]]]:
         self.calls.append((name, count))
         return self.rows[:count]
+
+
+class _Stage17FakeRedis:
+    def __init__(
+        self,
+        *,
+        streams: dict[str, list[tuple[str, dict[str, str]]]],
+        lengths: dict[str, int],
+    ) -> None:
+        self.streams = streams
+        self.lengths = lengths
+
+    def scan_iter(self, *, match: str, count: int) -> list[str]:
+        del count
+        prefix = match.removesuffix("*")
+        return sorted(name for name in self.streams if name.startswith(prefix))
+
+    def xrevrange(self, name: str, *, count: int) -> list[tuple[str, dict[str, str]]]:
+        return self.streams[name][:count]
+
+    def xlen(self, name: str) -> int:
+        if name in self.lengths:
+            return self.lengths[name]
+        return len(self.streams[name])
 
 
 def _redis_payload(*, ts_open: str, close: str) -> dict[str, str]:
@@ -465,6 +573,30 @@ def _redis_payload(*, ts_open: str, close: str) -> dict[str, str]:
         "volume_quote": "1010.0" if close == "102.0" else "824.0",
         "trades_count": "42" if close == "102.0" else "37",
     }
+
+
+def _stage17_rows(*, symbol: str) -> list[tuple[str, dict[str, str]]]:
+    instrument_key = f"binance:futures:{symbol}"
+    return [
+        (
+            "2-0",
+            {
+                **_redis_payload(ts_open="2026-07-05T18:29:00Z", close="103.0"),
+                "instrument_key": instrument_key,
+                "symbol": symbol,
+                "ts_close": "2026-07-05T18:30:00Z",
+            },
+        ),
+        (
+            "1-0",
+            {
+                **_redis_payload(ts_open="2026-07-05T18:28:00Z", close="102.0"),
+                "instrument_key": instrument_key,
+                "symbol": symbol,
+                "ts_close": "2026-07-05T18:29:00Z",
+            },
+        ),
+    ]
 
 
 def _candle(*, close: float) -> dict[str, object]:
