@@ -21,6 +21,7 @@ goal_artifact_required: false
 proof_boundary:
   label: post_main_production_runtime_proof_required_for_changed_runtime_code
   changed_code_production_claim_allowed: true
+  claim_scope: "monitor-only technical soak/runtime safety only when Stage 08N allows only stage18_monitor_only_technical_soak; never model quality, trading edge, product readiness, full trade-readiness, or mainnet readiness"
   production_proof_requires:
     - changed revision on `main`
     - green CI/GitHub Actions for that revision
@@ -52,7 +53,28 @@ change_ownership:
     - exchange credential changes
     - user billing/subscription behavior
     - branch/worktree/stash/local-folder workflow changes
-scope: "Run 24h/7d RL soak and prove incident drills: kill switch, pause, rollback, stale feed, missing artifact, unknown-state."
+scope: "Run only monitor-only technical RL soak after accepted Stage 17, up to 20 tickers, and prove incident drills: kill switch, pause, rollback, stale feed, missing artifact, unknown-state."
+stage_mode_policy:
+  source_of_truth: "accepted Stage 08N report, accepted Stage 17 report, and current stage ledger"
+  current_expected_mode: monitor_only_technical_soak
+  max_tickers: 20
+  stage18_monitor_only_technical_soak_allowed: true
+  stage18_soak_allowed: false
+  stage19_mainnet_readiness_allowed: false
+  stage20_mainnet_canary_allowed: false
+  stage21_product_rollout_allowed: false
+  allowed_claims:
+    - "monitor-only runtime stability"
+    - "safe/degraded-state behavior"
+    - "incident drill behavior"
+    - "technical evidence useful for future runtime work"
+  forbidden_claims:
+    - "model quality"
+    - "trading edge"
+    - "full trade-readiness"
+    - "product readiness"
+    - "mainnet readiness"
+    - "paper/testnet/live execution readiness"
 language:
   implementation: python
   agent_report: ru
@@ -213,13 +235,13 @@ safety_notes:
 
 # Task
 
-Implement Stage 18 RL soak and incident drills. Run 24h minimum, 7d preferred monitor/paper/testnet soak for selected tickers and prove kill switch, pause, rollback, missing artifact, stale feed, and unknown-state drills before mainnet review.
+Implement Stage 18 RL monitor-only technical soak and incident drills. Run a bounded monitor-only technical soak for up to `20` tickers and prove kill switch, pause, rollback, missing artifact, stale feed, and unknown-state drills. Do not run paper/testnet/live execution and do not open mainnet review from this stage.
 
 Done means:
 
-- Soak report includes logs/metrics/UI/DB ledgers/model drift evidence.
+- Soak report includes logs, metrics, safe/degraded UI evidence where visible, source-event/runtime state evidence where applicable, and model drift/runtime health evidence.
 - Incident drills are executed and recorded with operator actions and recovery evidence.
-- RL operations runbook exists or is updated for safe modes, restore/rollback, and mainnet-prep actions.
+- RL operations runbook exists or is updated for safe modes, restore/rollback, and monitor-only incident response. Mainnet-prep actions stay explicitly blocked.
 
 ## Context / Current State
 
@@ -228,9 +250,9 @@ Context ledger from the previous iteration:
 - completed:
   - Stage 01 plan and ledger are accepted.
   - This prompt pack is the execution handoff for the current stage.
-  - No code for this stage is assumed implemented before the executor runs it.
+  - Stage `17` is accepted as `infrastructure_only` and proved Mac Studio load for `1/5/20` ticker counts.
 - open_items:
-  - Prove operational safety and recovery before any mainnet readiness decision.
+  - Prove monitor-only runtime safety and recovery before any later runtime decision.
   - Stage report, ledger status, prompt path/hash, and evidence still need executor updates.
   - Delivery state must be recorded explicitly.
 - contract_changes:
@@ -254,12 +276,13 @@ Additional context:
 
 - Stage 01 is accepted: the RL architecture plan, stage ledger, ClickHouse/data snapshot, and docs index evidence exist.
 - Prompt generation snapshot: the ledger current_stage was 02A when this pack was authored; always trust the ledger value read during execution.
-- Classic strategy producer Stage 05 is currently blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`); RL paper/testnet execution remains gated until classic Stage 05 repair and downstream classic Stage 07/09 acceptance.
+- Stage `17` accepted only an `infrastructure_only` load gate. Its handoff allows Stage `18` only as `monitor_only_technical_soak`, with maximum `20` tickers and forbidden model/product/mainnet claims.
+- Classic strategy producer prerequisites are historical context only for this Stage `18` mode: this prompt must not start paper/testnet/live execution. If any work touches paper/testnet/live paths, stop and record a blocker unless a newer accepted ledger entry explicitly supersedes this monitor-only restriction.
 
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`. If that statement is not true after reading the ledger, stop and record the blocker instead of guessing.
-- Verify the stage prerequisites before implementation. Required accepted prerequisites: Stage 17 and Stage `08N`. If the stage plans a full 24h/7d trade-readiness soak, `08N` must set `stage18_soak_allowed=true`. If `08N` sets only `stage18_monitor_only_technical_soak_allowed=true`, this stage may run only a bounded monitor-only technical soak and must label the report `technical_soak_only`; no trade-readiness or product-quality claim is allowed. If any required prerequisite is missing or the requested soak mode is not allowed by `08N`, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
+- Verify the stage prerequisites before implementation. Required accepted prerequisites: Stage `17` and Stage `08N`. With the current ledger handoff, `08N` sets `stage18_monitor_only_technical_soak_allowed=true` and `stage18_soak_allowed=false`, so this stage may run only a bounded monitor-only technical soak up to `20` tickers and must label the report `monitor_only_technical_soak` or `technical_soak_only`; no paper/testnet/live execution, trade-readiness, product-quality or mainnet-readiness claim is allowed. If any required prerequisite is missing, if the requested soak mode is not allowed by `08N`, or if the work would require paper/testnet/live execution, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/18-rl-soak-incident-drills.md` and record the prompt path and hash in the stage report.
 - Before editing, narrow broad expected directories to a concrete file list or planned new files and record that list in the stage report.
 - Keep the change bounded to Stage `18`. Do not start later stages or silently repair unrelated legacy issues.
@@ -272,7 +295,7 @@ Additional context:
 - Create or update `docs/runbooks/rl-trading-operations.md` in existing runbook style.
 - Mainnet remains blocked.
 - Drills must not leak secrets or raw provider payloads.
-- Unknown order/source-event state drill must prove lookup/reconciliation before retry.
+- Unknown source-event/runtime state drill must prove lookup/reconciliation before retry. If order state becomes involved, this stage must fail closed because current Stage `18` mode is monitor-only.
 - Browser QA should verify UI degraded/safe-mode states where visible.
 
 ## Requirements (Should)
@@ -353,10 +376,10 @@ Skill routing for this task:
 
 # Acceptance criteria (Definition of Done)
 
-- 24h minimum soak evidence passes; 7d preferred status is recorded as pass, running, or deferred with reason.
+- Monitor-only technical soak evidence passes for up to `20` tickers. If the stage uses a managed 24h/7d observation, record whether the 24h minimum passed, is running, or is blocked; do not mark full trade-readiness accepted from monitor-only evidence.
 - Kill switch, pause, rollback, stale feed, missing artifact, and unknown-state drills have evidence.
-- Stage 19 can run a mainnet readiness architecture review against current runbooks/evidence.
-- Stage `08N` soak allowance is recorded, including whether this was `technical_soak_only` or full trade-readiness soak.
+- Stage `19` remains blocked unless a later accepted promotion-grade quality report explicitly sets `stage19_mainnet_readiness_allowed=true`; this Stage `18` may hand off only monitor-only technical runtime evidence.
+- Stage `08N` and Stage `17` allowance is recorded, including that this was `monitor_only_technical_soak` / `technical_soak_only`, not full trade-readiness soak.
 - The stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/18-rl-soak-incident-drills.md` and includes prompt path/hash plus a strict file manifest.
 - The stage ledger is updated after validation and before final response.
 - Contract impact is classified for public API, ports, DTOs, persistence, config/defaults, external side effects, browser-visible behavior, performance, and docs/runbooks as applicable.
@@ -448,6 +471,7 @@ The final report must list `created`, `modified`, `deleted`, and `outside_expect
 - Do not train user-owned custom models.
 - Do not add cloud/S3/model hosting.
 - Do not bypass live_execution or exchange-execution.
+- Do not run paper/testnet/live execution in the current Stage `18` mode.
 - Do not open mainnet execution before Stage 19 approval and Stage 20 prompt conditions.
 
 # Quality gates (must run and pass)
