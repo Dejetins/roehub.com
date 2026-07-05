@@ -6,7 +6,69 @@ branch_policy:
   default_branch: main
   separate_branch_allowed: false
   stage_specific_branches_forbidden: true
-scope: "Prove multi-ticker RL runtime load, quotas, inference scheduling, feed lag, and rate-limit behavior."
+prompt_pack_execution:
+  plan_doc: docs/architecture/ml/rl-trading-agent-platform-v1.md
+  prompt_pack_dir: .codex/agents/generated/rl-trading-agent-platform-v1
+  stage_ledger: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
+  mode: manual_sequential
+  execution_mode: manual_sequential
+  goal_md_policy: "GOAL.md is optional, not required by default"
+  goal_driven_mode: "optional only over the same plan_doc/prompt_pack_dir/stage_ledger; no separate GOAL.md required"
+  stage_gate: "read ledger before edits; run only when current_stage is 17 and accepted 08N explicitly allows Stage 17"
+  file_manifest_required: true
+goal_mode_optional: true
+goal_artifact_required: false
+proof_boundary:
+  label: post_main_production_runtime_proof_required_for_changed_runtime_code
+  changed_code_production_claim_allowed: true
+  claim_scope: "infrastructure/load behavior only when Stage 08N allows only infrastructure_only; never model quality, trading edge, product readiness, or mainnet readiness"
+  production_proof_requires:
+    - changed revision on `main`
+    - green CI/GitHub Actions for that revision
+    - deploy/sync to `/opt/roehub/app`
+    - production runtime smoke after deploy/sync
+  pre_main_not_production_proof:
+    - target_host_*_pre_main
+    - local browser harness
+    - read-only host check
+    - artifact-only check under `/opt/roehub/state/rl_trading/`
+browser_auth:
+  status: "N/A unless this prompt is explicitly expanded into browser-visible UI/auth work"
+  smoke_username: smoke_e2e_keycloak
+  host_local_password_source: "/Users/daniildegtyarev/.config/roehub/roehub.env key ROEHUB_SMOKE_E2E_PASSWORD"
+  redaction_rule: "do not read or print the password unless browser/auth work is explicitly in scope; never write credentials to prompts, docs, logs, traces, reports, screenshots, or ledgers"
+change_ownership:
+  allowed_files:
+    - apps
+    - configs/prod
+    - scripts
+    - src/trading/contexts/rl_trading
+    - tests
+    - docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/17-multi-ticker-runtime-load.md
+    - docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
+    - docs/architecture/README.md
+  forbidden_without_user_approval:
+    - mainnet enablement
+    - exchange credential changes
+    - user billing/subscription behavior
+    - branch/worktree/stash/local-folder workflow changes
+scope: "Prove multi-ticker RL runtime load, quotas, inference scheduling, feed lag, and rate-limit behavior; current ledger handoff permits infrastructure_only only."
+stage_mode_policy:
+  source_of_truth: "accepted Stage 08N report plus current stage ledger"
+  current_expected_mode: infrastructure_only
+  stage17_infrastructure_only_allowed: true
+  stage17_full_runtime_allowed: false
+  allowed_claims:
+    - "Mac Studio runtime/load capacity"
+    - "latency, resource, Redis lag, queue, DLQ, and throughput behavior"
+    - "technical readiness for a later monitor-only technical soak when Stage 17 is accepted"
+  forbidden_claims:
+    - "model quality"
+    - "trading edge"
+    - "product readiness"
+    - "mainnet readiness"
+    - "live execution readiness"
+    - "user-facing rollout readiness"
 language:
   implementation: python
   agent_report: ru
@@ -54,6 +116,8 @@ context_sources:
         - docs/architecture/README.md
         - docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/01-baseline-plan-freeze.md
   consult_if_needed:
+    - path: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/08n-candidate-quality-reclassification.md
+      read_when: "checking whether Stage 17 is allowed and whether it is infrastructure-only or full runtime"
     - path: docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1.md
       read_when: "paper, testnet, live, or classic producer dependency affects this stage"
     - path: docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/strategy-producer-paper-testnet-trading-v1-stage-ledger.md
@@ -104,6 +168,7 @@ non_goals:
   - "Do not train user-owned custom models."
   - "Do not add cloud/S3/model hosting."
   - "Do not bypass live_execution or exchange-execution."
+  - "Do not claim model/product/trading quality from load evidence; Stage 08N owns candidate quality reclassification."
   - "Do not open mainnet execution before Stage 19 approval and Stage 20 prompt conditions."
 final_report_format:
   language: ru
@@ -204,12 +269,14 @@ Additional context:
 
 - Stage 01 is accepted: the RL architecture plan, stage ledger, ClickHouse/data snapshot, and docs index evidence exist.
 - Prompt generation snapshot: the ledger current_stage was 02A when this pack was authored; always trust the ledger value read during execution.
-- Classic strategy producer Stage 05 is currently blocked on Binance Futures Testnet account funding/config (`insufficient_balance`, `margin_mode_mismatch`, `leverage_mismatch`); RL paper/testnet execution remains gated until classic Stage 05 repair and downstream classic Stage 07/09 acceptance.
+- Classic strategy producer prerequisites are historical context only for Stage `17`: the RL ledger records Stage `15` paper integration and Stage `16` testnet integration as accepted. Stage `17` must still verify the current ledger instead of using stale classic-stage blocker text.
 
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`. If that statement is not true after reading the ledger, stop and record the blocker instead of guessing.
-- Verify the stage prerequisites before implementation. Required accepted prerequisites: Stage 16. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
+- Verify the stage prerequisites before implementation. Required accepted prerequisites: Stage 16 and Stage `08N`. Stage `08N` must explicitly set either `stage17_infrastructure_only_allowed=true` or `stage17_full_runtime_allowed=true`. If any required prerequisite is not accepted in the ledger, or if `08N` does not explicitly allow Stage `17`, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
+- If `08N` sets only `stage17_infrastructure_only_allowed=true`, label the entire Stage `17` report and ledger handoff as `infrastructure_only`. It may prove Mac Studio capacity, latency, Redis lag, queues and rate limits, but it must not claim the current `08M` candidate is product-ready, profitable enough, promotion-grade, or mainnet-ready.
+- With the current accepted `08N` handoff, treat Stage `17` as `infrastructure_only` unless the ledger contains a newer accepted superseding quality report. Do not infer `full_runtime` from this prompt's filename, from historical `08M stage09_allowed=true`, or from accepted paper/testnet plumbing.
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/17-multi-ticker-runtime-load.md` and record the prompt path and hash in the stage report.
 - Before editing, narrow broad expected directories to a concrete file list or planned new files and record that list in the stage report.
 - Keep the change bounded to Stage `17`. Do not start later stages or silently repair unrelated legacy issues.
@@ -304,6 +371,7 @@ Skill routing for this task:
 - Load evidence meets or records accepted/blocked resource budget for Stage 18.
 - No unbounded Redis lag, DLQ growth, duplicate decisions, or quota bypass is observed.
 - Stage 18 has concrete soak ticker/mode/resource limits.
+- Stage `08N` allowance is recorded, including whether Stage `17` is `infrastructure_only` or full runtime.
 - The stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/17-multi-ticker-runtime-load.md` and includes prompt path/hash plus a strict file manifest.
 - The stage ledger is updated after validation and before final response.
 - Contract impact is classified for public API, ports, DTOs, persistence, config/defaults, external side effects, browser-visible behavior, performance, and docs/runbooks as applicable.

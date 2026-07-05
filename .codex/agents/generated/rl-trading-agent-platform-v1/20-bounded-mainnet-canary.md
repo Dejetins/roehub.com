@@ -6,6 +6,54 @@ branch_policy:
   default_branch: main
   separate_branch_allowed: false
   stage_specific_branches_forbidden: true
+prompt_pack_execution:
+  plan_doc: docs/architecture/ml/rl-trading-agent-platform-v1.md
+  prompt_pack_dir: .codex/agents/generated/rl-trading-agent-platform-v1
+  stage_ledger: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
+  mode: manual_sequential
+  execution_mode: manual_sequential
+  goal_md_policy: "GOAL.md is optional, not required by default"
+  goal_driven_mode: "optional only over the same plan_doc/prompt_pack_dir/stage_ledger; no separate GOAL.md required"
+  stage_gate: "read ledger before edits; run only when current_stage is 20, Stage 19 explicitly approves canary, operator confirmation is present, and accepted 08N sets stage20_mainnet_canary_allowed=true"
+  file_manifest_required: true
+goal_mode_optional: true
+goal_artifact_required: false
+proof_boundary:
+  label: post_main_production_runtime_proof_required_for_changed_runtime_code_and_real_money_canary
+  changed_code_production_claim_allowed: true
+  production_proof_requires:
+    - changed revision on `main`
+    - green CI/GitHub Actions for that revision
+    - deploy/sync to `/opt/roehub/app`
+    - production runtime smoke after deploy/sync
+    - explicit operator/admin confirmation before any real-money submit
+  pre_main_not_production_proof:
+    - target_host_*_pre_main
+    - local browser harness
+    - read-only host check
+    - artifact-only check under `/opt/roehub/state/rl_trading/`
+browser_auth:
+  status: "N/A unless this prompt is explicitly expanded into browser-visible UI/auth work"
+  smoke_username: smoke_e2e_keycloak
+  host_local_password_source: "/Users/daniildegtyarev/.config/roehub/roehub.env key ROEHUB_SMOKE_E2E_PASSWORD"
+  redaction_rule: "do not read or print the password unless browser/auth work is explicitly in scope; never write credentials to prompts, docs, logs, traces, reports, screenshots, or ledgers"
+change_ownership:
+  allowed_files:
+    - apps
+    - configs/prod
+    - docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/20-bounded-mainnet-canary.md
+    - docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
+    - docs/runbooks/rl-trading-operations.md
+    - docs/architecture/README.md
+    - scripts
+    - src/trading/contexts/rl_trading
+    - src/trading/contexts/live_execution
+    - tests
+  forbidden_without_user_approval:
+    - unbounded mainnet rollout
+    - exchange credential changes
+    - user billing/subscription behavior
+    - branch/worktree/stash/local-folder workflow changes
 scope: "Run bounded real-money mainnet canary only after Stage 19 approval and explicit operator confirmation."
 language:
   implementation: python
@@ -106,6 +154,7 @@ non_goals:
   - "Do not train user-owned custom models."
   - "Do not add cloud/S3/model hosting."
   - "Do not bypass live_execution or exchange-execution."
+  - "Do not treat historical 08M stage09_allowed=true as mainnet canary approval; Stage 08N must explicitly allow this stage."
   - "Do not open mainnet execution before Stage 19 approval and Stage 20 prompt conditions."
 final_report_format:
   language: ru
@@ -207,7 +256,7 @@ Additional context:
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`. If that statement is not true after reading the ledger, stop and record the blocker instead of guessing.
-- Verify the stage prerequisites before implementation. Required accepted prerequisites: Stage 19 explicit approval. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
+- Verify the stage prerequisites before implementation. Required accepted prerequisites: Stage 19 explicit approval, separate operator/admin confirmation, and accepted Stage `08N` with `stage20_mainnet_canary_allowed=true`. If any required prerequisite is not accepted in the ledger, if operator confirmation is absent, or if `08N` does not explicitly allow mainnet canary, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/20-bounded-mainnet-canary.md` and record the prompt path and hash in the stage report.
 - Before editing, narrow broad expected directories to a concrete file list or planned new files and record that list in the stage report.
 - Keep the change bounded to Stage `20`. Do not start later stages or silently repair unrelated legacy issues.
@@ -303,6 +352,7 @@ Skill routing for this task:
 - Real-money canary completes or is stopped safely with reconciliation evidence.
 - No quota bypass, duplicate submit, or uncontrolled exposure is observed.
 - Stage 21 rollout is allowed only if canary outcome is accepted and product/support/legal gates remain closed.
+- Stage `08N` mainnet-canary allowance is linked and its candidate quality status is carried into the canary decision.
 - The stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/20-bounded-mainnet-canary.md` and includes prompt path/hash plus a strict file manifest.
 - The stage ledger is updated after validation and before final response.
 - Contract impact is classified for public API, ports, DTOs, persistence, config/defaults, external side effects, browser-visible behavior, performance, and docs/runbooks as applicable.

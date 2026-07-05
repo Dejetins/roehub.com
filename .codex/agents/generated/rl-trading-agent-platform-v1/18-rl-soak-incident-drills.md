@@ -6,6 +6,52 @@ branch_policy:
   default_branch: main
   separate_branch_allowed: false
   stage_specific_branches_forbidden: true
+prompt_pack_execution:
+  plan_doc: docs/architecture/ml/rl-trading-agent-platform-v1.md
+  prompt_pack_dir: .codex/agents/generated/rl-trading-agent-platform-v1
+  stage_ledger: docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
+  mode: manual_sequential
+  execution_mode: manual_sequential
+  goal_md_policy: "GOAL.md is optional, not required by default"
+  goal_driven_mode: "optional only over the same plan_doc/prompt_pack_dir/stage_ledger; no separate GOAL.md required"
+  stage_gate: "read ledger before edits; run only when current_stage is 18 and accepted 08N explicitly allows the requested soak mode"
+  file_manifest_required: true
+goal_mode_optional: true
+goal_artifact_required: false
+proof_boundary:
+  label: post_main_production_runtime_proof_required_for_changed_runtime_code
+  changed_code_production_claim_allowed: true
+  production_proof_requires:
+    - changed revision on `main`
+    - green CI/GitHub Actions for that revision
+    - deploy/sync to `/opt/roehub/app`
+    - production runtime smoke after deploy/sync
+  pre_main_not_production_proof:
+    - target_host_*_pre_main
+    - local browser harness
+    - read-only host check
+    - artifact-only check under `/opt/roehub/state/rl_trading/`
+browser_auth:
+  status: "Required only for visible safe/degraded-state browser QA in this stage"
+  smoke_username: smoke_e2e_keycloak
+  host_local_password_source: "/Users/daniildegtyarev/.config/roehub/roehub.env key ROEHUB_SMOKE_E2E_PASSWORD"
+  redaction_rule: "never write credentials to prompts, docs, logs, traces, reports, screenshots, or ledgers"
+change_ownership:
+  allowed_files:
+    - apps
+    - configs/prod
+    - docs/runbooks/rl-trading-operations.md
+    - docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/18-rl-soak-incident-drills.md
+    - docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md
+    - docs/architecture/README.md
+    - scripts
+    - src/trading/contexts/rl_trading
+    - tests
+  forbidden_without_user_approval:
+    - mainnet enablement
+    - exchange credential changes
+    - user billing/subscription behavior
+    - branch/worktree/stash/local-folder workflow changes
 scope: "Run 24h/7d RL soak and prove incident drills: kill switch, pause, rollback, stale feed, missing artifact, unknown-state."
 language:
   implementation: python
@@ -109,6 +155,7 @@ non_goals:
   - "Do not train user-owned custom models."
   - "Do not add cloud/S3/model hosting."
   - "Do not bypass live_execution or exchange-execution."
+  - "Do not claim model/product/trading quality from soak evidence; Stage 08N owns candidate quality reclassification."
   - "Do not open mainnet execution before Stage 19 approval and Stage 20 prompt conditions."
 final_report_format:
   language: ru
@@ -212,7 +259,7 @@ Additional context:
 ## Requirements (Must)
 
 - Start by stating exactly: `User required before start: nothing unless a listed prerequisite is not accepted or a required credential/dataset/runtime source is unavailable; never ask for secrets in chat`. If that statement is not true after reading the ledger, stop and record the blocker instead of guessing.
-- Verify the stage prerequisites before implementation. Required accepted prerequisites: Stage 17. If any required prerequisite is not accepted in the ledger, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
+- Verify the stage prerequisites before implementation. Required accepted prerequisites: Stage 17 and Stage `08N`. If the stage plans a full 24h/7d trade-readiness soak, `08N` must set `stage18_soak_allowed=true`. If `08N` sets only `stage18_monitor_only_technical_soak_allowed=true`, this stage may run only a bounded monitor-only technical soak and must label the report `technical_soak_only`; no trade-readiness or product-quality claim is allowed. If any required prerequisite is missing or the requested soak mode is not allowed by `08N`, stop, write/update the stage report as blocked, update the ledger, and do not implement dependent work.
 - Compute this prompt hash with `shasum -a 256 .codex/agents/generated/rl-trading-agent-platform-v1/18-rl-soak-incident-drills.md` and record the prompt path and hash in the stage report.
 - Before editing, narrow broad expected directories to a concrete file list or planned new files and record that list in the stage report.
 - Keep the change bounded to Stage `18`. Do not start later stages or silently repair unrelated legacy issues.
@@ -309,6 +356,7 @@ Skill routing for this task:
 - 24h minimum soak evidence passes; 7d preferred status is recorded as pass, running, or deferred with reason.
 - Kill switch, pause, rollback, stale feed, missing artifact, and unknown-state drills have evidence.
 - Stage 19 can run a mainnet readiness architecture review against current runbooks/evidence.
+- Stage `08N` soak allowance is recorded, including whether this was `technical_soak_only` or full trade-readiness soak.
 - The stage report exists at `docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/18-rl-soak-incident-drills.md` and includes prompt path/hash plus a strict file manifest.
 - The stage ledger is updated after validation and before final response.
 - Contract impact is classified for public API, ports, DTOs, persistence, config/defaults, external side effects, browser-visible behavior, performance, and docs/runbooks as applicable.
