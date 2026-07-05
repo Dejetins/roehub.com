@@ -703,7 +703,8 @@ class ExchangeExecutionProcessService:
                     status_result=status,
                     reason=_reconciliation_reason(order=status_order, status_result=status),
             )
-            if self._config.cancel_after_submit:
+            should_cancel = self._config.cancel_after_submit and not status.fills
+            if should_cancel:
                 self._acquire_rate_limit(
                     exchange=connection.exchange_name,
                     operation="cancel",
@@ -780,7 +781,7 @@ class ExchangeExecutionProcessService:
                     ),
                 )
             return "adapter_error", reason
-        if self._config.cancel_after_submit:
+        if self._config.cancel_after_submit and not status.fills:
             return "testnet_submitted", "testnet_submit_status_cancel_recorded"
         return "testnet_submitted", "testnet_submit_status_recorded"
 
@@ -1081,6 +1082,10 @@ def _reconciliation_reason(
         if status_result.fills:
             return "spot_order_status_and_fills_matched"
         return "spot_order_status_matched"
+    if status_result.fills:
+        if status_result.funding_events:
+            return "futures_order_status_fills_funding_matched"
+        return "futures_order_status_and_fills_matched"
     if status_result.funding_events:
         return "futures_order_status_fills_funding_matched"
     return "funding_reconciliation_pending"

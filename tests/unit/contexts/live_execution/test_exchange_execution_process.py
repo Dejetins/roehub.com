@@ -16,6 +16,7 @@ from trading.contexts.live_execution.application import (
 from trading.contexts.live_execution.application.ports import (
     ExchangeExecutionRedisHealth,
     ExchangeExecutionRedisMessage,
+    ExchangeOrderAdapterError,
     ExecutionDispatchPublishResult,
 )
 from trading.contexts.live_execution.domain import (
@@ -253,7 +254,7 @@ def test_testnet_adapter_records_submit_status_cancel_before_ack() -> None:
             ),
         )
     )
-    adapter = _Adapter(exchange_name="bybit")
+    adapter = _Adapter(exchange_name="bybit", include_fills=False)
     service = ExchangeExecutionProcessService(
         config=ExchangeExecutionProcessConfig(
             adapter_mode="testnet",
@@ -279,10 +280,10 @@ def test_testnet_adapter_records_submit_status_cancel_before_ack() -> None:
     assert process_repository.observations[0].status == "testnet_submitted"
     assert order_repository.private_stream_sessions[intent.exchange_connection_id].status == "ready"
     assert len(order_repository.order_events) == 5
-    assert len(order_repository.fills) == 1
+    assert len(order_repository.fills) == 0
     assert len(order_repository.reconciliation_runs) == 1
     assert order_repository.reconciliation_runs[0].status == "matched"
-    assert order_repository.reconciliation_runs[0].reason == "spot_order_status_and_fills_matched"
+    assert order_repository.reconciliation_runs[0].reason == "spot_order_status_matched"
     assert adapter.submitted == 1
 
 
@@ -390,6 +391,104 @@ def test_testnet_adapter_canary_can_record_fill_without_cancel() -> None:
     assert len(order_repository.reconciliation_runs) == 1
     assert order_repository.reconciliation_runs[0].status == "matched"
     assert adapter.submitted == 1
+
+
+def test_testnet_adapter_skips_cancel_when_market_order_already_filled() -> None:
+    process_repository = InMemoryExchangeExecutionProcessRepository()
+    intent_repository = InMemoryExecutionIntentRepository()
+    order_repository = InMemoryExchangeExecutionOrderRepository()
+    intent = _intent(status="dispatched", risk_status="accepted")
+    intent_repository.record_intent(intent=intent)
+    consumer = _Consumer(
+        messages=(
+            _message(
+                payload={
+                    "intent_id": str(intent.intent_id),
+                    "owner_user_id": str(intent.owner_user_id),
+                }
+            ),
+        )
+    )
+    adapter = _Adapter(exchange_name="bybit", cancel_reason="filled_order_cannot_cancel")
+    service = ExchangeExecutionProcessService(
+        config=ExchangeExecutionProcessConfig(
+            adapter_mode="testnet",
+            consumer_enabled=True,
+            cancel_after_submit=True,
+            max_clock_drift_ms=10_000,
+        ),
+        repository=process_repository,
+        intent_repository=intent_repository,
+        order_repository=order_repository,
+        credential_resolver=_Resolver(environment="testnet"),
+        order_adapters=(adapter,),
+        consumer=consumer,
+        clock=_Clock(),
+    )
+
+    result = service.run_once()
+
+    assert result.submitted_count == 1
+    assert result.adapter_error_count == 0
+    assert process_repository.observations[0].status == "testnet_submitted"
+    assert process_repository.observations[0].status_reason == "testnet_submit_status_recorded"
+    assert order_repository.orders[intent.intent_id].status == "status_checked"
+    assert len(order_repository.fills) == 1
+    assert order_repository.reconciliation_runs[0].status == "matched"
+    assert adapter.cancelled == 0
+
+
+def test_testnet_futures_fill_without_funding_is_matched_order_reconciliation() -> None:
+    process_repository = InMemoryExchangeExecutionProcessRepository()
+    intent_repository = InMemoryExecutionIntentRepository()
+    order_repository = InMemoryExchangeExecutionOrderRepository()
+    intent = _intent(
+        status="dispatched",
+        risk_status="accepted",
+        instrument_key="bybit:futures:BTCUSDT",
+        market_type="futures",
+        side="sell",
+    )
+    intent_repository.record_intent(intent=intent)
+    consumer = _Consumer(
+        messages=(
+            _message(
+                payload={
+                    "intent_id": str(intent.intent_id),
+                    "owner_user_id": str(intent.owner_user_id),
+                }
+            ),
+        )
+    )
+    service = ExchangeExecutionProcessService(
+        config=ExchangeExecutionProcessConfig(
+            adapter_mode="testnet",
+            consumer_enabled=True,
+            cancel_after_submit=False,
+            max_clock_drift_ms=10_000,
+        ),
+        repository=process_repository,
+        intent_repository=intent_repository,
+        order_repository=order_repository,
+        credential_resolver=_Resolver(environment="testnet", market_type="futures"),
+        order_adapters=(_Adapter(exchange_name="bybit"),),
+        consumer=consumer,
+        clock=_Clock(),
+    )
+
+    result = service.run_once()
+
+    assert result.submitted_count == 1
+    assert result.adapter_error_count == 0
+    assert process_repository.observations[0].status == "testnet_submitted"
+    assert order_repository.orders[intent.intent_id].status == "status_checked"
+    assert len(order_repository.fills) == 1
+    assert order_repository.reconciliation_runs[0].status == "matched"
+    assert (
+        order_repository.reconciliation_runs[0].reason
+        == "futures_order_status_and_fills_matched"
+    )
+    assert order_repository.reconciliation_runs[0].funding_event_count == 0
 
 
 def test_testnet_adapter_accepts_dispatching_intent_after_redis_publish_race() -> None:
@@ -539,6 +638,8 @@ def _intent(
     status: str,
     risk_status: str,
     instrument_key: str = "bybit:spot:BTCUSDT",
+    market_type: str = "spot",
+    side: str = "buy",
 ) -> ExecutionIntent:
     return ExecutionIntent(
         intent_id=uuid4(),
@@ -547,9 +648,9 @@ def _intent(
         source_type="ops_test",
         strategy_signal_id=None,
         exchange_connection_id=UUID("00000000-0000-0000-0000-000000013101"),
-        market_type="spot",
+        market_type=market_type,  # type: ignore[arg-type]
         instrument_key=instrument_key,
-        side="buy",
+        side=side,  # type: ignore[arg-type]
         order_type="market",
         quantity=Decimal("0.01"),
         quote_notional=None,
@@ -568,8 +669,9 @@ def _intent(
 
 
 class _Resolver:
-    def __init__(self, *, environment: str) -> None:
+    def __init__(self, *, environment: str, market_type: str = "spot") -> None:
         self._environment = environment
+        self._market_type = market_type
 
     def resolve(
         self, *, owner_user_id: UserId, exchange_connection_id: UUID
@@ -578,7 +680,7 @@ class _Resolver:
             connection_id=exchange_connection_id,
             owner_user_id=owner_user_id,
             exchange_name="bybit",
-            market_type="spot",
+            market_type=self._market_type,  # type: ignore[arg-type]
             environment=self._environment,
             connection_readiness="ready_for_trading",
             effective_capability="trading",
@@ -590,9 +692,18 @@ class _Resolver:
 
 
 class _Adapter:
-    def __init__(self, *, exchange_name: str) -> None:
+    def __init__(
+        self,
+        *,
+        exchange_name: str,
+        cancel_reason: str | None = None,
+        include_fills: bool = True,
+    ) -> None:
         self.exchange_name = exchange_name
         self.submitted = 0
+        self.cancelled = 0
+        self._cancel_reason = cancel_reason
+        self._include_fills = include_fills
 
     def server_time_ms(self) -> int:
         return int(_NOW.timestamp() * 1000)
@@ -643,16 +754,20 @@ class _Adapter:
             latency_ms=1.0,
             metadata={"provider": self.exchange_name},
             fills=(
-                ExecutionFillFact(
-                    provider_trade_id="trade-1",
-                    price=Decimal("20"),
-                    quantity=Decimal("0.01"),
-                    fee_amount=Decimal("0.001"),
-                    fee_asset="USDT",
-                    filled_at=_NOW,
-                    liquidity="taker",
-                    metadata={"provider": self.exchange_name},
-                ),
+                (
+                    ExecutionFillFact(
+                        provider_trade_id="trade-1",
+                        price=Decimal("20"),
+                        quantity=Decimal("0.01"),
+                        fee_amount=Decimal("0.001"),
+                        fee_asset="USDT",
+                        filled_at=_NOW,
+                        liquidity="taker",
+                        metadata={"provider": self.exchange_name},
+                    ),
+                )
+                if self._include_fills
+                else ()
             ),
         )
 
@@ -664,6 +779,9 @@ class _Adapter:
         credential: object,
     ) -> ExchangeOrderCancelResult:
         _ = command, credential
+        self.cancelled += 1
+        if self._cancel_reason is not None:
+            raise ExchangeOrderAdapterError(reason=self._cancel_reason)
         return ExchangeOrderCancelResult(
             exchange_order_id=exchange_order_id,
             exchange_status="cancelled",
