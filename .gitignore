@@ -50,6 +50,8 @@ target/
 .codex/*.local.*
 .opencode/
 .playwright-cli/
+.local_artifacts/
+local_artifacts/
 .data_load/*
 /output/
 /output/playwright/
