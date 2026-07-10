@@ -99,3 +99,4 @@ def test_compact_actions_keep_minimum_desktop_and_mobile_target_widths() -> None
     assert ".rh-button--compact { min-width: 36px; min-height: 36px; }" in css
     assert ".rh-button--compact { min-width: 44px; }" in css
     assert "grid-template-columns: minmax(0, 1fr) 44px 44px" in css
+    assert ".strategies-action-group { flex-wrap: wrap; }" in css

@@ -709,6 +709,15 @@ table tbody tr { height: 44px; }
   .workbench-main select,
   .workbench-main textarea { min-height: 44px !important; }
   .rh-button--compact { min-width: 44px; }
+  .strategies-summary-actions,
+  .strategies-action-group,
+  .strategies-action-menu {
+    width: 100%;
+    max-width: 100%;
+  }
+  .strategies-action-group { flex-wrap: wrap; }
+  .strategies-action-group .rh-button { flex: 1 1 calc(50% - 4px); min-width: 0; }
+  .strategies-action-menu > .rh-dropdown__trigger { width: 100%; }
 }
 
 @media (prefers-reduced-motion: reduce) {
