@@ -1,0 +1,62 @@
+groups:
+  - name: rl-trading-inference-monitor-only
+    rules:
+      - alert: RlTradingInferenceDown
+        expr: up{job="rl-trading-inference"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          owner: rl-trading
+        annotations:
+          summary: RL monitor-only inference endpoint is down
+          description: Prometheus cannot scrape the Stage 08K monitor worker on port 9213.
+          runbook: docs/runbooks/rl-trading-operations.md#stage-08k-monitor-only-alert-actions
+          action: Keep paper, testnet and mainnet disabled; inspect launchd, Monit and sanitized logs.
+
+      - alert: RlTradingInferenceNotReady
+        expr: rl_trading_inference_ready{job="rl-trading-inference"} != 1
+        for: 2m
+        labels:
+          severity: critical
+          owner: rl-trading
+        annotations:
+          summary: RL monitor-only inference is not ready
+          description: The trusted model, configuration or runtime dependency is not ready.
+          runbook: docs/runbooks/rl-trading-operations.md#stage-08k-monitor-only-alert-actions
+          action: Inspect health payload and model hash validation; do not bypass the artifact gate.
+
+      - alert: RlTradingInferenceFeedLag
+        expr: (time() - rl_trading_inference_last_candle_unixtime{job="rl-trading-inference"} > 90) or (rl_trading_inference_last_candle_unixtime{job="rl-trading-inference"} == 0)
+        for: 2m
+        labels:
+          severity: warning
+          owner: rl-trading
+        annotations:
+          summary: RL monitor-only candle feed is stale
+          description: Latest acknowledged 1m candle is more than 90 seconds behind wall clock.
+          runbook: docs/runbooks/rl-trading-operations.md#stage-08k-monitor-only-alert-actions
+          action: Inspect market-data Redis streams and consumer pending state before restart.
+
+      - alert: RlTradingInferenceErrors
+        expr: increase(rl_trading_inference_errors_total{job="rl-trading-inference"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          owner: rl-trading
+        annotations:
+          summary: RL monitor-only worker errors increased
+          description: At least one candle could not complete persistence and acknowledgement.
+          runbook: docs/runbooks/rl-trading-operations.md#stage-08k-monitor-only-alert-actions
+          action: Inspect the bounded operation/reason labels and logs; pending Redis entries will retry.
+
+      - alert: RlTradingInferenceSafetyBreach
+        expr: increase(rl_trading_inference_safety_breaches_total{job="rl-trading-inference"}[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          owner: rl-trading
+        annotations:
+          summary: RL monitor-only no-intent contract was breached
+          description: A monitor source event unexpectedly referenced an execution intent.
+          runbook: docs/runbooks/rl-trading-operations.md#stage-08k-monitor-only-alert-actions
+          action: Stop the RL worker immediately and verify execution_source_events, intents and orders.

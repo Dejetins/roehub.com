@@ -27,8 +27,29 @@ curl -i http://127.0.0.1:8000/auth/current-user
 curl -fsS http://127.0.0.1:9201/metrics >/tmp/roehub-metrics-9201.txt
 curl -fsS http://127.0.0.1:9202/metrics >/tmp/roehub-metrics-9202.txt
 curl -fsS http://127.0.0.1:9204/metrics >/tmp/roehub-metrics-9204.txt
+rl_ready=0
+for _attempt in {1..60}; do
+  if curl -fsS http://127.0.0.1:9213/health/ready >/tmp/roehub-rl-ready-9213.json \
+    && grep -q '"ready": true' /tmp/roehub-rl-ready-9213.json; then
+    rl_ready=1
+    break
+  fi
+  sleep 1
+done
+if [[ "$rl_ready" -ne 1 ]]; then
+  printf 'RL monitor-only worker did not become ready within 60 seconds\n' >&2
+  cat /tmp/roehub-rl-ready-9213.json >&2 2>/dev/null || true
+  exit 1
+fi
+curl -fsS http://127.0.0.1:9213/metrics >/tmp/roehub-metrics-9213.txt
 grep -q 'backtest_runner_tasks_claimed_total' /tmp/roehub-metrics-9204.txt
 grep -q 'backtest_runner_last_success_unixtime' /tmp/roehub-metrics-9204.txt
+grep -q '^rl_trading_inference_ready 1.0$' /tmp/roehub-metrics-9213.txt
+grep -q '^rl_trading_inference_model_loaded 1.0$' /tmp/roehub-metrics-9213.txt
+if grep -Eq '^rl_trading_inference_safety_breaches_total\{[^}]*\} [1-9]' /tmp/roehub-metrics-9213.txt; then
+  printf 'RL monitor-only safety breach metric is non-zero\n' >&2
+  exit 1
+fi
 
 /opt/clickhouse/clickhouse client --host 127.0.0.1 --port 9000 --query "SELECT 1"
 redis-cli -h 127.0.0.1 -p 6379 PING

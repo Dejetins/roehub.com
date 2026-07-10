@@ -19,6 +19,7 @@ prod_services=(
   com.roehub.exchange-control.plist
   com.roehub.exchange-execution.plist
   com.roehub.strategy-live-runner.plist
+  com.roehub.rl-trading-inference.plist
   com.roehub.notification-dispatcher.plist
   com.roehub.api.plist
   com.roehub.backtest-job-runner.plist
@@ -40,6 +41,7 @@ prod_post_openbao_services=(
   com.roehub.exchange-control.plist
   com.roehub.exchange-execution.plist
   com.roehub.strategy-live-runner.plist
+  com.roehub.rl-trading-inference.plist
   com.roehub.notification-dispatcher.plist
   com.roehub.api.plist
   com.roehub.backtest-job-runner.plist

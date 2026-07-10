@@ -77,6 +77,7 @@ def test_macos_prometheus_stage17_rules_are_repo_managed() -> None:
         "/opt/roehub/config/prometheus.rules/market-data-funding.rules.yml",
         "/opt/roehub/config/prometheus.rules/market-data-live-tail-repair.rules.yml",
         "/opt/roehub/config/prometheus.rules/notifications-admin.rules.yml",
+        "/opt/roehub/config/prometheus.rules/rl-trading-inference.rules.yml",
     ]
     jobs_by_name = {job["job_name"]: job for job in payload["scrape_configs"]}
     assert jobs_by_name["exchange-execution"]["static_configs"] == [
@@ -84,6 +85,9 @@ def test_macos_prometheus_stage17_rules_are_repo_managed() -> None:
     ]
     assert jobs_by_name["strategy-producer"]["static_configs"] == [
         {"targets": ["127.0.0.1:9207"]}
+    ]
+    assert jobs_by_name["rl-trading-inference"]["static_configs"] == [
+        {"targets": ["127.0.0.1:9213"]}
     ]
 
     rules_payload = _load_yaml(
@@ -124,6 +128,33 @@ def test_macos_bootstrap_installs_stage17_prometheus_rules() -> None:
     assert "market-data-funding.rules.yml" in script
     assert "market-data-live-tail-repair.rules.yml" in script
     assert "notifications-admin.rules.yml" in script
+    assert "rl-trading-inference.rules.yml" in script
+
+
+def test_macos_prometheus_rl_monitor_rules_are_repo_managed() -> None:
+    rules_payload = _load_yaml(
+        relative_path="infra/macos/prometheus/rules/rl-trading-inference.rules.yml"
+    )
+    groups = rules_payload["groups"]
+    assert [group["name"] for group in groups] == ["rl-trading-inference-monitor-only"]
+    alerts = {rule["alert"]: rule for rule in groups[0]["rules"]}
+    assert set(alerts) == {
+        "RlTradingInferenceDown",
+        "RlTradingInferenceErrors",
+        "RlTradingInferenceFeedLag",
+        "RlTradingInferenceNotReady",
+        "RlTradingInferenceSafetyBreach",
+    }
+    for rule in alerts.values():
+        assert rule["labels"]["owner"] == "rl-trading"
+        assert rule["labels"]["severity"] in {"warning", "critical"}
+        assert rule["annotations"]["runbook"].startswith(
+            "docs/runbooks/rl-trading-operations.md#"
+        )
+        assert rule["annotations"]["action"]
+    feed_lag_expr = alerts["RlTradingInferenceFeedLag"]["expr"]
+    assert "time() - rl_trading_inference_last_candle_unixtime" in feed_lag_expr
+    assert "rl_trading_inference_last_candle_unixtime" in feed_lag_expr
 
 
 def test_macos_prometheus_strategy_producer_rules_are_repo_managed() -> None:

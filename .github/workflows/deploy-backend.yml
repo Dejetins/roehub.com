@@ -145,7 +145,7 @@ jobs:
           export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
           cd /opt/roehub/app
           uv python install 3.12
-          uv sync --locked
+          uv sync --locked --extra rl-ml
           uv run python -V
 
       - name: Install native production service surface
@@ -229,6 +229,13 @@ jobs:
             test "${ok}" = '1'
           done
           tailscale serve status
+
+      - name: Smoke test native production runtime
+        run: |
+          set -euxo pipefail
+          export PATH=/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:$HOME/.local/bin
+          cd /opt/roehub/app
+          bash scripts/macos/smoke_prod.sh
 
       - name: Stage 09D exchange connection cleanup
         if: >-

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 
 import pytest
@@ -12,6 +13,7 @@ from trading.contexts.rl_trading.domain import (
     FeatureContractViolation,
     RlFeatureCandle,
     Stage13DecisionContext,
+    Stage13InferenceDecision,
     Stage13LatencyObservation,
     build_stage13_feature_matrix_v1,
     build_stage13_source_event_payload_v1,
@@ -182,6 +184,47 @@ def test_source_event_payload_is_bounded_and_live_execution_compatible() -> None
         source_ref_json=payload.source_ref_json,
         strategy_signal_id=None,
     ) == STAGE13_SOURCE_TYPE_V1
+
+
+def test_source_event_payload_includes_monitor_policy_metadata() -> None:
+    context = Stage13DecisionContext(
+        owner_user_id="00000000-0000-0000-0000-000000013001",
+        strategy_id="00000000-0000-0000-0000-000000013101",
+        strategy_run_id="00000000-0000-0000-0000-000000013201",
+        exchange="binance",
+        market_type="futures",
+        symbol="BTCUSDT",
+        instrument_key="binance:futures:BTCUSDT",
+    )
+    decision = Stage13InferenceDecision(
+        decision_id="d" * 64,
+        model_version_id="stage08k_roehub_native_best_3e033951",
+        action_id=0,
+        action_name="hold",
+        confidence=0.2,
+        feature_hash="f" * 64,
+        feature_contract_hash="c" * 64,
+        window_ts_close_utc=datetime(2026, 7, 10, 12, 0, tzinfo=UTC),
+        metadata={
+            "monitor_context": (
+                '{"policy":"stage08k_long_only_hold_1m_monitor_v1",'
+                '"reason":"short_blocked_by_monitor_policy"}'
+            ),
+        },
+    )
+
+    payload = build_stage13_source_event_payload_v1(context=context, decision=decision)
+    next_payload = build_stage13_source_event_payload_v1(
+        context=context,
+        decision=replace(
+            decision,
+            decision_id="e" * 64,
+            window_ts_close_utc=datetime(2026, 7, 10, 12, 1, tzinfo=UTC),
+        ),
+    )
+
+    assert "short_blocked_by_monitor_policy" in payload.source_ref_json["monitor_context"]
+    assert payload.idempotency_key != next_payload.idempotency_key
 
 
 def test_latency_summary_reports_segment_p95() -> None:

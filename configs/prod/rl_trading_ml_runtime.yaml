@@ -33,16 +33,45 @@ rollback:
   host_local_command_enabled: true
   delete_artifacts_on_rollback: false
 inference:
-  enabled: false
+  enabled: true
   mode: monitor_only
+  rollout_phase: one_ticker_1h
   metrics_port: 9213
   health_check_enabled: true
   max_concurrent_processes: 1
   torch_num_threads: 1
   torch_num_interop_threads: 1
   max_rss_mb: 4096
+  postgres_dsn_env: STRATEGY_PG_DSN
+  state_path: /opt/roehub/state/rl_trading/monitor_state/stage08k_long_only_hold_1m_monitor_v1.json
+  operator_context:
+    owner_user_id: ab094ba2-61d7-4fbf-be8f-cbad9f351572
+    strategy_id: ee15e181-309f-478e-8726-04a299f1292f
+    strategy_run_id: 2ed77f4d-ee5f-4c2c-b86f-6a57c553fa5d
+  instruments:
+    - exchange: binance
+      market_type: futures
+      symbol: AIOTUSDT
+      instrument_key: binance:futures:AIOTUSDT
+  monitor_policy:
+    policy_id: stage08k_long_only_hold_1m_monitor_v1
+    direction_policy: long_only
+    virtual_hold_minutes: 1
+    taker_fee_rate: 0.0005
+    slippage_rate: 0.00025
+    virtual_notional_quote: 5000.0
+    funding_model: not_modeled_for_1m_monitor
+    artifacts:
+      candidate_manifest_path: /opt/roehub/state/rl_trading/training_runs/stage08k_article_demo_profile_training_evaluation_v1/roehub_native/stage08e_roehub_native_fd7c614b_7500ec1bd322437afd18/roehub_native_candidate_manifest.json
+      candidate_manifest_sha256: 03fd26aa9cbf3ee4d4d3f50e62301408dccfa443e10a2cf9875014b064b444cc
+      evaluation_manifest_path: /opt/roehub/state/rl_trading/evaluation_runs/stage08k_article_demo_profile_training_evaluation_v1/stage08k_roehub_native_03fd26aa_cc9179e39ded309544c3/final_holdout_b2adb7da3abc/stage08f_evaluation_manifest.json
+      evaluation_manifest_sha256: c16a08dffa6f49fd8f24d9a1af6737114d54363b4cca3630a4e83c2661880b07
+      checkpoint_path: /opt/roehub/state/rl_trading/training_runs/stage08k_article_demo_profile_training_evaluation_v1/roehub_native/stage08e_roehub_native_fd7c614b_7500ec1bd322437afd18/checkpoints/best.pth
+      checkpoint_sha256: 3e0339514d808a34a20d36a3e7e4035c5e722097046c2fc817bb5a4b93a03199
+      normalization_stats_path: /opt/roehub/state/rl_trading/training_runs/stage08k_article_demo_profile_training_evaluation_v1/roehub_native/stage08e_roehub_native_fd7c614b_7500ec1bd322437afd18/train_only_normalization_stats.json
+      normalization_stats_file_sha256: e3f787c3cbecb9d39d5a87399a235d4f3a7efdb4625ec8ff8cd437af344c20fd
   source_events:
-    enabled: false
+    enabled: true
     source_type: ml_agent_decision
     outcome: no_intent
     outcome_reason: monitor_only_no_intent
@@ -55,7 +84,12 @@ inference:
     socket_timeout_s: 2.0
     connect_timeout_s: 2.0
     stream_prefix: md.candles.1m
-    window_size: 30
+    window_size: 90
+    consumer_group: rl.inference.monitor.v1
+    consumer_name: auto
+    read_count: 20
+    block_ms: 1000
+    pending_claim_min_idle_ms: 60000
   latency_budget_ms:
     candle_close_to_feature_ready_p95: 250
     feature_to_decision_p95: 100

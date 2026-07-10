@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
 from prometheus_client import CollectorRegistry
 
 from apps.worker.rl_trading_inference.main import main as inference_main
 from apps.worker.rl_trading_inference.wiring.modules import (
+    RedisRlClosedCandleStream,
     RedisRlFeatureWindowReader,
     RlTradingInferenceMetrics,
     RlTradingInferenceRedisStreamsConfig,
@@ -19,29 +22,43 @@ from trading.contexts.rl_trading.domain import monitor_only_inference as mi
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
 
-def test_runtime_configs_are_monitor_only_and_disabled_by_default() -> None:
+def test_runtime_configs_keep_non_prod_disabled_and_enable_bounded_prod_monitor() -> None:
     for profile in ("dev", "test", "prod"):
         config = load_rl_trading_inference_runtime_config(
             REPO_ROOT / "configs" / profile / "rl_trading_ml_runtime.yaml"
         )
 
         assert config.profile == profile
-        assert config.enabled is False
+        assert config.enabled is (profile == "prod")
         assert config.mode == "monitor_only"
-        assert config.source_events.enabled is False
+        assert config.rollout_phase == ("one_ticker_1h" if profile == "prod" else "disabled")
+        assert config.source_events.enabled is (profile == "prod")
         assert config.source_events.source_type == "ml_agent_decision"
         assert config.source_events.outcome == "no_intent"
         assert config.redis_streams.enabled is True
         assert config.redis_streams.stream_prefix == "md.candles.1m"
+        assert config.redis_streams.window_size == 90
+        assert len(config.instruments) == (1 if profile == "prod" else 5)
+        assert config.monitor_policy.direction_policy == "long_only"
+        assert config.monitor_policy.virtual_hold_minutes == 1
         assert config.latency_budget.feature_to_decision_p95_ms == 100
-        assert config.readiness_payload()["degraded_reasons"] == ["inference_disabled"]
+        expected_reasons = (
+            [] if profile == "prod" else ["inference_disabled", "source_events_disabled"]
+        )
+        assert config.readiness_payload()["degraded_reasons"] == expected_reasons
 
 
 def test_redis_window_reader_reads_latest_stream_without_ack() -> None:
     fake_redis = _FakeRedis(
         rows=[
-            ("2-0", _redis_payload(ts_open="2026-07-03T12:01:00Z", close="103.0")),
-            ("1-0", _redis_payload(ts_open="2026-07-03T12:00:00Z", close="102.0")),
+            (
+                _stream_id("2026-07-03T12:01:00Z"),
+                _redis_payload(ts_open="2026-07-03T12:01:00Z", close="103.0"),
+            ),
+            (
+                _stream_id("2026-07-03T12:00:00Z"),
+                _redis_payload(ts_open="2026-07-03T12:00:00Z", close="102.0"),
+            ),
         ]
     )
     reader = RedisRlFeatureWindowReader(
@@ -56,6 +73,11 @@ def test_redis_window_reader_reads_latest_stream_without_ack() -> None:
             connect_timeout_s=2.0,
             stream_prefix="md.candles.1m",
             window_size=2,
+            consumer_group="rl.inference.monitor.v1",
+            consumer_name="test",
+            read_count=20,
+            block_ms=0,
+            pending_claim_min_idle_ms=60_000,
         ),
     )
 
@@ -70,6 +92,91 @@ def test_redis_window_reader_reads_latest_stream_without_ack() -> None:
     assert len(window.candles) == 2
     assert window.candles[0].close == 102.0
     assert window.candles[1].close == 103.0
+
+
+def test_redis_window_reader_rejects_gap_and_wrong_message_boundary() -> None:
+    gap_rows = [
+        (
+            _stream_id("2026-07-03T12:02:00Z"),
+            _redis_payload(ts_open="2026-07-03T12:02:00Z", close="103.0"),
+        ),
+        (
+            _stream_id("2026-07-03T12:00:00Z"),
+            _redis_payload(ts_open="2026-07-03T12:00:00Z", close="102.0"),
+        ),
+    ]
+    reader = RedisRlFeatureWindowReader(
+        redis_client=_FakeRedis(rows=gap_rows),
+        config=_redis_config(window_size=2),
+    )
+
+    with pytest.raises(ValueError, match="redis_window_not_contiguous"):
+        reader.read_window_at_message(
+            exchange="binance",
+            market_type="futures",
+            symbol="BTCUSDT",
+            instrument_key="binance:futures:BTCUSDT",
+            message_id=_stream_id("2026-07-03T12:02:00Z"),
+        )
+    with pytest.raises(ValueError, match="does not end at the consumed message"):
+        reader.read_window_at_message(
+            exchange="binance",
+            market_type="futures",
+            symbol="BTCUSDT",
+            instrument_key="binance:futures:BTCUSDT",
+            message_id=_stream_id("2026-07-03T12:03:00Z"),
+        )
+
+
+def test_runtime_config_rejects_invalid_operator_uuid(tmp_path: Path) -> None:
+    config_text = (REPO_ROOT / "configs/test/rl_trading_ml_runtime.yaml").read_text(
+        encoding="utf-8"
+    )
+    config_path = tmp_path / "invalid.yaml"
+    config_path.write_text(
+        config_text.replace(
+            "ab094ba2-61d7-4fbf-be8f-cbad9f351572",
+            "not-a-uuid",
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="owner_user_id must be a UUID"):
+        load_rl_trading_inference_runtime_config(config_path)
+
+
+def test_redis_closed_candle_stream_uses_consumer_group_and_ack() -> None:
+    fake_redis = _FakeConsumerRedis()
+    config = RlTradingInferenceRedisStreamsConfig(
+        enabled=True,
+        host="127.0.0.1",
+        port=6379,
+        db=0,
+        auth_env=None,
+        socket_timeout_s=2.0,
+        connect_timeout_s=2.0,
+        stream_prefix="md.candles.1m",
+        window_size=90,
+        consumer_group="rl.inference.monitor.v1",
+        consumer_name="test-consumer",
+        read_count=20,
+        block_ms=0,
+        pending_claim_min_idle_ms=60_000,
+    )
+    stream = RedisRlClosedCandleStream(
+        redis_client=fake_redis,
+        config=config,
+        instrument_keys=("binance:futures:BTCUSDT",),
+    )
+
+    messages = stream.read()
+    stream.ack(message=messages[0])
+
+    assert messages[0].instrument_key == "binance:futures:BTCUSDT"
+    assert messages[0].message_id == "3-0"
+    assert fake_redis.group_creates == 1
+    assert fake_redis.acks == [("md.candles.1m.binance:futures:BTCUSDT", "3-0")]
 
 
 def test_metrics_render_bounded_labels_without_user_or_strategy_ids() -> None:
@@ -528,9 +635,41 @@ class _FakeRedis:
         self.rows = rows
         self.calls: list[tuple[str, int]] = []
 
-    def xrevrange(self, name: str, *, count: int) -> list[tuple[str, dict[str, str]]]:
+    def xrevrange(
+        self,
+        name: str,
+        *,
+        count: int,
+        max: str | None = None,
+    ) -> list[tuple[str, dict[str, str]]]:
+        del max
         self.calls.append((name, count))
         return self.rows[:count]
+
+
+class _FakeConsumerRedis:
+    def __init__(self) -> None:
+        self.group_creates = 0
+        self.acks: list[tuple[str, str]] = []
+
+    def xgroup_create(self, **kwargs: object) -> None:
+        del kwargs
+        self.group_creates += 1
+
+    def xautoclaim(self, *args: object, **kwargs: object) -> tuple[str, list[object], list[object]]:
+        del args, kwargs
+        return ("0-0", [], [])
+
+    def xreadgroup(self, **kwargs: object) -> list[tuple[str, list[tuple[str, dict[str, str]]]]]:
+        streams = kwargs["streams"]
+        assert isinstance(streams, dict)
+        stream_name = next(iter(streams))
+        payload = _redis_payload(ts_open="2026-07-03T12:01:00Z", close="103.0")
+        return [(str(stream_name), [("3-0", payload)])]
+
+    def xack(self, stream_name: str, group: str, message_id: str) -> None:
+        assert group == "rl.inference.monitor.v1"
+        self.acks.append((stream_name, message_id))
 
 
 class _Stage17FakeRedis:
@@ -558,13 +697,14 @@ class _Stage17FakeRedis:
 
 
 def _redis_payload(*, ts_open: str, close: str) -> dict[str, str]:
+    ts_open_value = datetime.fromisoformat(ts_open.replace("Z", "+00:00"))
     return {
         "schema_version": "1",
         "instrument_key": "binance:futures:BTCUSDT",
         "ts_open": ts_open,
-        "ts_close": "2026-07-03T12:01:00Z"
-        if ts_open.endswith("12:00:00Z")
-        else "2026-07-03T12:02:00Z",
+        "ts_close": (ts_open_value + timedelta(minutes=1))
+        .isoformat()
+        .replace("+00:00", "Z"),
         "open": "100.0" if close == "102.0" else "102.0",
         "high": "103.0" if close == "102.0" else "104.0",
         "low": "99.0" if close == "102.0" else "101.0",
@@ -573,6 +713,30 @@ def _redis_payload(*, ts_open: str, close: str) -> dict[str, str]:
         "volume_quote": "1010.0" if close == "102.0" else "824.0",
         "trades_count": "42" if close == "102.0" else "37",
     }
+
+
+def _redis_config(*, window_size: int) -> RlTradingInferenceRedisStreamsConfig:
+    return RlTradingInferenceRedisStreamsConfig(
+        enabled=True,
+        host="127.0.0.1",
+        port=6379,
+        db=0,
+        auth_env=None,
+        socket_timeout_s=2.0,
+        connect_timeout_s=2.0,
+        stream_prefix="md.candles.1m",
+        window_size=window_size,
+        consumer_group="rl.inference.monitor.v1",
+        consumer_name="test",
+        read_count=20,
+        block_ms=0,
+        pending_claim_min_idle_ms=60_000,
+    )
+
+
+def _stream_id(ts_open: str) -> str:
+    opened = datetime.fromisoformat(ts_open.replace("Z", "+00:00"))
+    return f"{int(opened.timestamp() * 1_000)}-0"
 
 
 def _stage17_rows(*, symbol: str) -> list[tuple[str, dict[str, str]]]:

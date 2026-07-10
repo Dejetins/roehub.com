@@ -629,6 +629,61 @@ def build_upstream_state_v1(
     return np.ascontiguousarray(state, dtype=np.float32)
 
 
+def build_upstream_entry_state_from_history_v1(
+    *,
+    history: np.ndarray,
+    normalization_stats: NormalizationStats,
+    config: UpstreamAlphaConfig | None = None,
+) -> np.ndarray:
+    """Build the step-zero state from past candles only.
+
+    The training environment receives a full pre/post-signal session, but its
+    first observation only consumes the final ``agent_history_len`` rows from
+    the pre-signal history. This helper exposes that exact calculation to live
+    inference without fabricating future candles.
+    """
+    selected_config = default_upstream_alpha_config_v1() if config is None else config
+    values = np.asarray(history, dtype=np.float32)
+    expected_shape = (selected_config.pre_signal_len, selected_config.feature_count)
+    if values.shape != expected_shape:
+        raise UpstreamMethodologyError(
+            reason="entry_history_shape_mismatch",
+            field=f"{values.shape} != {expected_shape}",
+        )
+    if not np.all(np.isfinite(values)):
+        raise UpstreamMethodologyError(reason="non_finite_entry_history")
+    window = values[-selected_config.agent_history_len :]
+    normalized = apply_upstream_normalization_v1(
+        window,
+        normalization_stats,
+        config=selected_config,
+    )
+    current_price = _positive_float(
+        float(values[-1, FEATURE_NAMES_V1.index("close")]),
+        "close_price",
+    )
+    extras = build_state_extras_v1(
+        position_side=None,
+        entry_price=None,
+        current_price=current_price,
+        step_idx=0,
+        session_len=selected_config.agent_session_len,
+    )
+    encoded_history = encode_action_history_v1(
+        [None] * selected_config.action_history_len
+    )
+    state = np.concatenate(
+        [
+            normalized.reshape(-1),
+            np.asarray(extras, dtype=np.float32),
+            np.asarray(encoded_history, dtype=np.float32),
+        ],
+    )
+    if state.shape != (selected_config.state_dim,):
+        raise UpstreamMethodologyError(reason="state_dim_mismatch", field=str(state.shape))
+    return np.ascontiguousarray(state, dtype=np.float32)
+
+
 def session_close_price_v1(
     session: np.ndarray,
     *,

@@ -8,6 +8,7 @@ rule_files:
   - /opt/roehub/config/prometheus.rules/market-data-funding.rules.yml
   - /opt/roehub/config/prometheus.rules/market-data-live-tail-repair.rules.yml
   - /opt/roehub/config/prometheus.rules/notifications-admin.rules.yml
+  - /opt/roehub/config/prometheus.rules/rl-trading-inference.rules.yml
 
 scrape_configs:
   - job_name: prometheus
@@ -94,6 +95,10 @@ scrape_configs:
   - job_name: notification-dispatcher
     static_configs:
       - targets: ["127.0.0.1:9210"]
+
+  - job_name: rl-trading-inference
+    static_configs:
+      - targets: ["127.0.0.1:9213"]
 
   - job_name: openbao
     metrics_path: /v1/sys/metrics

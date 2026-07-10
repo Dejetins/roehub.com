@@ -4,8 +4,8 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
-from datetime import UTC, datetime
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, cast
 
 import numpy as np
@@ -29,7 +29,12 @@ STAGE13_SOURCE_EVENT_OUTCOME_V1 = "no_intent"
 STAGE13_SOURCE_EVENT_OUTCOME_REASON_V1 = "monitor_only_no_intent"
 STAGE13_MODE_V1 = "monitor_only"
 STAGE13_SOURCE_TYPE_V1 = "ml_agent_decision"
-STAGE13_ALLOWED_ACTIONS_V1: tuple[str, ...] = ("hold", "open_long", "open_short")
+STAGE13_ALLOWED_ACTIONS_V1: tuple[str, ...] = (
+    "hold",
+    "open_long",
+    "open_short",
+    "close",
+)
 STAGE13_STAGE08M_FEATURE_NAMES_V1: tuple[str, ...] = (
     "history_return",
     "mean_return",
@@ -117,6 +122,7 @@ class Stage13InferenceDecision:
     feature_hash: str
     feature_contract_hash: str
     window_ts_close_utc: datetime
+    metadata: Mapping[str, str] = field(default_factory=dict)
     mode: str = STAGE13_MODE_V1
     outcome: str = STAGE13_SOURCE_EVENT_OUTCOME_V1
     outcome_reason: str = STAGE13_SOURCE_EVENT_OUTCOME_REASON_V1
@@ -132,6 +138,7 @@ class Stage13InferenceDecision:
             "kind": STAGE13_DECISION_KIND_V1,
             "mode": self.mode,
             "model_version_id": self.model_version_id,
+            "metadata": dict(sorted(self.metadata.items())),
             "outcome": self.outcome,
             "outcome_reason": self.outcome_reason,
             "schema_version": STAGE13_SCHEMA_VERSION_V1,
@@ -326,6 +333,7 @@ def feature_window_from_redis_payloads_v1(
     if not payloads:
         raise Stage13MonitorOnlyInferenceError(reason="redis_feature_window_empty")
     sorted_payloads = sorted(payloads, key=lambda item: _parse_utc(str(item["ts_open"])))
+    _validate_closed_one_minute_payload_sequence(sorted_payloads)
     candles = tuple(redis_payload_to_feature_candle_v1(payload) for payload in sorted_payloads)
     observed_keys = {
         str(payload.get("instrument_key", "")).strip()
@@ -480,6 +488,21 @@ def build_stage13_source_event_payload_v1(
         "strategy_run_id": context.strategy_run_id,
         "symbol": context.symbol,
     }
+    conflicting = set(source_ref_json).intersection(decision.metadata)
+    if conflicting:
+        raise Stage13MonitorOnlyInferenceError(
+            reason="decision_metadata_reserved_key",
+            field=sorted(conflicting)[0],
+        )
+    if len(decision.metadata) > 1:
+        raise Stage13MonitorOnlyInferenceError(reason="decision_metadata_too_large")
+    source_ref_json.update(
+        {
+            str(key): str(value)
+            for key, value in decision.metadata.items()
+            if str(key).strip() and str(value).strip()
+        }
+    )
     return Stage13SourceEventPayload(
         source_event_ref=f"rl:{decision.decision_id}",
         source_ref_json=source_ref_json,
@@ -489,6 +512,7 @@ def build_stage13_source_event_payload_v1(
                 context.strategy_id,
                 context.strategy_run_id,
                 context.instrument_key,
+                decision.decision_id,
                 decision.feature_hash,
                 decision.model_version_id,
                 STAGE13_MODE_V1,
@@ -559,6 +583,34 @@ def _optional_float_field(payload: Mapping[str, object], field: str) -> float | 
     if not math.isfinite(value):
         raise Stage13MonitorOnlyInferenceError(reason="redis_field_non_finite", field=field)
     return value
+
+
+def _validate_closed_one_minute_payload_sequence(
+    payloads: Sequence[Mapping[str, object]],
+) -> None:
+    bounds = [
+        (
+            _parse_utc(str(payload["ts_open"])),
+            _parse_utc(str(payload["ts_close"])),
+        )
+        for payload in payloads
+    ]
+    opens = [item[0] for item in bounds]
+    if len(set(opens)) != len(opens):
+        raise Stage13MonitorOnlyInferenceError(reason="redis_window_duplicate_candle")
+    for index, (ts_open, ts_close) in enumerate(bounds):
+        if ts_close - ts_open != timedelta(minutes=1):
+            raise Stage13MonitorOnlyInferenceError(
+                reason="redis_candle_duration_not_one_minute",
+                field=str(index),
+            )
+        if index > 0 and ts_open - bounds[index - 1][0] != timedelta(minutes=1):
+            raise Stage13MonitorOnlyInferenceError(
+                reason="redis_window_not_contiguous",
+                field=str(index),
+            )
+    if bounds[-1][1] > datetime.now(UTC):
+        raise Stage13MonitorOnlyInferenceError(reason="redis_window_contains_unclosed_candle")
 
 
 def _optional_int_field(payload: Mapping[str, object], field: str) -> int | None:

@@ -24,6 +24,7 @@ install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/strategy-producer.rules
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/market-data-funding.rules.yml" /opt/roehub/config/prometheus.rules/market-data-funding.rules.yml
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/market-data-live-tail-repair.rules.yml" /opt/roehub/config/prometheus.rules/market-data-live-tail-repair.rules.yml
 install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/notifications-admin.rules.yml" /opt/roehub/config/prometheus.rules/notifications-admin.rules.yml
+install -m 0644 "$REPO_ROOT/infra/macos/prometheus/rules/rl-trading-inference.rules.yml" /opt/roehub/config/prometheus.rules/rl-trading-inference.rules.yml
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/openbao.prod.hcl" /opt/roehub/config/openbao/openbao.prod.hcl
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-exchange-control-transit.hcl" /opt/roehub/config/openbao/policies/roehub-exchange-control-transit.hcl
 install -m 0644 "$REPO_ROOT/infra/macos/openbao/policies/roehub-api-transit-deny-decrypt.hcl" /opt/roehub/config/openbao/policies/roehub-api-transit-deny-decrypt.hcl
@@ -40,6 +41,7 @@ install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-keycloak.monitrc" /opt/ho
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-exchange-control.monitrc" /opt/homebrew/etc/monit.d/roehub-exchange-control.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-exchange-execution.monitrc" /opt/homebrew/etc/monit.d/roehub-exchange-execution.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-strategy-live-runner.monitrc" /opt/homebrew/etc/monit.d/roehub-strategy-live-runner.monitrc
+install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-rl-trading-inference.monitrc" /opt/homebrew/etc/monit.d/roehub-rl-trading-inference.monitrc
 install -m 0600 "$REPO_ROOT/infra/scripts/monit/roehub-openbao.monitrc" /opt/homebrew/etc/monit.d/roehub-openbao.monitrc
 
 for plist in \
@@ -49,6 +51,7 @@ for plist in \
   com.roehub.exchange-control.plist \
   com.roehub.exchange-execution.plist \
   com.roehub.strategy-live-runner.plist \
+  com.roehub.rl-trading-inference.plist \
   com.roehub.notification-dispatcher.plist \
   com.roehub.backtest-job-runner.plist \
   com.roehub.market-data-ws-worker.plist \

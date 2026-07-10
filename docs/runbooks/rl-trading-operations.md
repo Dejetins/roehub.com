@@ -96,3 +96,75 @@ Stage `08N` has:
 Future Stage `19+` work requires separate accepted readiness evidence and
 explicit approval. Do not infer mainnet readiness from monitor-only safety
 checks.
+
+## Stage 08K Monitor-Only Runtime
+
+Постоянный исследовательский процесс использует DQN-кандидат Stage `08K`, но
+не меняет его продуктовый статус. Кандидат остаётся `research_monitor_only` и
+не открывает `paper`, `testnet`, `live` или Stage `19+`.
+
+Зафиксированный контракт первого запуска:
+
+| Поле | Значение |
+|---|---|
+| Модель | `stage08k_roehub_native_best_3e033951` |
+| Checkpoint SHA-256 | `3e0339514d808a34a20d36a3e7e4035c5e722097046c2fc817bb5a4b93a03199` |
+| Политика | `stage08k_long_only_hold_1m_monitor_v1` |
+| Направление | Только `open_long`; `open_short` преобразуется в `hold` |
+| Закрытие | Виртуальное закрытие по следующей закрытой минутной свече |
+| Комиссия | Binance Futures taker `0.0005` на каждую сторону |
+| Проскальзывание | `0.00025` на каждую сторону |
+| Funding | Не моделируется; результат имеет исследовательский статус |
+| Исполнение | Всегда `ml_agent_decision -> no_intent`; `intent_id=null` |
+
+Процесс запускается службой `com.roehub.rl-trading-inference` и публикует
+`/health/live`, `/health/ready` и `/metrics` на `127.0.0.1:9213`.
+
+```bash
+launchctl print gui/$(id -u)/com.roehub.rl-trading-inference
+curl -fsS http://127.0.0.1:9213/health/ready
+curl -fsS http://127.0.0.1:9213/metrics | grep '^rl_trading_inference_'
+```
+
+Структурированные журналы:
+
+- `/Users/daniildegtyarev/Library/Logs/roehub/rl-trading-inference.out.log`;
+- `/Users/daniildegtyarev/Library/Logs/roehub/rl-trading-inference.err.log`.
+
+Prometheus хранит метрики, а не текст журналов. В labels запрещены идентификаторы
+пользователя, стратегии и тикера. Детализация по инструменту хранится только в
+существующем PostgreSQL-журнале `execution_source_events`.
+
+Порядок расширения allowlist:
+
+1. `one_ticker_1h`: один тикер и минимум один час чистого runtime evidence.
+2. `five_ticker_24h`: пять тикеров только после принятого первого окна.
+3. `twenty_ticker_7d`: двадцать тикеров только после принятого суточного окна.
+
+Каждая фаза обязана подтвердить `0` execution intents, `0` orders, отсутствие
+роста `execution.requests.v1`, `execution.requests.retry.v1` и
+`execution.requests.dlq.v1`, а также отсутствие
+`rl_trading_inference_safety_breaches_total`.
+
+## Stage 08K Monitor-Only Alert Actions
+
+| Сигнал | Действие оператора |
+|---|---|
+| `RlTradingInferenceDown` | Проверить `launchctl`, Monit и оба файла журналов. Не включать другие режимы. |
+| `RlTradingInferenceNotReady` | Проверить SHA-256 модели, evaluation manifest, normalization stats и доступность host-local env. Не обходить artifact gate. |
+| `RlTradingInferenceFeedLag` | Проверить `md.candles.1m.*`, market-data worker и Redis pending entries. |
+| `RlTradingInferenceErrors` | Найти bounded `operation/reason`; сообщение не подтверждается до успешной записи состояния и source event. |
+| `RlTradingInferenceSafetyBreach` | Немедленно остановить службу и проверить `execution_source_events`, `execution_intents`, orders и Redis execution streams. |
+
+Остановка и повторный запуск:
+
+```bash
+launchctl bootout gui/$(id -u) /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.rl-trading-inference.plist
+launchctl bootstrap gui/$(id -u) /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.rl-trading-inference.plist
+```
+
+Незавершённые виртуальные позиции сохраняются в
+`/opt/roehub/state/rl_trading/monitor_state/stage08k_long_only_hold_1m_monitor_v1.json`.
+Удалять этот файл во время активной фазы нельзя. Повторная обработка безопасна:
+source events имеют детерминированные idempotency keys, а Redis message
+подтверждается только после успешной записи source event и локального состояния.

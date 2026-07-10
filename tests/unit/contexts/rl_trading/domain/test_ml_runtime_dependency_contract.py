@@ -29,11 +29,11 @@ def test_rl_ml_runtime_configs_are_fail_closed_and_host_local() -> None:
         assert config["runtime_artifacts"]["allowed_root"] == "/opt/roehub/state/rl_trading"
         assert config["runtime_artifacts"]["commit_to_git"] is False
         assert config["trainer"]["enabled"] is False
-        assert config["inference"]["enabled"] is False
+        assert config["inference"]["enabled"] is (profile == "prod")
         assert config["inference"]["mode"] == "monitor_only"
         assert config["inference"]["metrics_port"] == 9213
         assert config["inference"]["health_check_enabled"] is True
-        assert config["inference"]["source_events"]["enabled"] is False
+        assert config["inference"]["source_events"]["enabled"] is (profile == "prod")
         assert config["inference"]["source_events"]["source_type"] == "ml_agent_decision"
         assert config["inference"]["source_events"]["outcome"] == "no_intent"
         assert (
@@ -42,7 +42,18 @@ def test_rl_ml_runtime_configs_are_fail_closed_and_host_local() -> None:
         )
         assert config["inference"]["redis_streams"]["enabled"] is True
         assert config["inference"]["redis_streams"]["stream_prefix"] == "md.candles.1m"
-        assert config["inference"]["redis_streams"]["window_size"] == 30
+        assert config["inference"]["redis_streams"]["window_size"] == 90
+        assert config["inference"]["redis_streams"]["consumer_group"] == (
+            "rl.inference.monitor.v1"
+        )
+        assert len(config["inference"]["instruments"]) == (1 if profile == "prod" else 5)
+        assert config["inference"]["monitor_policy"]["direction_policy"] == "long_only"
+        assert config["inference"]["monitor_policy"]["virtual_hold_minutes"] == 1
+        assert config["inference"]["monitor_policy"]["taker_fee_rate"] == 0.0005
+        assert config["inference"]["monitor_policy"]["slippage_rate"] == 0.00025
+        assert config["inference"]["state_path"].startswith(
+            "/opt/roehub/state/rl_trading/"
+        )
         assert (
             config["inference"]["latency_budget_ms"]["candle_close_to_feature_ready_p95"]
             == 250
@@ -71,3 +82,11 @@ def test_rl_ml_runtime_configs_are_fail_closed_and_host_local() -> None:
         assert config["retraining"]["max_concurrent_candidate_jobs"] == 1
         assert config["disk"]["cleanup_may_delete_accepted_artifacts"] is False
         assert config["disk"]["block_training_below_free_gb"] >= config["disk"]["min_free_gb"]
+
+
+def test_production_deploy_installs_rl_ml_runtime_extra() -> None:
+    workflow = (REPO_ROOT / ".github/workflows/deploy-backend.yml").read_text(
+        encoding="utf-8"
+    )
+
+    assert "uv sync --locked --extra rl-ml" in workflow

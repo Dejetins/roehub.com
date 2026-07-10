@@ -15,8 +15,11 @@ from uuid import UUID
 from prometheus_client import CollectorRegistry
 
 from apps.worker.rl_trading_inference.wiring.modules import (
+    RedisRlClosedCandleStream,
+    RedisRlFeatureWindowReader,
     RlTradingInferenceHttpServer,
     RlTradingInferenceMetrics,
+    Stage08kMonitorWorker,
     load_rl_trading_inference_runtime_config,
 )
 from trading.contexts.live_execution.adapters.outbound import (
@@ -41,6 +44,9 @@ from trading.contexts.live_execution.application.ports import (
 )
 from trading.contexts.live_execution.domain import ExecutionIntent, ExecutionRiskContext
 from trading.contexts.rl_trading.adapters.outbound import LiveExecutionRlInferenceProducer
+from trading.contexts.rl_trading.adapters.outbound.persistence.file_monitor_state import (
+    FileStage08kMonitorStateStore,
+)
 from trading.contexts.rl_trading.domain import (
     STAGE13_SOURCE_EVENT_OUTCOME_REASON_V1,
     STAGE13_SOURCE_EVENT_OUTCOME_V1,
@@ -51,6 +57,7 @@ from trading.contexts.rl_trading.domain import (
     compare_stage13_train_live_feature_parity_v1,
     feature_window_from_redis_payloads_v1,
     offline_feature_window_from_candles_v1,
+    preload_stage08k_monitor_policy_v1,
     preload_stage13_policy_from_candidate_manifest_v1,
 )
 from trading.contexts.strategy.adapters.outbound import PsycopgStrategyPostgresGateway
@@ -59,10 +66,26 @@ log = logging.getLogger(__name__)
 
 
 def _configure_logging() -> None:
+    handler = logging.StreamHandler()
+    handler.setFormatter(_JsonLogFormatter())
     logging.basicConfig(
         level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+        handlers=[handler],
+        force=True,
     )
+
+
+class _JsonLogFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        payload: dict[str, object] = {
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "timestamp_utc": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+        }
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=True, sort_keys=True)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -518,19 +541,70 @@ def _run_serve(
     config = load_rl_trading_inference_runtime_config(config_path)
     metrics = RlTradingInferenceMetrics(registry=CollectorRegistry())
     readiness = config.readiness_payload()
+    initial_reasons = cast(list[str], readiness["degraded_reasons"])
+    if config.enabled:
+        initial_reasons = [*initial_reasons, "model_not_loaded"]
     metrics.set_readiness(
-        ready=bool(readiness["ready"]),
-        degraded_reasons=cast(list[str], readiness["degraded_reasons"]),
+        ready=False,
+        degraded_reasons=initial_reasons,
     )
     port = config.metrics_port if metrics_port is None else metrics_port
     server = RlTradingInferenceHttpServer(metrics=metrics, port=port)
     server.start()
     try:
-        if duration_seconds > 0:
-            time.sleep(duration_seconds)
-            return 0
-        while True:
-            time.sleep(60.0)
+        if not config.enabled:
+            if duration_seconds > 0:
+                time.sleep(duration_seconds)
+                return 0
+            while True:
+                time.sleep(60.0)
+        dsn = os.environ.get(config.postgres_dsn_env, "").strip()
+        if not dsn:
+            raise ValueError(f"{config.postgres_dsn_env} is required for monitor source events")
+        policy = preload_stage08k_monitor_policy_v1(
+            artifacts=config.artifacts,
+            policy_config=config.monitor_policy,
+            torch_num_threads=config.torch_num_threads,
+            torch_num_interop_threads=config.torch_num_interop_threads,
+        )
+        metrics.set_model_loaded(loaded=True)
+        gateway = PsycopgStrategyPostgresGateway(dsn=dsn)
+        repository = PostgresExecutionIntentRepository(gateway=gateway)
+        producer = LiveExecutionRlInferenceProducer(
+            ingress_service=ExecutionIngressService(
+                repository=repository,
+                clock=SystemLiveExecutionClock(),
+            ),
+            repository=repository,
+        )
+        instrument_keys = tuple(row.instrument_key for row in config.instruments)
+        stream = RedisRlClosedCandleStream.from_runtime_config(
+            config=config.redis_streams,
+            instrument_keys=instrument_keys,
+        )
+        window_reader = RedisRlFeatureWindowReader.from_runtime_config(
+            config=config.redis_streams,
+        )
+        state_store = FileStage08kMonitorStateStore(path=config.state_path)
+        worker = Stage08kMonitorWorker(
+            instruments=config.instruments,
+            operator_context=config.operator_context,
+            stream=stream,
+            window_reader=window_reader,
+            policy=policy,
+            producer=producer,
+            state_store=state_store,
+            metrics=metrics,
+        )
+        metrics.set_readiness(ready=True, degraded_reasons=[])
+        log.info(
+            "stage08k monitor started model_version_id=%s policy_id=%s instruments=%s",
+            policy.model_version_id,
+            config.monitor_policy.policy_id,
+            len(config.instruments),
+        )
+        worker.run(duration_seconds=duration_seconds)
+        return 0
     finally:
         server.stop()
 
