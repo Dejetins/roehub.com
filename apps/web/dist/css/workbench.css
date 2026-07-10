@@ -639,7 +639,7 @@ table tbody tr { height: 44px; }
   :root { --workbench-topbar-height: 58px; }
   .workbench-shell { display: block; padding-bottom: var(--workbench-mobile-nav-height); }
   .workbench-sidebar { display: none; }
-  .workbench-topbar { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+  .workbench-topbar { grid-template-columns: minmax(0, 1fr) 44px 44px; gap: 8px; }
   .workbench-command-trigger { width: 44px; min-width: 44px; padding: 0; justify-content: center; }
   .workbench-topbar button,
   .workbench-topbar .workbench-environment,
@@ -647,7 +647,7 @@ table tbody tr { height: 44px; }
   .workbench-command-trigger > span:nth-child(2),
   .workbench-command-trigger kbd,
   .workbench-environment span:last-child { display: none; }
-  .workbench-environment { min-width: 40px; padding: 8px; justify-content: center; }
+  .workbench-environment { min-width: 44px; padding: 8px; justify-content: center; }
   .workbench-main,
   .page-shell.workbench-main,
   .page-shell:has(.dashboard-workstation),
