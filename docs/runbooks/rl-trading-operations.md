@@ -141,6 +141,59 @@ Prometheus хранит метрики, а не текст журналов. В 
 2. `five_ticker_24h`: пять тикеров только после принятого первого окна.
 3. `twenty_ticker_7d`: двадцать тикеров только после принятого суточного окна.
 
+Списки Stage `18A` зафиксированы до начала расширенных окон. Они выбраны из
+тикеров с положительным исследовательским результатом для политики
+`long_only + 1m`, не менее чем пятью историческими сделками и активным
+`md.candles.1m.binance:futures:*` потоком на Mac Studio:
+
+- `five_ticker_24h`: `AIOTUSDT`, `LIGHTUSDT`, `COAIUSDT`, `ESPORTSUSDT`,
+  `RAVEUSDT`;
+- `twenty_ticker_7d`: предыдущие пять плюс `BLESSUSDT`, `BANKUSDT`, `BSBUSDT`,
+  `AGTUSDT`, `JCTUSDT`, `ZEREBROUSDT`, `MUBARAKUSDT`, `JELLYJELLYUSDT`,
+  `NAORISUSDT`, `LYNUSDT`, `ACTUSDT`, `TRADOORUSDT`, `SIRENUSDT`, `LABUSDT`,
+  `XNYUSDT`.
+
+Сборщик доказательств не позволяет сократить длительность фазы и проверяет
+неизменность ревизии, процесса, runtime-конфигурации, политики и списка
+инструментов на протяжении всего окна. Для `five_ticker_24h` обязателен
+принятый и хешированный итог `one_ticker_1h`; для `twenty_ticker_7d` — итог
+`five_ticker_24h`.
+
+```bash
+cd /opt/roehub/app
+
+ONE_TICKER_RUN=stage18a_one_ticker_1h_YYYYMMDDTHHMMSSZ
+FIVE_TICKER_RUN=stage18a_five_ticker_24h_YYYYMMDDTHHMMSSZ
+EVIDENCE_ROOT=/opt/roehub/state/rl_trading/evaluation_runs/stage18a_stage08k_monitor_only_runtime_v1
+ONE_TICKER_SUMMARY="$EVIDENCE_ROOT/$ONE_TICKER_RUN/summary.json"
+FIVE_TICKER_SUMMARY="$EVIDENCE_ROOT/$FIVE_TICKER_RUN/summary.json"
+
+.venv/bin/python scripts/macos/stage18a_rl_monitor_evidence.py \
+  --mode baseline \
+  --phase one_ticker_1h
+
+.venv/bin/python scripts/macos/stage18a_rl_monitor_evidence.py \
+  --mode baseline \
+  --phase five_ticker_24h \
+  --previous-summary "$ONE_TICKER_SUMMARY"
+
+.venv/bin/python scripts/macos/stage18a_rl_monitor_evidence.py \
+  --mode baseline \
+  --phase twenty_ticker_7d \
+  --previous-summary "$FIVE_TICKER_SUMMARY"
+
+.venv/bin/python scripts/macos/stage18a_rl_monitor_evidence.py \
+  --mode final \
+  --baseline /path/from/baseline-command/baseline.json
+```
+
+Финальный режим получает путь к `baseline.json`. Для суточного окна отсутствие
+редкого импульса `5%` за десять минут не считается отказом runtime. Недельное
+окно обязано зафиксировать хотя бы одно решение DQN, одну корректно закрытую
+виртуальную позицию и конечный расчётный PnL. Любой поздний виртуальный выход,
+перезапуск процесса, изменение списка инструментов или рост execution streams
+закрывает приёмку.
+
 Каждая фаза обязана подтвердить `0` execution intents, `0` orders, отсутствие
 роста `execution.requests.v1`, `execution.requests.retry.v1` и
 `execution.requests.dlq.v1`, а также отсутствие

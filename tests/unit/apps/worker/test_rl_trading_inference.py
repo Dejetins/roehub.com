@@ -31,14 +31,14 @@ def test_runtime_configs_keep_non_prod_disabled_and_enable_bounded_prod_monitor(
         assert config.profile == profile
         assert config.enabled is (profile == "prod")
         assert config.mode == "monitor_only"
-        assert config.rollout_phase == ("one_ticker_1h" if profile == "prod" else "disabled")
+        assert config.rollout_phase == ("five_ticker_24h" if profile == "prod" else "disabled")
         assert config.source_events.enabled is (profile == "prod")
         assert config.source_events.source_type == "ml_agent_decision"
         assert config.source_events.outcome == "no_intent"
         assert config.redis_streams.enabled is True
         assert config.redis_streams.stream_prefix == "md.candles.1m"
         assert config.redis_streams.window_size == 90
-        assert len(config.instruments) == (1 if profile == "prod" else 5)
+        assert len(config.instruments) == 5
         assert config.monitor_policy.direction_policy == "long_only"
         assert config.monitor_policy.virtual_hold_minutes == 1
         assert config.latency_budget.feature_to_decision_p95_ms == 100

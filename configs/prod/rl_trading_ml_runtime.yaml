@@ -35,7 +35,7 @@ rollback:
 inference:
   enabled: true
   mode: monitor_only
-  rollout_phase: one_ticker_1h
+  rollout_phase: five_ticker_24h
   metrics_port: 9213
   health_check_enabled: true
   max_concurrent_processes: 1
@@ -53,6 +53,22 @@ inference:
       market_type: futures
       symbol: AIOTUSDT
       instrument_key: binance:futures:AIOTUSDT
+    - exchange: binance
+      market_type: futures
+      symbol: LIGHTUSDT
+      instrument_key: binance:futures:LIGHTUSDT
+    - exchange: binance
+      market_type: futures
+      symbol: COAIUSDT
+      instrument_key: binance:futures:COAIUSDT
+    - exchange: binance
+      market_type: futures
+      symbol: ESPORTSUSDT
+      instrument_key: binance:futures:ESPORTSUSDT
+    - exchange: binance
+      market_type: futures
+      symbol: RAVEUSDT
+      instrument_key: binance:futures:RAVEUSDT
   monitor_policy:
     policy_id: stage08k_long_only_hold_1m_monitor_v1
     direction_policy: long_only

@@ -46,7 +46,10 @@ def test_rl_ml_runtime_configs_are_fail_closed_and_host_local() -> None:
         assert config["inference"]["redis_streams"]["consumer_group"] == (
             "rl.inference.monitor.v1"
         )
-        assert len(config["inference"]["instruments"]) == (1 if profile == "prod" else 5)
+        assert len(config["inference"]["instruments"]) == 5
+        assert config["inference"]["rollout_phase"] == (
+            "five_ticker_24h" if profile == "prod" else "disabled"
+        )
         assert config["inference"]["monitor_policy"]["direction_policy"] == "long_only"
         assert config["inference"]["monitor_policy"]["virtual_hold_minutes"] == 1
         assert config["inference"]["monitor_policy"]["taker_fee_rate"] == 0.0005
