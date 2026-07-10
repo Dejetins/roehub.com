@@ -525,13 +525,15 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'data-page="backtests"' in response.text
     assert 'data-backtests-root' in response.text
     assert 'data-config-field="strategy"' in response.text
-    assert 'type="text" value="" data-config-field="strategy"' in response.text
+    assert 'type="text" value="" placeholder="For example, Momentum BTC"' in response.text
     assert response.text.index('data-config-field="strategy"') < response.text.index(
         'data-config-field="symbol"'
     )
     assert response.text.index('data-config-field="symbol"') < response.text.index(
-        'id="backtest-market-trigger"'
+        'id="backtest-instrument-market-trigger"'
     )
+    assert 'class="backtests-advanced"' in response.text
+    assert 'class="backtests-indicator-list" data-indicator-rows' in response.text
     assert 'data-current-value="sizing_mode">All in</span>' in response.text
     assert 'data-workstation-endpoint="/api/ui/backtests/workstation"' in response.text
     assert 'data-runtime-defaults-endpoint="/api/backtests/runtime-defaults"' in response.text
@@ -763,6 +765,21 @@ def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
     assert '<span aria-hidden="true">&gt;_</span>' not in response.text
     assert "data-selected-action" not in response.text
     assert "<select" not in response.text
+
+
+def test_authorized_monitoring_uses_task_first_summary_surface() -> None:
+    client = _build_test_client()
+
+    response = client.get("/monitoring")
+
+    assert response.status_code == 200
+    assert 'data-page="monitoring"' in response.text
+    assert "data-monitoring-root" in response.text
+    assert "/assets/css/pages/monitoring.css" in response.text
+    assert "data-monitoring-state-title" in response.text
+    assert "data-monitoring-state-message" in response.text
+    assert "data-monitoring-metric-count" in response.text
+    assert 'class="monitoring-overview-grid"' in response.text
 
 
 def test_locale_cookie_selects_russian_shell_without_localizing_routes() -> None:
@@ -1010,6 +1027,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert ".backtests-field-pair--dates" in backtests_css
     assert "grid-template-columns: repeat(3, minmax(0, 1fr));" in backtests_css
     assert ".backtests-icon-button" in backtests_css
+    assert "task-first configuration with progressive disclosure" in backtests_css
+    assert ".backtests-indicator-card" in backtests_css
     assert ".backtests-variant-frame" in backtests_css
     assert "max-height var(--backtests-variant-open-duration" in backtests_css
     assert ".backtests-variant-frame.backtests-variant-frame--static" in backtests_css

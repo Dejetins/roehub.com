@@ -9,6 +9,14 @@ const DEFAULT_ARTIFACT_DATE_BOUNDS_ENDPOINT = "/api/ui/backtests/artifact-date-b
 const DEFAULT_VARIANT_OPEN_DELAY_MS = 180;
 const DEFAULT_VARIANT_OPEN_DURATION_MS = 650;
 const DEFAULT_VARIANT_PREVIEW_LIMIT = 10;
+const indicatorSourceLabelKeys = {
+  close: "backtests.source.close",
+  high: "backtests.source.high",
+  hlc3: "backtests.source.hlc3",
+  low: "backtests.source.low",
+  ohlc4: "backtests.source.ohlc4",
+  open: "backtests.source.open",
+};
 const DEFAULT_RESULT_DETAIL_PREFETCH_LIMIT = 0;
 const MAX_RESULT_DETAIL_CACHE_ENTRIES = 50;
 const DEFAULT_RESULT_POINTS = 600;
@@ -1308,15 +1316,26 @@ function renderIndicators(root, catalog) {
     target.innerHTML = rows.length
       ? rows
           .map((row, index) => `
-            <tr data-selected-indicator-index="${index}">
-              <td>
-                <strong>${escapeHtml(row.label)}</strong>
-                <small>${escapeHtml(row.indicator_id)}</small>
-              </td>
-              <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.min)}" max="${escapeHtml(row.window.max)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.start)}" data-indicator-window="start" aria-label="${escapeHtml(row.label)} from"></td>
-              <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.min)}" max="${escapeHtml(row.window.max)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.stop)}" data-indicator-window="stop" aria-label="${escapeHtml(row.label)} to"></td>
-              <td><input class="backtests-input backtests-input--axis" type="number" min="${escapeHtml(row.window.unitStep)}" step="${escapeHtml(row.window.unitStep)}" value="${escapeHtml(row.window.step)}" data-indicator-window="step" aria-label="${escapeHtml(row.label)} step"></td>
-              <td>
+            <article class="backtests-indicator-card" data-selected-indicator-index="${index}">
+              <header class="backtests-indicator-card__header">
+                <div>
+                  <strong>${escapeHtml(row.label)}</strong>
+                  <span>${escapeHtml(t("backtests.indicators.range_summary", {
+                    from: row.window.start,
+                    to: row.window.stop,
+                    step: row.window.step,
+                  }))}</span>
+                </div>
+                <button
+                  class="rh-button rh-button--secondary rh-button--compact backtests-icon-button"
+                  type="button"
+                  data-remove-indicator
+                  aria-label="${escapeHtml(t("backtests.actions.delete"))}"
+                  title="${escapeHtml(t("backtests.actions.delete"))}"
+                >${trashIcon(t("backtests.actions.delete"))}</button>
+              </header>
+              <div class="backtests-indicator-card__sources">
+                <span>${escapeHtml(t("backtests.indicators.price_source"))}</span>
                 <div class="backtests-source-list">
                   ${row.availableSources.length
                     ? row.availableSources
@@ -1325,27 +1344,46 @@ function renderIndicators(root, catalog) {
                             class="backtests-source-chip ${row.sources.includes(source) ? "is-selected" : ""}"
                             type="button"
                             data-indicator-source="${escapeHtml(source)}"
-                          >${escapeHtml(source)}</button>
+                          >${escapeHtml(t(indicatorSourceLabelKeys[source] || source))}</button>
                         `)
                         .join("")
                     : `<span class="backtests-muted">--</span>`}
                 </div>
-              </td>
-              <td>
-                <button
-                  class="rh-button rh-button--secondary rh-button--compact backtests-icon-button"
-                  type="button"
-                  data-remove-indicator
-                  aria-label="${escapeHtml(t("backtests.actions.delete"))}"
-                  title="${escapeHtml(t("backtests.actions.delete"))}"
-                >${trashIcon(t("backtests.actions.delete"))}</button>
-              </td>
-            </tr>
+              </div>
+              <details class="backtests-indicator-card__advanced">
+                <summary>${escapeHtml(t("backtests.indicators.parameters"))}</summary>
+                <div class="backtests-indicator-axis-grid">
+                  ${renderIndicatorAxisField(row, "start", "backtests.indicators.from")}
+                  ${renderIndicatorAxisField(row, "stop", "backtests.indicators.to")}
+                  ${renderIndicatorAxisField(row, "step", "backtests.indicators.step")}
+                </div>
+              </details>
+            </article>
           `)
           .join("")
-      : `<tr><td colspan="6">${escapeHtml(t("common.unavailable"))}</td></tr>`;
+      : `<div class="backtests-indicator-empty">${escapeHtml(t("backtests.indicators.empty"))}</div>`;
   }
   updateCombinationsCount(root);
+}
+
+function renderIndicatorAxisField(row, field, labelKey) {
+  const min = field === "step" ? row.window.unitStep : row.window.min;
+  const max = field === "step" ? "" : row.window.max;
+  const maxAttribute = max === "" ? "" : ` max="${escapeHtml(max)}"`;
+  return `
+    <label>
+      <span>${escapeHtml(t(labelKey))}</span>
+      <input
+        class="backtests-input backtests-input--axis"
+        type="number"
+        min="${escapeHtml(min)}"${maxAttribute}
+        step="${escapeHtml(row.window.unitStep)}"
+        value="${escapeHtml(row.window[field])}"
+        data-indicator-window="${escapeHtml(field)}"
+        aria-label="${escapeHtml(`${row.label}: ${t(labelKey)}`)}"
+      >
+    </label>
+  `;
 }
 
 function indicatorStateFromDraft(draft) {

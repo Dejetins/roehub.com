@@ -2,6 +2,7 @@
 
 {% block page_assets %}
   <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/dashboard.css') }}">
+  <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/monitoring.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -9,6 +10,7 @@
     class="dashboard-workstation monitoring-workstation"
     data-page="monitoring"
     data-dashboard-root
+    data-monitoring-root
     data-summary-endpoint="/api/ui/dashboard/summary"
     aria-label="{{ t('monitoring.aria') }}"
   >
@@ -18,10 +20,13 @@
       <button class="rh-button rh-button--secondary" type="button" data-dashboard-load-retry>{{ t("refresh.manual") }}</button>
     </div>
 
-    <div class="monitoring-toolbar">
-      <div class="workbench-state workbench-state--ready">
-        <strong>{{ t("monitoring.read_only") }}</strong>
-        <p>{{ t("monitoring.read_only_desc") }}</p>
+    <div class="monitoring-hero">
+      <div class="monitoring-hero__status">
+        <span class="monitoring-hero__dot" data-monitoring-state-dot aria-hidden="true"></span>
+        <div>
+          <strong data-monitoring-state-title>{{ t("monitoring.summary.loading") }}</strong>
+          <p data-monitoring-state-message>{{ t("monitoring.summary.loading_desc") }}</p>
+        </div>
       </div>
       <div class="monitoring-refresh" data-dashboard-refresh-control>
         <button class="rh-button rh-button--secondary" type="button" data-dashboard-refresh>{{ t("refresh.manual") }}</button>
@@ -29,8 +34,8 @@
       </div>
     </div>
 
-    <div class="monitoring-kpi-grid">
-      <section class="terminal-panel" data-dashboard-panel="selected_strategy_snapshot">
+    <div class="monitoring-overview-grid">
+      <section class="terminal-panel monitoring-strategy" data-dashboard-panel="selected_strategy_snapshot">
         <header class="panel-heading panel-heading--with-tools">
           <h2>{{ t("dashboard.selected.title") }}</h2>
           <span class="dashboard-pill" data-selected-status>{{ t("dashboard.status.unknown") }}</span>
@@ -42,8 +47,11 @@
           <div><dt>{{ t("dashboard.selected.updated") }}</dt><dd data-selected-updated>--</dd></div>
         </dl>
       </section>
-      <section class="terminal-panel dashboard-metrics" data-dashboard-panel="metric_grid">
-        <header class="panel-heading"><h2>{{ t("dashboard.metrics.title") }}</h2></header>
+      <section class="terminal-panel dashboard-metrics monitoring-metrics" data-dashboard-panel="metric_grid">
+        <header class="panel-heading panel-heading--with-tools">
+          <h2>{{ t("monitoring.metrics.title") }}</h2>
+          <span class="monitoring-metrics__count" data-monitoring-metric-count></span>
+        </header>
         <div class="dashboard-metric-grid" data-dashboard-metrics></div>
       </section>
     </div>
@@ -54,10 +62,8 @@
         <table class="dashboard-table">
           <thead><tr>
             <th>{{ t("dashboard.positions.symbol") }}</th><th>{{ t("dashboard.positions.side") }}</th>
-            <th>{{ t("dashboard.positions.entry") }}</th><th>{{ t("dashboard.positions.mark") }}</th>
             <th>{{ t("dashboard.positions.pnl") }}</th><th>{{ t("dashboard.positions.roe") }}</th>
-            <th>{{ t("dashboard.positions.leverage") }}</th><th>{{ t("dashboard.positions.opened") }}</th>
-            <th>{{ t("dashboard.positions.action") }}</th>
+            <th>{{ t("dashboard.positions.opened") }}</th>
           </tr></thead>
           <tbody data-open-positions></tbody>
         </table>
@@ -72,7 +78,6 @@
             <thead><tr>
               <th>{{ t("dashboard.executions.time") }}</th><th>{{ t("dashboard.executions.symbol") }}</th>
               <th>{{ t("dashboard.executions.side") }}</th><th>{{ t("dashboard.executions.price") }}</th>
-              <th>{{ t("dashboard.executions.qty") }}</th><th>{{ t("dashboard.executions.fee") }}</th>
               <th>{{ t("dashboard.executions.pnl") }}</th><th>{{ t("dashboard.executions.reason") }}</th>
             </tr></thead>
             <tbody data-recent-executions></tbody>

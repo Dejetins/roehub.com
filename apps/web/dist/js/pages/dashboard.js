@@ -80,6 +80,10 @@ function financialClass(direction) {
   return "rh-financial--neutral";
 }
 
+function isMonitoringWorkspace(root) {
+  return root instanceof HTMLElement && root.hasAttribute("data-monitoring-root");
+}
+
 function panelStatusText(state, reason) {
   if (state === "ready") {
     return t("dashboard.panel.ready");
@@ -212,16 +216,37 @@ function drawSparkline(values) {
 }
 
 function renderSelected(root, snapshot) {
-  setText("[data-selected-name]", snapshot?.name || t("common.unavailable"), root);
+  const monitoring = isMonitoringWorkspace(root);
+  const rawName = snapshot?.name || t("common.unavailable");
+  const displayName = monitoring ? friendlyStrategyName(rawName) : rawName;
+  const exchange = monitoring ? titleCase(snapshot?.exchange) : snapshot?.exchange;
+  const status = monitoring
+    ? t(`monitoring.status.${snapshot?.status || "unknown"}`)
+    : (snapshot?.status || t("dashboard.status.unknown"));
+  setText("[data-selected-name]", displayName, root);
   setText("[data-selected-version]", snapshot?.version || "--", root);
-  setText("[data-selected-exchange]", snapshot?.exchange || t("common.unavailable"), root);
+  setText("[data-selected-exchange]", exchange || t("common.unavailable"), root);
   setText("[data-selected-symbols]", (snapshot?.symbols || []).join(", ") || "--", root);
   setText("[data-selected-timeframe]", snapshot?.timeframe || "--", root);
   setText("[data-selected-mode]", snapshot?.mode || "--", root);
   setText("[data-selected-capital]", snapshot?.capital || t("common.unavailable"), root);
   setText("[data-selected-leverage]", snapshot?.leverage || t("common.unavailable"), root);
   setText("[data-selected-updated]", localTime(snapshot?.latest_update), root);
-  setText("[data-selected-status]", snapshot?.status || t("dashboard.status.unknown"), root);
+  setText("[data-selected-status]", status, root);
+}
+
+function friendlyStrategyName(value) {
+  const withoutHash = String(value || "").replace(/\s+#[0-9a-f…]+$/i, "").trim();
+  const generatedName = withoutHash.match(/^(\S+)\s+(\S+)\s+\[([^\]]+)\]$/);
+  if (generatedName) {
+    return `${generatedName[1]} · ${generatedName[2]} · ${generatedName[3]}`;
+  }
+  return withoutHash;
+}
+
+function titleCase(value) {
+  const text = String(value || "");
+  return text ? `${text.charAt(0).toUpperCase()}${text.slice(1)}` : "";
 }
 
 function renderChart(root, series) {
@@ -241,7 +266,24 @@ function renderMetrics(root, metrics) {
   if (!target) {
     return;
   }
-  target.innerHTML = (metrics || [])
+  const items = isMonitoringWorkspace(root)
+    ? (metrics || []).filter((metric) => metric.status === "available")
+    : (metrics || []);
+  setText(
+    "[data-monitoring-metric-count]",
+    items.length ? t("monitoring.metrics.available", { count: items.length }) : "",
+    root,
+  );
+  if (isMonitoringWorkspace(root) && !items.length) {
+    target.innerHTML = `
+      <div class="monitoring-empty-state">
+        <strong>${escapeHtml(t("monitoring.metrics.empty_title"))}</strong>
+        <p>${escapeHtml(t("monitoring.metrics.empty_desc"))}</p>
+      </div>
+    `;
+    return;
+  }
+  target.innerHTML = items
     .map((metric) => {
       const label = t(metricLabelKeys[metric.key] || metric.label || metric.key);
       const status = t(sourceStatusKeys[metric.status] || "dashboard.source.unavailable");
@@ -256,18 +298,65 @@ function renderMetrics(root, metrics) {
     .join("");
 }
 
+function renderMonitoringState(root, summary) {
+  if (!isMonitoringWorkspace(root)) {
+    return;
+  }
+  const snapshot = summary?.selected_strategy_snapshot || {};
+  const availableMetrics = (summary?.metric_grid || []).filter(
+    (metric) => metric.status === "available",
+  ).length;
+  let state = "attention";
+  let titleKey = "monitoring.summary.attention";
+  let messageKey = "monitoring.summary.attention_desc";
+  if (!snapshot.strategy_id) {
+    state = "empty";
+    titleKey = "monitoring.summary.empty";
+    messageKey = "monitoring.summary.empty_desc";
+  } else if (snapshot.status === "stopped") {
+    state = "stopped";
+    titleKey = "monitoring.summary.stopped";
+    messageKey = "monitoring.summary.stopped_desc";
+  } else if (availableMetrics > 0) {
+    state = "ready";
+    titleKey = "monitoring.summary.ready";
+    messageKey = "monitoring.summary.ready_desc";
+  }
+  root.dataset.monitoringState = state;
+  setText("[data-monitoring-state-title]", t(titleKey), root);
+  setText("[data-monitoring-state-message]", t(messageKey), root);
+}
+
 function renderPositions(root, positions) {
   const tbody = qs("[data-open-positions]", root);
   if (!tbody) {
     return;
   }
   const items = positions?.items || [];
+  tbody.closest("table")?.classList.toggle(
+    "is-empty",
+    isMonitoringWorkspace(root) && !items.length,
+  );
   if (!items.length) {
     tbody.innerHTML = `
-      <tr><td class="dashboard-empty-row" colspan="9">
-        ${escapeHtml(panelStatusText(positions?.state, positions?.degradation_reason))}
+      <tr><td class="dashboard-empty-row" colspan="${isMonitoringWorkspace(root) ? 5 : 9}">
+        ${escapeHtml(isMonitoringWorkspace(root) ? t("monitoring.positions.empty") : panelStatusText(positions?.state, positions?.degradation_reason))}
       </td></tr>
     `;
+    return;
+  }
+  if (isMonitoringWorkspace(root)) {
+    tbody.innerHTML = items
+      .map((item) => `
+        <tr>
+          <td>${escapeHtml(item.symbol)}</td>
+          <td>${escapeHtml(t(`monitoring.side.${item.side || "unknown"}`))}</td>
+          <td class="${financialClass(item.pnl > 0 ? "positive" : item.pnl < 0 ? "negative" : "neutral")}">${escapeHtml(item.pnl ?? "--")}</td>
+          <td>${escapeHtml(item.roe_percent ?? "--")}</td>
+          <td>${escapeHtml(localTime(item.opened_at))}</td>
+        </tr>
+      `)
+      .join("");
     return;
   }
   tbody.innerHTML = items
@@ -295,12 +384,31 @@ function renderExecutions(root, executions) {
     return;
   }
   const items = executions?.items || [];
+  tbody.closest("table")?.classList.toggle(
+    "is-empty",
+    isMonitoringWorkspace(root) && !items.length,
+  );
   if (!items.length) {
     tbody.innerHTML = `
-      <tr><td class="dashboard-empty-row" colspan="8">
-        ${escapeHtml(panelStatusText(executions?.state, executions?.degradation_reason))}
+      <tr><td class="dashboard-empty-row" colspan="${isMonitoringWorkspace(root) ? 6 : 8}">
+        ${escapeHtml(isMonitoringWorkspace(root) ? t("monitoring.executions.empty") : panelStatusText(executions?.state, executions?.degradation_reason))}
       </td></tr>
     `;
+    return;
+  }
+  if (isMonitoringWorkspace(root)) {
+    tbody.innerHTML = items
+      .map((item) => `
+        <tr>
+          <td>${escapeHtml(localTime(item.timestamp))}</td>
+          <td>${escapeHtml(item.symbol)}</td>
+          <td class="${item.side === "sell" ? "rh-financial--negative" : "rh-financial--positive"}">${escapeHtml(t(`monitoring.side.${item.side || "unknown"}`))}</td>
+          <td>${escapeHtml(item.price ?? "--")}</td>
+          <td class="${financialClass(item.realized_pnl > 0 ? "positive" : item.realized_pnl < 0 ? "negative" : "neutral")}">${escapeHtml(item.realized_pnl ?? "--")}</td>
+          <td>${escapeHtml(item.reason || "--")}</td>
+        </tr>
+      `)
+      .join("");
     return;
   }
   tbody.innerHTML = items
@@ -345,10 +453,18 @@ function renderAlerts(root, alerts) {
     const rightRank = alertSeverityRank[String(right.severity || "").toLowerCase()] ?? 0;
     return direction === "asc" ? leftRank - rightRank : rightRank - leftRank;
   });
+  tbody.closest("table")?.classList.toggle(
+    "is-empty",
+    isMonitoringWorkspace(root) && !items.length,
+  );
+  const sortButton = qs("[data-alert-sort-level]", root);
+  if (sortButton instanceof HTMLElement && isMonitoringWorkspace(root)) {
+    sortButton.hidden = !items.length;
+  }
   if (!items.length) {
     tbody.innerHTML = `
       <tr><td class="dashboard-empty-row" colspan="3">
-        ${escapeHtml(panelStatusText(alerts?.state, alerts?.degradation_reason))}
+        ${escapeHtml(isMonitoringWorkspace(root) ? t("monitoring.alerts.empty") : panelStatusText(alerts?.state, alerts?.degradation_reason))}
       </td></tr>
     `;
     return;
@@ -475,6 +591,14 @@ function renderFreshness(root, summary) {
     );
     return;
   }
+  if (isMonitoringWorkspace(root)) {
+    setText(
+      "[data-dashboard-freshness]",
+      t("monitoring.refresh.updated", { time: localTime(summary?.generated_at) }),
+      root,
+    );
+    return;
+  }
   setText(
     "[data-dashboard-freshness]",
     t("dashboard.refresh.freshness", {
@@ -487,6 +611,7 @@ function renderFreshness(root, summary) {
 }
 
 function renderSummary(root, summary) {
+  renderMonitoringState(root, summary);
   renderSelected(root, summary.selected_strategy_snapshot);
   renderChart(root, summary.equity_pnl_series);
   renderMetrics(root, summary.metric_grid);
@@ -497,7 +622,7 @@ function renderSummary(root, summary) {
   renderAllocation(root, summary.symbol_allocation);
   renderStrategyList(root, summary.strategy_list);
   renderFooter(document, summary.footer_status);
-  renderFreshness(document, summary);
+  renderFreshness(root, summary);
   setText(
     "[data-dashboard-refresh-status]",
     summary.refresh_status || t("refresh.idle"),
