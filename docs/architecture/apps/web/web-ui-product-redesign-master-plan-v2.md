@@ -4,7 +4,7 @@
 
 ## Статус документа
 
-- Статус: `implemented in apps/web; local browser verified; production delivery pending`.
+- Статус: `deployed; production browser verified`.
 - Режим: implementation; визуальный контракт проверен отдельным интерактивным прототипом, а перенос выполняется в текущем FastAPI SSR/Jinja2/CSS/vanilla JS/HTMX контуре.
 - Цель: зафиксировать целевую визуальную концепцию, информационную архитектуру, состав каждой страницы, связи между страницами, адаптивную модель и поэтапный путь миграции.
 - Текущий технологический контур сохраняется: FastAPI SSR, Jinja2, CSS, vanilla JS/HTMX, same-origin `/api/*`.
@@ -1349,4 +1349,4 @@ Controlled перенос принятой системы в `apps/web` по к�
 6. read-only Live / Monitoring;
 7. cross-page hardening, accessibility и local browser closure.
 
-Оставшийся этап — scoped публикация в `main`, green CI, `Deploy Web` и production smoke на `https://roehub.com`. До него статус ограничен формулировкой `local browser verified`. Этот запуск не является staged prompt-pack execution, поэтому отдельные prompt pack и stage ledger не создаются. Runtime goal plan хранит текущий прогресс; контракт, owned-file manifest, проверки и Git history обеспечивают устойчивую трассируемость.
+Перенос завершён: production Web UI использует образ `ghcr.io/dejetins/roehub-app:c07befd119062b067d6df9e35287a839fe69d1e4`, workflow `Deploy Web` успешно обновил VPS, а authenticated browser smoke пройден на `https://roehub.com`. Этот запуск не является staged prompt-pack execution, поэтому отдельные prompt pack и stage ledger не создаются. Runtime goal plan, production-контракт, QA-отчёт, workflow runs и Git history обеспечивают устойчивую трассируемость.

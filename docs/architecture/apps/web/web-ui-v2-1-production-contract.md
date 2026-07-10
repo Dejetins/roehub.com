@@ -2,7 +2,7 @@
 
 ## Статус и цель
 
-- Статус: `implemented in apps/web; local browser verified; production delivery pending`.
+- Статус: `deployed; production browser verified`.
 - Цель: перенести принятую концепцию Roehub Workbench в действующий `apps/web`, сохранив серверную архитектуру, API/DTO, авторизацию, deep links и безопасные операционные границы.
 - Пользователи: аутентифицированный пользователь Roehub и пользователь с ограниченной backend-capability. Новая ролевая модель в v2.1 не вводится: текущий principal передаёт только identity и paid tier, а разрешение каждой операции остаётся ответственностью backend.
 - Цена ошибки: скрытое изменение торгового состояния, повтор опасной операции, раскрытие секрета, неверный operational status или потеря доступа к существующему сценарию.
@@ -184,4 +184,4 @@ Compatibility routes сохраняются. Deep links используют р�
 - scoped Git manifest и green CI;
 - успешный workflow `Deploy Web`, production browser/API proof на `https://roehub.com` и отдельная проверка доступности Mac Studio upstream без представления её как web deploy.
 
-До выполнения последнего пункта допустимы только формулировки `implementation in progress` или `local browser verified`; слово `deployed` запрещено.
+Последний пункт выполнен для runtime revision `c07befd119062b067d6df9e35287a839fe69d1e4`: CI, публикация SHA-tagged GHCR image, `Deploy Web`, public edge smoke и authenticated production browser smoke завершены успешно.

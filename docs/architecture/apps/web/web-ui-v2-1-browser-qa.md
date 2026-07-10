@@ -5,10 +5,10 @@
 ## Статус
 
 - Дата локальной проверки: `2026-07-10`.
-- Статус: `local browser verified; production delivery pending`.
+- Статус: `deployed; production browser verified`.
 - Runtime: FastAPI SSR, Jinja2, CSS, vanilla JavaScript и HTMX.
-- Проверяемая версия: рабочее дерево до scoped commit в `main`.
-- Production считается обновлённым только после green CI, workflow `Deploy Web` и повторного smoke на `https://roehub.com`.
+- Runtime revision: `c07befd119062b067d6df9e35287a839fe69d1e4`.
+- Production URL: `https://roehub.com`.
 
 ## Реализованная поверхность
 
@@ -83,11 +83,27 @@
 - Исправлено: целевой deploy закреплён за GHCR/VPS workflow; Mac Studio оставлен backend upstream; backend остаётся единственным источником полномочий; неизвестный mutation result требует authoritative refetch без слепого повтора; темы сохраняются только в browser-local preference с legacy mapping; маршруты, владельцы и проверочная матрица зафиксированы явно.
 - Локальная повторная проверка: противоречия устранены; production readiness остаётся закрыт до delivery proof.
 
-## Остаточные риски и следующий gate
+## Production delivery и повторная проверка
 
-- Локальный smoke не доказывает реальные data-ready состояния, задержки API и production payload volume.
-- `200%` zoom, screen-reader walkthrough и Web Vitals требуют отдельного production evidence; полное соответствие WCAG не заявляется.
+- CI: run `29092837934`, `success`.
+- Publish App Image: run `29092905501`, `success`.
+- Deploy Web: run `29092963148`, `success`.
+- Развёрнутый образ: `ghcr.io/dejetins/roehub-app:c07befd119062b067d6df9e35287a839fe69d1e4`.
+- VPS container: `roehub-web-web-1`, image SHA-tag совпадает с runtime revision.
+- Public edge smoke workflow подтвердил `/ -> 200`, `/api/auth/current-user -> 401` для гостя и redirect `www -> 301`.
+- Authenticated smoke выполнен учётной записью `smoke_e2e_keycloak`; значение учётных данных получено из host-local env и не выводилось, не сохранялось и не попадало в снимки.
+- `/dashboard`, `/strategies`, `/backtests`, `/monitoring`, `/models`, `/connections`, `/settings` загрузили production data-ready состояния без видимых alert/error.
+- На каждом маршруте: одна sidebar, один `h1`, нет глобальной status strip, нет горизонтального overflow и активных целей меньше `36px` при фактическом desktop viewport `1280x1024`.
+- Strategies проверен при `1024x768`, `820x800` и `390x844`; на `390` sidebar скрыт, mobile navigation активна, document width равен `390px`, цели не меньше `44px`.
+- Production data обнаружили и позволили исправить два дополнительных дефекта: compact delete target `30px -> 36px` и mobile action group, расширявшую документ до `481px`.
+- Русская оболочка, темы `graphite`/`paper`, command dialog, `Escape` и restore focus подтверждены в production.
+- Отдельный authenticated обход приложения в новом tab не зафиксировал `console error/warn`; единственный ранний `AbortError: Transition was skipped` принадлежал навигации Keycloak и не воспроизводился внутри Roehub app.
+
+## Остаточные риски
+
+- Production smoke подтверждает текущий smoke-account и наблюдавшиеся payloads, но не покрывает другие уровни доступа, предельные объёмы данных и искусственно увеличенные задержки API.
+- Двукратный CSS layout-scale smoke Auth Gateway прошёл без глобального overflow; нативный browser zoom, screen-reader walkthrough и Web Vitals требуют отдельного специализированного evidence. Полное соответствие WCAG не заявляется.
 - Прототипный React bundle не переносится в production и не влияет на размер SSR assets.
-- Нельзя использовать слово `deployed`, пока scoped commit не опубликован, CI и `Deploy Web` не завершены успешно, а production browser smoke не пройден.
+- Prototype Vite chunk warning остаётся изолированным от SSR production bundle и не блокирует текущий Web UI.
 
 Contract impact: публичные API/DTO/persistence — `none`; новые route entry `/models` и `/connections` — `compatible-change`; `/monitoring` из placeholder в read-only workspace — `compatible-change`; shell, navigation и guest `/` — намеренный `breaking-change` browser-visible поведения.
