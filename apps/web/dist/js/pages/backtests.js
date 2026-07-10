@@ -2678,6 +2678,9 @@ function renderFooter(root, data) {
 }
 
 function renderWorkstation(root, data, { append = false, preserveLoadedRows = false } = {}) {
+  root.dataset.loadState = "ready";
+  const loadError = qs("[data-backtests-load-error]", root);
+  if (loadError instanceof HTMLElement) loadError.hidden = true;
   state.runtimeDefaults = data;
   manualRefreshRetrySeconds = Number(data?.retry_after_seconds || 0);
   const renderedData = append
@@ -4094,6 +4097,9 @@ function init() {
   }
   setWorkspaceView(root, initialWorkspaceView(root));
   bind(root);
+  qs("[data-backtests-retry]", root)?.addEventListener("click", () => {
+    refreshWorkstation(root, "manual").catch(() => {});
+  });
   state.selectedJobId = root.dataset.initialJobId || null;
   refreshWorkstation(root, "initial").then(() => {
     if (state.selectedJobId) {
@@ -4101,6 +4107,12 @@ function init() {
     }
     return null;
   }).catch((error) => {
+    root.dataset.loadState = "error";
+    const loading = qs("[data-backtests-loading]", root);
+    if (loading instanceof HTMLElement) loading.hidden = true;
+    const loadError = qs("[data-backtests-load-error]", root);
+    if (loadError instanceof HTMLElement) loadError.hidden = false;
+    setText("[data-backtests-load-error-message]", describeApiError(error), root);
     setText("[data-create-status]", describeApiError(error), root);
   });
   setAutorefresh(root, "15s");

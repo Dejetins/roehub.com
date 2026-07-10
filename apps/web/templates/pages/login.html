@@ -1,31 +1,36 @@
 {% extends "base.html" %}
 
 {% block page_assets %}
-    <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/landing.css') }}">
+  <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/landing.css') }}">
 {% endblock %}
 
 {% block content %}
-  <div class="landing-page" data-page="login" data-landing-root>
-    <section class="landing-hero" aria-label="{{ t('landing.cli.aria') }}">
-      <div class="landing-hero__copy">
-        <div class="landing-cli" data-cli-stream aria-label="{{ t('landing.cli.aria') }}">
-          <div class="landing-cli__screen">
-            <ol class="landing-cli__log" data-cli-log aria-live="off">
-              <li class="landing-cli__line landing-cli__line--command">{{ t("landing.cli.command_init") }}</li>
-              <li class="landing-cli__line landing-cli__line--response">{{ t("landing.cli.response_shell") }}</li>
-              <li class="landing-cli__line landing-cli__line--command">{{ t("landing.cli.command_backtest") }}</li>
-              <li class="landing-cli__line landing-cli__line--response">{{ t("landing.cli.response_variants") }}</li>
-              <li class="landing-cli__line landing-cli__line--command">{{ t("landing.cli.command_deploy") }}</li>
-              <li class="landing-cli__line landing-cli__line--response">{{ t("landing.cli.response_ready") }}</li>
-            </ol>
-          </div>
-        </div>
+  <section class="auth-gateway" data-page="login" data-auth-gateway>
+    <div class="auth-gateway__story">
+      <p class="auth-gateway__eyebrow">{{ t("auth.gateway.eyebrow") }}</p>
+      <h1>{{ t("auth.gateway.title") }}</h1>
+      <p class="auth-gateway__lead">{{ t("auth.gateway.body") }}</p>
+      <div class="auth-gateway__modules" aria-label="{{ t('auth.gateway.capabilities') }}">
+        <article><span aria-hidden="true">01</span><strong>{{ t("nav.strategies") }}</strong><p>{{ t("auth.gateway.strategies") }}</p></article>
+        <article><span aria-hidden="true">02</span><strong>{{ t("nav.backtests") }}</strong><p>{{ t("auth.gateway.backtests") }}</p></article>
+        <article><span aria-hidden="true">03</span><strong>{{ t("nav.monitoring") }}</strong><p>{{ t("auth.gateway.monitoring") }}</p></article>
       </div>
-    </section>
-  </div>
-{% endblock %}
+    </div>
 
-{% block scripts %}
-  {{ super() }}
-  <script type="module" src="{{ asset_url('/assets/js/pages/landing.js') }}"></script>
+    <div class="auth-gateway__card">
+      <div class="auth-gateway__mark" aria-hidden="true">R</div>
+      <p class="auth-gateway__eyebrow">{{ t("auth.login_eyebrow") }}</p>
+      <h2>{{ t("auth.login_title") }}</h2>
+      <p>{{ t("auth.login_body") }}</p>
+      <dl class="auth-gateway__session">
+        <div><dt>{{ t("auth.next_label") }}</dt><dd>{{ auth_next_path }}</dd></div>
+        <div><dt>{{ t("auth.gateway.identity") }}</dt><dd>Keycloak / OIDC</dd></div>
+        <div><dt>{{ t("auth.gateway.credentials") }}</dt><dd>{{ t("auth.gateway.credentials_value") }}</dd></div>
+      </dl>
+      <a class="rh-button rh-button--primary auth-gateway__continue" href="{{ oidc_login_url }}" data-auth-continue>
+        {{ t("auth.continue") }}
+      </a>
+      <p class="auth-gateway__security">{{ t("auth.gateway.security_note") }}</p>
+    </div>
+  </section>
 {% endblock %}

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block page_assets %}
+  <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/settings.css') }}">
+{% endblock %}
+
+{% block content %}
+  <section
+    class="settings-workstation connections-workstation"
+    data-page="connections"
+    data-settings-root
+    data-settings-scope="connections"
+    data-profile-endpoint="/api/ui/account/profile"
+    data-limits-endpoint="/api/ui/account/limits"
+    data-integrations-endpoint="/api/ui/account/integrations"
+    data-notifications-endpoint="/api/ui/account/notifications"
+    data-notification-scoped-endpoint="/api/ui/account/notifications/scoped"
+    data-preferences-endpoint="/api/ui/account/preferences"
+    data-sessions-endpoint="/api/ui/account/sessions"
+    data-audit-endpoint="/api/ui/account/audit-events"
+    data-exchange-keys-endpoint="/api/ui/account/exchange-connections"
+    aria-label="{{ t('connections.aria') }}"
+  >
+    <output class="settings-pill" data-settings-save-state aria-live="polite">{{ t("settings.loading") }}</output>
+    <section class="connections-summary" aria-label="{{ t('connections.lifecycle') }}">
+      <article class="connections-summary__item">
+        <span>01</span><strong>{{ t("connections.connect") }}</strong><p>{{ t("connections.connect_desc") }}</p>
+      </article>
+      <article class="connections-summary__item">
+        <span>02</span><strong>{{ t("connections.validate") }}</strong><p>{{ t("connections.validate_desc") }}</p>
+      </article>
+      <article class="connections-summary__item">
+        <span>03</span><strong>{{ t("connections.operate") }}</strong><p>{{ t("connections.operate_desc") }}</p>
+      </article>
+      <article class="connections-summary__item">
+        <span>04</span><strong>{{ t("connections.audit") }}</strong><p>{{ t("connections.audit_desc") }}</p>
+      </article>
+    </section>
+
+    <div class="connections-grid">
+      {% include "fragments/account/exchange_keys.html" %}
+      {% include "fragments/account/audit.html" %}
+    </div>
+    <p class="connections-security-note">{{ t("connections.security_note") }}</p>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{{ asset_url('/assets/js/pages/settings.js') }}"></script>
+{% endblock %}

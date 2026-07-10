@@ -13,12 +13,16 @@
     aria-label="{{ t('dashboard.aria') }}"
   >
     {% include "fragments/dashboard/loading_state.html" %}
+    <div class="workbench-module-state workbench-module-state--error" data-dashboard-load-error role="alert" hidden>
+      <div><strong>{{ t("dashboard.state.load_failed") }}</strong><p data-dashboard-load-error-message>{{ t("dashboard.refresh.failed") }}</p></div>
+      <button class="rh-button rh-button--secondary" type="button" data-dashboard-load-retry>{{ t("refresh.manual") }}</button>
+    </div>
 
     <div class="dashboard-grid">
       <div class="dashboard-top-row">
         <section class="terminal-panel dashboard-selected" data-dashboard-panel="selected_strategy_snapshot">
           <header class="panel-heading">
-            <h1>{{ t("dashboard.selected.title") }}</h1>
+            <h2>{{ t("dashboard.selected.title") }}</h2>
             <span class="dashboard-pill" data-selected-status>{{ t("dashboard.status.unknown") }}</span>
           </header>
           <div class="dashboard-selected__body">
@@ -50,11 +54,11 @@
             <header class="panel-heading panel-heading--with-tools">
               <h2>{{ t("dashboard.chart.title") }}</h2>
               <div class="dashboard-segments" aria-label="{{ t('dashboard.chart.range') }}">
-                <button class="dashboard-segment" type="button">1H</button>
-                <button class="dashboard-segment" type="button">4H</button>
-                <button class="dashboard-segment dashboard-segment--active" type="button">1D</button>
-                <button class="dashboard-segment" type="button">1W</button>
-                <button class="dashboard-segment" type="button">1M</button>
+                <button class="dashboard-segment" type="button" disabled title="{{ t('dashboard.chart.range_unavailable') }}">1H</button>
+                <button class="dashboard-segment" type="button" disabled title="{{ t('dashboard.chart.range_unavailable') }}">4H</button>
+                <button class="dashboard-segment dashboard-segment--active" type="button" disabled aria-pressed="true">1D</button>
+                <button class="dashboard-segment" type="button" disabled title="{{ t('dashboard.chart.range_unavailable') }}">1W</button>
+                <button class="dashboard-segment" type="button" disabled title="{{ t('dashboard.chart.range_unavailable') }}">1M</button>
               </div>
             </header>
             <div class="dashboard-chart-wrap">
@@ -184,13 +188,13 @@
         </header>
         <div class="dashboard-list-controls">
           <div class="dashboard-tabs" role="tablist" aria-label="{{ t('dashboard.strategy_list.tabs') }}">
-            <button class="dashboard-tab dashboard-tab--active" type="button" role="tab" aria-selected="true">
+            <button class="dashboard-tab dashboard-tab--active" type="button" role="tab" aria-selected="true" data-dashboard-status-filter="running">
               {{ t("dashboard.strategy_list.running") }}
             </button>
-            <button class="dashboard-tab" type="button" role="tab" aria-selected="false">
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-status-filter="stopped">
               {{ t("dashboard.strategy_list.stopped") }}
             </button>
-            <button class="dashboard-tab" type="button" role="tab" aria-selected="false">
+            <button class="dashboard-tab" type="button" role="tab" aria-selected="false" data-dashboard-status-filter="degraded">
               {{ t("dashboard.strategy_list.degraded") }}
             </button>
           </div>
@@ -216,9 +220,11 @@
                 <span class="rh-dropdown__value" data-exchange-current>{{ t("common.unavailable") }}</span>
               </button>
               <div class="rh-popover" id="dashboard-exchange-menu" role="listbox" hidden data-rh-dropdown-menu>
-                <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="all">
+                <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="all" data-dashboard-exchange-option="all">
                   {{ t("dashboard.strategy_list.all") }}
                 </button>
+                <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-rh-dropdown-item="binance" data-dashboard-exchange-option="binance">Binance</button>
+                <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-rh-dropdown-item="bybit" data-dashboard-exchange-option="bybit">Bybit</button>
               </div>
             </div>
             <div class="rh-dropdown dashboard-dropdown" data-rh-dropdown data-rh-dropdown-kind="listbox">
@@ -235,10 +241,10 @@
                 <span class="rh-dropdown__value" data-sort-current>activity</span>
               </button>
               <div class="rh-popover" id="dashboard-sort-menu" role="listbox" hidden data-rh-dropdown-menu>
-                <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="activity">
+                <button class="rh-menu-item" type="button" role="option" aria-selected="true" data-rh-dropdown-item="activity" data-dashboard-sort-option="activity">
                   {{ t("dashboard.strategy_list.sort_activity") }}
                 </button>
-                <button class="rh-menu-item" type="button" role="option" data-rh-dropdown-item="pnl">
+                <button class="rh-menu-item" type="button" role="option" aria-selected="false" data-rh-dropdown-item="pnl" data-dashboard-sort-option="pnl">
                   {{ t("dashboard.strategy_list.sort_pnl") }}
                 </button>
               </div>

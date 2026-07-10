@@ -54,6 +54,7 @@ _HOP_BY_HOP_HEADERS = {
 class _NavItem:
     key: str
     label_key: str
+    short_label: str
     path: str
     active_path: str
 
@@ -67,26 +68,55 @@ class _ProtectedPage:
 
 
 _NAV_ITEMS: tuple[_NavItem, ...] = (
-    _NavItem(key="home", label_key="nav.home", path="/", active_path="/"),
     _NavItem(
         key="dashboard",
         label_key="nav.dashboard",
+        short_label="OV",
         path="/dashboard",
         active_path="/dashboard",
     ),
     _NavItem(
         key="strategies",
         label_key="nav.strategies",
+        short_label="ST",
         path="/strategies",
         active_path="/strategies",
     ),
     _NavItem(
         key="backtests",
         label_key="nav.backtests",
+        short_label="BT",
         path="/backtests",
         active_path="/backtests",
     ),
-    _NavItem(key="settings", label_key="nav.settings", path="/settings", active_path="/settings"),
+    _NavItem(
+        key="monitoring",
+        label_key="nav.monitoring",
+        short_label="LV",
+        path="/monitoring",
+        active_path="/monitoring",
+    ),
+    _NavItem(
+        key="models",
+        label_key="nav.models",
+        short_label="ML",
+        path="/models",
+        active_path="/models",
+    ),
+    _NavItem(
+        key="connections",
+        label_key="nav.connections",
+        short_label="CN",
+        path="/connections",
+        active_path="/connections",
+    ),
+    _NavItem(
+        key="settings",
+        label_key="nav.settings",
+        short_label="SE",
+        path="/settings",
+        active_path="/settings",
+    ),
 )
 _PROTECTED_PAGES: dict[str, _ProtectedPage] = {
     "/dashboard": _ProtectedPage(
@@ -127,14 +157,30 @@ _PROTECTED_PAGES: dict[str, _ProtectedPage] = {
     ),
     "/monitoring": _ProtectedPage(
         page_path="/monitoring",
-        active_path="/dashboard",
+        active_path="/monitoring",
         title_key="page.monitoring.title",
         description_key="page.monitoring.desc",
     ),
+    "/models": _ProtectedPage(
+        page_path="/models",
+        active_path="/models",
+        title_key="page.models.title",
+        description_key="page.models.desc",
+    ),
+    "/connections": _ProtectedPage(
+        page_path="/connections",
+        active_path="/connections",
+        title_key="page.connections.title",
+        description_key="page.connections.desc",
+    ),
 }
 _THEME_OPTIONS: tuple[dict[str, str], ...] = (
-    {"key": "terminal-orange", "label_key": "theme.terminal_orange"},
+    {"key": "abyss", "label_key": "theme.abyss"},
     {"key": "graphite", "label_key": "theme.graphite"},
+    {"key": "slate", "label_key": "theme.slate"},
+    {"key": "frost", "label_key": "theme.frost"},
+    {"key": "paper", "label_key": "theme.paper"},
+    {"key": "sand", "label_key": "theme.sand"},
 )
 _REFRESH_PRESETS: tuple[dict[str, str], ...] = (
     {"key": "off", "label": "Off"},
@@ -173,13 +219,15 @@ def _register_routes(
 
     @app.get("/", response_class=HTMLResponse)
     def get_landing_page(request: Request) -> Response:
+        if _resolve_optional_public_current_user(request=request) is not None:
+            return RedirectResponse(url="/dashboard")
         return _render_public_page(
             request=request,
             templates=templates,
-            template_name="pages/landing.html",
+            template_name="pages/login.html",
             page_path="/",
             active_path="/",
-            title_key="landing.page_title",
+            title_key="auth.login_title",
             open_login_modal=False,
         )
 
@@ -209,6 +257,8 @@ def _register_routes(
 
     @app.get("/login", response_class=HTMLResponse)
     def get_login_page(request: Request, next: str | None = None) -> Response:
+        if _resolve_optional_public_current_user(request=request) is not None:
+            return RedirectResponse(url="/dashboard")
         return _render_public_page(
             request=request,
             templates=templates,
@@ -216,7 +266,7 @@ def _register_routes(
             page_path="/login",
             active_path="/",
             title_key="auth.login_title",
-            open_login_modal=True,
+            open_login_modal=False,
             auth_next_path=sanitize_next_path(raw_next=next),
         )
 
@@ -411,10 +461,42 @@ def _register_routes(
 
     @app.get("/monitoring", response_class=HTMLResponse)
     def get_monitoring_page(request: Request) -> Response:
-        return _render_protected_placeholder(
+        return _render_protected_page(
             request=request,
             templates=templates,
-            page=_PROTECTED_PAGES["/monitoring"],
+            page_path="/monitoring",
+            active_path="/monitoring",
+            page_title_key="page.monitoring.title",
+            page_description_key="page.monitoring.desc",
+            template_name="pages/monitoring.html",
+        )
+
+    @app.get("/models", response_class=HTMLResponse)
+    def get_models_page(request: Request) -> Response:
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path="/models",
+            active_path="/models",
+            page_title_key="page.models.title",
+            page_description_key="page.models.desc",
+            template_name="pages/strategies.html",
+            template_context={
+                "strategy_initial_mode": "rl_ml",
+                "strategy_initial_id": request.query_params.get("strategy_id") or "",
+            },
+        )
+
+    @app.get("/connections", response_class=HTMLResponse)
+    def get_connections_page(request: Request) -> Response:
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path="/connections",
+            active_path="/connections",
+            page_title_key="page.connections.title",
+            page_description_key="page.connections.desc",
+            template_name="pages/connections.html",
         )
 
 
@@ -542,12 +624,14 @@ def _render_protected_page(
         )
     if template_context is not None:
         context.update(template_context)
-    return templates.TemplateResponse(
+    response = templates.TemplateResponse(
         request,
         template_name,
         context=context,
         status_code=status_code,
     )
+    response.headers["Cache-Control"] = "private, no-store"
+    return response
 
 
 def _build_login_redirect_response(*, current_path: str) -> RedirectResponse:
@@ -622,6 +706,7 @@ def _build_nav_items(*, locale: str, active_path: str) -> list[dict[str, str | b
         {
             "key": item.key,
             "label": translate(locale=locale, key=item.label_key),
+            "short_label": item.short_label,
             "path": item.path,
             "is_active": item.active_path == active_path,
         }

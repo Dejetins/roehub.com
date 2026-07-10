@@ -23,6 +23,11 @@
   >
     {% include "fragments/strategies/loading_state.html" %}
 
+    <div class="workbench-module-state workbench-module-state--error" data-strategies-load-error role="alert" hidden>
+      <div><strong>{{ t("strategies.state.load_failed") }}</strong><p data-strategies-load-error-message>{{ t("strategies.refresh.failed") }}</p></div>
+      <button class="rh-button rh-button--secondary" type="button" data-strategies-retry>{{ t("refresh.manual") }}</button>
+    </div>
+
     <div class="strategies-mode-tabbar" role="tablist" aria-label="{{ t('strategies.mode_tabs.label') }}">
       <button
         class="strategies-tab strategies-tab--active"
@@ -152,19 +157,19 @@
           <div class="strategies-summary-actions">
             <span class="strategies-pill" data-strategy-action-status aria-live="polite">--</span>
             <span class="strategies-action-group" aria-label="{{ t('strategies.actions.execution') }}">
-              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-run>
+              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-run disabled>
                 {{ t("strategies.actions.run") }}
               </button>
-              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-stop>
+              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-stop disabled>
                 {{ t("strategies.actions.stop") }}
               </button>
-              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-restart>
+              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-restart disabled>
                 {{ t("strategies.actions.restart") }}
               </button>
-              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-manual-entry>
+              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-manual-entry disabled>
                 {{ t("strategies.actions.manual_entry") }}
               </button>
-              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-manual-exit>
+              <button class="rh-button rh-button--secondary rh-button--compact" type="button" data-strategy-manual-exit disabled>
                 {{ t("strategies.actions.manual_exit") }}
               </button>
             </span>
@@ -178,14 +183,15 @@
                 aria-controls="strategy-manage-menu"
                 data-rh-dropdown-trigger
                 data-strategy-control="branded dropdown"
+                disabled
               >
                 {{ t("strategies.actions.manage") }}
               </button>
               <span class="rh-popover" id="strategy-manage-menu" role="menu" hidden data-rh-dropdown-menu>
-                <button class="rh-menu-item" type="button" role="menuitem" data-strategy-clone>
+                <button class="rh-menu-item" type="button" role="menuitem" data-strategy-clone disabled>
                   {{ t("strategies.actions.clone") }}
                 </button>
-                <button class="rh-menu-item strategies-danger-action" type="button" role="menuitem" data-strategy-delete>
+                <button class="rh-menu-item strategies-danger-action" type="button" role="menuitem" data-strategy-delete disabled>
                   {{ t("strategies.actions.delete") }}
                 </button>
               </span>
@@ -333,11 +339,11 @@
             </div>
           </div>
           <div class="strategies-chart-controls">
-            <button class="strategies-segment" type="button" data-chart-symbol>--</button>
-            <button class="strategies-segment" type="button">1m</button>
-            <button class="strategies-segment strategies-segment--active" type="button">1h</button>
-            <button class="strategies-segment" type="button">4h</button>
-            <button class="strategies-segment" type="button">1D</button>
+            <span class="strategies-segment" data-chart-symbol>--</span>
+            <button class="strategies-segment" type="button" disabled title="{{ t('strategies.chart.range_unavailable') }}">1m</button>
+            <button class="strategies-segment strategies-segment--active" type="button" disabled aria-pressed="true">1h</button>
+            <button class="strategies-segment" type="button" disabled title="{{ t('strategies.chart.range_unavailable') }}">4h</button>
+            <button class="strategies-segment" type="button" disabled title="{{ t('strategies.chart.range_unavailable') }}">1D</button>
           </div>
         </header>
         <div class="strategies-chart-wrap">

@@ -5,11 +5,12 @@ import { initDropdowns } from "../components/dropdown.js";
 
 const AUTOREFRESH_STORAGE_KEY = "roehub_autorefresh_defaults";
 const DEFAULT_MARKET_TYPES = ["spot", "futures"];
+let hadLoadError = false;
 
 const state = {
   activeTab: "profile",
   preferences: {
-    theme: "terminal-orange",
+    theme: "graphite",
     locale: document.documentElement.dataset.locale || "en",
     density: "compact",
     autorefresh_preset: "15s",
@@ -46,6 +47,9 @@ function setStatus(message, ok = true) {
 }
 
 function errorMessage(error) {
+  if (error?.outcomeUnknown) {
+    return t("settings.mutation.unknown");
+  }
   const payload = error?.payload;
   if (payload?.error?.message) {
     return payload.error.message;
@@ -63,6 +67,7 @@ async function loadJson(path, fallback) {
   try {
     return await apiFetch(path);
   } catch (error) {
+    hadLoadError = true;
     setStatus(errorMessage(error), false);
     return fallback;
   }
@@ -139,7 +144,7 @@ function openExchangeFormModal() {
   resetMarketResults();
   syncMarketTypesFromControls(modal);
   setEnvironmentValue(modal, state.environment);
-  const firstControl = qs("[data-rh-dropdown-trigger], input, button", modal);
+  const firstControl = qs("[data-exchange-form] [data-rh-dropdown-trigger], [data-exchange-form] input, [data-exchange-form] button", modal);
   if (firstControl instanceof HTMLElement) {
     firstControl.focus();
   }
@@ -778,6 +783,8 @@ function renderSessions(payload, append = false) {
   if (!body) return;
   if (!append) body.replaceChildren();
   state.sessionsCursor = payload?.next_cursor || null;
+  const moreButton = qs("[data-sessions-more]");
+  if (moreButton instanceof HTMLButtonElement) moreButton.disabled = !state.sessionsCursor;
   (payload?.items || []).forEach((item) => {
     const row = body.insertRow();
     [formatTimestampToSeconds(item.last_seen_at), item.ip_address, item.device, item.location, item.is_current ? t("settings.state.active") : t("settings.state.ready")].forEach((value) => {
@@ -791,6 +798,8 @@ function renderAudit(payload, append = false) {
   if (!body) return;
   if (!append) body.replaceChildren();
   state.auditCursor = payload?.next_cursor || null;
+  const moreButton = qs("[data-audit-more]");
+  if (moreButton instanceof HTMLButtonElement) moreButton.disabled = !state.auditCursor;
   const items = payload?.items || [];
   if (!append && !items.length) {
     const row = body.insertRow();
@@ -808,6 +817,18 @@ function renderAudit(payload, append = false) {
 }
 
 async function initSettings(root) {
+  hadLoadError = false;
+  if (root.dataset.settingsScope === "connections") {
+    const [exchangeKeys, audit] = await Promise.all([
+      loadJson(exchangeKeysPath(root, "active"), []),
+      loadJson(`${endpoint(root, "auditEndpoint")}?limit=5`, { items: [], next_cursor: null }),
+    ]);
+    setExchangeStatusFilter(root, "active");
+    renderExchangeKeys(exchangeKeys);
+    renderAudit(audit);
+    if (!hadLoadError) setStatus(t("settings.state.ready"), true);
+    return;
+  }
   const [
     profile,
     limits,
@@ -839,7 +860,7 @@ async function initSettings(root) {
   renderExchangeKeys(exchangeKeys);
   renderSessions(sessions);
   renderAudit(audit);
-  setStatus(t("settings.state.ready"), true);
+  if (!hadLoadError) setStatus(t("settings.state.ready"), true);
 }
 
 function initEvents(root) {
@@ -911,11 +932,17 @@ function initEvents(root) {
   on(root, "click", "[data-exchange-validate]", async (_event, item) => {
     const connectionId = item.dataset.exchangeValidate;
     if (!connectionId) return;
-    await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/validate`, {
-      method: "POST",
-    });
+    item.disabled = true;
+    try {
+      await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/validate`, {
+        method: "POST",
+      });
+    } catch (error) {
+      setStatus(errorMessage(error), false);
+    }
     const exchangeKeys = await loadJson(exchangeKeysPath(root), { items: [] });
     renderExchangeKeys(exchangeKeys);
+    item.disabled = false;
   });
   on(root, "click", "[data-exchange-configure-account]", async (_event, item) => {
     const connectionId = item.dataset.exchangeConfigureAccount;
@@ -964,22 +991,34 @@ function initEvents(root) {
     if (!connectionId) return;
     const confirmation = window.prompt(t("settings.exchange.confirm_disable"));
     if (confirmation !== "DISCONNECT") return;
-    await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/disable`, {
-      method: "POST",
-    });
+    item.disabled = true;
+    try {
+      await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/disable`, {
+        method: "POST",
+      });
+    } catch (error) {
+      setStatus(errorMessage(error), false);
+    }
     const exchangeKeys = await loadJson(exchangeKeysPath(root), { items: [] });
     renderExchangeKeys(exchangeKeys);
+    item.disabled = false;
   });
   on(root, "click", "[data-exchange-archive]", async (_event, item) => {
     const connectionId = item.dataset.exchangeArchive;
     if (!connectionId) return;
     const confirmation = window.prompt(t("settings.exchange.confirm_archive"));
     if (confirmation !== "ARCHIVE") return;
-    await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/archive`, {
-      method: "POST",
-    });
+    item.disabled = true;
+    try {
+      await apiFetch(`${endpoint(root, "exchangeKeysEndpoint")}/${connectionId}/archive`, {
+        method: "POST",
+      });
+    } catch (error) {
+      setStatus(errorMessage(error), false);
+    }
     const exchangeKeys = await loadJson(exchangeKeysPath(root), { items: [] });
     renderExchangeKeys(exchangeKeys);
+    item.disabled = false;
   });
   on(root, "click", "[data-exchange-status-filter]", async (_event, item) => {
     const status = item.dataset.exchangeStatusFilter || "active";
@@ -1023,6 +1062,22 @@ function initEvents(root) {
     if (event.key === "Escape" && modal instanceof HTMLElement && !modal.hidden) {
       event.preventDefault();
       closeExchangeFormModal();
+      return;
+    }
+    if (event.key === "Tab" && modal instanceof HTMLElement && !modal.hidden) {
+      const focusable = Array.from(modal.querySelectorAll(
+        'button:not([disabled]):not([tabindex="-1"]), input:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+      )).filter((node) => node instanceof HTMLElement && !node.hidden);
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
     }
   });
   on(root, "click", "[data-exchange-name-option]", (_event, item) => {
@@ -1069,6 +1124,8 @@ function initForms(root) {
       if (status) status.textContent = t("settings.exchange.market_required");
       return;
     }
+    const submitButton = qs('button[type="submit"]', form);
+    if (submitButton instanceof HTMLButtonElement) submitButton.disabled = true;
     const payload = {
       exchange_name: state.exchangeName,
       market_type: marketTypes[0],
@@ -1109,6 +1166,15 @@ function initForms(root) {
       clearSecretInputs(form);
       resetMarketResults();
       if (status) status.textContent = errorMessage(error);
+      if (error?.outcomeUnknown) {
+        const exchangeKeys = await loadJson(exchangeKeysPath(root, "all"), { items: [] });
+        setExchangeStatusFilter(root, "history");
+        renderExchangeKeys(exchangeKeys);
+        closeExchangeFormModal({ clearSecrets: false });
+        setStatus(t("settings.mutation.unknown"), false);
+      }
+    } finally {
+      if (submitButton instanceof HTMLButtonElement) submitButton.disabled = false;
     }
   });
 

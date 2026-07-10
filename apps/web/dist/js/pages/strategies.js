@@ -235,6 +235,9 @@ function renderSelected(root, selected) {
   setButtonDisabled(root, "[data-strategy-restart]", !canRestart);
   setButtonDisabled(root, "[data-strategy-manual-entry]", !canManual);
   setButtonDisabled(root, "[data-strategy-manual-exit]", !canManual);
+  setButtonDisabled(root, "#strategy-manage-trigger", !selected);
+  setButtonDisabled(root, "[data-strategy-clone]", !selected);
+  setButtonDisabled(root, "[data-strategy-delete]", !selected);
 }
 
 function setActionStatus(root, value) {
@@ -1059,6 +1062,8 @@ function initStrategies(root) {
     setRunning(true);
     activeRequest = apiFetch(dashboardUrl(reason))
       .then((summary) => {
+        const loadError = qs("[data-strategies-load-error]", root);
+        if (loadError instanceof HTMLElement) loadError.hidden = true;
         lastSummary = summary;
         root.dataset.strategiesLoaded = "true";
         root.dataset.strategiesLastRefresh = reason;
@@ -1068,6 +1073,9 @@ function initStrategies(root) {
         return summary;
       })
       .catch((error) => {
+        const loadError = qs("[data-strategies-load-error]", root);
+        if (loadError instanceof HTMLElement) loadError.hidden = false;
+        setText("[data-strategies-load-error-message]", error.message || t("strategies.refresh.failed"), root);
         setText("[data-strategies-refresh-status]", error.code || "failed", document);
         setText("[data-strategies-freshness]", error.message || t("strategies.refresh.failed"), document);
         throw error;
@@ -1160,6 +1168,9 @@ function initStrategies(root) {
     button.addEventListener("click", () => {
       loadDashboard("manual").catch(() => null);
     });
+  });
+  qs("[data-strategies-retry]", root)?.addEventListener("click", () => {
+    loadDashboard("manual").catch(() => null);
   });
   qs("#strategies-refresh-trigger", document)?.addEventListener("click", () => {
     window.requestAnimationFrame(positionStatusRefreshMenu);

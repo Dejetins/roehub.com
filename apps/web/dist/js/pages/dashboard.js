@@ -283,7 +283,7 @@ function renderPositions(root, positions) {
         <td>${escapeHtml(item.roe_percent ?? "--")}</td>
         <td>${escapeHtml(item.leverage ?? "--")}</td>
         <td>${escapeHtml(localTime(item.opened_at))}</td>
-        <td><button class="rh-button rh-button--compact" type="button" ${item.can_close ? "" : "disabled"}>${escapeHtml(t("dashboard.action.close"))}</button></td>
+        <td><span class="dashboard-read-only-action" title="${escapeHtml(t("monitoring.read_only_desc"))}">${escapeHtml(t("monitoring.read_only"))}</span></td>
       </tr>
     `)
     .join("");
@@ -426,14 +426,23 @@ function renderStrategyList(root, strategyList) {
   if (!rowsTarget) {
     return;
   }
-  const rows = strategyList?.items || [];
+  const statusFilter = root.dataset.strategyStatusFilter || "running";
+  const exchangeFilter = root.dataset.strategyExchangeFilter || "all";
+  const sortMode = root.dataset.strategySort || "activity";
+  const query = String(root.dataset.strategyQuery || "").toLocaleLowerCase();
+  const statusAliases = statusFilter === "running" ? new Set(["running", "live"]) : new Set([statusFilter]);
+  const rows = [...(strategyList?.items || [])]
+    .filter((row) => statusAliases.has(String(row.status || "").toLocaleLowerCase()))
+    .filter((row) => exchangeFilter === "all" || String(row.exchange || "").toLocaleLowerCase() === exchangeFilter)
+    .filter((row) => !query || `${row.name || ""} ${(row.symbols || []).join(" ")}`.toLocaleLowerCase().includes(query))
+    .sort((left, right) => sortMode === "pnl" ? Number(right.pnl || 0) - Number(left.pnl || 0) : 0);
   if (!rows.length) {
     rowsTarget.innerHTML = `<div class="dashboard-empty-block">${escapeHtml(panelStatusText(strategyList?.state, strategyList?.degradation_reason))}</div>`;
     return;
   }
   rowsTarget.innerHTML = rows
     .map((row) => `
-      <article class="dashboard-strategy-row" data-strategy-id="${escapeHtml(row.strategy_id)}">
+      <a class="dashboard-strategy-row" href="/strategies/${encodeURIComponent(row.strategy_id)}" data-strategy-id="${escapeHtml(row.strategy_id)}">
         <span class="dashboard-row-dot ${rowStateClass(row.status)}" aria-hidden="true"></span>
         <span class="dashboard-row-main">
           <strong>${escapeHtml(row.name)}</strong>
@@ -442,7 +451,7 @@ function renderStrategyList(root, strategyList) {
         <span class="dashboard-row-meta">${escapeHtml(row.exchange || "--")} / ${escapeHtml((row.symbols || []).join(", ") || "--")}</span>
         <span class="${financialClass(row.pnl > 0 ? "positive" : row.pnl < 0 ? "negative" : "neutral")}">${escapeHtml(row.pnl ?? "--")}</span>
         ${drawSparkline(row.mini_sparkline)}
-      </article>
+      </a>
     `)
     .join("");
 }
@@ -518,6 +527,9 @@ function initDashboard(root) {
     const separator = endpoint.includes("?") ? "&" : "?";
     activeRequest = apiFetch(`${endpoint}${separator}refresh=${encodeURIComponent(reason)}`)
       .then((summary) => {
+        root.dataset.dashboardState = "ready";
+        const loadError = qs("[data-dashboard-load-error]", root);
+        if (loadError instanceof HTMLElement) loadError.hidden = true;
         lastSummary = summary;
         root.dataset.dashboardLoaded = "true";
         root.dataset.dashboardLastRefresh = reason;
@@ -525,6 +537,10 @@ function initDashboard(root) {
         return summary;
       })
       .catch((error) => {
+        root.dataset.dashboardState = "error";
+        const loadError = qs("[data-dashboard-load-error]", root);
+        if (loadError instanceof HTMLElement) loadError.hidden = false;
+        setText("[data-dashboard-load-error-message]", error.message || t("dashboard.refresh.failed"), root);
         setText("[data-dashboard-refresh-status]", error.code || "failed", document);
         setText("[data-dashboard-freshness]", error.message || t("dashboard.refresh.failed"), document);
         throw error;
@@ -572,6 +588,9 @@ function initDashboard(root) {
   refreshButton?.addEventListener("click", () => {
     loadSummary("manual").catch(() => null);
   });
+  qs("[data-dashboard-load-retry]", root)?.addEventListener("click", () => {
+    loadSummary("manual").catch(() => null);
+  });
   qsa("[data-dashboard-refresh-preset]", document).forEach((item) => {
     item.addEventListener("click", () => {
       setAutorefresh(item.dataset.dashboardRefreshPreset || "off");
@@ -582,6 +601,41 @@ function initDashboard(root) {
     if (lastSummary) {
       renderAlerts(root, lastSummary.alerts);
     }
+  });
+  qsa("[data-dashboard-status-filter]", root).forEach((item) => {
+    item.addEventListener("click", () => {
+      root.dataset.strategyStatusFilter = item.dataset.dashboardStatusFilter || "running";
+      qsa("[data-dashboard-status-filter]", root).forEach((candidate) => {
+        const selected = candidate === item;
+        candidate.classList.toggle("dashboard-tab--active", selected);
+        candidate.setAttribute("aria-selected", selected ? "true" : "false");
+      });
+      if (lastSummary) renderStrategyList(root, lastSummary.strategy_list);
+    });
+  });
+  qs("[data-strategy-search]", root)?.addEventListener("input", (event) => {
+    root.dataset.strategyQuery = event.currentTarget.value || "";
+    if (lastSummary) renderStrategyList(root, lastSummary.strategy_list);
+  });
+  qsa("[data-dashboard-exchange-option]", root).forEach((item) => {
+    item.addEventListener("click", () => {
+      root.dataset.strategyExchangeFilter = item.dataset.dashboardExchangeOption || "all";
+      setText("[data-exchange-current]", item.textContent.trim(), root);
+      qsa("[data-dashboard-exchange-option]", root).forEach((candidate) => {
+        candidate.setAttribute("aria-selected", candidate === item ? "true" : "false");
+      });
+      if (lastSummary) renderStrategyList(root, lastSummary.strategy_list);
+    });
+  });
+  qsa("[data-dashboard-sort-option]", root).forEach((item) => {
+    item.addEventListener("click", () => {
+      root.dataset.strategySort = item.dataset.dashboardSortOption || "activity";
+      setText("[data-sort-current]", item.textContent.trim(), root);
+      qsa("[data-dashboard-sort-option]", root).forEach((candidate) => {
+        candidate.setAttribute("aria-selected", candidate === item ? "true" : "false");
+      });
+      if (lastSummary) renderStrategyList(root, lastSummary.strategy_list);
+    });
   });
 
   window.__roehubDashboard = {

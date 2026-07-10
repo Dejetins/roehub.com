@@ -36,6 +36,10 @@
     aria-label="{{ t('backtests.aria') }}"
   >
     {% include "fragments/backtests/loading_state.html" %}
+    <div class="workbench-module-state workbench-module-state--error" data-backtests-load-error role="alert" hidden>
+      <div><strong>{{ t("backtests.state.load_failed") }}</strong><p data-backtests-load-error-message>{{ t("backtests.status.failed") }}</p></div>
+      <button class="rh-button rh-button--secondary" type="button" data-backtests-retry>{{ t("refresh.manual") }}</button>
+    </div>
 
     <header class="backtests-modebar" role="tablist" aria-label="{{ t('backtests.mode.label') }}">
       <button

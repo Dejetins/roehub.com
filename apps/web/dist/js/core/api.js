@@ -1,11 +1,12 @@
 export class RoehubApiError extends Error {
-  constructor(message, { status = 0, code = "request_failed", payload = null, retryAfterSeconds = null } = {}) {
+  constructor(message, { status = 0, code = "request_failed", payload = null, retryAfterSeconds = null, outcomeUnknown = false } = {}) {
     super(message);
     this.name = "RoehubApiError";
     this.status = status;
     this.code = code;
     this.payload = payload;
     this.retryAfterSeconds = retryAfterSeconds;
+    this.outcomeUnknown = outcomeUnknown;
   }
 }
 
@@ -74,6 +75,12 @@ export async function apiFetch(path, options = {}) {
   }
 
   if (isMutation(method)) {
+    if (!headers.has("x-request-id")) {
+      headers.set(
+        "x-request-id",
+        globalThis.crypto?.randomUUID?.() || `web-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      );
+    }
     const token = csrf.get();
     if (token) {
       headers.set("x-csrf-token", token);
@@ -108,6 +115,7 @@ export async function apiFetch(path, options = {}) {
       code: codeByStatus[response.status] || normalized.code,
       payload,
       retryAfterSeconds,
+      outcomeUnknown: isMutation(method) && response.status >= 500,
     });
   } catch (error) {
     if (error instanceof RoehubApiError) {
@@ -120,9 +128,13 @@ export async function apiFetch(path, options = {}) {
       const isTimeout = abortKind === "timeout";
       throw new RoehubApiError(isTimeout ? "Request timed out" : "Request aborted", {
         code: isTimeout ? "timeout" : "aborted",
+        outcomeUnknown: isMutation(method),
       });
     }
-    throw new RoehubApiError(error?.message || "Network request failed", { code: "network_error" });
+    throw new RoehubApiError(error?.message || "Network request failed", {
+      code: "network_error",
+      outcomeUnknown: isMutation(method),
+    });
   } finally {
     window.clearTimeout(timeoutId);
     removeExternalAbort?.();

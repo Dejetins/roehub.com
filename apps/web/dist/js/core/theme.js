@@ -1,15 +1,25 @@
 import { dispatchRoehubEvent, qsa, setText } from "./dom.js";
 
 export const THEME_STORAGE_KEY = "roehub_theme";
-export const SUPPORTED_THEMES = ["terminal-orange", "graphite"];
-export const DEFAULT_THEME = "terminal-orange";
+export const SUPPORTED_THEMES = ["abyss", "graphite", "slate", "frost", "paper", "sand"];
+export const DEFAULT_THEME = "graphite";
+const LEGACY_THEME_MAP = {
+  "terminal-orange": "abyss",
+  "matrix-green": "slate",
+  "high-contrast": "paper",
+};
 const THEME_LABELS = {
-  "terminal-orange": "Orange",
+  abyss: "Abyss",
   graphite: "Graphite",
+  slate: "Slate",
+  frost: "Frost",
+  paper: "Paper",
+  sand: "Sand",
 };
 
 export function normalizeTheme(value) {
-  return SUPPORTED_THEMES.includes(value) ? value : DEFAULT_THEME;
+  const mappedValue = LEGACY_THEME_MAP[value] || value;
+  return SUPPORTED_THEMES.includes(mappedValue) ? mappedValue : DEFAULT_THEME;
 }
 
 export function themeDisplayName(theme) {

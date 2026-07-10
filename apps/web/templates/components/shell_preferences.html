@@ -3,20 +3,20 @@
     <button
       class="rh-button rh-button--compact rh-dropdown__trigger"
       type="button"
-      id="theme-switcher-trigger"
+      id="{{ preference_id_prefix|default('shell') }}-theme-switcher-trigger"
       aria-label="{{ t('theme.label') }}"
       aria-haspopup="listbox"
       aria-expanded="false"
-      aria-controls="theme-switcher-menu"
+      aria-controls="{{ preference_id_prefix|default('shell') }}-theme-switcher-menu"
       data-rh-dropdown-trigger
     >
-      <span class="rh-dropdown__value" data-theme-current>{{ t("theme.terminal_orange") }}</span>
+      <span class="rh-dropdown__value" data-theme-current>{{ t("theme.graphite") }}</span>
     </button>
     <div
       class="rh-popover rh-popover--theme"
-      id="theme-switcher-menu"
+      id="{{ preference_id_prefix|default('shell') }}-theme-switcher-menu"
       role="listbox"
-      aria-labelledby="theme-switcher-trigger"
+      aria-labelledby="{{ preference_id_prefix|default('shell') }}-theme-switcher-trigger"
       hidden
       data-rh-dropdown-menu
       data-theme-menu
@@ -26,7 +26,7 @@
           class="rh-menu-item rh-theme-option"
           type="button"
           role="option"
-          aria-selected="{{ 'true' if theme.key == 'terminal-orange' else 'false' }}"
+          aria-selected="{{ 'true' if theme.key == 'graphite' else 'false' }}"
           data-rh-dropdown-item="{{ theme.key }}"
           data-theme-option
           data-theme-value="{{ theme.key }}"
@@ -42,20 +42,20 @@
     <button
       class="rh-button rh-button--compact rh-dropdown__trigger"
       type="button"
-      id="locale-switcher-trigger"
+      id="{{ preference_id_prefix|default('shell') }}-locale-switcher-trigger"
       aria-label="{{ t('common.language') }}"
       aria-haspopup="listbox"
       aria-expanded="false"
-      aria-controls="locale-switcher-menu"
+      aria-controls="{{ preference_id_prefix|default('shell') }}-locale-switcher-menu"
       data-rh-dropdown-trigger
     >
       <span class="rh-dropdown__value" data-locale-current>{{ locale|upper }}</span>
     </button>
     <div
       class="rh-popover"
-      id="locale-switcher-menu"
+      id="{{ preference_id_prefix|default('shell') }}-locale-switcher-menu"
       role="listbox"
-      aria-labelledby="locale-switcher-trigger"
+      aria-labelledby="{{ preference_id_prefix|default('shell') }}-locale-switcher-trigger"
       hidden
       data-rh-dropdown-menu
       data-locale-menu
