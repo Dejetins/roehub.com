@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 from fastapi.testclient import TestClient
 
 from apps.web.main.api_client import CurrentUserApiResult, WebCurrentUser
 from apps.web.main.app import create_app
+
+_WORKBENCH_CSS = Path(__file__).resolve().parents[4] / "apps/web/dist/css/workbench.css"
 
 
 def _authorized_client() -> TestClient:
@@ -88,3 +91,10 @@ def test_shell_exposes_six_local_themes_and_mutation_reconciliation_contract() -
     for theme in ("abyss", "graphite", "slate", "frost", "paper", "sand"):
         assert f'data-theme-value="{theme}"' in response.text
     assert "/assets/js/core/workbench-shell.js" in response.text
+
+
+def test_compact_actions_keep_minimum_desktop_and_mobile_target_widths() -> None:
+    css = _WORKBENCH_CSS.read_text(encoding="utf-8")
+
+    assert ".rh-button--compact { min-width: 36px; min-height: 36px; }" in css
+    assert ".rh-button--compact { min-width: 44px; }" in css

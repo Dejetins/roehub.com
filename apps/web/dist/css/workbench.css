@@ -596,7 +596,7 @@ textarea,
 }
 
 .rh-button { padding-inline: 14px; text-transform: none; }
-.rh-button--compact { min-height: 36px; }
+.rh-button--compact { min-width: 36px; min-height: 36px; }
 .strategies-segment { min-width: 36px; }
 
 .workbench-main button,
@@ -708,6 +708,7 @@ table tbody tr { height: 44px; }
   .workbench-main input:not([type="checkbox"]):not([type="radio"]),
   .workbench-main select,
   .workbench-main textarea { min-height: 44px !important; }
+  .rh-button--compact { min-width: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
