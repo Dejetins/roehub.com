@@ -20,7 +20,7 @@
     <string>/usr/bin/ssh</string>
     <string>-NT</string>
     <string>-L</string>
-    <string>127.0.0.1:18080:127.0.0.1:3128</string>
+    <string>127.0.0.1:18180:127.0.0.1:3128</string>
     <string>-i</string>
     <string>/Users/daniildegtyarev/.ssh/roehub_nl_tunnel_ed25519</string>
     <string>-o</string>

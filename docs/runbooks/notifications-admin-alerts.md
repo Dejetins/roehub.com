@@ -20,7 +20,7 @@ Production-диспетчер на `macstudio` получает доступ к 
 - отдельная учетная запись `roehub-tunnel` может переадресовывать только
   `127.0.0.1:3128`;
 - `launchd`-служба `com.roehub.telegram-egress-tunnel` на `macstudio` публикует
-  прокси только локально как `127.0.0.1:18080`;
+  прокси только локально как `127.0.0.1:18180`;
 - `notification-dispatcher` использует локальный прокси только при наличии
   host-local ключа `ROEHUB_NOTIFICATIONS_TELEGRAM_PROXY_URL`;
 - токен бота остается в host-local env и не передается в SSH-конфигурацию,
@@ -37,7 +37,7 @@ ssh roehub-nl 'systemctl is-active squid fail2ban; ss -lntp | grep 127.0.0.1:312
 ```bash
 ssh macstudio 'launchctl print gui/$(id -u)/com.roehub.telegram-egress-tunnel'
 ssh macstudio 'curl -4sS -o /dev/null -w "%{http_code}\n" \
-  --proxy http://127.0.0.1:18080 \
+  --proxy http://127.0.0.1:18180 \
   --connect-timeout 5 --max-time 15 \
   https://api.telegram.org'
 ```
