@@ -174,7 +174,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 74,
+      "file_count": 90,
       "id": "automation",
       "paths": [
         "tools/",
@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 317,
+      "file_count": 323,
       "id": "quality",
       "paths": [
         "tests/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 873,
+      "file_count": 995,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -2483,6 +2483,86 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-classic-audit-v1/00-inventory-and-batch-plan.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-classic-audit-v1/01-subagent-batch-audits.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-classic-audit-v1/02-consolidated-improvement-backlog.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-wave0-full-implementation-v1/00-contract-and-catalog-foundation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-wave0-full-implementation-v1/01-wave0-direct-critical-repairs.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-wave0-full-implementation-v1/02-wave0-managed-overlay.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-wave0-full-implementation-v1/03-wave1-direct-repairs.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-wave0-full-implementation-v1/04-wave1-managed-overlay.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-wave0-full-implementation-v1/05-wave2-wave3-completion.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-wave0-full-implementation-v1/06-system-integration.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-wave0-full-implementation-v1/07-full-validation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-library-wave0-full-implementation-v1/08-closure.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-plugin-auto-improve-benchmark-v1/00-baseline-inventory-and-rubric.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-plugin-auto-improve-benchmark-v1/01-local-benchmark-harness.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-plugin-auto-improve-benchmark-v1/02-ten-iteration-auto-improve-run.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/skill-plugin-auto-improve-benchmark-v1/03-final-analysis-and-handoff.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/agents/generated/strategy-producer-paper-testnet-trading-v1/01-baseline-handoff-freeze.md"
     },
     {
@@ -3231,9 +3311,424 @@
       "path": ".codex/rules/roehub.rules"
     },
     {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/catalog-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-00-contract-fixtures.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-00-current-audit/skill_audit.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/evidence/stage-00-current-audit/skill_audit.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-00-current-audit/skill_audit.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-00-current-audit/skill_inventory.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-00-current-audit/skill_inventory.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-01-contract-fixtures.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-01-current-audit/skill_audit.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/evidence/stage-01-current-audit/skill_audit.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-01-current-audit/skill_audit.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-01-current-audit/skill_inventory.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-01-current-audit/skill_inventory.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-01-semantic-gates.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-02-contract-fixtures.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-02-overlay-audit/skill_audit.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/evidence/stage-02-overlay-audit/skill_audit.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-02-overlay-audit/skill_audit.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-02-overlay-audit/skill_inventory.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-02-overlay-audit/skill_inventory.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-02-semantic-gates.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-03-contract-fixtures.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-03-current-audit/skill_audit.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/evidence/stage-03-current-audit/skill_audit.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-03-current-audit/skill_audit.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-03-current-audit/skill_inventory.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-03-current-audit/skill_inventory.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-03-semantic-gates.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-04-contract-fixtures.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-04-overlay-audit/skill_audit.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/evidence/stage-04-overlay-audit/skill_audit.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-04-overlay-audit/skill_audit.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-04-overlay-audit/skill_inventory.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-04-overlay-audit/skill_inventory.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-04-semantic-gates.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-05-contract-fixtures.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-05-current-audit/skill_audit.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/evidence/stage-05-current-audit/skill_audit.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-05-current-audit/skill_audit.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-05-current-audit/skill_inventory.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/skill-system/evidence/stage-05-current-audit/skill_inventory.tsv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-05-semantic-gates.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-06-plugin-reload-receipt.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-07-fresh-process.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-07-validation.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/evidence/stage-08-final-reconciliation.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/fixtures/skill-contract-cases-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/ownership-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/policy-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/0003e9adfe5581b9e8062e03251e64a21539a87518ac083a2fc5c2fdef9c0c09.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/0d08fb3566b84c94b792b6751f83e06a0a0e97401b84279e705cc7d0edc359e1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/21cd8a009a323702bd721180b918352e6b4900bf2cd810938346a3b6da48c5a1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/34e518dec5000fcd4494404539b60c9516669fc280715d07da66959918172741.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/4d058de8ae000033b24e124e1effcc5033cea9bfc30a08a146b47748bce538f5.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/5168bbe4eb4b514f217d11e508a8861909136a899acd05ba286f683dd788edef.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/59981d23519222bcecf1be48bb37730bbc50539ceb0e35ad09fcef98a3df19d3.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/669a42ccf3323fe0ceda6e466730bcb05dddf1e0c220d6523ea504909fc49165.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/697effe69e9d906538a85f18cb651838ea5878e0952406e8f61d98db35c94088.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/6adb991df8dbc1b7f89fa5a82309664d99e08f678b5e8a219fb8fea003db801d.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/6ed55e3e41bd511818dc92c33e3bfc410b5439375c4ef4d07fe22821693bfd10.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/76a4b2da76ab1a5a13d08a38113471e3ea596465cb25e29063ed3db63038596e.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/77b3d61e1bceae0323aecd394861435bf87479ba040593c923a07a9a260143aa.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/86485a2e1d29b84664131baac3ed61c9cbc03496fd2f92cf7430a8f9c0523995.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/86cb230cc71e17efbb7d3f757543d514a84d43b4809550cf0555c22f9ed3025a.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/8c763dbd1041fc31d9152125d449e791a2545206f56368c21b6c040d0644e99d.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/8fd56316b2c49cbdc657a5d197967a233018e1fada65b00a5dd030dce6499a6e.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/939a7deb074816fa290fdf263e7c10fb1d2c61616202cc661a9f3c75c3e33f9a.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/98cf8632d819c850b093f2e693a0b39d1d40ff47c09140cb005cecc1f306d211.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/a0db6085139c382852724b6ac3baef8d7de78f43eff8c12828784c90eef7cc2e.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/aad2ee31cb92d0b79c23024920ea9d865dc404c604411fc4c682d988b17edd98.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/abf15a221f2c5f994e7730c27ad2d6658ffe1f3387e1a0bfc6a9230167d89c43.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/afb6b757f6f65f6c721d25d49b7a26ba762c8341754ab03d760cb7536096ba5c.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/bdc3928edf713ea31b7f81dbd5d706237bcdb4424a7a90a79996fec1ca702309.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/c6143d3d0d6b93b8c8bbf6e991c1f95d1c27121c001b5a2d88eb280dedad72a0.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/d68b77e5bbb34dedab89d134da52855f140fc4b4299b80104f534e3b9e98f8ee.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/da44c88f6b3845a8fa8c60792ec9a722110a55a9793c279757b48fefb11f819c.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/e542979fab6141f130b9129b7fdc4bccb2ec3762dd788538b6fdfe074d40c9e0.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/ea42c60691e2567d1d24c962456fa72f4b7466d8377c7e4e35d83b5e77687a80.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/f1281550ebe53e926534a64e0b7edc58b749f95a2cd98281c277662d1f9dd5a1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/f1f5151afd2a5f4823512d173edfb5d5492f4a5752104723ae62fcc08dd2c1e5.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/rollback/blobs/f9054aec3f4170e6b828326c1336b618d9bee729f4e7efb86c4e88fe6e123285.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/skill-system/rollback/manifest-v1.json"
+    },
+    {
       "area": "repository-meta",
       "kind": "other",
       "path": ".dockerignore"
+    },
+    {
+      "area": "repository-root",
+      "kind": "other",
+      "path": ".gitattributes"
     },
     {
       "area": "operations",
@@ -4809,6 +5304,126 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-classic-audit-v1-stage-reports/00-inventory-and-batch-plan.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-classic-audit-v1-stage-reports/01-subagent-batch-audits.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-classic-audit-v1-stage-reports/02-consolidated-improvement-backlog.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-classic-audit-v1-stage-reports/skill-library-classic-audit-v1-stage-ledger.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-classic-audit-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/00-contract-and-catalog-foundation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/01-wave0-direct-critical-repairs.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/02-wave0-managed-overlay.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/03-wave1-direct-repairs.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/04-wave1-managed-overlay.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/05-wave2-wave3-completion.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/06-system-integration.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/07-full-validation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/08-closure.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/skill-library-wave0-full-implementation-v1-stage-ledger.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-library-wave0-full-implementation-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-plugin-all-skills-official-format-ab-test-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-plugin-auto-improve-benchmark-v1-stage-reports/00-baseline-inventory-and-rubric.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-plugin-auto-improve-benchmark-v1-stage-reports/01-local-benchmark-harness.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-plugin-auto-improve-benchmark-v1-stage-reports/02-ten-iteration-auto-improve-run.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-plugin-auto-improve-benchmark-v1-stage-reports/03-final-analysis-and-handoff.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-plugin-auto-improve-benchmark-v1-stage-reports/skill-plugin-auto-improve-benchmark-v1-stage-ledger.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-plugin-auto-improve-benchmark-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/agents/skill-plugin-official-format-audit-ab-test-v1.md"
     },
     {
       "area": "knowledge",
@@ -13278,6 +13893,36 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/tools/test_codex_quality_benchmark.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_codex_skill_audit.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_codex_skill_catalog.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_codex_skill_contract.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_codex_skill_contract_fixtures.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_codex_skill_discovery.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/tools/test_generate_docs_index.py"
     },
     {
@@ -13294,6 +13939,86 @@
       "area": "automation",
       "kind": "python",
       "path": "tools/ci/route_changes.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/__init__.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/cli.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/manifest.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/models.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/pairwise.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/reports.py"
+    },
+    {
+      "area": "automation",
+      "kind": "configuration",
+      "path": "tools/codex_quality_benchmark/schemas/skill-catalog-v1.schema.json"
+    },
+    {
+      "area": "automation",
+      "kind": "configuration",
+      "path": "tools/codex_quality_benchmark/schemas/skill-contract-case-result-v1.schema.json"
+    },
+    {
+      "area": "automation",
+      "kind": "configuration",
+      "path": "tools/codex_quality_benchmark/schemas/skill-result-v1.schema.json"
+    },
+    {
+      "area": "automation",
+      "kind": "configuration",
+      "path": "tools/codex_quality_benchmark/schemas/skill-spec-v1.schema.json"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/scoring.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/skill_audit.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/skill_catalog.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/skill_contract.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/skill_contract_fixtures.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/codex_quality_benchmark/skill_discovery.py"
     },
     {
       "area": "automation",
@@ -13331,7 +14056,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 2335,
+  "inventory_file_count": 2480,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -13507,5 +14232,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "5dede431923c4cdfba2250ca6c47871232586af79b7132c606c91fd64fd6f89c"
+  "structural_digest": "12e1a84e6c3c00abb9e7ae15670b0c9f27bcb34898bec049cd469aa088d711c4"
 }
