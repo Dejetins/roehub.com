@@ -10,6 +10,53 @@ This runbook covers Stage `07` notifications admin alerts, admin-only synthetic 
 - Admin recipient configuration must come from host-local env/config or persisted admin-owned routes.
 - Evidence may report only key presence, redacted references or stable hashes.
 
+## Шлюз исходящего доступа Telegram
+
+Production-диспетчер на `macstudio` получает доступ к `api.telegram.org` через
+закрытый SSH-туннель до шлюза `89.150.41.97`. Публичный прокси-порт не
+используется:
+
+- Squid на шлюзе слушает только `127.0.0.1:3128`;
+- отдельная учетная запись `roehub-tunnel` может переадресовывать только
+  `127.0.0.1:3128`;
+- `launchd`-служба `com.roehub.telegram-egress-tunnel` на `macstudio` публикует
+  прокси только локально как `127.0.0.1:18080`;
+- `notification-dispatcher` использует локальный прокси только при наличии
+  host-local ключа `ROEHUB_NOTIFICATIONS_TELEGRAM_PROXY_URL`;
+- токен бота остается в host-local env и не передается в SSH-конфигурацию,
+  `plist`, runbook или журналы туннеля.
+
+Проверка шлюза с операторской машины:
+
+```bash
+ssh roehub-nl 'systemctl is-active squid fail2ban; ss -lntp | grep 127.0.0.1:3128'
+```
+
+Проверка постоянного туннеля и доступа к Telegram с `macstudio`:
+
+```bash
+ssh macstudio 'launchctl print gui/$(id -u)/com.roehub.telegram-egress-tunnel'
+ssh macstudio 'curl -4sS -o /dev/null -w "%{http_code}\n" \
+  --proxy http://127.0.0.1:18080 \
+  --connect-timeout 5 --max-time 15 \
+  https://api.telegram.org'
+```
+
+Ожидаемый HTTP-код для корневого адреса Telegram — `302`. Эта проверка не
+отправляет сообщение и не раскрывает токен.
+
+Восстановление после обрыва:
+
+```bash
+ssh macstudio 'launchctl kickstart -k \
+  gui/$(id -u)/com.roehub.telegram-egress-tunnel'
+ssh roehub-nl 'systemctl restart squid'
+```
+
+После восстановления повторить проверку HTTP-кода. Не включать реальную
+Telegram-доставку, пока `real-readiness` не подтверждает один согласованный
+тестовый маршрут.
+
 ## Critical Unknown Delivery
 
 Alert: `NotificationsCriticalUnknownDelivery`.

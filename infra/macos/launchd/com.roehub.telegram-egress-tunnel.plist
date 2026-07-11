@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.roehub.telegram-egress-tunnel</string>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>LimitLoadToSessionType</key>
+  <string>Aqua</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/ssh</string>
+    <string>-NT</string>
+    <string>-L</string>
+    <string>127.0.0.1:18080:127.0.0.1:3128</string>
+    <string>-i</string>
+    <string>/Users/daniildegtyarev/.ssh/roehub_nl_tunnel_ed25519</string>
+    <string>-o</string>
+    <string>IdentitiesOnly=yes</string>
+    <string>-o</string>
+    <string>BatchMode=yes</string>
+    <string>-o</string>
+    <string>StrictHostKeyChecking=yes</string>
+    <string>-o</string>
+    <string>ExitOnForwardFailure=yes</string>
+    <string>-o</string>
+    <string>ConnectTimeout=10</string>
+    <string>-o</string>
+    <string>ServerAliveInterval=30</string>
+    <string>-o</string>
+    <string>ServerAliveCountMax=3</string>
+    <string>-o</string>
+    <string>TCPKeepAlive=yes</string>
+    <string>roehub-tunnel@89.150.41.97</string>
+  </array>
+
+  <key>StandardOutPath</key>
+  <string>/Users/daniildegtyarev/Library/Logs/roehub/telegram-egress-tunnel.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/daniildegtyarev/Library/Logs/roehub/telegram-egress-tunnel.err.log</string>
+</dict>
+</plist>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import plistlib
 from pathlib import Path
 
 
@@ -9,6 +10,10 @@ def _repo_root() -> Path:
 
 def _read(relative_path: str) -> str:
     return (_repo_root() / relative_path).read_text(encoding="utf-8")
+
+
+def _read_plist(relative_path: str) -> dict[str, object]:
+    return plistlib.loads((_repo_root() / relative_path).read_bytes())
 
 
 def test_exchange_execution_native_service_assets_are_installed_and_reloaded() -> None:
@@ -46,3 +51,32 @@ def test_rl_monitor_smoke_checks_ready_loaded_and_safety_metrics() -> None:
     assert "rl_trading_inference_model_loaded 1.0" in smoke
     assert "rl_trading_inference_safety_breaches_total" in smoke
     assert "bash scripts/macos/smoke_prod.sh" in deploy_workflow
+
+
+def test_telegram_egress_tunnel_is_installed_and_scoped_to_notifications() -> None:
+    prod_bootstrap = _read("scripts/macos/bootstrap_native_prod.sh")
+    reload_services = _read("scripts/macos/reload_launchd_services.sh")
+    tunnel_plist = _read_plist(
+        "infra/macos/launchd/com.roehub.telegram-egress-tunnel.plist"
+    )
+    dispatcher_plist = _read_plist(
+        "infra/macos/launchd/com.roehub.notification-dispatcher.plist"
+    )
+
+    tunnel_asset = "com.roehub.telegram-egress-tunnel.plist"
+    assert tunnel_asset in prod_bootstrap
+    assert tunnel_asset in reload_services
+
+    tunnel_arguments = tunnel_plist["ProgramArguments"]
+    assert isinstance(tunnel_arguments, list)
+    assert "127.0.0.1:18080:127.0.0.1:3128" in tunnel_arguments
+    assert "BatchMode=yes" in tunnel_arguments
+    assert "StrictHostKeyChecking=yes" in tunnel_arguments
+    assert "ExitOnForwardFailure=yes" in tunnel_arguments
+
+    dispatcher_arguments = dispatcher_plist["ProgramArguments"]
+    assert isinstance(dispatcher_arguments, list)
+    dispatcher_command = dispatcher_arguments[2]
+    assert isinstance(dispatcher_command, str)
+    assert "ROEHUB_NOTIFICATIONS_TELEGRAM_PROXY_URL" in dispatcher_command
+    assert 'NO_PROXY="127.0.0.1,localhost"' in dispatcher_command
