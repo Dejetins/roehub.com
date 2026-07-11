@@ -112,7 +112,10 @@ class TelegramCommandHandler:
             chat_id_ref=command.chat_id_ref,
             owner_user_id=owner_user_id,
             command_name=parsed.name,
-            command_args_json=_command_args_json(args=parsed.args),
+            command_args_json=_command_args_json(
+                command_name=parsed.name,
+                args=parsed.args,
+            ),
             status=status,
             idempotency_key=f"telegram_update:{command.telegram_update_id}",
             created_at=command.received_at,
@@ -246,8 +249,14 @@ def _is_stats_period(*, value: str) -> TypeGuard[NotificationStatsPeriod]:
     return value in {"today", "week", "month"}
 
 
-def _command_args_json(*, args: tuple[str, ...]) -> dict[str, object]:
+def _command_args_json(
+    *, command_name: str, args: tuple[str, ...]
+) -> dict[str, object]:
     values: dict[str, object] = {"arg_count": len(args)}
+    if command_name == "start":
+        if args:
+            values["arg_0"] = "<redacted>"
+        return values
     for index, arg in enumerate(args[:8]):
         values[f"arg_{index}"] = arg
     return values

@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 from uuid import UUID, uuid4
 
+import pytest
+
 from trading.contexts.notifications.adapters import InMemoryNotificationRepository
 from trading.contexts.notifications.application import (
     NotificationDispatcher,
@@ -80,7 +82,9 @@ class StaticProvider:
         )
 
 
-def test_dispatcher_claims_pending_delivery_and_marks_sent() -> None:
+def test_dispatcher_claims_pending_delivery_and_marks_sent(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     repository = InMemoryNotificationRepository()
     delivery = repository.record_delivery(
         delivery=_delivery(status="pending", created_at=_now() - timedelta(seconds=12))
@@ -93,7 +97,8 @@ def test_dispatcher_claims_pending_delivery_and_marks_sent() -> None:
         metrics=metrics,
     )
 
-    result = dispatcher.drain_once()
+    with caplog.at_level("INFO"):
+        result = dispatcher.drain_once()
 
     updated = repository.deliveries[delivery.delivery_id]
     assert result.sent == 1
@@ -106,6 +111,10 @@ def test_dispatcher_claims_pending_delivery_and_marks_sent() -> None:
     assert metrics.claimed == 1
     assert metrics.results == [("log_only", "sent")]
     assert metrics.pending_age_seconds == 12.0
+    assert str(delivery.delivery_id) in caplog.text
+    assert "status=sent" in caplog.text
+    assert delivery.recipient_address_ref not in caplog.text
+    assert "Stage 03 dispatcher smoke" not in caplog.text
 
 
 def test_dispatcher_schedules_retry_until_attempt_budget_is_exhausted() -> None:

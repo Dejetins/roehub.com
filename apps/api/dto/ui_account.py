@@ -304,6 +304,14 @@ class NotificationReportScheduleResponse(BaseModel):
     timezone: str
 
 
+class NotificationDeliveryCountersResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    telegram_sent_total: int
+    telegram_sent_last_24h: int
+    last_telegram_sent_at: datetime | None
+
+
 class NotificationScopedSettingsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -312,6 +320,7 @@ class NotificationScopedSettingsResponse(BaseModel):
     route_status: NotificationRouteStatusValue
     recipient_address_ref_masked: str | None
     report_schedule: NotificationReportScheduleResponse
+    delivery_counters: NotificationDeliveryCountersResponse
     available_modes: list[NotificationScopedModeValue]
     updated_at: datetime
 

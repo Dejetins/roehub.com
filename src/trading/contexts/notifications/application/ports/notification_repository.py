@@ -4,6 +4,9 @@ from datetime import datetime
 from typing import Protocol
 from uuid import UUID
 
+from trading.contexts.notifications.application.delivery_counters import (
+    NotificationDeliveryCounters,
+)
 from trading.contexts.notifications.domain import (
     NotificationDelivery,
     NotificationDeliveryAttempt,
@@ -39,6 +42,10 @@ class NotificationRepository(Protocol):
     def update_delivery(self, *, delivery: NotificationDelivery) -> NotificationDelivery: ...
 
     def count_deliveries_by_status(self, *, status: str) -> int: ...
+
+    def get_delivery_counters(
+        self, *, owner_user_id: UserId, now: datetime
+    ) -> NotificationDeliveryCounters: ...
 
     def claim_delivery(
         self, *, delivery_id: UUID, lease_until: datetime, now: datetime

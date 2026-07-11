@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from uuid import UUID
 
+from trading.contexts.notifications.application.delivery_counters import (
+    NotificationDeliveryCounters,
+)
 from trading.contexts.notifications.domain import (
     NotificationDelivery,
     NotificationDeliveryAttempt,
@@ -38,6 +41,12 @@ class InMemoryNotificationRepository:
         return None
 
     def upsert_route(self, *, route: NotificationRoute) -> NotificationRoute:
+        existing = self.routes.get(route.route_id)
+        if existing is not None and (
+            existing.owner_user_id != route.owner_user_id
+            or existing.recipient_kind != route.recipient_kind
+        ):
+            raise ValueError("NotificationRoute owner and recipient kind are immutable")
         self.routes[route.route_id] = route
         return route
 
@@ -97,6 +106,36 @@ class InMemoryNotificationRepository:
 
     def count_deliveries_by_status(self, *, status: str) -> int:
         return sum(1 for delivery in self.deliveries.values() if delivery.status == status)
+
+    def get_delivery_counters(
+        self, *, owner_user_id: UserId, now: datetime
+    ) -> NotificationDeliveryCounters:
+        owned_route_ids = {
+            route.route_id
+            for route in self.routes.values()
+            if route.owner_user_id == owner_user_id and route.recipient_kind == "user"
+        }
+        sent = tuple(
+            delivery
+            for delivery in self.deliveries.values()
+            if delivery.route_id in owned_route_ids
+            and delivery.status == "sent"
+            and delivery.provider_key == "telegram_bot_api"
+        )
+        last_sent_at = max(
+            (delivery.sent_at for delivery in sent if delivery.sent_at is not None),
+            default=None,
+        )
+        return NotificationDeliveryCounters(
+            telegram_sent_total=len(sent),
+            telegram_sent_last_24h=sum(
+                1
+                for delivery in sent
+                if delivery.sent_at is not None
+                and delivery.sent_at >= now - timedelta(hours=24)
+            ),
+            last_telegram_sent_at=last_sent_at,
+        )
 
     def claim_delivery(
         self, *, delivery_id: UUID, lease_until: datetime, now: datetime

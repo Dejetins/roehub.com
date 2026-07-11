@@ -13,8 +13,9 @@ This runbook covers Stage `07` notifications admin alerts, admin-only synthetic 
 ## Шлюз исходящего доступа Telegram
 
 Production-диспетчер на `macstudio` получает доступ к `api.telegram.org` через
-закрытый SSH-туннель до шлюза `89.150.41.97`. Публичный прокси-порт не
-используется:
+закрытый SSH-туннель до host-local SSH-псевдонима `roehub-telegram-egress`.
+Конкретный адрес шлюза и путь к ключу хранятся только в `~/.ssh/config` на
+хосте; публичный прокси-порт не используется:
 
 - Squid на шлюзе слушает только `127.0.0.1:3128`;
 - ACL Squid разрешает только `api.telegram.org`; другие адреса должны получать
@@ -28,10 +29,14 @@ Production-диспетчер на `macstudio` получает доступ к 
 - токен бота остается в host-local env и не передается в SSH-конфигурацию,
   `plist`, runbook или журналы туннеля.
 
-Проверка шлюза с операторской машины:
+Шаблон host-local SSH-конфигурации находится в
+`infra/macos/ssh/roehub-telegram-egress.conf.example`. Заполненный файл, адрес
+шлюза и закрытый ключ не должны попадать в Git.
+
+Проверка шлюза с `macstudio`:
 
 ```bash
-ssh roehub-nl 'systemctl is-active squid fail2ban; ss -lntp | grep 127.0.0.1:3128'
+ssh macstudio 'ssh roehub-telegram-egress true'
 ```
 
 Проверка постоянного туннеля и доступа к Telegram с `macstudio`:
@@ -52,12 +57,50 @@ ssh macstudio 'curl -4sS -o /dev/null -w "%{http_code}\n" \
 ```bash
 ssh macstudio 'launchctl kickstart -k \
   gui/$(id -u)/com.roehub.telegram-egress-tunnel'
-ssh roehub-nl 'systemctl restart squid'
+ssh <gateway-admin-alias> 'systemctl restart squid'
 ```
 
 После восстановления повторить проверку HTTP-кода. Не включать реальную
 Telegram-доставку, пока `real-readiness` не подтверждает один согласованный
 тестовый маршрут.
+
+Проверка метрик Telegram API:
+
+```bash
+ssh macstudio 'curl -fsS http://127.0.0.1:9210/metrics | grep notifications_telegram_api_'
+```
+
+- `notifications_telegram_api_up` равно `1`, если последний `getMe` завершился
+  успешно;
+- `notifications_telegram_api_probe_latency_seconds` показывает задержку
+  последней проверки;
+- `notifications_telegram_api_last_success_unixtime` хранит время последнего
+  успешного ответа;
+- `notifications_telegram_api_probe_total{result=...}` считает успешные и
+  неуспешные проверки без идентификаторов пользователей, чатов и токенов.
+
+Каждый результат доставки записывается в системный журнал диспетчера только с
+внутренними `delivery_id`, `route_id`, `provider`, `status`, `attempt_count` и
+нормализованным `error_code`. Адрес получателя, текст сообщения и ответ
+Telegram в журнал не выводятся.
+
+Проверка управляемой ротации журналов:
+
+```bash
+ssh macstudio 'launchctl print gui/$(id -u)/com.roehub.notification-log-rotation'
+ssh macstudio '/opt/roehub/app/scripts/macos/rotate_notification_logs.sh'
+```
+
+## Пользовательские счетчики
+
+`/ui/account/notifications/scoped` возвращает счетчик только для текущего
+аутентифицированного пользователя. Он строится из delivery ledger и учитывает
+только успешные отправки через `telegram_bot_api`; `log_only`, административные
+маршруты и доставки других пользователей исключены.
+
+Полная пользовательская привязка не включается этим rollout. Ее канонический
+источник остается в Identity; нельзя создавать параллельную таблицу Notifications
+без совместной миграции consumer-ов и production `telegram_bot_worker`.
 
 ## Critical Unknown Delivery
 

@@ -7,6 +7,9 @@ from .persistence import (
 from .providers import (
     FakeNotificationProvider,
     LogOnlyNotificationProvider,
+    TelegramApiHealthProbeConfig,
+    TelegramApiHealthProbeResult,
+    TelegramBotApiHealthProbe,
     TelegramBotApiNotificationProvider,
     TelegramNotificationProviderConfig,
 )
@@ -18,6 +21,9 @@ __all__ = [
     "LogOnlyNotificationProvider",
     "PostgresNotificationRepository",
     "PsycopgNotificationPostgresGateway",
+    "TelegramApiHealthProbeConfig",
+    "TelegramApiHealthProbeResult",
+    "TelegramBotApiHealthProbe",
     "TelegramBotApiNotificationProvider",
     "TelegramNotificationProviderConfig",
 ]

@@ -14,9 +14,17 @@ class _Gateway:
         self.routes: dict[str, Mapping[str, Any]] = {}
         self.deliveries: dict[str, Mapping[str, Any]] = {}
         self.fetch_all_queries: list[str] = []
+        self.last_route_upsert_query = ""
 
     def fetch_one(self, *, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any] | None:
+        if "AS telegram_sent_last_24h" in query:
+            return {
+                "telegram_sent_total": 2,
+                "telegram_sent_last_24h": 1,
+                "last_telegram_sent_at": parameters["now"],
+            }
         if "INSERT INTO notification_routes" in query:
+            self.last_route_upsert_query = query
             row = _decode_jsonb(parameters)
             self.routes[str(row["route_id"])] = row
             return row
@@ -84,6 +92,9 @@ def test_postgres_notification_repository_maps_route_and_claims_delivery() -> No
     assert claimed is not None
     assert claimed.status == "claimed"
     assert claimed.attempt_count == 1
+    assert "owner_user_id IS NOT DISTINCT FROM EXCLUDED.owner_user_id" in (
+        gateway.last_route_upsert_query
+    )
 
 
 def test_postgres_notification_repository_lists_active_routes_with_typed_owner_filter() -> None:
@@ -101,6 +112,21 @@ def test_postgres_notification_repository_lists_active_routes_with_typed_owner_f
     assert routes == (route,)
     assert gateway.fetch_all_queries
     assert "%(owner_user_id)s::uuid" in gateway.fetch_all_queries[-1]
+
+
+def test_postgres_notification_repository_reads_owner_scoped_delivery_counters() -> None:
+    gateway = _Gateway()
+    repository = PostgresNotificationRepository(gateway=gateway)
+    now = datetime(2026, 6, 29, 16, 0, tzinfo=timezone.utc)
+
+    counters = repository.get_delivery_counters(
+        owner_user_id=UserId(UUID("11111111-1111-4111-8111-111111111111")),
+        now=now,
+    )
+
+    assert counters.telegram_sent_total == 2
+    assert counters.telegram_sent_last_24h == 1
+    assert counters.last_telegram_sent_at == now
 
 
 def _route(*, now: datetime) -> NotificationRoute:

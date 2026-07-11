@@ -21,11 +21,6 @@
     <string>-NT</string>
     <string>-L</string>
     <string>127.0.0.1:18180:127.0.0.1:3128</string>
-    <string>-i</string>
-    <string>/Users/daniildegtyarev/.ssh/roehub_nl_tunnel_ed25519</string>
-    <string>-o</string>
-    <string>IdentitiesOnly=yes</string>
-    <string>-o</string>
     <string>BatchMode=yes</string>
     <string>-o</string>
     <string>StrictHostKeyChecking=yes</string>
@@ -39,7 +34,7 @@
     <string>ServerAliveCountMax=3</string>
     <string>-o</string>
     <string>TCPKeepAlive=yes</string>
-    <string>roehub-tunnel@89.150.41.97</string>
+    <string>roehub-telegram-egress</string>
   </array>
 
   <key>StandardOutPath</key>

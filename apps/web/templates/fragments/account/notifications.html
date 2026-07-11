@@ -13,6 +13,13 @@
     <div class="settings-list-row" data-scoped-mode-row></div>
     <div class="settings-list-row settings-list-row--stacked">
       <div>
+        <strong>{{ t("settings.notifications.sent_messages") }}</strong>
+        <span data-notification-sent-last>--</span>
+      </div>
+      <span class="settings-pill settings-pill--ok" data-notification-sent-count>0</span>
+    </div>
+    <div class="settings-list-row settings-list-row--stacked">
+      <div>
         <strong>{{ t("settings.notifications.report_schedule") }}</strong>
         <span data-report-schedule-timezone>--</span>
       </div>

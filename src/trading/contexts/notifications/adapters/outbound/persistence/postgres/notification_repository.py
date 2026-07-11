@@ -7,6 +7,9 @@ from uuid import UUID
 
 from psycopg.types.json import Jsonb
 
+from trading.contexts.notifications.application.delivery_counters import (
+    NotificationDeliveryCounters,
+)
 from trading.contexts.notifications.domain import (
     NotificationDelivery,
     NotificationDeliveryAttempt,
@@ -97,6 +100,8 @@ class PostgresNotificationRepository:
               recipient_address_ref = EXCLUDED.recipient_address_ref,
               status = EXCLUDED.status,
               updated_at = EXCLUDED.updated_at
+            WHERE notification_routes.owner_user_id IS NOT DISTINCT FROM EXCLUDED.owner_user_id
+              AND notification_routes.recipient_kind = EXCLUDED.recipient_kind
             RETURNING route_id, recipient_kind, owner_user_id, channel_key, provider_key,
                       mode, category_filter, scope_filter_json, schedule_json,
                       recipient_address_ref, status, created_at, updated_at
@@ -245,6 +250,33 @@ class PostgresNotificationRepository:
         if row is None:
             return 0
         return int(row["count"])
+
+    def get_delivery_counters(
+        self, *, owner_user_id: UserId, now: datetime
+    ) -> NotificationDeliveryCounters:
+        row = self._gateway.fetch_one(
+            query="""
+            SELECT
+              count(*) AS telegram_sent_total,
+              count(*) FILTER (WHERE d.sent_at >= %(now)s - interval '24 hours')
+                AS telegram_sent_last_24h,
+              max(d.sent_at) AS last_telegram_sent_at
+            FROM notification_deliveries AS d
+            JOIN notification_routes AS r ON r.route_id = d.route_id
+            WHERE r.owner_user_id = %(owner_user_id)s::uuid
+              AND r.recipient_kind = 'user'
+              AND d.status = 'sent'
+              AND d.provider_key = 'telegram_bot_api'
+            """,
+            parameters={"owner_user_id": str(owner_user_id), "now": now},
+        )
+        if row is None:
+            return NotificationDeliveryCounters(0, 0, None)
+        return NotificationDeliveryCounters(
+            telegram_sent_total=int(row["telegram_sent_total"]),
+            telegram_sent_last_24h=int(row["telegram_sent_last_24h"]),
+            last_telegram_sent_at=row["last_telegram_sent_at"],
+        )
 
     def claim_delivery(
         self, *, delivery_id: UUID, lease_until: datetime, now: datetime

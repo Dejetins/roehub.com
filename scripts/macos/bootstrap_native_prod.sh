@@ -54,6 +54,7 @@ for plist in \
   com.roehub.rl-trading-inference.plist \
   com.roehub.telegram-egress-tunnel.plist \
   com.roehub.notification-dispatcher.plist \
+  com.roehub.notification-log-rotation.plist \
   com.roehub.backtest-job-runner.plist \
   com.roehub.market-data-ws-worker.plist \
   com.roehub.market-data-scheduler.plist \

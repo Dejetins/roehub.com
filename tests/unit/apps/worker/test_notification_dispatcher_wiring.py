@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -7,14 +9,19 @@ from uuid import UUID, uuid4
 from prometheus_client import CollectorRegistry, generate_latest
 
 from apps.worker.notification_dispatcher.wiring.modules.notification_dispatcher import (
+    NotificationDispatcherApp,
     NotificationDispatcherPrometheusMetrics,
+    NotificationDispatcherRuntimeConfig,
     build_notification_dispatcher,
     load_notification_dispatcher_runtime_config,
     postgres_dsn_presence,
     resolve_notification_postgres_dsn,
     telegram_credential_presence,
 )
-from trading.contexts.notifications.adapters import InMemoryNotificationRepository
+from trading.contexts.notifications.adapters import (
+    InMemoryNotificationRepository,
+    TelegramApiHealthProbeResult,
+)
 from trading.contexts.notifications.domain import NotificationDelivery
 from trading.contexts.notifications.domain.notification import NotificationProviderKey
 
@@ -34,6 +41,11 @@ def test_notification_dispatcher_configs_are_disabled_and_redacted_by_default() 
         assert runtime_config.provider_mode == "log_only"
         assert runtime_config.telegram_enabled is False
         assert runtime_config.telegram_api_base_url == "https://api.telegram.org"
+        assert runtime_config.telegram_healthcheck_enabled is (
+            config_path == Path("configs/prod/notifications.yaml")
+        )
+        assert runtime_config.telegram_healthcheck_interval_seconds == 30.0
+        assert runtime_config.telegram_healthcheck_timeout_s == 5.0
 
 
 def test_telegram_credential_presence_reports_only_booleans() -> None:
@@ -91,6 +103,10 @@ def test_composition_root_drains_backlog_with_log_only_provider() -> None:
     assert "notification_dispatcher_delivery_latency_seconds" in payload
     assert "notification_dispatcher_pending_age_seconds" in payload
     assert "notification_dispatcher_unknown_deliveries" in payload
+    assert "notifications_telegram_api_up" in payload
+    assert "notifications_telegram_api_probe_latency_seconds" in payload
+    assert "notifications_telegram_api_last_success_unixtime" in payload
+    assert "notifications_telegram_api_probe_total" in payload
 
 
 def test_log_only_provider_mode_skips_telegram_deliveries_without_claiming() -> None:
@@ -111,6 +127,66 @@ def test_log_only_provider_mode_skips_telegram_deliveries_without_claiming() -> 
     assert result.claimed == 0
     assert repository.deliveries[delivery.delivery_id].status == "pending"
     assert repository.deliveries[delivery.delivery_id].attempt_count == 0
+
+
+def test_slow_telegram_probe_does_not_block_dispatcher_loop() -> None:
+    dispatcher = _FastDispatcher()
+    app = NotificationDispatcherApp(
+        dispatcher=dispatcher,  # type: ignore[arg-type]
+        runtime_config=_runtime_config(),
+        metrics=NotificationDispatcherPrometheusMetrics(
+            registry=CollectorRegistry()
+        ),
+        telegram_health_probe=_SlowProbe(),  # type: ignore[arg-type]
+    )
+
+    async def scenario() -> None:
+        stop_event = asyncio.Event()
+        tasks = (
+            asyncio.create_task(app._run_dispatcher_loop(stop_event)),
+            asyncio.create_task(app._run_telegram_health_probe_loop(stop_event)),
+        )
+        await asyncio.sleep(0.05)
+        assert dispatcher.calls >= 2
+        stop_event.set()
+        await asyncio.gather(*tasks)
+
+    asyncio.run(scenario())
+
+
+class _FastDispatcher:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def drain_once(self) -> object:
+        self.calls += 1
+        return type("Batch", (), {"claimed": 0})()
+
+
+class _SlowProbe:
+    def probe(self) -> TelegramApiHealthProbeResult:
+        time.sleep(0.15)
+        return TelegramApiHealthProbeResult(up=True, latency_seconds=0.15)
+
+
+def _runtime_config() -> NotificationDispatcherRuntimeConfig:
+    return NotificationDispatcherRuntimeConfig(
+        enabled=True,
+        provider_mode="log_only",
+        batch_size=1,
+        lease_seconds=30,
+        retry_backoff_seconds=60,
+        max_attempts=3,
+        poll_interval_seconds=0.01,
+        empty_backoff_seconds=0.01,
+        metrics_port=0,
+        telegram_enabled=False,
+        telegram_api_base_url="https://api.telegram.org",
+        telegram_send_timeout_s=2.0,
+        telegram_healthcheck_enabled=True,
+        telegram_healthcheck_interval_seconds=30.0,
+        telegram_healthcheck_timeout_s=5.0,
+    )
 
 
 def _delivery(*, provider_key: NotificationProviderKey = "log_only") -> NotificationDelivery:

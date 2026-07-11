@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from hashlib import sha256
 from typing import Any, Mapping, Protocol, cast
 
@@ -14,7 +14,7 @@ from trading.contexts.notifications.domain import NotificationDelivery
 @dataclass(frozen=True, slots=True)
 class TelegramNotificationProviderConfig:
     enabled: bool
-    credential: str | None
+    credential: str | None = field(repr=False)
     api_base_url: str = "https://api.telegram.org"
     send_timeout_s: float = 2.0
 

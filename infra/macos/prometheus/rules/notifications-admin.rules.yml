@@ -40,6 +40,22 @@ groups:
           runbook: docs/runbooks/notifications-admin-alerts.md#worker-down
           action: Restart the affected worker through the managed Mac Studio service path and verify metrics.
 
+      - alert: NotificationsTelegramApiDown
+        expr: >-
+          notifications_telegram_api_up == 0
+          or absent(notifications_telegram_api_up)
+          or (time() - notifications_telegram_api_last_success_unixtime > 120)
+        for: 2m
+        labels:
+          severity: critical
+          owner: notifications
+        annotations:
+          summary: Telegram Bot API is unreachable from the notification dispatcher
+          description: The bounded getMe probe is failing through the configured egress path.
+          escalation: Check the local SSH tunnel, restricted proxy, Telegram API response, and host-local token presence.
+          runbook: docs/runbooks/notifications-admin-alerts.md#шлюз-исходящего-доступа-telegram
+          action: Keep broad Telegram delivery disabled until the probe returns one and a bounded readiness check passes.
+
       - alert: NotificationsRetry429High
         expr: increase(notifications_deliveries_retry_total{reason="rate_limited"}[10m]) > 5
         for: 0m

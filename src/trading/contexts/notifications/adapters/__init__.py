@@ -5,6 +5,9 @@ from .outbound import (
     LogOnlyNotificationProvider,
     PostgresNotificationRepository,
     PsycopgNotificationPostgresGateway,
+    TelegramApiHealthProbeConfig,
+    TelegramApiHealthProbeResult,
+    TelegramBotApiHealthProbe,
     TelegramBotApiNotificationProvider,
     TelegramNotificationProviderConfig,
 )
@@ -16,6 +19,9 @@ __all__ = [
     "LogOnlyNotificationProvider",
     "PostgresNotificationRepository",
     "PsycopgNotificationPostgresGateway",
+    "TelegramApiHealthProbeConfig",
+    "TelegramApiHealthProbeResult",
+    "TelegramBotApiHealthProbe",
     "TelegramBotApiNotificationProvider",
     "TelegramNotificationProviderConfig",
 ]

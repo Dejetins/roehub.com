@@ -17,10 +17,16 @@ from trading.contexts.identity.application import AccountSettingsRepository
 from trading.contexts.identity.application.use_cases.account_settings import (
     AccountSettingsUseCase,
 )
+from trading.contexts.notifications.adapters import (
+    InMemoryNotificationRepository,
+    PostgresNotificationRepository,
+    PsycopgNotificationPostgresGateway,
+)
 from trading.contexts.notifications.application import (
     InMemoryNotificationTelegramBindingStore,
     NotificationTelegramBindingService,
 )
+from trading.contexts.notifications.application.ports import NotificationRepository
 from trading.contexts.strategy.adapters.outbound import (
     InMemoryStrategyExchangeBindingRepository,
     InMemoryStrategyRepository,
@@ -34,6 +40,8 @@ from trading.contexts.strategy.application.use_cases import (
 
 _IDENTITY_PG_DSN_KEY = "IDENTITY_PG_DSN"
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
+_NOTIFICATIONS_PG_DSN_KEY = "NOTIFICATIONS_PG_DSN"
+_POSTGRES_DSN_KEY = "POSTGRES_DSN"
 
 
 def build_ui_account_router(
@@ -51,6 +59,7 @@ def build_ui_account_router(
         exchange_control_client=build_exchange_control_client_from_environ(environ=environ),
         strategy_binding_service=build_strategy_exchange_binding_service(environ=environ),
         telegram_binding_service=build_notification_telegram_binding_service(),
+        notification_repository=build_notification_repository(environ=environ),
     )
 
 
@@ -96,3 +105,26 @@ def build_notification_telegram_binding_service() -> NotificationTelegramBinding
     return NotificationTelegramBindingService(
         store=InMemoryNotificationTelegramBindingStore()
     )
+
+
+def build_notification_repository(
+    *, environ: Mapping[str, str]
+) -> NotificationRepository:
+    gateway = _build_notification_gateway(environ=environ)
+    if gateway is not None:
+        return PostgresNotificationRepository(gateway=gateway)
+    return InMemoryNotificationRepository()
+
+
+def _build_notification_gateway(
+    *, environ: Mapping[str, str]
+) -> PsycopgNotificationPostgresGateway | None:
+    for key in (
+        _NOTIFICATIONS_PG_DSN_KEY,
+        _STRATEGY_PG_DSN_KEY,
+        _POSTGRES_DSN_KEY,
+    ):
+        dsn = environ.get(key, "").strip()
+        if dsn:
+            return PsycopgNotificationPostgresGateway(dsn=dsn)
+    return None

@@ -28,6 +28,7 @@ from apps.api.dto.ui_account import (
     ExchangeConnectionMarketCreateResult,
     ExchangeConnectionResponse,
     ExchangeConnectionsResponse,
+    NotificationDeliveryCountersResponse,
     NotificationReportScheduleResponse,
     NotificationScopedSettingsResponse,
     RotateExchangeConnectionRequest,
@@ -67,6 +68,8 @@ from trading.contexts.identity.application.use_cases.account_settings import (
 from trading.contexts.notifications.adapters import InMemoryNotificationRepository
 from trading.contexts.notifications.application import (
     InMemoryNotificationTelegramBindingStore,
+    NotificationDeliveryCounters,
+    NotificationDeliveryCounterService,
     NotificationTelegramBindingService,
     NotificationTelegramBindingStatus,
     UserNotificationSettingsService,
@@ -111,6 +114,9 @@ def build_ui_account_router(
     )
     notification_settings = UserNotificationSettingsService(
         repository=notification_repository or InMemoryNotificationRepository()
+    )
+    notification_counters = NotificationDeliveryCounterService(
+        reader=notification_settings.repository
     )
 
     router = APIRouter(tags=["ui-account"])
@@ -729,6 +735,10 @@ def build_ui_account_router(
         return _scoped_notification_response(
             settings=settings,
             binding_status=binding_status,
+            delivery_counters=notification_counters.get_counters(
+                owner_user_id=principal.user_id,
+                now=clock.now(),
+            ),
         )
 
     @router.put(
@@ -760,6 +770,10 @@ def build_ui_account_router(
         return _scoped_notification_response(
             settings=settings,
             binding_status=binding_status,
+            delivery_counters=notification_counters.get_counters(
+                owner_user_id=principal.user_id,
+                now=clock.now(),
+            ),
         )
 
     @router.get("/ui/account/preferences", response_model=AccountPreferencesResponse)
@@ -1235,6 +1249,7 @@ def _scoped_notification_response(
     *,
     settings: UserNotificationSettingsView,
     binding_status: NotificationTelegramBindingStatus,
+    delivery_counters: NotificationDeliveryCounters,
 ) -> NotificationScopedSettingsResponse:
     return NotificationScopedSettingsResponse(
         telegram_binding=TelegramBindingStatusResponse(
@@ -1251,6 +1266,11 @@ def _scoped_notification_response(
             weekly_enabled=settings.report_schedule.weekly_enabled,
             monthly_enabled=settings.report_schedule.monthly_enabled,
             timezone=settings.report_schedule.timezone,
+        ),
+        delivery_counters=NotificationDeliveryCountersResponse(
+            telegram_sent_total=delivery_counters.telegram_sent_total,
+            telegram_sent_last_24h=delivery_counters.telegram_sent_last_24h,
+            last_telegram_sent_at=delivery_counters.last_telegram_sent_at,
         ),
         available_modes=["off", "critical_only", "signals", "trades", "reports", "all"],
         updated_at=settings.updated_at,

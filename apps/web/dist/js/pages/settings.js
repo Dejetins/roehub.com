@@ -575,11 +575,13 @@ function renderScopedNotifications(payload) {
     mode: "off",
     route_status: "disabled",
     telegram_binding: { is_confirmed: false },
+    delivery_counters: { telegram_sent_total: 0, telegram_sent_last_24h: 0, last_telegram_sent_at: null },
     report_schedule: { weekly_enabled: false, monthly_enabled: false, timezone: "UTC" },
     available_modes: ["off", "critical_only", "signals", "trades", "reports", "all"],
   };
   const model = { ...fallback, ...(payload || {}) };
   model.telegram_binding = { ...fallback.telegram_binding, ...(payload?.telegram_binding || {}) };
+  model.delivery_counters = { ...fallback.delivery_counters, ...(payload?.delivery_counters || {}) };
   model.report_schedule = { ...fallback.report_schedule, ...(payload?.report_schedule || {}) };
   state.notificationScoped = model;
 
@@ -595,6 +597,18 @@ function renderScopedNotifications(payload) {
     bindingPill.textContent = isBound ? t("settings.state.active") : t("settings.state.paused");
     bindingPill.classList.toggle("settings-pill--ok", isBound);
     bindingPill.classList.toggle("settings-pill--warn", !isBound);
+  }
+
+  const sentCount = qs("[data-notification-sent-count]");
+  const sentLast = qs("[data-notification-sent-last]");
+  if (sentCount) {
+    sentCount.textContent = String(model.delivery_counters.telegram_sent_total || 0);
+  }
+  if (sentLast) {
+    const lastSentAt = model.delivery_counters.last_telegram_sent_at;
+    sentLast.textContent = lastSentAt
+      ? `${t("settings.notifications.last_sent")}: ${new Date(lastSentAt).toLocaleString()}`
+      : t("settings.notifications.no_sent_messages");
   }
 
   const modeRow = qs("[data-scoped-mode-row]");

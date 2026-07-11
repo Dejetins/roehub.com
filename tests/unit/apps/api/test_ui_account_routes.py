@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from uuid import UUID, uuid4
 
 import httpx
 import pytest
@@ -42,6 +43,7 @@ from trading.contexts.notifications.application import (
     InMemoryNotificationTelegramBindingStore,
     NotificationTelegramBindingService,
 )
+from trading.contexts.notifications.domain import NotificationDelivery
 from trading.contexts.strategy.adapters.outbound.persistence.in_memory import (
     InMemoryStrategyEventRepository,
     InMemoryStrategyExchangeBindingRepository,
@@ -1216,6 +1218,11 @@ def test_ui_account_scoped_notification_settings_are_additive_and_secret_safe() 
     assert legacy_before.status_code == 200
     assert initial.status_code == 200
     assert initial.json()["telegram_binding"]["is_confirmed"] is True
+    assert initial.json()["delivery_counters"] == {
+        "telegram_sent_total": 0,
+        "telegram_sent_last_24h": 0,
+        "last_telegram_sent_at": None,
+    }
     assert chat_ref not in initial.text
     assert initial.json()["mode"] == "off"
     assert updated.status_code == 200
@@ -1238,6 +1245,30 @@ def test_ui_account_scoped_notification_settings_are_additive_and_secret_safe() 
     assert route.schedule_json["weekly"] == {"enabled": True}
     assert route.schedule_json["monthly"] == {"enabled": False}
     assert route.schedule_json["timezone"] == "Europe/Moscow"
+    notification_repository.record_delivery(
+        delivery=NotificationDelivery(
+            delivery_id=uuid4(),
+            event_id=UUID("22222222-2222-4222-8222-222222222222"),
+            report_run_id=None,
+            command_id=None,
+            route_id=route.route_id,
+            provider_key="telegram_bot_api",
+            channel_key="telegram",
+            recipient_address_ref="telegram_ref:fixture:masked",
+            template_key="test",
+            rendered_payload_json={"text": "redacted test"},
+            status="sent",
+            attempt_count=1,
+            created_at=datetime(2026, 2, 15, 12, 59, tzinfo=timezone.utc),
+            sent_at=datetime(2026, 2, 15, 13, 0, tzinfo=timezone.utc),
+        )
+    )
+    counters = client.get("/ui/account/notifications/scoped").json()[
+        "delivery_counters"
+    ]
+    assert counters["telegram_sent_total"] == 1
+    assert counters["telegram_sent_last_24h"] == 1
+    assert "123456789" not in repr(counters)
 
 
 def test_ui_account_sessions_and_audit_are_owner_scoped_and_cursor_paginated() -> None:

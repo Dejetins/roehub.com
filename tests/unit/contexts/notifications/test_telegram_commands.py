@@ -57,6 +57,11 @@ def test_start_binding_uses_hashed_one_time_code_and_idempotent_updates() -> Non
     assert len(repository.telegram_updates) == 2
     assert len(repository.deliveries) == 2
     assert code_view.code not in repr(binding_store.binding_codes)
+    assert code_view.code not in repr(repository.telegram_updates)
+    assert first.telegram_update.command_args_json == {
+        "arg_count": 1,
+        "arg_0": "<redacted>",
+    }
 
 
 @pytest.mark.parametrize(

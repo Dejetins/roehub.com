@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +17,8 @@ from trading.contexts.notifications.adapters import (
     LogOnlyNotificationProvider,
     PostgresNotificationRepository,
     PsycopgNotificationPostgresGateway,
+    TelegramApiHealthProbeConfig,
+    TelegramBotApiHealthProbe,
     TelegramBotApiNotificationProvider,
     TelegramNotificationProviderConfig,
 )
@@ -50,6 +53,15 @@ class NotificationDispatcherRuntimeConfig:
     telegram_enabled: bool
     telegram_api_base_url: str
     telegram_send_timeout_s: float
+    telegram_healthcheck_enabled: bool
+    telegram_healthcheck_interval_seconds: float
+    telegram_healthcheck_timeout_s: float
+
+    def __post_init__(self) -> None:
+        if self.telegram_healthcheck_interval_seconds <= 0:
+            raise ValueError("Telegram healthcheck interval must be > 0")
+        if self.telegram_healthcheck_timeout_s <= 0:
+            raise ValueError("Telegram healthcheck timeout must be > 0")
 
     def dispatcher_config(self) -> NotificationDispatcherConfig:
         return NotificationDispatcherConfig(
@@ -98,6 +110,27 @@ class NotificationDispatcherPrometheusMetrics:
             "Notification deliveries currently in unknown provider state",
             registry=self.registry,
         )
+        self.telegram_api_up = Gauge(
+            "notifications_telegram_api_up",
+            "Whether the latest Telegram Bot API getMe probe succeeded",
+            registry=self.registry,
+        )
+        self.telegram_api_probe_latency_seconds = Gauge(
+            "notifications_telegram_api_probe_latency_seconds",
+            "Latency of the latest Telegram Bot API getMe probe",
+            registry=self.registry,
+        )
+        self.telegram_api_last_success_unixtime = Gauge(
+            "notifications_telegram_api_last_success_unixtime",
+            "Unix timestamp of the latest successful Telegram Bot API probe",
+            registry=self.registry,
+        )
+        self.telegram_api_probe_total = Counter(
+            "notifications_telegram_api_probe_total",
+            "Telegram Bot API probes by bounded result",
+            ("result",),
+            registry=self.registry,
+        )
 
     def on_delivery_claimed(self, *, provider_key: str) -> None:
         self.deliveries_claimed_total.labels(provider=provider_key).inc()
@@ -115,6 +148,15 @@ class NotificationDispatcherPrometheusMetrics:
 
     def set_unknown_count(self, *, count: int) -> None:
         self.unknown_deliveries.set(count)
+
+    def on_telegram_api_probe(
+        self, *, up: bool, latency_seconds: float, checked_at_unixtime: float
+    ) -> None:
+        self.telegram_api_up.set(1 if up else 0)
+        self.telegram_api_probe_latency_seconds.set(latency_seconds)
+        self.telegram_api_probe_total.labels(result="success" if up else "failure").inc()
+        if up:
+            self.telegram_api_last_success_unixtime.set(checked_at_unixtime)
 
 
 def load_notification_dispatcher_runtime_config(
@@ -149,6 +191,15 @@ def notification_dispatcher_runtime_config_from_mapping(
             telegram.get("api_base_url"), default="https://api.telegram.org"
         ),
         telegram_send_timeout_s=_float(telegram.get("send_timeout_s"), default=2.0),
+        telegram_healthcheck_enabled=_bool(
+            telegram.get("healthcheck_enabled"), default=False
+        ),
+        telegram_healthcheck_interval_seconds=_float(
+            telegram.get("healthcheck_interval_seconds"), default=30.0
+        ),
+        telegram_healthcheck_timeout_s=_float(
+            telegram.get("healthcheck_timeout_s"), default=5.0
+        ),
     )
 
 
@@ -189,6 +240,7 @@ class NotificationDispatcherApp:
     dispatcher: NotificationDispatcher
     runtime_config: NotificationDispatcherRuntimeConfig
     metrics: NotificationDispatcherPrometheusMetrics
+    telegram_health_probe: TelegramBotApiHealthProbe | None = None
 
     async def run(self, stop_event: asyncio.Event) -> None:
         start_http_server(self.runtime_config.metrics_port, registry=self.metrics.registry)
@@ -196,6 +248,12 @@ class NotificationDispatcherApp:
             "notification-dispatcher metrics server started on port %s",
             self.runtime_config.metrics_port,
         )
+        tasks = [self._run_dispatcher_loop(stop_event)]
+        if self.telegram_health_probe is not None:
+            tasks.append(self._run_telegram_health_probe_loop(stop_event))
+        await asyncio.gather(*tasks)
+
+    async def _run_dispatcher_loop(self, stop_event: asyncio.Event) -> None:
         while not stop_event.is_set():
             result = self.dispatcher.drain_once()
             wait_seconds = (
@@ -205,6 +263,45 @@ class NotificationDispatcherApp:
             )
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=wait_seconds)
+            except TimeoutError:
+                continue
+
+    async def _run_telegram_health_probe_loop(
+        self, stop_event: asyncio.Event
+    ) -> None:
+        if self.telegram_health_probe is None:
+            return
+        previous_probe_up: bool | None = None
+        while not stop_event.is_set():
+            probe_result = await asyncio.to_thread(self.telegram_health_probe.probe)
+            self.metrics.on_telegram_api_probe(
+                up=probe_result.up,
+                latency_seconds=probe_result.latency_seconds,
+                checked_at_unixtime=time.time(),
+            )
+            state_changed = (
+                previous_probe_up is None or previous_probe_up != probe_result.up
+            )
+            log_method = (
+                log.info
+                if state_changed and probe_result.up
+                else log.warning
+                if state_changed
+                else log.debug
+            )
+            log_method(
+                "telegram-api probe up=%s latency_ms=%s error_code=%s state_changed=%s",
+                probe_result.up,
+                round(probe_result.latency_seconds * 1000, 1),
+                probe_result.error_code or "none",
+                state_changed,
+            )
+            previous_probe_up = probe_result.up
+            try:
+                await asyncio.wait_for(
+                    stop_event.wait(),
+                    timeout=self.runtime_config.telegram_healthcheck_interval_seconds,
+                )
             except TimeoutError:
                 continue
 
@@ -227,10 +324,22 @@ def build_notification_dispatcher_app(
         environ=env,
         metrics=metrics,
     )
+    credential = _resolve_telegram_credential(environ=env)
+    telegram_health_probe = None
+    if runtime_config.telegram_healthcheck_enabled:
+        telegram_health_probe = TelegramBotApiHealthProbe(
+            config=TelegramApiHealthProbeConfig(
+                enabled=True,
+                credential=credential,
+                api_base_url=runtime_config.telegram_api_base_url,
+                timeout_s=runtime_config.telegram_healthcheck_timeout_s,
+            )
+        )
     return NotificationDispatcherApp(
         dispatcher=dispatcher,
         runtime_config=runtime_config,
         metrics=metrics,
+        telegram_health_probe=telegram_health_probe,
     )
 
 

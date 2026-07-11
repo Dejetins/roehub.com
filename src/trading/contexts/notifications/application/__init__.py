@@ -3,6 +3,10 @@ from .admin_notifications import (
     NotificationAdminDrillService,
     synthetic_admin_notification_facts,
 )
+from .delivery_counters import (
+    NotificationDeliveryCounters,
+    NotificationDeliveryCounterService,
+)
 from .dispatcher import (
     NotificationDispatchBatchResult,
     NotificationDispatcher,
@@ -52,6 +56,8 @@ __all__ = [
     "NotificationAdminDrillResult",
     "NotificationAdminDrillService",
     "NotificationDispatchBatchResult",
+    "NotificationDeliveryCounterService",
+    "NotificationDeliveryCounters",
     "NotificationDispatcher",
     "NotificationDispatcherConfig",
     "NotificationReportScheduler",

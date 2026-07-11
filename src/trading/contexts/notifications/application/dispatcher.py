@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Protocol
@@ -14,6 +15,8 @@ from trading.contexts.notifications.domain import (
     NotificationDelivery,
     NotificationDeliveryAttempt,
 )
+
+log = logging.getLogger(__name__)
 
 
 class NotificationDispatcherClock(Protocol):
@@ -209,6 +212,16 @@ class NotificationDispatcher:
             counts.dead_letter += 1
 
         self._repository.update_delivery(delivery=updated)
+        log.info(
+            "notification delivery result delivery_id=%s route_id=%s provider=%s "
+            "status=%s attempt_count=%s error_code=%s",
+            updated.delivery_id,
+            updated.route_id,
+            updated.provider_key,
+            updated.status,
+            updated.attempt_count,
+            updated.last_error_code or "none",
+        )
         if self._metrics is not None:
             self._metrics.on_delivery_result(
                 provider_key=delivery.provider_key, status=updated.status

@@ -21,6 +21,7 @@ prod_services=(
   com.roehub.strategy-live-runner.plist
   com.roehub.rl-trading-inference.plist
   com.roehub.telegram-egress-tunnel.plist
+  com.roehub.notification-log-rotation.plist
   com.roehub.notification-dispatcher.plist
   com.roehub.api.plist
   com.roehub.backtest-job-runner.plist
@@ -36,6 +37,7 @@ prod_pre_openbao_services=(
   com.roehub.redis-exporter.plist
   com.roehub.clickhouse-exporter.plist
   com.roehub.telegram-egress-tunnel.plist
+  com.roehub.notification-log-rotation.plist
 )
 
 prod_post_openbao_services=(

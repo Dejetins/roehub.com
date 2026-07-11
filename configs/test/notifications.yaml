@@ -12,6 +12,9 @@ notifications:
       enabled: false
       api_base_url: "https://api.telegram.org"
       send_timeout_s: 2.0
+      healthcheck_enabled: false
+      healthcheck_interval_seconds: 30.0
+      healthcheck_timeout_s: 5.0
   telegram_bot:
     enabled: false
     poll_interval_seconds: 5
