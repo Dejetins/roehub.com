@@ -1,0 +1,10 @@
+run_id	target_id	scope	source_path	managed_cache
+skill-system-stage-02	global.s013	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S013/SKILL.md	false
+skill-system-stage-02	global.s014	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S014/SKILL.md	false
+skill-system-stage-02	global.s019	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S019/SKILL.md	false
+skill-system-stage-02	global.s023	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S023/SKILL.md	false
+skill-system-stage-02	global.s030	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S030/SKILL.md	false
+skill-system-stage-02	global.s047	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S047/SKILL.md	false
+skill-system-stage-02	global.s048	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S048/SKILL.md	false
+skill-system-stage-02	global.s052	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S052/SKILL.md	false
+skill-system-stage-02	global.s053	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S053/SKILL.md	false

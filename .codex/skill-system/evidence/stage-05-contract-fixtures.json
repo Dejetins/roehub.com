@@ -1,0 +1,549 @@
+{
+  "results": [
+    {
+      "actual_status": "blocked",
+      "case_id": "paid.missing-budget",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-budget"
+      ]
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "paid.complete-material-choices",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "external.missing-target",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-target"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "external.missing-destination",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-destination"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "external.missing-visibility",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-visibility"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "external.missing-authority",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-authority"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "provider.unknown-state-retry",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "unknown-provider-state"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "evidence.secret-value",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "secret-evidence"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "intent.read-only-mutation",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "read-only-intent"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "shared-main.broad-staging",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "dirty-main-broad-staging"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "capability.absent-no-fallback",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "capability-absence"
+      ]
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "capability.absent-safe-fallback",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "alias.presentations",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "alias.spreadsheets",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "inspect.safe-default",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "installer.destination-exists",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "destination-exists"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "installer.system-skill-target",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "system-skill-target"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "pre-ship.report-only-mutation",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "report-only-mutation"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "publish.no-runtime-relevance",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "runtime-not-relevant"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "ui.unknown-stack",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "unknown-ui-stack"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "ui.unrequested-persistence",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "unrequested-persistence"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "research.cookie-access",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "cookie-access"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "research.policy-override",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "policy-override"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "publisher.unrequested-branch",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "unrequested-branch"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "publisher.unrequested-install",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "unrequested-dependency-install"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "legal.missing-jurisdiction-and-date",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-as-of-date",
+        "missing-jurisdiction",
+        "missing-primary-sources"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "ideate.unstable-option-mapping",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "unstable-option-mapping"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "image-to-code.asset-license-unknown",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "asset-license-unknown"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "url-to-code.no-capture-budget",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "capture-budget-missing"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "user-context.no-fresh-consent",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "fresh-consent-missing"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "imagegen.tool-contract-override",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "policy-override"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "openai-docs.docs-only-config-mutation",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "read-only-intent"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "numba.runtime-version-unknown",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "capability-absence"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "playwright.raw-browser-state-evidence",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "secret-evidence"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "production-review.unknown-base",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "capability-absence"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "prompt-manager.unrequested-branch",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "unrequested-branch"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "debugging.diagnose-only-mutation",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "read-only-intent"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "staged-runner.inspect-status-mutation",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "read-only-intent"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "chrome.profile-state-secret-evidence",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "secret-evidence"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "computer-use.platform-policy-override",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "policy-override"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "visualize.missing-writable-path",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "capability-absence"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "hf-cli.destructive-missing-authority",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-authority",
+        "missing-target"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "hf-eval.provider-missing-budget",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-budget"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "hf-datasets.viewer-upload",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "read-only-intent"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "hf-paper.authorship-missing-authority",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-authority"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "hf-papers.read-admin-write",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "read-only-intent"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "trackio.unknown-relaunch",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "unknown-provider-state"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "design-qa.report-only-mutation",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "report-only-mutation"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "product-share.missing-target",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-target"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "pdf.unrequested-dependency-install",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "unrequested-dependency-install"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "spreadsheets.inspect-mutation",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "read-only-intent"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "template-creator.retention-without-consent",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "fresh-consent-missing"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "prototype.missing-browser-proof",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "capability-absence"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "in-app-browser.cookie-evidence",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "cookie-access"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "gradio.unrequested-space-publish",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-authority"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "letterhead.create-versus-send",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "read-only-intent"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "product-audit.report-only-fix",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "report-only-mutation"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "design-context.unrequested-persistence",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "unrequested-persistence"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "backend-evidence.secret-telemetry",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "secret-evidence"
+      ]
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "template-local-artifact",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "methodology-approved-read-only",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    }
+  ],
+  "run_id": "skill-system-stage-05-v1",
+  "spec": "skill-contract-case-result/v1",
+  "summary": {
+    "failed": 0,
+    "passed": 61,
+    "total": 61
+  }
+}

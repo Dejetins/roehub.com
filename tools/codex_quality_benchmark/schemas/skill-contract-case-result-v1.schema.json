@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "skill-contract-case-result/v1",
+  "type": "object",
+  "required": ["spec", "run_id", "results", "summary"],
+  "properties": {
+    "spec": {"const": "skill-contract-case-result/v1"},
+    "run_id": {"type": "string", "minLength": 1},
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["case_id", "expected_status", "actual_status", "passed", "reason_codes"],
+        "properties": {
+          "case_id": {"type": "string", "pattern": "^[a-z0-9._-]+$"},
+          "expected_status": {"enum": ["blocked", "completed"]},
+          "actual_status": {"enum": ["blocked", "completed"]},
+          "passed": {"type": "boolean"},
+          "reason_codes": {
+            "type": "array",
+            "items": {"type": "string", "pattern": "^[a-z0-9._-]+$"},
+            "uniqueItems": true
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": ["total", "passed", "failed"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

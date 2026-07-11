@@ -1,0 +1,543 @@
+{
+  "spec": "skill-contract-cases/v1",
+  "run_id": "skill-system-stage-05-v1",
+  "cases": [
+    {
+      "case_id": "paid.missing-budget",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "paid-job",
+      "authority": true,
+      "target": "job-a",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "paid.complete-material-choices",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "paid-job",
+      "authority": true,
+      "target": "job-a",
+      "budget": "10 USD",
+      "expected_status": "completed"
+    },
+    {
+      "case_id": "external.missing-target",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "authority": true,
+      "destination": "repo-a",
+      "visibility": "private",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "external.missing-destination",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "authority": true,
+      "target": "issue-1",
+      "visibility": "private",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "external.missing-visibility",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "authority": true,
+      "target": "issue-1",
+      "destination": "repo-a",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "external.missing-authority",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "target": "issue-1",
+      "destination": "repo-a",
+      "visibility": "private",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "provider.unknown-state-retry",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "authority": true,
+      "target": "job-a",
+      "destination": "provider-a",
+      "visibility": "private",
+      "provider_state": "unknown",
+      "retry_mutation": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "evidence.secret-value",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "evidence_contains_secret": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "intent.read-only-mutation",
+      "intent": "read-only",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "shared-main.broad-staging",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "dirty_main": true,
+      "broad_staging": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "capability.absent-no-fallback",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "capability_available": false,
+      "safe_fallback": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "capability.absent-safe-fallback",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "capability_available": false,
+      "safe_fallback": true,
+      "expected_status": "completed"
+    },
+    {
+      "case_id": "alias.presentations",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "alias": "Presentations",
+      "expected_skill_id": "S056",
+      "expected_status": "completed"
+    },
+    {
+      "case_id": "alias.spreadsheets",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "alias": "Spreadsheets",
+      "expected_skill_id": "S057",
+      "expected_status": "completed"
+    },
+    {
+      "case_id": "inspect.safe-default",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "expected_status": "completed"
+    },
+    {
+      "case_id": "installer.destination-exists",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "destination_exists": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "installer.system-skill-target",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "system_skill_target": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "pre-ship.report-only-mutation",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "report_only": true,
+      "requested_mutation": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "publish.no-runtime-relevance",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "deploy_relevant": false,
+      "runtime_action": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "ui.unknown-stack",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "stack_known": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "ui.unrequested-persistence",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "persist_requested": false,
+      "persist_action": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "research.cookie-access",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "cookie_access": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "research.policy-override",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "policy_override": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "publisher.unrequested-branch",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "branch_action": true,
+      "branch_authority": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "publisher.unrequested-install",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "dependency_install": true,
+      "dependency_authority": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "legal.missing-jurisdiction-and-date",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "legal_high_stakes": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "ideate.unstable-option-mapping",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "option_mapping_stable": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "image-to-code.asset-license-unknown",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "asset_license_confirmed": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "url-to-code.no-capture-budget",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "capture_budget_present": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "user-context.no-fresh-consent",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "fresh_consent": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "imagegen.tool-contract-override",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "policy_override": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "openai-docs.docs-only-config-mutation",
+      "intent": "read-only",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "numba.runtime-version-unknown",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "capability_available": false,
+      "safe_fallback": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "playwright.raw-browser-state-evidence",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "evidence_contains_secret": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "production-review.unknown-base",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "capability_available": false,
+      "safe_fallback": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "prompt-manager.unrequested-branch",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "branch_action": true,
+      "branch_authority": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "debugging.diagnose-only-mutation",
+      "intent": "read-only",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "staged-runner.inspect-status-mutation",
+      "intent": "read-only",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "chrome.profile-state-secret-evidence",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "evidence_contains_secret": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "computer-use.platform-policy-override",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "policy_override": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "visualize.missing-writable-path",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "capability_available": false,
+      "safe_fallback": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "hf-cli.destructive-missing-authority",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "destination": "hub",
+      "visibility": "private",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "hf-eval.provider-missing-budget",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "paid-job",
+      "authority": true,
+      "target": "model-eval",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "hf-datasets.viewer-upload",
+      "intent": "read-only",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "authority": true,
+      "target": "dataset",
+      "destination": "hub",
+      "visibility": "private",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "hf-paper.authorship-missing-authority",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "target": "paper-author",
+      "destination": "profile",
+      "visibility": "public",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "hf-papers.read-admin-write",
+      "intent": "read-only",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "authority": true,
+      "target": "paper",
+      "destination": "hub",
+      "visibility": "public",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "trackio.unknown-relaunch",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "authority": true,
+      "target": "run",
+      "destination": "space",
+      "visibility": "private",
+      "provider_state": "unknown",
+      "retry_mutation": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "design-qa.report-only-mutation",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "report_only": true,
+      "requested_mutation": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "product-share.missing-target",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "authority": true,
+      "destination": "hosting",
+      "visibility": "public",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "pdf.unrequested-dependency-install",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "dependency_install": true,
+      "dependency_authority": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "spreadsheets.inspect-mutation",
+      "intent": "read-only",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "template-creator.retention-without-consent",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "fresh_consent": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "prototype.missing-browser-proof",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "capability_available": false,
+      "safe_fallback": false,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "in-app-browser.cookie-evidence",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "cookie_access": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "gradio.unrequested-space-publish",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "target": "space",
+      "destination": "huggingface",
+      "visibility": "public",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "letterhead.create-versus-send",
+      "intent": "read-only",
+      "mode": "execute",
+      "side_effect": "external-write",
+      "authority": true,
+      "target": "letter",
+      "destination": "email",
+      "visibility": "private",
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "product-audit.report-only-fix",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "report_only": true,
+      "requested_mutation": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "design-context.unrequested-persistence",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "persist_requested": false,
+      "persist_action": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "backend-evidence.secret-telemetry",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "evidence_contains_secret": true,
+      "expected_status": "blocked"
+    },
+    {
+      "case_id": "template-local-artifact",
+      "intent": "execute",
+      "mode": "execute",
+      "side_effect": "local-write",
+      "expected_status": "completed"
+    },
+    {
+      "case_id": "methodology-approved-read-only",
+      "intent": "inspect",
+      "mode": "inspect",
+      "side_effect": "read-only",
+      "expected_status": "completed"
+    }
+  ]
+}

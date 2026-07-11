@@ -1,0 +1,113 @@
+{
+  "spec": "skill-plugin-reload-receipt/v1",
+  "run_id": "skill-system-stage-06-v1",
+  "marketplace": {
+    "name": "personal",
+    "path": "/Users/daniildegtyarev/.agents/plugins/marketplace.json",
+    "sha256": "51fc6471537d79965e03d1a5a1cd685eaebd23f521f6589f239ad3db8fea3c42",
+    "entry_count": 1,
+    "source": {
+      "source": "local",
+      "path": "./plugins/codex-skill-system-overrides"
+    }
+  },
+  "plugin": {
+    "name": "codex-skill-system-overrides",
+    "marketplace_ref": "codex-skill-system-overrides@personal",
+    "version": "0.1.0+codex.20260709224522",
+    "source_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides",
+    "installed_path": "/Users/daniildegtyarev/.codex/plugins/cache/personal/codex-skill-system-overrides/0.1.0+codex.20260709224522",
+    "installed_state": "installed, enabled",
+    "source_manifest_sha256": "aa407c1c48cf2418700e228781d713cce0985c4b38c43e26ec814803189cc22e",
+    "installed_manifest_sha256": "aa407c1c48cf2418700e228781d713cce0985c4b38c43e26ec814803189cc22e"
+  },
+  "content": {
+    "declared_skill_list": [],
+    "top_level_skill_files": 0,
+    "resource_contract_count": 55,
+    "resource_contract_ids": [
+      "S001",
+      "S002",
+      "S003",
+      "S004",
+      "S009",
+      "S010",
+      "S011",
+      "S012",
+      "S013",
+      "S014",
+      "S015",
+      "S016",
+      "S017",
+      "S018",
+      "S019",
+      "S020",
+      "S021",
+      "S022",
+      "S023",
+      "S024",
+      "S025",
+      "S026",
+      "S027",
+      "S028",
+      "S029",
+      "S030",
+      "S031",
+      "S032",
+      "S033",
+      "S034",
+      "S035",
+      "S036",
+      "S037",
+      "S038",
+      "S039",
+      "S040",
+      "S041",
+      "S042",
+      "S043",
+      "S044",
+      "S045",
+      "S046",
+      "S047",
+      "S048",
+      "S049",
+      "S050",
+      "S051",
+      "S052",
+      "S053",
+      "S054",
+      "S055",
+      "S056",
+      "S057",
+      "S058",
+      "S062"
+    ]
+  },
+  "exposure": {
+    "expected_public_skill_delta": 0,
+    "current_task_reloaded": false,
+    "current_task_plugin_skill_delta": "not_claimed",
+    "fresh_process_required": true,
+    "resource_paths_excluded_from_loader_candidate_inventory": true,
+    "loader_candidate_inventory_after_install": 96
+  },
+  "catalog": {
+    "repo_path": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/catalog-v1.json",
+    "global_path": "/Users/daniildegtyarev/.codex/skill-system/catalog-v1.json",
+    "sha256": "1767adcd1beffa982217ab9111e602849988f00d83c02ec3c95d4db269fea2f3",
+    "parity": true,
+    "effective_metadata_records": 78,
+    "relation_integrity_records": 96
+  },
+  "agents": {
+    "repo_sha256": "a58c4aa538f24fe3de73eb313e96557d29daefb673d729846802e39ee13b8c06",
+    "global_sha256": "0babb7e71d008b7847cc622841b0503a91a5b66ec0d5bbd694363ee90069468b"
+  },
+  "sanitization": {
+    "secrets": "not captured",
+    "cookies": "not captured",
+    "raw_environment": "not captured",
+    "raw_provider_payloads": "not captured"
+  },
+  "status": "fresh_process_required"
+}

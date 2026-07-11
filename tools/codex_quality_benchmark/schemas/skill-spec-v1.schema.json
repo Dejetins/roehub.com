@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "skill-spec/v1",
+  "type": "object",
+  "required": ["name", "description", "metadata"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "maxLength": 64
+    },
+    "description": {"type": "string", "minLength": 1},
+    "license": {"type": ["string", "null"]},
+    "allowed-tools": {},
+    "metadata": {
+      "type": "object",
+      "required": [
+        "short-description",
+        "skill-spec",
+        "role",
+        "visibility",
+        "owner",
+        "mutability",
+        "side-effect-class",
+        "primary-output",
+        "companions",
+        "conflicts"
+      ],
+      "properties": {
+        "short-description": {"type": "string", "minLength": 1},
+        "skill-spec": {"const": "v1"},
+        "role": {
+          "enum": ["router", "orchestrator", "workflow", "gate", "tool", "domain", "template", "meta"]
+        },
+        "visibility": {"enum": ["public", "internal", "cache-only"]},
+        "owner": {
+          "type": "string",
+          "pattern": "^(system|user|plugin:[a-z0-9._-]+|project:[a-z0-9._-]+)$"
+        },
+        "mutability": {"enum": ["source", "managed-cache"]},
+        "side-effect-class": {
+          "enum": ["read-only", "local-write", "external-write", "paid-job", "production-mutation"]
+        },
+        "primary-output": {"enum": ["report", "artifact", "patch", "deployment", "decision"]},
+        "companions": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+          "uniqueItems": true
+        },
+        "conflicts": {
+          "type": "array",
+          "items": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false
+}

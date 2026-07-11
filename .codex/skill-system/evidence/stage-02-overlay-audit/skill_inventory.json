@@ -1,0 +1,65 @@
+[
+  {
+    "managed_cache": false,
+    "run_id": "skill-system-stage-02",
+    "scope": "global_skill",
+    "source_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S013/SKILL.md",
+    "target_id": "global.s013"
+  },
+  {
+    "managed_cache": false,
+    "run_id": "skill-system-stage-02",
+    "scope": "global_skill",
+    "source_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S014/SKILL.md",
+    "target_id": "global.s014"
+  },
+  {
+    "managed_cache": false,
+    "run_id": "skill-system-stage-02",
+    "scope": "global_skill",
+    "source_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S019/SKILL.md",
+    "target_id": "global.s019"
+  },
+  {
+    "managed_cache": false,
+    "run_id": "skill-system-stage-02",
+    "scope": "global_skill",
+    "source_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S023/SKILL.md",
+    "target_id": "global.s023"
+  },
+  {
+    "managed_cache": false,
+    "run_id": "skill-system-stage-02",
+    "scope": "global_skill",
+    "source_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S030/SKILL.md",
+    "target_id": "global.s030"
+  },
+  {
+    "managed_cache": false,
+    "run_id": "skill-system-stage-02",
+    "scope": "global_skill",
+    "source_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S047/SKILL.md",
+    "target_id": "global.s047"
+  },
+  {
+    "managed_cache": false,
+    "run_id": "skill-system-stage-02",
+    "scope": "global_skill",
+    "source_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S048/SKILL.md",
+    "target_id": "global.s048"
+  },
+  {
+    "managed_cache": false,
+    "run_id": "skill-system-stage-02",
+    "scope": "global_skill",
+    "source_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S052/SKILL.md",
+    "target_id": "global.s052"
+  },
+  {
+    "managed_cache": false,
+    "run_id": "skill-system-stage-02",
+    "scope": "global_skill",
+    "source_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S053/SKILL.md",
+    "target_id": "global.s053"
+  }
+]

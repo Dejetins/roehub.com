@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "skill-catalog/v1",
+  "type": "object",
+  "required": ["spec", "generated_at", "audit_baseline", "filesystem_inventory", "skills"],
+  "properties": {
+    "spec": {"const": "skill-catalog/v1"},
+    "generated_at": {"type": "string", "minLength": 1},
+    "audit_baseline": {
+      "type": "object",
+      "required": ["expected", "observed"],
+      "properties": {
+        "expected": {"const": 85},
+        "observed": {"const": 85}
+      },
+      "additionalProperties": false
+    },
+    "filesystem_inventory": {
+      "type": "object",
+      "required": ["expected", "observed", "supplemental"],
+      "properties": {
+        "expected": {"type": "integer", "minimum": 85},
+        "observed": {"type": "integer", "minimum": 85},
+        "supplemental": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "skill_id", "logical_name", "canonical_name", "source_kind",
+          "canonical_path", "source_sha256", "baseline_membership",
+          "effective_path", "implementation_channel", "discovery_state",
+          "installed_enabled", "session_exposed", "activation_policy",
+          "role", "visibility", "owner", "mutability", "side_effect_class",
+          "primary_output", "aliases", "companions", "conflicts", "supersedes",
+          "stage", "recommended_action", "implementation_status",
+          "verification_status", "result_contract_provider",
+          "result_contract_evidence", "evidence_refs"
+        ],
+        "properties": {
+          "skill_id": {"type": "string", "pattern": "^S[0-9]{3}$"},
+          "logical_name": {"type": "string", "minLength": 1},
+          "canonical_name": {"type": "string", "minLength": 1},
+          "source_kind": {"enum": ["user_skill", "system_skill", "plugin_skill"]},
+          "canonical_path": {"type": "string", "minLength": 1},
+          "source_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "baseline_membership": {"enum": ["audit_baseline", "supplemental"]},
+          "effective_path": {"type": "string", "minLength": 1},
+          "effective_sha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+          "implementation_channel": {"enum": ["direct", "overlay", "dormant_overlay", "deprecated", "no_change", "supplemental"]},
+          "discovery_state": {"enum": ["direct", "plugin_public", "plugin_internal", "cache_only", "dependency_duplicate", "missing"]},
+          "installed_enabled": {"type": ["boolean", "string"], "enum": [true, false, "unknown"]},
+          "session_exposed": {"enum": ["public", "internal", "not_exposed", "unknown"]},
+          "activation_policy": {"enum": ["preserve_public", "preserve_internal", "preserve_dormant", "deprecate", "activate_overlay"]},
+          "role": {"enum": ["router", "orchestrator", "workflow", "gate", "tool", "domain", "template", "meta"]},
+          "visibility": {"enum": ["public", "internal", "cache-only"]},
+          "owner": {"type": "string", "minLength": 1},
+          "mutability": {"enum": ["source", "managed-cache"]},
+          "side_effect_class": {"enum": ["read-only", "local-write", "external-write", "paid-job", "production-mutation"]},
+          "primary_output": {"enum": ["report", "artifact", "patch", "deployment", "decision"]},
+          "aliases": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "companions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "conflicts": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "supersedes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+          "stage": {"type": "string", "pattern": "^(00|01|02|03|04|05|06|07|08|supplemental)$"},
+          "recommended_action": {"type": "string", "minLength": 1},
+          "implementation_status": {"enum": ["pending", "implemented", "canonicalized", "deprecated", "accepted_no_change", "classified", "blocked"]},
+          "verification_status": {"enum": ["pending", "structural_pass", "family_pass", "forward_pass", "inventory_only", "blocked"]},
+          "result_contract_provider": {"enum": ["skill_body", "overlay_adapter", "orchestrator", "artifact_adapter", "not_applicable"]},
+          "result_contract_evidence": {"type": "string", "minLength": 1},
+          "evidence_refs": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+        },
+        "additionalProperties": true
+      }
+    }
+  },
+  "additionalProperties": false
+}

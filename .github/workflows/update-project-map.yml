@@ -1,0 +1,81 @@
+name: Update Project Map
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: project-map-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Verify generated project map
+        run: python -m tools.docs.generate_project_map --check
+
+  update:
+    if: github.event_name != 'pull_request' && github.ref_type == 'branch' && github.actor != 'github-actions[bot]'
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Regenerate project map
+        run: python -m tools.docs.generate_project_map
+      - name: Detect generated changes
+        id: changes
+        shell: bash
+        run: |
+          if git diff --quiet -- \
+            docs/architecture/project-map/PROJECT_MAP.md \
+            docs/architecture/project-map/project-map.mmd \
+            docs/architecture/project-map/component-map.mmd \
+            docs/architecture/project-map/project-map.json \
+            docs/architecture/project-map/AGENT_GUIDE.md; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Commit and push generated map
+        if: steps.changes.outputs.changed == 'true'
+        shell: bash
+        run: |
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- \
+            docs/architecture/project-map/PROJECT_MAP.md \
+            docs/architecture/project-map/project-map.mmd \
+            docs/architecture/project-map/component-map.mmd \
+            docs/architecture/project-map/project-map.json \
+            docs/architecture/project-map/AGENT_GUIDE.md
+          git diff --cached --name-status
+          git commit -m "docs(project-map): auto-update [skip ci]"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          python -m tools.docs.generate_project_map
+          git add -- \
+            docs/architecture/project-map/PROJECT_MAP.md \
+            docs/architecture/project-map/project-map.mmd \
+            docs/architecture/project-map/component-map.mmd \
+            docs/architecture/project-map/project-map.json \
+            docs/architecture/project-map/AGENT_GUIDE.md
+          if ! git diff --cached --quiet; then
+            git commit --amend --no-edit
+          fi
+          git push origin "HEAD:$GITHUB_REF_NAME"

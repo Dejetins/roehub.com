@@ -1,0 +1,581 @@
+{
+  "entries": [
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/f1f5151afd2a5f4823512d173edfb5d5492f4a5752104723ae62fcc08dd2c1e5.md",
+      "path": "/Users/daniildegtyarev/.agents/plugins/marketplace.json",
+      "restore": "copy_blob_to_path",
+      "sha256": "f1f5151afd2a5f4823512d173edfb5d5492f4a5752104723ae62fcc08dd2c1e5"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/5168bbe4eb4b514f217d11e508a8861909136a899acd05ba286f683dd788edef.md",
+      "path": "/Users/daniildegtyarev/.codex/AGENTS.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "5168bbe4eb4b514f217d11e508a8861909136a899acd05ba286f683dd788edef"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skill-system/catalog-v1.json",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/59981d23519222bcecf1be48bb37730bbc50539ceb0e35ad09fcef98a3df19d3.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/.system/imagegen/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "59981d23519222bcecf1be48bb37730bbc50539ceb0e35ad09fcef98a3df19d3"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/669a42ccf3323fe0ceda6e466730bcb05dddf1e0c220d6523ea504909fc49165.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/.system/openai-docs/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "669a42ccf3323fe0ceda6e466730bcb05dddf1e0c220d6523ea504909fc49165"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/8fd56316b2c49cbdc657a5d197967a233018e1fada65b00a5dd030dce6499a6e.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/.system/plugin-creator/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "8fd56316b2c49cbdc657a5d197967a233018e1fada65b00a5dd030dce6499a6e"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skills/.system/plugin-creator/references/skill-system-contract-v1.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/da44c88f6b3845a8fa8c60792ec9a722110a55a9793c279757b48fefb11f819c.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/.system/skill-creator/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "da44c88f6b3845a8fa8c60792ec9a722110a55a9793c279757b48fefb11f819c"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skills/.system/skill-creator/references/skill-system-contract-v1.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/d68b77e5bbb34dedab89d134da52855f140fc4b4299b80104f534e3b9e98f8ee.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/.system/skill-installer/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "d68b77e5bbb34dedab89d134da52855f140fc4b4299b80104f534e3b9e98f8ee"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/bdc3928edf713ea31b7f81dbd5d706237bcdb4424a7a90a79996fec1ca702309.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/architecture-design/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "bdc3928edf713ea31b7f81dbd5d706237bcdb4424a7a90a79996fec1ca702309"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skills/architecture-design/references/roehub-profile.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/abf15a221f2c5f994e7730c27ad2d6658ffe1f3387e1a0bfc6a9230167d89c43.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/architecture-review/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "abf15a221f2c5f994e7730c27ad2d6658ffe1f3387e1a0bfc6a9230167d89c43"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/c6143d3d0d6b93b8c8bbf6e991c1f95d1c27121c001b5a2d88eb280dedad72a0.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/backend-performance-evidence/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "c6143d3d0d6b93b8c8bbf6e991c1f95d1c27121c001b5a2d88eb280dedad72a0"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/76a4b2da76ab1a5a13d08a38113471e3ea596465cb25e29063ed3db63038596e.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/backend-quality-gates/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "76a4b2da76ab1a5a13d08a38113471e3ea596465cb25e29063ed3db63038596e"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/e542979fab6141f130b9129b7fdc4bccb2ec3762dd788538b6fdfe074d40c9e0.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/browser-qa-evidence/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "e542979fab6141f130b9129b7fdc4bccb2ec3762dd788538b6fdfe074d40c9e0"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/6ed55e3e41bd511818dc92c33e3bfc410b5439375c4ef4d07fe22821693bfd10.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/contract-impact-analysis/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "6ed55e3e41bd511818dc92c33e3bfc410b5439375c4ef4d07fe22821693bfd10"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/0003e9adfe5581b9e8062e03251e64a21539a87518ac083a2fc5c2fdef9c0c09.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/data-analytics-methodology/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "0003e9adfe5581b9e8062e03251e64a21539a87518ac083a2fc5c2fdef9c0c09"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/aad2ee31cb92d0b79c23024920ea9d865dc404c604411fc4c682d988b17edd98.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/last30days/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "aad2ee31cb92d0b79c23024920ea9d865dc404c604411fc4c682d988b17edd98"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skills/last30days/references/execution.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skills/last30days/references/security.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skills/last30days/references/synthesis.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/34e518dec5000fcd4494404539b60c9516669fc280715d07da66959918172741.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/numba-jit-performance/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "34e518dec5000fcd4494404539b60c9516669fc280715d07da66959918172741"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/a0db6085139c382852724b6ac3baef8d7de78f43eff8c12828784c90eef7cc2e.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/playwright/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "a0db6085139c382852724b6ac3baef8d7de78f43eff8c12828784c90eef7cc2e"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/86cb230cc71e17efbb7d3f757543d514a84d43b4809550cf0555c22f9ed3025a.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/pre-ship-gate/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "86cb230cc71e17efbb7d3f757543d514a84d43b4809550cf0555c22f9ed3025a"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/afb6b757f6f65f6c721d25d49b7a26ba762c8341754ab03d760cb7536096ba5c.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/production-risk-review/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "afb6b757f6f65f6c721d25d49b7a26ba762c8341754ab03d760cb7536096ba5c"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/f1281550ebe53e926534a64e0b7edc58b749f95a2cd98281c277662d1f9dd5a1.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/prompt-manager/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "f1281550ebe53e926534a64e0b7edc58b749f95a2cd98281c277662d1f9dd5a1"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skills/prompt-manager/references/prompt-contract.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skills/prompt-manager/references/roehub-profile.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/939a7deb074816fa290fdf263e7c10fb1d2c61616202cc661a9f3c75c3e33f9a.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/publish-ci-deploy/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "939a7deb074816fa290fdf263e7c10fb1d2c61616202cc661a9f3c75c3e33f9a"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/6adb991df8dbc1b7f89fa5a82309664d99e08f678b5e8a219fb8fea003db801d.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/root-cause-debugging/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "6adb991df8dbc1b7f89fa5a82309664d99e08f678b5e8a219fb8fea003db801d"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/77b3d61e1bceae0323aecd394861435bf87479ba040593c923a07a9a260143aa.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/staged-plan-runner/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "77b3d61e1bceae0323aecd394861435bf87479ba040593c923a07a9a260143aa"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/8c763dbd1041fc31d9152125d449e791a2545206f56368c21b6c040d0644e99d.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/topological-data-analysis/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "8c763dbd1041fc31d9152125d449e791a2545206f56368c21b6c040d0644e99d"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/0d08fb3566b84c94b792b6751f83e06a0a0e97401b84279e705cc7d0edc359e1.md",
+      "path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "0d08fb3566b84c94b792b6751f83e06a0a0e97401b84279e705cc7d0edc359e1"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/acceptance.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/mobile.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/web.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/ea42c60691e2567d1d24c962456fa72f4b7466d8377c7e4e35d83b5e77687a80.md",
+      "path": "/Users/daniildegtyarev/Projects/roehub.com/.codex/AGENTS.md",
+      "restore": "copy_blob_to_path",
+      "sha256": "ea42c60691e2567d1d24c962456fa72f4b7466d8377c7e4e35d83b5e77687a80"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/21cd8a009a323702bd721180b918352e6b4900bf2cd810938346a3b6da48c5a1.md",
+      "path": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_codex_skill_audit.py",
+      "restore": "copy_blob_to_path",
+      "sha256": "21cd8a009a323702bd721180b918352e6b4900bf2cd810938346a3b6da48c5a1"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/98cf8632d819c850b093f2e693a0b39d1d40ff47c09140cb005cecc1f306d211.md",
+      "path": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_codex_skill_catalog.py",
+      "restore": "copy_blob_to_path",
+      "sha256": "98cf8632d819c850b093f2e693a0b39d1d40ff47c09140cb005cecc1f306d211"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_codex_skill_discovery.py",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/86485a2e1d29b84664131baac3ed61c9cbc03496fd2f92cf7430a8f9c0523995.md",
+      "path": "/Users/daniildegtyarev/Projects/roehub.com/tools/codex_quality_benchmark/schemas/skill-catalog-v1.schema.json",
+      "restore": "copy_blob_to_path",
+      "sha256": "86485a2e1d29b84664131baac3ed61c9cbc03496fd2f92cf7430a8f9c0523995"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/f9054aec3f4170e6b828326c1336b618d9bee729f4e7efb86c4e88fe6e123285.md",
+      "path": "/Users/daniildegtyarev/Projects/roehub.com/tools/codex_quality_benchmark/skill_audit.py",
+      "restore": "copy_blob_to_path",
+      "sha256": "f9054aec3f4170e6b828326c1336b618d9bee729f4e7efb86c4e88fe6e123285"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/4d058de8ae000033b24e124e1effcc5033cea9bfc30a08a146b47748bce538f5.md",
+      "path": "/Users/daniildegtyarev/Projects/roehub.com/tools/codex_quality_benchmark/skill_catalog.py",
+      "restore": "copy_blob_to_path",
+      "sha256": "4d058de8ae000033b24e124e1effcc5033cea9bfc30a08a146b47748bce538f5"
+    },
+    {
+      "before_state": "present",
+      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/697effe69e9d906538a85f18cb651838ea5878e0952406e8f61d98db35c94088.md",
+      "path": "/Users/daniildegtyarev/Projects/roehub.com/tools/codex_quality_benchmark/skill_contract.py",
+      "restore": "copy_blob_to_path",
+      "sha256": "697effe69e9d906538a85f18cb651838ea5878e0952406e8f61d98db35c94088"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/Projects/roehub.com/tools/codex_quality_benchmark/skill_discovery.py",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/.codex-plugin/plugin.json",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S001/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S002/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S003/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S004/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S009/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S010/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S011/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S012/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S013/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S014/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S015/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S016/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S017/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S018/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S019/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S020/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S021/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S022/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S023/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S024/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S025/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S026/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S027/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S028/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S029/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S030/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S031/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S032/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S033/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S034/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S035/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S036/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S037/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S038/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S039/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S040/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S041/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S042/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S043/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S044/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S045/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S046/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S047/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S048/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S049/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S050/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S051/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S052/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S053/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S054/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S055/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S056/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S057/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S058/SKILL.md",
+      "restore": "delete_created_path"
+    },
+    {
+      "before_state": "absent",
+      "path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S062/SKILL.md",
+      "restore": "delete_created_path"
+    }
+  ],
+  "generated_at": "2026-07-09T21:32:36.936870+00:00",
+  "spec": "skill-rollback/v1",
+  "updated_at": "2026-07-09T23:01:55.153656+00:00"
+}

@@ -1,0 +1,150 @@
+flowchart TB
+  classDef context fill:#e8f4ff,stroke:#3178c6
+  classDef app fill:#edf7ed,stroke:#2e7d32
+  classDef worker fill:#fff3cd,stroke:#b8860b
+  classDef core fill:#f3e8ff,stroke:#7b1fa2
+  n_app_api["app:api"]
+  class n_app_api app
+  n_app_cli["app:cli"]
+  class n_app_cli app
+  n_app_exchange_control["app:exchange_control"]
+  class n_app_exchange_control app
+  n_app_exchange_execution["app:exchange_execution"]
+  class n_app_exchange_execution app
+  n_app_migrations["app:migrations"]
+  class n_app_migrations app
+  n_app_monitoring["app:monitoring"]
+  class n_app_monitoring app
+  n_app_scheduler["app:scheduler"]
+  class n_app_scheduler app
+  n_app_web["app:web"]
+  class n_app_web app
+  n_context_backtest["context:backtest"]
+  class n_context_backtest context
+  n_context_backtest_artifacts["context:backtest_artifacts"]
+  class n_context_backtest_artifacts context
+  n_context_exchange_control["context:exchange_control"]
+  class n_context_exchange_control context
+  n_context_identity["context:identity"]
+  class n_context_identity context
+  n_context_indicators["context:indicators"]
+  class n_context_indicators context
+  n_context_live_execution["context:live_execution"]
+  class n_context_live_execution context
+  n_context_market_data["context:market_data"]
+  class n_context_market_data context
+  n_context_ml["context:ml"]
+  class n_context_ml context
+  n_context_notifications["context:notifications"]
+  class n_context_notifications context
+  n_context_optimize["context:optimize"]
+  class n_context_optimize context
+  n_context_risk["context:risk"]
+  class n_context_risk context
+  n_context_rl_trading["context:rl_trading"]
+  class n_context_rl_trading context
+  n_context_strategy["context:strategy"]
+  class n_context_strategy context
+  n_core_fastpath["core:fastpath"]
+  class n_core_fastpath core
+  n_core_integration["core:integration"]
+  class n_core_integration core
+  n_core_platform["core:platform"]
+  class n_core_platform core
+  n_core_shared_kernel["core:shared_kernel"]
+  class n_core_shared_kernel core
+  n_worker_backtest_job_runner["worker:backtest_job_runner"]
+  class n_worker_backtest_job_runner worker
+  n_worker_market_data_ws["worker:market_data_ws"]
+  class n_worker_market_data_ws worker
+  n_worker_notification_dispatcher["worker:notification_dispatcher"]
+  class n_worker_notification_dispatcher worker
+  n_worker_notification_report_scheduler["worker:notification_report_scheduler"]
+  class n_worker_notification_report_scheduler worker
+  n_worker_rl_trading_inference["worker:rl_trading_inference"]
+  class n_worker_rl_trading_inference worker
+  n_worker_rl_trading_trainer["worker:rl_trading_trainer"]
+  class n_worker_rl_trading_trainer worker
+  n_worker_strategy_live_runner["worker:strategy_live_runner"]
+  class n_worker_strategy_live_runner worker
+  n_worker_telegram_bot_worker["worker:telegram_bot_worker"]
+  class n_worker_telegram_bot_worker worker
+  n_app_api --> n_app_cli
+  n_app_api --> n_context_backtest
+  n_app_api --> n_context_backtest_artifacts
+  n_app_api --> n_context_identity
+  n_app_api --> n_context_indicators
+  n_app_api --> n_context_live_execution
+  n_app_api --> n_context_market_data
+  n_app_api --> n_context_notifications
+  n_app_api --> n_context_rl_trading
+  n_app_api --> n_context_strategy
+  n_app_api --> n_core_platform
+  n_app_api --> n_core_shared_kernel
+  n_app_cli --> n_app_api
+  n_app_cli --> n_context_backtest_artifacts
+  n_app_cli --> n_context_indicators
+  n_app_cli --> n_context_market_data
+  n_app_cli --> n_core_platform
+  n_app_cli --> n_core_shared_kernel
+  n_app_exchange_control --> n_context_exchange_control
+  n_app_exchange_execution --> n_context_exchange_control
+  n_app_exchange_execution --> n_context_live_execution
+  n_app_exchange_execution --> n_context_strategy
+  n_app_exchange_execution --> n_core_shared_kernel
+  n_app_scheduler --> n_app_api
+  n_app_scheduler --> n_app_cli
+  n_app_scheduler --> n_context_backtest_artifacts
+  n_app_scheduler --> n_context_indicators
+  n_app_scheduler --> n_context_market_data
+  n_app_scheduler --> n_core_platform
+  n_app_scheduler --> n_core_shared_kernel
+  n_context_backtest --> n_context_backtest_artifacts
+  n_context_backtest --> n_context_indicators
+  n_context_backtest --> n_core_platform
+  n_context_backtest --> n_core_shared_kernel
+  n_context_backtest_artifacts --> n_context_backtest
+  n_context_backtest_artifacts --> n_context_indicators
+  n_context_backtest_artifacts --> n_context_market_data
+  n_context_backtest_artifacts --> n_core_platform
+  n_context_backtest_artifacts --> n_core_shared_kernel
+  n_context_exchange_control --> n_core_shared_kernel
+  n_context_identity --> n_core_shared_kernel
+  n_context_indicators --> n_context_market_data
+  n_context_indicators --> n_core_platform
+  n_context_indicators --> n_core_shared_kernel
+  n_context_live_execution --> n_context_exchange_control
+  n_context_live_execution --> n_context_strategy
+  n_context_live_execution --> n_core_shared_kernel
+  n_context_market_data --> n_core_shared_kernel
+  n_context_notifications --> n_core_shared_kernel
+  n_context_rl_trading --> n_context_live_execution
+  n_context_rl_trading --> n_context_strategy
+  n_context_rl_trading --> n_core_shared_kernel
+  n_context_strategy --> n_context_live_execution
+  n_context_strategy --> n_context_market_data
+  n_context_strategy --> n_context_notifications
+  n_context_strategy --> n_core_platform
+  n_context_strategy --> n_core_shared_kernel
+  n_core_platform --> n_context_market_data
+  n_core_platform --> n_core_shared_kernel
+  n_worker_backtest_job_runner --> n_context_backtest
+  n_worker_backtest_job_runner --> n_context_backtest_artifacts
+  n_worker_backtest_job_runner --> n_core_platform
+  n_worker_backtest_job_runner --> n_core_shared_kernel
+  n_worker_market_data_ws --> n_app_cli
+  n_worker_market_data_ws --> n_context_market_data
+  n_worker_market_data_ws --> n_core_platform
+  n_worker_market_data_ws --> n_core_shared_kernel
+  n_worker_notification_dispatcher --> n_context_notifications
+  n_worker_notification_report_scheduler --> n_context_notifications
+  n_worker_rl_trading_inference --> n_context_live_execution
+  n_worker_rl_trading_inference --> n_context_rl_trading
+  n_worker_rl_trading_inference --> n_context_strategy
+  n_worker_strategy_live_runner --> n_app_cli
+  n_worker_strategy_live_runner --> n_context_live_execution
+  n_worker_strategy_live_runner --> n_context_market_data
+  n_worker_strategy_live_runner --> n_context_notifications
+  n_worker_strategy_live_runner --> n_context_strategy
+  n_worker_strategy_live_runner --> n_core_platform
+  n_worker_telegram_bot_worker --> n_context_notifications

@@ -1,0 +1,262 @@
+schema_version = 1
+project = "Roehub"
+description = "Торговая платформа: исследование, рыночные данные, стратегии, бектест, исполнение и эксплуатация."
+
+[[areas]]
+id = "domain"
+title = "Доменные контексты"
+purpose = "Бизнес-правила и use cases по bounded contexts."
+paths = ["src/trading/contexts/"]
+
+[[areas]]
+id = "shared-core"
+title = "Shared kernel и платформа"
+purpose = "Общие типы, конфигурация, ошибки, интеграционные и производительные примитивы."
+paths = ["src/trading/__init__.py", "src/trading/shared_kernel/", "src/trading/platform/", "src/trading/integration/", "src/trading/fastpath/"]
+
+[[areas]]
+id = "delivery"
+title = "Приложения и delivery"
+purpose = "HTTP, HTML, CLI, workers, schedulers, migrations и composition roots."
+paths = ["apps/"]
+
+[[areas]]
+id = "operations"
+title = "Инфраструктура и эксплуатация"
+purpose = "Docker, macOS runtime, edge, monitoring, конфигурация и миграции данных."
+paths = ["infra/", "configs/", "migrations/", "alembic/", ".github/workflows/"]
+
+[[areas]]
+id = "automation"
+title = "Инструменты и автоматизация"
+purpose = "Операторские скрипты, генераторы, CI helpers, загрузчики и notebooks."
+paths = ["tools/", "scripts/", "data_load/", "notebooks/"]
+
+[[areas]]
+id = "quality"
+title = "Проверки и тестовые данные"
+purpose = "Unit, integration, notebook и performance-smoke проверки, fixtures и typings."
+paths = ["tests/", "fixtures/", "typings/"]
+
+[[areas]]
+id = "knowledge"
+title = "Документация и агентные контракты"
+purpose = "Архитектура, runbooks, планы, правила агентов и индекс проекта."
+paths = ["docs/", ".codex/", "AGENTS.md", "README.md"]
+
+[[areas]]
+id = "experiments"
+title = "Прототипы и локальные результаты"
+purpose = "Изолированные прототипы и каталоги воспроизводимых результатов."
+paths = ["prototypes/", "output/", "local_artifacts/"]
+
+[[areas]]
+id = "repository-meta"
+title = "Корневые контракты репозитория"
+purpose = "Build metadata, dependency locks, root configuration and compatibility indexes."
+paths = [".dockerignore", ".gitignore", ".opencode/", ".python-version", ".vscode/", "Dockerfile.api", "LICENSE", "alembic.ini", "pyproject.toml", "pyrightconfig.json", "repo_tree.md", "uv.lock"]
+
+[descriptions.contexts]
+backtest = "Расчёт и оркестрация исторических прогонов."
+backtest_artifacts = "Публикация и чтение артефактов бектеста."
+exchange_control = "Политики доступности биржевых соединений и ключей."
+identity = "Пользователь, сессия, владение и доступ."
+indicators = "Индикаторы и их вычислительные контракты."
+live_execution = "Живое исполнение, ордера и reconciliation."
+market_data = "Получение, нормализация и хранение рыночных данных."
+ml = "ML-модели и исследовательские контракты."
+notifications = "События, уведомления и каналы доставки."
+optimize = "Поиск и оценка параметров стратегий."
+risk = "Риск-политики и ограничения исполнения."
+rl_trading = "Обучение, inference и эксплуатация RL-агентов."
+strategy = "Модель стратегии, версии и жизненный цикл запусков."
+
+[descriptions.apps]
+api = "FastAPI API и UI-oriented DTO/routes."
+cli = "Командная строка для операторских и data workflows."
+exchange_control = "Сервис контроля биржевых соединений."
+exchange_execution = "Изолированный gateway исполнения на бирже."
+migrations = "Bootstrap и применение миграций."
+monitoring = "Экспорт технических метрик."
+scheduler = "Планировщики фоновых задач."
+web = "Server-rendered web UI и same-origin API client."
+worker = "Фоновые consumers и runtime workers."
+
+[descriptions.workers]
+backtest_job_runner = "Исполнение очереди задач бектеста."
+market_data_ws = "WebSocket ingestion рыночных данных."
+notification_dispatcher = "Доставка подготовленных уведомлений."
+notification_report_scheduler = "Планирование отчётных уведомлений."
+rl_trading_inference = "Inference RL-политик."
+rl_trading_trainer = "Обучение RL-моделей."
+strategy_live_runner = "Живой цикл стратегии и отправка intents."
+telegram_bot_worker = "Telegram-команды и пользовательские уведомления."
+
+[[runtime_nodes]]
+id = "browser"
+title = "Браузер"
+kind = "client"
+paths = ["apps/web/"]
+
+[[runtime_nodes]]
+id = "edge"
+title = "VPS edge / TLS"
+kind = "edge"
+paths = ["infra/caddy/", "infra/docker/docker-compose.web.prod.yml"]
+
+[[runtime_nodes]]
+id = "web"
+title = "Web UI"
+kind = "service"
+paths = ["apps/web/"]
+
+[[runtime_nodes]]
+id = "api"
+title = "FastAPI API"
+kind = "service"
+paths = ["apps/api/"]
+
+[[runtime_nodes]]
+id = "workers"
+title = "Workers / schedulers"
+kind = "service-group"
+paths = ["apps/worker/", "apps/scheduler/"]
+
+[[runtime_nodes]]
+id = "execution"
+title = "Exchange control / execution"
+kind = "service-group"
+paths = ["apps/exchange_control/", "apps/exchange_execution/"]
+
+[[runtime_nodes]]
+id = "postgres"
+title = "PostgreSQL"
+kind = "data-store"
+paths = ["migrations/postgres/", "alembic/"]
+
+[[runtime_nodes]]
+id = "clickhouse"
+title = "ClickHouse"
+kind = "data-store"
+paths = ["migrations/clickhouse/"]
+
+[[runtime_nodes]]
+id = "redis"
+title = "Redis streams/cache"
+kind = "data-store"
+paths = ["infra/docker/"]
+
+[[runtime_nodes]]
+id = "exchanges"
+title = "Binance / Bybit"
+kind = "external"
+paths = ["data_load/binance/", "data_load/bybit/"]
+
+[[runtime_nodes]]
+id = "observability"
+title = "Prometheus / Grafana / OTel"
+kind = "operations"
+paths = ["infra/monitoring/", "apps/monitoring/"]
+
+[[flows]]
+source = "browser"
+target = "edge"
+label = "HTTPS"
+[[flows]]
+source = "edge"
+target = "web"
+label = "UI"
+[[flows]]
+source = "edge"
+target = "api"
+label = "/api/*"
+[[flows]]
+source = "web"
+target = "api"
+label = "same-origin API"
+[[flows]]
+source = "api"
+target = "postgres"
+label = "identity/config/jobs"
+[[flows]]
+source = "api"
+target = "clickhouse"
+label = "market/backtest reads"
+[[flows]]
+source = "api"
+target = "redis"
+label = "commands/streams/cache"
+[[flows]]
+source = "workers"
+target = "redis"
+label = "consume/publish"
+[[flows]]
+source = "workers"
+target = "postgres"
+label = "state/results"
+[[flows]]
+source = "workers"
+target = "clickhouse"
+label = "market data/artifacts"
+[[flows]]
+source = "workers"
+target = "execution"
+label = "execution intents"
+[[flows]]
+source = "execution"
+target = "exchanges"
+label = "authenticated exchange API"
+[[flows]]
+source = "exchanges"
+target = "workers"
+label = "market/private streams"
+[[flows]]
+source = "api"
+target = "observability"
+label = "metrics/traces"
+[[flows]]
+source = "workers"
+target = "observability"
+label = "metrics/traces"
+
+[[agent_routes]]
+match = "HTTP API, DTO, auth, UI API"
+components = ["app:api", "context:identity"]
+read_first = ["apps/api/main/app.py", "apps/api/routes/", "apps/api/dto/", "docs/architecture/api/"]
+skills = ["root-cause-debugging", "contract-impact-analysis", "backend-quality-gates"]
+
+[[agent_routes]]
+match = "Web UI, template, locale, browser flow"
+components = ["app:web", "app:api"]
+read_first = ["apps/web/main/app.py", "apps/web/templates/", "apps/web/dist/", "docs/architecture/apps/web/"]
+skills = ["ui-ux-pro-max", "browser-qa-evidence"]
+
+[[agent_routes]]
+match = "Backtest, benchmark, optimize"
+components = ["context:backtest", "context:backtest_artifacts", "context:optimize", "worker:backtest_job_runner"]
+read_first = ["src/trading/contexts/backtest/", "apps/worker/backtest_job_runner/", "docs/architecture/backtest/"]
+skills = ["root-cause-debugging", "backend-performance-evidence", "backend-quality-gates"]
+
+[[agent_routes]]
+match = "Market data, candles, ingestion"
+components = ["context:market_data", "worker:market_data_ws"]
+read_first = ["src/trading/contexts/market_data/", "apps/worker/market_data_ws/", "docs/architecture/market_data/"]
+skills = ["root-cause-debugging", "backend-quality-gates"]
+
+[[agent_routes]]
+match = "Live trading, order, exchange, risk"
+components = ["context:live_execution", "context:exchange_control", "context:risk", "app:exchange_execution", "worker:strategy_live_runner"]
+read_first = ["src/trading/contexts/live_execution/", "src/trading/contexts/exchange_control/", "apps/exchange_execution/", "docs/architecture/live_execution/"]
+skills = ["architecture-design", "contract-impact-analysis", "root-cause-debugging"]
+
+[[agent_routes]]
+match = "RL, ML, training, inference"
+components = ["context:rl_trading", "context:ml", "worker:rl_trading_trainer", "worker:rl_trading_inference"]
+read_first = ["src/trading/contexts/rl_trading/", "apps/worker/rl_trading_trainer/", "apps/worker/rl_trading_inference/", "docs/architecture/ml/"]
+skills = ["architecture-design", "backend-performance-evidence", "backend-quality-gates"]
+
+[[agent_routes]]
+match = "Deploy, CI, runtime, monitoring"
+components = ["area:operations"]
+read_first = [".github/workflows/", "infra/", "docs/runbooks/"]
+skills = ["publish-ci-deploy", "pre-ship-gate", "root-cause-debugging"]

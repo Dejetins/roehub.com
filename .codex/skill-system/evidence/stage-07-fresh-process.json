@@ -1,0 +1,183 @@
+{
+  "spec": "skill-fresh-process-proof/v1",
+  "run_id": "skill-system-stage-07-v1",
+  "fresh_process": true,
+  "status": "pass",
+  "process": {
+    "thread_id": "019f4913-757c-72a1-8af4-7270f2a85dae",
+    "command_profile": "codex exec --ephemeral -s read-only -C /Users/daniildegtyarev/Projects/roehub.com",
+    "exit_code": 0
+  },
+  "plugin": {
+    "name": "codex-skill-system-overrides",
+    "marketplace": "personal",
+    "installed": true,
+    "enabled": true,
+    "version": "0.1.0+codex.20260709224522",
+    "source_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides",
+    "installed_path": "/Users/daniildegtyarev/.codex/plugins/cache/personal/codex-skill-system-overrides/0.1.0+codex.20260709224522",
+    "manifest_sha256": "aa407c1c48cf2418700e228781d713cce0985c4b38c43e26ec814803189cc22e",
+    "manifests_byte_equal": true,
+    "manifest_declares_no_skills": true,
+    "declared_skill_count": 0,
+    "top_level_loaded_skill_files": {
+      "source": 0,
+      "installed": 0
+    },
+    "resolver_contracts": {
+      "source": 55,
+      "installed": 55,
+      "trees_equal": true
+    }
+  },
+  "catalogs": {
+    "repo_path": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/catalog-v1.json",
+    "global_path": "/Users/daniildegtyarev/.codex/skill-system/catalog-v1.json",
+    "sha256": "1767adcd1beffa982217ab9111e602849988f00d83c02ec3c95d4db269fea2f3",
+    "byte_equal": true,
+    "schema_valid": true,
+    "schema_errors": [],
+    "relations_valid": true,
+    "audit_baseline": {
+      "expected": 85,
+      "observed": 85,
+      "rows": 85
+    },
+    "policy": {
+      "spec": "skill-policy/v1",
+      "scope": "deterministic-selection-not-loader-filter"
+    }
+  },
+  "inventory": {
+    "catalog_rows": 96,
+    "loader_candidate_count": 96,
+    "supplemental_count": 11,
+    "resource_only_contract_count": 55,
+    "installed_resource_loader_intersection": 0,
+    "no_installed_resource_only_contract_counted": true
+  },
+  "routes": {
+    "public": {
+      "query": "gh-address-comments",
+      "resolved_skill_id": "S020",
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S020/SKILL.md",
+      "effective_path_inspected": true,
+      "hash_match": true
+    },
+    "internal": {
+      "query": "S046",
+      "resolved_skill_id": "S046",
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S046/SKILL.md",
+      "effective_path_inspected": true,
+      "session_exposed": "internal",
+      "hash_match": true
+    },
+    "dormant": {
+      "query": "S012",
+      "resolved_skill_id": "S012",
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S012/SKILL.md",
+      "effective_path_inspected": true,
+      "installed_enabled": false,
+      "session_exposed": "not_exposed",
+      "exposure_claimed": false,
+      "hash_match": true
+    },
+    "alias": {
+      "query": "Presentations",
+      "resolved_skill_id": "S056",
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S056/SKILL.md",
+      "effective_path_inspected": true,
+      "hash_match": true
+    },
+    "deprecated": {
+      "query": "S005",
+      "resolved_skill_id": "S020",
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S020/SKILL.md",
+      "effective_path_inspected": true,
+      "hash_match": true
+    },
+    "missing": {
+      "query": "missing-capability-fixture",
+      "exit_code": 1,
+      "error": "skill not found: missing-capability-fixture",
+      "failed_closed": true
+    }
+  },
+  "exposure": {
+    "observation_thread_id": "019f491b-238f-7c52-b464-a483819fe1e1",
+    "observed_skill_name_count": 31,
+    "observed_skill_names": [
+      "architecture-design",
+      "architecture-review",
+      "backend-performance-evidence",
+      "backend-quality-gates",
+      "browser-qa-evidence",
+      "browser:control-in-app-browser",
+      "contract-impact-analysis",
+      "data-analytics-methodology",
+      "documents:documents",
+      "imagegen",
+      "last30days",
+      "numba",
+      "openai-docs",
+      "pdf:pdf",
+      "playwright",
+      "plugin-creator",
+      "pre-ship-gate",
+      "presentations:Presentations",
+      "production-risk-review",
+      "prompt-manager",
+      "publish-ci-deploy",
+      "roehub-live-redesign-prototype:backtests-live-prototype",
+      "root-cause-debugging",
+      "skill-creator",
+      "skill-installer",
+      "spreadsheets:Spreadsheets",
+      "staged-plan-runner",
+      "template-creator:template-creator",
+      "topological-data-analysis",
+      "ui-ux-pro-max",
+      "visualize:visualize"
+    ],
+    "figma_names": [],
+    "hugging_face_names": [],
+    "artifact_template_names": [],
+    "expected_public_delta": 0,
+    "observed_public_delta": 0,
+    "observed_overlay_skill_names": [],
+    "unexpected_overlay_skill_names": [],
+    "codex_skill_system_overrides_skill_exposed": false,
+    "resource_only_plugin_added_public_skill_name": false,
+    "catalog_is_loader_filter": false
+  },
+  "side_effects": {
+    "local_only": true,
+    "read_only": true,
+    "network_access": false,
+    "browser_or_account_capabilities_invoked": false,
+    "paid_jobs_run": false,
+    "environment_variables_read": false,
+    "plugins_installed_or_removed": false,
+    "files_modified": 0,
+    "mutation_occurred": false
+  },
+  "redaction": {
+    "sensitive_evidence_occurred": false,
+    "secrets_exposed": false,
+    "cookies_exposed": false,
+    "headers_exposed": false,
+    "provider_payloads_exposed": false
+  },
+  "proof_boundary": {
+    "surface": "runtime",
+    "profile": "codex-local",
+    "label": "fresh_process_read_only_discovery"
+  },
+  "process_warnings": [
+    "Three pre-existing repo agent role TOML files use unsupported reasoning_language and were ignored; they are outside the skill audit ownership.",
+    "codex plugin list could not create PATH aliases in the read-only sandbox; no write succeeded."
+  ],
+  "residual_risks": [
+    "Future plugin, cache, or loader updates can change discovery and require this proof to be rerun."
+  ]
+}

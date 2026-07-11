@@ -1,0 +1,136 @@
+{
+  "results": [
+    {
+      "actual_status": "blocked",
+      "case_id": "paid.missing-budget",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-budget"
+      ]
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "paid.complete-material-choices",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "external.missing-target",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-target"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "external.missing-destination",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-destination"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "external.missing-visibility",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-visibility"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "external.missing-authority",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "missing-authority"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "provider.unknown-state-retry",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "unknown-provider-state"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "evidence.secret-value",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "secret-evidence"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "intent.read-only-mutation",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "read-only-intent"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "shared-main.broad-staging",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "dirty-main-broad-staging"
+      ]
+    },
+    {
+      "actual_status": "blocked",
+      "case_id": "capability.absent-no-fallback",
+      "expected_status": "blocked",
+      "passed": true,
+      "reason_codes": [
+        "capability-absence"
+      ]
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "capability.absent-safe-fallback",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "alias.presentations",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "alias.spreadsheets",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    },
+    {
+      "actual_status": "completed",
+      "case_id": "inspect.safe-default",
+      "expected_status": "completed",
+      "passed": true,
+      "reason_codes": []
+    }
+  ],
+  "run_id": "skill-system-stage-00-v1",
+  "spec": "skill-contract-case-result/v1",
+  "summary": {
+    "failed": 0,
+    "passed": 15,
+    "total": 15
+  }
+}

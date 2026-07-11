@@ -1,0 +1,37 @@
+{
+  "spec": "skill-policy/v1",
+  "catalog_authority": "/Users/daniildegtyarev/.codex/skill-system/catalog-v1.json",
+  "repo_snapshot": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/catalog-v1.json",
+  "resolver": "uv run python -m tools.codex_quality_benchmark.skill_catalog resolve-skill",
+  "catalog_scope": "deterministic-selection-not-loader-filter",
+  "effective_contract_required": true,
+  "resolution_required_when": [
+    "alias",
+    "deprecated-name",
+    "duplicate-name",
+    "explicit-conflict"
+  ],
+  "fresh_process_boundary": "required-after-plugin-reinstall",
+  "precedence": [
+    "platform-system-developer",
+    "applicable-AGENTS",
+    "explicit-user-request",
+    "resolved-skill-contract",
+    "historical-context"
+  ],
+  "defaults": {
+    "read_only_intent": "no-mutation",
+    "unknown_major_contract": "blocked",
+    "unknown_external_state": "reconcile-before-retry",
+    "managed_cache": "read-only",
+    "dormant_activation": "forbidden-without-explicit-install"
+  },
+  "forbidden_evidence": [
+    "secrets",
+    "cookies",
+    "authorization-headers",
+    "raw-browser-storage",
+    "raw-provider-payloads",
+    "private-account-data"
+  ]
+}

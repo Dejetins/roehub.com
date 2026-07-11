@@ -1,0 +1,41 @@
+flowchart LR
+  classDef external fill:#fff3cd,stroke:#b8860b
+  classDef store fill:#e8f4ff,stroke:#3178c6
+  classDef service fill:#edf7ed,stroke:#2e7d32
+  n_browser["Браузер"]
+  class n_browser service
+  n_edge["VPS edge / TLS"]
+  class n_edge service
+  n_web["Web UI"]
+  class n_web service
+  n_api["FastAPI API"]
+  class n_api service
+  n_workers["Workers / schedulers"]
+  class n_workers service
+  n_execution["Exchange control / execution"]
+  class n_execution service
+  n_postgres["PostgreSQL"]
+  class n_postgres store
+  n_clickhouse["ClickHouse"]
+  class n_clickhouse store
+  n_redis["Redis streams/cache"]
+  class n_redis store
+  n_exchanges["Binance / Bybit"]
+  class n_exchanges external
+  n_observability["Prometheus / Grafana / OTel"]
+  class n_observability service
+  n_browser -->|"HTTPS"| n_edge
+  n_edge -->|"UI"| n_web
+  n_edge -->|"/api/*"| n_api
+  n_web -->|"same-origin API"| n_api
+  n_api -->|"identity/config/jobs"| n_postgres
+  n_api -->|"market/backtest reads"| n_clickhouse
+  n_api -->|"commands/streams/cache"| n_redis
+  n_workers -->|"consume/publish"| n_redis
+  n_workers -->|"state/results"| n_postgres
+  n_workers -->|"market data/artifacts"| n_clickhouse
+  n_workers -->|"execution intents"| n_execution
+  n_execution -->|"authenticated exchange API"| n_exchanges
+  n_exchanges -->|"market/private streams"| n_workers
+  n_api -->|"metrics/traces"| n_observability
+  n_workers -->|"metrics/traces"| n_observability

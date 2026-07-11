@@ -1,0 +1,165 @@
+{
+  "results": [
+    {
+      "checks": [
+        "tool contract wins",
+        "Logo generation is limited",
+        "terminal action",
+        "cli_fallback"
+      ],
+      "line_count": 105,
+      "missing": [],
+      "path": "/Users/daniildegtyarev/.codex/skills/.system/imagegen/SKILL.md",
+      "sha256": "55233565ae0eb6ad18e864b6ec3e753b120878905aacc7c2a6b976f002241929",
+      "skill_id": "S063",
+      "status": "pass"
+    },
+    {
+      "checks": [
+        "First discover which source capabilities are callable",
+        "A docs-only request is read-only",
+        "Never install or register an MCP server",
+        "bounded uncertainty"
+      ],
+      "line_count": 104,
+      "missing": [],
+      "path": "/Users/daniildegtyarev/.codex/skills/.system/openai-docs/SKILL.md",
+      "sha256": "36e1336af3c9e017be49af2daff2af906916bef8611e23a04523d05a4f4e9c4d",
+      "skill_id": "S064",
+      "status": "pass"
+    },
+    {
+      "checks": [
+        "references/roehub-profile.md",
+        "exactly one read-only reviewer",
+        "terminal role",
+        "skill-result/v1"
+      ],
+      "line_count": 95,
+      "missing": [],
+      "path": "/Users/daniildegtyarev/.codex/skills/architecture-design/SKILL.md",
+      "sha256": "b51c81010d4369f68b0d1c16c1f055debc77ee743342db22549a35ade54da5a5",
+      "skill_id": "S068",
+      "status": "pass"
+    },
+    {
+      "checks": [
+        "fact/inference/proposal/unknown",
+        "Never spawn a subagent",
+        "shared `skill-result/v1` envelope",
+        "Release after fixes"
+      ],
+      "line_count": 95,
+      "missing": [],
+      "path": "/Users/daniildegtyarev/.codex/skills/architecture-review/SKILL.md",
+      "sha256": "2656495557806624dbc3ba3364620c9a304c133d30472130cb626e91f15208ce",
+      "skill_id": "S069",
+      "status": "pass"
+    },
+    {
+      "checks": [
+        "browser_qa_readiness",
+        "This is not a release or ship verdict",
+        "proof_boundary",
+        "fix_authorized"
+      ],
+      "line_count": 86,
+      "missing": [],
+      "path": "/Users/daniildegtyarev/.codex/skills/browser-qa-evidence/SKILL.md",
+      "sha256": "0af47412ddc8a0d8fa890799576b76f0e9ca66bfd99e7443ab2c444069e6ce93",
+      "skill_id": "S072",
+      "status": "pass"
+    },
+    {
+      "checks": [
+        "Runtime gate",
+        "deterministic corpus",
+        "same corpus",
+        "Cache and artifact ownership"
+      ],
+      "line_count": 120,
+      "missing": [],
+      "path": "/Users/daniildegtyarev/.codex/skills/numba-jit-performance/SKILL.md",
+      "sha256": "233e16c7d7f0501c76bc44a66322a2b6c697c872970225a6d3c7699d06a8ffa0",
+      "skill_id": "S076",
+      "status": "pass"
+    },
+    {
+      "checks": [
+        "caller-owned evidence destination",
+        "Keep tracing, screenshots, video, HAR, and console capture disabled",
+        "Do not save raw browser/storage state",
+        "skill-result/v1"
+      ],
+      "line_count": 102,
+      "missing": [],
+      "path": "/Users/daniildegtyarev/.codex/skills/playwright/SKILL.md",
+      "sha256": "d7295e935665d3568a40ecbf02eadab3760a3da553590cad76c2028b4fca02ec",
+      "skill_id": "S077",
+      "status": "pass"
+    },
+    {
+      "checks": [
+        "verified merge-base",
+        "Contract matrix",
+        "confidence",
+        "foreign exclusions"
+      ],
+      "line_count": 93,
+      "missing": [],
+      "path": "/Users/daniildegtyarev/.codex/skills/production-risk-review/SKILL.md",
+      "sha256": "63c8665db428df3b6e5c1cbad7e27fc6d2b8b0dac3b575e5bc66f61670a00a0d",
+      "skill_id": "S079",
+      "status": "pass"
+    },
+    {
+      "checks": [
+        "references/prompt-contract.md",
+        "references/roehub-profile.md",
+        "impact, not ceremony",
+        "terminal and never spawns"
+      ],
+      "line_count": 102,
+      "missing": [],
+      "path": "/Users/daniildegtyarev/.codex/skills/prompt-manager/SKILL.md",
+      "sha256": "d5cd29c0c3203f0620419eae1aef7afb38ccb1da3a213a24b3df75436314200c",
+      "skill_id": "S080",
+      "status": "pass"
+    },
+    {
+      "checks": [
+        "diagnose_only",
+        "fix_authorized",
+        "Sanitize commands",
+        "file manifest is empty"
+      ],
+      "line_count": 85,
+      "missing": [],
+      "path": "/Users/daniildegtyarev/.codex/skills/root-cause-debugging/SKILL.md",
+      "sha256": "7540ea73eaff069d2d48ea987e26ae486e18764533e375eb873177ccfda8bc15",
+      "skill_id": "S082",
+      "status": "pass"
+    },
+    {
+      "checks": [
+        "inspect_status",
+        "Strict ledger gate",
+        "Do not fall back",
+        "re-parse the updated ledger"
+      ],
+      "line_count": 99,
+      "missing": [],
+      "path": "/Users/daniildegtyarev/.codex/skills/staged-plan-runner/SKILL.md",
+      "sha256": "b1e3c1f0bc30988b12230404b5d45eba841ae932c0a94f734db5cb3035b1e672",
+      "skill_id": "S083",
+      "status": "pass"
+    }
+  ],
+  "run_id": "skill-system-stage-03-v1",
+  "spec": "skill-semantic-gates/v1",
+  "summary": {
+    "failed": 0,
+    "passed": 11,
+    "total": 11
+  }
+}

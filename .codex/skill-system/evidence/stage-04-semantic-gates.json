@@ -1,0 +1,509 @@
+{
+  "results": [
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "named Chrome profile",
+        "allowed domains",
+        "Never export raw profile"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S002/SKILL.md",
+      "effective_sha256": "f4c0e1ca805ff92f63bed23a02d3e26547c9272c604b9cc356920d79e81e9c94",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S002",
+      "source_sha256": "bf396dd558967b012b369603b9e86cb4c0c5dd23912a2eae60a302540ff5db4b",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "Inherit the active platform",
+        "terminal application's UI",
+        "Redact or discard"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S003/SKILL.md",
+      "effective_sha256": "cc67a371f6c884c0649e76ec0402d52eedd50d0fbd36b2b965b11a458c30d859",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S003",
+      "source_sha256": "8e6a753cb166190a7f573b04dc73ae13a1c991497c77f0ef07e0c3e71d143a08",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_public",
+      "checks": [
+        "communication requirements outrank",
+        "thread-scoped writable",
+        "Route by fidelity"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S004/SKILL.md",
+      "effective_sha256": "b7addb885180b315e9a916d16da4da799a8188d55c5cd820a7861aa1f2989cbb",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S004",
+      "source_sha256": "174968af443c48fa2ace0fb73c35b86be6d63a3049fb88312e59e500d337db4d",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "deprecate",
+      "checks": [
+        "source hash unchanged",
+        "canonical target catalog://S020"
+      ],
+      "effective_path": "catalog://S020",
+      "missing": [],
+      "operation": "deprecate_catalog_entry",
+      "skill_id": "S005",
+      "source_sha256": "c1ebc337357402f7faabafe712e0c463981a65f736453efe52abd305bcb74769",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "deprecate",
+      "checks": [
+        "source hash unchanged",
+        "canonical target catalog://S021"
+      ],
+      "effective_path": "catalog://S021",
+      "missing": [],
+      "operation": "deprecate_catalog_entry",
+      "skill_id": "S006",
+      "source_sha256": "7621a3560d788fb221d25f9753233fe0c393c5cfe63167c88b11f027c277b1f8",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "deprecate",
+      "checks": [
+        "source hash unchanged",
+        "canonical target catalog://S022"
+      ],
+      "effective_path": "catalog://S022",
+      "missing": [],
+      "operation": "deprecate_catalog_entry",
+      "skill_id": "S007",
+      "source_sha256": "81dbdd90934fe86a79ddc4790fd211e5fca866302a74090ad153395f56f2bd42",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "hf <command> --help",
+        "Never execute `curl | bash`",
+        "Reconcile unknown provider state"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S009/SKILL.md",
+      "effective_sha256": "04d1527eb46000e7e57b22a1bfe3b5d1b62be8be64b6e484b7129f8fc6de9e85",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S009",
+      "source_sha256": "ee85209886c4ec3d3d850489368be193d11a8a3fa589012b39a4a5bbf7c7da2e",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "`local`",
+        "`provider`",
+        "immutable revision",
+        "trust_remote_code"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S010/SKILL.md",
+      "effective_sha256": "8a48f1d964625c10a96302790ea50ed5e354d45147ac089aed135be49564ef10",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S010",
+      "source_sha256": "a97f1c703f55b72427453a76af858237e6392a447fcafa9eeb85f7ac67f0155d",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "`viewer`",
+        "`publish`",
+        "destination visibility",
+        "reconciled before retry"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S011/SKILL.md",
+      "effective_sha256": "2d7eb6ab86abc30fb0bf99f7d5e572e942b0b69679d710aa8bfa65d0d93fa0d3",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S011",
+      "source_sha256": "5af74f3e042313efadf02e85c316a2576bdc0b0ff92c43c3ba5dcb6e2dae1ded",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "`authorship`",
+        "preview/diff",
+        "Email addresses and authorship proof are PII",
+        "rollback"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S015/SKILL.md",
+      "effective_sha256": "47223722f305d7cd594244c0406ddeb73c62cf6c9997b2d658f8a594bf74463b",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S015",
+      "source_sha256": "fd437f107a467a65987364d19dd55cf662b0228102d466f3b0691fad18d20679",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "Default read contract",
+        "Admin isolation",
+        "primary section/page/figure/table"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S016/SKILL.md",
+      "effective_sha256": "736fdaf2f79c506ed4d1298524264cc4d8ba0ecb867db8b9da767b8f53a5652d",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S016",
+      "source_sha256": "985c2d5c7261aba2b157811cde0c2b30134663694a4ab701280de28f941eb3b2",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "maximum poll duration",
+        "never infer the latest run",
+        "relaunch requires a new run ID",
+        "webhooks are external data transmission"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S017/SKILL.md",
+      "effective_sha256": "3f6116d455b23c06d4daf6e2d460871d458eaec78d081071862725d9f55b8369",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S017",
+      "source_sha256": "893ac9695f8677db4c4f0c15795e789346946f6142305c89d7ee57774e22ffb1",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "Runtime and model gate",
+        "Correct lifecycle pattern",
+        "await pipe.dispose()",
+        "same corpus"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S018/SKILL.md",
+      "effective_sha256": "5a0acd7e9eec1030feeb6b847ae7d35a1dee7ffaf37fa8ad551c77612571df12",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S018",
+      "source_sha256": "03e5039f7f68644ee894a066ae2c3a6a27b025746c16c945d9926b594e48744f",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_public",
+      "checks": [
+        "flat comments are insufficient",
+        "least-privilege network",
+        "fix all comments",
+        "redacted excerpts"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S020/SKILL.md",
+      "effective_sha256": "4c4add90ea0edb73a285bd62601c6eccd35447e64daa672482a0e89e9c96c66d",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S020",
+      "source_sha256": "c1ebc337357402f7faabafe712e0c463981a65f736453efe52abd305bcb74769",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_public",
+      "checks": [
+        "bounded line",
+        "sufficient local mutation authority",
+        "Never persist full raw logs",
+        "exact head SHA"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S021/SKILL.md",
+      "effective_sha256": "f562cb7b97a29ed5d48a1ea5c5c339210bb8fc771b9a14ccae7a88539edc4ad8",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S021",
+      "source_sha256": "7621a3560d788fb221d25f9753233fe0c393c5cfe63167c88b11f027c277b1f8",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_public",
+      "checks": [
+        "applicable `AGENTS.md`",
+        "Roehub publication routes to `publish-ci-deploy`",
+        "gh-address-comments",
+        "gh-fix-ci"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S022/SKILL.md",
+      "effective_sha256": "5e756d6e042f1a42ef37e72be910071e2d81331fdf8cbc8072380b8250bf521d",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S022",
+      "source_sha256": "81dbdd90934fe86a79ddc4790fd211e5fca866302a74090ad153395f56f2bd42",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "power/MDE",
+        "multiple-testing",
+        "causal language",
+        "confidence interval"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S027/SKILL.md",
+      "effective_sha256": "80ba9ca893cb5631c38002ac14fb65d83747914cec0f546e5dd82ea0b8d88085",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S027",
+      "source_sha256": "0b05effc47df0a14f8e0c3e3597e6722224747435546385d38a2cae279bd20b9",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "Recalculate",
+        "reconcile",
+        "cash burn/runway",
+        "reopen"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S028/SKILL.md",
+      "effective_sha256": "b254845df758ad65056440293d51fca06a487c917ac7cbfdec6bcb21438c46eb",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S028",
+      "source_sha256": "c0b6b7a62a15597aaf2b1ec679e21da48f533b756127f0aef957cdfe9f3da738",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "provenance ledger",
+        "assumptions/sensitivities",
+        "unresolved-data flags",
+        "high-stakes"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S029/SKILL.md",
+      "effective_sha256": "66a1387014ffd7d47424e680ca223c074e6d8d2844aebffa2447f1d258cbf770",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S029",
+      "source_sha256": "68abd08cfe5e073e3c446a3f675f44c5bf98f57434dba679e8acd8a763379a8b",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "stable opportunity ID",
+        "duplicate",
+        "Weighted forecast",
+        "reopen"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S037/SKILL.md",
+      "effective_sha256": "439a244ca150b9db839d368ab61b39e50ab09e0396d1de8ebeef40b701188a77",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S037",
+      "source_sha256": "15cfeeedf440021f16ed3f3ad8c7c1ef6d48898b9447741e223d2fb41cfc9800",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "architecture-design",
+        "architecture-review",
+        "contract matrix",
+        "cold review"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S041/SKILL.md",
+      "effective_sha256": "cf3a192abaa24e7a0c5e776c88e43ffb7e32134e7d301cb9fe217a296545a9da",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S041",
+      "source_sha256": "87f7b7ed1b0d8410f5e5971cd7f7db9a4165e2f37069e97e52dbfb469b75a57c",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_dormant",
+      "checks": [
+        "assets equal liabilities plus equity",
+        "ending cash",
+        "roll-forwards",
+        "reopen"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S043/SKILL.md",
+      "effective_sha256": "d1e6b5534b743afa7ac9ac667ecdb513375d3de000f273d343a96ef253cf95cf",
+      "missing": [],
+      "operation": "create_dormant_resource",
+      "skill_id": "S043",
+      "source_sha256": "74f4a5cccec0107b861548b157e04c51d9b58ec13a990c86394b4c529b8ecf41",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_internal",
+      "checks": [
+        "`report_only`",
+        "`fix_authorized`",
+        "caller owns the report",
+        "Repository asset policy"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S045/SKILL.md",
+      "effective_sha256": "5bc25f4ab4474cb0423a927a4a4588c591fbd4c059c8a319cd73dc14467e05a6",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S045",
+      "source_sha256": "a761ed96e1e91905e7e6f32ab95e8dc6d0cca2036556d4d63945b25efd3eaa5c",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_public",
+      "checks": [
+        "Public and internal edges",
+        "Discover current session capabilities",
+        "Load saved user context lazily",
+        "internal helper"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S049/SKILL.md",
+      "effective_sha256": "c453fb330bcdec395790f7f796f3df662fc6b954e962e8ccda9a2602ddab508b",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S049",
+      "source_sha256": "8f9f19273ee34a06298ed93f8d70a9c17b3d4ce66f061b024f6d1038b138e5f7",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_internal",
+      "checks": [
+        "time window",
+        "maximum queries/pages/time",
+        "Deduplicate",
+        "quote only"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S050/SKILL.md",
+      "effective_sha256": "1ea816a5b73ba6773fefd4b48be26715a2204172099079e039dbae5a9e17d6a7",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S050",
+      "source_sha256": "bf824e72dd93941c8d591e4af13bb7e3a09380cd6ed7dd8c1f61a295648fa023",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_internal",
+      "checks": [
+        "`disposable_preview`",
+        "`repository_delivery`",
+        "rollback/delete",
+        "publish-ci-deploy"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S051/SKILL.md",
+      "effective_sha256": "5d03cffffbe26ef1e1e87c07b4424e44885ff77f5eb50fc12b0c99528dde1a62",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S051",
+      "source_sha256": "5976cfbc9d865230db085af37f0c25a2d8beed3ff58e0e2edb9d0a4f7ca987b5",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_public",
+      "checks": [
+        "workspace dependency loader",
+        "at most three render-repair",
+        "accessibility",
+        "privacy"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S054/SKILL.md",
+      "effective_sha256": "21b4f25db2414588b81a3b7a6fdc068d160f1542cb56dd0299c02ed2220d40ca",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S054",
+      "source_sha256": "1e7aad4a77d92c36309429043b63c59f510c413623b9ab4af036da82fc3dd5b0",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_public",
+      "checks": [
+        "caller source/output/temp paths",
+        "Unicode-capable",
+        "active/encrypted-content",
+        "at most three"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S055/SKILL.md",
+      "effective_sha256": "0843df7aa760f5cd086b276fb1d76af1a058af045ba7ce385d14d3aa73999232",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S055",
+      "source_sha256": "b09cb414c60234a15599c04a502ce36fe6e9aa178aabe007e43a3346b5aab607",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_public",
+      "checks": [
+        "legacy alias `Presentations`",
+        "native PowerPoint shapes",
+        "at most three",
+        "native import"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S056/SKILL.md",
+      "effective_sha256": "77d179a6dbaf4b042c88cb2253cd0b719072f35417c79e5597a84ca04e66a496",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S056",
+      "source_sha256": "1c6d64a49dcaef02799a493f6679a1a7a530e80f01f8b14f566313e4f3d358f9",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_public",
+      "checks": [
+        "legacy alias `Spreadsheets`",
+        "`inspect`",
+        "authority",
+        "reopen"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S057/SKILL.md",
+      "effective_sha256": "0ad36b98164c871affb2825a66a4136bf79c433d75642d2677aded17b50873ec",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S057",
+      "source_sha256": "1ec84be8e108181a0f761f6e8c7398b2c9e41daa3db78e18475f095b22fd0ed4",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_public",
+      "checks": [
+        "informed choice",
+        "hidden text/sheets/slides",
+        "scrubbed copy",
+        "Remove only owned"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S058/SKILL.md",
+      "effective_sha256": "b44df39a3a9afba4308cd8cca6d009e24413fe53f15dd60d014839c9913faa88",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S058",
+      "source_sha256": "36c4b07109d27f7f57024a67f7682f6e7c3727c73feef01401d6c6aef7a9a57c",
+      "status": "pass"
+    },
+    {
+      "activation_policy": "preserve_public",
+      "checks": [
+        "catalog `source_path`",
+        "exactly to `<plugin-root>/prototype`",
+        "real-browser adapter",
+        "console/network"
+      ],
+      "effective_path": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S062/SKILL.md",
+      "effective_sha256": "ab818ec032989132e2dc434211ff3e94167d7b576f42780106dc4c19ac0ad421",
+      "missing": [],
+      "operation": "create_overlay_resource",
+      "skill_id": "S062",
+      "source_sha256": "542fda3e7c2ff460d6be95860223f2e3d8703355af88b3807a1c28572d1c2e4e",
+      "status": "pass"
+    }
+  ],
+  "run_id": "skill-system-stage-04-v1",
+  "spec": "skill-semantic-gates/v1",
+  "summary": {
+    "failed": 0,
+    "passed": 32,
+    "total": 32
+  }
+}

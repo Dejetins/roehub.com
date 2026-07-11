@@ -1,0 +1,10 @@
+run_id	target_id	version_id	skill_type	source_path	audit_score_0_100	format_score	description_score	structure_score	safety_score	compliance_status	severe_findings	findings_count	line_count	description_length
+skill-system-stage-02	global.s013	live	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S013/SKILL.md	100	25	25	25	25	pass	0	0	67	236
+skill-system-stage-02	global.s014	live	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S014/SKILL.md	100	25	25	25	25	pass	0	0	63	269
+skill-system-stage-02	global.s019	live	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S019/SKILL.md	100	25	25	25	25	pass	0	0	55	257
+skill-system-stage-02	global.s023	live	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S023/SKILL.md	100	25	25	25	25	pass	0	0	57	267
+skill-system-stage-02	global.s030	live	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S030/SKILL.md	100	25	25	25	25	pass	0	0	53	202
+skill-system-stage-02	global.s047	live	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S047/SKILL.md	100	25	25	25	25	pass	0	0	57	261
+skill-system-stage-02	global.s048	live	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S048/SKILL.md	100	25	25	25	25	pass	0	0	59	249
+skill-system-stage-02	global.s052	live	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S052/SKILL.md	100	25	25	25	25	pass	0	0	55	266
+skill-system-stage-02	global.s053	live	global_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S053/SKILL.md	100	25	25	25	25	pass	0	0	62	246

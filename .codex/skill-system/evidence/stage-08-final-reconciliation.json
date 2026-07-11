@@ -1,0 +1,172 @@
+{
+  "spec": "skill-system-final-reconciliation/v1",
+  "run_id": "skill-system-stage-08-v1",
+  "generated_at": "2026-07-10T02:08:34+03:00",
+  "status": "pass",
+  "source_artifacts": {
+    "catalog": ".codex/skill-system/catalog-v1.json",
+    "ownership": ".codex/skill-system/ownership-v1.json",
+    "rollback": ".codex/skill-system/rollback/manifest-v1.json",
+    "stage_07_validation": ".codex/skill-system/evidence/stage-07-validation.json",
+    "fresh_process": ".codex/skill-system/evidence/stage-07-fresh-process.json"
+  },
+  "inventory": {
+    "audit_baseline": {
+      "expected": 85,
+      "observed": 85,
+      "terminal": 85,
+      "pending": 0,
+      "blocked": 0
+    },
+    "loader_candidates": {
+      "expected": 96,
+      "observed": 96,
+      "classified": 96,
+      "unexplained_additions": 0,
+      "unexplained_removals": 0
+    },
+    "supplemental": {
+      "expected": 11,
+      "observed": 11,
+      "classified": 11,
+      "policy": "inventory_only/preserve_dormant"
+    }
+  },
+  "implementation": {
+    "implemented": 78,
+    "deprecated": 7,
+    "accepted_no_change": 0,
+    "classified_supplemental": 11,
+    "channels": {
+      "direct": 23,
+      "corrected_resource": 55,
+      "deprecated": 7,
+      "supplemental_inventory_only": 11
+    },
+    "pending": 0,
+    "blocked": 0
+  },
+  "verification": {
+    "statuses": {
+      "forward_pass": 83,
+      "structural_pass": 2,
+      "inventory_only": 11
+    },
+    "effective_contracts": {
+      "expected": 78,
+      "quick_validate_passed": 78,
+      "skill_spec_v1_passed": 78,
+      "structural_audit_passed": 78,
+      "minimum_structural_score": 100
+    },
+    "fixtures": {
+      "passed": 61,
+      "total": 61
+    },
+    "representative_skill_result_envelopes": {
+      "passed": 4,
+      "total": 4
+    },
+    "five_baseline_invalid_effective": {
+      "passed": 5,
+      "total": 5
+    },
+    "eight_long_root_decisions": {
+      "passed": 8,
+      "total": 8
+    }
+  },
+  "catalog_and_relationships": {
+    "rows": 96,
+    "repo_global_byte_equal": true,
+    "sha256": "1767adcd1beffa982217ab9111e602849988f00d83c02ec3c95d4db269fea2f3",
+    "dangling_edges": 0,
+    "unresolved_aliases": 0,
+    "public_duplicate_targets": 0,
+    "missing_result_provider_or_evidence": 0
+  },
+  "ownership_and_recovery": {
+    "ownership_rows": 96,
+    "baseline_rows": 85,
+    "supplemental_rows": 11,
+    "broad_ownership": false,
+    "rollback_entries": 102,
+    "rollback_content_address_validation": "pass",
+    "implemented_effective_coverage": "78/78",
+    "integration_path_coverage": "10/10",
+    "forbidden_secret_values": 0
+  },
+  "source_integrity": {
+    "managed_baseline_hashes_unchanged": "62/62",
+    "supplemental_hashes_unchanged": "11/11",
+    "managed_cache_direct_edit": false
+  },
+  "plugin": {
+    "name": "codex-skill-system-overrides",
+    "version": "0.1.0+codex.20260709224522",
+    "installed": true,
+    "enabled": true,
+    "validation": "pass",
+    "source_installed_tree_parity": true,
+    "declared_skill_count": 0,
+    "corrected_resource_count": 55
+  },
+  "fresh_process": {
+    "evidence_status": "pass",
+    "command_profile": "codex exec --ephemeral -s read-only -C /Users/daniildegtyarev/Projects/roehub.com",
+    "observed_skill_names": 31,
+    "expected_public_delta": 0,
+    "observed_public_delta": 0,
+    "installed_resource_loader_intersection": 0,
+    "dormant_figma_hugging_face_template_names_exposed": 0,
+    "mutation_occurred": false,
+    "sensitive_evidence_occurred": false
+  },
+  "quality_gates": {
+    "ruff": "pass",
+    "pyright": "0 errors, 0 warnings",
+    "pytest": "30 passed",
+    "fixtures": "61/61",
+    "prompt_yaml": "9/9",
+    "skill_system_json": "pass",
+    "plugin_validation": "pass",
+    "rollback_verify": "pass",
+    "docs_index_final": "pass",
+    "git_diff_check_final": "pass"
+  },
+  "contract_impact": {
+    "overall": "compatible-change",
+    "dimensions": {
+      "roehub_runtime_api_ui_data": "none",
+      "public_skill_names": "compatible-change",
+      "skill_spec_and_result_consumers": "compatible-change",
+      "canonical_alias_resolution": "compatible-change",
+      "external_and_paid_autonomy": "breaking-change",
+      "plugin_public_surface": "compatible-change",
+      "global_routing_policy": "compatible-change",
+      "persisted_schema": "none",
+      "request_hash_cache_identity": "none"
+    },
+    "migration": "Aliases and deprecated IDs resolve to canonical effective contracts; external and paid actions require explicit authority, target and budget."
+  },
+  "proof_boundary": {
+    "codex_local": "fresh_process_read_only_discovery",
+    "roehub_product_runtime_api_browser_deploy": "not_applicable",
+    "current_desktop_session_reload_claimed": false,
+    "catalog_loader_filter_claimed": false
+  },
+  "diagnostics": [
+    {
+      "classification": "unrelated_pre_existing",
+      "surface": ".codex/agents/*.toml",
+      "finding": "architect.toml, promt_manager.toml and software_engineer.toml contain unsupported reasoning_language fields.",
+      "impact_on_skill_closure": "none",
+      "scope_decision": "not changed because these files are outside skill ownership"
+    }
+  ],
+  "residual_risks": [
+    "Provider plugin, cache or loader updates can change paths or discovery and require inventory, catalog parity and fresh-process checks to be repeated.",
+    "Desktop and CLI discovery can differ; the catalog remains a deterministic selection policy rather than a loader filter.",
+    "Ten supplemental Figma managed-cache sources fail the current quick validator but remain uninstalled, unexposed and inventory-only."
+  ]
+}

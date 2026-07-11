@@ -1,0 +1,63 @@
+{
+  "spec": "skill-stage-evidence/v1",
+  "stage": "01",
+  "status": "passed",
+  "skills": {
+    "S067": {
+      "checks": [
+        "source provenance and immutable ref are required",
+        "existing destinations block installation",
+        "system skills cannot be overwritten",
+        "credentials are never collected in chat",
+        "downloaded code is not executed during validation"
+      ],
+      "structural_score": 100
+    },
+    "S075": {
+      "checks": [
+        "root is below 500 lines",
+        "execution synthesis and security are one-hop references",
+        "platform and tool contracts outrank the skill",
+        "cookies browser storage and secret collection are forbidden",
+        "paid provider and durable save choices are explicit"
+      ],
+      "structural_score": 100
+    },
+    "S078": {
+      "checks": [
+        "quoted valid description",
+        "inspect-only report contract",
+        "empty file manifest required",
+        "shared-main owned foreign and mixed scope is explicit"
+      ],
+      "structural_score": 100
+    },
+    "S081": {
+      "checks": [
+        "prerequisites are route-conditional",
+        "deploy relevance is classified after main and CI",
+        "shipped-no-runtime terminal state exists",
+        "production proof labels remain distinct",
+        "logs receipts and cleanup are bounded and redacted"
+      ],
+      "structural_score": 100
+    },
+    "S085": {
+      "checks": [
+        "stack is inferred from repository and request",
+        "web and mobile references are selected conditionally",
+        "persist and package installation are opt-in",
+        "browser or device acceptance is required for visible behavior",
+        "repository design system remains authoritative"
+      ],
+      "structural_score": 100
+    }
+  },
+  "contract_fixtures": {
+    "total": 23,
+    "passed": 23,
+    "failed": 0
+  },
+  "proof_boundary": "local skill validation and deterministic contract simulation",
+  "live_external_or_production_mutation": false
+}

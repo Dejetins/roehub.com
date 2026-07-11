@@ -1,0 +1,28 @@
+{
+  "spec": "skill-stage-evidence/v1",
+  "stage": "02",
+  "status": "passed",
+  "plugin_source": "/Users/daniildegtyarev/plugins/codex-skill-system-overrides",
+  "plugin_installed": false,
+  "top_level_skills_directory_present": false,
+  "managed_cache_modified": false,
+  "rows": {
+    "deprecated": ["S008", "S059", "S060", "S061"],
+    "dormant_resources": ["S013", "S014", "S019", "S030"],
+    "public_logical_resources": ["S023", "S047", "S048", "S052"],
+    "internal_resources": ["S053"]
+  },
+  "checks": [
+    "paid jobs require target hardware timeout persistence visibility authority and cost cap",
+    "training adapters reuse the safe Jobs boundary and require dataset validation plus small smoke",
+    "generic publisher obeys repository routing and forbids broad staging auto branch and auto install",
+    "legal memorandum requires jurisdiction as-of date primary authority and legal review boundary",
+    "ideation states selection mapping before generation and records durable result identity",
+    "image implementation requires licensed assets and real browser evidence",
+    "URL clone requires ownership permission route-state manifest and stop budget",
+    "saved design context requires namespace PII scan fresh consent retention and deletion path"
+  ],
+  "structural_audit": {"total": 9, "pass": 9, "fail": 0},
+  "contract_fixtures": {"total": 30, "passed": 30, "failed": 0},
+  "live_paid_external_or_production_mutation": false
+}

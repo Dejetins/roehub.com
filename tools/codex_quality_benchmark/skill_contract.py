@@ -1,0 +1,79 @@
+from __future__ import annotations
+
+import json
+from collections.abc import Iterable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+import yaml
+from jsonschema import Draft202012Validator, FormatChecker
+
+from tools.codex_quality_benchmark.models import BenchmarkError
+
+SCHEMA_DIR = Path(__file__).with_name("schemas")
+
+
+@dataclass(frozen=True)
+class ContractValidation:
+    valid: bool
+    errors: tuple[str, ...]
+
+
+def load_schema(name: str) -> dict[str, Any]:
+    path = SCHEMA_DIR / name
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise BenchmarkError(f"missing contract schema: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise BenchmarkError(f"invalid contract schema JSON: {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise BenchmarkError(f"contract schema must be an object: {path}")
+    Draft202012Validator.check_schema(data)
+    return data
+
+
+def validate_instance(instance: Any, schema_name: str) -> ContractValidation:
+    validator = Draft202012Validator(load_schema(schema_name), format_checker=FormatChecker())
+    errors = tuple(
+        f"{_json_path(error.absolute_path)}: {error.message}"
+        for error in sorted(validator.iter_errors(instance), key=lambda item: list(item.path))
+    )
+    return ContractValidation(valid=not errors, errors=errors)
+
+
+def parse_skill_frontmatter(path: Path) -> dict[str, Any]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise BenchmarkError(f"missing skill file: {path}") from exc
+    if not text.startswith("---\n"):
+        raise BenchmarkError(f"skill frontmatter is missing: {path}")
+    parts = text.split("---\n", 2)
+    if len(parts) != 3:
+        raise BenchmarkError(f"skill frontmatter is not closed: {path}")
+    try:
+        data = yaml.safe_load(parts[1])
+    except yaml.YAMLError as exc:
+        raise BenchmarkError(f"invalid skill YAML: {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise BenchmarkError(f"skill frontmatter must be an object: {path}")
+    return data
+
+
+def validate_skill_spec(path: Path) -> ContractValidation:
+    return validate_instance(parse_skill_frontmatter(path), "skill-spec-v1.schema.json")
+
+
+def validate_skill_result(instance: Any) -> ContractValidation:
+    return validate_instance(instance, "skill-result-v1.schema.json")
+
+
+def validate_catalog(instance: Any) -> ContractValidation:
+    return validate_instance(instance, "skill-catalog-v1.schema.json")
+
+
+def _json_path(path: Iterable[object]) -> str:
+    parts = list(path)
+    return "$" + "".join(f"[{part!r}]" if isinstance(part, str) else f"[{part}]" for part in parts)

@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "skill-result/v1",
+  "type": "object",
+  "required": ["skill_run"],
+  "properties": {
+    "skill_run": {
+      "type": "object",
+      "required": [
+        "spec", "skill", "status", "mode", "inputs", "assumptions",
+        "actions", "evidence", "side_effects", "contract_impact", "files",
+        "redaction", "proof_boundary", "residual_risks", "next_action"
+      ],
+      "properties": {
+        "spec": {"const": "skill-result/v1"},
+        "skill": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+        "status": {"enum": ["completed", "partial", "blocked"]},
+        "mode": {"enum": ["inspect", "execute"]},
+        "inputs": {"type": "array"},
+        "assumptions": {"type": "array"},
+        "actions": {"type": "array"},
+        "evidence": {"type": "array"},
+        "side_effects": {"type": "array"},
+        "contract_impact": {
+          "type": "object",
+          "required": ["classification", "dimensions"],
+          "properties": {
+            "classification": {"enum": ["none", "compatible-change", "breaking-change", "unknown"]},
+            "dimensions": {"type": "array"}
+          },
+          "additionalProperties": false
+        },
+        "files": {
+          "type": "object",
+          "required": ["created", "modified", "deleted", "outside_expected_paths"],
+          "properties": {
+            "created": {"type": "array", "items": {"type": "string"}},
+            "modified": {"type": "array", "items": {"type": "string"}},
+            "deleted": {"type": "array", "items": {"type": "string"}},
+            "outside_expected_paths": {"type": "array", "items": {"type": "string"}}
+          },
+          "additionalProperties": false
+        },
+        "redaction": {"enum": ["applied", "not-needed", "unknown"]},
+        "proof_boundary": {
+          "type": "object",
+          "required": ["surface", "profile", "label"],
+          "properties": {
+            "surface": {"enum": ["tests-only", "browser", "api", "runtime", "ci", "deploy", "none"]},
+            "profile": {"type": "string", "minLength": 1},
+            "label": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        },
+        "residual_risks": {"type": "array"},
+        "next_action": {"type": "string"}
+      },
+      "additionalProperties": false,
+      "allOf": [{
+        "if": {
+          "properties": {
+            "proof_boundary": {
+              "properties": {
+                "profile": {"const": "roehub"},
+                "surface": {"enum": ["runtime", "deploy"]}
+              },
+              "required": ["profile", "surface"]
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "proof_boundary": {
+              "properties": {
+                "label": {
+                  "enum": [
+                    "target_host_readiness_pre_main",
+                    "read_only_existing_runtime_smoke",
+                    "post_main_production_runtime_proof"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }]
+    }
+  },
+  "additionalProperties": false
+}

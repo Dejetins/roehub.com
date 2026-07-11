@@ -1,0 +1,908 @@
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from tools.codex_quality_benchmark.models import BenchmarkError
+from tools.codex_quality_benchmark.skill_contract import (
+    parse_skill_frontmatter,
+    validate_catalog,
+    validate_skill_spec,
+)
+from tools.codex_quality_benchmark.skill_discovery import discover_skill_paths
+
+BASELINE_IDS = tuple(f"S{number:03d}" for number in range(1, 86))
+PUBLIC_PLUGIN_IDS = {
+    "S001",
+    "S004",
+    "S020",
+    "S021",
+    "S022",
+    "S023",
+    "S044",
+    "S047",
+    "S048",
+    "S049",
+    "S052",
+    "S054",
+    "S055",
+    "S056",
+    "S057",
+    "S058",
+    "S062",
+}
+INTERNAL_PLUGIN_IDS = {"S045", "S046", "S050", "S051", "S053"}
+DEPRECATED_TO = {
+    "S005": "S020",
+    "S006": "S021",
+    "S007": "S022",
+    "S008": "S023",
+    "S059": "S077",
+    "S060": "S077",
+    "S061": "S077",
+}
+STAGE_IDS = {
+    "00": {"S065", "S066"},
+    "01": {"S067", "S075", "S078", "S081", "S085"},
+    "02": {
+        "S008",
+        "S013",
+        "S014",
+        "S019",
+        "S023",
+        "S030",
+        "S047",
+        "S048",
+        "S052",
+        "S053",
+        "S059",
+        "S060",
+        "S061",
+    },
+    "03": {"S063", "S064", "S068", "S069", "S072", "S076", "S077", "S079", "S080", "S082", "S083"},
+    "04": {
+        "S002",
+        "S003",
+        "S004",
+        "S005",
+        "S006",
+        "S007",
+        "S009",
+        "S010",
+        "S011",
+        "S015",
+        "S016",
+        "S017",
+        "S018",
+        "S020",
+        "S021",
+        "S022",
+        "S027",
+        "S028",
+        "S029",
+        "S037",
+        "S041",
+        "S043",
+        "S045",
+        "S049",
+        "S050",
+        "S051",
+        "S054",
+        "S055",
+        "S056",
+        "S057",
+        "S058",
+        "S062",
+    },
+    "05": {
+        "S001",
+        "S012",
+        "S024",
+        "S025",
+        "S026",
+        "S031",
+        "S032",
+        "S033",
+        "S034",
+        "S035",
+        "S036",
+        "S038",
+        "S039",
+        "S040",
+        "S042",
+        "S044",
+        "S046",
+        "S070",
+        "S071",
+        "S073",
+        "S074",
+        "S084",
+    },
+}
+SUPPLEMENTAL_ORDER = [
+    "figma-code-connect",
+    "figma-create-new-file",
+    "figma-generate-design",
+    "figma-generate-diagram",
+    "figma-generate-library",
+    "figma-implement-motion",
+    "figma-swiftui",
+    "figma-use-figjam",
+    "figma-use-motion",
+    "figma-use-slides",
+    "figma-use",
+]
+SPLIT_REFERENCES = {
+    "S065": ["references/skill-system-contract-v1.md"],
+    "S066": ["references/skill-system-contract-v1.md"],
+    "S068": ["references/roehub-profile.md"],
+    "S075": ["references/execution.md", "references/synthesis.md", "references/security.md"],
+    "S080": ["references/prompt-contract.md", "references/roehub-profile.md"],
+    "S085": ["references/web.md", "references/mobile.md", "references/acceptance.md"],
+}
+SECRET_VALUE_RE = re.compile(
+    r"(?:sk-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|"
+    r"Bearer\s+[A-Za-z0-9._~+/=-]{20,})"
+)
+
+
+def sha256_file(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def parse_audit_baseline(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    row_re = re.compile(
+        r"^\| (S\d{3}) \| `([^`]+)` \| `([^`]+)` \| `([^`]+)` \| "
+        r"`([^`]+)` \| (\d+) \| `([a-f0-9]{64})` \| `([^`]+)` \|$"
+    )
+    for line in path.read_text(encoding="utf-8").splitlines():
+        match = row_re.match(line)
+        if not match:
+            continue
+        skill_id, name, source, role, batch, lines, digest, source_path = match.groups()
+        rows.append(
+            {
+                "skill_id": skill_id,
+                "name": name,
+                "source_kind": source,
+                "role": role,
+                "batch_id": batch,
+                "lines": int(lines),
+                "baseline_sha256": digest,
+                "path": source_path,
+            }
+        )
+    if [row["skill_id"] for row in rows] != list(BASELINE_IDS):
+        raise BenchmarkError(f"audit baseline must contain ordered S001-S085: {path}")
+    return rows
+
+
+def parse_backlog(path: Path) -> dict[str, dict[str, str]]:
+    rows: dict[str, dict[str, str]] = {}
+    in_table = False
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("| skill_id | relation | what_works"):
+            in_table = True
+            continue
+        if in_table and line.startswith("## Final per-skill audit schema"):
+            break
+        if not in_table or not re.match(r"^\| S\d{3} \|", line):
+            continue
+        parts = [part.strip() for part in line.strip("|").split("|")]
+        if len(parts) != 9:
+            raise BenchmarkError(f"unexpected backlog row: {line}")
+        skill_id, relation, works, action, proposal, priority, evidence, drift, coverage = parts
+        rows[skill_id] = {
+            "relation": relation,
+            "what_works": works,
+            "recommended_action": action,
+            "improvement_proposal": proposal,
+            "priority": priority,
+            "audit_evidence": evidence,
+            "hash_drift_status": drift,
+            "coverage_status": coverage,
+        }
+    if set(rows) != set(BASELINE_IDS):
+        raise BenchmarkError(f"backlog must contain S001-S085 exactly: {path}")
+    return rows
+
+
+def discover_current_paths(skills_root: Path, plugins_cache_root: Path) -> list[Path]:
+    paths = {path.resolve() for path in skills_root.rglob("SKILL.md")}
+    paths.update(discover_skill_paths(plugins_cache_root))
+    return sorted(paths)
+
+
+def build_catalog(
+    inventory_doc: Path,
+    backlog_doc: Path,
+    *,
+    skills_root: Path,
+    plugins_cache_root: Path,
+    overlay_root: Path,
+    allowed_changed: set[str] | None = None,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    allowed_changed = allowed_changed or set()
+    baseline = parse_audit_baseline(inventory_doc)
+    backlog = parse_backlog(backlog_doc)
+    baseline_by_path = {Path(row["path"]).resolve(): row for row in baseline}
+    current_paths = discover_current_paths(skills_root, plugins_cache_root)
+    current_set = set(current_paths)
+    missing = sorted(str(path) for path in set(baseline_by_path) - current_set)
+    if missing:
+        raise BenchmarkError(f"baseline skill paths missing: {missing}")
+
+    additions = [path for path in current_paths if path not in baseline_by_path]
+    supplemental_by_name = {path.parent.name: path for path in additions}
+    if set(supplemental_by_name) != set(SUPPLEMENTAL_ORDER):
+        raise BenchmarkError(
+            "unexpected supplemental inventory: "
+            f"expected={SUPPLEMENTAL_ORDER} observed={sorted(supplemental_by_name)}"
+        )
+
+    records: list[dict[str, Any]] = []
+    ownership_rows: list[dict[str, Any]] = []
+    for source in baseline:
+        skill_id = source["skill_id"]
+        source_path = Path(source["path"]).resolve()
+        current_hash = sha256_file(source_path)
+        if current_hash != source["baseline_sha256"] and skill_id not in allowed_changed:
+            raise BenchmarkError(
+                f"unaccounted baseline drift for {skill_id}: "
+                f"expected={source['baseline_sha256']} observed={current_hash}"
+            )
+        record = _baseline_record(source, backlog[skill_id], current_hash, overlay_root)
+        records.append(record)
+        ownership_rows.append(_ownership_record(record, source["baseline_sha256"]))
+
+    next_id = 86
+    for name in SUPPLEMENTAL_ORDER:
+        path = supplemental_by_name[name]
+        skill_id = f"S{next_id:03d}"
+        next_id += 1
+        record = _supplemental_record(skill_id, name, path)
+        records.append(record)
+        ownership_rows.append(_ownership_record(record, record["source_sha256"]))
+
+    _apply_effective_metadata(records)
+    catalog = {
+        "spec": "skill-catalog/v1",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "audit_baseline": {"expected": 85, "observed": len(baseline)},
+        "filesystem_inventory": {
+            "expected": len(current_paths),
+            "observed": len(current_paths),
+            "supplemental": len(additions),
+        },
+        "skills": records,
+    }
+    validation = validate_catalog(catalog)
+    if not validation.valid:
+        raise BenchmarkError("invalid generated catalog: " + "; ".join(validation.errors))
+    _validate_relations(catalog)
+    ownership = {
+        "spec": "skill-ownership/v1",
+        "generated_at": catalog["generated_at"],
+        "audit_baseline_count": 85,
+        "filesystem_inventory_count": len(current_paths),
+        "rows": ownership_rows,
+    }
+    return catalog, ownership
+
+
+def write_catalog_pair(catalog: dict[str, Any], repo_path: Path, global_path: Path) -> str:
+    payload = json.dumps(catalog, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+    repo_path.parent.mkdir(parents=True, exist_ok=True)
+    global_path.parent.mkdir(parents=True, exist_ok=True)
+    repo_path.write_text(payload, encoding="utf-8")
+    global_path.write_text(payload, encoding="utf-8")
+    repo_hash = sha256_file(repo_path)
+    if repo_hash != sha256_file(global_path):
+        raise BenchmarkError("global and repo catalog hashes differ after write")
+    return repo_hash
+
+
+def resolve_skill(catalog: dict[str, Any], query: str) -> dict[str, Any]:
+    normalized = query.strip()
+    candidates = []
+    for record in catalog.get("skills", []):
+        values = {
+            record["skill_id"],
+            record["logical_name"],
+            record["canonical_name"],
+            *record.get("aliases", []),
+        }
+        if normalized in values or normalized.lower() in {str(value).lower() for value in values}:
+            candidates.append(record)
+    canonical_candidates = [
+        row for row in candidates if row["implementation_channel"] != "deprecated"
+    ]
+    if len(canonical_candidates) == 1:
+        return canonical_candidates[0]
+    if not canonical_candidates and len(candidates) == 1:
+        target = DEPRECATED_TO.get(candidates[0]["skill_id"])
+        if target:
+            return next(row for row in catalog["skills"] if row["skill_id"] == target)
+    if not candidates:
+        raise BenchmarkError(f"skill not found: {query}")
+    raise BenchmarkError(
+        f"ambiguous skill query {query}: {[row['skill_id'] for row in canonical_candidates]}"
+    )
+
+
+def mark_catalog_records(
+    catalog: dict[str, Any],
+    skill_ids: set[str],
+    *,
+    implementation_status: str,
+    verification_status: str,
+    evidence_ref: str,
+) -> dict[str, Any]:
+    known = {record["skill_id"] for record in catalog["skills"]}
+    missing = skill_ids - known
+    if missing:
+        raise BenchmarkError(f"cannot mark unknown skill IDs: {sorted(missing)}")
+    for record in catalog["skills"]:
+        if record["skill_id"] not in skill_ids:
+            continue
+        record["implementation_status"] = implementation_status
+        record["verification_status"] = verification_status
+        record["result_contract_evidence"] = evidence_ref
+        record["evidence_refs"] = sorted(set([*record["evidence_refs"], evidence_ref]))
+        effective_path = Path(record["effective_path"])
+        if effective_path.is_file():
+            record["effective_sha256"] = sha256_file(effective_path)
+    if catalog.get("spec") == "skill-catalog/v1":
+        validation = validate_catalog(catalog)
+        if not validation.valid:
+            raise BenchmarkError("invalid marked catalog: " + "; ".join(validation.errors))
+    return catalog
+
+
+def create_rollback_snapshots(
+    manifest_path: Path, blob_dir: Path, paths: list[Path]
+) -> dict[str, Any]:
+    generated_at = datetime.now(UTC).isoformat()
+    existing: dict[str, dict[str, Any]] = {}
+    if manifest_path.is_file():
+        current = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if current.get("spec") != "skill-rollback/v1":
+            raise BenchmarkError("unsupported rollback manifest")
+        generated_at = str(current.get("generated_at", generated_at))
+        existing = {entry["path"]: entry for entry in current.get("entries", [])}
+    blob_dir.mkdir(parents=True, exist_ok=True)
+    for path in paths:
+        resolved = path.resolve()
+        if str(resolved) in existing:
+            continue
+        if not resolved.exists():
+            existing[str(resolved)] = {
+                "path": str(resolved),
+                "before_state": "absent",
+                "restore": "delete_created_path",
+            }
+            continue
+        payload = resolved.read_bytes()
+        decoded = payload.decode("utf-8", errors="ignore")
+        if SECRET_VALUE_RE.search(decoded):
+            raise BenchmarkError(f"possible secret value in rollback source: {resolved}")
+        digest = hashlib.sha256(payload).hexdigest()
+        blob_path = blob_dir / f"{digest}.md"
+        if not blob_path.exists():
+            blob_path.write_bytes(payload)
+        existing[str(resolved)] = {
+            "path": str(resolved),
+            "before_state": "present",
+            "sha256": digest,
+            "blob": str(blob_path.resolve()),
+            "restore": "copy_blob_to_path",
+        }
+    manifest = {
+        "spec": "skill-rollback/v1",
+        "generated_at": generated_at,
+        "updated_at": datetime.now(UTC).isoformat(),
+        "entries": [existing[path] for path in sorted(existing)],
+    }
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    verify_rollback_manifest(manifest_path)
+    return manifest
+
+
+def verify_rollback_manifest(manifest_path: Path) -> None:
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if data.get("spec") != "skill-rollback/v1":
+        raise BenchmarkError("unsupported rollback manifest")
+    seen: set[str] = set()
+    for entry in data.get("entries", []):
+        path = entry.get("path")
+        if not isinstance(path, str) or path in seen:
+            raise BenchmarkError(f"invalid or duplicate rollback path: {path}")
+        seen.add(path)
+        if entry.get("before_state") == "present":
+            blob = Path(entry["blob"])
+            if not blob.is_file() or sha256_file(blob) != entry.get("sha256"):
+                raise BenchmarkError(f"rollback blob verification failed: {blob}")
+        elif entry.get("before_state") != "absent":
+            raise BenchmarkError(f"invalid rollback before_state: {entry}")
+
+
+def _baseline_record(
+    source: dict[str, Any], finding: dict[str, str], current_hash: str, overlay_root: Path
+) -> dict[str, Any]:
+    skill_id = source["skill_id"]
+    source_kind = source["source_kind"]
+    stage = _stage_for(skill_id)
+    deprecated = skill_id in DEPRECATED_TO
+    direct = source_kind in {"user_skill", "system_skill"}
+    if deprecated:
+        channel = "deprecated"
+    elif direct:
+        channel = "direct"
+    elif skill_id in PUBLIC_PLUGIN_IDS or skill_id in INTERNAL_PLUGIN_IDS:
+        channel = "overlay"
+    else:
+        channel = "dormant_overlay"
+    discovery_state, installed, exposed, activation, visibility = _discovery(skill_id, source_kind)
+    canonical_name = source["name"].lower()
+    aliases: list[str] = []
+    if skill_id == "S056":
+        aliases = ["Presentations"]
+    elif skill_id == "S057":
+        aliases = ["Spreadsheets"]
+    canonical_id = DEPRECATED_TO.get(skill_id)
+    if canonical_id:
+        effective_path = _baseline_path_for_id(canonical_id)
+    elif direct:
+        effective_path = str(Path(source["path"]).resolve())
+    else:
+        effective_path = str(
+            (overlay_root / "resources" / "skills" / skill_id / "SKILL.md").resolve()
+        )
+    companions = sorted(set(re.findall(r"S\d{3}", finding["relation"])) - {skill_id})
+    supersedes = sorted(old for old, new in DEPRECATED_TO.items() if new == skill_id)
+    role = _normalize_role(source["role"])
+    provider = _result_provider(role, channel)
+    return {
+        "skill_id": skill_id,
+        "logical_name": source["name"],
+        "canonical_name": canonical_name,
+        "source_kind": source_kind,
+        "canonical_path": str(Path(source["path"]).resolve()),
+        "baseline_sha256": source["baseline_sha256"],
+        "source_sha256": current_hash,
+        "baseline_membership": "audit_baseline",
+        "effective_path": effective_path,
+        "effective_sha256": current_hash if direct and not deprecated else None,
+        "implementation_channel": channel,
+        "discovery_state": discovery_state,
+        "installed_enabled": installed,
+        "session_exposed": exposed,
+        "activation_policy": activation,
+        "role": role,
+        "visibility": visibility,
+        "owner": _owner(source),
+        "mutability": "source" if direct else "managed-cache",
+        "side_effect_class": _side_effect(skill_id, role),
+        "primary_output": _primary_output(role),
+        "aliases": aliases,
+        "companions": companions,
+        "conflicts": [],
+        "supersedes": supersedes,
+        "stage": stage,
+        "priority": finding["priority"],
+        "recommended_action": finding["recommended_action"],
+        "improvement_proposal": finding["improvement_proposal"],
+        "implementation_status": "pending",
+        "verification_status": "pending",
+        "result_contract_provider": provider,
+        "result_contract_evidence": (
+            f"Stage {stage} must provide emitted-result or adapter evidence"
+        ),
+        "evidence_refs": [finding["audit_evidence"]],
+    }
+
+
+def _supplemental_record(skill_id: str, name: str, path: Path) -> dict[str, Any]:
+    digest = sha256_file(path)
+    return {
+        "skill_id": skill_id,
+        "logical_name": name,
+        "canonical_name": name,
+        "source_kind": "plugin_skill",
+        "canonical_path": str(path),
+        "baseline_sha256": None,
+        "source_sha256": digest,
+        "baseline_membership": "supplemental",
+        "effective_path": str(path),
+        "effective_sha256": digest,
+        "implementation_channel": "supplemental",
+        "discovery_state": "cache_only",
+        "installed_enabled": False,
+        "session_exposed": "not_exposed",
+        "activation_policy": "preserve_dormant",
+        "role": "tool",
+        "visibility": "cache-only",
+        "owner": "plugin:figma",
+        "mutability": "managed-cache",
+        "side_effect_class": "local-write",
+        "primary_output": "artifact",
+        "aliases": [],
+        "companions": [],
+        "conflicts": [],
+        "supersedes": [],
+        "stage": "supplemental",
+        "priority": "unreviewed-supplemental",
+        "recommended_action": "classify_only",
+        "improvement_proposal": "preserve dormant until a separate installed-plugin audit",
+        "implementation_status": "classified",
+        "verification_status": "inventory_only",
+        "result_contract_provider": "not_applicable",
+        "result_contract_evidence": "cache-only and not session-exposed",
+        "evidence_refs": ["current recursive inventory"],
+    }
+
+
+def _apply_effective_metadata(records: list[dict[str, Any]]) -> None:
+    relation_names: dict[str, tuple[list[str], list[str]]] = {}
+    for record in records:
+        if record["implementation_channel"] in {"deprecated", "supplemental"}:
+            continue
+        effective_path = Path(record["effective_path"])
+        if not effective_path.is_file():
+            continue
+        frontmatter = parse_skill_frontmatter(effective_path)
+        metadata = frontmatter.get("metadata")
+        if not isinstance(metadata, dict) or metadata.get("skill-spec") != "v1":
+            continue
+        validation = validate_skill_spec(effective_path)
+        if not validation.valid:
+            raise BenchmarkError(
+                f"invalid effective skill metadata for {record['skill_id']}: "
+                + "; ".join(validation.errors)
+            )
+        record["canonical_name"] = str(frontmatter["name"])
+        record["effective_sha256"] = sha256_file(effective_path)
+        for catalog_field, metadata_field in (
+            ("role", "role"),
+            ("visibility", "visibility"),
+            ("owner", "owner"),
+            ("mutability", "mutability"),
+            ("side_effect_class", "side-effect-class"),
+            ("primary_output", "primary-output"),
+        ):
+            record[catalog_field] = metadata[metadata_field]
+        relation_names[record["skill_id"]] = (
+            list(metadata["companions"]),
+            list(metadata["conflicts"]),
+        )
+        record["result_contract_provider"] = _result_provider(
+            record["role"], record["implementation_channel"]
+        )
+
+    name_index: dict[str, list[str]] = {}
+    for record in records:
+        if record["implementation_channel"] == "deprecated":
+            continue
+        names = {
+            record["skill_id"],
+            record["logical_name"],
+            record["canonical_name"],
+            *record.get("aliases", []),
+        }
+        for name in names:
+            name_index.setdefault(str(name).lower(), []).append(record["skill_id"])
+
+    for skill_id, (companions, conflicts) in relation_names.items():
+        record = next(item for item in records if item["skill_id"] == skill_id)
+        record["companions"] = _resolve_relation_names(
+            skill_id, "companions", companions, name_index
+        )
+        record["conflicts"] = _resolve_relation_names(
+            skill_id, "conflicts", conflicts, name_index
+        )
+
+
+def _resolve_relation_names(
+    skill_id: str,
+    field: str,
+    names: list[str],
+    name_index: dict[str, list[str]],
+) -> list[str]:
+    resolved: set[str] = set()
+    for name in names:
+        candidates = sorted(set(name_index.get(name.lower(), [])))
+        if len(candidates) != 1:
+            raise BenchmarkError(
+                f"{field} relation for {skill_id} must resolve once: "
+                f"name={name!r} candidates={candidates}"
+            )
+        if candidates[0] != skill_id:
+            resolved.add(candidates[0])
+    return sorted(resolved)
+
+
+def _ownership_record(record: dict[str, Any], before_hash: str) -> dict[str, Any]:
+    source_path = Path(record["canonical_path"])
+    secondary = [
+        str((source_path.parent / relative).resolve())
+        for relative in SPLIT_REFERENCES.get(record["skill_id"], [])
+    ]
+    operation = {
+        "direct": "edit_source",
+        "overlay": "create_overlay_resource",
+        "dormant_overlay": "create_dormant_resource",
+        "deprecated": "deprecate_catalog_entry",
+        "supplemental": "classify_only",
+        "no_change": "accept_no_change",
+    }[record["implementation_channel"]]
+    return {
+        "skill_id": record["skill_id"],
+        "stage": record["stage"],
+        "operation": operation,
+        "source_path": record["canonical_path"],
+        "effective_path": record["effective_path"],
+        "before_sha256": before_hash,
+        "allowed_primary_touches": [record["canonical_path"]]
+        if operation == "edit_source"
+        else ([record["effective_path"]] if "resource" in operation else []),
+        "allowed_secondary_touches": secondary,
+        "discovery_state": record["discovery_state"],
+        "session_exposed": record["session_exposed"],
+        "activation_policy": record["activation_policy"],
+    }
+
+
+def _stage_for(skill_id: str) -> str:
+    matches = [stage for stage, ids in STAGE_IDS.items() if skill_id in ids]
+    if len(matches) != 1:
+        raise BenchmarkError(f"skill must be owned by exactly one implementation stage: {skill_id}")
+    return matches[0]
+
+
+def _discovery(skill_id: str, source_kind: str) -> tuple[str, bool | str, str, str, str]:
+    if source_kind != "plugin_skill":
+        return "direct", True, "public", "preserve_public", "public"
+    if skill_id in DEPRECATED_TO:
+        return "dependency_duplicate", False, "not_exposed", "deprecate", "cache-only"
+    if skill_id in PUBLIC_PLUGIN_IDS:
+        return "plugin_public", True, "public", "preserve_public", "public"
+    if skill_id in INTERNAL_PLUGIN_IDS:
+        return "plugin_internal", True, "internal", "preserve_internal", "internal"
+    return "cache_only", False, "not_exposed", "preserve_dormant", "cache-only"
+
+
+def _normalize_role(role: str) -> str:
+    return {"project": "workflow"}.get(
+        role,
+        role
+        if role
+        in {"router", "orchestrator", "workflow", "gate", "tool", "domain", "template", "meta"}
+        else "workflow",
+    )
+
+
+def _side_effect(skill_id: str, role: str) -> str:
+    if skill_id in {"S013", "S014", "S019"}:
+        return "paid-job"
+    if skill_id == "S081":
+        return "production-mutation"
+    if skill_id in {
+        "S005",
+        "S006",
+        "S007",
+        "S008",
+        "S009",
+        "S011",
+        "S015",
+        "S017",
+        "S020",
+        "S021",
+        "S022",
+        "S023",
+        "S051",
+        "S053",
+    }:
+        return "external-write"
+    if role in {"gate", "router"}:
+        return "read-only"
+    return "local-write"
+
+
+def _primary_output(role: str) -> str:
+    if role in {"gate", "router", "domain"}:
+        return "report"
+    if role == "orchestrator":
+        return "decision"
+    if role in {"tool", "template"}:
+        return "artifact"
+    if role == "meta":
+        return "patch"
+    return "patch"
+
+
+def _result_provider(role: str, channel: str) -> str:
+    if channel == "deprecated":
+        return "not_applicable"
+    if role == "template":
+        return "artifact_adapter"
+    if role in {"router", "orchestrator"}:
+        return "orchestrator"
+    if channel in {"overlay", "dormant_overlay"}:
+        return "overlay_adapter"
+    return "skill_body"
+
+
+def _owner(source: dict[str, Any]) -> str:
+    if source["source_kind"] == "system_skill":
+        return "system"
+    if source["source_kind"] == "user_skill":
+        return "user"
+    parts = Path(source["path"]).parts
+    try:
+        cache_index = parts.index("cache")
+        return "plugin:" + ".".join(parts[cache_index + 1 : cache_index + 3]).lower()
+    except ValueError:
+        return "plugin:unknown"
+
+
+def _baseline_path_for_id(skill_id: str) -> str:
+    # Filled from the immutable inventory at runtime by the resolver fallback.
+    # The known target ID is kept as a catalog URI until build finalization.
+    return f"catalog://{skill_id}"
+
+
+def _validate_relations(catalog: dict[str, Any]) -> None:
+    ids = {record["skill_id"] for record in catalog["skills"]}
+    if len(ids) != len(catalog["skills"]):
+        raise BenchmarkError("duplicate skill IDs in catalog")
+    for record in catalog["skills"]:
+        for field in ("companions", "conflicts", "supersedes"):
+            missing = set(record[field]) - ids
+            if missing:
+                raise BenchmarkError(
+                    f"dangling {field} for {record['skill_id']}: {sorted(missing)}"
+                )
+
+
+def _load_catalog(path: Path) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        raise BenchmarkError(f"cannot load catalog {path}: {exc}") from exc
+    if not isinstance(data, dict):
+        raise BenchmarkError(f"catalog must be an object: {path}")
+    validation = validate_catalog(data)
+    if not validation.valid:
+        raise BenchmarkError("invalid catalog: " + "; ".join(validation.errors))
+    return data
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="skill-catalog")
+    sub = parser.add_subparsers(dest="command", required=True)
+    build = sub.add_parser("build")
+    build.add_argument("--inventory-doc", type=Path, required=True)
+    build.add_argument("--backlog-doc", type=Path, required=True)
+    build.add_argument("--skills-root", type=Path, default=Path.home() / ".codex" / "skills")
+    build.add_argument(
+        "--plugins-cache-root", type=Path, default=Path.home() / ".codex" / "plugins" / "cache"
+    )
+    build.add_argument(
+        "--overlay-root",
+        type=Path,
+        default=Path.home() / "plugins" / "codex-skill-system-overrides",
+    )
+    build.add_argument("--repo-catalog", type=Path, required=True)
+    build.add_argument("--global-catalog", type=Path, required=True)
+    build.add_argument("--ownership", type=Path, required=True)
+    build.add_argument("--allow-changed", action="append", default=[])
+    resolve = sub.add_parser("resolve-skill")
+    resolve.add_argument(
+        "--catalog", type=Path, default=Path.home() / ".codex" / "skill-system" / "catalog-v1.json"
+    )
+    resolve.add_argument("query")
+    mark = sub.add_parser("mark")
+    mark.add_argument("--repo-catalog", type=Path, required=True)
+    mark.add_argument("--global-catalog", type=Path, required=True)
+    mark.add_argument("--id", action="append", required=True)
+    mark.add_argument(
+        "--implementation-status",
+        choices=[
+            "pending",
+            "implemented",
+            "canonicalized",
+            "deprecated",
+            "accepted_no_change",
+            "classified",
+            "blocked",
+        ],
+        required=True,
+    )
+    mark.add_argument(
+        "--verification-status",
+        choices=[
+            "pending",
+            "structural_pass",
+            "family_pass",
+            "forward_pass",
+            "inventory_only",
+            "blocked",
+        ],
+        required=True,
+    )
+    mark.add_argument("--evidence-ref", required=True)
+    snapshot = sub.add_parser("snapshot")
+    snapshot.add_argument("--manifest", type=Path, required=True)
+    snapshot.add_argument("--blob-dir", type=Path, required=True)
+    snapshot.add_argument("paths", nargs="+", type=Path)
+    verify = sub.add_parser("verify-rollback")
+    verify.add_argument("--manifest", type=Path, required=True)
+    args = parser.parse_args(argv)
+    try:
+        if args.command == "build":
+            catalog, ownership = build_catalog(
+                args.inventory_doc,
+                args.backlog_doc,
+                skills_root=args.skills_root.expanduser(),
+                plugins_cache_root=args.plugins_cache_root.expanduser(),
+                overlay_root=args.overlay_root.expanduser(),
+                allowed_changed=set(args.allow_changed),
+            )
+            digest = write_catalog_pair(
+                catalog, args.repo_catalog, args.global_catalog.expanduser()
+            )
+            args.ownership.parent.mkdir(parents=True, exist_ok=True)
+            args.ownership.write_text(
+                json.dumps(ownership, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+            print(f"OK: catalog={len(catalog['skills'])} sha256={digest}")
+            return 0
+        if args.command == "resolve-skill":
+            print(
+                json.dumps(
+                    resolve_skill(_load_catalog(args.catalog.expanduser()), args.query),
+                    indent=2,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+            )
+            return 0
+        if args.command == "mark":
+            catalog = mark_catalog_records(
+                _load_catalog(args.repo_catalog),
+                set(args.id),
+                implementation_status=args.implementation_status,
+                verification_status=args.verification_status,
+                evidence_ref=args.evidence_ref,
+            )
+            digest = write_catalog_pair(
+                catalog, args.repo_catalog, args.global_catalog.expanduser()
+            )
+            print(f"OK: marked={len(set(args.id))} sha256={digest}")
+            return 0
+        if args.command == "snapshot":
+            manifest = create_rollback_snapshots(args.manifest, args.blob_dir, args.paths)
+            print(f"OK: rollback entries={len(manifest['entries'])}")
+            return 0
+        if args.command == "verify-rollback":
+            verify_rollback_manifest(args.manifest)
+            print("OK: rollback manifest valid")
+            return 0
+    except BenchmarkError as exc:
+        print(f"ERROR: {exc}")
+        return 1
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

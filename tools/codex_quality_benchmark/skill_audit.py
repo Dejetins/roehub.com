@@ -1,0 +1,1392 @@
+from __future__ import annotations
+
+import csv
+import json
+import re
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from tools.codex_quality_benchmark.manifest import load_json_file, load_manifest
+from tools.codex_quality_benchmark.models import BenchmarkError
+from tools.codex_quality_benchmark.skill_discovery import discover_skill_paths
+
+AUDIT_FIELDS = [
+    "run_id",
+    "target_id",
+    "version_id",
+    "skill_type",
+    "source_path",
+    "audit_score_0_100",
+    "format_score",
+    "description_score",
+    "structure_score",
+    "safety_score",
+    "compliance_status",
+    "severe_findings",
+    "findings_count",
+    "line_count",
+    "description_length",
+]
+
+INVENTORY_FIELDS = [
+    "run_id",
+    "target_id",
+    "scope",
+    "source_path",
+    "managed_cache",
+]
+
+AB_DECISION_FIELDS = [
+    "run_id",
+    "target_id",
+    "version_id",
+    "target_metric",
+    "baseline_task_score",
+    "candidate_task_score",
+    "task_score_delta",
+    "baseline_metric_score",
+    "candidate_metric_score",
+    "metric_delta",
+    "task_preserved",
+    "metric_improved",
+    "audit_blocked",
+    "ab_decision",
+    "decision_reason",
+]
+
+FOCUSED_AB_FIELDS = [
+    "target_id",
+    "target_metric",
+    "before_score",
+    "after_score",
+    "metric_delta",
+    "before_status",
+    "after_status",
+    "pairwise_orders",
+    "task_contract_preserved",
+    "metric_improved",
+    "audit_blocked",
+    "ab_decision",
+    "decision_reason",
+]
+
+ALL_SKILLS_AB_FIELDS = [
+    "run_id",
+    "target_id",
+    "source_path",
+    "managed_cache",
+    "target_metric",
+    "before_score",
+    "after_score",
+    "metric_delta",
+    "before_status",
+    "after_status",
+    "task_contract_preserved",
+    "metric_improved",
+    "audit_blocked",
+    "before_findings",
+    "after_findings",
+    "ab_decision",
+    "decision_reason",
+]
+
+METRIC_FIELDS = {
+    "audit_score_0_100",
+    "format_score",
+    "description_score",
+    "structure_score",
+    "safety_score",
+}
+
+_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
+_ACTION_START_RE = re.compile(
+    r"^\s*(use|create|edit|redline|comment|review|research|control|debug|fix|generate|build|"
+    r"audit|analyze|read|install|publish|triage)\b",
+    re.IGNORECASE,
+)
+_BOUNDARY_RE = re.compile(
+    r"\b(do not use|don't use|when not|unless|without|only when|instead|avoid|boundary|"
+    r"not for|except)\b",
+    re.IGNORECASE,
+)
+_WORKFLOW_RE = re.compile(r"(^|\n)\s*(\d+\.|- |\* |## .*workflow|## .*contract|step \d+)", re.I)
+_DANGEROUS_SECRET_RE = re.compile(
+    r"(ask .*paste.*(api[_ -]?key|token|secret|cookie|credential|xai_api_key)|"
+    r"paste .*?(api[_ -]?key|token|secret|cookie|credential|xai_api_key)|"
+    r"scan .*browser cookies?|browser cookie scan|"
+    r"write .*?(xai_api_key|auth_token|ct0).*?\.env)",
+    re.IGNORECASE,
+)
+_SAFE_CONTEXT_RE = re.compile(
+    r"\b(do not|don't|never|without|redact|sanitize|placeholder|no secret|not required|"
+    r"does not|out of artifacts)\b",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True)
+class SkillAuditFinding:
+    category: str
+    severity: str
+    code: str
+    message: str
+    points_lost: int
+    line: int | None = None
+
+    def as_dict(self) -> dict[str, object]:
+        data: dict[str, object] = {
+            "category": self.category,
+            "severity": self.severity,
+            "code": self.code,
+            "message": self.message,
+            "points_lost": self.points_lost,
+        }
+        if self.line is not None:
+            data["line"] = self.line
+        return data
+
+
+@dataclass(frozen=True)
+class SkillAuditRow:
+    run_id: str
+    target_id: str
+    version_id: str
+    skill_type: str
+    source_path: str
+    audit_score_0_100: int
+    format_score: int
+    description_score: int
+    structure_score: int
+    safety_score: int
+    compliance_status: str
+    severe_findings: int
+    findings_count: int
+    line_count: int
+    description_length: int
+    findings: tuple[SkillAuditFinding, ...]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "run_id": self.run_id,
+            "target_id": self.target_id,
+            "version_id": self.version_id,
+            "skill_type": self.skill_type,
+            "source_path": self.source_path,
+            "audit_score_0_100": self.audit_score_0_100,
+            "format_score": self.format_score,
+            "description_score": self.description_score,
+            "structure_score": self.structure_score,
+            "safety_score": self.safety_score,
+            "compliance_status": self.compliance_status,
+            "severe_findings": self.severe_findings,
+            "findings_count": self.findings_count,
+            "line_count": self.line_count,
+            "description_length": self.description_length,
+            "findings": [finding.as_dict() for finding in self.findings],
+        }
+
+    def as_tsv_row(self) -> dict[str, str]:
+        return {field: str(self.as_dict()[field]) for field in AUDIT_FIELDS}
+
+
+@dataclass(frozen=True)
+class SkillInventoryRow:
+    run_id: str
+    target_id: str
+    scope: str
+    source_path: str
+    managed_cache: bool
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "run_id": self.run_id,
+            "target_id": self.target_id,
+            "scope": self.scope,
+            "source_path": self.source_path,
+            "managed_cache": self.managed_cache,
+        }
+
+    def as_tsv_row(self) -> dict[str, str]:
+        return {
+            "run_id": self.run_id,
+            "target_id": self.target_id,
+            "scope": self.scope,
+            "source_path": self.source_path,
+            "managed_cache": str(self.managed_cache).lower(),
+        }
+
+
+@dataclass(frozen=True)
+class AbDecisionRow:
+    run_id: str
+    target_id: str
+    version_id: str
+    target_metric: str
+    baseline_task_score: float
+    candidate_task_score: float
+    task_score_delta: float
+    baseline_metric_score: float
+    candidate_metric_score: float
+    metric_delta: float
+    task_preserved: bool
+    metric_improved: bool
+    audit_blocked: bool
+    ab_decision: str
+    decision_reason: str
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "run_id": self.run_id,
+            "target_id": self.target_id,
+            "version_id": self.version_id,
+            "target_metric": self.target_metric,
+            "baseline_task_score": self.baseline_task_score,
+            "candidate_task_score": self.candidate_task_score,
+            "task_score_delta": self.task_score_delta,
+            "baseline_metric_score": self.baseline_metric_score,
+            "candidate_metric_score": self.candidate_metric_score,
+            "metric_delta": self.metric_delta,
+            "task_preserved": self.task_preserved,
+            "metric_improved": self.metric_improved,
+            "audit_blocked": self.audit_blocked,
+            "ab_decision": self.ab_decision,
+            "decision_reason": self.decision_reason,
+        }
+
+    def as_tsv_row(self) -> dict[str, str]:
+        data = self.as_dict()
+        return {field: _format_value(data[field]) for field in AB_DECISION_FIELDS}
+
+
+@dataclass(frozen=True)
+class FocusedAbDecision:
+    target_id: str
+    target_metric: str
+    before_score: float
+    after_score: float
+    metric_delta: float
+    before_status: str
+    after_status: str
+    pairwise_orders: int
+    task_contract_preserved: bool
+    metric_improved: bool
+    audit_blocked: bool
+    ab_decision: str
+    decision_reason: str
+    pairwise_verdicts: tuple[dict[str, Any], ...]
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "target_id": self.target_id,
+            "target_metric": self.target_metric,
+            "before_score": self.before_score,
+            "after_score": self.after_score,
+            "metric_delta": self.metric_delta,
+            "before_status": self.before_status,
+            "after_status": self.after_status,
+            "pairwise_orders": self.pairwise_orders,
+            "task_contract_preserved": self.task_contract_preserved,
+            "metric_improved": self.metric_improved,
+            "audit_blocked": self.audit_blocked,
+            "ab_decision": self.ab_decision,
+            "decision_reason": self.decision_reason,
+            "pairwise_verdicts": list(self.pairwise_verdicts),
+        }
+
+    def as_tsv_row(self) -> dict[str, str]:
+        data = self.as_dict()
+        return {field: _format_value(data[field]) for field in FOCUSED_AB_FIELDS}
+
+
+@dataclass(frozen=True)
+class AllSkillsAbDecision:
+    run_id: str
+    target_id: str
+    source_path: str
+    managed_cache: bool
+    target_metric: str
+    before_score: float
+    after_score: float
+    metric_delta: float
+    before_status: str
+    after_status: str
+    task_contract_preserved: bool
+    metric_improved: bool
+    audit_blocked: bool
+    before_findings: tuple[str, ...]
+    after_findings: tuple[str, ...]
+    ab_decision: str
+    decision_reason: str
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "run_id": self.run_id,
+            "target_id": self.target_id,
+            "source_path": self.source_path,
+            "managed_cache": self.managed_cache,
+            "target_metric": self.target_metric,
+            "before_score": self.before_score,
+            "after_score": self.after_score,
+            "metric_delta": self.metric_delta,
+            "before_status": self.before_status,
+            "after_status": self.after_status,
+            "task_contract_preserved": self.task_contract_preserved,
+            "metric_improved": self.metric_improved,
+            "audit_blocked": self.audit_blocked,
+            "before_findings": list(self.before_findings),
+            "after_findings": list(self.after_findings),
+            "ab_decision": self.ab_decision,
+            "decision_reason": self.decision_reason,
+        }
+
+    def as_tsv_row(self) -> dict[str, str]:
+        data = self.as_dict()
+        return {field: _format_value(data[field]) for field in ALL_SKILLS_AB_FIELDS}
+
+
+def audit_manifest_skills(
+    manifest_path: Path,
+    out_dir: Path,
+    *,
+    source: str = "versions",
+    version_id: str | None = None,
+) -> list[SkillAuditRow]:
+    if source not in {"live", "versions"}:
+        raise BenchmarkError(f"unsupported audit source: {source}")
+
+    manifest = load_manifest(manifest_path)
+    manifest_data = load_json_file(manifest_path)
+    rows: list[SkillAuditRow] = []
+
+    for target in _required_list(manifest_data, "targets", "manifest"):
+        target_id = _required_str(target, "target_id", "target")
+        skill_type = _required_str(target, "skill_type", target_id)
+        if source == "live":
+            path = _resolve_source_path(
+                _required_str(target, "target_path", target_id), manifest_path
+            )
+            rows.append(audit_skill_file(path, manifest.run_id, target_id, "live", skill_type))
+            continue
+
+        for version in _required_list(target, "versions", target_id):
+            current_version_id = _required_str(version, "version_id", f"{target_id}.version")
+            if version_id is not None and current_version_id != version_id:
+                continue
+            raw_path = str(version.get("candidate_path") or target["target_path"])
+            path = _resolve_source_path(raw_path, manifest_path)
+            rows.append(
+                audit_skill_file(path, manifest.run_id, target_id, current_version_id, skill_type)
+            )
+
+    write_audit_artifacts(out_dir, rows)
+    return rows
+
+
+def audit_all_skills(
+    out_dir: Path,
+    *,
+    run_id: str,
+    skills_root: Path,
+    plugins_cache_root: Path,
+) -> tuple[list[SkillInventoryRow], list[SkillAuditRow]]:
+    inventory = discover_skill_inventory(
+        run_id=run_id,
+        skills_root=skills_root.expanduser(),
+        plugins_cache_root=plugins_cache_root.expanduser(),
+    )
+    rows = [
+        audit_skill_file(
+            Path(item.source_path),
+            item.run_id,
+            item.target_id,
+            "live",
+            item.scope,
+        )
+        for item in inventory
+    ]
+    write_inventory_artifacts(out_dir, inventory)
+    write_audit_artifacts(out_dir, rows)
+    return inventory, rows
+
+
+def discover_skill_inventory(
+    *,
+    run_id: str,
+    skills_root: Path,
+    plugins_cache_root: Path,
+) -> list[SkillInventoryRow]:
+    rows: list[SkillInventoryRow] = []
+    seen_paths: set[Path] = set()
+    for path in sorted(skills_root.rglob("SKILL.md")):
+        resolved = path.resolve()
+        if resolved in seen_paths:
+            continue
+        seen_paths.add(resolved)
+        scope = "system_skill" if ".system" in path.parts else "global_skill"
+        rows.append(
+            SkillInventoryRow(
+                run_id=run_id,
+                target_id=_global_target_id(path, skills_root),
+                scope=scope,
+                source_path=str(path),
+                managed_cache=False,
+            )
+        )
+    for path in discover_skill_paths(plugins_cache_root):
+        resolved = path.resolve()
+        if resolved in seen_paths:
+            continue
+        seen_paths.add(resolved)
+        rows.append(
+            SkillInventoryRow(
+                run_id=run_id,
+                target_id=_plugin_target_id(path, plugins_cache_root),
+                scope="plugin_skill",
+                source_path=str(path),
+                managed_cache=True,
+            )
+        )
+    if not rows:
+        raise BenchmarkError(
+            f"no SKILL.md files found under {skills_root} or {plugins_cache_root}"
+        )
+    _validate_unique_targets(rows)
+    return rows
+
+
+def audit_skill_file(
+    path: Path,
+    run_id: str,
+    target_id: str,
+    version_id: str,
+    skill_type: str,
+) -> SkillAuditRow:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        finding = SkillAuditFinding(
+            category="format",
+            severity="blocker",
+            code="missing_skill_file",
+            message=f"Skill file is missing: {path}",
+            points_lost=25,
+        )
+        return _row_from_scores(
+            run_id,
+            target_id,
+            version_id,
+            skill_type,
+            path,
+            {"format": 0, "description": 0, "structure": 0, "safety": 0},
+            0,
+            0,
+            (finding,),
+        )
+
+    metadata, body, frontmatter_ok = _parse_frontmatter(text)
+    findings: list[SkillAuditFinding] = []
+    line_count = len(text.splitlines())
+    description = str(metadata.get("description", "")).strip()
+
+    _audit_format(metadata, frontmatter_ok, findings)
+    _audit_description(description, body, findings)
+    _audit_structure(body, line_count, findings)
+    _audit_safety(text, findings)
+
+    scores = {
+        "format": _category_score("format", findings),
+        "description": _category_score("description", findings),
+        "structure": _category_score("structure", findings),
+        "safety": _category_score("safety", findings),
+    }
+    return _row_from_scores(
+        run_id,
+        target_id,
+        version_id,
+        skill_type,
+        path,
+        scores,
+        line_count,
+        len(description),
+        tuple(findings),
+    )
+
+
+def compare_ab_results(
+    run_dir: Path,
+    audit_dir: Path,
+    out_dir: Path,
+    *,
+    target_metric: str = "audit_score_0_100",
+    min_metric_delta: float = 5.0,
+    max_task_regression: float = 0.0,
+) -> list[AbDecisionRow]:
+    if target_metric not in {
+        "audit_score_0_100",
+        "format_score",
+        "description_score",
+        "structure_score",
+        "safety_score",
+    }:
+        raise BenchmarkError(f"unsupported target_metric: {target_metric}")
+
+    task_rows = _load_results_tsv(run_dir / "results.tsv")
+    audit_rows = _load_audit_json(audit_dir / "skill_audit.json")
+    decisions: list[AbDecisionRow] = []
+
+    for target_id in sorted({row["target_id"] for row in task_rows}):
+        baseline_task = _find_row(task_rows, target_id, "v00")
+        baseline_audit = _find_row(audit_rows, target_id, "v00")
+        if baseline_task is None or baseline_audit is None:
+            raise BenchmarkError(f"missing baseline rows for {target_id}")
+        baseline_task_score = float(baseline_task["score_0_100"])
+        baseline_metric_score = float(baseline_audit[target_metric])
+
+        for candidate_task in sorted(
+            (
+                row
+                for row in task_rows
+                if row["target_id"] == target_id and row["version_id"] != "v00"
+            ),
+            key=lambda row: row["version_id"],
+        ):
+            candidate_audit = _find_row(audit_rows, target_id, candidate_task["version_id"])
+            if candidate_audit is None:
+                raise BenchmarkError(
+                    f"missing audit row for {target_id} {candidate_task['version_id']}"
+                )
+            candidate_task_score = float(candidate_task["score_0_100"])
+            candidate_metric_score = float(candidate_audit[target_metric])
+            task_delta = round(candidate_task_score - baseline_task_score, 4)
+            metric_delta = round(candidate_metric_score - baseline_metric_score, 4)
+            task_preserved = task_delta >= -max_task_regression
+            metric_improved = metric_delta >= min_metric_delta
+            audit_blocked = candidate_audit["compliance_status"] == "blocked"
+            if task_preserved and metric_improved and not audit_blocked:
+                decision = "candidate"
+                reason = (
+                    "target metric improved while task score stayed within "
+                    f"{max_task_regression:g} regression tolerance"
+                )
+            elif audit_blocked:
+                decision = "reject"
+                reason = "audit compliance status is blocked"
+            elif not task_preserved:
+                decision = "reject"
+                reason = "task score regressed beyond tolerance"
+            else:
+                decision = "reject"
+                reason = "target metric did not improve enough"
+
+            decisions.append(
+                AbDecisionRow(
+                    run_id=str(candidate_task["run_id"]),
+                    target_id=target_id,
+                    version_id=str(candidate_task["version_id"]),
+                    target_metric=target_metric,
+                    baseline_task_score=baseline_task_score,
+                    candidate_task_score=candidate_task_score,
+                    task_score_delta=task_delta,
+                    baseline_metric_score=baseline_metric_score,
+                    candidate_metric_score=candidate_metric_score,
+                    metric_delta=metric_delta,
+                    task_preserved=task_preserved,
+                    metric_improved=metric_improved,
+                    audit_blocked=audit_blocked,
+                    ab_decision=decision,
+                    decision_reason=reason,
+                )
+            )
+
+    write_ab_artifacts(out_dir, decisions, target_metric)
+    return decisions
+
+
+def compare_focused_ab(
+    before_audit_path: Path,
+    after_audit_path: Path,
+    pairwise_path: Path,
+    out_dir: Path,
+    *,
+    target_id: str,
+    target_metric: str = "safety_score",
+    min_metric_delta: float = 5.0,
+) -> FocusedAbDecision:
+    if target_metric not in {
+        "audit_score_0_100",
+        "format_score",
+        "description_score",
+        "structure_score",
+        "safety_score",
+    }:
+        raise BenchmarkError(f"unsupported target_metric: {target_metric}")
+    before = _find_row(_load_audit_json(before_audit_path), target_id, "live")
+    after = _find_row(_load_audit_json(after_audit_path), target_id, "live")
+    if before is None or after is None:
+        raise BenchmarkError(f"missing live audit rows for {target_id}")
+
+    pairwise = _load_pairwise_verdicts(pairwise_path)
+    if not pairwise:
+        raise BenchmarkError(f"missing pairwise verdicts: {pairwise_path}")
+    before_score = float(before[target_metric])
+    after_score = float(after[target_metric])
+    metric_delta = round(after_score - before_score, 4)
+    task_contract_preserved = all(
+        verdict.get("task_contract_preserved") is True
+        and verdict.get("pairwise_verdict") == "patched"
+        for verdict in pairwise
+    )
+    metric_improved = metric_delta >= min_metric_delta
+    audit_blocked = str(after.get("compliance_status")) == "blocked"
+    if task_contract_preserved and metric_improved and not audit_blocked:
+        decision = "candidate"
+        reason = (
+            "target metric improved while clean-context pairwise preserved "
+            "the task contract in both orders"
+        )
+    elif audit_blocked:
+        decision = "reject"
+        reason = "after audit is blocked"
+    elif not task_contract_preserved:
+        decision = "reject"
+        reason = "pairwise did not preserve the task contract in both orders"
+    else:
+        decision = "reject"
+        reason = "target metric did not improve enough"
+
+    focused = FocusedAbDecision(
+        target_id=target_id,
+        target_metric=target_metric,
+        before_score=before_score,
+        after_score=after_score,
+        metric_delta=metric_delta,
+        before_status=str(before.get("compliance_status")),
+        after_status=str(after.get("compliance_status")),
+        pairwise_orders=len(pairwise),
+        task_contract_preserved=task_contract_preserved,
+        metric_improved=metric_improved,
+        audit_blocked=audit_blocked,
+        ab_decision=decision,
+        decision_reason=reason,
+        pairwise_verdicts=tuple(pairwise),
+    )
+    write_focused_ab_artifacts(out_dir, focused)
+    return focused
+
+
+def compare_all_skills_ab(
+    before_audit_path: Path,
+    after_audit_path: Path,
+    out_dir: Path,
+    *,
+    inventory_path: Path | None = None,
+    target_metric: str = "audit_score_0_100",
+    min_metric_delta: float = 1.0,
+) -> list[AllSkillsAbDecision]:
+    if target_metric not in METRIC_FIELDS:
+        raise BenchmarkError(f"unsupported target_metric: {target_metric}")
+
+    before_rows = _index_live_audit_rows(_load_audit_json(before_audit_path))
+    after_rows = _index_live_audit_rows(_load_audit_json(after_audit_path))
+    if set(before_rows) != set(after_rows):
+        missing_after = sorted(set(before_rows) - set(after_rows))
+        missing_before = sorted(set(after_rows) - set(before_rows))
+        raise BenchmarkError(
+            "before/after audit target sets differ: "
+            f"missing_after={missing_after} missing_before={missing_before}"
+        )
+
+    inventory = _load_inventory_map(inventory_path) if inventory_path is not None else {}
+    decisions: list[AllSkillsAbDecision] = []
+    for target_id in sorted(before_rows):
+        before = before_rows[target_id]
+        after = after_rows[target_id]
+        before_score = float(before[target_metric])
+        after_score = float(after[target_metric])
+        metric_delta = round(after_score - before_score, 4)
+        before_status = str(before.get("compliance_status"))
+        after_status = str(after.get("compliance_status"))
+        managed_cache = _managed_cache_for(target_id, after, inventory)
+        task_contract_preserved = _status_rank(after_status) >= _status_rank(before_status)
+        metric_improved = metric_delta >= min_metric_delta
+        audit_blocked = after_status == "blocked"
+        decision, reason = _all_skills_decision(
+            metric_delta=metric_delta,
+            task_contract_preserved=task_contract_preserved,
+            metric_improved=metric_improved,
+            audit_blocked=audit_blocked,
+            after_status=after_status,
+            managed_cache=managed_cache,
+        )
+        decisions.append(
+            AllSkillsAbDecision(
+                run_id=str(after.get("run_id", "")),
+                target_id=target_id,
+                source_path=str(after.get("source_path") or before.get("source_path") or ""),
+                managed_cache=managed_cache,
+                target_metric=target_metric,
+                before_score=before_score,
+                after_score=after_score,
+                metric_delta=metric_delta,
+                before_status=before_status,
+                after_status=after_status,
+                task_contract_preserved=task_contract_preserved,
+                metric_improved=metric_improved,
+                audit_blocked=audit_blocked,
+                before_findings=tuple(_finding_codes(before)),
+                after_findings=tuple(_finding_codes(after)),
+                ab_decision=decision,
+                decision_reason=reason,
+            )
+        )
+
+    write_all_skills_ab_artifacts(out_dir, decisions, target_metric)
+    return decisions
+
+
+def write_audit_artifacts(out_dir: Path, rows: list[SkillAuditRow]) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "skill_audit.json").write_text(
+        json.dumps([row.as_dict() for row in rows], indent=2, ensure_ascii=False, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
+    )
+    with (out_dir / "skill_audit.tsv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=AUDIT_FIELDS,
+            delimiter="\t",
+            lineterminator="\n",
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row.as_tsv_row())
+    _write_audit_summary(out_dir / "skill_audit.md", rows)
+
+
+def write_inventory_artifacts(out_dir: Path, rows: list[SkillInventoryRow]) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "skill_inventory.json").write_text(
+        json.dumps([row.as_dict() for row in rows], indent=2, ensure_ascii=False, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
+    )
+    with (out_dir / "skill_inventory.tsv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=INVENTORY_FIELDS,
+            delimiter="\t",
+            lineterminator="\n",
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row.as_tsv_row())
+
+
+def write_ab_artifacts(out_dir: Path, rows: list[AbDecisionRow], target_metric: str) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "ab_decisions.json").write_text(
+        json.dumps([row.as_dict() for row in rows], indent=2, ensure_ascii=False, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
+    )
+    with (out_dir / "ab_decisions.tsv").open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=AB_DECISION_FIELDS,
+            delimiter="\t",
+            lineterminator="\n",
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row.as_tsv_row())
+    _write_ab_summary(out_dir / "ab_decisions.md", rows, target_metric)
+
+
+def write_focused_ab_artifacts(out_dir: Path, decision: FocusedAbDecision) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "focused_ab_decision.json").write_text(
+        json.dumps(decision.as_dict(), indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    with (out_dir / "focused_ab_decision.tsv").open(
+        "w", encoding="utf-8", newline=""
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=FOCUSED_AB_FIELDS,
+            delimiter="\t",
+            lineterminator="\n",
+        )
+        writer.writeheader()
+        writer.writerow(decision.as_tsv_row())
+    _write_focused_ab_summary(out_dir / "focused_ab_decision.md", decision)
+
+
+def write_all_skills_ab_artifacts(
+    out_dir: Path,
+    rows: list[AllSkillsAbDecision],
+    target_metric: str,
+) -> None:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "all_skills_ab_decisions.json").write_text(
+        json.dumps([row.as_dict() for row in rows], indent=2, ensure_ascii=False, sort_keys=True)
+        + "\n",
+        encoding="utf-8",
+    )
+    with (out_dir / "all_skills_ab_decisions.tsv").open(
+        "w", encoding="utf-8", newline=""
+    ) as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=ALL_SKILLS_AB_FIELDS,
+            delimiter="\t",
+            lineterminator="\n",
+        )
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row.as_tsv_row())
+    _write_all_skills_ab_summary(out_dir / "all_skills_ab_decisions.md", rows, target_metric)
+
+
+def _audit_format(
+    metadata: dict[str, str],
+    frontmatter_ok: bool,
+    findings: list[SkillAuditFinding],
+) -> None:
+    if not frontmatter_ok:
+        findings.append(
+            SkillAuditFinding(
+                "format",
+                "blocker",
+                "missing_or_invalid_frontmatter",
+                "SKILL.md must start with YAML frontmatter delimited by ---.",
+                18,
+            )
+        )
+    name = metadata.get("name", "").strip()
+    description = metadata.get("description", "").strip()
+    if not name:
+        findings.append(
+            SkillAuditFinding(
+                "format",
+                "high",
+                "missing_name",
+                "Codex requires SKILL.md frontmatter to include name.",
+                6,
+            )
+        )
+    elif not _NAME_RE.fullmatch(name):
+        findings.append(
+            SkillAuditFinding(
+                "format",
+                "medium",
+                "nonportable_name",
+                "Skill name should be lowercase and stable for cross-runtime invocation.",
+                3,
+            )
+        )
+    if not description:
+        findings.append(
+            SkillAuditFinding(
+                "format",
+                "high",
+                "missing_description",
+                "Codex requires SKILL.md frontmatter to include description.",
+                12,
+            )
+        )
+
+
+def _audit_description(
+    description: str,
+    body: str,
+    findings: list[SkillAuditFinding],
+) -> None:
+    if not description:
+        findings.append(
+            SkillAuditFinding(
+                "description",
+                "high",
+                "empty_description",
+                "Description is required for discovery and implicit invocation.",
+                25,
+            )
+        )
+        return
+    if len(description) > 1536:
+        findings.append(
+            SkillAuditFinding(
+                "description",
+                "medium",
+                "description_too_long",
+                "Description exceeds Claude's 1,536 character skill-listing budget.",
+                8,
+            )
+        )
+    if len(description) < 50:
+        findings.append(
+            SkillAuditFinding(
+                "description",
+                "low",
+                "description_too_short",
+                "Description is too short to carry clear trigger scope.",
+                5,
+            )
+        )
+    if _ACTION_START_RE.search(description) is None:
+        findings.append(
+            SkillAuditFinding(
+                "description",
+                "medium",
+                "key_use_case_not_front_loaded",
+                "Description should front-load the key use case and trigger words.",
+                5,
+            )
+        )
+    if _BOUNDARY_RE.search(f"{description}\n{body[:3000]}") is None:
+        findings.append(
+            SkillAuditFinding(
+                "description",
+                "medium",
+                "missing_invocation_boundary",
+                "Skill should state boundaries or adjacent non-use cases.",
+                5,
+            )
+        )
+
+
+def _audit_structure(body: str, line_count: int, findings: list[SkillAuditFinding]) -> None:
+    if len(body.strip()) < 200:
+        findings.append(
+            SkillAuditFinding(
+                "structure",
+                "medium",
+                "body_too_thin",
+                "Skill body is too thin to give a fresh agent executable instructions.",
+                8,
+            )
+        )
+    if "\n## " not in body:
+        findings.append(
+            SkillAuditFinding(
+                "structure",
+                "low",
+                "missing_section_structure",
+                "Skill body should use sections for scanable progressive reading.",
+                4,
+            )
+        )
+    if _WORKFLOW_RE.search(body) is None:
+        findings.append(
+            SkillAuditFinding(
+                "structure",
+                "medium",
+                "missing_executable_steps",
+                "Skill should include imperative workflow steps or explicit input/output contract.",
+                6,
+            )
+        )
+    if line_count > 500:
+        findings.append(
+            SkillAuditFinding(
+                "structure",
+                "high",
+                "skill_body_too_long",
+                "Skill body is too long for efficient progressive disclosure; "
+                "move details to references or scripts.",
+                8,
+            )
+        )
+    if line_count > 300 and not re.search(r"\b(references?/|scripts?/|assets?/)\b", body, re.I):
+        findings.append(
+            SkillAuditFinding(
+                "structure",
+                "medium",
+                "missing_supporting_files_for_long_skill",
+                "Long skills should point to supporting files instead of keeping "
+                "all reference material inline.",
+                5,
+            )
+        )
+
+
+def _audit_safety(text: str, findings: list[SkillAuditFinding]) -> None:
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        if _DANGEROUS_SECRET_RE.search(line) is None:
+            continue
+        if _SAFE_CONTEXT_RE.search(line):
+            continue
+        findings.append(
+            SkillAuditFinding(
+                "safety",
+                "blocker",
+                "dangerous_credential_or_cookie_guidance",
+                "Skill must not ask users to paste secrets or scan browser cookies "
+                "as workflow setup.",
+                18,
+                line_number,
+            )
+        )
+
+
+def _parse_frontmatter(text: str) -> tuple[dict[str, str], str, bool]:
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}, text, False
+    closing_index: int | None = None
+    for index, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            closing_index = index
+            break
+    if closing_index is None:
+        return {}, text, False
+
+    metadata: dict[str, str] = {}
+    for line in lines[1:closing_index]:
+        if not line.strip() or line.lstrip().startswith(("#", "-")):
+            continue
+        if line.startswith((" ", "\t")) or ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        metadata[key.strip()] = _strip_yaml_scalar(value.strip())
+    return metadata, "\n".join(lines[closing_index + 1 :]), True
+
+
+def _strip_yaml_scalar(value: str) -> str:
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        return value[1:-1]
+    return value
+
+
+def _category_score(category: str, findings: list[SkillAuditFinding]) -> int:
+    return max(0, 25 - sum(f.points_lost for f in findings if f.category == category))
+
+
+def _row_from_scores(
+    run_id: str,
+    target_id: str,
+    version_id: str,
+    skill_type: str,
+    path: Path,
+    scores: dict[str, int],
+    line_count: int,
+    description_length: int,
+    findings: tuple[SkillAuditFinding, ...],
+) -> SkillAuditRow:
+    total = sum(scores.values())
+    severe_findings = sum(1 for finding in findings if finding.severity == "blocker")
+    if severe_findings:
+        total = min(total, 49)
+        status = "blocked"
+    elif total >= 90:
+        status = "pass"
+    elif total >= 75:
+        status = "warn"
+    else:
+        status = "fail"
+    return SkillAuditRow(
+        run_id=run_id,
+        target_id=target_id,
+        version_id=version_id,
+        skill_type=skill_type,
+        source_path=str(path),
+        audit_score_0_100=total,
+        format_score=scores["format"],
+        description_score=scores["description"],
+        structure_score=scores["structure"],
+        safety_score=scores["safety"],
+        compliance_status=status,
+        severe_findings=severe_findings,
+        findings_count=len(findings),
+        line_count=line_count,
+        description_length=description_length,
+        findings=findings,
+    )
+
+
+def _write_audit_summary(path: Path, rows: list[SkillAuditRow]) -> None:
+    lines = [
+        "# Skill Official-Format Audit Summary",
+        "",
+        "Deterministic audit for Codex/Claude skill shape, discovery metadata, "
+        "progressive disclosure, and safety/locality risks.",
+        "",
+        "| target_id | version_id | audit | format | description | structure | "
+        "safety | status | findings |",
+        "|---|---:|---:|---:|---:|---:|---:|---|---:|",
+    ]
+    for row in rows:
+        lines.append(
+            "| "
+            f"{row.target_id} | {row.version_id} | {row.audit_score_0_100} | "
+            f"{row.format_score} | {row.description_score} | {row.structure_score} | "
+            f"{row.safety_score} | {row.compliance_status} | {row.findings_count} |"
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_ab_summary(path: Path, rows: list[AbDecisionRow], target_metric: str) -> None:
+    accepted = sum(1 for row in rows if row.ab_decision == "candidate")
+    lines = [
+        "# Skill Benchmark A/B Decisions",
+        "",
+        f"Target metric: `{target_metric}`.",
+        f"Accepted candidates: `{accepted}` of `{len(rows)}`.",
+        "",
+        "| target_id | version_id | task_delta | metric_delta | decision | reason |",
+        "|---|---:|---:|---:|---|---|",
+    ]
+    for row in rows:
+        lines.append(
+            "| "
+            f"{row.target_id} | {row.version_id} | {row.task_score_delta:g} | "
+            f"{row.metric_delta:g} | {row.ab_decision} | "
+            f"{_escape_table(row.decision_reason)} |"
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_focused_ab_summary(path: Path, decision: FocusedAbDecision) -> None:
+    lines = [
+        "# Focused Skill A/B Decision",
+        "",
+        f"Target: `{decision.target_id}`.",
+        f"Target metric: `{decision.target_metric}`.",
+        "",
+        "| before | after | delta | before_status | after_status | pairwise_orders | decision |",
+        "|---:|---:|---:|---|---|---:|---|",
+        "| "
+        f"{decision.before_score:g} | {decision.after_score:g} | {decision.metric_delta:g} | "
+        f"{decision.before_status} | {decision.after_status} | {decision.pairwise_orders} | "
+        f"{decision.ab_decision} |",
+        "",
+        f"Decision reason: {decision.decision_reason}.",
+    ]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_all_skills_ab_summary(
+    path: Path,
+    rows: list[AllSkillsAbDecision],
+    target_metric: str,
+) -> None:
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row.ab_decision] = counts.get(row.ab_decision, 0) + 1
+    accepted = counts.get("candidate", 0)
+    baseline_retained = counts.get("baseline_retained", 0)
+    lines = [
+        "# All-Skills A/B Decisions",
+        "",
+        f"Target metric: `{target_metric}`.",
+        f"Rows: `{len(rows)}`.",
+        f"Accepted candidates: `{accepted}`.",
+        f"Baseline retained: `{baseline_retained}`.",
+        "",
+        "| decision | count |",
+        "|---|---:|",
+    ]
+    for decision, count in sorted(counts.items()):
+        lines.append(f"| {decision} | {count} |")
+    lines.extend(
+        [
+            "",
+            "| target_id | managed_cache | before | after | delta | before_status | "
+            "after_status | decision | reason |",
+            "|---|---:|---:|---:|---:|---|---|---|---|",
+        ]
+    )
+    for row in rows:
+        lines.append(
+            "| "
+            f"{row.target_id} | {str(row.managed_cache).lower()} | "
+            f"{row.before_score:g} | {row.after_score:g} | {row.metric_delta:g} | "
+            f"{row.before_status} | {row.after_status} | {row.ab_decision} | "
+            f"{_escape_table(row.decision_reason)} |"
+        )
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _global_target_id(path: Path, skills_root: Path) -> str:
+    relative = path.relative_to(skills_root)
+    if relative.parts[0] == ".system":
+        return _target_id("system", relative.parts[1])
+    return _target_id("global", relative.parts[0])
+
+
+def _plugin_target_id(path: Path, plugins_cache_root: Path) -> str:
+    relative = path.relative_to(plugins_cache_root)
+    parts = relative.parts
+    if "skills" in parts:
+        skills_index = parts.index("skills")
+        prefix = ".".join(parts[:skills_index])
+        suffix = ".".join(parts[skills_index + 1 : -1])
+        return _target_id("plugin", prefix, suffix)
+    # Dependency bundles can ship nested skills below node_modules without a
+    # conventional `skills/<name>` segment. Preserve the complete parent path
+    # so discovery is exhaustive and generated target IDs stay unique.
+    return _target_id("plugin", ".".join(parts[:-1]))
+
+
+def _target_id(*parts: str) -> str:
+    value = ".".join(parts)
+    value = value.replace("/", ".")
+    value = re.sub(r"[^A-Za-z0-9_.-]+", "_", value)
+    value = re.sub(r"_+", "_", value)
+    return value.strip("._").lower()
+
+
+def _validate_unique_targets(rows: list[SkillInventoryRow]) -> None:
+    seen: set[str] = set()
+    for row in rows:
+        if row.target_id in seen:
+            raise BenchmarkError(f"duplicate target_id generated: {row.target_id}")
+        seen.add(row.target_id)
+
+
+def _load_results_tsv(path: Path) -> list[dict[str, str]]:
+    try:
+        with path.open(encoding="utf-8", newline="") as handle:
+            return list(csv.DictReader(handle, delimiter="\t"))
+    except FileNotFoundError as exc:
+        raise BenchmarkError(f"missing results TSV: {path}") from exc
+
+
+def _load_audit_json(path: Path) -> list[dict[str, Any]]:
+    data = load_json_file(path)
+    if not isinstance(data, list):
+        raise BenchmarkError(f"audit JSON must be a list: {path}")
+    return [row for row in data if isinstance(row, dict)]
+
+
+def _load_pairwise_verdicts(path: Path) -> list[dict[str, Any]]:
+    data = load_json_file(path)
+    if not isinstance(data, list):
+        raise BenchmarkError(f"pairwise verdict JSON must be a list: {path}")
+    return [row for row in data if isinstance(row, dict)]
+
+
+def _load_inventory_map(path: Path) -> dict[str, dict[str, Any]]:
+    data = load_json_file(path)
+    if not isinstance(data, list):
+        raise BenchmarkError(f"inventory JSON must be a list: {path}")
+    return {
+        str(row["target_id"]): row
+        for row in data
+        if isinstance(row, dict) and isinstance(row.get("target_id"), str)
+    }
+
+
+def _index_live_audit_rows(rows: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    indexed: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        target_id = row.get("target_id")
+        if not isinstance(target_id, str):
+            continue
+        if row.get("version_id") != "live":
+            continue
+        if target_id in indexed:
+            raise BenchmarkError(f"duplicate live audit row for {target_id}")
+        indexed[target_id] = row
+    if not indexed:
+        raise BenchmarkError("audit JSON has no live rows")
+    return indexed
+
+
+def _find_row(rows: list[dict[str, Any]], target_id: str, version_id: str) -> dict[str, Any] | None:
+    for row in rows:
+        if row.get("target_id") == target_id and row.get("version_id") == version_id:
+            return row
+    return None
+
+
+def _resolve_source_path(raw_path: str, manifest_path: Path) -> Path:
+    path = Path(raw_path).expanduser()
+    if path.is_absolute():
+        return path
+    cwd_path = Path.cwd() / path
+    if cwd_path.exists():
+        return cwd_path
+    return manifest_path.parent / path
+
+
+def _required_str(data: dict[str, Any], field: str, context: str) -> str:
+    value = data.get(field)
+    if not isinstance(value, str) or not value:
+        raise BenchmarkError(f"{context}.{field} must be a non-empty string")
+    return value
+
+
+def _required_list(data: dict[str, Any], field: str, context: str) -> list[Any]:
+    value = data.get(field)
+    if not isinstance(value, list):
+        raise BenchmarkError(f"{context}.{field} must be a list")
+    return value
+
+
+def _escape_table(value: str) -> str:
+    return value.replace("|", "\\|").replace("\n", " ")
+
+
+def _finding_codes(row: dict[str, Any]) -> list[str]:
+    findings = row.get("findings", [])
+    if not isinstance(findings, list):
+        return []
+    return [
+        str(finding["code"])
+        for finding in findings
+        if isinstance(finding, dict) and isinstance(finding.get("code"), str)
+    ]
+
+
+def _managed_cache_for(
+    target_id: str,
+    row: dict[str, Any],
+    inventory: dict[str, dict[str, Any]],
+) -> bool:
+    inventory_row = inventory.get(target_id)
+    if inventory_row is not None:
+        return bool(inventory_row.get("managed_cache"))
+    return "/.codex/plugins/cache/" in str(row.get("source_path", ""))
+
+
+def _status_rank(status: str) -> int:
+    return {"blocked": 0, "fail": 1, "warn": 2, "pass": 3}.get(status, -1)
+
+
+def _all_skills_decision(
+    *,
+    metric_delta: float,
+    task_contract_preserved: bool,
+    metric_improved: bool,
+    audit_blocked: bool,
+    after_status: str,
+    managed_cache: bool,
+) -> tuple[str, str]:
+    if audit_blocked:
+        return "reject", "after audit is blocked"
+    if metric_delta < 0:
+        return "reject", "target metric regressed"
+    if not task_contract_preserved:
+        return "reject", "overall compliance status regressed"
+    if metric_improved:
+        return "candidate", "target metric improved while overall compliance was preserved"
+    if after_status == "pass":
+        return "baseline_retained", "already passes the audit with no material A/B gain"
+    if managed_cache:
+        return (
+            "deferred_managed_cache",
+            "remaining issue is in installed plugin cache and needs upstream or "
+            "reinstall-safe repair",
+        )
+    return "needs_follow_up", "target metric did not improve enough and audit still does not pass"
+
+
+def _format_value(value: object) -> str:
+    if isinstance(value, float):
+        return f"{value:g}"
+    if isinstance(value, list):
+        return ",".join(str(item) for item in value)
+    return str(value)

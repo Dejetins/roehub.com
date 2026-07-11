@@ -1,0 +1,288 @@
+{
+  "spec": "skill-full-validation/v1",
+  "run_id": "skill-system-stage-07-v1",
+  "status": "pass",
+  "inventory": {
+    "audit_baseline": {
+      "expected": 85,
+      "observed": 85,
+      "terminal": 85,
+      "pending": 0,
+      "blocked": 0
+    },
+    "loader_candidates": {
+      "expected": 96,
+      "observed": 96,
+      "unexplained_additions": 0,
+      "unexplained_removals": 0
+    },
+    "supplemental": {
+      "expected": 11,
+      "observed": 11,
+      "classified": 11,
+      "activation_policy": "preserve_dormant",
+      "verification_status": "inventory_only"
+    }
+  },
+  "implementation": {
+    "implemented": 78,
+    "deprecated": 7,
+    "classified_supplemental": 11,
+    "accepted_no_change": 0,
+    "pending": 0,
+    "blocked": 0
+  },
+  "effective_contracts": {
+    "implemented_count": 78,
+    "quick_validate": {
+      "passed": 78,
+      "failed": 0
+    },
+    "skill_spec_v1": {
+      "passed": 78,
+      "failed": 0
+    },
+    "structural_audit": {
+      "passed": 78,
+      "failed": 0,
+      "minimum_score": 100
+    },
+    "metadata_catalog_parity": {
+      "passed": 78,
+      "failed": 0
+    },
+    "five_baseline_invalid_effective": {
+      "ids": [
+        "S018",
+        "S056",
+        "S057",
+        "S075",
+        "S078"
+      ],
+      "passed": 5,
+      "failed": 0
+    },
+    "eight_long_root_decisions": {
+      "ids": [
+        "S013",
+        "S014",
+        "S015",
+        "S018",
+        "S019",
+        "S075",
+        "S080",
+        "S085"
+      ],
+      "root_at_most_500_lines": 8,
+      "failed": 0
+    }
+  },
+  "supplemental_source_diagnostic": {
+    "scope": "inventory-only managed cache; not an effective implementation gate",
+    "quick_validate_passed": 1,
+    "quick_validate_failed": 10,
+    "invalid_source_ids": [
+      "S086",
+      "S087",
+      "S088",
+      "S090",
+      "S091",
+      "S092",
+      "S093",
+      "S094",
+      "S095",
+      "S096"
+    ],
+    "decision": "preserve_dormant_inventory_only",
+    "managed_cache_edit": false,
+    "fresh_cli_exposure_count": 0
+  },
+  "provenance": {
+    "managed_baseline_source_hashes": {
+      "passed": 62,
+      "failed": 0,
+      "changed": 0
+    },
+    "supplemental_source_hashes": {
+      "passed": 11,
+      "failed": 0,
+      "changed": 0
+    },
+    "catalog_repo_global_parity": true,
+    "catalog_sha256": "1767adcd1beffa982217ab9111e602849988f00d83c02ec3c95d4db269fea2f3"
+  },
+  "ownership": {
+    "rows": 96,
+    "baseline_rows": 85,
+    "supplemental_rows": 11,
+    "broad_ownership": false,
+    "operations": {
+      "edit_source": 23,
+      "create_overlay_resource": 22,
+      "create_dormant_resource": 33,
+      "deprecate_catalog_entry": 7,
+      "classify_only": 11
+    }
+  },
+  "rollback": {
+    "manifest_entries": 102,
+    "content_address_validation": "pass",
+    "implemented_effective_coverage": {
+      "passed": 78,
+      "total": 78
+    },
+    "integration_path_coverage": {
+      "passed": 10,
+      "total": 10
+    },
+    "forbidden_secret_values": 0
+  },
+  "relations_and_resolution": {
+    "catalog_rows": 96,
+    "dangling_edges": 0,
+    "public_duplicate_targets": 0,
+    "unresolved_aliases": 0,
+    "cases": [
+      {
+        "query": "Presentations",
+        "resolved": "S056"
+      },
+      {
+        "query": "Spreadsheets",
+        "resolved": "S057"
+      },
+      {
+        "query": "S005",
+        "resolved": "S020"
+      },
+      {
+        "query": "S006",
+        "resolved": "S021"
+      },
+      {
+        "query": "S007",
+        "resolved": "S022"
+      },
+      {
+        "query": "S008",
+        "resolved": "S023"
+      },
+      {
+        "query": "S059",
+        "resolved": "S077"
+      },
+      {
+        "query": "S060",
+        "resolved": "S077"
+      },
+      {
+        "query": "S061",
+        "resolved": "S077"
+      }
+    ]
+  },
+  "result_contracts": {
+    "providers": {
+      "skill_body": 20,
+      "overlay_adapter": 31,
+      "orchestrator": 7,
+      "artifact_adapter": 20,
+      "not_applicable": 18
+    },
+    "missing_provider_or_evidence": 0,
+    "representative_envelopes": [
+      {
+        "provider": "skill_body",
+        "skill": "data-analytics-methodology",
+        "valid": true
+      },
+      {
+        "provider": "overlay_adapter",
+        "skill": "gh-address-comments",
+        "valid": true
+      },
+      {
+        "provider": "orchestrator",
+        "skill": "staged-plan-runner",
+        "valid": true
+      },
+      {
+        "provider": "artifact_adapter",
+        "skill": "artifact-template-analytics-dashboard",
+        "valid": true
+      }
+    ]
+  },
+  "fixtures": {
+    "total": 61,
+    "passed": 61,
+    "failed": 0
+  },
+  "plugin": {
+    "name": "codex-skill-system-overrides",
+    "version": "0.1.0+codex.20260709224522",
+    "validation": "pass",
+    "source_installed_tree_parity": true,
+    "declared_skill_count": 0,
+    "resource_contract_count": 55
+  },
+  "fresh_process": {
+    "evidence": ".codex/skill-system/evidence/stage-07-fresh-process.json",
+    "status": "pass",
+    "process_exit_code": 0,
+    "observed_skill_names": 31,
+    "expected_public_delta": 0,
+    "observed_public_delta": 0,
+    "unexpected_overlay_skill_names": [],
+    "figma_names": [],
+    "hugging_face_names": [],
+    "artifact_template_names": [],
+    "resource_loader_intersection": 0,
+    "catalog_is_loader_filter": false,
+    "mutation_occurred": false
+  },
+  "quality_gates": {
+    "ruff": "pass",
+    "pyright": "pass after two narrow typing fixes",
+    "pytest": "30 passed",
+    "prompt_yaml": "9/9",
+    "skill_system_json": "pass",
+    "plugin_validation": "pass",
+    "docs_index": "pass",
+    "git_diff_check": "pass"
+  },
+  "contract_impact": {
+    "overall": "compatible-change",
+    "dimensions": {
+      "roehub_runtime_api_ui_data": "none",
+      "public_skill_names": "compatible-change",
+      "skill_spec_and_result_consumers": "compatible-change",
+      "canonical_alias_resolution": "compatible-change",
+      "external_and_paid_autonomy": "breaking-change",
+      "plugin_public_surface": "compatible-change",
+      "global_routing_policy": "compatible-change",
+      "persisted_schema": "none",
+      "request_hash_cache_identity": "none"
+    },
+    "migration": "Aliases and deprecated IDs resolve to canonical effective contracts; external/paid actions require explicit authority, target and budget."
+  },
+  "proof_boundary": {
+    "surface": "runtime",
+    "profile": "codex-local",
+    "label": "fresh_process_read_only_discovery",
+    "roehub_product_runtime": "not applicable"
+  },
+  "diagnostics": [
+    {
+      "classification": "unrelated_pre_existing",
+      "surface": ".codex/agents/*.toml",
+      "finding": "architect.toml, promt_manager.toml and software_engineer.toml use unsupported reasoning_language and are ignored by fresh Codex.",
+      "impact_on_skill_validation": "none",
+      "scope_decision": "not changed; outside skill ownership and Stage 07 narrow-fix manifest"
+    }
+  ],
+  "residual_risks": [
+    "Desktop and CLI plugin discovery can differ; the catalog remains a selection policy and fresh-process proof is repeated after plugin or loader updates.",
+    "Ten supplemental Figma cache sources fail the current quick validator but remain inventory-only, uninstalled and unexposed in the verified fresh CLI process."
+  ]
+}
