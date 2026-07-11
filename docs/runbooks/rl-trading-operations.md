@@ -208,6 +208,29 @@ execution streams закрывает приёмку.
 `execution.requests.dlq.v1`, а также отсутствие
 `rl_trading_inference_safety_breaches_total`.
 
+Ускоренный изолированный harness разрешен только как дополнительная проверка
+repair-механики. Он использует event-enriched историческую выборку, отдельные
+Redis stream prefix/consumer group/state/run id и in-memory execution
+repository. Его `accepted` результат не сокращает длительность фаз и не открывает
+следующий rollout:
+
+```bash
+cd /opt/roehub/app
+
+.venv/bin/python scripts/rl_trading/stage18a_accelerated_monitor_validation.py \
+  --config configs/prod/rl_trading_ml_runtime.yaml \
+  --production-baseline "$EVIDENCE_ROOT/$FIVE_TICKER_RUN/baseline.json" \
+  --session-count 100 \
+  --natural-open-target 20 \
+  --boundary-message-count 20
+```
+
+Event-enriched PnL нельзя использовать как profitability, OOS или product
+quality claim. Приемка ускоренного harness требует естественных, а не
+принудительных действий модели, точного open/close pairing, идемпотентного
+replay, наблюдаемого close-boundary retry, нулевых errors/intents/orders/safety
+breaches и неизменных production execution streams.
+
 ## Stage 08K Monitor-Only Alert Actions
 
 | Сигнал | Действие оператора |
