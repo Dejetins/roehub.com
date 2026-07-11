@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 995,
+      "file_count": 996,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -7923,6 +7923,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/18a-accelerated-monitor-validation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/architecture/ml/rl-trading-agent-platform-v1-stage-reports/rl-trading-agent-platform-v1-stage-ledger.md"
     },
     {
@@ -14076,7 +14081,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 2484,
+  "inventory_file_count": 2485,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -14252,5 +14257,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "617ab1b42e98b1fd0c73ff4ca46da239ad1a95b21600e79db2e7a8ea691fe2f0"
+  "structural_digest": "b0ff3e6ce72f55ef1010419e09d684279fa59bb4b481face7770704032834427"
 }

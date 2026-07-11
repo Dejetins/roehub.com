@@ -2,7 +2,7 @@
 
 Этот документ — человекочитаемое представление единой карты проекта. Машиночитаемый источник для агентов — [`project-map.json`](project-map.json), семантический каталог — [`project-map.toml`](project-map.toml), правила использования — [`AGENT_GUIDE.md`](AGENT_GUIDE.md).
 
-Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `617ab1b42e98b1fd0c73ff4ca46da239ad1a95b21600e79db2e7a8ea691fe2f0`; учтено файлов: **2484**.
+Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `b0ff3e6ce72f55ef1010419e09d684279fa59bb4b481face7770704032834427`; учтено файлов: **2485**.
 
 ## Визуальная runtime-карта
 
@@ -221,7 +221,7 @@ flowchart TB
 | `operations` | Инфраструктура и эксплуатация | Docker, macOS runtime, edge, monitoring, конфигурация и миграции данных. | 170 | `infra/`, `configs/`, `migrations/`, `alembic/`, `.github/workflows/` |
 | `automation` | Инструменты и автоматизация | Операторские скрипты, генераторы, CI helpers, загрузчики и notebooks. | 91 | `tools/`, `scripts/`, `data_load/`, `notebooks/` |
 | `quality` | Проверки и тестовые данные | Unit, integration, notebook и performance-smoke проверки, fixtures и typings. | 324 | `tests/`, `fixtures/`, `typings/` |
-| `knowledge` | Документация и агентные контракты | Архитектура, runbooks, планы, правила агентов и индекс проекта. | 995 | `docs/`, `.codex/`, `AGENTS.md`, `README.md` |
+| `knowledge` | Документация и агентные контракты | Архитектура, runbooks, планы, правила агентов и индекс проекта. | 996 | `docs/`, `.codex/`, `AGENTS.md`, `README.md` |
 | `experiments` | Прототипы и локальные результаты | Изолированные прототипы и каталоги воспроизводимых результатов. | 52 | `prototypes/`, `output/`, `local_artifacts/` |
 | `repository-meta` | Корневые контракты репозитория | Build metadata, dependency locks, root configuration and compatibility indexes. | 12 | `.dockerignore`, `.gitignore`, `.opencode/`, `.python-version`, `.vscode/`, `Dockerfile.api`, `LICENSE`, `alembic.ini`, `pyproject.toml`, `pyrightconfig.json`, `repo_tree.md`, `uv.lock` |
 
