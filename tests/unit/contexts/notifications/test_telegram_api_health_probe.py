@@ -29,6 +29,7 @@ def test_telegram_api_health_probe_uses_get_me_without_exposing_credential() -> 
     assert result.up is True
     assert result.error_code is None
     assert result.latency_seconds >= 0
+    assert session.url is not None
     assert session.url.endswith(f"/bot{credential}/getMe")
     assert session.timeout == 3.0
     assert credential not in repr(result)

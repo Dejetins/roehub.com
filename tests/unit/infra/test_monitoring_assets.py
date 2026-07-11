@@ -197,6 +197,7 @@ def test_macos_prometheus_notifications_admin_rules_are_repo_managed() -> None:
         "NotificationsCriticalUnknownDelivery",
         "NotificationsDispatcherPendingOld",
         "NotificationsWorkerDown",
+        "NotificationsTelegramApiDown",
         "NotificationsRetry429High",
         "NotificationsMissedReportSchedule",
     }
@@ -208,6 +209,9 @@ def test_macos_prometheus_notifications_admin_rules_are_repo_managed() -> None:
         )
         assert rule["annotations"]["escalation"]
         assert rule["annotations"]["action"]
+    telegram_expr = alerts["NotificationsTelegramApiDown"]["expr"]
+    assert "absent(notifications_telegram_api_up)" in telegram_expr
+    assert "notifications_telegram_api_last_success_unixtime" in telegram_expr
 
 
 def test_macos_prometheus_funding_rules_are_repo_managed() -> None:

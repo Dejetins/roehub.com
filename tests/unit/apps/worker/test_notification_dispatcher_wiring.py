@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-import time
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -131,13 +131,14 @@ def test_log_only_provider_mode_skips_telegram_deliveries_without_claiming() -> 
 
 def test_slow_telegram_probe_does_not_block_dispatcher_loop() -> None:
     dispatcher = _FastDispatcher()
+    probe = _BlockingProbe()
     app = NotificationDispatcherApp(
         dispatcher=dispatcher,  # type: ignore[arg-type]
         runtime_config=_runtime_config(),
         metrics=NotificationDispatcherPrometheusMetrics(
             registry=CollectorRegistry()
         ),
-        telegram_health_probe=_SlowProbe(),  # type: ignore[arg-type]
+        telegram_health_probe=probe,  # type: ignore[arg-type]
     )
 
     async def scenario() -> None:
@@ -146,8 +147,14 @@ def test_slow_telegram_probe_does_not_block_dispatcher_loop() -> None:
             asyncio.create_task(app._run_dispatcher_loop(stop_event)),
             asyncio.create_task(app._run_telegram_health_probe_loop(stop_event)),
         )
-        await asyncio.sleep(0.05)
-        assert dispatcher.calls >= 2
+        assert await asyncio.to_thread(probe.started.wait, 1.0)
+        calls_when_probe_started = dispatcher.calls
+        for _ in range(50):
+            if dispatcher.calls > calls_when_probe_started:
+                break
+            await asyncio.sleep(0.01)
+        assert dispatcher.calls > calls_when_probe_started
+        probe.release.set()
         stop_event.set()
         await asyncio.gather(*tasks)
 
@@ -163,10 +170,15 @@ class _FastDispatcher:
         return type("Batch", (), {"claimed": 0})()
 
 
-class _SlowProbe:
+class _BlockingProbe:
+    def __init__(self) -> None:
+        self.started = threading.Event()
+        self.release = threading.Event()
+
     def probe(self) -> TelegramApiHealthProbeResult:
-        time.sleep(0.15)
-        return TelegramApiHealthProbeResult(up=True, latency_seconds=0.15)
+        self.started.set()
+        assert self.release.wait(timeout=2.0)
+        return TelegramApiHealthProbeResult(up=True, latency_seconds=0.1)
 
 
 def _runtime_config() -> NotificationDispatcherRuntimeConfig:
