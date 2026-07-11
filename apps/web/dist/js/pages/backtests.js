@@ -80,6 +80,10 @@ const state = {
   pendingCancelTrigger: null,
   resultSummary: null,
   resultDetails: null,
+  resultChartModes: {
+    equity: "line",
+    drawdown: "line",
+  },
   tradesPage: 1,
   animateVariantJobId: null,
   closingVariantJobId: null,
@@ -1997,15 +2001,48 @@ function renderChartShell(kind, label, payload) {
   const stateName = resultPayloadState(payload);
   const points = Array.isArray(payload?.points) ? payload.points.length : 0;
   const unavailable = !payload || isMaterializationPayload(payload) || points === 0;
+  const mode = resultChartMode(kind);
   return `
     <section class="backtests-result-chart-panel" data-result-chart-panel="${escapeHtml(kind)}" data-result-state="${escapeHtml(stateName)}">
       <header>
-        <strong>${escapeHtml(label)}</strong>
-        <span>${escapeHtml(unavailable ? resultStatusText(payload, t("backtests.result_detail.pending")) : `${points} pts`)}</span>
+        <div class="backtests-result-chart-title">
+          <strong>${escapeHtml(label)}</strong>
+          <span>${escapeHtml(unavailable ? resultStatusText(payload, t("backtests.result_detail.pending")) : `${points} pts`)}</span>
+        </div>
+        <div class="backtests-result-chart-modes" role="group" aria-label="${escapeHtml(t("backtests.result_detail.chart_mode"))}">
+          ${renderChartModeButton(kind, "line", mode)}
+          ${renderChartModeButton(kind, "baseline", mode)}
+        </div>
       </header>
-      <canvas class="backtests-result-chart" data-result-chart="${escapeHtml(kind)}" width="420" height="170"></canvas>
+      <div
+        class="backtests-result-chart"
+        data-result-chart="${escapeHtml(kind)}"
+        data-result-chart-mode="${escapeHtml(mode)}"
+        role="img"
+        aria-label="${escapeHtml(label)}"
+      ></div>
     </section>
   `;
+}
+
+function renderChartModeButton(kind, mode, selectedMode) {
+  const selected = mode === selectedMode;
+  const label = mode === "baseline"
+    ? t("backtests.result_detail.chart_baseline")
+    : t("backtests.result_detail.chart_line");
+  return `
+    <button
+      class="backtests-result-chart-mode${selected ? " is-active" : ""}"
+      type="button"
+      data-result-chart-mode-button="${escapeHtml(mode)}"
+      data-result-chart-kind="${escapeHtml(kind)}"
+      aria-pressed="${selected ? "true" : "false"}"
+    >${escapeHtml(label)}</button>
+  `;
+}
+
+function resultChartMode(kind) {
+  return state.resultChartModes?.[kind] === "baseline" ? "baseline" : "line";
 }
 
 function renderMonthlyStatsTable(root, payload) {
@@ -2166,7 +2203,9 @@ function renderResultCanvases(root) {
   qsa("[data-result-chart]", root).forEach((canvas) => {
     const kind = canvas.dataset.resultChart;
     const payload = kind === "drawdown" ? details.drawdown : details.equity;
-    const result = renderBacktestSeries(canvas, payload?.points || [], { kind });
+    const mode = resultChartMode(kind);
+    canvas.dataset.resultChartMode = mode;
+    const result = renderBacktestSeries(canvas, payload?.points || [], { kind, mode });
     canvas.dataset.nonblank = result.nonblank ? "true" : "false";
     canvas.dataset.pointCount = String(result.points || 0);
   });
@@ -3991,6 +4030,23 @@ function bind(root) {
       clearSelectedVariantRetry();
       renderJobs(root, { items: state.jobRows });
       loadSelectedVariantDetails(root, { page: 1 }).catch(() => {});
+      return;
+    }
+    const resultChartModeButton = event.target.closest("[data-result-chart-mode-button]");
+    if (resultChartModeButton instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      const kind = resultChartModeButton.dataset.resultChartKind || "";
+      const mode = resultChartModeButton.dataset.resultChartModeButton || "line";
+      if ((kind === "equity" || kind === "drawdown") && (mode === "line" || mode === "baseline")) {
+        state.resultChartModes[kind] = mode;
+        qsa(`[data-result-chart-kind='${kind}']`, root).forEach((button) => {
+          const selected = button instanceof HTMLElement && button.dataset.resultChartModeButton === mode;
+          button.classList.toggle("is-active", selected);
+          button.setAttribute("aria-pressed", selected ? "true" : "false");
+        });
+        renderResultCanvases(root);
+      }
       return;
     }
     const resultRefresh = event.target.closest("[data-result-refresh]");

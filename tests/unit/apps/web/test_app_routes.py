@@ -640,6 +640,7 @@ def test_authorized_backtest_routes_render_stage_8_workstation_and_aliases() -> 
     assert 'data-backtests-view-button="results"' in response.text
     assert 'data-backtests-panel="config_summary"' in response.text
     assert "/assets/css/pages/backtests.css" in response.text
+    assert "/assets/vendor/lightweight-charts.standalone.production.js" in response.text
     assert "/assets/js/pages/backtests.js" in response.text
     assert "/assets/backtest_ui.js" not in response.text
     assert response.text.count("<select") == 1
@@ -1002,6 +1003,8 @@ def test_stage_2_design_system_assets_exist_and_keep_contract_literals() -> None
     assert "<small>${escapeHtml(symbol.status)}</small>" not in backtests_js
     assert "button.disabled = isRunning;" in backtests_js
     assert "renderBacktestSeries" in backtests_js
+    assert "data-result-chart-mode-button" in backtests_js
+    assert "resultChartModes" in backtests_js
     assert "/api/backtests/jobs/{job_id}/variants/{variant_key}/equity" in backtests_js
     assert "/api/backtests/jobs/{job_id}/variants/{variant_key}/drawdown" in backtests_js
     assert "/api/backtests/jobs/{job_id}/variants/{variant_key}/monthly-stats" in backtests_js

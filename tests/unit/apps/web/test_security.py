@@ -32,6 +32,8 @@ def test_base_shell_has_no_external_cdn_script() -> None:
     assert "https://cdn" not in base_template
     assert "/assets/vendor/htmx.min.js" in base_template
     assert (WEB_DIST / "vendor" / "htmx.min.js").exists()
+    assert (WEB_DIST / "vendor" / "lightweight-charts.standalone.production.js").exists()
+    assert (WEB_DIST / "vendor" / "lightweight-charts.NOTICE.txt").exists()
 
 
 def test_auth_templates_do_not_embed_inline_scripts() -> None:

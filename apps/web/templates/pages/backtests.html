@@ -607,5 +607,6 @@
 {% endblock %}
 
 {% block scripts %}
+  <script src="{{ asset_url('/assets/vendor/lightweight-charts.standalone.production.js') }}" defer></script>
   <script type="module" src="{{ asset_url('/assets/js/pages/backtests.js') }}"></script>
 {% endblock %}
