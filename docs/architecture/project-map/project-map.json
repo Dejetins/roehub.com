@@ -152,7 +152,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 222,
+      "file_count": 224,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -430,7 +430,7 @@
         "apps/web/main/app.py",
         "apps/web/main/main.py"
       ],
-      "file_count": 86,
+      "file_count": 88,
       "id": "app:web",
       "kind": "app",
       "name": "web",
@@ -4679,6 +4679,16 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/web/dist/vendor/htmx.min.js"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/web/dist/vendor/lightweight-charts.NOTICE.txt"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/web/dist/vendor/lightweight-charts.standalone.production.js"
     },
     {
       "area": "delivery",
@@ -14056,7 +14066,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 2480,
+  "inventory_file_count": 2482,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -14232,5 +14242,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "12e1a84e6c3c00abb9e7ae15670b0c9f27bcb34898bec049cd469aa088d711c4"
+  "structural_digest": "37254f7e795776d12b92a03e5fbc59df7c8ff5c5e511ca7ca45c28384e859c4e"
 }

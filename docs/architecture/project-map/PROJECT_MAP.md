@@ -2,7 +2,7 @@
 
 Этот документ — человекочитаемое представление единой карты проекта. Машиночитаемый источник для агентов — [`project-map.json`](project-map.json), семантический каталог — [`project-map.toml`](project-map.toml), правила использования — [`AGENT_GUIDE.md`](AGENT_GUIDE.md).
 
-Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `12e1a84e6c3c00abb9e7ae15670b0c9f27bcb34898bec049cd469aa088d711c4`; учтено файлов: **2480**.
+Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `37254f7e795776d12b92a03e5fbc59df7c8ff5c5e511ca7ca45c28384e859c4e`; учтено файлов: **2482**.
 
 ## Визуальная runtime-карта
 
@@ -217,7 +217,7 @@ flowchart TB
 |---|---|---|---:|---|
 | `domain` | Доменные контексты | Бизнес-правила и use cases по bounded contexts. | 593 | `src/trading/contexts/` |
 | `shared-core` | Shared kernel и платформа | Общие типы, конфигурация, ошибки, интеграционные и производительные примитивы. | 22 | `src/trading/__init__.py`, `src/trading/shared_kernel/`, `src/trading/platform/`, `src/trading/integration/`, `src/trading/fastpath/` |
-| `delivery` | Приложения и delivery | HTTP, HTML, CLI, workers, schedulers, migrations и composition roots. | 222 | `apps/` |
+| `delivery` | Приложения и delivery | HTTP, HTML, CLI, workers, schedulers, migrations и composition roots. | 224 | `apps/` |
 | `operations` | Инфраструктура и эксплуатация | Docker, macOS runtime, edge, monitoring, конфигурация и миграции данных. | 170 | `infra/`, `configs/`, `migrations/`, `alembic/`, `.github/workflows/` |
 | `automation` | Инструменты и автоматизация | Операторские скрипты, генераторы, CI helpers, загрузчики и notebooks. | 90 | `tools/`, `scripts/`, `data_load/`, `notebooks/` |
 | `quality` | Проверки и тестовые данные | Unit, integration, notebook и performance-smoke проверки, fixtures и typings. | 323 | `tests/`, `fixtures/`, `typings/` |
@@ -238,7 +238,7 @@ flowchart TB
 | `app:migrations` | Bootstrap и применение миграций. | 4 | `apps/migrations/main.py` | — |
 | `app:monitoring` | Экспорт технических метрик. | 2 | — | — |
 | `app:scheduler` | Планировщики фоновых задач. | 12 | `apps/scheduler/backtest_artifact_publisher/main/main.py`, `apps/scheduler/market_data_scheduler/main/main.py` | `app:api`, `app:cli`, `context:backtest_artifacts`, `context:indicators`, `context:market_data`, `core:platform`, `core:shared_kernel` |
-| `app:web` | Server-rendered web UI и same-origin API client. | 86 | `apps/web/main/app.py`, `apps/web/main/main.py` | — |
+| `app:web` | Server-rendered web UI и same-origin API client. | 88 | `apps/web/main/app.py`, `apps/web/main/main.py` | — |
 | `context:backtest` | Расчёт и оркестрация исторических прогонов. | 86 | — | `context:backtest_artifacts`, `context:indicators`, `core:platform`, `core:shared_kernel` |
 | `context:backtest_artifacts` | Публикация и чтение артефактов бектеста. | 28 | — | `context:backtest`, `context:indicators`, `context:market_data`, `core:platform`, `core:shared_kernel` |
 | `context:exchange_control` | Политики доступности биржевых соединений и ключей. | 17 | `src/trading/contexts/exchange_control/adapters/inbound/http/app.py` | `core:shared_kernel` |
