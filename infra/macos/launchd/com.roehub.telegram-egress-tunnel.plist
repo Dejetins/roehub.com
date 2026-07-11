@@ -21,6 +21,7 @@
     <string>-NT</string>
     <string>-L</string>
     <string>127.0.0.1:18180:127.0.0.1:3128</string>
+    <string>-o</string>
     <string>BatchMode=yes</string>
     <string>-o</string>
     <string>StrictHostKeyChecking=yes</string>

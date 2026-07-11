@@ -70,9 +70,13 @@ def test_telegram_egress_tunnel_is_installed_and_scoped_to_notifications() -> No
     tunnel_arguments = tunnel_plist["ProgramArguments"]
     assert isinstance(tunnel_arguments, list)
     assert "127.0.0.1:18180:127.0.0.1:3128" in tunnel_arguments
-    assert "BatchMode=yes" in tunnel_arguments
-    assert "StrictHostKeyChecking=yes" in tunnel_arguments
-    assert "ExitOnForwardFailure=yes" in tunnel_arguments
+    for option in (
+        "BatchMode=yes",
+        "StrictHostKeyChecking=yes",
+        "ExitOnForwardFailure=yes",
+    ):
+        option_index = tunnel_arguments.index(option)
+        assert tunnel_arguments[option_index - 1] == "-o"
 
     dispatcher_arguments = dispatcher_plist["ProgramArguments"]
     assert isinstance(dispatcher_arguments, list)
