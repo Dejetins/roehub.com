@@ -17,6 +17,8 @@ Production-диспетчер на `macstudio` получает доступ к 
 используется:
 
 - Squid на шлюзе слушает только `127.0.0.1:3128`;
+- ACL Squid разрешает только `api.telegram.org`; другие адреса должны получать
+  `403 Forbidden`;
 - отдельная учетная запись `roehub-tunnel` может переадресовывать только
   `127.0.0.1:3128`;
 - `launchd`-служба `com.roehub.telegram-egress-tunnel` на `macstudio` публикует
