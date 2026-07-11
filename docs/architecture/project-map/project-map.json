@@ -174,7 +174,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 90,
+      "file_count": 91,
       "id": "automation",
       "paths": [
         "tools/",
@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 323,
+      "file_count": 324,
       "id": "quality",
       "paths": [
         "tests/",
@@ -9261,6 +9261,11 @@
       "path": "scripts/rl_trading/stage18_rl_soak_incident_drills.py"
     },
     {
+      "area": "automation",
+      "kind": "python",
+      "path": "scripts/rl_trading/stage18a_accelerated_monitor_validation.py"
+    },
+    {
       "area": "shared-core",
       "kind": "python",
       "path": "src/trading/__init__.py"
@@ -13863,6 +13868,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/scripts/rl_trading/test_stage18a_accelerated_monitor_validation.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/shared_kernel/primitives/test_candle.py"
     },
     {
@@ -14066,7 +14076,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 2482,
+  "inventory_file_count": 2484,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -14242,5 +14252,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "37254f7e795776d12b92a03e5fbc59df7c8ff5c5e511ca7ca45c28384e859c4e"
+  "structural_digest": "617ab1b42e98b1fd0c73ff4ca46da239ad1a95b21600e79db2e7a8ea691fe2f0"
 }
