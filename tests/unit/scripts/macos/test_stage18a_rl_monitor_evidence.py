@@ -33,13 +33,16 @@ def test_assess_window_accepts_clean_monitor_only_hour() -> None:
     summary = assess_window(baseline=baseline, final=final, minimum_seconds=3_600)
 
     assert summary["status"] == "accepted"
-    assert summary["metric_deltas"]["candles_total"] == 60.0
+    assert summary["prometheus_window_metrics"]["processed_candles_total"] == 60.0
     assert summary["database_deltas"] == {
         "source_events": 2,
         "open_long_source_events": 0,
         "close_source_events": 0,
+        "valid_close_source_events": 0,
+        "invalid_close_source_events": 0,
         "intents": 0,
         "orders": 0,
+        "virtual_pnl_quote": 0.0,
     }
     assert summary["stream_deltas"] == {
         "execution.requests.v1": 0,
@@ -98,12 +101,71 @@ def test_assess_window_requires_valid_virtual_exit_for_twenty_ticker_week() -> N
         source_events=2,
         open_long_source_events=1,
         close_source_events=1,
+        valid_close_source_events=1,
+        virtual_pnl_quote=12.5,
     )
 
     summary = assess_window(baseline=baseline, final=final, minimum_seconds=604_800)
 
     assert summary["status"] == "accepted"
     assert summary["checks"]["virtual_exit_observed_when_required"] is True
+
+
+def test_assess_window_accepts_restart_when_runtime_components_are_unchanged() -> None:
+    baseline = _snapshot(phase="five_ticker_24h", instrument_count=5)
+    final = deepcopy(baseline)
+    final["recorded_at_utc"] = "2026-07-11T06:00:00Z"
+    final["process_pid"] = 5678
+    final["revision"] = "d" * 40
+
+    summary = assess_window(
+        baseline=baseline,
+        final=final,
+        minimum_seconds=86_400,
+        window_metrics=_window_metrics(processed_candles_total=7_201.0),
+    )
+
+    assert summary["status"] == "accepted"
+    assert summary["observations"] == {
+        "process_restarted": True,
+        "revision_changed": True,
+    }
+    assert summary["checks"]["runtime_components_unchanged"] is True
+
+
+def test_assess_window_blocks_runtime_component_change() -> None:
+    baseline = _snapshot(phase="five_ticker_24h", instrument_count=5)
+    final = deepcopy(baseline)
+    final["recorded_at_utc"] = "2026-07-11T06:00:00Z"
+    final["runtime_component_sha256"]["monitor_worker"] = "f" * 64
+
+    summary = assess_window(
+        baseline=baseline,
+        final=final,
+        minimum_seconds=86_400,
+        window_metrics=_window_metrics(processed_candles_total=7_201.0),
+    )
+
+    assert summary["status"] == "blocked"
+    assert summary["checks"]["runtime_components_unchanged"] is False
+
+
+def test_assess_window_blocks_error_seen_before_process_restart() -> None:
+    baseline = _snapshot(phase="five_ticker_24h", instrument_count=5)
+    final = deepcopy(baseline)
+    final["recorded_at_utc"] = "2026-07-11T06:00:00Z"
+    metrics = _window_metrics(processed_candles_total=7_201.0)
+    metrics["errors_total"] = 1.0
+
+    summary = assess_window(
+        baseline=baseline,
+        final=final,
+        minimum_seconds=86_400,
+        window_metrics=metrics,
+    )
+
+    assert summary["status"] == "blocked"
+    assert summary["checks"]["errors_zero"] is False
 
 
 def test_previous_summary_gate_accepts_only_hashed_accepted_prior_phase() -> None:
@@ -129,8 +191,11 @@ def _snapshot(*, phase: str = "one_ticker_1h", instrument_count: int = 1) -> dic
             "source_events": 0,
             "open_long_source_events": 0,
             "close_source_events": 0,
+            "valid_close_source_events": 0,
+            "invalid_close_source_events": 0,
             "intents": 0,
             "orders": 0,
+            "virtual_pnl_quote": 0.0,
         },
         "health": {"ready": True},
         "log_json_valid": True,
@@ -148,10 +213,40 @@ def _snapshot(*, phase: str = "one_ticker_1h", instrument_count: int = 1) -> dic
             f"binance:futures:TICKER{index}USDT" for index in range(instrument_count)
         ],
         "runtime_config_sha256": "c" * 64,
+        "latency_budget_ms": {
+            "candle_close_to_feature_ready": 250.0,
+            "decision_to_source_event": 50.0,
+            "feature_to_decision": 100.0,
+        },
+        "runtime_component_sha256": {
+            "inference_runtime": "1" * 64,
+            "monitor_worker": "2" * 64,
+            "monitor_domain": "3" * 64,
+            "monitor_policy": "b" * 64,
+        },
         "runtime_policy_sha256": "b" * 64,
         "stream_lengths": {
             "execution.requests.v1": 49,
             "execution.requests.retry.v1": 1,
             "execution.requests.dlq.v1": 2,
         },
+    }
+
+
+def _window_metrics(*, processed_candles_total: float) -> dict[str, Any]:
+    return {
+        "counter_resets": 0.0,
+        "decisions_total": 0.0,
+        "errors_total": 0.0,
+        "feed_lag_max_seconds": 6.0,
+        "invalid_virtual_exits_total": 0.0,
+        "latency_p95_seconds": {
+            "candle_close_to_feature_ready": 0.02,
+        },
+        "processed_candles_total": processed_candles_total,
+        "safety_breaches_total": 0.0,
+        "target_samples": 2_880.0,
+        "target_up_samples": 2_880.0,
+        "valid_virtual_exits_total": 0.0,
+        "virtual_realized_pnl_quote": 0.0,
     }

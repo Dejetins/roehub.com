@@ -25,7 +25,11 @@ from trading.contexts.rl_trading.adapters.outbound import LiveExecutionRlInferen
 from trading.contexts.rl_trading.adapters.outbound.persistence.file_monitor_state import (
     FileStage08kMonitorStateStore,
 )
-from trading.contexts.rl_trading.domain import RlFeatureCandle, Stage13FeatureWindow
+from trading.contexts.rl_trading.domain import (
+    RlFeatureCandle,
+    Stage13FeatureWindow,
+    Stage13MonitorOnlyInferenceError,
+)
 from trading.contexts.rl_trading.domain.stage08k_monitor_policy import (
     Stage08kArticleSignal,
     Stage08kMonitorDecision,
@@ -156,6 +160,61 @@ def test_worker_replay_after_ack_failure_is_idempotent(tmp_path: Path) -> None:
     assert store.last_processed_close_utc(instrument_key=instrument.instrument_key) == close_time
 
 
+def test_worker_retries_early_stream_message_without_accepting_unclosed_candle(
+    tmp_path: Path,
+) -> None:
+    instrument = RlTradingInferenceInstrumentConfig(
+        exchange="binance",
+        market_type="futures",
+        symbol="BTCUSDT",
+        instrument_key="binance:futures:BTCUSDT",
+    )
+    close_time = datetime(2026, 7, 10, 12, 0, tzinfo=UTC)
+    stream = _FakeStream()
+    repository = InMemoryExecutionIntentRepository()
+    reader = _FakeCloseBoundaryReader(
+        window=_window(close_time=close_time, close_price=100.0),
+        failures=2,
+    )
+    sleeps: list[float] = []
+    metrics = RlTradingInferenceMetrics(registry=CollectorRegistry())
+    worker = Stage08kMonitorWorker(
+        instruments=(instrument,),
+        operator_context=RlTradingInferenceOperatorContextConfig(
+            owner_user_id="00000000-0000-0000-0000-000000013001",
+            strategy_id="00000000-0000-0000-0000-000000013101",
+            strategy_run_id="00000000-0000-0000-0000-000000013201",
+        ),
+        stream=cast(Any, stream),
+        window_reader=cast(Any, reader),
+        policy=cast(Any, _FakePolicy()),
+        producer=LiveExecutionRlInferenceProducer(
+            ingress_service=ExecutionIngressService(
+                repository=repository,
+                clock=SystemLiveExecutionClock(),
+            ),
+            repository=repository,
+        ),
+        state_store=FileStage08kMonitorStateStore(path=(tmp_path / "state.json").resolve()),
+        metrics=metrics,
+        close_boundary_sleep=sleeps.append,
+    )
+    message = RlTradingRedisCandleMessage(
+        instrument_key=instrument.instrument_key,
+        message_id="1-0",
+    )
+
+    worker.process_with_close_boundary_retry(message=message)
+
+    assert reader.calls == 3
+    assert sleeps == [0.05, 0.05]
+    assert stream.acked == ["1-0"]
+    assert len(repository.source_events) == 1
+    rendered = metrics.render_latest().decode("utf-8")
+    assert "rl_trading_inference_close_boundary_retries_total 2.0" in rendered
+    assert "rl_trading_inference_errors_total{" not in rendered
+
+
 class _FakeStream:
     def __init__(self, *, fail_first_ack: bool = False) -> None:
         self.acked: list[str] = []
@@ -174,6 +233,22 @@ class _FakeWindowReader:
 
     def read_window_at_message(self, **kwargs: object) -> Stage13FeatureWindow:
         return self._windows[str(kwargs["message_id"])]
+
+
+class _FakeCloseBoundaryReader:
+    def __init__(self, *, window: Stage13FeatureWindow, failures: int) -> None:
+        self._window = window
+        self._failures = failures
+        self.calls = 0
+
+    def read_window_at_message(self, **kwargs: object) -> Stage13FeatureWindow:
+        del kwargs
+        self.calls += 1
+        if self.calls <= self._failures:
+            raise Stage13MonitorOnlyInferenceError(
+                reason="redis_window_contains_unclosed_candle"
+            )
+        return self._window
 
 
 class _FakePolicy:

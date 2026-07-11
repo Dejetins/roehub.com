@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 
 from trading.contexts.rl_trading.adapters.outbound import LiveExecutionRlInferenceProducer
@@ -17,6 +17,7 @@ from trading.contexts.rl_trading.domain import (
     Stage13DecisionContext,
     Stage13FeatureWindow,
     Stage13InferenceDecision,
+    Stage13MonitorOnlyInferenceError,
 )
 from trading.contexts.rl_trading.domain.raw_feature_dataset import hash_json_payload_v1
 from trading.contexts.rl_trading.domain.stage08k_monitor_runtime import (
@@ -37,6 +38,9 @@ from .rl_trading_inference import (
 
 log = logging.getLogger(__name__)
 
+_CLOSE_BOUNDARY_RETRY_ATTEMPTS = 20
+_CLOSE_BOUNDARY_RETRY_SECONDS = 0.05
+
 
 class Stage08kMonitorWorker:
     def __init__(
@@ -50,6 +54,7 @@ class Stage08kMonitorWorker:
         producer: LiveExecutionRlInferenceProducer,
         state_store: FileStage08kMonitorStateStore,
         metrics: RlTradingInferenceMetrics,
+        close_boundary_sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._instruments = {row.instrument_key: row for row in instruments}
         if not self._instruments:
@@ -61,6 +66,7 @@ class Stage08kMonitorWorker:
         self._producer = producer
         self._state_store = state_store
         self._metrics = metrics
+        self._close_boundary_sleep = close_boundary_sleep
         self._metrics.set_pending_virtual_positions(len(state_store.all_pending()))
 
     def run(self, *, duration_seconds: float = 0.0) -> None:
@@ -69,7 +75,7 @@ class Stage08kMonitorWorker:
             messages = self._stream.read()
             for message in messages:
                 try:
-                    self.process(message=message)
+                    self.process_with_close_boundary_retry(message=message)
                 except Exception as error:  # noqa: BLE001
                     self._metrics.observe_error(
                         operation="process_candle",
@@ -80,6 +86,23 @@ class Stage08kMonitorWorker:
                         message.instrument_key,
                         message.message_id,
                     )
+
+    def process_with_close_boundary_retry(
+        self, *, message: RlTradingRedisCandleMessage
+    ) -> None:
+        for attempt in range(_CLOSE_BOUNDARY_RETRY_ATTEMPTS):
+            try:
+                self.process(message=message)
+                return
+            except Stage13MonitorOnlyInferenceError as error:
+                should_retry = (
+                    error.reason == "redis_window_contains_unclosed_candle"
+                    and attempt + 1 < _CLOSE_BOUNDARY_RETRY_ATTEMPTS
+                )
+                if not should_retry:
+                    raise
+                self._metrics.observe_close_boundary_retry()
+                self._close_boundary_sleep(_CLOSE_BOUNDARY_RETRY_SECONDS)
 
     def process(self, *, message: RlTradingRedisCandleMessage) -> None:
         instrument = self._instruments.get(message.instrument_key)

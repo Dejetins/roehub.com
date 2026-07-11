@@ -424,6 +424,11 @@ class RlTradingInferenceMetrics:
             ("result",),
             registry=self.registry,
         )
+        self.close_boundary_retries_total = Counter(
+            "rl_trading_inference_close_boundary_retries_total",
+            "Closed-candle reads deferred until the declared candle close boundary",
+            registry=self.registry,
+        )
         self.sessions_total = Counter(
             "rl_trading_inference_sessions_total",
             "Article session eligibility checks by bounded eligibility and reason",
@@ -516,6 +521,9 @@ class RlTradingInferenceMetrics:
         self.candles_total.labels(result=_bounded_reason(result)).inc()
         self.last_candle_unixtime.set(candle_close_unixtime)
         self.feed_lag_seconds.set(max(0.0, now - candle_close_unixtime))
+
+    def observe_close_boundary_retry(self) -> None:
+        self.close_boundary_retries_total.inc()
 
     def observe_session(self, *, eligible: bool, reason: str) -> None:
         self.sessions_total.labels(

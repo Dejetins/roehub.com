@@ -6,10 +6,12 @@ import json
 import math
 import os
 import subprocess
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, LiteralString, cast
+from urllib.parse import urlencode
 from urllib.request import urlopen
 
 import psycopg
@@ -27,6 +29,24 @@ EXECUTION_STREAMS = (
     "execution.requests.dlq.v1",
 )
 RUNTIME_CONFIG_PATH = Path("/opt/roehub/app/configs/prod/rl_trading_ml_runtime.yaml")
+RUNTIME_COMPONENT_PATHS = {
+    "inference_runtime": Path(
+        "/opt/roehub/app/apps/worker/rl_trading_inference/wiring/modules/"
+        "rl_trading_inference.py"
+    ),
+    "monitor_worker": Path(
+        "/opt/roehub/app/apps/worker/rl_trading_inference/wiring/modules/"
+        "stage08k_monitor_worker.py"
+    ),
+    "monitor_domain": Path(
+        "/opt/roehub/app/src/trading/contexts/rl_trading/domain/"
+        "stage08k_monitor_runtime.py"
+    ),
+    "monitor_policy": Path(
+        "/opt/roehub/app/src/trading/contexts/rl_trading/domain/"
+        "stage08k_monitor_policy.py"
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,10 +160,14 @@ def create_baseline(
 def create_final_summary(*, baseline_path: Path, minimum_seconds: int) -> tuple[Path, bool]:
     baseline = _read_json(baseline_path)
     final = capture_snapshot(recorded_at=datetime.now(UTC))
+    started = _parse_utc(str(baseline["recorded_at_utc"]))
+    finished = _parse_utc(str(final["recorded_at_utc"]))
+    window_metrics = _prometheus_window_metrics(started=started, finished=finished)
     summary = assess_window(
         baseline=baseline,
         final=final,
         minimum_seconds=minimum_seconds,
+        window_metrics=window_metrics,
     )
     summary_without_hash = {
         "artifact_kind": f"stage18a_{baseline['rollout_phase']}_summary_v1",
@@ -182,18 +206,21 @@ def capture_snapshot(*, recorded_at: datetime) -> dict[str, Any]:
         "rollout_phase": runtime["rollout_phase"],
         "instrument_keys": runtime["instrument_keys"],
         "runtime_config_sha256": runtime["runtime_config_sha256"],
-        "runtime_policy_sha256": _sha256(
-            Path(
-                "/opt/roehub/app/src/trading/contexts/rl_trading/domain/"
-                "stage08k_monitor_policy.py"
-            )
-        ),
+        "latency_budget_ms": runtime["latency_budget_ms"],
+        "runtime_component_sha256": {
+            name: _sha256(path) for name, path in RUNTIME_COMPONENT_PATHS.items()
+        },
+        "runtime_policy_sha256": _sha256(RUNTIME_COMPONENT_PATHS["monitor_policy"]),
         "stream_lengths": stream_lengths,
     }
 
 
 def assess_window(
-    *, baseline: dict[str, Any], final: dict[str, Any], minimum_seconds: int
+    *,
+    baseline: dict[str, Any],
+    final: dict[str, Any],
+    minimum_seconds: int,
+    window_metrics: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     started = _parse_utc(str(baseline["recorded_at_utc"]))
     finished = _parse_utc(str(final["recorded_at_utc"]))
@@ -202,7 +229,7 @@ def assess_window(
     final_metrics = dict(final.get("metrics", {}))
     phase = str(baseline["rollout_phase"])
     requirements = _phase_requirements(phase)
-    candle_delta = _metric_sum_matching(
+    local_candle_delta = _metric_sum_matching(
         final_metrics,
         "rl_trading_inference_candles_total",
         ('result="processed"',),
@@ -211,16 +238,16 @@ def assess_window(
         "rl_trading_inference_candles_total",
         ('result="processed"',),
     )
-    error_delta = _metric_sum(final_metrics, "rl_trading_inference_errors_total") - _metric_sum(
-        baseline_metrics, "rl_trading_inference_errors_total"
-    )
-    safety_delta = _metric_sum(
+    local_error_delta = _metric_sum(
+        final_metrics, "rl_trading_inference_errors_total"
+    ) - _metric_sum(baseline_metrics, "rl_trading_inference_errors_total")
+    local_safety_delta = _metric_sum(
         final_metrics, "rl_trading_inference_safety_breaches_total"
     ) - _metric_sum(baseline_metrics, "rl_trading_inference_safety_breaches_total")
-    decision_delta = _metric_sum(
+    local_decision_delta = _metric_sum(
         final_metrics, "rl_trading_inference_decisions_total"
     ) - _metric_sum(baseline_metrics, "rl_trading_inference_decisions_total")
-    valid_virtual_exit_delta = _metric_sum_matching(
+    local_valid_virtual_exit_delta = _metric_sum_matching(
         final_metrics,
         "rl_trading_inference_virtual_exits_total",
         ('valid="true"',),
@@ -229,7 +256,7 @@ def assess_window(
         "rl_trading_inference_virtual_exits_total",
         ('valid="true"',),
     )
-    invalid_virtual_exit_delta = _metric_sum_matching(
+    local_invalid_virtual_exit_delta = _metric_sum_matching(
         final_metrics,
         "rl_trading_inference_virtual_exits_total",
         ('valid="false"',),
@@ -238,59 +265,113 @@ def assess_window(
         "rl_trading_inference_virtual_exits_total",
         ('valid="false"',),
     )
-    virtual_pnl_delta = _metric_value(
+    local_virtual_pnl_delta = _metric_value(
         final_metrics, "rl_trading_inference_virtual_realized_pnl_quote"
     ) - _metric_value(baseline_metrics, "rl_trading_inference_virtual_realized_pnl_quote")
-    database_deltas = {
+    database_count_deltas = {
         key: int(final["database_counts"][key]) - int(baseline["database_counts"][key])
         for key in (
             "source_events",
             "open_long_source_events",
             "close_source_events",
+            "valid_close_source_events",
+            "invalid_close_source_events",
             "intents",
             "orders",
         )
+    }
+    database_deltas: dict[str, float | int] = {
+        **database_count_deltas,
+        "virtual_pnl_quote": float(final["database_counts"]["virtual_pnl_quote"])
+        - float(baseline["database_counts"]["virtual_pnl_quote"]),
     }
     stream_deltas = {
         key: int(final["stream_lengths"][key]) - int(baseline["stream_lengths"][key])
         for key in EXECUTION_STREAMS
     }
-    required_candles = requirements.instrument_count * max(1, (minimum_seconds // 60) - 5)
+    observed = dict(window_metrics or {})
+    if not observed:
+        observed = {
+            "counter_resets": 0.0,
+            "decisions_total": local_decision_delta,
+            "errors_total": local_error_delta,
+            "feed_lag_max_seconds": _metric_value(
+                final_metrics, "rl_trading_inference_feed_lag_seconds"
+            ),
+            "invalid_virtual_exits_total": local_invalid_virtual_exit_delta,
+            "latency_p95_seconds": {},
+            "processed_candles_total": local_candle_delta,
+            "safety_breaches_total": local_safety_delta,
+            "target_samples": 1.0,
+            "target_up_samples": 1.0,
+            "valid_virtual_exits_total": local_valid_virtual_exit_delta,
+            "virtual_realized_pnl_quote": local_virtual_pnl_delta,
+        }
+    target_samples = float(observed.get("target_samples", 0.0))
+    target_up_samples = float(observed.get("target_up_samples", 0.0))
+    prometheus_availability = (
+        target_up_samples / target_samples if target_samples > 0.0 else 0.0
+    )
+    processed_candles = float(observed.get("processed_candles_total", 0.0))
+    errors_total = float(observed.get("errors_total", 0.0))
+    safety_total = float(observed.get("safety_breaches_total", 0.0))
+    invalid_exits_total = float(observed.get("invalid_virtual_exits_total", 0.0))
+    required_candles = requirements.instrument_count * max(
+        1, (minimum_seconds // 60) - 5
+    )
+    baseline_components = baseline.get("runtime_component_sha256")
+    final_components = final.get("runtime_component_sha256")
+    runtime_components_unchanged = (
+        isinstance(baseline_components, dict)
+        and isinstance(final_components, dict)
+        and baseline_components == final_components
+    )
+    if baseline_components is None and final_components is None:
+        runtime_components_unchanged = final.get("runtime_policy_sha256") == baseline.get(
+            "runtime_policy_sha256"
+        )
     checks = {
         "duration_reached": elapsed_seconds >= minimum_seconds,
-        "enough_closed_candles": candle_delta >= required_candles,
-        "errors_zero": error_delta == 0,
+        "enough_closed_candles": processed_candles >= required_candles,
+        "errors_zero": errors_total == 0.0,
+        "feed_lag_within_budget": float(observed.get("feed_lag_max_seconds", 0.0))
+        <= 15.0,
         "health_ready": final.get("health", {}).get("ready") is True,
         "instrument_count_exact": len(final.get("instrument_keys", ()))
         == requirements.instrument_count,
         "instrument_set_unchanged": final.get("instrument_keys") == baseline.get("instrument_keys"),
-        "intents_zero": database_deltas["intents"] == 0,
+        "intents_zero": database_count_deltas["intents"] == 0,
+        "latency_within_budget": _latency_within_budget(
+            p95_seconds=observed.get("latency_p95_seconds"),
+            budgets_ms=final.get("latency_budget_ms"),
+        ),
         "log_json_valid": final.get("log_json_valid") is True,
         "model_loaded": _metric_value(final_metrics, "rl_trading_inference_model_loaded") == 1,
-        "orders_zero": database_deltas["orders"] == 0,
+        "orders_zero": database_count_deltas["orders"] == 0,
         "phase_unchanged": final.get("rollout_phase") == phase,
+        "prometheus_availability": prometheus_availability >= 0.99,
         "prometheus_target_up": final.get("prometheus_target_health") == "up",
-        "process_unchanged": final.get("process_pid") == baseline.get("process_pid"),
-        "revision_unchanged": final.get("revision") == baseline.get("revision"),
         "rss_within_budget": float(final.get("process_rss_mb", 0.0)) <= 4_096.0,
-        "runtime_policy_unchanged": final.get("runtime_policy_sha256")
-        == baseline.get("runtime_policy_sha256"),
+        "runtime_components_unchanged": runtime_components_unchanged,
         "runtime_config_unchanged": final.get("runtime_config_sha256")
         == baseline.get("runtime_config_sha256"),
-        "safety_breaches_zero": safety_delta == 0,
+        "safety_breaches_zero": safety_total == 0.0,
         "dispatch_stream_growth_zero": all(value == 0 for value in stream_deltas.values()),
-        "invalid_virtual_exits_zero": invalid_virtual_exit_delta == 0,
+        "invalid_virtual_exits_zero": (
+            invalid_exits_total == 0.0
+            and database_count_deltas["invalid_close_source_events"] == 0
+        ),
         "decision_observed_when_required": (
             not requirements.require_decision
-            or (decision_delta > 0 and database_deltas["source_events"] > 0)
+            or database_count_deltas["source_events"] > 0
         ),
         "virtual_exit_observed_when_required": (
             not requirements.require_virtual_exit
             or (
-                valid_virtual_exit_delta > 0
-                and database_deltas["open_long_source_events"] > 0
-                and database_deltas["close_source_events"] > 0
-                and math.isfinite(virtual_pnl_delta)
+                database_count_deltas["valid_close_source_events"] > 0
+                and database_count_deltas["open_long_source_events"] > 0
+                and database_count_deltas["close_source_events"] > 0
+                and math.isfinite(float(database_deltas["virtual_pnl_quote"]))
             )
         ),
     }
@@ -299,22 +380,19 @@ def assess_window(
         "database_deltas": database_deltas,
         "elapsed_seconds": elapsed_seconds,
         "final": final,
-        "metric_deltas": {
-            "candles_total": candle_delta,
-            "decisions_total": decision_delta,
-            "errors_total": error_delta,
-            "invalid_virtual_exits_total": invalid_virtual_exit_delta,
-            "safety_breaches_total": safety_delta,
-            "valid_virtual_exits_total": valid_virtual_exit_delta,
-            "virtual_realized_pnl_quote": virtual_pnl_delta,
+        "observations": {
+            "process_restarted": final.get("process_pid") != baseline.get("process_pid"),
+            "revision_changed": final.get("revision") != baseline.get("revision"),
         },
+        "prometheus_availability": prometheus_availability,
+        "prometheus_window_metrics": observed,
         "minimum_seconds": minimum_seconds,
         "status": "accepted" if all(checks.values()) else "blocked",
         "stream_deltas": stream_deltas,
     }
 
 
-def _database_counts() -> dict[str, int]:
+def _database_counts() -> dict[str, float | int]:
     queries: dict[str, LiteralString] = {
         "source_events": """
             SELECT count(*) FROM execution_source_events
@@ -329,6 +407,33 @@ def _database_counts() -> dict[str, int]:
         """,
         "close_source_events": """
             SELECT count(*) FROM execution_source_events
+            WHERE source_type = 'ml_agent_decision'
+              AND source_ref_json ->> 'model_version_id' = %s
+              AND source_ref_json ->> 'action' = 'close'
+        """,
+        "valid_close_source_events": """
+            SELECT count(*) FROM execution_source_events
+            WHERE source_type = 'ml_agent_decision'
+              AND source_ref_json ->> 'model_version_id' = %s
+              AND source_ref_json ->> 'action' = 'close'
+              AND ((source_ref_json ->> 'monitor_context')::jsonb ->> 'valid')::boolean
+        """,
+        "invalid_close_source_events": """
+            SELECT count(*) FROM execution_source_events
+            WHERE source_type = 'ml_agent_decision'
+              AND source_ref_json ->> 'model_version_id' = %s
+              AND source_ref_json ->> 'action' = 'close'
+              AND NOT ((source_ref_json ->> 'monitor_context')::jsonb ->> 'valid')::boolean
+        """,
+        "virtual_pnl_quote": """
+            SELECT COALESCE(
+                sum(
+                    ((source_ref_json ->> 'monitor_context')::jsonb
+                        ->> 'pnl_quote')::double precision
+                ),
+                0.0
+            )
+            FROM execution_source_events
             WHERE source_type = 'ml_agent_decision'
               AND source_ref_json ->> 'model_version_id' = %s
               AND source_ref_json ->> 'action' = 'close'
@@ -349,12 +454,100 @@ def _database_counts() -> dict[str, int]:
     }
     with psycopg.connect(os.environ["STRATEGY_PG_DSN"]) as connection:
         with connection.cursor() as cursor:
-            counts: dict[str, int] = {}
+            counts: dict[str, float | int] = {}
             for name, query in queries.items():
                 cursor.execute(query, (MODEL_VERSION,))
                 row = cursor.fetchone()
-                counts[name] = int(row[0]) if row is not None else 0
+                if name == "virtual_pnl_quote":
+                    counts[name] = float(row[0]) if row is not None else 0.0
+                else:
+                    counts[name] = int(row[0]) if row is not None else 0
     return counts
+
+
+def _prometheus_window_metrics(
+    *, started: datetime, finished: datetime
+) -> dict[str, Any]:
+    elapsed_seconds = max(1, math.ceil((finished - started).total_seconds()))
+    window = f"{elapsed_seconds}s"
+    query_time = _format_utc(finished)
+    scalar_queries = {
+        "counter_resets": (
+            "sum(resets(rl_trading_inference_candles_total"
+            f'{{result="processed"}}[{window}]))'
+        ),
+        "decisions_total": (
+            f"sum(increase(rl_trading_inference_decisions_total[{window}]))"
+        ),
+        "errors_total": f"sum(increase(rl_trading_inference_errors_total[{window}]))",
+        "feed_lag_max_seconds": (
+            f"max(max_over_time(rl_trading_inference_feed_lag_seconds[{window}]))"
+        ),
+        "invalid_virtual_exits_total": (
+            "sum(increase(rl_trading_inference_virtual_exits_total"
+            f'{{valid="false"}}[{window}]))'
+        ),
+        "processed_candles_total": (
+            "sum(increase(rl_trading_inference_candles_total"
+            f'{{result="processed"}}[{window}]))'
+        ),
+        "safety_breaches_total": (
+            f"sum(increase(rl_trading_inference_safety_breaches_total[{window}]))"
+        ),
+        "target_samples": (
+            f'count_over_time(up{{job="rl-trading-inference"}}[{window}])'
+        ),
+        "target_up_samples": (
+            f'sum_over_time(up{{job="rl-trading-inference"}}[{window}])'
+        ),
+        "valid_virtual_exits_total": (
+            "sum(increase(rl_trading_inference_virtual_exits_total"
+            f'{{valid="true"}}[{window}]))'
+        ),
+    }
+    payload: dict[str, Any] = {
+        name: _prometheus_scalar(query=query, query_time=query_time)
+        for name, query in scalar_queries.items()
+    }
+    latency_query = (
+        "histogram_quantile(0.95, sum by (le,segment) (increase("
+        f"rl_trading_inference_segment_latency_seconds_bucket[{window}])))"
+    )
+    payload["latency_p95_seconds"] = _prometheus_label_values(
+        query=latency_query,
+        query_time=query_time,
+        label="segment",
+    )
+    return payload
+
+
+def _prometheus_scalar(*, query: str, query_time: str) -> float:
+    result = _prometheus_query(query=query, query_time=query_time)
+    if not result:
+        return 0.0
+    return float(result[0]["value"][1])
+
+
+def _prometheus_label_values(
+    *, query: str, query_time: str, label: str
+) -> dict[str, float]:
+    return {
+        str(row.get("metric", {}).get(label, "unknown")): float(row["value"][1])
+        for row in _prometheus_query(query=query, query_time=query_time)
+    }
+
+
+def _prometheus_query(*, query: str, query_time: str) -> list[dict[str, Any]]:
+    url = "http://127.0.0.1:9090/api/v1/query?" + urlencode(
+        {"query": query, "time": query_time}
+    )
+    payload = json.loads(urlopen(url, timeout=10).read())
+    if payload.get("status") != "success":
+        raise RuntimeError("Prometheus query failed")
+    result = payload.get("data", {}).get("result", [])
+    if not isinstance(result, list):
+        raise RuntimeError("Prometheus query returned invalid result")
+    return cast(list[dict[str, Any]], result)
 
 
 def _prometheus_target_health() -> str:
@@ -425,6 +618,20 @@ def _metric_value(metrics: dict[str, Any], name: str) -> float:
     return float(metrics.get(name, 0.0))
 
 
+def _latency_within_budget(
+    *, p95_seconds: object, budgets_ms: object
+) -> bool:
+    if not isinstance(p95_seconds, Mapping) or not isinstance(budgets_ms, Mapping):
+        return False
+    for segment, observed in p95_seconds.items():
+        budget_ms = budgets_ms.get(segment)
+        if budget_ms is None:
+            continue
+        if float(observed) > float(budget_ms) / 1_000.0:
+            return False
+    return True
+
+
 def _checkout_revision() -> str:
     return subprocess.check_output(
         [
@@ -457,6 +664,23 @@ def _runtime_config_snapshot() -> dict[str, Any]:
         raise ValueError("production RL runtime instruments are invalid or duplicated")
     return {
         "instrument_keys": instrument_keys,
+        "latency_budget_ms": {
+            "candle_close_to_feature_ready": float(
+                inference.get("latency_budget_ms", {}).get(
+                    "candle_close_to_feature_ready_p95", 250
+                )
+            ),
+            "decision_to_source_event": float(
+                inference.get("latency_budget_ms", {}).get(
+                    "decision_to_source_event_p95", 50
+                )
+            ),
+            "feature_to_decision": float(
+                inference.get("latency_budget_ms", {}).get(
+                    "feature_to_decision_p95", 100
+                )
+            ),
+        },
         "rollout_phase": str(inference.get("rollout_phase", "")),
         "runtime_config_sha256": _sha256(RUNTIME_CONFIG_PATH),
     }
