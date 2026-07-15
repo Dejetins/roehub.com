@@ -152,7 +152,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 287,
+      "file_count": 289,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -557,7 +557,7 @@
         "apps/web/main/app.py",
         "apps/web/main/main.py"
       ],
-      "file_count": 94,
+      "file_count": 96,
       "id": "app:web",
       "kind": "app",
       "name": "web",
@@ -5385,6 +5385,11 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/web/dist/css/pages/admin.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/web/dist/css/pages/backtests.css"
     },
     {
@@ -5526,6 +5531,11 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/web/dist/js/core/workbench-shell.js"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/web/dist/js/pages/admin.js"
     },
     {
       "area": "delivery",
@@ -17363,7 +17373,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3038,
+  "inventory_file_count": 3040,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17580,5 +17590,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "ee45c315b667a4bc6317843660d2d02107b1454a438345a9a4c9667208fb71ad"
+  "structural_digest": "6f73c7e8e1648f912bbb682b72b77455f5b5caf2ab12e24e38952a26ebf4a6a9"
 }

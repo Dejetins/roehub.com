@@ -223,6 +223,12 @@ jobs:
           uv sync --locked --all-groups
           uv run python -V
 
+      - name: Install apps-platform system dependencies
+        if: matrix.name == 'apps-platform'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends --yes age
+
       - name: Tests
         run: |
           uv run pytest -q -ra ${{ matrix.target }}

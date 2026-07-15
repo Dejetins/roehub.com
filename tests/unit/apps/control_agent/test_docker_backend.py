@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
+import stat
 import subprocess
 from pathlib import Path
 from uuid import UUID
@@ -12,6 +14,7 @@ import yaml
 
 from apps.control_agent.docker_backend import (
     DockerComposeControlBackend,
+    _path_component_is_trusted,
     _ReleaseStateStore,
 )
 from trading.contexts.operations import (
@@ -24,6 +27,18 @@ from trading.contexts.operations import (
 ROOT = Path(__file__).resolve().parents[4]
 BASE_PROFILE = ROOT / "configs/installation/generated/base"
 TRUSTED_RELEASE = ROOT / "tools/release/release-metadata.json"
+
+
+def _directory_info(*, mode: int, uid: int) -> os.stat_result:
+    return os.stat_result((stat.S_IFDIR | mode, 0, 0, 1, uid, 0, 0, 0, 0, 0))
+
+
+def test_secure_path_allows_only_root_owned_sticky_writable_ancestor() -> None:
+    assert _path_component_is_trusted(_directory_info(mode=0o1777, uid=0))
+    assert not _path_component_is_trusted(_directory_info(mode=0o0777, uid=0))
+    assert not _path_component_is_trusted(
+        _directory_info(mode=0o1777, uid=os.geteuid() + 1)
+    )
 
 
 def _copy_profile(tmp_path: Path) -> Path:

@@ -737,8 +737,20 @@ def _validate_path_chain(path: Path, *, code: str) -> None:
             raise ControlOperationError(code=code) from error
         if stat.S_ISLNK(info.st_mode):
             raise ControlOperationError(code=code)
-        if info.st_uid not in {0, os.geteuid()} or stat.S_IMODE(info.st_mode) & 0o022:
+        if not _path_component_is_trusted(info):
             raise ControlOperationError(code=code)
+
+
+def _path_component_is_trusted(info: os.stat_result) -> bool:
+    if info.st_uid not in {0, os.geteuid()}:
+        return False
+    if not stat.S_IMODE(info.st_mode) & 0o022:
+        return True
+    return (
+        info.st_uid == 0
+        and stat.S_ISDIR(info.st_mode)
+        and bool(info.st_mode & stat.S_ISVTX)
+    )
 
 
 def _write_all(descriptor: int, payload: bytes, *, code: str) -> None:
