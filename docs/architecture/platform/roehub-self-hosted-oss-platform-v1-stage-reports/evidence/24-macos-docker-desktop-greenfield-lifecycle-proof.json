@@ -1,0 +1,299 @@
+{
+  "backup_restore": {
+    "artifact_digest": "sha256:690b74af063fd65bdfc6952a5c6bc07631982a35f272963856567893d1dd2271",
+    "clickhouse_sha256": "sha256:3f379ff92aa6972d1b1d94dcd922fa98662125170acb2f50875b0f933f77895c",
+    "identity_counts": {
+      "identity_administrative_audit_events": 7,
+      "identity_installation_owners": 1,
+      "identity_installations": 1,
+      "identity_invitations": 2,
+      "identity_memberships": 4,
+      "identity_organizations": 2,
+      "identity_plugin_permissions": 2,
+      "identity_users": 3
+    },
+    "identity_state_digest": "sha256:feedac03e3af37eb5ef9e1bbcd42774893fccf00b271bc871e88f904203b2615",
+    "openbao_metadata": {
+      "initialized": false,
+      "sealed": true,
+      "storage_type": "raft",
+      "version": "2.5.4"
+    },
+    "postgres_backup_sha256": "sha256:a507c29c09ec8faa7762a16ff7dfb71b47fd36184ba40f51c06f0a714debf443",
+    "reconciled": true,
+    "redis_checkpoint": "checkpoint-0002"
+  },
+  "browser": {
+    "admin_visible": true,
+    "auth_material_retained": false,
+    "bootstrap": {
+      "authenticated": true,
+      "recovery_code_count": 8,
+      "recovery_values_retained": false
+    },
+    "console_errors": 0,
+    "cross_organization_permission_status": 404,
+    "ingress": {
+      "repeat": {
+        "helper_image": "signed-runtime-image-id",
+        "host_port": 8080,
+        "signed_workloads_remained_internal": true,
+        "status": "passed"
+      },
+      "source": {
+        "helper_image": "signed-runtime-image-id",
+        "host_port": 8080,
+        "signed_workloads_remained_internal": true,
+        "status": "passed"
+      },
+      "target": {
+        "helper_image": "signed-runtime-image-id",
+        "host_port": 8080,
+        "signed_workloads_remained_internal": true,
+        "status": "passed"
+      }
+    },
+    "network_boundaries": [
+      "/api/v1/organizations",
+      "/api/v1/admin/organizations/{organization_id}/snapshot"
+    ],
+    "primary_member_count": 2,
+    "restored_login": {
+      "admin_visible": true,
+      "restored_passkey_login": true
+    },
+    "screenshot": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/24-macos-docker-desktop-admin.png",
+    "screenshot_capture": "chromium-cdp-isolated-bounded-admin-text",
+    "screenshot_sha256": "sha256:04bb8ff4efee0c20da5eb9356231c7f4000bd9addf7e19ae63a6a7036f5f7dc8",
+    "screenshot_written": true,
+    "secondary_member_count": 2,
+    "session_state_persisted": false
+  },
+  "bundle": {
+    "path": "/Users/daniildegtyarev/.cache/roehub/stage22-offline-release/candidates/roehub-0.1.0",
+    "signature_verified": true,
+    "source_install": "passed",
+    "target_install": "passed",
+    "version": "0.1.0"
+  },
+  "cleanup": {
+    "status": "completed"
+  },
+  "duration_seconds": 471.74,
+  "fresh_state": {
+    "current_production_access": false,
+    "disposable_oidc_users": 2,
+    "external_provider_writes": false,
+    "organizations": 2,
+    "personal_data_present": false,
+    "real_orders": false
+  },
+  "memory": {
+    "execution": "sequential-single-full-installation",
+    "repeat": {
+      "container_count": 24,
+      "observed": [
+        "roehub-stage23-repeat-60175-alertmanager-1|25.5MiB / 192MiB",
+        "roehub-stage23-repeat-60175-api-1|299.5MiB / 768MiB",
+        "roehub-stage23-repeat-60175-backtest-artifact-publisher-1|283MiB / 1GiB",
+        "roehub-stage23-repeat-60175-backtest-job-runner-1|96.37MiB / 2GiB",
+        "roehub-stage23-repeat-60175-blackbox-1|22.2MiB / 128MiB",
+        "roehub-stage23-repeat-60175-clickhouse-1|614.9MiB / 2GiB",
+        "roehub-stage23-repeat-60175-clickhouse-exporter-1|34.04MiB / 256MiB",
+        "roehub-stage23-repeat-60175-exchange-control-1|79.72MiB / 512MiB",
+        "roehub-stage23-repeat-60175-exchange-execution-1|78.14MiB / 768MiB",
+        "roehub-stage23-repeat-60175-grafana-1|81.74MiB / 512MiB",
+        "roehub-stage23-repeat-60175-loki-1|65.23MiB / 512MiB",
+        "roehub-stage23-repeat-60175-market-data-scheduler-1|73.38MiB / 512MiB",
+        "roehub-stage23-repeat-60175-market-data-ws-1|73.34MiB / 768MiB",
+        "roehub-stage23-repeat-60175-notification-dispatcher-1|42.09MiB / 384MiB",
+        "roehub-stage23-repeat-60175-notification-report-scheduler-1|30.5MiB / 256MiB",
+        "roehub-stage23-repeat-60175-openbao-1|15.52MiB / 512MiB",
+        "roehub-stage23-repeat-60175-operational-health-1|62.91MiB / 256MiB",
+        "roehub-stage23-repeat-60175-plugin-gateway-1|64.62MiB / 384MiB",
+        "roehub-stage23-repeat-60175-postgresql-1|32.21MiB / 1GiB",
+        "roehub-stage23-repeat-60175-prometheus-1|37.23MiB / 512MiB",
+        "roehub-stage23-repeat-60175-redis-1|9.281MiB / 512MiB",
+        "roehub-stage23-repeat-60175-strategy-live-runner-1|60.82MiB / 768MiB",
+        "roehub-stage23-repeat-60175-telegram-bot-worker-1|40.98MiB / 256MiB",
+        "roehub-stage23-repeat-60175-web-1|58.6MiB / 384MiB"
+      ]
+    },
+    "source": {
+      "container_count": 24,
+      "observed": [
+        "roehub-stage23-source-60175-alertmanager-1|48.67MiB / 192MiB",
+        "roehub-stage23-source-60175-api-1|301.9MiB / 768MiB",
+        "roehub-stage23-source-60175-backtest-artifact-publisher-1|283MiB / 1GiB",
+        "roehub-stage23-source-60175-backtest-job-runner-1|96.53MiB / 2GiB",
+        "roehub-stage23-source-60175-blackbox-1|35.18MiB / 128MiB",
+        "roehub-stage23-source-60175-clickhouse-1|571.9MiB / 2GiB",
+        "roehub-stage23-source-60175-clickhouse-exporter-1|32.98MiB / 256MiB",
+        "roehub-stage23-source-60175-exchange-control-1|85.88MiB / 512MiB",
+        "roehub-stage23-source-60175-exchange-execution-1|78.21MiB / 768MiB",
+        "roehub-stage23-source-60175-grafana-1|269.3MiB / 512MiB",
+        "roehub-stage23-source-60175-loki-1|136.5MiB / 512MiB",
+        "roehub-stage23-source-60175-market-data-scheduler-1|73.52MiB / 512MiB",
+        "roehub-stage23-source-60175-market-data-ws-1|73.46MiB / 768MiB",
+        "roehub-stage23-source-60175-notification-dispatcher-1|42.63MiB / 384MiB",
+        "roehub-stage23-source-60175-notification-report-scheduler-1|29.18MiB / 256MiB",
+        "roehub-stage23-source-60175-openbao-1|16.29MiB / 512MiB",
+        "roehub-stage23-source-60175-operational-health-1|63.55MiB / 256MiB",
+        "roehub-stage23-source-60175-plugin-gateway-1|66.13MiB / 384MiB",
+        "roehub-stage23-source-60175-postgresql-1|32.4MiB / 1GiB",
+        "roehub-stage23-source-60175-prometheus-1|36.68MiB / 512MiB",
+        "roehub-stage23-source-60175-redis-1|10.02MiB / 512MiB",
+        "roehub-stage23-source-60175-strategy-live-runner-1|60.9MiB / 768MiB",
+        "roehub-stage23-source-60175-telegram-bot-worker-1|42.76MiB / 256MiB",
+        "roehub-stage23-source-60175-web-1|58.62MiB / 384MiB"
+      ]
+    },
+    "target": {
+      "container_count": 24,
+      "observed": [
+        "roehub-stage23-target-60175-alertmanager-1|24.57MiB / 192MiB",
+        "roehub-stage23-target-60175-api-1|299.5MiB / 768MiB",
+        "roehub-stage23-target-60175-backtest-artifact-publisher-1|283MiB / 1GiB",
+        "roehub-stage23-target-60175-backtest-job-runner-1|96.35MiB / 2GiB",
+        "roehub-stage23-target-60175-blackbox-1|16.91MiB / 128MiB",
+        "roehub-stage23-target-60175-clickhouse-1|595.8MiB / 2GiB",
+        "roehub-stage23-target-60175-clickhouse-exporter-1|39.38MiB / 256MiB",
+        "roehub-stage23-target-60175-exchange-control-1|79.72MiB / 512MiB",
+        "roehub-stage23-target-60175-exchange-execution-1|78.12MiB / 768MiB",
+        "roehub-stage23-target-60175-grafana-1|81.27MiB / 512MiB",
+        "roehub-stage23-target-60175-loki-1|50.18MiB / 512MiB",
+        "roehub-stage23-target-60175-market-data-scheduler-1|73.5MiB / 512MiB",
+        "roehub-stage23-target-60175-market-data-ws-1|73.29MiB / 768MiB",
+        "roehub-stage23-target-60175-notification-dispatcher-1|42.09MiB / 384MiB",
+        "roehub-stage23-target-60175-notification-report-scheduler-1|29.03MiB / 256MiB",
+        "roehub-stage23-target-60175-openbao-1|17.57MiB / 512MiB",
+        "roehub-stage23-target-60175-operational-health-1|61.9MiB / 256MiB",
+        "roehub-stage23-target-60175-plugin-gateway-1|64.62MiB / 384MiB",
+        "roehub-stage23-target-60175-postgresql-1|33.72MiB / 1GiB",
+        "roehub-stage23-target-60175-prometheus-1|39.19MiB / 512MiB",
+        "roehub-stage23-target-60175-redis-1|10.33MiB / 512MiB",
+        "roehub-stage23-target-60175-strategy-live-runner-1|60.82MiB / 768MiB",
+        "roehub-stage23-target-60175-telegram-bot-worker-1|40.89MiB / 256MiB",
+        "roehub-stage23-target-60175-web-1|58.59MiB / 384MiB"
+      ]
+    }
+  },
+  "recovery_lifecycle": {
+    "attempt_count": 1,
+    "cleanup": {
+      "down_exit_status": {
+        "roehub-stage23-recovery-60175-attempt-1-monitoring": 0,
+        "roehub-stage23-recovery-60175-attempt-1-rollback": 0,
+        "roehub-stage23-recovery-60175-attempt-1-source": 0,
+        "roehub-stage23-recovery-60175-attempt-1-target": 0,
+        "roehub-stage23-recovery-60175-attempt-1-update": 0
+      },
+      "residual_resources": {
+        "roehub-stage23-recovery-60175-attempt-1-monitoring": {
+          "containers": [],
+          "networks": [],
+          "volumes": []
+        },
+        "roehub-stage23-recovery-60175-attempt-1-rollback": {
+          "containers": [],
+          "networks": [],
+          "volumes": []
+        },
+        "roehub-stage23-recovery-60175-attempt-1-source": {
+          "containers": [],
+          "networks": [],
+          "volumes": []
+        },
+        "roehub-stage23-recovery-60175-attempt-1-target": {
+          "containers": [],
+          "networks": [],
+          "volumes": []
+        },
+        "roehub-stage23-recovery-60175-attempt-1-update": {
+          "containers": [],
+          "networks": [],
+          "volumes": []
+        }
+      },
+      "status": "completed"
+    },
+    "release_lifecycle": {
+      "failed_update_detail": "upgrade.injected_failure_before_commit",
+      "failed_update_state": "failed",
+      "fixture": "versioned-unpublished-n-minus-one",
+      "from_release": "0.0.0",
+      "injected_failure": "failed_before_atomic_release_commit",
+      "irreversible_migration_guard": "upgrade.forward_recovery_plan_required",
+      "irreversible_update_state": "failed",
+      "observed_rollback_seconds": 6.659923666000395,
+      "observed_upgrade_seconds": 0.045294292000107816,
+      "preupgrade_backup_verified": true,
+      "resume_after_failure": "passed",
+      "resumed_update_state": "succeeded",
+      "rollback_release": "0.0.0",
+      "rollback_state": "succeeded",
+      "rollback_state_owner_count": 8,
+      "to_release": "0.1.0"
+    },
+    "restore_comparison": {
+      "all_plaintext_digests": 8,
+      "artifacts": {
+        "digest": "sha256:15078be2718eaaea75b0f3f4a377be221b6da93bcb049758d6d8453f807ed043",
+        "match": true
+      },
+      "clickhouse": {
+        "digest_match": true,
+        "rows": 3,
+        "time_range": [
+          "2026-07-14 09:00:00.000",
+          "2026-07-14 09:02:00.000"
+        ]
+      },
+      "observability_bounded_history": "matched",
+      "openbao_encrypted_snapshot": {
+        "ciphertext_sha256": "sha256:61a2ddf9c2397fd8f24f141fbe9d4940f1ddf6d8e8252bad4828458d161eb1ae",
+        "decryptable_by_operator_key": true,
+        "same_snapshot_fresh_volume_restore": "passed"
+      },
+      "plugin_operation_audit": "matched",
+      "postgresql": {
+        "kinds": [
+          "audit",
+          "config",
+          "operation",
+          "plugin",
+          "user"
+        ],
+        "rows": 5,
+        "users_config_plugin_operation_audit": "matched"
+      },
+      "redis_checkpoint": {
+        "source_of_truth": false,
+        "value_match": true
+      },
+      "release_config": {
+        "exact_files": 3,
+        "match": true
+      }
+    },
+    "schema": "io.roehub.installation-recovery-runtime-proof/v1alpha1",
+    "status": "passed"
+  },
+  "repeat_install": {
+    "bootstrap": {
+      "authenticated": true,
+      "recovery_code_count": 8,
+      "recovery_values_retained": false
+    },
+    "expected_structural_counts": {
+      "identity_installation_owners": 1,
+      "identity_installations": 1,
+      "identity_memberships": 1,
+      "identity_organizations": 1,
+      "identity_users": 1
+    },
+    "status": "passed"
+  },
+  "schema": "io.roehub.greenfield-installation-lifecycle-proof/v1alpha1",
+  "status": "passed"
+}

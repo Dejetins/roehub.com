@@ -12,7 +12,7 @@ from trading.contexts.rl_trading.domain.risk_sizing_policy import (
     RlRiskSizingPolicyKey,
     RlRiskSizingPolicyService,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 def test_stage14_in_memory_policy_repository_persists_validation_and_audit() -> None:
@@ -47,6 +47,9 @@ def test_stage14_service_returns_blocked_default_when_policy_missing() -> None:
 
 def _key() -> RlRiskSizingPolicyKey:
     return RlRiskSizingPolicyKey(
+        organization_id=OrganizationId(
+            UUID("00000000-0000-4000-8000-000000001430")
+        ),
         owner_user_id=UserId(UUID("00000000-0000-0000-0000-000000001431")),
         strategy_id=UUID("00000000-0000-0000-0000-000000001432"),
         exchange_name="binance",

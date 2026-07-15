@@ -156,9 +156,7 @@ def signal_rule_spec_v2(*, indicator_id: str) -> SignalRuleSpecV2:
         raise ValueError("indicator_id must be non-empty")
     spec = _SIGNAL_RULE_REGISTRY_V2.get(normalized_indicator_id)
     if spec is None:
-        raise ValueError(
-            f"Unsupported indicator_id for signal rules v2: {normalized_indicator_id}"
-        )
+        raise ValueError(f"Unsupported indicator_id for signal rules v2: {normalized_indicator_id}")
     return spec
 
 
@@ -709,9 +707,7 @@ def _resolve_inputs_source_v2(
             f"expected '{default_source}'"
         )
     if default_source is None:
-        raise ValueError(
-            f"{indicator_id}: inputs.source is not supported by this indicator"
-        )
+        raise ValueError(f"{indicator_id}: inputs.source is not supported by this indicator")
     return default_source
 
 

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block page_assets %}
+  <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/plugin-panel-lab.css') }}">
+{% endblock %}
+
+{% block content %}
+  <section
+    class="plugin-panel-lab"
+    data-plugin-panel-lab
+    data-query-endpoint="{{ plugin_panel_query_endpoint }}"
+    data-instance-id="{{ plugin_panel_instance_id }}"
+    data-label-loading="{{ t('plugin_panel_lab.state.loading') }}"
+    data-label-empty="{{ t('plugin_panel_lab.state.empty') }}"
+    data-label-error="{{ t('plugin_panel_lab.state.error') }}"
+    data-label-degraded="{{ t('plugin_panel_lab.state.degraded') }}"
+    data-label-partial="{{ t('plugin_panel_lab.state.partial') }}"
+    data-label-success="{{ t('plugin_panel_lab.state.success') }}"
+    data-label-no-data="{{ t('plugin_panel_lab.no_data') }}"
+    data-label-unit="{{ t('plugin_panel_lab.unit') }}"
+    data-label-selected="{{ t('plugin_panel_lab.selected') }}"
+  >
+    <header class="plugin-panel-lab__controls terminal-panel">
+      <div>
+        <p class="plugin-panel-lab__eyebrow">RoehubDataFrame/v1 · host render adapters</p>
+        <h2>{{ t("plugin_panel_lab.controls_title") }}</h2>
+      </div>
+      <button class="rh-button rh-button--primary" type="button" data-panel-refresh>
+        {{ t("plugin_panel_lab.refresh") }}
+      </button>
+      <div class="plugin-panel-lab__control-group" aria-label="{{ t('plugin_panel_lab.renderer_label') }}">
+        <span>{{ t("plugin_panel_lab.renderer_label") }}</span>
+        <div class="plugin-panel-lab__segmented" role="group">
+          <button type="button" aria-pressed="true" data-panel-renderer="trading-time-series">{{ t("plugin_panel_lab.renderer.trading") }}</button>
+          <button type="button" aria-pressed="false" data-panel-renderer="analytics-series">{{ t("plugin_panel_lab.renderer.analytics") }}</button>
+          <button type="button" aria-pressed="false" data-panel-renderer="analytics-table">{{ t("plugin_panel_lab.renderer.table") }}</button>
+          <button type="button" aria-pressed="false" data-panel-renderer="research-summary">{{ t("plugin_panel_lab.renderer.research") }}</button>
+        </div>
+      </div>
+      <div class="plugin-panel-lab__control-group" aria-label="{{ t('plugin_panel_lab.fixture_label') }}">
+        <span>{{ t("plugin_panel_lab.fixture_label") }}</span>
+        <div class="plugin-panel-lab__segmented" role="group">
+          <button type="button" aria-pressed="true" data-panel-fixture-state="success">{{ t("plugin_panel_lab.state.success") }}</button>
+          <button type="button" aria-pressed="false" data-panel-fixture-state="empty">{{ t("plugin_panel_lab.state.empty") }}</button>
+          <button type="button" aria-pressed="false" data-panel-fixture-state="degraded">{{ t("plugin_panel_lab.state.degraded") }}</button>
+          <button type="button" aria-pressed="false" data-panel-fixture-state="partial">{{ t("plugin_panel_lab.state.partial") }}</button>
+          <button type="button" aria-pressed="false" data-panel-fixture-state="error">{{ t("plugin_panel_lab.state.error") }}</button>
+        </div>
+      </div>
+    </header>
+
+    <article class="plugin-panel terminal-panel" data-host-panel aria-busy="true">
+      <header class="plugin-panel__header">
+        <div>
+          <p class="plugin-panel__source" data-panel-source>—</p>
+          <h2 data-panel-title>{{ t("plugin_panel_lab.panel_title") }}</h2>
+          <p data-panel-description>{{ t("plugin_panel_lab.panel_description") }}</p>
+        </div>
+        <div class="plugin-panel__badges" aria-label="{{ t('plugin_panel_lab.status_label') }}">
+          <span class="plugin-panel__badge" data-panel-state>{{ t("plugin_panel_lab.state.loading") }}</span>
+          <span class="plugin-panel__badge" data-panel-freshness>—</span>
+        </div>
+      </header>
+
+      <div class="plugin-panel__state" role="status" aria-live="polite" data-panel-state-message>
+        <span class="plugin-panel__spinner" aria-hidden="true"></span>
+        <strong>{{ t("plugin_panel_lab.state.loading") }}</strong>
+      </div>
+
+      <div class="plugin-panel__content" data-panel-content hidden>
+        <div class="plugin-panel__summary" data-panel-summary></div>
+        <div class="plugin-panel__units" data-panel-units aria-label="{{ t('plugin_panel_lab.units_label') }}"></div>
+
+        <section class="plugin-panel__visual" data-panel-visual aria-labelledby="plugin-panel-visual-title">
+          <h3 id="plugin-panel-visual-title">{{ t("plugin_panel_lab.visual_title") }}</h3>
+          <svg
+            viewBox="0 0 960 320"
+            preserveAspectRatio="none"
+            role="img"
+            aria-labelledby="plugin-panel-chart-title plugin-panel-chart-description"
+            data-panel-chart
+          >
+            <title id="plugin-panel-chart-title">{{ t("plugin_panel_lab.chart_title") }}</title>
+            <desc id="plugin-panel-chart-description">{{ t("plugin_panel_lab.chart_description") }}</desc>
+          </svg>
+        </section>
+
+        <aside class="plugin-panel__drilldown" aria-live="polite" data-panel-drilldown>
+          <strong>{{ t("plugin_panel_lab.drilldown_title") }}</strong>
+          <span>{{ t("plugin_panel_lab.drilldown_hint") }}</span>
+        </aside>
+
+        <details class="plugin-panel__table-alternative" open data-panel-table-alternative>
+          <summary>{{ t("plugin_panel_lab.table_title") }}</summary>
+          <div class="plugin-panel__table-scroll" tabindex="0">
+            <table>
+              <caption class="visually-hidden">{{ t("plugin_panel_lab.table_caption") }}</caption>
+              <thead data-panel-table-head></thead>
+              <tbody data-panel-table-body></tbody>
+            </table>
+          </div>
+        </details>
+
+        <div class="plugin-panel__notices" data-panel-notices aria-live="polite"></div>
+      </div>
+    </article>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{{ asset_url('/assets/js/pages/plugin-panel-lab.js') }}"></script>
+{% endblock %}

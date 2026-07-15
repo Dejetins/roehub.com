@@ -16,7 +16,7 @@ class InMemoryIdentitySessionRepository(SessionRepository):
     InMemoryIdentitySessionRepository — deterministic in-memory session store for dev/test.
 
     Docs:
-      - docs/architecture/identity/keycloak-cutover-plan-v1.md
+      - docs/architecture/identity/oidc-authentication-provider-v1.md
     Related:
       - src/trading/contexts/identity/application/ports/session_repository.py
       - src/trading/contexts/identity/adapters/outbound/persistence/postgres/session_repository.py
@@ -119,6 +119,15 @@ class InMemoryIdentitySessionRepository(SessionRepository):
         revoked_session = replace(existing_session, revoked_at=revoked_at)
         self._sessions[str(session_id)] = revoked_session
         return revoked_session
+
+    def revoke_user_sessions(self, *, user_id: UserId, revoked_at: datetime) -> int:
+        revoked_count = 0
+        for key, session in tuple(self._sessions.items()):
+            if session.user_id != user_id or session.revoked_at is not None:
+                continue
+            self._sessions[key] = replace(session, revoked_at=revoked_at)
+            revoked_count += 1
+        return revoked_count
 
 
 def _validate_session_ttls(*, idle_ttl_seconds: int, absolute_ttl_seconds: int) -> None:

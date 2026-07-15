@@ -317,6 +317,8 @@ class YamlBacktestGridDefaultsProvider(BacktestGridDefaultsProvider):
         if not normalized_indicator_id:
             raise ValueError("allowed_source_values requires non-empty indicator_id")
         return self.source_values_by_indicator_id.get(normalized_indicator_id, ())
+
+
 def _compute_defaults_grid(
     *,
     indicator_id: str,
@@ -429,9 +431,7 @@ def _signal_defaults(
     for raw_param_name in sorted(params_payload.keys(), key=lambda key: str(key).strip().lower()):
         param_name = str(raw_param_name).strip().lower()
         if not param_name:
-            raise ValueError(
-                f"defaults.{indicator_id}.signals.v1.params keys must be non-empty"
-            )
+            raise ValueError(f"defaults.{indicator_id}.signals.v1.params keys must be non-empty")
         signal_params[param_name] = _grid_param_spec_from_node(
             name=param_name,
             node=params_payload[raw_param_name],
@@ -477,14 +477,10 @@ def _source_values(
     seen_values: set[str] = set()
     for raw_value in source_spec.materialize():
         if not isinstance(raw_value, str):
-            raise ValueError(
-                f"defaults.{indicator_id}.inputs.source values must be strings"
-            )
+            raise ValueError(f"defaults.{indicator_id}.inputs.source values must be strings")
         value = raw_value.strip().lower()
         if not value:
-            raise ValueError(
-                f"defaults.{indicator_id}.inputs.source values must be non-empty"
-            )
+            raise ValueError(f"defaults.{indicator_id}.inputs.source values must be non-empty")
         if value in seen_values:
             continue
         seen_values.add(value)

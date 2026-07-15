@@ -30,10 +30,11 @@ from trading.contexts.backtest.domain.entities import (
 )
 from trading.contexts.backtest.domain.errors import BacktestStorageError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 _BACKTEST_JOB_SELECT_COLUMNS = """
     job_id,
+    organization_id,
     user_id,
     mode,
     state,
@@ -177,6 +178,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         INSERT INTO {self._jobs_table}
         (
             job_id,
+            organization_id,
             user_id,
             mode,
             state,
@@ -219,6 +221,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         VALUES
         (
             %(job_id)s,
+            %(organization_id)s,
             %(user_id)s,
             %(mode)s,
             %(state)s,
@@ -320,6 +323,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             INSERT INTO {self._jobs_table}
             (
                 job_id,
+                organization_id,
                 user_id,
                 mode,
                 state,
@@ -362,6 +366,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             VALUES
             (
                 %(job_id)s,
+                %(organization_id)s,
                 %(user_id)s,
                 %(mode)s,
                 %(state)s,
@@ -411,6 +416,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         inserted_shortlist AS (
             INSERT INTO {self._stage_a_shortlist_table}
             (
+                organization_id,
                 job_id,
                 stage_a_indexes_json,
                 stage_a_variants_total,
@@ -421,6 +427,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 updated_at
             )
             SELECT
+                %(organization_id)s::uuid AS organization_id,
                 %(job_id)s::uuid AS job_id,
                 %(stage_a_indexes_json)s::jsonb AS stage_a_indexes_json,
                 %(stage_a_variants_total)s AS stage_a_variants_total,
@@ -435,6 +442,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         inserted_rows AS (
             INSERT INTO {self._top_variants_table}
             (
+                organization_id,
                 job_id,
                 rank,
                 variant_key,
@@ -450,6 +458,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 updated_at
             )
             SELECT
+                %(organization_id)s::uuid AS organization_id,
                 %(job_id)s::uuid AS job_id,
                 (item ->> 'rank')::INTEGER AS rank,
                 item ->> 'variant_key' AS variant_key,
@@ -482,6 +491,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
     def find_by_idempotency_key(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         idempotency_key_hash: str,
         created_after: datetime,
@@ -493,7 +503,8 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         SELECT
             {_BACKTEST_JOB_SELECT_COLUMNS}
         FROM {self._jobs_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND created_at >= %(created_after)s
           AND request_json -> 'idempotency' ->> 'key_hash' = %(idempotency_key_hash)s
         ORDER BY created_at ASC, job_id ASC
@@ -502,6 +513,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "idempotency_key_hash": idempotency_key_hash,
                 "created_after": created_after,
@@ -515,6 +527,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         now: datetime,
         locked_by: str,
@@ -541,6 +554,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             heartbeat_at = %(now)s,
             attempt = attempt + 1
         WHERE job_id = %(job_id)s
+          AND organization_id = %(organization_id)s
           AND user_id = %(user_id)s
           AND state = 'queued'
         RETURNING
@@ -550,6 +564,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             query=query,
             parameters={
                 "job_id": str(job_id),
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "now": now,
                 "locked_by": normalized_owner,
@@ -564,6 +579,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         now: datetime,
         locked_by: str,
@@ -640,6 +656,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                     ELSE NULL
                 END
             WHERE job_id = %(job_id)s
+              AND organization_id = %(organization_id)s
               AND user_id = %(user_id)s
               AND state = 'running'
               AND locked_by = %(locked_by)s
@@ -650,6 +667,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         deleted_rows AS (
             DELETE FROM {self._top_variants_table}
             WHERE job_id = %(job_id)s
+              AND organization_id = %(organization_id)s
               AND EXISTS (SELECT 1 FROM updated_job)
         ),
         source_rows AS (
@@ -659,6 +677,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         inserted_rows AS (
             INSERT INTO {self._top_variants_table}
             (
+                organization_id,
                 job_id,
                 rank,
                 variant_key,
@@ -674,6 +693,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 updated_at
             )
             SELECT
+                %(organization_id)s::uuid AS organization_id,
                 %(job_id)s::uuid AS job_id,
                 (item ->> 'rank')::INTEGER AS rank,
                 item ->> 'variant_key' AS variant_key,
@@ -701,6 +721,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             query=query,
             parameters={
                 "job_id": str(job_id),
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "now": now,
                 "locked_by": normalized_owner,
@@ -716,7 +737,13 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             return None
         return _map_job_row(row=row)
 
-    def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
+    def get(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId | None = None,
+    ) -> BacktestJob | None:
         """
         Load one job snapshot by id with optional owner filter.
 
@@ -733,7 +760,10 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             Executes one SQL select statement.
         """
         owner_filter = ""
-        parameters: dict[str, Any] = {"job_id": str(job_id)}
+        parameters: dict[str, Any] = {
+            "job_id": str(job_id),
+            "organization_id": str(organization_id),
+        }
         if user_id is not None:
             owner_filter = "AND user_id = %(user_id)s"
             parameters["user_id"] = str(user_id)
@@ -743,6 +773,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             {_BACKTEST_JOB_SELECT_COLUMNS}
         FROM {self._jobs_table}
         WHERE job_id = %(job_id)s
+          AND organization_id = %(organization_id)s
           {owner_filter}
         """
         row = self._gateway.fetch_one(query=query, parameters=parameters)
@@ -754,6 +785,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         limit: int | None = None,
     ) -> tuple[BacktestJobTopVariant, ...]:
         """
@@ -762,7 +794,10 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         if limit is not None and limit <= 0:
             raise BacktestStorageError("Backtest top variants limit must be positive")
         limit_clause = "" if limit is None else "LIMIT %(limit)s"
-        parameters: dict[str, Any] = {"job_id": str(job_id)}
+        parameters: dict[str, Any] = {
+            "job_id": str(job_id),
+            "organization_id": str(organization_id),
+        }
         if limit is not None:
             parameters["limit"] = int(limit)
         query = f"""
@@ -770,6 +805,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             {_BACKTEST_TOP_VARIANT_SELECT_COLUMNS}
         FROM {self._top_variants_table}
         WHERE job_id = %(job_id)s
+          AND organization_id = %(organization_id)s
         ORDER BY rank ASC, variant_key ASC
         {limit_clause}
         """
@@ -783,6 +819,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         public_variant_key: str,
     ) -> BacktestJobTopVariant | None:
         """
@@ -793,6 +830,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             {_BACKTEST_TOP_VARIANT_SELECT_COLUMNS}
         FROM {self._top_variants_table}
         WHERE job_id = %(job_id)s
+          AND organization_id = %(organization_id)s
           AND payload_json ->> 'public_variant_key' = %(public_variant_key)s
         ORDER BY rank ASC
         LIMIT 1
@@ -801,6 +839,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             query=query,
             parameters={
                 "job_id": str(job_id),
+                "organization_id": str(organization_id),
                 "public_variant_key": public_variant_key,
             },
         )
@@ -831,7 +870,8 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         SELECT
             {_BACKTEST_JOB_SELECT_COLUMNS}
         FROM {self._jobs_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND (%(state)s::text IS NULL OR state = %(state)s::text)
           AND (
             %(cursor_created_at)s::timestamptz IS NULL
@@ -846,6 +886,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         rows = self._gateway.fetch_all(
             query=sql,
             parameters={
+                "organization_id": str(query.organization_id),
                 "user_id": str(query.user_id),
                 "state": query.state,
                 "cursor_created_at": cursor_created_at,
@@ -869,6 +910,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         cancel_requested_at: datetime,
     ) -> BacktestJob | None:
@@ -911,6 +953,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 ELSE %(cancel_requested_at)s
             END
         WHERE job_id = %(job_id)s
+          AND organization_id = %(organization_id)s
           AND user_id = %(user_id)s
           AND state IN ('queued', 'running')
         RETURNING
@@ -920,6 +963,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             query=update_sql,
             parameters={
                 "job_id": str(job_id),
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "cancel_requested_at": cancel_requested_at,
             },
@@ -927,9 +971,19 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         if row is not None:
             return _map_job_row(row=row)
 
-        return self.get(job_id=job_id, user_id=user_id)
+        return self.get(
+            job_id=job_id,
+            organization_id=organization_id,
+            user_id=user_id,
+        )
 
-    def delete_terminal(self, *, job_id: UUID, user_id: UserId) -> bool:
+    def delete_terminal(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId,
+    ) -> bool:
         """
         Hard-delete one owner terminal job row.
 
@@ -939,6 +993,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         sql = f"""
         DELETE FROM {self._jobs_table}
         WHERE job_id = %(job_id)s
+          AND organization_id = %(organization_id)s
           AND user_id = %(user_id)s
           AND state IN ('succeeded', 'failed', 'cancelled')
         RETURNING job_id
@@ -947,12 +1002,18 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             query=sql,
             parameters={
                 "job_id": str(job_id),
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
             },
         )
         return row is not None
 
-    def count_active_for_user(self, *, user_id: UserId) -> int:
+    def count_active_for_user(
+        self,
+        *,
+        organization_id: OrganizationId,
+        user_id: UserId,
+    ) -> int:
         """
         Count active owner jobs (`queued + running`) for deterministic quota checks.
 
@@ -971,10 +1032,17 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         SELECT
             COUNT(*) AS active_total
         FROM {self._jobs_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND state IN ('queued', 'running')
         """
-        row = self._gateway.fetch_one(query=sql, parameters={"user_id": str(user_id)})
+        row = self._gateway.fetch_one(
+            query=sql,
+            parameters={
+                "organization_id": str(organization_id),
+                "user_id": str(user_id),
+            },
+        )
         if row is None:
             raise BacktestStorageError(
                 "PostgresBacktestJobRepository.count_active_for_user returned no row"
@@ -989,6 +1057,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
     def count_created_for_user_since(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         created_after: datetime,
     ) -> int:
@@ -999,12 +1068,14 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         SELECT
             COUNT(*) AS created_total
         FROM {self._jobs_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND created_at >= %(created_after)s
         """
         row = self._gateway.fetch_one(
             query=sql,
             parameters={
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "created_after": created_after,
             },
@@ -1216,6 +1287,7 @@ def _map_job_row(*, row: Mapping[str, Any]) -> BacktestJob:
             )
         return BacktestJob(
             job_id=UUID(str(row["job_id"])),
+            organization_id=OrganizationId.from_string(str(row["organization_id"])),
             user_id=UserId.from_string(str(row["user_id"])),
             mode=_parse_job_mode(value=row["mode"]),
             state=_parse_job_state(value=row["state"]),
@@ -1316,6 +1388,7 @@ def _build_job_insert_parameters(*, job: BacktestJob) -> dict[str, Any]:
     """
     return {
         "job_id": str(job.job_id),
+        "organization_id": str(job.organization_id),
         "user_id": str(job.user_id),
         "mode": job.mode,
         "state": job.state,

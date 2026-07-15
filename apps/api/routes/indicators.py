@@ -7,7 +7,9 @@ Docs: docs/architecture/indicators/indicators-registry-yaml-defaults-v1.md,
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request
+from typing import Callable
+
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from apps.api.dto import (
     IndicatorsComputeRequest,
@@ -29,6 +31,8 @@ from apps.api.dto import (
     build_time_range,
     build_timeframe,
 )
+from trading.contexts.backtest.application.ports import ResearchOrganizationScopeResolver
+from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.indicators.application.dto import BatchEstimateResult, ExplicitValuesSpec
 from trading.contexts.indicators.application.errors import (
     EstimateMemoryGuardExceeded,
@@ -49,14 +53,18 @@ from trading.contexts.indicators.domain.errors import (
     GridValidationError,
     UnknownIndicatorError,
 )
+from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import Timeframe
 
 _TIMEFRAME_1M = Timeframe("1m")
+CurrentUserDependency = Callable[[Request], CurrentUserPrincipal]
 
 
 def build_indicators_router(
     *,
     registry: IndicatorRegistry,
+    current_user_dependency: CurrentUserDependency,
+    organization_scope_resolver: ResearchOrganizationScopeResolver | None,
     compute: IndicatorCompute | None = None,
     candle_feed: CandleFeed | None = None,
     max_variants_per_compute: int = MAX_VARIANTS_PER_COMPUTE_DEFAULT,
@@ -94,13 +102,17 @@ def build_indicators_router(
             "max_compute_bytes_total must be > 0, "
             f"got {max_compute_bytes_total}"
         )
+    if current_user_dependency is None:  # type: ignore[truthy-bool]
+        raise ValueError("build_indicators_router requires current_user_dependency")
 
     grid_builder = GridBuilder(registry=registry)
     estimator = BatchEstimator(grid_builder=grid_builder)
     router = APIRouter(tags=["indicators"])
 
     @router.get("/indicators", response_model=IndicatorsResponse)
-    def get_indicators() -> IndicatorsResponse:
+    def get_indicators(
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
+    ) -> IndicatorsResponse:
         """
         Return merged registry view (hard defs + defaults).
 
@@ -115,11 +127,18 @@ def build_indicators_router(
         Side Effects:
             None.
         """
+        _resolve_research_scope(
+            resolver=organization_scope_resolver,
+            principal=principal,
+        )
         views = registry.list_merged()
         return build_indicators_response(views=views)
 
     @router.post("/indicators/estimate", response_model=IndicatorsEstimateResponse)
-    def post_indicators_estimate(request: IndicatorsEstimateRequest) -> IndicatorsEstimateResponse:
+    def post_indicators_estimate(
+        request: IndicatorsEstimateRequest,
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
+    ) -> IndicatorsEstimateResponse:
         """
         Estimate total variants and memory usage for full indicators batch preflight.
 
@@ -135,6 +154,10 @@ def build_indicators_router(
         Side Effects:
             None.
         """
+        _resolve_research_scope(
+            resolver=organization_scope_resolver,
+            principal=principal,
+        )
         try:
             indicator_grids = build_indicator_grid_specs(request=request)
             sl_spec, tp_spec = build_risk_specs(request=request)
@@ -173,6 +196,7 @@ def build_indicators_router(
     def post_indicators_compute(
         request: IndicatorsComputeRequest,
         http_request: Request,
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> IndicatorsComputeResponse:
         """
         Compute one indicator tensor using CandleFeed + compute adapter.
@@ -193,6 +217,10 @@ def build_indicators_router(
         Side Effects:
             Loads dense candles from CandleFeed and executes compute adapter.
         """
+        _resolve_research_scope(
+            resolver=organization_scope_resolver,
+            principal=principal,
+        )
         effective_compute = compute or getattr(http_request.app.state, "indicators_compute", None)
         effective_candle_feed = candle_feed or getattr(
             http_request.app.state,
@@ -273,6 +301,20 @@ def build_indicators_router(
         return build_indicators_compute_response(tensor=tensor)
 
     return router
+
+
+def _resolve_research_scope(
+    *,
+    resolver: ResearchOrganizationScopeResolver | None,
+    principal: CurrentUserPrincipal,
+) -> None:
+    if resolver is None:
+        raise RoehubError(
+            code="research.organization_scope_unavailable",
+            message="Research organization scope is unavailable",
+            details={"reason": "scope_resolver_unavailable"},
+        )
+    resolver.resolve(user_id=principal.user_id)
 
 
 def _estimate_error_payload(*, error: Exception) -> dict[str, object]:

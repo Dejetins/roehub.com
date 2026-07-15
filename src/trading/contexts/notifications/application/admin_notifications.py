@@ -12,6 +12,7 @@ from trading.contexts.notifications.application.source_router import (
     decide_route,
 )
 from trading.contexts.notifications.domain import NotificationDelivery
+from trading.shared_kernel.primitives import OrganizationId
 
 
 class NotificationAdminClock(Protocol):
@@ -45,19 +46,24 @@ class NotificationAdminDrillService:
         self._router = NotificationSourceRouter()
         self._metrics = metrics
 
-    def create_synthetic_admin_deliveries(self) -> NotificationAdminDrillResult:
+    def create_synthetic_admin_deliveries(
+        self, *, organization_id: OrganizationId
+    ) -> NotificationAdminDrillResult:
         now = self._clock.now()
         events_created = 0
         deliveries_created = 0
         suppressed_routes = 0
         categories: list[str] = []
 
-        for fact in synthetic_admin_notification_facts(now=now):
+        for fact in synthetic_admin_notification_facts(
+            organization_id=organization_id, now=now
+        ):
             event = self._router.event_from_fact(fact=fact, now=now)
             stored_event = self._repository.record_event(event=event)
             events_created += 1
             categories.append(stored_event.category)
             routes = self._repository.list_active_routes(
+                organization_id=organization_id,
                 owner_user_id=None,
                 recipient_kind="admin",
                 category=stored_event.category,
@@ -69,6 +75,8 @@ class NotificationAdminDrillService:
                     continue
                 delivery = NotificationDelivery(
                     delivery_id=uuid4(),
+                    organization_id=organization_id,
+                    provider_instance_id=route.provider_instance_id,
                     event_id=stored_event.event_id,
                     report_run_id=None,
                     command_id=None,
@@ -105,11 +113,12 @@ class NotificationAdminDrillService:
 
 
 def synthetic_admin_notification_facts(
-    *, now: datetime
+    *, organization_id: OrganizationId, now: datetime
 ) -> tuple[SyntheticNotificationSourceFact, ...]:
     return (
         SyntheticNotificationSourceFact(
             fact_id="stage07-admin-critical",
+            organization_id=organization_id,
             owner_user_id=None,
             recipient_kind="admin",
             source_context="ops",
@@ -122,6 +131,7 @@ def synthetic_admin_notification_facts(
         ),
         SyntheticNotificationSourceFact(
             fact_id="stage07-admin-alert",
+            organization_id=organization_id,
             owner_user_id=None,
             recipient_kind="admin",
             source_context="ops",
@@ -134,6 +144,7 @@ def synthetic_admin_notification_facts(
         ),
         SyntheticNotificationSourceFact(
             fact_id="stage07-admin-report",
+            organization_id=organization_id,
             owner_user_id=None,
             recipient_kind="admin",
             source_context="notifications",

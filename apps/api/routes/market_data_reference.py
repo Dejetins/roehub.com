@@ -19,6 +19,7 @@ from apps.api.dto import (
     build_market_data_instruments_response,
     build_market_data_markets_response,
 )
+from trading.contexts.backtest.application.ports import ResearchOrganizationScopeResolver
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.market_data.application.use_cases import (
     DEFAULT_INSTRUMENT_SEARCH_LIMIT,
@@ -27,6 +28,7 @@ from trading.contexts.market_data.application.use_cases import (
     ListEnabledMarketsUseCase,
     SearchEnabledTradableInstrumentsUseCase,
 )
+from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import MarketId
 
 CurrentUserDependency = Callable[[Request], CurrentUserPrincipal]
@@ -38,6 +40,7 @@ def build_market_data_reference_router(
     search_enabled_tradable_instruments_use_case: SearchEnabledTradableInstrumentsUseCase,
     btcusdt_market_readiness_use_case: BTCUSDTMarketReadinessUseCase | None = None,
     current_user_dependency: CurrentUserDependency,
+    organization_scope_resolver: ResearchOrganizationScopeResolver | None,
 ) -> APIRouter:
     """
     Build auth-only Market Data reference API router.
@@ -78,7 +81,7 @@ def build_market_data_reference_router(
 
     @router.get("/market-data/markets", response_model=MarketDataMarketsResponse)
     def get_market_data_markets(
-        _principal: CurrentUserPrincipal = Depends(current_user_dependency),
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> MarketDataMarketsResponse:
         """
         Return enabled markets ordered deterministically by `market_id ASC`.
@@ -94,6 +97,10 @@ def build_market_data_reference_router(
         Side Effects:
             Executes one use-case read over ClickHouse reference table.
         """
+        _resolve_research_scope(
+            resolver=organization_scope_resolver,
+            principal=principal,
+        )
         markets = list_enabled_markets_use_case.execute()
         return build_market_data_markets_response(markets=markets)
 
@@ -107,7 +114,7 @@ def build_market_data_reference_router(
             ge=1,
             le=MAX_INSTRUMENT_SEARCH_LIMIT,
         ),
-        _principal: CurrentUserPrincipal = Depends(current_user_dependency),
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> MarketDataInstrumentsResponse:
         """
         Search enabled tradable instruments for one market with optional prefix filter.
@@ -126,6 +133,10 @@ def build_market_data_reference_router(
         Side Effects:
             Executes one use-case read over ClickHouse reference tables.
         """
+        _resolve_research_scope(
+            resolver=organization_scope_resolver,
+            principal=principal,
+        )
         instruments = search_enabled_tradable_instruments_use_case.execute(
             market_id=MarketId(market_id),
             q=q,
@@ -138,17 +149,35 @@ def build_market_data_reference_router(
         response_model=BTCUSDTMarketReadinessResponse,
     )
     def get_btcusdt_market_readiness(
-        _principal: CurrentUserPrincipal = Depends(current_user_dependency),
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> BTCUSDTMarketReadinessResponse:
         """
         Return BTCUSDT market-data readiness matrix for strategy producer launch gates.
         """
         if btcusdt_market_readiness_use_case is None:
             raise ValueError("BTCUSDT market readiness use-case is not configured")
+        _resolve_research_scope(
+            resolver=organization_scope_resolver,
+            principal=principal,
+        )
         report = btcusdt_market_readiness_use_case.execute()
         return build_btcusdt_market_readiness_response(report=report)
 
     return router
+
+
+def _resolve_research_scope(
+    *,
+    resolver: ResearchOrganizationScopeResolver | None,
+    principal: CurrentUserPrincipal,
+) -> None:
+    if resolver is None:
+        raise RoehubError(
+            code="research.organization_scope_unavailable",
+            message="Research organization scope is unavailable",
+            details={"reason": "scope_resolver_unavailable"},
+        )
+    resolver.resolve(user_id=principal.user_id)
 
 
 __all__ = ["build_market_data_reference_router"]

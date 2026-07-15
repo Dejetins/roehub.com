@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Literal, Protocol
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 RlLiveTickerMode = Literal["monitor_only", "paper", "testnet", "live"]
 RlLiveEntitlementSource = Literal["paid_level", "override", "fail_closed"]
@@ -26,6 +26,7 @@ _PAID_LEVEL_LIMITS = {
 
 @dataclass(frozen=True, slots=True)
 class RlLiveTickerIdentity:
+    organization_id: OrganizationId
     owner_user_id: UserId
     exchange_name: str
     market_type: str
@@ -46,8 +47,9 @@ class RlLiveTickerIdentity:
         object.__setattr__(self, "symbol", symbol)
 
     @property
-    def distinct_key(self) -> tuple[str, str, str, str]:
+    def distinct_key(self) -> tuple[str, str, str, str, str]:
         return (
+            str(self.organization_id),
             str(self.owner_user_id),
             self.exchange_name,
             self.market_type,
@@ -82,6 +84,7 @@ class RlLiveTickerEntitlementRepository(Protocol):
     def snapshot(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         paid_level: str,
         mode: RlLiveTickerMode,
@@ -91,6 +94,7 @@ class RlLiveTickerEntitlementRepository(Protocol):
     def sync_profile(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         paid_level: str,
         strategy_id: UUID,
@@ -111,12 +115,14 @@ class RlLiveTickerEntitlementService:
     def snapshot(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         paid_level: str,
         mode: RlLiveTickerMode,
         requested_ticker: RlLiveTickerIdentity | None = None,
     ) -> RlLiveTickerEntitlementSnapshot:
         return self._repository.snapshot(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             paid_level=paid_level,
             mode=mode,
@@ -126,6 +132,7 @@ class RlLiveTickerEntitlementService:
     def sync_profile(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         paid_level: str,
         strategy_id: UUID,
@@ -136,6 +143,7 @@ class RlLiveTickerEntitlementService:
         observed_at: datetime,
     ) -> RlLiveTickerEntitlementSnapshot:
         return self._repository.sync_profile(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             paid_level=paid_level,
             strategy_id=strategy_id,

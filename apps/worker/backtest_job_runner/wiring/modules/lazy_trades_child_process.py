@@ -48,6 +48,8 @@ class BacktestLazyTradesChildProcessExecutor:
                 str(task.task_id),
                 "--job-id",
                 str(task.job_id),
+                "--organization-id",
+                str(task.organization_id),
                 "--owner-user-id",
                 str(task.owner_user_id),
                 "--variant-key",

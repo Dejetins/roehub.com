@@ -14,7 +14,9 @@ from trading.contexts.rl_trading.domain.risk_sizing_policy import (
 
 class InMemoryRlRiskSizingPolicyRepository:
     def __init__(self) -> None:
-        self._records: dict[tuple[str, str, str, str, str], RlRiskSizingPolicyRecord] = {}
+        self._records: dict[
+            tuple[str, str, str, str, str, str], RlRiskSizingPolicyRecord
+        ] = {}
         self.audit_events: list[dict[str, object]] = []
 
     def get_policy(self, *, key: RlRiskSizingPolicyKey) -> RlRiskSizingPolicyRecord | None:

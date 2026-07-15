@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class BacktestJobExecutionTrigger(Protocol):
@@ -15,6 +15,7 @@ class BacktestJobExecutionTrigger(Protocol):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         request_hash: str,
     ) -> None:

@@ -48,6 +48,7 @@ from apps.api.exchange_control_client import (
     ExchangeControlClient,
     ExchangeControlClientError,
 )
+from trading.contexts.backtest.application.ports import ResearchOrganizationScopeResolver
 from trading.contexts.identity.adapters.inbound.api.csrf import (
     same_origin_rejection_reason,
 )
@@ -67,7 +68,6 @@ from trading.contexts.identity.application.use_cases.account_settings import (
 )
 from trading.contexts.notifications.adapters import InMemoryNotificationRepository
 from trading.contexts.notifications.application import (
-    InMemoryNotificationTelegramBindingStore,
     NotificationDeliveryCounters,
     NotificationDeliveryCounterService,
     NotificationTelegramBindingService,
@@ -82,9 +82,12 @@ from trading.contexts.strategy.application.use_cases.exchange_bindings import (
     StrategyExchangeBindingView,
 )
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 CurrentUserDependency = Callable[[Request], CurrentUserPrincipal]
+TelegramBindingServiceResolver = Callable[
+    [OrganizationId], NotificationTelegramBindingService
+]
 _RECENT_AUTH_WINDOW = timedelta(minutes=10)
 ExchangeConnectionStatusFilter = Literal["active", "disabled", "archived", "all"]
 
@@ -97,7 +100,9 @@ def build_ui_account_router(
     exchange_control_client: ExchangeControlClient | None = None,
     strategy_binding_service: StrategyExchangeBindingService | None = None,
     telegram_binding_service: NotificationTelegramBindingService | None = None,
+    telegram_binding_service_resolver: TelegramBindingServiceResolver | None = None,
     notification_repository: NotificationRepository | None = None,
+    organization_scope_resolver: ResearchOrganizationScopeResolver,
 ) -> APIRouter:
     if account_settings is None:  # type: ignore[truthy-bool]
         raise ValueError("build_ui_account_router requires account_settings")
@@ -105,13 +110,8 @@ def build_ui_account_router(
         raise ValueError("build_ui_account_router requires current_user_dependency")
     if clock is None:  # type: ignore[truthy-bool]
         raise ValueError("build_ui_account_router requires clock")
-    effective_telegram_binding_service = (
-        telegram_binding_service
-        if telegram_binding_service is not None
-        else NotificationTelegramBindingService(
-            store=InMemoryNotificationTelegramBindingStore()
-        )
-    )
+    if organization_scope_resolver is None:  # type: ignore[truthy-bool]
+        raise ValueError("build_ui_account_router requires organization_scope_resolver")
     notification_settings = UserNotificationSettingsService(
         repository=notification_repository or InMemoryNotificationRepository()
     )
@@ -545,6 +545,9 @@ def build_ui_account_router(
     ) -> StrategyExchangeBindingsResponse:
         service = _require_strategy_binding_service(service=strategy_binding_service)
         rows = service.list_bindings(
+            organization_id=organization_scope_resolver.resolve(
+                user_id=principal.user_id
+            ).organization_id,
             owner_user_id=principal.user_id,
             strategy_id=strategy_id,
         )
@@ -577,6 +580,9 @@ def build_ui_account_router(
             connection_id=str(connection_id),
         )
         binding = service.create_binding(
+            organization_id=organization_scope_resolver.resolve(
+                user_id=principal.user_id
+            ).organization_id,
             owner_user_id=principal.user_id,
             strategy_id=strategy_id,
             exchange_connection_id=connection_id,
@@ -607,6 +613,9 @@ def build_ui_account_router(
         _enforce_recent_auth(principal=principal, now=clock.now())
         service = _require_strategy_binding_service(service=strategy_binding_service)
         binding = service.disable_binding(
+            organization_id=organization_scope_resolver.resolve(
+                user_id=principal.user_id
+            ).organization_id,
             owner_user_id=principal.user_id,
             strategy_id=strategy_id,
             binding_id=binding_id,
@@ -691,7 +700,15 @@ def build_ui_account_router(
         principal: CurrentUserPrincipal = Depends(require_account_user),
     ) -> TelegramBindingCodeResponse:
         _enforce_same_origin_mutation(request=request)
-        binding_code = effective_telegram_binding_service.create_binding_code(
+        organization_id = organization_scope_resolver.resolve(
+            user_id=principal.user_id
+        ).organization_id
+        binding_service = _require_telegram_binding_service(
+            organization_id=organization_id,
+            service=telegram_binding_service,
+            resolver=telegram_binding_service_resolver,
+        )
+        binding_code = binding_service.create_binding_code(
             owner_user_id=principal.user_id,
             now=clock.now(),
         )
@@ -707,7 +724,15 @@ def build_ui_account_router(
     def get_telegram_binding(
         principal: CurrentUserPrincipal = Depends(require_account_user),
     ) -> TelegramBindingStatusResponse:
-        status = effective_telegram_binding_service.get_binding_status(
+        organization_id = organization_scope_resolver.resolve(
+            user_id=principal.user_id
+        ).organization_id
+        binding_service = _require_telegram_binding_service(
+            organization_id=organization_id,
+            service=telegram_binding_service,
+            resolver=telegram_binding_service_resolver,
+        )
+        status = binding_service.get_binding_status(
             owner_user_id=principal.user_id
         )
         return TelegramBindingStatusResponse(
@@ -724,10 +749,19 @@ def build_ui_account_router(
         principal: CurrentUserPrincipal = Depends(require_account_user),
     ) -> NotificationScopedSettingsResponse:
         profile = account_settings.get_profile(owner_user_id=principal.user_id)
-        binding_status = effective_telegram_binding_service.get_binding_status(
+        organization_id = organization_scope_resolver.resolve(
+            user_id=principal.user_id
+        ).organization_id
+        binding_service = _require_telegram_binding_service(
+            organization_id=organization_id,
+            service=telegram_binding_service,
+            resolver=telegram_binding_service_resolver,
+        )
+        binding_status = binding_service.get_binding_status(
             owner_user_id=principal.user_id
         )
         settings = notification_settings.get_settings(
+            organization_id=organization_id,
             owner_user_id=principal.user_id,
             now=clock.now(),
             default_timezone=profile.timezone,
@@ -736,6 +770,7 @@ def build_ui_account_router(
             settings=settings,
             binding_status=binding_status,
             delivery_counters=notification_counters.get_counters(
+                organization_id=organization_id,
                 owner_user_id=principal.user_id,
                 now=clock.now(),
             ),
@@ -752,10 +787,20 @@ def build_ui_account_router(
     ) -> NotificationScopedSettingsResponse:
         _enforce_same_origin_mutation(request=request)
         profile = account_settings.get_profile(owner_user_id=principal.user_id)
-        binding_status = effective_telegram_binding_service.get_binding_status(
+        organization_id = organization_scope_resolver.resolve(
+            user_id=principal.user_id
+        ).organization_id
+        binding_service = _require_telegram_binding_service(
+            organization_id=organization_id,
+            service=telegram_binding_service,
+            resolver=telegram_binding_service_resolver,
+        )
+        binding_status = binding_service.get_binding_status(
             owner_user_id=principal.user_id
         )
         settings = notification_settings.update_settings(
+            organization_id=organization_id,
+            provider_instance_id=binding_service.provider_instance_id,
             owner_user_id=principal.user_id,
             update=UserNotificationSettingsUpdate(
                 mode=payload.mode,
@@ -771,6 +816,7 @@ def build_ui_account_router(
             settings=settings,
             binding_status=binding_status,
             delivery_counters=notification_counters.get_counters(
+                organization_id=organization_id,
                 owner_user_id=principal.user_id,
                 now=clock.now(),
             ),
@@ -881,6 +927,43 @@ def _require_strategy_binding_service(
             details={},
         )
     return service
+
+
+def _require_telegram_binding_service(
+    *,
+    organization_id: OrganizationId,
+    service: NotificationTelegramBindingService | None,
+    resolver: TelegramBindingServiceResolver | None,
+) -> NotificationTelegramBindingService:
+    if service is not None:
+        if service.organization_id != organization_id:
+            raise RoehubError(
+                code="notification_provider_scope_mismatch",
+                message="Telegram provider instance belongs to another organization.",
+                details={"reason": "provider_scope_mismatch"},
+            )
+        return service
+    if resolver is None:
+        raise RoehubError(
+            code="notification_provider_unavailable",
+            message="A Telegram provider instance is not configured.",
+            details={"reason": "provider_unavailable"},
+        )
+    try:
+        resolved = resolver(organization_id)
+    except ValueError as error:
+        raise RoehubError(
+            code="notification_provider_unavailable",
+            message="Exactly one active Telegram provider instance is required.",
+            details={"reason": str(error)},
+        ) from error
+    if resolved.organization_id != organization_id:
+        raise RoehubError(
+            code="notification_provider_scope_mismatch",
+            message="Telegram provider instance belongs to another organization.",
+            details={"reason": "provider_scope_mismatch"},
+        )
+    return resolved
 
 
 def _require_trading_ready_connection(

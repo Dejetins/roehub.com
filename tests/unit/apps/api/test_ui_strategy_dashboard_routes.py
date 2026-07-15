@@ -13,6 +13,7 @@ from starlette.requests import Request
 
 from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_ui_strategies_dashboard_router
+from apps.api.wiring.modules.research_tenancy import DevelopmentOrganizationScopeResolver
 from apps.api.wiring.modules.ui_strategies_dashboard import StrategyDashboardQueryService
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.live_execution.domain import ExecutionProducerOutcomeLink
@@ -39,9 +40,10 @@ from trading.contexts.strategy.domain.entities import (
     StrategySignal,
 )
 from trading.contexts.strategy.domain.entities.strategy_spec_v1 import StrategySpecV1
-from trading.shared_kernel.primitives import PaidLevel, UserId
+from trading.shared_kernel.primitives import OrganizationId, PaidLevel, UserId
 
 _USER_ID = "00000000-0000-0000-0000-000000006006"
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-4000-8000-000000000010")
 _STRATEGY_ID = UUID("00000000-0000-0000-0000-000000006101")
 
 _STRATEGY_DASHBOARD_ENDPOINT_CONTRACT = {
@@ -72,6 +74,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     strategy = _strategy(symbol="BTCUSDT")
     run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-000000006201"),
+        organization_id=_ORGANIZATION_ID,
         user_id=strategy.user_id,
         strategy_id=strategy.strategy_id,
         started_at=datetime(2026, 5, 6, 9, 0, tzinfo=UTC),
@@ -94,6 +97,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     )
     risk_policy_service.upsert_policy(
         key=RlRiskSizingPolicyKey(
+            organization_id=strategy.organization_id,
             owner_user_id=strategy.user_id,
             strategy_id=strategy.strategy_id,
             exchange_name="binance",
@@ -104,6 +108,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
         observed_at=datetime(2026, 5, 6, 8, 59, tzinfo=UTC),
     )
     service = StrategyDashboardQueryService(
+        organization_scope_resolver=DevelopmentOrganizationScopeResolver(),
         strategy_repository=_FakeStrategyRepository(strategies=(strategy,)),
         run_repository=_FakeRunRepository(runs=(run,)),
         signal_repository=_FakeSignalRepository(signals=(_signal(strategy=strategy, run=run),)),
@@ -154,9 +159,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert payload["signal_journal"]["state"] == "ready"
     assert payload["signal_journal"]["items"][0]["outcome"] == "signal"
     assert payload["signal_journal"]["items"][0]["mode"] == "monitor_only"
-    assert payload["signal_journal"]["items"][0]["reason_code"].endswith(
-        "monitor_only_no_intent"
-    )
+    assert payload["signal_journal"]["items"][0]["reason_code"].endswith("monitor_only_no_intent")
     assert payload["exchange_account_readiness"]["status"] == "degraded"
     assert payload["exchange_account_readiness"]["reason_codes"] == [
         "account_projection_not_configured"
@@ -167,9 +170,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert payload["market_readiness"]["items"][0]["instrument_key"] == "binance:spot:BTCUSDT"
     assert payload["market_readiness"]["items"][0]["readiness_state"] == "ready"
     assert payload["market_readiness"]["items"][1]["instrument_key"] == "bybit:spot:BTCUSDT"
-    assert payload["market_readiness"]["items"][1]["reason_codes"] == [
-        "reference_market_missing"
-    ]
+    assert payload["market_readiness"]["items"][1]["reason_codes"] == ["reference_market_missing"]
     assert "summary" not in payload["monthly_stats"]
     assert "symbol_results" not in payload
     assert payload["refresh_control"]["interval_seconds"] == 15
@@ -186,9 +187,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert source_statuses["execution_fills"] == "unavailable"
     assert payload["rl_ml"]["state"] == "degraded"
     assert payload["rl_ml"]["model_status"]["model_family"] == "rl-trading-agent-platform-v1"
-    assert payload["rl_ml"]["model_status"]["artifact_root"] == (
-        "/opt/roehub/state/rl_trading/"
-    )
+    assert payload["rl_ml"]["model_status"]["artifact_root"] == ("/opt/roehub/state/rl_trading/")
     assert payload["rl_ml"]["model_status"]["registry_status"] == "not_configured"
     assert payload["rl_ml"]["ticker_slots"]["paid_level"] == "free"
     assert payload["rl_ml"]["ticker_slots"]["product_label"] == "Free"
@@ -214,8 +213,7 @@ def test_strategy_dashboard_exposes_reference_panel_inventory_and_degraded_stats
     assert payload["rl_ml"]["risk_config"]["base_quote_notional"] == "25"
     assert payload["rl_ml"]["risk_config"]["validation_reasons"] == ["rl_risk_policy_ready"]
     synthetic_rule_types = [
-        rule["rule_type"]
-        for rule in payload["rl_ml"]["risk_config"]["synthetic_exit_rules"]
+        rule["rule_type"] for rule in payload["rl_ml"]["risk_config"]["synthetic_exit_rules"]
     ]
     assert synthetic_rule_types == [
         "take_profit",
@@ -259,6 +257,7 @@ def test_strategy_dashboard_exposes_runtime_status_allocation_and_execution_jour
     strategy = _strategy(symbol="BTCUSDT")
     run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-000000006202"),
+        organization_id=_ORGANIZATION_ID,
         user_id=strategy.user_id,
         strategy_id=strategy.strategy_id,
         started_at=datetime(2026, 5, 6, 9, 0, tzinfo=UTC),
@@ -268,6 +267,7 @@ def test_strategy_dashboard_exposes_runtime_status_allocation_and_execution_jour
     source_event_received_at = datetime(2026, 5, 6, 9, 2, 3, tzinfo=UTC)
     execution_updated_at = source_event_received_at + timedelta(seconds=7)
     service = StrategyDashboardQueryService(
+        organization_scope_resolver=DevelopmentOrganizationScopeResolver(),
         strategy_repository=_FakeStrategyRepository(strategies=(strategy,)),
         run_repository=_FakeRunRepository(runs=(run,)),
         profile_repository=_FakeLiveProfileRepository(profile=profile),
@@ -276,6 +276,7 @@ def test_strategy_dashboard_exposes_runtime_status_allocation_and_execution_jour
             links=(
                 ExecutionProducerOutcomeLink(
                     source_event_id=UUID("00000000-0000-0000-0000-000000006401"),
+                    organization_id=_ORGANIZATION_ID,
                     owner_user_id=strategy.user_id,
                     source_type="strategy_signal",
                     source_event_ref=str(signal.signal_id),
@@ -300,6 +301,7 @@ def test_strategy_dashboard_exposes_runtime_status_allocation_and_execution_jour
                 ),
                 ExecutionProducerOutcomeLink(
                     source_event_id=UUID("00000000-0000-0000-0000-000000006402"),
+                    organization_id=_ORGANIZATION_ID,
                     owner_user_id=strategy.user_id,
                     source_type="ml_agent_decision",
                     source_event_ref="rl-decision-202605060902",
@@ -366,6 +368,7 @@ def test_strategy_dashboard_exposes_runtime_status_allocation_and_execution_jour
 
 def test_strategy_dashboard_auth_failure_uses_auth_required_code() -> None:
     service = StrategyDashboardQueryService(
+        organization_scope_resolver=DevelopmentOrganizationScopeResolver(),
         strategy_repository=_FakeStrategyRepository(strategies=()),
         run_repository=_FakeRunRepository(),
     )
@@ -379,6 +382,7 @@ def test_strategy_dashboard_auth_failure_uses_auth_required_code() -> None:
 
 def test_strategy_dashboard_source_failure_degrades_panels_without_500() -> None:
     service = StrategyDashboardQueryService(
+        organization_scope_resolver=DevelopmentOrganizationScopeResolver(),
         strategy_repository=_FailingStrategyRepository(),
         run_repository=_FakeRunRepository(),
     )
@@ -397,6 +401,7 @@ def test_strategy_dashboard_source_failure_degrades_panels_without_500() -> None
 
 def test_strategy_dashboard_manual_refresh_reports_rate_limit_in_dto() -> None:
     service = StrategyDashboardQueryService(
+        organization_scope_resolver=DevelopmentOrganizationScopeResolver(),
         strategy_repository=_FakeStrategyRepository(strategies=()),
         run_repository=_FakeRunRepository(),
     )
@@ -437,25 +442,34 @@ class _FakeStrategyRepository:
     def list_for_user(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         include_deleted: bool = False,
     ) -> tuple[Strategy, ...]:
         return tuple(
             strategy
             for strategy in self._strategies
-            if strategy.user_id == user_id and (include_deleted or not strategy.is_deleted)
+            if strategy.organization_id == organization_id
+            and strategy.user_id == user_id
+            and (include_deleted or not strategy.is_deleted)
         )
 
     def create(self, *, strategy: Strategy) -> Strategy:
         raise NotImplementedError
 
-    def find_by_strategy_id(self, *, user_id: UserId, strategy_id: UUID) -> Strategy | None:
+    def find_by_strategy_id(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> Strategy | None:
         raise NotImplementedError
 
-    def find_any_by_strategy_id(self, *, strategy_id: UUID) -> Strategy | None:
+    def find_any_by_strategy_id(
+        self, *, organization_id: OrganizationId, strategy_id: UUID
+    ) -> Strategy | None:
         raise NotImplementedError
 
-    def soft_delete(self, *, user_id: UserId, strategy_id: UUID) -> bool:
+    def soft_delete(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> bool:
         raise NotImplementedError
 
 
@@ -466,6 +480,7 @@ class _FailingStrategyRepository(_FakeStrategyRepository):
     def list_for_user(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         include_deleted: bool = False,
     ) -> tuple[Strategy, ...]:
@@ -479,11 +494,17 @@ class _FakeRunRepository:
     def find_active_for_strategy(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         strategy_id: UUID,
     ) -> StrategyRun | None:
         for run in self._runs:
-            if run.user_id == user_id and run.strategy_id == strategy_id and run.is_active():
+            if (
+                run.organization_id == organization_id
+                and run.user_id == user_id
+                and run.strategy_id == strategy_id
+                and run.is_active()
+            ):
                 return run
         return None
 
@@ -493,10 +514,14 @@ class _FakeRunRepository:
     def update(self, *, run: StrategyRun) -> StrategyRun:
         raise NotImplementedError
 
-    def find_by_run_id(self, *, user_id: UserId, run_id: UUID) -> StrategyRun | None:
+    def find_by_run_id(
+        self, *, organization_id: OrganizationId, user_id: UserId, run_id: UUID
+    ) -> StrategyRun | None:
         raise NotImplementedError
 
-    def list_for_strategy(self, *, user_id: UserId, strategy_id: UUID) -> tuple[StrategyRun, ...]:
+    def list_for_strategy(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> tuple[StrategyRun, ...]:
         raise NotImplementedError
 
     def list_active_runs(self) -> tuple[StrategyRun, ...]:
@@ -513,6 +538,7 @@ class _FakeSignalRepository:
     def list_latest_for_strategy(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         limit: int,
@@ -521,7 +547,9 @@ class _FakeSignalRepository:
         return tuple(
             signal
             for signal in self._signals
-            if signal.owner_user_id == owner_user_id and signal.strategy_id == strategy_id
+            if signal.organization_id == organization_id
+            and signal.owner_user_id == owner_user_id
+            and signal.strategy_id == strategy_id
         )
 
 
@@ -532,11 +560,13 @@ class _FakeLiveProfileRepository:
     def get_for_strategy(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
     ) -> LiveStrategyProfile | None:
         if (
             self._profile is not None
+            and self._profile.organization_id == organization_id
             and self._profile.owner_user_id == owner_user_id
             and self._profile.strategy_id == strategy_id
         ):
@@ -557,6 +587,7 @@ class _FakeExecutionOutcomeService:
     def list_producer_outcome_links_for_strategy(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         limit: int,
@@ -565,12 +596,10 @@ class _FakeExecutionOutcomeService:
         return tuple(
             link
             for link in self._links
-            if link.owner_user_id == owner_user_id
+            if link.organization_id == organization_id
+            and link.owner_user_id == owner_user_id
             and link.source_event_ref
-            and (
-                link.strategy_signal_id is not None
-                or link.source_type == "ml_agent_decision"
-            )
+            and (link.strategy_signal_id is not None or link.source_type == "ml_agent_decision")
             and strategy_id == _STRATEGY_ID
         )
 
@@ -666,6 +695,7 @@ def _strategy(*, symbol: str) -> Strategy:
     user_id = UserId.from_string(_USER_ID)
     spec = StrategySpecV1.from_json(payload=_strategy_spec_payload(symbol=symbol))
     return Strategy.create(
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         spec=spec,
         created_at=datetime(2026, 5, 6, 8, 0, tzinfo=UTC),
@@ -676,6 +706,7 @@ def _strategy(*, symbol: str) -> Strategy:
 def _signal(*, strategy: Strategy, run: StrategyRun) -> StrategySignal:
     return StrategySignal(
         signal_id=UUID("00000000-0000-0000-0000-000000006301"),
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=strategy.user_id,
         strategy_id=strategy.strategy_id,
         strategy_run_id=run.run_id,
@@ -704,6 +735,7 @@ def _profile(
 ) -> LiveStrategyProfile:
     return LiveStrategyProfile(
         profile_id=UUID("00000000-0000-0000-0000-000000006701"),
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=strategy.user_id,
         strategy_id=strategy.strategy_id,
         mode=mode,

@@ -11,7 +11,7 @@ from trading.contexts.live_execution.domain import (
     StrategyPositionOwnership,
     StrategyPositionOwnershipConflictError,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class StrategyPositionOwnershipService:
@@ -29,6 +29,7 @@ class StrategyPositionOwnershipService:
     def reserve_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         strategy_id: UUID,
@@ -42,6 +43,7 @@ class StrategyPositionOwnershipService:
     ) -> StrategyPositionOwnership:
         ownership = StrategyPositionOwnership(
             ownership_id=uuid4(),
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_connection_id=exchange_connection_id,
             strategy_id=strategy_id,
@@ -65,9 +67,15 @@ class StrategyPositionOwnershipService:
         return reserved
 
     def activate_for_strategy_run(
-        self, *, owner_user_id: UserId, strategy_run_id: UUID, now: datetime
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_run_id: UUID,
+        now: datetime,
     ) -> StrategyPositionOwnership | None:
         updated = self._repository.update_state(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_run_id=strategy_run_id,
             state="active",
@@ -81,12 +89,14 @@ class StrategyPositionOwnershipService:
     def mark_releasing_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         now: datetime,
         reason: str = "run_stopping",
     ) -> StrategyPositionOwnership | None:
         updated = self._repository.update_state(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_run_id=strategy_run_id,
             state="releasing",
@@ -100,12 +110,14 @@ class StrategyPositionOwnershipService:
     def release_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         now: datetime,
         reason: str = "run_stopped",
     ) -> StrategyPositionOwnership | None:
         updated = self._repository.update_state(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_run_id=strategy_run_id,
             state="released",
@@ -119,12 +131,14 @@ class StrategyPositionOwnershipService:
     def mark_stale_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         now: datetime,
         reason: str = "manual_repair_required",
     ) -> StrategyPositionOwnership | None:
         updated = self._repository.update_state(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_run_id=strategy_run_id,
             state="stale_requires_repair",

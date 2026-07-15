@@ -1,2 +1,1 @@
 """Backtest artifacts bounded context."""
-

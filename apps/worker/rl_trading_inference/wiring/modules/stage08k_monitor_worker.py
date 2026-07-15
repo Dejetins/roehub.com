@@ -26,6 +26,7 @@ from trading.contexts.rl_trading.domain.stage08k_monitor_runtime import (
     open_stage08k_virtual_trade_v1,
     stage08k_entry_decision_id_v1,
 )
+from trading.shared_kernel.primitives import OrganizationId
 
 from .rl_trading_inference import (
     RedisRlClosedCandleStream,
@@ -189,6 +190,9 @@ class Stage08kMonitorWorker:
             )
             source_started = time.perf_counter()
             event = self._producer.record_monitor_only_decision(
+                organization_id=OrganizationId.from_string(
+                    self._operator_context.organization_id
+                ),
                 context=self._decision_context(instrument=instrument),
                 decision=decision,
             )
@@ -278,6 +282,9 @@ class Stage08kMonitorWorker:
             },
         )
         event = self._producer.record_monitor_only_decision(
+            organization_id=OrganizationId.from_string(
+                self._operator_context.organization_id
+            ),
             context=self._decision_context(instrument=instrument),
             decision=decision,
         )

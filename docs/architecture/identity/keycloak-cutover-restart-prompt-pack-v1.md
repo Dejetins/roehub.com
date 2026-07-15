@@ -1,7 +1,18 @@
 # Keycloak Cutover Restart Prompt-Pack v1
 
-Статус: proposed executable restart-pack after target-architecture hardening  
+Статус: `superseded`; не выполнять после 2026-07-13
 Дата: 2026-04-22
+
+Этот Keycloak-only пакет заменён goal-driven планом и пакетом:
+
+- `docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md`;
+- `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/`;
+- `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/roehub-self-hosted-oss-platform-v1-stage-ledger.md`.
+
+Текущую реализованную Keycloak-систему нельзя удалять по этому старому пакету.
+Миграция выполняется только через принятые Stages `06`–`07` нового плана.
+Real-boundary validation этого superseded-пакета не применима: файл не
+исполняется, а browser/API/migration evidence задаётся новыми этапными промтами.
 
 Связанные документы:
 - `docs/architecture/identity/keycloak-cutover-plan-v1.md`

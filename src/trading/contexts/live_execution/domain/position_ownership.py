@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 StrategyPositionOwnershipState = Literal[
     "reserved",
@@ -33,6 +33,7 @@ class StrategyPositionOwnershipStorageError(ValueError):
 @dataclass(frozen=True, slots=True)
 class StrategyPositionOwnership:
     ownership_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     exchange_connection_id: UUID
     strategy_id: UUID
@@ -60,6 +61,7 @@ class StrategyPositionOwnership:
     ) -> StrategyPositionOwnership:
         return StrategyPositionOwnership(
             ownership_id=self.ownership_id,
+            organization_id=self.organization_id,
             owner_user_id=self.owner_user_id,
             exchange_connection_id=self.exchange_connection_id,
             strategy_id=self.strategy_id,

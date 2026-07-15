@@ -74,13 +74,19 @@ def require_owned_strategy(
         Reads one strategy snapshot from storage.
     """
     try:
-        strategy = repository.find_any_by_strategy_id(strategy_id=strategy_id)
+        strategy = repository.find_any_by_strategy_id(
+            organization_id=current_user.organization_id,
+            strategy_id=strategy_id,
+        )
     except Exception as error:  # noqa: BLE001
         raise map_strategy_exception(error=error) from error
 
     if strategy is None or strategy.is_deleted:
         raise strategy_not_found(strategy_id=strategy_id)
-    if strategy.user_id != current_user.user_id:
+    if (
+        strategy.organization_id != current_user.organization_id
+        or strategy.user_id != current_user.user_id
+    ):
         raise strategy_forbidden(strategy_id=strategy_id)
     return strategy
 
@@ -121,6 +127,7 @@ def append_strategy_event(
 
     try:
         event = StrategyEvent.create(
+            organization_id=current_user.organization_id,
             user_id=current_user.user_id,
             strategy_id=strategy_id,
             run_id=run_id,

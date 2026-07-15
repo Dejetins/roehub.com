@@ -114,10 +114,31 @@ jobs:
         run: |
           uv run python -m tools.docs.generate_docs_index --check
 
+      - name: Job contract schema drift check
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          uv run python -m tools.jobs.generate_schemas --check
+
       - name: Docs index drift check (docs-only)
         if: needs.changes.outputs.code != 'true' && needs.changes.outputs.docs == 'true'
         run: |
           python -m tools.docs.generate_docs_index --check
+
+  oss_metadata:
+    name: oss-metadata
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Verify license inventory and generated release metadata
+        run: |
+          python tools/release/oss_metadata.py --check
 
   migrations:
     name: migrations
@@ -265,6 +286,7 @@ jobs:
     needs:
       - changes
       - static
+      - oss_metadata
       - migrations
       - test
       - perf_smoke
@@ -275,6 +297,7 @@ jobs:
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
           STATIC_RESULT: ${{ needs.static.result }}
+          OSS_METADATA_RESULT: ${{ needs.oss_metadata.result }}
           MIGRATIONS_RESULT: ${{ needs.migrations.result }}
           TEST_RESULT: ${{ needs.test.result }}
           PERF_SMOKE_RESULT: ${{ needs.perf_smoke.result }}
@@ -282,6 +305,7 @@ jobs:
           set -euo pipefail
           printf 'changes=%s\n' "$CHANGES_RESULT"
           printf 'static=%s\n' "$STATIC_RESULT"
+          printf 'oss_metadata=%s\n' "$OSS_METADATA_RESULT"
           printf 'migrations=%s\n' "$MIGRATIONS_RESULT"
           printf 'test=%s\n' "$TEST_RESULT"
           printf 'perf_smoke=%s\n' "$PERF_SMOKE_RESULT"
@@ -289,6 +313,7 @@ jobs:
           for result in \
             "$CHANGES_RESULT" \
             "$STATIC_RESULT" \
+            "$OSS_METADATA_RESULT" \
             "$MIGRATIONS_RESULT" \
             "$TEST_RESULT" \
             "$PERF_SMOKE_RESULT"; do

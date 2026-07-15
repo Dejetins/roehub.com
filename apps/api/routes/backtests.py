@@ -41,6 +41,7 @@ from apps.api.monitoring import (
 from trading.contexts.backtest.application.dto import (
     BacktestLazyTradesMaterializationReadModel,
 )
+from trading.contexts.backtest.application.ports import ResearchOrganizationScopeResolver
 from trading.contexts.backtest.application.services.v2 import (
     DEFAULT_BACKTEST_RESULT_POINTS,
     DEFAULT_BACKTEST_TRADES_CSV_MAX_ROWS,
@@ -173,6 +174,7 @@ def build_backtests_router(
     runtime_defaults_service: BacktestRuntimeDefaultsService,
     preflight_service: BacktestPreflightService,
     current_user_dependency: CurrentUserDependency,
+    organization_scope_resolver: ResearchOrganizationScopeResolver,
     jobs_use_case: BacktestJobsUseCase | None = None,
     create_strategy_from_variant_use_case: CreateStrategyFromBacktestVariantUseCase | None = None,
     compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
@@ -188,6 +190,8 @@ def build_backtests_router(
         raise ValueError("build_backtests_router requires preflight_service")
     if current_user_dependency is None:  # type: ignore[truthy-bool]
         raise ValueError("build_backtests_router requires current_user_dependency")
+    if organization_scope_resolver is None:  # type: ignore[truthy-bool]
+        raise ValueError("build_backtests_router requires organization_scope_resolver")
 
     router = APIRouter(tags=["backtests"])
 
@@ -412,7 +416,12 @@ def build_backtests_router(
             variant_key=variant_key,
         )
         report = service.check_backtest_variant(
-            current_user=CurrentUser(user_id=principal.user_id),
+            current_user=CurrentUser(
+                organization_id=organization_scope_resolver.resolve(
+                    user_id=principal.user_id
+                ).organization_id,
+                user_id=principal.user_id,
+            ),
             snapshot=snapshot,
         )
         record_strategy_variant_compatibility(
@@ -444,7 +453,12 @@ def build_backtests_router(
             variant_key=variant_key,
         )
         report = service.build_for_backtest_variant(
-            current_user=CurrentUser(user_id=principal.user_id),
+            current_user=CurrentUser(
+                organization_id=organization_scope_resolver.resolve(
+                    user_id=principal.user_id
+                ).organization_id,
+                user_id=principal.user_id,
+            ),
             snapshot=snapshot,
         )
         return _to_scenario_matrix_response(report=report)
@@ -466,7 +480,12 @@ def build_backtests_router(
     ) -> BacktestVariantStrategyResponse:
         try:
             result = use_case.execute(
-                current_user=CurrentUser(user_id=principal.user_id),
+                current_user=CurrentUser(
+                    organization_id=organization_scope_resolver.resolve(
+                        user_id=principal.user_id
+                    ).organization_id,
+                    user_id=principal.user_id,
+                ),
                 job_id=job_id,
                 variant_key=variant_key,
                 idempotency_key=idempotency_key,

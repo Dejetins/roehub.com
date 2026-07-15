@@ -417,9 +417,7 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
             funding_time=funding_directory / FUNDING_TIME_FILENAME_V2,
             funding_rate=funding_directory / FUNDING_RATE_FILENAME_V2,
             mark_price=funding_directory / FUNDING_MARK_PRICE_FILENAME_V2,
-            funding_interval_minutes=(
-                funding_directory / FUNDING_INTERVAL_MINUTES_FILENAME_V2
-            ),
+            funding_interval_minutes=(funding_directory / FUNDING_INTERVAL_MINUTES_FILENAME_V2),
             data_quality=funding_directory / FUNDING_DATA_QUALITY_FILENAME_V2,
         )
 

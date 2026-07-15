@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import datetime
 from uuid import UUID, uuid4
 
 from trading.contexts.live_execution.application.ports import ExchangeExecutionOrderRepository
@@ -19,13 +20,17 @@ from trading.contexts.live_execution.domain import (
     ExecutionLedgerRetentionPolicy,
     ExecutionOrderEvent,
     ExecutionReconciliationRun,
+    ExecutionSubmitClaim,
 )
+from trading.shared_kernel.primitives import OrganizationId
 
 
 class InMemoryExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository):
     def __init__(self) -> None:
         self.orders: dict[UUID, ExchangeExecutionOrderRecord] = {}
-        self.private_stream_sessions: dict[UUID, ExchangePrivateStreamSession] = {}
+        self.private_stream_sessions: dict[
+            tuple[OrganizationId, UUID], ExchangePrivateStreamSession
+        ] = {}
         self.order_events: list[ExecutionOrderEvent] = []
         self.fills: dict[tuple[UUID, str], ExecutionFill] = {}
         self.funding_events: dict[tuple[UUID, str], ExecutionFundingEvent] = {}
@@ -33,8 +38,13 @@ class InMemoryExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository)
         self.retention_policies: dict[str, ExecutionLedgerRetentionPolicy] = {}
         self.pitr_drills: list[ExecutionLedgerPitrDrill] = []
 
-    def get_by_intent(self, *, intent_id: UUID) -> ExchangeExecutionOrderRecord | None:
-        return self.orders.get(intent_id)
+    def get_by_intent(
+        self, *, organization_id: OrganizationId, intent_id: UUID
+    ) -> ExchangeExecutionOrderRecord | None:
+        order = self.orders.get(intent_id)
+        if order is None or order.organization_id != organization_id:
+            return None
+        return order
 
     def record_guard_rejection(
         self, *, command: ExchangeOrderCommand, reason: str
@@ -44,6 +54,37 @@ class InMemoryExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository)
         record = _base_record(command=command, status="guard_rejected", reason=reason, now=now)
         self.orders[command.intent_id] = record
         return record
+
+    def record_claim_guard_rejection(
+        self,
+        *,
+        command: ExchangeOrderCommand,
+        claim_id: UUID,
+        rejected_at: datetime,
+        reason: str,
+    ) -> ExchangeExecutionOrderRecord | None:
+        existing = self.orders.get(command.intent_id)
+        if (
+            existing is None
+            or existing.organization_id != command.organization_id
+            or existing.status != "submit_pending"
+            or existing.submit_claim_id != claim_id
+            or existing.submit_claim_expires_at is None
+            or existing.submit_claim_expires_at <= rejected_at
+        ):
+            return None
+        rejected = replace(
+            existing,
+            status="guard_rejected",
+            status_reason=reason,
+            metadata={"guard_reason": reason},
+            submit_claim_id=None,
+            submit_claimed_at=None,
+            submit_claim_expires_at=None,
+            updated_at=rejected_at,
+        )
+        self.orders[command.intent_id] = rejected
+        return rejected
 
     def record_submit_pending(
         self, *, command: ExchangeOrderCommand
@@ -60,14 +101,81 @@ class InMemoryExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository)
         self.orders[command.intent_id] = record
         return record
 
+    def claim_submit(
+        self,
+        *,
+        command: ExchangeOrderCommand,
+        claim_id: UUID,
+        claimed_at: datetime,
+        expires_at: datetime,
+        submit_guard_audit_event_id: UUID,
+        mainnet_approval_id: UUID | None,
+    ) -> ExecutionSubmitClaim:
+        existing = self.orders.get(command.intent_id)
+        if existing is not None:
+            if existing.exchange_order_id is not None:
+                return ExecutionSubmitClaim(
+                    order=existing,
+                    claim_id=claim_id,
+                    acquired=False,
+                    reason="order_already_processed",
+                )
+            if existing.status in {"unknown", "submit_pending"}:
+                return ExecutionSubmitClaim(
+                    order=existing,
+                    claim_id=claim_id,
+                    acquired=False,
+                    reason=(
+                        "submission_in_flight"
+                        if existing.status == "submit_pending"
+                        and existing.submit_claim_expires_at is not None
+                        and existing.submit_claim_expires_at > claimed_at
+                        else "unknown_state_reconciliation_required"
+                    ),
+                )
+        base = _base_record(
+            command=command,
+            status="submit_pending",
+            reason="submit_claim_acquired",
+            now=claimed_at,
+        )
+        claimed = replace(
+            base if existing is None else existing,
+            status="submit_pending",
+            status_reason="submit_claim_acquired",
+            submit_claim_id=claim_id,
+            submit_claimed_at=claimed_at,
+            submit_claim_expires_at=expires_at,
+            submit_guard_audit_event_id=submit_guard_audit_event_id,
+            mainnet_approval_id=mainnet_approval_id,
+            updated_at=claimed_at,
+        )
+        self.orders[command.intent_id] = claimed
+        return ExecutionSubmitClaim(
+            order=claimed,
+            claim_id=claim_id,
+            acquired=True,
+            reason="submit_claim_acquired",
+        )
+
     def record_submit_result(
         self,
         *,
+        organization_id: OrganizationId,
         intent_id: UUID,
+        claim_id: UUID,
+        finalized_at: datetime,
         result: ExchangeOrderSubmitResult,
     ) -> ExchangeExecutionOrderRecord | None:
         existing = self.orders.get(intent_id)
-        if existing is None:
+        if (
+            existing is None
+            or existing.organization_id != organization_id
+            or existing.submit_claim_id != claim_id
+            or existing.status != "submit_pending"
+            or existing.submit_claim_expires_at is None
+            or existing.submit_claim_expires_at <= finalized_at
+        ):
             return None
         updated = replace(
             existing,
@@ -79,28 +187,63 @@ class InMemoryExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository)
             latency_ms=result.latency_ms,
             metadata=dict(result.metadata),
             updated_at=result.submitted_at,
+            submit_claim_id=None,
+            submit_claimed_at=None,
+            submit_claim_expires_at=None,
         )
         self.orders[intent_id] = updated
         return updated
 
+    def renew_submit_claim(
+        self,
+        *,
+        organization_id: OrganizationId,
+        intent_id: UUID,
+        claim_id: UUID,
+        renewed_at: datetime,
+        expires_at: datetime,
+    ) -> bool:
+        existing = self.orders.get(intent_id)
+        if (
+            existing is None
+            or existing.organization_id != organization_id
+            or existing.status != "submit_pending"
+            or existing.submit_claim_id != claim_id
+            or existing.submit_claim_expires_at is None
+            or existing.submit_claim_expires_at <= renewed_at
+            or expires_at <= renewed_at
+        ):
+            return False
+        self.orders[intent_id] = replace(
+            existing,
+            submit_claimed_at=renewed_at,
+            submit_claim_expires_at=expires_at,
+            updated_at=renewed_at,
+        )
+        return True
+
     def record_status_result(
         self,
         *,
+        organization_id: OrganizationId,
         intent_id: UUID,
         result: ExchangeOrderStatusResult,
     ) -> ExchangeExecutionOrderRecord | None:
         existing = self.orders.get(intent_id)
-        if existing is None:
+        if existing is None or existing.organization_id != organization_id:
             return None
         updated = replace(
             existing,
-            exchange_order_id=result.exchange_order_id,
+            exchange_order_id=result.exchange_order_id or None,
             status="status_checked",
             status_reason=result.exchange_status,
             last_checked_at=result.checked_at,
             latency_ms=result.latency_ms,
             metadata=dict(result.metadata),
             updated_at=result.checked_at,
+            submit_claim_id=None,
+            submit_claimed_at=None,
+            submit_claim_expires_at=None,
         )
         self.orders[intent_id] = updated
         return updated
@@ -108,11 +251,12 @@ class InMemoryExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository)
     def record_cancel_result(
         self,
         *,
+        organization_id: OrganizationId,
         intent_id: UUID,
         result: ExchangeOrderCancelResult,
     ) -> ExchangeExecutionOrderRecord | None:
         existing = self.orders.get(intent_id)
-        if existing is None:
+        if existing is None or existing.organization_id != organization_id:
             return None
         updated = replace(
             existing,
@@ -129,22 +273,46 @@ class InMemoryExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository)
         return updated
 
     def record_adapter_error(
-        self, *, intent_id: UUID, reason: str
+        self,
+        *,
+        organization_id: OrganizationId,
+        intent_id: UUID,
+        claim_id: UUID,
+        occurred_at: datetime,
+        reason: str,
     ) -> ExchangeExecutionOrderRecord | None:
         existing = self.orders.get(intent_id)
-        if existing is None:
+        if (
+            existing is None
+            or existing.organization_id != organization_id
+            or existing.submit_claim_id != claim_id
+            or existing.status != "submit_pending"
+            or existing.submit_claim_expires_at is None
+            or existing.submit_claim_expires_at <= occurred_at
+        ):
             return None
-        updated = replace(existing, status="adapter_error", status_reason=reason)
+        updated = replace(
+            existing,
+            status="unknown" if "unknown_state" in reason else "adapter_error",
+            status_reason=reason,
+            submit_claim_id=None,
+            submit_claimed_at=None,
+            submit_claim_expires_at=None,
+            updated_at=occurred_at,
+        )
         self.orders[intent_id] = updated
         return updated
 
     def record_private_stream_session(
         self,
         *,
+        organization_id: OrganizationId,
         connection_id: UUID,
         session: ExchangePrivateStreamSession,
     ) -> ExchangePrivateStreamSession:
-        self.private_stream_sessions[connection_id] = session
+        if session.organization_id != organization_id:
+            raise ValueError("private stream organization mismatch")
+        self.private_stream_sessions[(organization_id, connection_id)] = session
         return session
 
     def record_order_event(self, *, event: ExecutionOrderEvent) -> ExecutionOrderEvent:
@@ -177,6 +345,7 @@ class InMemoryExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository)
             fill_id=uuid4(),
             order_id=order.order_id,
             intent_id=order.intent_id,
+            organization_id=order.organization_id,
             owner_user_id=order.owner_user_id,
             provider_trade_id=fill.provider_trade_id,
             price=fill.price,
@@ -204,6 +373,7 @@ class InMemoryExchangeExecutionOrderRepository(ExchangeExecutionOrderRepository)
             funding_event_id=uuid4(),
             order_id=order.order_id,
             intent_id=order.intent_id,
+            organization_id=order.organization_id,
             owner_user_id=order.owner_user_id,
             provider_event_id=funding_event.provider_event_id,
             amount=funding_event.amount,
@@ -242,6 +412,7 @@ def _base_record(
     return ExchangeExecutionOrderRecord(
         order_id=uuid4(),
         intent_id=command.intent_id,
+        organization_id=command.organization_id,
         owner_user_id=command.owner_user_id,
         exchange_connection_id=command.exchange_connection_id,
         exchange_name=command.exchange_name,

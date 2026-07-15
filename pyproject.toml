@@ -1,12 +1,19 @@
 [build-system]
-requires = ["hatchling>=1.25.0"]
+requires = ["hatchling==1.31.0"]
 build-backend = "hatchling.build"
 
 [project]
 name = "roehub"
-version = "0.0.0"
+version = "0.1.0"
 description = "roehub.com (open-source repo)"
 readme = "README.md"
+license = "Apache-2.0"
+license-files = [
+  "LICENSE",
+  "NOTICE",
+  "tools/release/THIRD_PARTY_NOTICES.md",
+  "apps/web/dist/vendor/lightweight-charts.NOTICE.txt",
+]
 requires-python = ">=3.12,<3.13"
 dependencies = [
   # Base runtime
@@ -54,13 +61,27 @@ dependencies = [
   "lxml>=6.0.2",
   "pybit>=5.13.0",
   "binance-historical-data>=0.1.14",
+  "webauthn==2.5.1",
+  "argon2-cffi==25.1.0",
 ]
+
+[project.scripts]
+roehubctl = "apps.roehubctl.main.main:main"
+roehub-control-agent = "apps.control_agent.main.main:main"
 
 [project.optional-dependencies]
 rl-ml = [
   "optuna>=4.2,<5",
-  "torch>=2.7,<3",
+  "torch==2.7.1",
 ]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
 
 [dependency-groups]
 dev = [

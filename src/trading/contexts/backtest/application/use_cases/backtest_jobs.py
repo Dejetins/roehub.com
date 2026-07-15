@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import hashlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -27,6 +26,11 @@ from trading.contexts.backtest.application.ports import (
     BacktestLazyTradesMaterializationRepository,
     BacktestLazyTradesMaterializationRequest,
     BacktestLazyTradesMaterializationTask,
+    ResearchOrganizationScope,
+    ResearchOrganizationScopeResolver,
+)
+from trading.contexts.backtest.application.services.research_identity import (
+    build_research_idempotency_key_hash,
 )
 from trading.contexts.backtest.application.services.v2 import (
     BacktestAdmissionService,
@@ -64,7 +68,7 @@ from trading.contexts.backtest_artifacts.application.services.v2.contracts impor
     artifact_market_id_from_coordinates_v2,
 )
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import PaidLevel, UserId
+from trading.shared_kernel.primitives import OrganizationId, PaidLevel, UserId
 
 BACKTEST_ERROR_AUTH_REQUIRED = "auth.required"
 BACKTEST_ERROR_FORBIDDEN = "backtest.forbidden"
@@ -82,6 +86,7 @@ class BacktestJobsUseCase:
     job_repository: BacktestJobRepository
     preflight_service: BacktestPreflightService
     runtime_config: BacktestRuntimeConfig
+    organization_scope_resolver: ResearchOrganizationScopeResolver
     execution_trigger: BacktestJobExecutionTrigger | None = None
     lazy_trades_service: BacktestLazyTradesDetailService | None = None
     lazy_trades_materialization_repository: BacktestLazyTradesMaterializationRepository | None = (
@@ -98,8 +103,10 @@ class BacktestJobsUseCase:
         paid_level: PaidLevel,
         payload: Mapping[str, Any],
     ) -> BacktestPreflightResult:
+        scope = self._scope(user_id=user_id)
         preflight = self._preflight(payload=payload, paid_level=paid_level)
         self._enforce_full_job_admission(
+            organization_id=scope.organization_id,
             user_id=user_id,
             paid_level=paid_level,
             preflight=preflight,
@@ -115,11 +122,16 @@ class BacktestJobsUseCase:
         payload: Mapping[str, Any],
         idempotency_key: str | None,
     ) -> BacktestJobCreateResult:
+        scope = self._scope(user_id=user_id)
         preflight = self._preflight(payload=payload, paid_level=paid_level)
-        key_hash = _idempotency_key_hash(idempotency_key=idempotency_key)
+        key_hash = _idempotency_key_hash(
+            organization_id=scope.organization_id,
+            idempotency_key=idempotency_key,
+        )
         now = datetime.now(UTC)
         if key_hash is not None:
             existing = self.job_repository.find_by_idempotency_key(
+                organization_id=scope.organization_id,
                 user_id=user_id,
                 idempotency_key_hash=key_hash,
                 created_after=now - timedelta(seconds=self.idempotency_ttl_seconds),
@@ -137,6 +149,7 @@ class BacktestJobsUseCase:
                 )
 
         self._enforce_full_job_admission(
+            organization_id=scope.organization_id,
             user_id=user_id,
             paid_level=paid_level,
             preflight=preflight,
@@ -145,6 +158,7 @@ class BacktestJobsUseCase:
         job_id = uuid4()
         queued_job = BacktestJob.create_queued(
             job_id=job_id,
+            organization_id=scope.organization_id,
             user_id=user_id,
             mode="template",
             created_at=now,
@@ -172,6 +186,7 @@ class BacktestJobsUseCase:
         if self.execution_trigger is not None:
             self.execution_trigger.enqueue(
                 job_id=stored_job.job_id,
+                organization_id=stored_job.organization_id,
                 user_id=user_id,
                 request_hash=stored_job.request_hash,
             )
@@ -182,7 +197,12 @@ class BacktestJobsUseCase:
 
     def get(self, *, user_id: UserId, job_id: UUID) -> BacktestJobReadModel:
         job = self._require_visible_job(user_id=user_id, job_id=job_id)
-        top_count = len(self.job_repository.list_top_variants(job_id=job_id))
+        top_count = len(
+            self.job_repository.list_top_variants(
+                job_id=job_id,
+                organization_id=job.organization_id,
+            )
+        )
         return build_backtest_job_read_model(job=job, top_variants_count=top_count)
 
     def list(
@@ -194,10 +214,12 @@ class BacktestJobsUseCase:
         limit: int,
         cursor: str | None,
     ) -> BacktestJobListResult:
+        scope = self._scope(user_id=user_id)
         parsed_state = _parse_state(state=state)
         parsed_cursor = _decode_cursor(cursor=cursor)
         page = self.job_repository.list_for_user(
             query=BacktestJobListQuery(
+                organization_id=scope.organization_id,
                 user_id=user_id,
                 limit=limit,
                 state=parsed_state,
@@ -219,14 +241,18 @@ class BacktestJobsUseCase:
         job_id: UUID,
         limit: int | None = None,
     ) -> BacktestJobTopResult:
-        self._require_visible_job(user_id=user_id, job_id=job_id)
+        job = self._require_visible_job(user_id=user_id, job_id=job_id)
         if limit is not None and limit <= 0:
             raise _error(
                 code=BACKTEST_ERROR_INVALID_REQUEST,
                 message="Backtest top variants limit must be positive",
                 details={"limit": limit},
             )
-        rows = self.job_repository.list_top_variants(job_id=job_id, limit=limit)
+        rows = self.job_repository.list_top_variants(
+            job_id=job_id,
+            organization_id=job.organization_id,
+            limit=limit,
+        )
         return BacktestJobTopResult(
             items=tuple(
                 build_top_variant_read_model(job_id=str(job_id), row=row)
@@ -242,9 +268,10 @@ class BacktestJobsUseCase:
         variant_key: str,
     ) -> BacktestJobTopVariantReadModel:
         variant_key = _validate_public_variant_key(variant_key=variant_key)
-        self._require_visible_job(user_id=user_id, job_id=job_id)
+        job = self._require_visible_job(user_id=user_id, job_id=job_id)
         row = self.job_repository.get_top_variant_by_public_key(
             job_id=job_id,
+            organization_id=job.organization_id,
             public_variant_key=variant_key,
         )
         if row is None:
@@ -428,6 +455,7 @@ class BacktestJobsUseCase:
             return self.get(user_id=user_id, job_id=job_id)
         cancelled = self.job_repository.cancel(
             job_id=job_id,
+            organization_id=job.organization_id,
             user_id=user_id,
             cancel_requested_at=datetime.now(UTC),
         )
@@ -447,7 +475,11 @@ class BacktestJobsUseCase:
                 message="Backtest job must be terminal before it can be deleted",
                 details={"job_id": str(job_id), "state": job.state},
             )
-        deleted = self.job_repository.delete_terminal(job_id=job_id, user_id=user_id)
+        deleted = self.job_repository.delete_terminal(
+            job_id=job_id,
+            organization_id=job.organization_id,
+            user_id=user_id,
+        )
         if not deleted:
             raise _error(
                 code=BACKTEST_ERROR_NOT_FOUND,
@@ -467,6 +499,7 @@ class BacktestJobsUseCase:
         job = self._require_visible_job(user_id=user_id, job_id=job_id)
         row = self.job_repository.get_top_variant_by_public_key(
             job_id=job_id,
+            organization_id=job.organization_id,
             public_variant_key=variant_key,
         )
         if row is None:
@@ -512,14 +545,13 @@ class BacktestJobsUseCase:
             )
         probe = context.probe
         existing_task = self.lazy_trades_materialization_repository.find_by_identity(
+            organization_id=context.job.organization_id,
             owner_user_id=context.user_id,
             job_id=context.job.job_id,
             public_variant_key=context.public_variant_key,
             cache_key=probe.cache_key.digest,
         )
-        if existing_task is not None and not _materialization_should_requeue(
-            task=existing_task
-        ):
+        if existing_task is not None and not _materialization_should_requeue(task=existing_task):
             return _materialization_read_model(
                 task=existing_task,
                 cache_warning=probe.cache_warning,
@@ -527,6 +559,7 @@ class BacktestJobsUseCase:
             )
         requested_at = datetime.now(UTC)
         request = BacktestLazyTradesMaterializationRequest(
+            organization_id=context.job.organization_id,
             owner_user_id=context.user_id,
             job_id=context.job.job_id,
             public_variant_key=context.public_variant_key,
@@ -550,11 +583,13 @@ class BacktestJobsUseCase:
                 snapshot=BacktestLazyDetailQuotaSnapshot(
                     active_lazy_detail_tasks_for_user=(
                         self.lazy_trades_materialization_repository.count_active_for_user(
+                            organization_id=context.job.organization_id,
                             owner_user_id=context.user_id,
                         )
                     ),
                     lazy_detail_creates_in_window=(
                         self.lazy_trades_materialization_repository.count_created_for_user_since(
+                            organization_id=context.job.organization_id,
                             owner_user_id=context.user_id,
                             created_after=now - timedelta(hours=1),
                         )
@@ -604,6 +639,7 @@ class BacktestJobsUseCase:
     def _enforce_full_job_admission(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         paid_level: PaidLevel | None,
         preflight: BacktestPreflightResult,
@@ -620,10 +656,14 @@ class BacktestJobsUseCase:
                 paid_level=paid_level,
                 snapshot=BacktestFullJobQuotaSnapshot(
                     active_full_jobs_for_user=(
-                        self.job_repository.count_active_for_user(user_id=user_id)
+                        self.job_repository.count_active_for_user(
+                            organization_id=organization_id,
+                            user_id=user_id,
+                        )
                     ),
                     full_job_creates_in_window=(
                         self.job_repository.count_created_for_user_since(
+                            organization_id=organization_id,
                             user_id=user_id,
                             created_after=now - timedelta(hours=1),
                         )
@@ -634,7 +674,10 @@ class BacktestJobsUseCase:
             return
 
         guardrails = self.runtime_config.guardrails
-        active_for_user = self.job_repository.count_active_for_user(user_id=user_id)
+        active_for_user = self.job_repository.count_active_for_user(
+            organization_id=organization_id,
+            user_id=user_id,
+        )
         user_active_limit = (
             guardrails.max_active_jobs_per_user + guardrails.max_queued_jobs_per_user
         )
@@ -655,11 +698,23 @@ class BacktestJobsUseCase:
     def _job_read_model(self, *, job: BacktestJob) -> BacktestJobReadModel:
         top_count = None
         if job.state in {"succeeded", "failed", "cancelled"}:
-            top_count = len(self.job_repository.list_top_variants(job_id=job.job_id))
+            top_count = len(
+                self.job_repository.list_top_variants(
+                    job_id=job.job_id,
+                    organization_id=job.organization_id,
+                )
+            )
         return build_backtest_job_read_model(job=job, top_variants_count=top_count)
 
+    def _scope(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        return self.organization_scope_resolver.resolve(user_id=user_id)
+
     def _require_visible_job(self, *, user_id: UserId, job_id: UUID) -> BacktestJob:
-        job = self.job_repository.get(job_id=job_id)
+        scope = self._scope(user_id=user_id)
+        job = self.job_repository.get(
+            job_id=job_id,
+            organization_id=scope.organization_id,
+        )
         if job is None:
             raise _error(
                 code=BACKTEST_ERROR_NOT_FOUND,
@@ -933,13 +988,20 @@ def _coordinates(*, preflight: BacktestPreflightResult) -> Mapping[str, Any]:
     return coordinates
 
 
-def _idempotency_key_hash(*, idempotency_key: str | None) -> str | None:
+def _idempotency_key_hash(
+    *,
+    organization_id: OrganizationId,
+    idempotency_key: str | None,
+) -> str | None:
     if idempotency_key is None:
         return None
     normalized = idempotency_key.strip()
     if not normalized:
         return None
-    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    return build_research_idempotency_key_hash(
+        organization_id=organization_id,
+        idempotency_key=normalized,
+    )
 
 
 def _parse_state(*, state: str | None) -> BacktestJobState | None:

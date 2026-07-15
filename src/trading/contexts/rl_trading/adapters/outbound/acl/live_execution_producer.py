@@ -27,7 +27,7 @@ from trading.contexts.rl_trading.domain import (
     Stage13InferenceDecision,
     build_stage13_source_event_payload_v1,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +62,7 @@ class LiveExecutionRlInferenceProducer:
     def record_monitor_only_decision(
         self,
         *,
+        organization_id: OrganizationId,
         context: Stage13DecisionContext,
         decision: Stage13InferenceDecision,
     ) -> ExecutionSourceEvent:
@@ -69,6 +70,7 @@ class LiveExecutionRlInferenceProducer:
         payload = build_stage13_source_event_payload_v1(context=context, decision=decision)
         result = self._ingress_service.record_source_event(
             command=RecordExecutionSourceEventCommand(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 source_type=STAGE13_SOURCE_TYPE_V1,
                 source_event_ref=payload.source_event_ref,
@@ -78,6 +80,7 @@ class LiveExecutionRlInferenceProducer:
             )
         )
         updated = self._repository.update_source_event_outcome(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             source_event_id=result.event.source_event_id,
             outcome=STAGE13_SOURCE_EVENT_OUTCOME_V1,
@@ -89,6 +92,7 @@ class LiveExecutionRlInferenceProducer:
     def record_paper_decision(
         self,
         *,
+        organization_id: OrganizationId,
         context: Stage13DecisionContext,
         decision: Stage13InferenceDecision,
         risk_context: ExecutionRiskContext,
@@ -101,6 +105,7 @@ class LiveExecutionRlInferenceProducer:
         owner_user_id = UserId.from_string(context.owner_user_id)
         source = self._ingress_service.record_source_event(
             command=RecordExecutionSourceEventCommand(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 source_type=STAGE13_SOURCE_TYPE_V1,
                 source_event_ref=f"rl:{decision.decision_id}",
@@ -112,6 +117,7 @@ class LiveExecutionRlInferenceProducer:
         side = _paper_side_for_action(decision.action_name)
         if side is None:
             updated = self._repository.update_source_event_outcome(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 source_event_id=source.event.source_event_id,
                 outcome="no_intent",
@@ -127,6 +133,7 @@ class LiveExecutionRlInferenceProducer:
 
         intent = self._ingress_service.create_intent(
             command=CreateExecutionIntentCommand(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 source_event_id=source.event.source_event_id,
                 idempotency_key=_paper_intent_idempotency_key(context=context, decision=decision),
@@ -145,6 +152,7 @@ class LiveExecutionRlInferenceProducer:
         accounting = None
         if intent.intent.risk_reason == "paper_no_exchange_submit":
             accounting = paper_accounting_service.record_rl_paper_execution(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 strategy_id=UUID(context.strategy_id),
                 live_profile_id=live_profile_id,
@@ -167,6 +175,7 @@ class LiveExecutionRlInferenceProducer:
     def record_testnet_decision(
         self,
         *,
+        organization_id: OrganizationId,
         context: Stage13DecisionContext,
         decision: Stage13InferenceDecision,
         risk_context: ExecutionRiskContext,
@@ -177,6 +186,7 @@ class LiveExecutionRlInferenceProducer:
         owner_user_id = UserId.from_string(context.owner_user_id)
         source = self._ingress_service.record_source_event(
             command=RecordExecutionSourceEventCommand(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 source_type=STAGE13_SOURCE_TYPE_V1,
                 source_event_ref=f"rl:{decision.decision_id}",
@@ -191,6 +201,7 @@ class LiveExecutionRlInferenceProducer:
         side = _testnet_side_for_action(context=context, action_name=decision.action_name)
         if side is None:
             updated = self._repository.update_source_event_outcome(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 source_event_id=source.event.source_event_id,
                 outcome="no_intent",
@@ -208,6 +219,7 @@ class LiveExecutionRlInferenceProducer:
 
         intent = self._ingress_service.create_intent(
             command=CreateExecutionIntentCommand(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 source_event_id=source.event.source_event_id,
                 idempotency_key=_testnet_intent_idempotency_key(

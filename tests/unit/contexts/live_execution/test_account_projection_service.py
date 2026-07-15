@@ -16,8 +16,9 @@ from trading.contexts.live_execution.domain import (
     ExchangePositionSnapshot,
     ExpectedInstrumentConfig,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000007000"))
 _USER_ID = UserId.from_string("00000000-0000-0000-0000-000000007001")
 _CONNECTION_ID = UUID("00000000-0000-0000-0000-000000007101")
 _ACCOUNT_ID = UUID("00000000-0000-0000-0000-000000007201")
@@ -44,6 +45,7 @@ def test_account_projection_readiness_reports_fresh_and_config_mismatch() -> Non
     )
 
     fresh = service.get_readiness(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         requirement=ok_requirement,
@@ -61,6 +63,7 @@ def test_account_projection_readiness_reports_fresh_and_config_mismatch() -> Non
         min_notional=Decimal("20"),
     )
     mismatch_result = service.verify_config(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         requirement=mismatch_requirement,
@@ -69,6 +72,7 @@ def test_account_projection_readiness_reports_fresh_and_config_mismatch() -> Non
     repository.record_config_guard_result(result=mismatch_result)
 
     mismatch = service.get_readiness(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         requirement=mismatch_requirement,
@@ -93,6 +97,7 @@ def test_account_projection_readiness_reports_stale_and_missing_projection() -> 
     )
 
     missing = service.get_readiness(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         requirement=requirement,
@@ -107,6 +112,7 @@ def test_account_projection_readiness_reports_stale_and_missing_projection() -> 
         result=AccountConfigGuardResult(
             config_guard_result_id=UUID("00000000-0000-0000-0000-000000007301"),
             account_snapshot_id=projection.account_snapshot_id,
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             exchange_connection_id=_CONNECTION_ID,
             instrument_key=requirement.instrument_key,
@@ -119,6 +125,7 @@ def test_account_projection_readiness_reports_stale_and_missing_projection() -> 
     )
 
     stale = service.get_readiness(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         requirement=requirement,
@@ -139,6 +146,7 @@ def test_futures_short_guard_accepts_only_isolated_1x_with_balance_and_notional(
     )
 
     readiness = service.get_readiness(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         requirement=requirement,
@@ -163,6 +171,7 @@ def test_futures_short_guard_blocks_missing_position_config() -> None:
     )
 
     readiness = service.get_readiness(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         requirement=requirement,
@@ -196,6 +205,7 @@ def test_futures_short_guard_blocks_margin_balance_and_min_notional_mismatch() -
     repository.record_projection(projection=projection)
 
     readiness = service.get_readiness(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         requirement=requirement,
@@ -213,6 +223,7 @@ def test_futures_short_guard_blocks_margin_balance_and_min_notional_mismatch() -
 def _projection(*, observed_at: datetime) -> ExchangeAccountProjection:
     return ExchangeAccountProjection(
         account_snapshot_id=_ACCOUNT_ID,
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         exchange_name="binance",
@@ -267,6 +278,7 @@ def _futures_projection(
 ) -> ExchangeAccountProjection:
     return ExchangeAccountProjection(
         account_snapshot_id=_ACCOUNT_ID,
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         exchange_name="binance",

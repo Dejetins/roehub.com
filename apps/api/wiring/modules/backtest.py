@@ -26,7 +26,10 @@ from trading.contexts.backtest.adapters.outbound import (
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
 )
-from trading.contexts.backtest.application.ports import BacktestJobRepository
+from trading.contexts.backtest.application.ports import (
+    BacktestJobRepository,
+    ResearchOrganizationScopeResolver,
+)
 from trading.contexts.backtest.application.services.v2 import (
     DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS,
     BacktestAdmissionService,
@@ -65,6 +68,8 @@ from trading.contexts.strategy.application import (
 )
 from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import UserId
+
+from .research_tenancy import build_required_organization_scope_resolver
 
 
 def build_backtests_router(
@@ -112,6 +117,9 @@ def build_backtests_router(
         runtime_config=runtime_config,
     )
     job_repository = _build_job_repository(environ=effective_environ)
+    organization_scope_resolver = build_required_organization_scope_resolver(
+        environ=effective_environ
+    )
     jobs_use_case = _build_jobs_use_case(
         environ=effective_environ,
         job_repository=job_repository,
@@ -119,14 +127,19 @@ def build_backtests_router(
         artifact_array_loader=artifact_array_loader,
         preflight_service=preflight_service,
         runtime_config=runtime_config,
+        organization_scope_resolver=organization_scope_resolver,
     )
     create_strategy_from_variant_use_case = _build_create_strategy_from_variant_use_case(
         environ=effective_environ,
         job_repository=job_repository,
+        organization_scope_resolver=organization_scope_resolver,
     )
     variant_launch_reader = (
-        _BacktestJobRepositoryVariantLaunchReader(repository=job_repository)
-        if job_repository is not None
+        _BacktestJobRepositoryVariantLaunchReader(
+            repository=job_repository,
+            organization_scope_resolver=organization_scope_resolver,
+        )
+        if job_repository is not None and organization_scope_resolver is not None
         else None
     )
     compatibility_readiness_service = _build_compatibility_readiness_service(
@@ -140,6 +153,7 @@ def build_backtests_router(
         runtime_defaults_service=runtime_defaults_service,
         preflight_service=preflight_service,
         current_user_dependency=current_user_dependency,
+        organization_scope_resolver=organization_scope_resolver,
         jobs_use_case=jobs_use_case,
         create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
         compatibility_readiness_service=compatibility_readiness_service,
@@ -172,11 +186,12 @@ def _build_jobs_use_case(
     artifact_array_loader: FilesystemBacktestArtifactArrayLoader,
     preflight_service: BacktestPreflightService,
     runtime_config: BacktestRuntimeConfig,
+    organization_scope_resolver: ResearchOrganizationScopeResolver | None = None,
     job_repository: BacktestJobRepository | None = None,
 ) -> BacktestJobsUseCase | None:
     if job_repository is None:
         job_repository = _build_job_repository(environ=environ)
-    if job_repository is None:
+    if job_repository is None or organization_scope_resolver is None:
         return None
     postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
     postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
@@ -191,6 +206,7 @@ def _build_jobs_use_case(
         job_repository=job_repository,
         preflight_service=preflight_service,
         runtime_config=runtime_config,
+        organization_scope_resolver=organization_scope_resolver,
         admission_service=BacktestAdmissionService(
             config=load_backtest_admission_config(
                 resolve_backtest_admission_config_path(environ=environ)
@@ -224,14 +240,22 @@ def _build_create_strategy_from_variant_use_case(
     *,
     environ: Mapping[str, str],
     job_repository: BacktestJobRepository | None,
+    organization_scope_resolver: ResearchOrganizationScopeResolver | None,
 ) -> CreateStrategyFromBacktestVariantUseCase | None:
     postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
-    if not postgres_dsn or job_repository is None:
+    if (
+        not postgres_dsn
+        or job_repository is None
+        or organization_scope_resolver is None
+    ):
         return None
     strategy_gateway = PsycopgStrategyPostgresGateway(dsn=postgres_dsn)
     strategy_repository = PostgresStrategyRepository(gateway=strategy_gateway)
     return CreateStrategyFromBacktestVariantUseCase(
-        variant_reader=_BacktestJobRepositoryVariantLaunchReader(repository=job_repository),
+        variant_reader=_BacktestJobRepositoryVariantLaunchReader(
+            repository=job_repository,
+            organization_scope_resolver=organization_scope_resolver,
+        ),
         strategy_repository=strategy_repository,
         provenance_repository=PostgresStrategyBacktestVariantProvenanceRepository(
             gateway=strategy_gateway,
@@ -305,8 +329,14 @@ def _build_scenario_matrix_service(
 
 
 class _BacktestJobRepositoryVariantLaunchReader(BacktestVariantLaunchReader):
-    def __init__(self, *, repository: BacktestJobRepository) -> None:
+    def __init__(
+        self,
+        *,
+        repository: BacktestJobRepository,
+        organization_scope_resolver: ResearchOrganizationScopeResolver,
+    ) -> None:
         self._repository = repository
+        self._organization_scope_resolver = organization_scope_resolver
 
     def get(
         self,
@@ -315,21 +345,21 @@ class _BacktestJobRepositoryVariantLaunchReader(BacktestVariantLaunchReader):
         job_id: UUID,
         variant_key: str,
     ) -> BacktestVariantLaunchSnapshot:
-        job = self._repository.get(job_id=job_id)
+        scope = self._organization_scope_resolver.resolve(user_id=user_id)
+        job = self._repository.get(
+            job_id=job_id,
+            organization_id=scope.organization_id,
+            user_id=user_id,
+        )
         if job is None:
             raise RoehubError(
                 code="strategy_variant_launch.not_found",
                 message="Backtest job was not found",
                 details={"reason": "not_found", "job_id": str(job_id)},
             )
-        if job.user_id != user_id:
-            raise RoehubError(
-                code="strategy_variant_launch.forbidden",
-                message="Backtest job does not belong to current user",
-                details={"reason": "forbidden", "job_id": str(job_id)},
-            )
         row = self._repository.get_top_variant_by_public_key(
             job_id=job_id,
+            organization_id=scope.organization_id,
             public_variant_key=variant_key,
         )
         if row is None:

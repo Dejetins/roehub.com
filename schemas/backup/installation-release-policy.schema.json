@@ -1,0 +1,79 @@
+{
+  "$defs": {
+    "ReleaseTransitionRule": {
+      "additionalProperties": false,
+      "description": "One trusted release transition and its recovery classification.",
+      "properties": {
+        "forward_recovery_plan_sha256": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Forward Recovery Plan Sha256"
+        },
+        "from_release": {
+          "pattern": "^[a-z0-9][a-z0-9._+-]{0,63}$",
+          "title": "From Release",
+          "type": "string"
+        },
+        "reversible": {
+          "title": "Reversible",
+          "type": "boolean"
+        },
+        "to_release": {
+          "pattern": "^[a-z0-9][a-z0-9._+-]{0,63}$",
+          "title": "To Release",
+          "type": "string"
+        }
+      },
+      "required": [
+        "from_release",
+        "to_release",
+        "reversible"
+      ],
+      "title": "ReleaseTransitionRule",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.roehub.io/backup/installation-release-policy.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Installation-bound authority for update and rollback transitions.",
+  "properties": {
+    "installation_fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Installation Fingerprint",
+      "type": "string"
+    },
+    "schema": {
+      "const": "io.roehub.installation-release-policy/v1alpha1",
+      "default": "io.roehub.installation-release-policy/v1alpha1",
+      "enum": [
+        "io.roehub.installation-release-policy/v1alpha1"
+      ],
+      "title": "Schema",
+      "type": "string"
+    },
+    "transitions": {
+      "items": {
+        "$ref": "#/$defs/ReleaseTransitionRule"
+      },
+      "maxItems": 128,
+      "minItems": 1,
+      "title": "Transitions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "installation_fingerprint",
+    "transitions"
+  ],
+  "title": "InstallationReleasePolicy",
+  "type": "object"
+}

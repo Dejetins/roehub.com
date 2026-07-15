@@ -7,11 +7,7 @@
       <h1>{{ t("auth.register_title") }}</h1>
       <p>{{ t("auth.register_body") }}</p>
       <p class="muted-text">{{ t("auth.register_note") }}</p>
-      <a
-        class="shell-button shell-button--primary"
-        href="{{ register_entrypoint_url }}"
-        data-register-entrypoint="{{ register_entrypoint_url }}"
-      >{{ t("auth.register_cta") }}</a>
+      <a class="shell-button shell-button--primary" href="/login">{{ t("auth.register_cta") }}</a>
     </div>
   </section>
 {% endblock %}

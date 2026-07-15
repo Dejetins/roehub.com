@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.roehub.io/plugins/roehub-plugin-manifest-v1alpha1.schema.json",
+  "title": "Roehub plugin manifest v1alpha1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "spec"],
+  "properties": {
+    "apiVersion": {"const": "roehub.io/v1alpha1"},
+    "kind": {"const": "Plugin"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "publisher"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "version": {"type": "string", "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"},
+        "publisher": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "developmentMode": {"type": "boolean", "default": false}
+      }
+    },
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type", "pluginApi", "rpc", "image", "compatibility", "permissions",
+        "configSchema", "license", "sbom", "runtime"
+      ],
+      "properties": {
+        "type": {"enum": ["data-source", "panel", "app", "notification-provider"]},
+        "pluginApi": {"const": "v1alpha1"},
+        "rpc": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["version", "port"],
+          "properties": {
+            "version": {"const": "roehub.plugin.rpc/v1alpha1"},
+            "port": {"type": "integer", "minimum": 1024, "maximum": 65535}
+          }
+        },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["reference", "digest", "architectures"],
+          "properties": {
+            "reference": {"type": "string", "minLength": 3, "maxLength": 512, "not": {"pattern": "\\s"}},
+            "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+            "architectures": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {"enum": ["linux/amd64", "linux/arm64"]}
+            }
+          }
+        },
+        "compatibility": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["roehubMin", "roehubMaxExclusive"],
+          "properties": {
+            "roehubMin": {"type": "string"},
+            "roehubMaxExclusive": {"type": "string"}
+          }
+        },
+        "permissions": {
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 32,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["capability"],
+            "properties": {
+              "capability": {
+                "enum": [
+                  "app.action", "data.read", "notification.send", "panel.describe"
+                ]
+              }
+            }
+          }
+        },
+        "configSchema": {"$ref": "#/$defs/hashedArtifact"},
+        "license": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256", "spdx"],
+          "properties": {
+            "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]{1,240}$"},
+            "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+            "spdx": {"type": "string", "minLength": 2, "maxLength": 64}
+          }
+        },
+        "sbom": {"$ref": "#/$defs/hashedArtifact"},
+        "runtime": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["nonRootUid", "readOnlyRootFilesystem", "noNewPrivileges", "resources", "egress"],
+          "properties": {
+            "nonRootUid": {"type": "integer", "minimum": 10000, "maximum": 65535},
+            "readOnlyRootFilesystem": {"const": true},
+            "noNewPrivileges": {"const": true},
+            "resources": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["cpus", "memoryMb", "pids"],
+              "properties": {
+                "cpus": {"type": "number", "exclusiveMinimum": 0, "maximum": 4},
+                "memoryMb": {"type": "integer", "minimum": 32, "maximum": 4096},
+                "pids": {"type": "integer", "minimum": 8, "maximum": 512}
+              }
+            },
+            "egress": {
+              "type": "array",
+              "uniqueItems": true,
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["host", "port"],
+                "properties": {
+                  "host": {"type": "string", "pattern": "^[A-Za-z0-9.-]{1,253}$"},
+                  "port": {"type": "integer", "minimum": 1, "maximum": 65535}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "keyId", "value"],
+      "properties": {
+        "algorithm": {"const": "Ed25519"},
+        "keyId": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{2,127}$"},
+        "value": {"type": "string", "minLength": 80, "maxLength": 128}
+      }
+    }
+  },
+  "$defs": {
+    "hashedArtifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]{1,240}$"},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

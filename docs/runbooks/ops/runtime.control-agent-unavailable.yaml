@@ -1,0 +1,94 @@
+apiVersion: ops.roehub.io/v1
+kind: Runbook
+metadata:
+  id: runtime.control-agent-unavailable
+  revision: 1
+  source_legacy: docs/runbooks/control-agent-emergency-recovery.md
+spec:
+  title: Control agent is unavailable or an operation result is unknown
+  summary: Restore the bounded host control path without bypassing policy, replaying an ambiguous effect, or exposing service identity material.
+  severity: critical
+  component_ids: [app:control_agent, app:roehubctl, context:operations]
+  prerequisites:
+    - id: identify_installation
+      text: Confirm the installation, generated profile, and local control socket without reading identity values.
+    - id: preserve_journal
+      text: Preserve the local operation journal and its lock file before any service recovery action.
+  symptoms:
+    - id: socket_unavailable
+      text: The host-local control socket cannot be reached while the main API or PostgreSQL may also be unavailable.
+    - id: journal_rejected
+      text: The control agent rejects operations because journal permissions, sequence, or hash-chain integrity cannot be verified.
+    - id: effect_unknown
+      text: A bounded operation ended in the unknown state after a timeout or transport interruption.
+  diagnostics:
+    - id: inspect_health
+      capability: observe.health.read
+      instruction: Inspect the control-agent service, socket, and generated topology readiness through the approved host boundary.
+      expected_evidence: Timestamped service and socket classifications plus redacted expected and actual topology state.
+    - id: inspect_journal
+      capability: observe.audit.read
+      instruction: Verify journal permissions, sequence continuity, hash-chain integrity, and the original operation identifier without reading identity material.
+      expected_evidence: A sanitized integrity result and terminal or unknown state for the original operation identifier.
+    - id: verify_policy
+      capability: observe.config.read
+      instruction: Verify generated policy and manifest hashes before any topology recovery or rollback.
+      expected_evidence: Matching policy, Compose, generation manifest, and release digest classifications without environment values.
+  allowed_actions:
+    - id: restart_control_agent
+      capability: control.service.restart
+      instruction: Restart only the host control-agent service after its journal and generated policy pass validation.
+      approval: operator
+      effect: reversible
+    - id: reconcile_original_operation
+      capability: control.reconciliation.trigger
+      instruction: Reconcile the original unknown operation against actual topology before deciding whether another operation is safe.
+      approval: operator
+      effect: reversible
+    - id: rollback_release
+      capability: control.release.rollback
+      instruction: Roll back to the last verified release only through the typed control-agent boundary.
+      approval: installation_owner
+      effect: disruptive
+  rollback:
+    - id: restore_verified_release
+      action_ref: rollback_release
+      instruction: Restore the last verified release and preserve the original operation journal for audit reconciliation.
+      expected_evidence: Control-agent health, journal integrity, generated-policy hashes, and expected topology all pass.
+  evidence:
+    collect:
+      - id: control_health
+        text: Sanitized host-service, socket, policy, and topology classifications with timestamps.
+      - id: journal_integrity
+        text: Journal sequence, hash-chain result, and operation state without credentials or command output.
+    success_conditions:
+      - id: bounded_control_restored
+        text: The control socket is available, the journal verifies, and the expected topology is reconciled through a typed action.
+    failure_conditions:
+      - id: integrity_or_state_unknown
+        text: Journal integrity, generated-policy integrity, or the effect of the original operation remains unknown.
+  secret_redaction:
+    forbidden_evidence_keys: [authorization, cookie, credential, environment, identity, token]
+    rules:
+      - id: no_identity_material
+        text: Never record host identity file contents, assertions, HMAC inputs, or signatures.
+      - id: no_runtime_values
+        text: Record environment names and state classes only, never environment values, DSNs, or provider payloads.
+  owner:
+    team: platform.operations
+    escalation_role: installation_owner
+  related_alerts: []
+  monitoring_gaps:
+    - id: missing_control_agent_alert
+      text: A canonical control-agent socket and journal-integrity alert is required by Stage 20 and is not yet present.
+  safety:
+    warnings:
+      - id: no_docker_bypass
+        text: Do not mount the Docker socket into API, Web, worker, or plugin services and do not invoke an arbitrary shell as a workaround.
+      - id: no_blind_retry
+        text: Do not retry an unknown effect with a new operation identifier before reconciliation of the original operation.
+    stop_conditions:
+      - id: integrity_unknown
+        text: Stop when journal or generated-policy integrity cannot be proven.
+      - id: owner_authority_missing
+        text: Stop before release rollback or destructive state recovery without explicit installation-owner authority.

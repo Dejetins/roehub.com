@@ -34,6 +34,7 @@ class LiveExecutionStrategySignalProducer(StrategyExecutionProducer):
     def record_signal(self, *, signal: StrategySignal) -> None:
         result = self._ingress_service.record_source_event(
             command=RecordExecutionSourceEventCommand(
+                organization_id=signal.organization_id,
                 owner_user_id=signal.owner_user_id,
                 source_type="strategy_signal",
                 source_event_ref=str(signal.signal_id),
@@ -51,6 +52,7 @@ class LiveExecutionStrategySignalProducer(StrategyExecutionProducer):
         if signal.mode == "paper" and signal.outcome == "signal":
             self._ingress_service.create_intent(
                 command=CreateExecutionIntentCommand(
+                    organization_id=signal.organization_id,
                     owner_user_id=signal.owner_user_id,
                     source_event_id=result.event.source_event_id,
                     idempotency_key=_signal_intent_idempotency_key(signal=signal),
@@ -69,6 +71,7 @@ class LiveExecutionStrategySignalProducer(StrategyExecutionProducer):
             return
         if signal.mode == "monitor_only" or signal.outcome != "signal":
             self._repository.update_source_event_outcome(
+                organization_id=signal.organization_id,
                 owner_user_id=signal.owner_user_id,
                 source_event_id=result.event.source_event_id,
                 outcome="no_intent",
@@ -95,6 +98,8 @@ def _expected_exchange_connection_id(*, signal: StrategySignal) -> UUID:
 
 def _paper_no_dispatch_context() -> ExecutionRiskContext:
     return ExecutionRiskContext(
+        organization_ownership_verified=True,
+        account_ownership_verified=True,
         exchange_connection_active=True,
         secret_custody_ready=True,
         source_authorized=True,

@@ -7,7 +7,7 @@ from trading.contexts.live_execution.domain import (
     AccountConfigGuardResult,
     ExchangeAccountProjection,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class ExchangeAccountProjectionRepository(Protocol):
@@ -20,15 +20,19 @@ class ExchangeAccountProjectionRepository(Protocol):
     ) -> AccountConfigGuardResult: ...
 
     def get_latest_projection(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
     ) -> ExchangeAccountProjection | None: ...
 
     def get_latest_config_guard_result(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         instrument_key: str,
         market_type: str,
     ) -> AccountConfigGuardResult | None: ...
-

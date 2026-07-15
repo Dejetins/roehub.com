@@ -155,9 +155,10 @@ class RedisExecutionDispatchTransport(ExecutionDispatchTransport):
 
 def _request_payload(*, intent: ExecutionIntent, attempt_count: int) -> dict[str, str]:
     return {
-        "schema_version": "1",
+        "schema_version": "io.roehub.execution-request/v1",
         "intent_id": str(intent.intent_id),
         "source_event_id": str(intent.source_event_id),
+        "organization_id": str(intent.organization_id),
         "owner_user_id": str(intent.owner_user_id),
         "source_type": intent.source_type,
         "exchange_connection_id": str(intent.exchange_connection_id),

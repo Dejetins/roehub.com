@@ -1,0 +1,2 @@
+Roehub deterministic demo bundle.
+No production data, credentials, model weights, or user content are included.

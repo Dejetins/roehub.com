@@ -1,0 +1,39 @@
+{
+  "approval_revoked": true,
+  "checks": {
+    "adapter_artifact_revision": "passed",
+    "approval_revocation": "passed",
+    "audit_immutability": "passed",
+    "canonical_intent_and_idempotency": "passed",
+    "claim_fenced_finalization": "passed",
+    "claim_fenced_guard_rejection": "passed",
+    "cross_intent_daily_limit_serialization": "passed",
+    "cross_intent_exposure_serialization": "passed",
+    "current_credential_reresolution": "passed",
+    "current_risk_snapshot_freshness": "passed",
+    "duplicate_submit": "passed",
+    "expired_accepted_reservation": "passed",
+    "identity_session_authority": "passed",
+    "kill_switch_during_flight": "passed",
+    "persisted_owner_approval": "passed",
+    "policy_audit_atomicity": "passed",
+    "policy_delete_guards": "passed",
+    "postgres_concurrent_claim_and_restart": "passed",
+    "preflight_and_pre_submit_guard": "passed",
+    "risk_revision_invalidation": "passed",
+    "timeout_after_accept": "passed",
+    "timeout_before_accept": "passed",
+    "untrusted_plugin_denial": "passed"
+  },
+  "database_counts": {
+    "execution_gateway_audit_events": 41,
+    "execution_mainnet_approvals": 1,
+    "execution_orders": 14,
+    "execution_reconciliation_runs": 6
+  },
+  "mainnet_external_effects": false,
+  "proof_boundary": "N/A",
+  "provider": "core:exchange-emulator",
+  "schema": "io.roehub.execution-gateway-proof/v1",
+  "status": "passed"
+}

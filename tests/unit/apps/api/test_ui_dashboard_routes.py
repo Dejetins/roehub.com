@@ -12,11 +12,12 @@ from starlette.requests import Request
 
 from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_ui_dashboard_router
+from apps.api.wiring.modules.research_tenancy import DevelopmentOrganizationScopeResolver
 from apps.api.wiring.modules.ui_dashboard import DashboardSummaryQueryService
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.strategy.domain.entities import Strategy, StrategyRun
 from trading.contexts.strategy.domain.entities.strategy_spec_v1 import StrategySpecV1
-from trading.shared_kernel.primitives import PaidLevel, UserId
+from trading.shared_kernel.primitives import OrganizationId, PaidLevel, UserId
 
 _USER_ID = "00000000-0000-0000-0000-000000004004"
 
@@ -40,6 +41,7 @@ def test_dashboard_summary_exposes_bounded_degraded_contract() -> None:
     strategy = _strategy(symbol="BTCUSDT")
     run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-000000009101"),
+        organization_id=strategy.organization_id,
         user_id=strategy.user_id,
         strategy_id=strategy.strategy_id,
         started_at=datetime(2026, 5, 5, 9, 5, tzinfo=UTC),
@@ -60,6 +62,7 @@ def test_dashboard_summary_exposes_bounded_degraded_contract() -> None:
     service = DashboardSummaryQueryService(
         strategy_repository=_FakeStrategyRepository(strategies=(strategy,)),
         run_repository=_FakeRunRepository(runs=(run,)),
+        organization_scope_resolver=DevelopmentOrganizationScopeResolver(),
     )
     client = _build_client(service=service)
 
@@ -98,6 +101,7 @@ def test_dashboard_summary_auth_failure_uses_auth_required_code() -> None:
     service = DashboardSummaryQueryService(
         strategy_repository=_FakeStrategyRepository(strategies=()),
         run_repository=_FakeRunRepository(),
+        organization_scope_resolver=DevelopmentOrganizationScopeResolver(),
     )
     client = _build_client(service=service)
 
@@ -111,6 +115,7 @@ def test_dashboard_summary_degrades_source_failure_without_page_failure() -> Non
     service = DashboardSummaryQueryService(
         strategy_repository=_FailingStrategyRepository(),
         run_repository=_FakeRunRepository(),
+        organization_scope_resolver=DevelopmentOrganizationScopeResolver(),
     )
     client = _build_client(service=service)
 
@@ -129,6 +134,7 @@ def test_dashboard_manual_refresh_reports_rate_limit_in_dto() -> None:
     service = DashboardSummaryQueryService(
         strategy_repository=_FakeStrategyRepository(strategies=()),
         run_repository=_FakeRunRepository(),
+        organization_scope_resolver=DevelopmentOrganizationScopeResolver(),
     )
     client = _build_client(service=service)
 
@@ -166,25 +172,44 @@ class _FakeStrategyRepository:
     def list_for_user(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         include_deleted: bool = False,
     ) -> tuple[Strategy, ...]:
         return tuple(
             strategy
             for strategy in self._strategies
-            if strategy.user_id == user_id and (include_deleted or not strategy.is_deleted)
+            if (
+                strategy.organization_id == organization_id
+                and strategy.user_id == user_id
+                and (include_deleted or not strategy.is_deleted)
+            )
         )
 
     def create(self, *, strategy: Strategy) -> Strategy:
         raise NotImplementedError
 
-    def find_by_strategy_id(self, *, user_id: UserId, strategy_id: UUID) -> Strategy | None:
+    def find_by_strategy_id(
+        self,
+        *,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        strategy_id: UUID,
+    ) -> Strategy | None:
         raise NotImplementedError
 
-    def find_any_by_strategy_id(self, *, strategy_id: UUID) -> Strategy | None:
+    def find_any_by_strategy_id(
+        self, *, organization_id: OrganizationId, strategy_id: UUID
+    ) -> Strategy | None:
         raise NotImplementedError
 
-    def soft_delete(self, *, user_id: UserId, strategy_id: UUID) -> bool:
+    def soft_delete(
+        self,
+        *,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        strategy_id: UUID,
+    ) -> bool:
         raise NotImplementedError
 
 
@@ -195,6 +220,7 @@ class _FailingStrategyRepository(_FakeStrategyRepository):
     def list_for_user(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         include_deleted: bool = False,
     ) -> tuple[Strategy, ...]:
@@ -208,11 +234,17 @@ class _FakeRunRepository:
     def find_active_for_strategy(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         strategy_id: UUID,
     ) -> StrategyRun | None:
         for run in self._runs:
-            if run.user_id == user_id and run.strategy_id == strategy_id and run.is_active():
+            if (
+                run.organization_id == organization_id
+                and run.user_id == user_id
+                and run.strategy_id == strategy_id
+                and run.is_active()
+            ):
                 return run
         return None
 
@@ -222,10 +254,18 @@ class _FakeRunRepository:
     def update(self, *, run: StrategyRun) -> StrategyRun:
         raise NotImplementedError
 
-    def find_by_run_id(self, *, user_id: UserId, run_id: UUID) -> StrategyRun | None:
+    def find_by_run_id(
+        self, *, organization_id: OrganizationId, user_id: UserId, run_id: UUID
+    ) -> StrategyRun | None:
         raise NotImplementedError
 
-    def list_for_strategy(self, *, user_id: UserId, strategy_id: UUID) -> tuple[StrategyRun, ...]:
+    def list_for_strategy(
+        self,
+        *,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        strategy_id: UUID,
+    ) -> tuple[StrategyRun, ...]:
         raise NotImplementedError
 
     def list_active_runs(self) -> tuple[StrategyRun, ...]:
@@ -248,6 +288,9 @@ def _strategy(*, symbol: str) -> Strategy:
     user_id = UserId.from_string(_USER_ID)
     spec = StrategySpecV1.from_json(payload=_strategy_spec_payload(symbol=symbol))
     return Strategy.create(
+        organization_id=DevelopmentOrganizationScopeResolver()
+        .resolve(user_id=user_id)
+        .organization_id,
         user_id=user_id,
         spec=spec,
         created_at=datetime(2026, 5, 5, 9, 0, tzinfo=UTC),

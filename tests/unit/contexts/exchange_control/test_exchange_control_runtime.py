@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import secrets
+import stat
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import datetime
+from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -34,6 +38,58 @@ from trading.contexts.exchange_control.application.validation import (
     ExchangeCredentialValidationResult,
 )
 
+_TEST_INTERNAL_CREDENTIAL_PATH: Path | None = None
+_TEST_INTERNAL_CREDENTIAL_VALUE: str | None = None
+
+
+@pytest.fixture(autouse=True)
+def _service_credential_boundary(tmp_path: Path) -> Iterator[None]:
+    global _TEST_INTERNAL_CREDENTIAL_PATH, _TEST_INTERNAL_CREDENTIAL_VALUE
+    _TEST_INTERNAL_CREDENTIAL_VALUE = secrets.token_urlsafe(32)
+    _TEST_INTERNAL_CREDENTIAL_PATH = tmp_path / "internal-api.credential"
+    _TEST_INTERNAL_CREDENTIAL_PATH.write_text(
+        _TEST_INTERNAL_CREDENTIAL_VALUE,
+        encoding="utf-8",
+    )
+    _TEST_INTERNAL_CREDENTIAL_PATH.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    yield
+    _TEST_INTERNAL_CREDENTIAL_PATH = None
+    _TEST_INTERNAL_CREDENTIAL_VALUE = None
+
+
+def _dev_runtime_env() -> dict[str, str]:
+    assert _TEST_INTERNAL_CREDENTIAL_PATH is not None
+    return {
+        "ROEHUB_ENV": "dev",
+        "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE": str(_TEST_INTERNAL_CREDENTIAL_PATH),
+    }
+
+
+def _authorization_header() -> str:
+    assert _TEST_INTERNAL_CREDENTIAL_VALUE is not None
+    return f"Bearer {_TEST_INTERNAL_CREDENTIAL_VALUE}"
+
+
+def _write_service_credential(path: Path) -> str:
+    path.write_text(secrets.token_urlsafe(32), encoding="utf-8")
+    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    return str(path)
+
+
+def _prod_runtime_env(tmp_path: Path) -> dict[str, str]:
+    return {
+        "ROEHUB_ENV": "prod",
+        "ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER": "openbao_transit_v1",
+        "OPENBAO_ADDR": "http://127.0.0.1:8200",
+        "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN_FILE": _write_service_credential(
+            tmp_path / "exchange-control.credential"
+        ),
+        "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE": _write_service_credential(
+            tmp_path / "internal-api.credential"
+        ),
+        "IDENTITY_PG_DSN": "postgresql://localhost/roehub",
+    }
+
 
 def _build_client() -> TestClient:
     config = ExchangeControlRuntimeConfig.from_environ(environ={"ROEHUB_ENV": "dev"})
@@ -51,12 +107,7 @@ class _RuntimeConfigWithValidator(ExchangeControlRuntimeConfig):
         validator: "_SequenceValidator | _StaticValidator | _CapturingValidator",
         secret_cipher: ExchangeSecretCipher | None = None,
     ) -> "_RuntimeConfigWithValidator":
-        base = ExchangeControlRuntimeConfig.from_environ(
-            environ={
-                "ROEHUB_ENV": "dev",
-                "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
-            }
-        )
+        base = ExchangeControlRuntimeConfig.from_environ(environ=_dev_runtime_env())
         config = cls(**base.__dict__)
         object.__setattr__(config, "_validator", validator)
         object.__setattr__(config, "_secret_cipher", secret_cipher)
@@ -140,7 +191,7 @@ class _RoundTripInMemoryExchangeSecretCipher:
 
 def _internal_headers(request_id: str) -> dict[str, str]:
     return {
-        "Authorization": "Bearer internal-token",
+        "Authorization": _authorization_header(),
         "X-Roehub-Internal-Service": "apps/api",
         "X-Request-Id": request_id,
     }
@@ -185,16 +236,10 @@ def test_service_identity_is_mandatory_exchange_control() -> None:
         ExchangeControlServiceIdentity(name="apps-api")
 
 
-def test_prod_runtime_requires_localhost_port_9205_and_explicit_validation_flag() -> None:
-    environ = {
-        "ROEHUB_ENV": "prod",
-        "ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER": "openbao_transit_v1",
-        "OPENBAO_ADDR": "http://127.0.0.1:8200",
-        "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN": "exchange-control-token",
-        "ROEHUB_API_TRANSIT_TOKEN": "api-token",
-        "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
-        "IDENTITY_PG_DSN": "postgresql://roehub:roehub@127.0.0.1:5432/roehub",
-    }
+def test_prod_runtime_requires_localhost_port_9205_and_explicit_validation_flag(
+    tmp_path: Path,
+) -> None:
+    environ = _prod_runtime_env(tmp_path)
     config = ExchangeControlRuntimeConfig.from_environ(environ=environ)
 
     assert config.service_identity_name == "exchange-control"
@@ -204,6 +249,18 @@ def test_prod_runtime_requires_localhost_port_9205_and_explicit_validation_flag(
     assert not config.exchange_validation_live_enabled
     assert config.secret_cipher_backend == "openbao_transit_v1"
     assert config.transit_key_name == TRANSIT_KEY_NAME
+
+    with pytest.raises(ValueError, match="explicit container bind"):
+        ExchangeControlRuntimeConfig.from_environ(
+            environ=environ,
+            bind_host="0.0.0.0",
+        )
+
+    container_config = ExchangeControlRuntimeConfig.from_environ(
+        environ={**environ, "ROEHUB_EXCHANGE_CONTROL_CONTAINER_BIND": "true"},
+        bind_host="0.0.0.0",
+    )
+    assert container_config.bind_host == "0.0.0.0"
 
     with pytest.raises(ValueError, match="port 9205"):
         ExchangeControlRuntimeConfig.from_environ(
@@ -225,26 +282,20 @@ def test_prod_runtime_requires_localhost_port_9205_and_explicit_validation_flag(
     assert live_config.exchange_validation_live_enabled
 
 
-def test_prod_runtime_fails_closed_without_transit_config() -> None:
+def test_prod_runtime_fails_closed_without_transit_config(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="requires OpenBao/Vault Transit"):
         ExchangeControlRuntimeConfig.from_environ(environ={"ROEHUB_ENV": "prod"})
 
-    base_environ = {
-        "ROEHUB_ENV": "prod",
-        "ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER": "openbao_transit_v1",
-        "OPENBAO_ADDR": "http://127.0.0.1:8200",
-        "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN": "exchange-control-token",
-        "ROEHUB_API_TRANSIT_TOKEN": "api-token",
-        "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
-        "IDENTITY_PG_DSN": "postgresql://roehub:roehub@127.0.0.1:5432/roehub",
-    }
+    base_environ = _prod_runtime_env(tmp_path)
     for missing_name, expected in (
         ("OPENBAO_ADDR", "OPENBAO_ADDR"),
-        ("ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN", "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN"),
-        ("ROEHUB_API_TRANSIT_TOKEN", "ROEHUB_API_TRANSIT_TOKEN"),
         (
-            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN",
-            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN",
+            "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN_FILE",
+            "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN_FILE",
+        ),
+        (
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE",
         ),
         ("IDENTITY_PG_DSN", "IDENTITY_PG_DSN"),
     ):
@@ -279,7 +330,19 @@ def test_health_ready_exposes_service_identity_and_disabled_external_validation(
     }
 
 
+def test_health_live_does_not_claim_dependency_readiness() -> None:
+    response = _build_client().get("/health/live")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "live",
+        "service": "exchange-control",
+        "service_identity": "exchange-control",
+    }
+
+
 def test_health_ready_fails_closed_when_transit_is_unavailable(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def raise_transit_error(
@@ -293,17 +356,7 @@ def test_health_ready_fails_closed_when_transit_is_unavailable(
         "fingerprint",
         raise_transit_error,
     )
-    config = ExchangeControlRuntimeConfig.from_environ(
-        environ={
-            "ROEHUB_ENV": "prod",
-            "ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER": "openbao_transit_v1",
-            "OPENBAO_ADDR": "http://127.0.0.1:8200",
-            "ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN": "exchange-control-token",
-            "ROEHUB_API_TRANSIT_TOKEN": "api-token",
-            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
-            "IDENTITY_PG_DSN": "postgresql://roehub:roehub@127.0.0.1:5432/roehub",
-        }
-    )
+    config = ExchangeControlRuntimeConfig.from_environ(environ=_prod_runtime_env(tmp_path))
     client = TestClient(create_exchange_control_app(config=config))
 
     response = client.get("/health/ready")
@@ -378,14 +431,14 @@ def test_internal_capabilities_require_service_auth_and_headers() -> None:
     missing_service = client.get(
         "/internal/v1/capabilities",
         headers={
-            "Authorization": "Bearer internal-token",
+            "Authorization": _authorization_header(),
             "X-Request-Id": "stage-3c-test",
         },
     )
     missing_request_id = client.get(
         "/internal/v1/capabilities",
         headers={
-            "Authorization": "Bearer internal-token",
+            "Authorization": _authorization_header(),
             "X-Roehub-Internal-Service": "apps/api",
         },
     )
@@ -401,18 +454,13 @@ def test_internal_capabilities_require_service_auth_and_headers() -> None:
 
 
 def test_internal_capabilities_are_secret_safe() -> None:
-    config = ExchangeControlRuntimeConfig.from_environ(
-        environ={
-            "ROEHUB_ENV": "dev",
-            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
-        }
-    )
+    config = ExchangeControlRuntimeConfig.from_environ(environ=_dev_runtime_env())
     client = TestClient(create_exchange_control_app(config=config))
 
     response = client.get(
         "/internal/v1/capabilities",
         headers={
-            "Authorization": "Bearer internal-token",
+            "Authorization": _authorization_header(),
             "X-Roehub-Internal-Service": "apps/api",
             "X-Request-Id": "stage-3c-test",
         },
@@ -428,7 +476,8 @@ def test_internal_capabilities_are_secret_safe() -> None:
     assert "exchange_connections.create_from_existing" in payload["capabilities"]
     assert "exchange_connections.archive" in payload["capabilities"]
     assert payload["timeout_policy"]["retry_policy"] == "no_implicit_retry"
-    assert "internal-token" not in response.text
+    assert _TEST_INTERNAL_CREDENTIAL_VALUE is not None
+    assert _TEST_INTERNAL_CREDENTIAL_VALUE not in response.text
     assert "api_secret" not in response.text
     assert "passphrase" not in response.text
 
@@ -439,7 +488,7 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
     )
     client = TestClient(create_exchange_control_app(config=config))
     headers = {
-        "Authorization": "Bearer internal-token",
+        "Authorization": _authorization_header(),
         "X-Roehub-Internal-Service": "apps/api",
         "X-Request-Id": "stage-4-test",
     }
@@ -549,10 +598,7 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
         },
     )
     assert rotate_archived.status_code == 404
-    assert (
-        rotate_archived.json()["detail"]["error"]["code"]
-        == "exchange_connection_not_found"
-    )
+    assert rotate_archived.json()["detail"]["error"]["code"] == "exchange_connection_not_found"
 
     validate_archived = client.post(
         f"/internal/v1/exchange-connections/{connection_id}/validate",
@@ -560,10 +606,7 @@ def test_internal_exchange_connection_create_rotate_disable_flow_is_secret_safe(
         json={"owner_user_id": owner_user_id},
     )
     assert validate_archived.status_code == 404
-    assert (
-        validate_archived.json()["detail"]["error"]["code"]
-        == "exchange_connection_not_found"
-    )
+    assert validate_archived.json()["detail"]["error"]["code"] == "exchange_connection_not_found"
 
     metrics = client.get("/metrics")
     assert "exchange_connection_archive_total" in metrics.text
@@ -647,7 +690,7 @@ def test_internal_validate_reclassifies_readonly_connection_and_allows_recreate(
     )
     client = TestClient(create_exchange_control_app(config=config))
     headers = {
-        "Authorization": "Bearer internal-token",
+        "Authorization": _authorization_header(),
         "X-Roehub-Internal-Service": "apps/api",
         "X-Request-Id": "readonly-recheck-regression",
     }
@@ -656,7 +699,7 @@ def test_internal_validate_reclassifies_readonly_connection_and_allows_recreate(
         "owner_user_id": owner_user_id,
         "exchange_name": "bybit",
         "market_type": "spot",
-        "environment": "mainnet",
+        "environment": "testnet",
         "label": "bybit-recheck",
         "permissions": "trade",
         "api_key": "BYBITRECHECK1234",
@@ -874,15 +917,10 @@ def test_internal_account_state_read_reports_legacy_ciphertext_as_unavailable() 
 
 
 def test_internal_exchange_connection_auto_validation_unavailable_is_not_active() -> None:
-    config = ExchangeControlRuntimeConfig.from_environ(
-        environ={
-            "ROEHUB_ENV": "dev",
-            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
-        }
-    )
+    config = ExchangeControlRuntimeConfig.from_environ(environ=_dev_runtime_env())
     client = TestClient(create_exchange_control_app(config=config))
     headers = {
-        "Authorization": "Bearer internal-token",
+        "Authorization": _authorization_header(),
         "X-Roehub-Internal-Service": "apps/api",
         "X-Request-Id": "stage-10b-unavailable-test",
     }
@@ -894,7 +932,7 @@ def test_internal_exchange_connection_auto_validation_unavailable_is_not_active(
             "owner_user_id": "00000000-0000-0000-0000-000000001010",
             "exchange_name": "bybit",
             "market_type": "spot",
-            "environment": "mainnet",
+            "environment": "testnet",
             "label": "validation-unavailable",
             "permissions": "trade",
             "api_key": "STAGE10BKEY1234",
@@ -922,7 +960,7 @@ def test_internal_exchange_connection_archive_rejects_active_connection() -> Non
     )
     client = TestClient(create_exchange_control_app(config=config))
     headers = {
-        "Authorization": "Bearer internal-token",
+        "Authorization": _authorization_header(),
         "X-Roehub-Internal-Service": "apps/api",
         "X-Request-Id": "stage-09a-test",
     }
@@ -951,10 +989,7 @@ def test_internal_exchange_connection_archive_rejects_active_connection() -> Non
     )
 
     assert archived.status_code == 409
-    assert (
-        archived.json()["detail"]["error"]["code"]
-        == "exchange_connection_not_disabled"
-    )
+    assert archived.json()["detail"]["error"]["code"] == "exchange_connection_not_disabled"
     assert "TEST_SECRET_STAGE09A" not in archived.text
 
 
@@ -980,7 +1015,7 @@ def test_internal_exchange_connection_validate_skips_live_calls_by_default() -> 
     )
     client = TestClient(create_exchange_control_app(config=config))
     headers = {
-        "Authorization": "Bearer internal-token",
+        "Authorization": _authorization_header(),
         "X-Roehub-Internal-Service": "apps/api",
         "X-Request-Id": "stage-5-test",
     }
@@ -1036,18 +1071,13 @@ def test_internal_exchange_connection_validate_skips_live_calls_by_default() -> 
 
 
 def test_internal_exchange_connection_rejects_linear_market_type() -> None:
-    config = ExchangeControlRuntimeConfig.from_environ(
-        environ={
-            "ROEHUB_ENV": "dev",
-            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
-        }
-    )
+    config = ExchangeControlRuntimeConfig.from_environ(environ=_dev_runtime_env())
     client = TestClient(create_exchange_control_app(config=config))
 
     response = client.post(
         "/internal/v1/exchange-connections",
         headers={
-            "Authorization": "Bearer internal-token",
+            "Authorization": _authorization_header(),
             "X-Roehub-Internal-Service": "apps/api",
             "X-Request-Id": "stage-4-test",
         },
@@ -1091,7 +1121,10 @@ def test_deterministic_test_cipher_encrypts_and_fingerprints_without_decrypt_pat
         cipher.decrypt(first)
 
 
-def test_openbao_transit_adapter_sanitizes_http_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_openbao_transit_adapter_sanitizes_http_errors(
+    request: pytest.FixtureRequest,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     import urllib.error
     import urllib.request
     from email.message import Message
@@ -1109,10 +1142,16 @@ def test_openbao_transit_adapter_sanitizes_http_errors(monkeypatch: pytest.Monke
             fp=None,
         )
 
-    monkeypatch.setattr(urllib.request, "urlopen", raise_http_error)
+    credential_path = Path("/tmp/exchange-control.credential")
+    _write_service_credential(credential_path)
+    request.addfinalizer(lambda: credential_path.unlink(missing_ok=True))
+    monkeypatch.setattr(
+        "trading.contexts.exchange_control.adapters.outbound.openbao_transit.open_without_redirect",
+        raise_http_error,
+    )
     cipher = OpenBaoTransitExchangeSecretCipher(
         address="http://127.0.0.1:8200",
-        token="exchange-control-token",
+        token="/tmp/exchange-control.credential",
     )
 
     with pytest.raises(ExchangeSecretCipherError) as exc_info:

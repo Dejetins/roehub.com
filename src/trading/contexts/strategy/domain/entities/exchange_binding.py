@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 StrategyExchangeBindingStatus = Literal["active", "paused", "disabled", "archived"]
 StrategyExchangeBindingUsageMode = Literal["trading"]
@@ -14,6 +14,7 @@ StrategyExchangeBindingUsageMode = Literal["trading"]
 @dataclass(frozen=True, slots=True)
 class StrategyExchangeBinding:
     binding_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     strategy_id: UUID
     exchange_connection_id: UUID
@@ -37,6 +38,7 @@ class StrategyExchangeBinding:
     def disabled(self, *, disabled_at: datetime) -> "StrategyExchangeBinding":
         return StrategyExchangeBinding(
             binding_id=self.binding_id,
+            organization_id=self.organization_id,
             owner_user_id=self.owner_user_id,
             strategy_id=self.strategy_id,
             exchange_connection_id=self.exchange_connection_id,

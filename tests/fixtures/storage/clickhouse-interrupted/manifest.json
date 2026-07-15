@@ -1,0 +1,12 @@
+{
+  "schema": "io.roehub.clickhouse-migrations/v1alpha1",
+  "database_token": "market_data",
+  "migrations": [
+    {
+      "version": "0001",
+      "name": "intentional-interruption-proof",
+      "path": "0001_interrupted.sql",
+      "sha256": "d4b130d22d06803ed05918ed592f4589c832853d1d9c4e8d7f42381362d5fb5a"
+    }
+  ]
+}

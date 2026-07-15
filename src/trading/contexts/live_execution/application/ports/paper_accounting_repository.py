@@ -11,7 +11,7 @@ from trading.contexts.live_execution.domain import (
     PaperOrder,
     StrategyPaperAccountingSnapshot,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PaperAccountingRepository(Protocol):
@@ -20,6 +20,7 @@ class PaperAccountingRepository(Protocol):
     def release_reservation_for_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         changed_at: datetime,
@@ -27,11 +28,16 @@ class PaperAccountingRepository(Protocol):
     ) -> CapitalReservation | None: ...
 
     def get_active_reservation_for_run(
-        self, *, owner_user_id: UserId, strategy_run_id: UUID
+        self, *, organization_id: OrganizationId, owner_user_id: UserId, strategy_run_id: UUID
     ) -> CapitalReservation | None: ...
 
     def sum_active_reserved(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID, asset: str
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
+        asset: str,
     ) -> Decimal: ...
 
     def record_paper_execution(
@@ -43,5 +49,5 @@ class PaperAccountingRepository(Protocol):
     ) -> StrategyPaperAccountingSnapshot: ...
 
     def get_latest_accounting_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID
+        self, *, organization_id: OrganizationId, owner_user_id: UserId, strategy_id: UUID
     ) -> StrategyPaperAccountingSnapshot | None: ...

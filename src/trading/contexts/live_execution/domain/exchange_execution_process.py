@@ -5,16 +5,20 @@ from datetime import datetime
 from typing import Literal, Mapping
 from uuid import UUID
 
+from trading.shared_kernel.primitives import OrganizationId
+
 ExchangeExecutionDependencyStatus = Literal["ready", "degraded", "not_ready"]
 ExchangeExecutionProcessStatus = Literal["ready", "degraded", "not_ready"]
-ExchangeExecutionAdapterMode = Literal["disabled", "testnet"]
+ExchangeExecutionAdapterMode = Literal["disabled", "testnet", "emulator"]
 ExchangeExecutionObservationStatus = Literal[
     "adapter_disabled",
     "adapter_error",
     "guard_rejected",
     "quarantined",
     "skipped",
+    "reconciled",
     "testnet_submitted",
+    "emulator_submitted",
 ]
 
 
@@ -54,6 +58,7 @@ class ExchangeExecutionProcessHeartbeat:
 class ExchangeExecutionRequestObservation:
     observation_id: UUID
     service_id: str
+    organization_id: OrganizationId | None
     intent_id: UUID | None
     stream_name: str
     redis_message_id: str

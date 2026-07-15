@@ -1,0 +1,297 @@
+{
+  "$defs": {
+    "JobConfigValue": {
+      "oneOf": [
+        {
+          "maxLength": 16384,
+          "type": "string"
+        },
+        {
+          "maximum": 9007199254740991,
+          "minimum": -9007199254740991,
+          "type": "integer"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "items": {
+            "$ref": "#/$defs/JobConfigValue"
+          },
+          "maxItems": 4096,
+          "type": "array"
+        },
+        {
+          "additionalProperties": {
+            "$ref": "#/$defs/JobConfigValue"
+          },
+          "maxProperties": 256,
+          "propertyNames": {
+            "maxLength": 128,
+            "minLength": 1,
+            "not": {
+              "pattern": "(?:^|[._-])(?:[aA][pP][iI][_-]?[kK][eE][yY]|[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[cC][oO][oO][kK][iI][eE]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[dD][sS][nN]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:$|[._-])"
+            }
+          },
+          "type": "object"
+        }
+      ]
+    },
+    "JobResourceLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "cpu_millis": {
+          "maximum": 64000,
+          "minimum": 50,
+          "title": "Cpu Millis",
+          "type": "integer"
+        },
+        "memory_bytes": {
+          "maximum": 68719476736,
+          "minimum": 16777216,
+          "title": "Memory Bytes",
+          "type": "integer"
+        },
+        "output_bytes": {
+          "maximum": 67108864,
+          "minimum": 1,
+          "title": "Output Bytes",
+          "type": "integer"
+        },
+        "pids": {
+          "maximum": 4096,
+          "minimum": 16,
+          "title": "Pids",
+          "type": "integer"
+        },
+        "tmpfs_bytes": {
+          "maximum": 67108864,
+          "minimum": 1048576,
+          "title": "Tmpfs Bytes",
+          "type": "integer"
+        },
+        "wall_time_seconds": {
+          "maximum": 86400,
+          "minimum": 1,
+          "title": "Wall Time Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "cpu_millis",
+        "memory_bytes",
+        "pids",
+        "wall_time_seconds",
+        "tmpfs_bytes",
+        "output_bytes"
+      ],
+      "title": "JobResourceLimits",
+      "type": "object"
+    },
+    "JobRuntimeIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$",
+          "title": "Name",
+          "type": "string"
+        },
+        "plugin_package_digest": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Plugin Package Digest"
+        },
+        "version": {
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version"
+      ],
+      "title": "JobRuntimeIdentity",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.roehub.io/jobs/job-envelope-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "capability": {
+            "const": "custom_strategy"
+          }
+        },
+        "required": [
+          "capability"
+        ]
+      },
+      "then": {
+        "properties": {
+          "runtime": {
+            "properties": {
+              "plugin_package_digest": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "plugin_package_digest"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "attempt_id": {
+      "format": "uuid",
+      "title": "Attempt Id",
+      "type": "string"
+    },
+    "attempt_number": {
+      "maximum": 10000,
+      "minimum": 1,
+      "title": "Attempt Number",
+      "type": "integer"
+    },
+    "capability": {
+      "enum": [
+        "backtest",
+        "optimize",
+        "history_import",
+        "report",
+        "artifact_transform",
+        "ml_training",
+        "ml_inference",
+        "rl_training",
+        "rl_inference",
+        "custom_strategy"
+      ],
+      "title": "Capability",
+      "type": "string"
+    },
+    "command": {
+      "items": {
+        "maxLength": 4096,
+        "minLength": 1,
+        "not": {
+          "pattern": "\\u0000"
+        },
+        "type": "string"
+      },
+      "maxItems": 64,
+      "minItems": 1,
+      "title": "Command",
+      "type": "array",
+      "x-roehub-max-utf8-bytes": 32768
+    },
+    "config_snapshot": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JobConfigValue"
+      },
+      "maxProperties": 256,
+      "propertyNames": {
+        "maxLength": 128,
+        "minLength": 1,
+        "not": {
+          "pattern": "(?:^|[._-])(?:[aA][pP][iI][_-]?[kK][eE][yY]|[aA][uU][tT][hH][oO][rR][iI][zZ][aA][tT][iI][oO][nN]|[cC][oO][oO][kK][iI][eE]|[cC][rR][eE][dD][eE][nN][tT][iI][aA][lL]|[dD][sS][nN]|[pP][aA][sS][sS][wW][oO][rR][dD]|[sS][eE][cC][rR][eE][tT]|[tT][oO][kK][eE][nN])(?:$|[._-])"
+        }
+      },
+      "type": "object",
+      "x-roehub-max-canonical-json-bytes": 262144
+    },
+    "deadline": {
+      "format": "date-time",
+      "title": "Deadline",
+      "type": "string"
+    },
+    "image_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Image Digest",
+      "type": "string"
+    },
+    "input_artifact_digests": {
+      "items": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "maxItems": 256,
+      "title": "Input Artifact Digests",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "job_id": {
+      "format": "uuid",
+      "title": "Job Id",
+      "type": "string"
+    },
+    "limits": {
+      "$ref": "#/$defs/JobResourceLimits"
+    },
+    "network": {
+      "const": "none",
+      "default": "none",
+      "enum": [
+        "none"
+      ],
+      "title": "Network",
+      "type": "string"
+    },
+    "organization_id": {
+      "format": "uuid",
+      "title": "Organization Id",
+      "type": "string"
+    },
+    "runtime": {
+      "$ref": "#/$defs/JobRuntimeIdentity"
+    },
+    "schema": {
+      "const": "JobEnvelope/v1",
+      "enum": [
+        "JobEnvelope/v1"
+      ],
+      "title": "Schema",
+      "type": "string"
+    },
+    "semantic_job_key": {
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$",
+      "title": "Semantic Job Key",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "job_id",
+    "attempt_id",
+    "attempt_number",
+    "organization_id",
+    "semantic_job_key",
+    "capability",
+    "image_digest",
+    "runtime",
+    "config_snapshot",
+    "input_artifact_digests",
+    "limits",
+    "deadline",
+    "command"
+  ],
+  "title": "JobEnvelope",
+  "type": "object",
+  "x-roehub-enforcement-boundary": "trading.integration.JobEnvelope.model_validate"
+}

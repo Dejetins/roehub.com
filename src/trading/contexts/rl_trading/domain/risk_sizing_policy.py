@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Literal, Protocol
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 STAGE14_SCHEMA_VERSION_V1 = 1
 STAGE14_POLICY_KIND_V1 = "rl_risk_sizing_policy_v1"
@@ -32,6 +32,7 @@ _ZERO = Decimal("0")
 
 @dataclass(frozen=True, slots=True)
 class RlRiskSizingPolicyKey:
+    organization_id: OrganizationId
     owner_user_id: UserId
     strategy_id: UUID
     exchange_name: str
@@ -53,8 +54,9 @@ class RlRiskSizingPolicyKey:
         object.__setattr__(self, "symbol", symbol)
 
     @property
-    def persistence_key(self) -> tuple[str, str, str, str, str]:
+    def persistence_key(self) -> tuple[str, str, str, str, str, str]:
         return (
+            str(self.organization_id),
             str(self.owner_user_id),
             str(self.strategy_id),
             self.exchange_name,

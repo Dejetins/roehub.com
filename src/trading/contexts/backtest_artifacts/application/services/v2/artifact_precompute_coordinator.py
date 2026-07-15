@@ -447,9 +447,7 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
         """
         if session.timeframe not in self._open_timeframes:
-            raise ValueError(
-                f"timeframe session {session.timeframe!r} is not currently open"
-            )
+            raise ValueError(f"timeframe session {session.timeframe!r} is not currently open")
         self._open_timeframes.remove(session.timeframe)
         self._emit_progress_event(
             ArtifactPrecomputeProgressEventV2(

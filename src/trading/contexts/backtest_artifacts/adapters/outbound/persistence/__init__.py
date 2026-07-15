@@ -6,3 +6,6 @@ __all__ = [
     "PostgresBacktestJobRepository",
     "PsycopgBacktestPostgresGateway",
 ]
+from .in_memory_artifact_catalog import InMemoryArtifactCatalogRepository
+
+__all__ = ["InMemoryArtifactCatalogRepository"]

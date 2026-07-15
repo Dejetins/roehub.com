@@ -1,0 +1,41 @@
+apiVersion: io.roehub.openbao-identities/v1alpha1
+kind: OpenBaoServiceIdentitySet
+identities:
+  api:
+    policy: roehub-api
+    value_scopes: []
+    metadata_scopes: [kv/metadata/roehub/*]
+    transit_decrypt: false
+  exchange-execution:
+    policy: roehub-exchange-execution
+    value_scopes: [kv/data/roehub/exchange/*]
+    transit_decrypt: true
+  identity:
+    policy: roehub-identity
+    value_scopes: [kv/data/roehub/oidc/*]
+    transit_decrypt: false
+  notification-dispatcher:
+    policy: roehub-notification-dispatcher
+    value_scopes:
+      - kv/data/roehub/telegram/providers/*
+      - kv/data/roehub/telegram/recipients/*
+    transit_decrypt: false
+  telegram-bot-worker:
+    policy: roehub-telegram-bot-worker
+    value_scopes:
+      - kv/data/roehub/telegram/providers/*
+      - kv/data/roehub/telegram/recipients/*
+    value_writes: [kv/data/roehub/telegram/recipients/*]
+    transit_decrypt: false
+  plugin-runtime:
+    policy_template: roehub-plugin-runtime.template
+    value_scopes: [kv/data/roehub/plugins/${organization_id}/${instance_id}]
+    transit_decrypt: false
+  secret-operator:
+    policy: roehub-secret-operator
+    value_scopes: [kv/data/roehub/*]
+    destructive_version_removal: false
+  backup-recovery:
+    policy: roehub-backup-recovery
+    value_scopes: []
+    raft_snapshot: true

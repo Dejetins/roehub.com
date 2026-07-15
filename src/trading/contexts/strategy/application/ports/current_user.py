@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,6 +20,7 @@ class CurrentUser:
     """
 
     user_id: UserId
+    organization_id: OrganizationId
 
     def __post_init__(self) -> None:
         """
@@ -38,6 +39,8 @@ class CurrentUser:
         """
         if self.user_id is None:  # type: ignore[truthy-bool]
             raise ValueError("CurrentUser.user_id is required")
+        if self.organization_id is None:  # type: ignore[truthy-bool]
+            raise ValueError("CurrentUser.organization_id is required")
 
 
 class CurrentUserProvider(Protocol):

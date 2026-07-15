@@ -25,6 +25,7 @@ from .persistence import (
     PostgresBacktestJobLeaseRepository,
     PostgresBacktestJobRepository,
     PostgresBacktestLazyTradesMaterializationRepository,
+    PostgresResearchOrganizationScopeResolver,
     PsycopgBacktestPostgresGateway,
 )
 from .queue import DatabaseBacktestJobExecutionTrigger
@@ -48,6 +49,7 @@ __all__ = [
     "PostgresBacktestJobLeaseRepository",
     "PostgresBacktestJobRepository",
     "PostgresBacktestLazyTradesMaterializationRepository",
+    "PostgresResearchOrganizationScopeResolver",
     "PsycopgBacktestPostgresGateway",
     "YamlBacktestGridDefaultsProvider",
     "build_backtest_artifacts_runtime_config_hash",

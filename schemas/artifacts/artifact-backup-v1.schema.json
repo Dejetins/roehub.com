@@ -1,0 +1,260 @@
+{
+  "$defs": {
+    "ArtifactBackupBlob": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "size_bytes": {
+          "maximum": 67108864,
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "digest",
+        "size_bytes"
+      ],
+      "title": "ArtifactBackupBlob",
+      "type": "object"
+    },
+    "ArtifactBlobDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "media_type": {
+          "maxLength": 127,
+          "minLength": 1,
+          "pattern": "^[a-z0-9.+-]+/[a-z0-9.+-]+$",
+          "title": "Media Type",
+          "type": "string"
+        },
+        "size_bytes": {
+          "maximum": 67108864,
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "digest",
+        "size_bytes",
+        "media_type"
+      ],
+      "title": "ArtifactBlobDescriptor",
+      "type": "object"
+    },
+    "ArtifactBundleSignature": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "const": "Ed25519",
+          "default": "Ed25519",
+          "enum": [
+            "Ed25519"
+          ],
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "key_id": {
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$",
+          "title": "Key Id",
+          "type": "string"
+        },
+        "value_b64": {
+          "maxLength": 88,
+          "minLength": 88,
+          "pattern": "^[A-Za-z0-9+/]{86}==$",
+          "title": "Value B64",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key_id",
+        "value_b64"
+      ],
+      "title": "ArtifactBundleSignature",
+      "type": "object"
+    },
+    "ArtifactManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "bundle_id": {
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$",
+          "title": "Bundle Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "entries": {
+          "items": {
+            "$ref": "#/$defs/ArtifactManifestEntry"
+          },
+          "maxItems": 256,
+          "minItems": 1,
+          "title": "Entries",
+          "type": "array",
+          "x-roehub-unique-by": "path"
+        },
+        "metadata": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "maxProperties": 32,
+          "propertyNames": {
+            "not": {
+              "pattern": "(?:^|[._-])(?:api[_-]?key|authorization|cookie|credential|password|secret|token)(?:$|[._-])"
+            },
+            "pattern": "^[a-z][a-z0-9._-]{2,127}$"
+          },
+          "title": "Metadata",
+          "type": "object"
+        },
+        "name": {
+          "maxLength": 120,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "schema": {
+          "const": "ArtifactManifest/v1",
+          "enum": [
+            "ArtifactManifest/v1"
+          ],
+          "title": "Schema",
+          "type": "string"
+        },
+        "signature": {
+          "$ref": "#/$defs/ArtifactBundleSignature"
+        },
+        "version": {
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "schema",
+        "bundle_id",
+        "name",
+        "version",
+        "created_at",
+        "entries",
+        "signature"
+      ],
+      "title": "ArtifactManifest",
+      "type": "object"
+    },
+    "ArtifactManifestEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "blob": {
+          "$ref": "#/$defs/ArtifactBlobDescriptor"
+        },
+        "executable": {
+          "const": false,
+          "default": false,
+          "enum": [
+            false
+          ],
+          "title": "Executable",
+          "type": "boolean"
+        },
+        "path": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\\\\\)(?!.*//)(?!.*/$).+$",
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "blob"
+      ],
+      "title": "ArtifactManifestEntry",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.roehub.io/artifacts/artifact-backup-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "blobs": {
+      "items": {
+        "$ref": "#/$defs/ArtifactBackupBlob"
+      },
+      "maxItems": 65536,
+      "title": "Blobs",
+      "type": "array"
+    },
+    "manifests": {
+      "items": {
+        "$ref": "#/$defs/ArtifactManifest"
+      },
+      "maxItems": 4096,
+      "title": "Manifests",
+      "type": "array"
+    },
+    "pinned_digests": {
+      "items": {
+        "pattern": "^sha256:[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "maxItems": 65536,
+      "title": "Pinned Digests",
+      "type": "array"
+    },
+    "quota_bytes": {
+      "maximum": 1099511627776,
+      "minimum": 1,
+      "title": "Quota Bytes",
+      "type": "integer"
+    },
+    "schema": {
+      "const": "ArtifactBackup/v1",
+      "enum": [
+        "ArtifactBackup/v1"
+      ],
+      "title": "Schema",
+      "type": "string"
+    },
+    "source_organization_id": {
+      "format": "uuid",
+      "title": "Source Organization Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "source_organization_id",
+    "quota_bytes",
+    "manifests",
+    "pinned_digests",
+    "blobs"
+  ],
+  "title": "ArtifactBackupCatalog",
+  "type": "object"
+}

@@ -1,0 +1,154 @@
+alerting:
+  alertmanagers:
+  - static_configs:
+    - targets:
+      - alertmanager:9093
+global:
+  evaluation_interval: 2s
+  scrape_interval: 2s
+rule_files:
+- /etc/prometheus/alerts.yml
+scrape_configs:
+- job_name: operational-health
+  static_configs:
+  - labels:
+      profile: ml
+    targets:
+    - operational-health:9300
+- job_name: prometheus
+  static_configs:
+  - targets:
+    - prometheus:9090
+- job_name: alertmanager
+  static_configs:
+  - targets:
+    - alertmanager:9093
+- job_name: loki
+  static_configs:
+  - targets:
+    - loki:3100
+- job_name: blackbox-http
+  metrics_path: /probe
+  params:
+    module:
+    - http_reachable
+  relabel_configs:
+  - source_labels:
+    - __address__
+    target_label: __param_target
+  - source_labels:
+    - __param_target
+    target_label: instance
+  - replacement: blackbox:9115
+    target_label: __address__
+  static_configs:
+  - labels:
+      capability: product.web_api
+      service: api
+    targets:
+    - http://api:8000/health
+  - labels:
+      capability: research.backtests
+      service: backtest-artifact-publisher
+    targets:
+    - http://backtest-artifact-publisher:9203/metrics
+  - labels:
+      capability: research.backtests
+      service: backtest-job-runner
+    targets:
+    - http://backtest-job-runner:9204/metrics
+  - labels:
+      capability: storage.clickhouse
+      service: clickhouse
+    targets:
+    - http://clickhouse:8123/ping
+  - labels:
+      capability: runtime.service
+      service: clickhouse-exporter
+    targets:
+    - http://clickhouse-exporter:9116/metrics
+  - labels:
+      capability: trading.execution
+      service: exchange-control
+    targets:
+    - http://exchange-control:9205/health/ready
+  - labels:
+      capability: trading.execution
+      service: exchange-execution
+    targets:
+    - http://exchange-execution:9206/health/ready
+  - labels:
+      capability: market_data.ingestion
+      service: market-data-scheduler
+    targets:
+    - http://market-data-scheduler:9202/metrics
+  - labels:
+      capability: market_data.ingestion
+      service: market-data-ws
+    targets:
+    - http://market-data-ws:9201/metrics
+  - labels:
+      capability: notifications.delivery
+      service: notification-dispatcher
+    targets:
+    - http://notification-dispatcher:9210/metrics
+  - labels:
+      capability: notifications.delivery
+      service: notification-report-scheduler
+    targets:
+    - http://notification-report-scheduler:9211/health/ready
+  - labels:
+      capability: secrets.openbao
+      service: openbao
+    targets:
+    - http://openbao:8200/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200
+  - labels:
+      capability: extensions.plugins
+      service: plugin-gateway
+    targets:
+    - http://plugin-gateway:9209/health/ready
+  - labels:
+      capability: ml.inference
+      service: rl-inference
+    targets:
+    - http://rl-inference:9213/health/ready
+  - labels:
+      capability: trading.strategy
+      service: strategy-live-runner
+    targets:
+    - http://strategy-live-runner:9207/health/ready
+  - labels:
+      capability: notifications.delivery
+      service: telegram-bot-worker
+    targets:
+    - http://telegram-bot-worker:9212/health/ready
+  - labels:
+      capability: product.web_api
+      service: web
+    targets:
+    - http://web:8010/health/ready
+- job_name: blackbox-tcp
+  metrics_path: /probe
+  params:
+    module:
+    - tcp_connect
+  relabel_configs:
+  - source_labels:
+    - __address__
+    target_label: __param_target
+  - source_labels:
+    - __param_target
+    target_label: instance
+  - replacement: blackbox:9115
+    target_label: __address__
+  static_configs:
+  - labels:
+      capability: storage.postgresql
+      service: postgresql
+    targets:
+    - postgresql:5432
+  - labels:
+      capability: transport.redis
+      service: redis
+    targets:
+    - redis:6379

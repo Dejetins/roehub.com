@@ -1,0 +1,26 @@
+{
+  "apiVersion": "ops.roehub.io/v1",
+  "kind": "ActionCapabilityCatalog",
+  "diagnostics": {
+    "observe.audit.read": {"effect": "read_only", "minimum_approval": "none"},
+    "observe.config.read": {"effect": "read_only", "minimum_approval": "none"},
+    "observe.database.read": {"effect": "read_only", "minimum_approval": "none"},
+    "observe.health.read": {"effect": "read_only", "minimum_approval": "none"},
+    "observe.logs.read": {"effect": "read_only", "minimum_approval": "none"},
+    "observe.metrics.query": {"effect": "read_only", "minimum_approval": "none"},
+    "observe.network.probe": {"effect": "read_only", "minimum_approval": "none"}
+  },
+  "actions": {
+    "observe.health.read": {
+      "effect": "read_only",
+      "minimum_approval": "none"
+    },
+    "control.execution.pause": {"effect": "reversible", "minimum_approval": "operator"},
+    "control.execution.resume": {"effect": "disruptive", "minimum_approval": "installation_owner"},
+    "control.reconciliation.trigger": {"effect": "reversible", "minimum_approval": "operator"},
+    "control.release.rollback": {"effect": "disruptive", "minimum_approval": "installation_owner"},
+    "control.service.restart": {"effect": "reversible", "minimum_approval": "operator"},
+    "control.worker.pause": {"effect": "reversible", "minimum_approval": "operator"},
+    "control.worker.resume": {"effect": "reversible", "minimum_approval": "operator"}
+  }
+}

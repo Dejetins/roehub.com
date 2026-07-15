@@ -8,7 +8,7 @@ from trading.contexts.strategy.application.ports.repositories import (
 from trading.contexts.strategy.domain.entities.live_strategy_profile import (
     LiveStrategyProfile,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class InMemoryLiveStrategyProfileRepository(LiveStrategyProfileRepository):
@@ -18,6 +18,7 @@ class InMemoryLiveStrategyProfileRepository(LiveStrategyProfileRepository):
     def create(self, *, profile: LiveStrategyProfile) -> LiveStrategyProfile | None:
         if (
             self.get_for_strategy(
+                organization_id=profile.organization_id,
                 owner_user_id=profile.owner_user_id,
                 strategy_id=profile.strategy_id,
             )
@@ -28,10 +29,18 @@ class InMemoryLiveStrategyProfileRepository(LiveStrategyProfileRepository):
         return profile
 
     def get_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_id: UUID,
     ) -> LiveStrategyProfile | None:
         for profile in self._profiles.values():
-            if profile.owner_user_id == owner_user_id and profile.strategy_id == strategy_id:
+            if (
+                profile.organization_id == organization_id
+                and profile.owner_user_id == owner_user_id
+                and profile.strategy_id == strategy_id
+            ):
                 return profile
         return None
 

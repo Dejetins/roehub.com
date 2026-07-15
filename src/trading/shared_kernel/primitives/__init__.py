@@ -9,8 +9,10 @@ modules can import them from one place:
 
 from .candle import Candle
 from .candle_meta import CandleMeta
+from .installation_id import InstallationId
 from .instrument_id import InstrumentId
 from .market_id import MarketId
+from .organization_id import OrganizationId
 from .paid_level import PaidLevel
 from .symbol import Symbol
 from .time_range import TimeRange
@@ -22,7 +24,9 @@ __all__ = [
     "Candle",
     "CandleMeta",
     "InstrumentId",
+    "InstallationId",
     "MarketId",
+    "OrganizationId",
     "PaidLevel",
     "Symbol",
     "TimeRange",

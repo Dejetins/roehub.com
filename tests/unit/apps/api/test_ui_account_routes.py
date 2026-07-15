@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import secrets
+import stat
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import httpx
@@ -22,6 +25,7 @@ from apps.api.exchange_control_client import (
     InMemoryExchangeControlClient,
 )
 from apps.api.routes.ui_account import build_ui_account_router
+from apps.api.wiring.modules.research_tenancy import DevelopmentOrganizationScopeResolver
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.adapters.outbound.persistence.in_memory import (
     InMemoryAccountSettingsRepository,
@@ -54,9 +58,12 @@ from trading.contexts.strategy.application import (
     CurrentUser,
     StrategyExchangeBindingService,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.platform.secrets import SecureCredentialFile
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 _SESSION_COOKIE_NAME = "roehub_session_id"
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000000010"))
+_TELEGRAM_PROVIDER_INSTANCE_ID = UUID("00000000-0000-4000-8000-000000000011")
 
 
 class _MutableClock(IdentityClock):
@@ -1159,7 +1166,11 @@ def test_ui_account_integrations_and_notifications_mutations_mask_webhook_and_au
 
 def test_ui_account_telegram_binding_code_and_status_are_secret_safe() -> None:
     binding_store = InMemoryNotificationTelegramBindingStore()
-    binding_service = NotificationTelegramBindingService(store=binding_store)
+    binding_service = NotificationTelegramBindingService(
+        store=binding_store,
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_TELEGRAM_PROVIDER_INSTANCE_ID,
+    )
     client, _account_repository, _session_ids = _build_test_client(
         telegram_binding_service=binding_service
     )
@@ -1188,7 +1199,11 @@ def test_ui_account_telegram_binding_code_and_status_are_secret_safe() -> None:
 
 def test_ui_account_scoped_notification_settings_are_additive_and_secret_safe() -> None:
     binding_store = InMemoryNotificationTelegramBindingStore()
-    binding_service = NotificationTelegramBindingService(store=binding_store)
+    binding_service = NotificationTelegramBindingService(
+        store=binding_store,
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_TELEGRAM_PROVIDER_INSTANCE_ID,
+    )
     notification_repository = InMemoryNotificationRepository()
     client, _account_repository, session_ids = _build_test_client(
         telegram_binding_service=binding_service,
@@ -1196,8 +1211,13 @@ def test_ui_account_scoped_notification_settings_are_additive_and_secret_safe() 
     )
     chat_ref = "telegram_ref:abcdef123456:masked"
     binding_store.confirm_chat(
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_TELEGRAM_PROVIDER_INSTANCE_ID,
         owner_user_id=session_ids["first_user_id"],
         chat_id_ref=chat_ref,
+        recipient_secret_ref=(
+            "openbao://kv/roehub/telegram/test-recipient#chat_id"
+        ),
         confirmed_at=datetime(2026, 2, 15, 13, 5, tzinfo=timezone.utc),
     )
 
@@ -1248,6 +1268,8 @@ def test_ui_account_scoped_notification_settings_are_additive_and_secret_safe() 
     notification_repository.record_delivery(
         delivery=NotificationDelivery(
             delivery_id=uuid4(),
+            organization_id=_ORGANIZATION_ID,
+            provider_instance_id=_TELEGRAM_PROVIDER_INSTANCE_ID,
             event_id=UUID("22222222-2222-4222-8222-222222222222"),
             report_run_id=None,
             command_id=None,
@@ -1326,7 +1348,17 @@ def test_ui_account_mutations_reject_cross_origin_requests() -> None:
     assert response.json()["error"]["details"] == {"reason": "csrf_origin_mismatch"}
 
 
-def test_exchange_control_client_config_fails_closed_when_public_routes_enabled() -> None:
+def _exchange_control_credential(tmp_path: Path) -> tuple[SecureCredentialFile, str]:
+    value = secrets.token_urlsafe(32)
+    path = tmp_path / "exchange-control-client.credential"
+    path.write_text(value, encoding="utf-8")
+    path.chmod(stat.S_IRUSR | stat.S_IWUSR)
+    return SecureCredentialFile(path.resolve()), value
+
+
+def test_exchange_control_client_config_fails_closed_when_public_routes_enabled(
+    tmp_path: Path,
+) -> None:
     with pytest.raises(ValueError, match="INTERNAL_BASE_URL"):
         ExchangeControlClientConfig.from_environ(
             {"ROEHUB_EXCHANGE_CONNECTIONS_PUBLIC_ROUTES_ENABLED": "true"}
@@ -1339,11 +1371,12 @@ def test_exchange_control_client_config_fails_closed_when_public_routes_enabled(
             }
         )
 
+    source, _ = _exchange_control_credential(tmp_path)
     config = ExchangeControlClientConfig.from_environ(
         {
             "ROEHUB_EXCHANGE_CONNECTIONS_PUBLIC_ROUTES_ENABLED": "true",
             "ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL": "http://127.0.0.1:9205",
-            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN": "internal-token",
+            "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE": str(source.path),
         }
     )
 
@@ -1352,8 +1385,9 @@ def test_exchange_control_client_config_fails_closed_when_public_routes_enabled(
     assert config.build_client() is not None
 
 
-def test_exchange_control_http_client_sends_internal_auth_headers() -> None:
+def test_exchange_control_http_client_sends_internal_auth_headers(tmp_path: Path) -> None:
     captured_headers: dict[str, str] = {}
+    source, expected_value = _exchange_control_credential(tmp_path)
 
     def handler(request: httpx.Request) -> httpx.Response:
         captured_headers.update(dict(request.headers))
@@ -1369,7 +1403,7 @@ def test_exchange_control_http_client_sends_internal_auth_headers() -> None:
 
     client = HttpExchangeControlClient(
         base_url="http://127.0.0.1:9205",
-        internal_api_token="internal-token",
+        internal_api_credential=source,
         transport=httpx.MockTransport(handler),
     )
 
@@ -1379,21 +1413,23 @@ def test_exchange_control_http_client_sends_internal_auth_headers() -> None:
     assert capabilities.service_identity == "exchange-control"
     assert capabilities.contract_version == "internal-v1"
     assert capabilities.capabilities == ("capabilities.read",)
-    assert captured_headers["authorization"] == "Bearer internal-token"
+    assert captured_headers["authorization"] == f"Bearer {expected_value}"
     assert captured_headers["x-roehub-internal-service"] == "apps/api"
     assert captured_headers["x-request-id"] == "stage-3c-test"
 
 
-def test_exchange_control_http_client_sanitizes_failures() -> None:
+def test_exchange_control_http_client_sanitizes_failures(tmp_path: Path) -> None:
+    source, marker = _exchange_control_credential(tmp_path)
+
     def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(
             status_code=403,
-            json={"error": {"message": "internal-token leaked"}},
+            json={"error": {"message": marker}},
         )
 
     client = HttpExchangeControlClient(
         base_url="http://127.0.0.1:9205",
-        internal_api_token="internal-token",
+        internal_api_credential=source,
         transport=httpx.MockTransport(handler),
     )
 
@@ -1402,7 +1438,7 @@ def test_exchange_control_http_client_sanitizes_failures() -> None:
 
     message = str(exc_info.value)
     assert "403" in message
-    assert "internal-token" not in message
+    assert marker not in message
 
 
 def test_exchange_control_fake_client_is_deterministic() -> None:
@@ -1424,7 +1460,12 @@ def test_strategy_exchange_binding_routes_create_list_and_disable_binding() -> N
     client, account_repository, session_ids = _build_test_client(
         strategy_binding_service=service
     )
-    owner = CurrentUser(user_id=session_ids["first_user_id"])
+    owner = CurrentUser(
+        organization_id=DevelopmentOrganizationScopeResolver()
+        .resolve(user_id=session_ids["first_user_id"])
+        .organization_id,
+        user_id=session_ids["first_user_id"],
+    )
     strategy = CreateStrategyUseCase(
         repository=strategy_repository,
         event_repository=InMemoryStrategyEventRepository(),
@@ -1613,10 +1654,11 @@ def _build_test_client(
             clock=clock,
             exchange_control_client=exchange_control_client or InMemoryExchangeControlClient(),
             strategy_binding_service=strategy_binding_service,
-            telegram_binding_service=telegram_binding_service,
-            notification_repository=notification_repository,
+                telegram_binding_service=telegram_binding_service,
+                notification_repository=notification_repository,
+                organization_scope_resolver=DevelopmentOrganizationScopeResolver(),
+            )
         )
-    )
     client = TestClient(app)
     client.cookies.set(_SESSION_COOKIE_NAME, str(first_session.session_id))
     return client, account_repository, {

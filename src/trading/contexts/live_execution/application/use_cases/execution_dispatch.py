@@ -119,12 +119,14 @@ class ExecutionDispatchService:
                 )
 
             dispatching = self._repository.claim_intent_for_dispatch(
+                organization_id=intent.organization_id,
                 intent_id=intent.intent_id,
                 now=self._clock.now(),
                 retry_budget=self._config.retry_budget,
             )
             if dispatching is None:
                 current = self._repository.get_intent_by_id(
+                    organization_id=intent.organization_id,
                     owner_user_id=intent.owner_user_id,
                     intent_id=intent.intent_id,
                 )
@@ -138,6 +140,7 @@ class ExecutionDispatchService:
                 attempt_count=dispatching.dispatch_attempt_count,
             )
             dispatched = self._repository.mark_intent_dispatched(
+                organization_id=dispatching.organization_id,
                 intent_id=dispatching.intent_id,
                 stream_name=published.stream_name,
                 redis_message_id=published.message_id,
@@ -176,6 +179,7 @@ class ExecutionDispatchService:
 
     def _mark_retry(self, *, intent: ExecutionIntent, reason: str) -> ExecutionIntent:
         retry_intent = self._repository.mark_intent_dispatch_retry(
+            organization_id=intent.organization_id,
             intent_id=intent.intent_id,
             reason=reason,
             now=self._clock.now(),
@@ -188,6 +192,7 @@ class ExecutionDispatchService:
         self, *, intent: ExecutionIntent, reason: str, stream_name: str | None
     ) -> ExecutionIntent:
         quarantined = self._repository.mark_intent_quarantined(
+            organization_id=intent.organization_id,
             intent_id=intent.intent_id,
             reason=reason,
             stream_name=stream_name,

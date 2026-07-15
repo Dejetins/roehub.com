@@ -37,7 +37,7 @@ class ProjectMapError(RuntimeError):
 
 def _git_files(repo_root: Path) -> list[str]:
     result = subprocess.run(
-        ["git", "ls-files", "-z"],
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
         cwd=repo_root,
         check=False,
         capture_output=True,

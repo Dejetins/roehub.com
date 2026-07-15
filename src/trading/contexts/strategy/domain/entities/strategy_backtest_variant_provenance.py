@@ -6,7 +6,7 @@ from typing import Any, Mapping
 from uuid import UUID
 
 from trading.contexts.strategy.domain.errors import StrategySpecValidationError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,6 +16,7 @@ class StrategyBacktestVariantProvenance:
     """
 
     strategy_id: UUID
+    organization_id: OrganizationId
     user_id: UserId
     source_job_id: UUID
     source_variant_key: str

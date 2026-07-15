@@ -5,7 +5,7 @@ from uuid import UUID
 
 from trading.contexts.exchange_control.adapters.outbound import postgres_connections
 from trading.contexts.exchange_control.application.connections import ExchangeConnectionRecord
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 def test_fingerprint_text_accepts_transit_text_values() -> None:
@@ -29,6 +29,7 @@ def test_connection_parameters_preserve_create_validation_metadata() -> None:
     observed_at = datetime(2026, 6, 19, 1, 30, tzinfo=timezone.utc)
     connection = ExchangeConnectionRecord(
         connection_id=UUID("00000000-0000-0000-0000-000000000501"),
+        organization_id=OrganizationId(UUID("00000000-0000-4000-8000-000000000500")),
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000601"),
         exchange_name="bybit",
         market_type="futures",

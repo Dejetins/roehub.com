@@ -1,0 +1,19 @@
+apiVersion: io.roehub.openbao-bootstrap/v1alpha1
+kind: OpenBaoBootstrapPolicy
+initialization:
+  unseal_shares: 3
+  unseal_threshold: 2
+  share_delivery: owner-pgp-encrypted-files
+  initial_admin_delivery: owner-pgp-encrypted-file
+  revoke_initial_admin_after_bootstrap: true
+service_authentication:
+  method: approle
+  credential_delivery: response-wrapped-file
+  runtime_delivery: tmpfs-token-file
+  default_ttl: 15m
+  maximum_ttl: 30m
+  attach_default_policy: false
+audit:
+  enabled: true
+  raw_logging: false
+  path: /openbao/logs/audit.log

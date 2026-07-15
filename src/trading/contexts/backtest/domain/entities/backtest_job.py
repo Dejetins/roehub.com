@@ -12,7 +12,7 @@ from trading.contexts.backtest.domain.errors import (
     BacktestJobLeaseError,
     BacktestJobTransitionError,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 BacktestJobMode = Literal["saved", "template"]
 BacktestJobState = Literal["queued", "running", "succeeded", "failed", "cancelled"]
@@ -333,6 +333,7 @@ class BacktestJob:
     """
 
     job_id: UUID
+    organization_id: OrganizationId
     user_id: UserId
     mode: BacktestJobMode
     state: BacktestJobState
@@ -400,6 +401,8 @@ class BacktestJob:
         if self.stage not in _STAGE_ORDER:
             raise BacktestJobTransitionError(f"BacktestJob.stage is unsupported: {self.stage!r}")
 
+        if self.organization_id is None:  # type: ignore[truthy-bool]
+            raise BacktestJobTransitionError("BacktestJob.organization_id is required")
         if self.user_id is None:  # type: ignore[truthy-bool]
             raise BacktestJobTransitionError("BacktestJob.user_id is required")
 
@@ -679,6 +682,7 @@ class BacktestJob:
         cls,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         mode: BacktestJobMode,
         created_at: datetime,
@@ -713,6 +717,7 @@ class BacktestJob:
           - alembic/versions/20260329_0005_backtest_persisted_run_storage_v1.py
         Args:
             job_id: Stable job identifier.
+            organization_id: Server-resolved organization owner identifier.
             user_id: Job owner identifier.
             mode: Job mode literal (`saved` or `template`).
             created_at: Creation timestamp in UTC.
@@ -745,6 +750,7 @@ class BacktestJob:
         """
         return cls(
             job_id=job_id,
+            organization_id=organization_id,
             user_id=user_id,
             mode=mode,
             state="queued",

@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 LiveStrategyProfileMode = Literal["monitor_only", "paper", "live", "testnet"]
 LiveStrategyProfileSizingMethod = Literal["fixed_quote", "fixed_equity_pct"]
@@ -20,6 +20,7 @@ _ALLOWED_READINESS_STATUSES = {"ready", "blocked"}
 @dataclass(frozen=True, slots=True)
 class LiveStrategyProfile:
     profile_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     strategy_id: UUID
     mode: LiveStrategyProfileMode

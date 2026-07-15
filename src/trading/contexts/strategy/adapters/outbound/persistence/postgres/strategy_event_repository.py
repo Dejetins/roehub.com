@@ -11,7 +11,7 @@ from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway im
 from trading.contexts.strategy.application.ports.repositories import StrategyEventRepository
 from trading.contexts.strategy.domain.entities import StrategyEvent
 from trading.contexts.strategy.domain.errors import StrategyStorageError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresStrategyEventRepository(StrategyEventRepository):
@@ -74,6 +74,7 @@ class PostgresStrategyEventRepository(StrategyEventRepository):
         INSERT INTO {self._events_table}
         (
             event_id,
+            organization_id,
             user_id,
             strategy_id,
             run_id,
@@ -84,6 +85,7 @@ class PostgresStrategyEventRepository(StrategyEventRepository):
         VALUES
         (
             %(event_id)s,
+            %(organization_id)s,
             %(user_id)s,
             %(strategy_id)s,
             %(run_id)s,
@@ -93,6 +95,7 @@ class PostgresStrategyEventRepository(StrategyEventRepository):
         )
         RETURNING
             event_id,
+            organization_id,
             user_id,
             strategy_id,
             run_id,
@@ -104,6 +107,7 @@ class PostgresStrategyEventRepository(StrategyEventRepository):
             query=query,
             parameters={
                 "event_id": str(event.event_id),
+                "organization_id": str(event.organization_id),
                 "user_id": str(event.user_id),
                 "strategy_id": str(event.strategy_id),
                 "run_id": str(event.run_id) if event.run_id is not None else None,
@@ -116,7 +120,9 @@ class PostgresStrategyEventRepository(StrategyEventRepository):
             raise StrategyStorageError("PostgresStrategyEventRepository.append returned no row")
         return _map_event_row(row=row)
 
-    def list_for_strategy(self, *, user_id: UserId, strategy_id: UUID) -> tuple[StrategyEvent, ...]:
+    def list_for_strategy(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> tuple[StrategyEvent, ...]:
         """
         List strategy-level event stream in deterministic timestamp order.
 
@@ -135,6 +141,7 @@ class PostgresStrategyEventRepository(StrategyEventRepository):
         query = f"""
         SELECT
             event_id,
+            organization_id,
             user_id,
             strategy_id,
             run_id,
@@ -142,20 +149,24 @@ class PostgresStrategyEventRepository(StrategyEventRepository):
             event_type,
             payload_json
         FROM {self._events_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND strategy_id = %(strategy_id)s
         ORDER BY ts ASC, event_id ASC
         """
         rows = self._gateway.fetch_all(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "strategy_id": str(strategy_id),
             },
         )
         return tuple(_map_event_row(row=row) for row in rows)
 
-    def list_for_run(self, *, user_id: UserId, run_id: UUID) -> tuple[StrategyEvent, ...]:
+    def list_for_run(
+        self, *, organization_id: OrganizationId, user_id: UserId, run_id: UUID
+    ) -> tuple[StrategyEvent, ...]:
         """
         List run-level event stream in deterministic timestamp order.
 
@@ -174,6 +185,7 @@ class PostgresStrategyEventRepository(StrategyEventRepository):
         query = f"""
         SELECT
             event_id,
+            organization_id,
             user_id,
             strategy_id,
             run_id,
@@ -181,13 +193,15 @@ class PostgresStrategyEventRepository(StrategyEventRepository):
             event_type,
             payload_json
         FROM {self._events_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND run_id = %(run_id)s
         ORDER BY ts ASC, event_id ASC
         """
         rows = self._gateway.fetch_all(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "run_id": str(run_id),
             },
@@ -217,6 +231,7 @@ def _map_event_row(*, row: Mapping[str, Any]) -> StrategyEvent:
         payload_json = _coerce_json_mapping(value=row["payload_json"], field_name="payload_json")
         return StrategyEvent(
             event_id=UUID(str(row["event_id"])),
+            organization_id=OrganizationId.from_string(str(row["organization_id"])),
             user_id=UserId.from_string(str(row["user_id"])),
             strategy_id=UUID(str(row["strategy_id"])),
             run_id=run_id,

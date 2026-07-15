@@ -8,6 +8,8 @@ import argparse
 
 import uvicorn
 
+from apps.common.uvicorn_logging import build_uvicorn_log_config
+
 
 def _build_parser() -> argparse.ArgumentParser:
     """
@@ -46,7 +48,12 @@ def main(argv: list[str] | None = None) -> int:
         Starts HTTP server loop.
     """
     args = _build_parser().parse_args(argv)
-    uvicorn.run("apps.api.main.app:app", host=args.host, port=args.port)
+    uvicorn.run(
+        "apps.api.main.app:app",
+        host=args.host,
+        port=args.port,
+        log_config=build_uvicorn_log_config(),
+    )
     return 0
 
 

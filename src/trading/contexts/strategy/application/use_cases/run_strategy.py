@@ -138,12 +138,11 @@ class RunStrategyUseCase:
                                 readiness.compatibility_reason_codes
                             ),
                             "market_data_state": readiness.market_data_state,
-                            "market_data_reason_codes": list(
-                                readiness.market_data_reason_codes
-                            ),
+                            "market_data_reason_codes": list(readiness.market_data_reason_codes),
                         },
                     )
             active_run = self._run_repository.find_active_for_strategy(
+                organization_id=current_user.organization_id,
                 user_id=current_user.user_id,
                 strategy_id=strategy.strategy_id,
             )
@@ -162,6 +161,7 @@ class RunStrategyUseCase:
             reserved_capital = False
             profile = (
                 self._live_profile_repository.get_for_strategy(
+                    organization_id=current_user.organization_id,
                     owner_user_id=current_user.user_id,
                     strategy_id=strategy.strategy_id,
                 )
@@ -175,6 +175,7 @@ class RunStrategyUseCase:
             ):
                 try:
                     self._capital_reservation_coordinator.reserve_virtual_for_strategy_run(
+                        organization_id=current_user.organization_id,
                         owner_user_id=current_user.user_id,
                         strategy_id=strategy.strategy_id,
                         live_profile_id=profile.profile_id,
@@ -201,6 +202,7 @@ class RunStrategyUseCase:
             ):
                 try:
                     self._capital_reservation_coordinator.reserve_for_strategy_run(
+                        organization_id=current_user.organization_id,
                         owner_user_id=current_user.user_id,
                         exchange_connection_id=profile.exchange_connection_id,
                         strategy_id=strategy.strategy_id,
@@ -227,6 +229,7 @@ class RunStrategyUseCase:
             ):
                 try:
                     self._position_ownership_coordinator.reserve_for_strategy_run(
+                        organization_id=current_user.organization_id,
                         owner_user_id=current_user.user_id,
                         exchange_connection_id=profile.exchange_connection_id,
                         strategy_id=strategy.strategy_id,
@@ -240,6 +243,7 @@ class RunStrategyUseCase:
                 except Exception as error:  # noqa: BLE001
                     if reserved_capital and self._capital_reservation_coordinator is not None:
                         self._capital_reservation_coordinator.release_for_strategy_run(
+                            organization_id=current_user.organization_id,
                             owner_user_id=current_user.user_id,
                             strategy_run_id=run_id,
                             now=run_started_at,
@@ -254,6 +258,7 @@ class RunStrategyUseCase:
 
             started = StrategyRun.start(
                 run_id=run_id,
+                organization_id=current_user.organization_id,
                 user_id=current_user.user_id,
                 strategy_id=strategy.strategy_id,
                 started_at=run_started_at,
@@ -264,6 +269,7 @@ class RunStrategyUseCase:
             except Exception:
                 if reserved_capital and self._capital_reservation_coordinator is not None:
                     self._capital_reservation_coordinator.release_for_strategy_run(
+                        organization_id=current_user.organization_id,
                         owner_user_id=current_user.user_id,
                         strategy_run_id=run_id,
                         now=run_started_at,
@@ -271,6 +277,7 @@ class RunStrategyUseCase:
                     )
                 if reserved_ownership and self._position_ownership_coordinator is not None:
                     self._position_ownership_coordinator.release_for_strategy_run(
+                        organization_id=current_user.organization_id,
                         owner_user_id=current_user.user_id,
                         strategy_run_id=run_id,
                         now=run_started_at,
@@ -279,6 +286,7 @@ class RunStrategyUseCase:
                 raise
             if reserved_ownership and self._position_ownership_coordinator is not None:
                 self._position_ownership_coordinator.activate_for_strategy_run(
+                    organization_id=current_user.organization_id,
                     owner_user_id=current_user.user_id,
                     strategy_run_id=persisted_started.run_id,
                     now=run_started_at,

@@ -15,7 +15,7 @@ from trading.contexts.strategy.domain.entities.live_strategy_profile import (
     LiveStrategyProfile,
 )
 from trading.contexts.strategy.domain.errors import StrategyStorageError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresLiveStrategyProfileRepository(LiveStrategyProfileRepository):
@@ -39,6 +39,7 @@ class PostgresLiveStrategyProfileRepository(LiveStrategyProfileRepository):
             INSERT INTO {self._table_name}
             (
                 profile_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 mode,
@@ -56,6 +57,7 @@ class PostgresLiveStrategyProfileRepository(LiveStrategyProfileRepository):
             VALUES
             (
                 %(profile_id)s,
+                %(organization_id)s,
                 %(owner_user_id)s,
                 %(strategy_id)s,
                 %(mode)s,
@@ -70,9 +72,10 @@ class PostgresLiveStrategyProfileRepository(LiveStrategyProfileRepository):
                 %(created_at)s,
                 %(updated_at)s
             )
-            ON CONFLICT (owner_user_id, strategy_id) DO NOTHING
+            ON CONFLICT (organization_id, owner_user_id, strategy_id) DO NOTHING
             RETURNING
                 profile_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 mode,
@@ -92,12 +95,17 @@ class PostgresLiveStrategyProfileRepository(LiveStrategyProfileRepository):
         return _map_profile(row=row) if row is not None else None
 
     def get_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_id: UUID,
     ) -> LiveStrategyProfile | None:
         row = self._gateway.fetch_one(
             query=f"""
             SELECT
                 profile_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 mode,
@@ -112,10 +120,12 @@ class PostgresLiveStrategyProfileRepository(LiveStrategyProfileRepository):
                 created_at,
                 updated_at
             FROM {self._table_name}
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND strategy_id = %(strategy_id)s
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_id": str(strategy_id),
             },
@@ -137,10 +147,12 @@ class PostgresLiveStrategyProfileRepository(LiveStrategyProfileRepository):
                    readiness_reason = %(readiness_reason)s,
                    updated_at = %(updated_at)s
              WHERE profile_id = %(profile_id)s
+               AND organization_id = %(organization_id)s
                AND owner_user_id = %(owner_user_id)s
                AND strategy_id = %(strategy_id)s
             RETURNING
                 profile_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 mode,
@@ -165,6 +177,7 @@ class PostgresLiveStrategyProfileRepository(LiveStrategyProfileRepository):
 def _profile_parameters(*, profile: LiveStrategyProfile) -> dict[str, object]:
     return {
         "profile_id": str(profile.profile_id),
+        "organization_id": str(profile.organization_id),
         "owner_user_id": str(profile.owner_user_id),
         "strategy_id": str(profile.strategy_id),
         "mode": profile.mode,
@@ -188,6 +201,7 @@ def _profile_parameters(*, profile: LiveStrategyProfile) -> dict[str, object]:
 def _map_profile(*, row: Mapping[str, Any]) -> LiveStrategyProfile:
     return LiveStrategyProfile(
         profile_id=UUID(str(row["profile_id"])),
+        organization_id=OrganizationId.from_string(str(row["organization_id"])),
         owner_user_id=UserId.from_string(str(row["owner_user_id"])),
         strategy_id=UUID(str(row["strategy_id"])),
         mode=str(row["mode"]),  # type: ignore[arg-type]

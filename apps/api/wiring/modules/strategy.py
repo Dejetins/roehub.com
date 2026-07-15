@@ -31,7 +31,10 @@ from trading.contexts.backtest.adapters.outbound import (
     PostgresBacktestJobRepository,
     PsycopgBacktestPostgresGateway,
 )
-from trading.contexts.backtest.application.ports import BacktestJobRepository
+from trading.contexts.backtest.application.ports import (
+    BacktestJobRepository,
+    ResearchOrganizationScopeResolver,
+)
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.live_execution.adapters.outbound import (
@@ -114,7 +117,9 @@ from trading.contexts.strategy.application import (
     StrategySignalRepository,
 )
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+from .research_tenancy import build_research_organization_scope_resolver
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _STRATEGY_FAIL_FAST_KEY = "STRATEGY_FAIL_FAST"
@@ -173,7 +178,12 @@ class IdentityPrincipalCurrentUserProvider(CurrentUserProvider):
       - apps/api/wiring/modules/strategy.py
     """
 
-    def __init__(self, *, principal: CurrentUserPrincipal) -> None:
+    def __init__(
+        self,
+        *,
+        principal: CurrentUserPrincipal,
+        organization_scope_resolver: ResearchOrganizationScopeResolver | None,
+    ) -> None:
         """
         Store identity principal for current request scope.
 
@@ -191,6 +201,7 @@ class IdentityPrincipalCurrentUserProvider(CurrentUserProvider):
         if principal is None:  # type: ignore[truthy-bool]
             raise ValueError("IdentityPrincipalCurrentUserProvider requires principal")
         self._principal = principal
+        self._organization_scope_resolver = organization_scope_resolver
 
     def require_current_user(self) -> CurrentUser:
         """
@@ -207,7 +218,19 @@ class IdentityPrincipalCurrentUserProvider(CurrentUserProvider):
         Side Effects:
             None.
         """
-        return CurrentUser(user_id=self._principal.user_id)
+        if self._organization_scope_resolver is None:
+            raise RoehubError(
+                code="identity.organization_scope_unavailable",
+                message="Organization scope resolver is unavailable",
+                details={"reason": "organization_scope_unavailable"},
+            )
+        scope = self._organization_scope_resolver.resolve(
+            user_id=self._principal.user_id
+        )
+        return CurrentUser(
+            user_id=self._principal.user_id,
+            organization_id=scope.organization_id,
+        )
 
 
 class StrategyCurrentUserProviderDependency:
@@ -223,7 +246,12 @@ class StrategyCurrentUserProviderDependency:
       - src/trading/contexts/strategy/application/ports/current_user.py
     """
 
-    def __init__(self, *, current_user_dependency: RequireCurrentUserDependency) -> None:
+    def __init__(
+        self,
+        *,
+        current_user_dependency: RequireCurrentUserDependency,
+        organization_scope_resolver: ResearchOrganizationScopeResolver | None,
+    ) -> None:
         """
         Initialize dependency bridge with identity current-user resolver.
 
@@ -243,6 +271,7 @@ class StrategyCurrentUserProviderDependency:
                 "StrategyCurrentUserProviderDependency requires current_user_dependency"
             )
         self._current_user_dependency = current_user_dependency
+        self._organization_scope_resolver = organization_scope_resolver
 
     def __call__(self, request: Request) -> CurrentUserProvider:
         """
@@ -260,7 +289,10 @@ class StrategyCurrentUserProviderDependency:
             None.
         """
         principal = self._current_user_dependency(request)
-        return IdentityPrincipalCurrentUserProvider(principal=principal)
+        return IdentityPrincipalCurrentUserProvider(
+            principal=principal,
+            organization_scope_resolver=self._organization_scope_resolver,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -271,6 +303,7 @@ class ExchangeControlReadinessChecker(ExchangeConnectionReadinessChecker):
     def check_trading_ready(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         context: ExchangeConnectionReadinessContext | None = None,
@@ -328,6 +361,7 @@ class ExchangeControlReadinessChecker(ExchangeConnectionReadinessChecker):
             )
         if _requires_safe_futures_short_guard(context=context):
             return self._check_safe_futures_short(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 exchange_connection_id=exchange_connection_id,
                 exchange_name=connection.exchange_name,
@@ -344,6 +378,7 @@ class ExchangeControlReadinessChecker(ExchangeConnectionReadinessChecker):
     def _check_safe_futures_short(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         exchange_name: str,
@@ -376,6 +411,7 @@ class ExchangeControlReadinessChecker(ExchangeConnectionReadinessChecker):
         )
         try:
             self.account_projection_service.sync_connection(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 exchange_connection_id=exchange_connection_id,
                 reader=_ExchangeControlAccountProjectionReader(
@@ -385,6 +421,7 @@ class ExchangeControlReadinessChecker(ExchangeConnectionReadinessChecker):
                 requirements=(requirement,),
             )
             readiness = self.account_projection_service.get_readiness(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 exchange_connection_id=exchange_connection_id,
                 requirement=requirement,
@@ -417,7 +454,11 @@ class _ExchangeControlAccountProjectionReader:
     instrument_keys: tuple[str, ...]
 
     def read_account_projection(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
     ) -> ExchangeAccountProjection:
         snapshot = self.client.read_account_state(
             owner_user_id=str(owner_user_id),
@@ -426,6 +467,7 @@ class _ExchangeControlAccountProjectionReader:
             request_id="apps-api-safe-testnet-binding-account-read",
         )
         return _projection_from_exchange_control_snapshot(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_connection_id=exchange_connection_id,
             snapshot=snapshot,
@@ -461,6 +503,7 @@ def _requires_safe_futures_short_guard(
 
 def _projection_from_exchange_control_snapshot(
     *,
+    organization_id: OrganizationId,
     owner_user_id: UserId,
     exchange_connection_id: UUID,
     snapshot: ExchangeControlAccountStateSnapshot,
@@ -472,6 +515,7 @@ def _projection_from_exchange_control_snapshot(
         observed_at = observed_at.astimezone(UTC)
     return ExchangeAccountProjection(
         account_snapshot_id=uuid4(),
+        organization_id=organization_id,
         owner_user_id=owner_user_id,
         exchange_connection_id=exchange_connection_id,
         exchange_name=snapshot.exchange_name,
@@ -679,13 +723,19 @@ def build_strategy_router(
         ),
         compatibility_readiness_checker=compatibility_readiness_service,
     )
+    backtest_job_repository = _build_backtest_job_repository(settings=settings)
+    organization_scope_resolver = _build_research_organization_scope_resolver(
+        settings=settings
+    )
     create_strategy_from_variant_use_case = _build_create_strategy_from_variant_use_case(
         settings=settings,
-        job_repository=_build_backtest_job_repository(settings=settings),
+        job_repository=backtest_job_repository,
+        organization_scope_resolver=organization_scope_resolver,
     )
 
     current_user_provider_dependency = StrategyCurrentUserProviderDependency(
         current_user_dependency=current_user_dependency,
+        organization_scope_resolver=organization_scope_resolver,
     )
 
     return build_strategies_router(
@@ -832,16 +882,32 @@ def _build_backtest_job_repository(
     )
 
 
+def _build_research_organization_scope_resolver(
+    *, settings: StrategyRuntimeSettings
+) -> ResearchOrganizationScopeResolver | None:
+    return build_research_organization_scope_resolver(
+        environ={"STRATEGY_PG_DSN": settings.postgres_dsn}
+    )
+
+
 def _build_create_strategy_from_variant_use_case(
     *,
     settings: StrategyRuntimeSettings,
     job_repository: BacktestJobRepository | None,
+    organization_scope_resolver: ResearchOrganizationScopeResolver | None,
 ) -> CreateStrategyFromBacktestVariantUseCase | None:
-    if not settings.postgres_dsn or job_repository is None:
+    if (
+        not settings.postgres_dsn
+        or job_repository is None
+        or organization_scope_resolver is None
+    ):
         return None
     strategy_gateway = PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
     return CreateStrategyFromBacktestVariantUseCase(
-        variant_reader=_BacktestJobRepositoryVariantLaunchReader(repository=job_repository),
+        variant_reader=_BacktestJobRepositoryVariantLaunchReader(
+            repository=job_repository,
+            organization_scope_resolver=organization_scope_resolver,
+        ),
         strategy_repository=PostgresStrategyRepository(gateway=strategy_gateway),
         provenance_repository=PostgresStrategyBacktestVariantProvenanceRepository(
             gateway=strategy_gateway,
@@ -988,8 +1054,14 @@ def _build_signal_repository(
 
 
 class _BacktestJobRepositoryVariantLaunchReader(BacktestVariantLaunchReader):
-    def __init__(self, *, repository: BacktestJobRepository) -> None:
+    def __init__(
+        self,
+        *,
+        repository: BacktestJobRepository,
+        organization_scope_resolver: ResearchOrganizationScopeResolver,
+    ) -> None:
         self._repository = repository
+        self._organization_scope_resolver = organization_scope_resolver
 
     def get(
         self,
@@ -998,21 +1070,21 @@ class _BacktestJobRepositoryVariantLaunchReader(BacktestVariantLaunchReader):
         job_id: UUID,
         variant_key: str,
     ) -> BacktestVariantLaunchSnapshot:
-        job = self._repository.get(job_id=job_id)
+        scope = self._organization_scope_resolver.resolve(user_id=user_id)
+        job = self._repository.get(
+            job_id=job_id,
+            organization_id=scope.organization_id,
+            user_id=user_id,
+        )
         if job is None:
             raise RoehubError(
                 code="strategy_variant_launch.not_found",
                 message="Backtest job was not found",
                 details={"reason": "not_found", "job_id": str(job_id)},
             )
-        if job.user_id != user_id:
-            raise RoehubError(
-                code="strategy_variant_launch.forbidden",
-                message="Backtest job does not belong to current user",
-                details={"reason": "forbidden", "job_id": str(job_id)},
-            )
         row = self._repository.get_top_variant_by_public_key(
             job_id=job_id,
+            organization_id=scope.organization_id,
             public_variant_key=variant_key,
         )
         if row is None:

@@ -2,12 +2,12 @@
 
 ## Purpose
 
-This runbook covers Stage `07` notifications admin alerts, admin-only synthetic drills and replay policy. It applies to `admin_critical`, `admin_alert` and `admin_report` categories.
+This runbook covers notification provider instances, admin alerts, synthetic drills and explicit replay policy. It applies to installation-wide and organization-owned providers, including critical and trading categories.
 
 ## Secret Handling
 
 - Do not paste Telegram bot tokens, chat ids, cookies, provider payloads or raw credentials into issues, docs, logs or chat.
-- Admin recipient configuration must come from host-local env/config or persisted admin-owned routes.
+- Provider credentials and Telegram recipients must be stored behind typed OpenBao references. Raw bot tokens and raw chat ids are not runtime environment inputs.
 - Evidence may report only key presence, redacted references or stable hashes.
 
 ## Шлюз исходящего доступа Telegram
@@ -26,8 +26,9 @@ Production-диспетчер на `macstudio` получает доступ к 
   прокси только локально как `127.0.0.1:18180`;
 - `notification-dispatcher` использует локальный прокси только при наличии
   host-local ключа `ROEHUB_NOTIFICATIONS_TELEGRAM_PROXY_URL`;
-- токен бота остается в host-local env и не передается в SSH-конфигурацию,
-  `plist`, runbook или журналы туннеля.
+- токен экземпляра бота разрешается только через его типизированную ссылку
+  OpenBao и отдельную service identity; значение токена не передается в
+  окружение процесса, SSH-конфигурацию, `plist`, runbook или журналы туннеля.
 
 Шаблон host-local SSH-конфигурации находится в
 `infra/macos/ssh/roehub-telegram-egress.conf.example`. Заполненный файл, адрес
@@ -118,6 +119,24 @@ Replay policy:
 - Do not blindly retry `unknown` critical or trade-related deliveries.
 - Manual replay must create a new delivery linked in operator notes to the unknown delivery id.
 - Replays require an operator decision after checking whether the provider may already have accepted the message.
+
+## Provider Instance Degraded
+
+Alert: `NotificationsProviderInstanceDegraded`.
+
+Diagnosis:
+
+- Use only the sanitized `provider` and `provider_instance` metric labels.
+- Inspect the bounded provider health code and the affected instance's recent `sent`, `retry`, `unknown` and `dead_letter` outcomes.
+- Confirm whether the failure is credential, transport, timeout or provider-side degradation without printing secret values or provider payloads.
+- Verify that other organization or installation instances remain independent.
+
+Action:
+
+- Pause or disable only the affected instance when continued attempts are unsafe.
+- Do not reroute critical or trading notifications from an organization bot to the installation-wide bot.
+- Preserve `unknown` deliveries and use explicit replay only after checking possible provider acceptance.
+- Restore the instance through its OpenBao reference and rerun the bounded health probe before resuming traffic.
 
 ## Manual Replay
 
@@ -248,7 +267,9 @@ export STRATEGY_PG_DSN="${STRATEGY_PG_DSN:-${POSTGRES_DSN}}"
 export NOTIFICATIONS_PG_DSN="${NOTIFICATIONS_PG_DSN:-${STRATEGY_PG_DSN}}"
 /opt/roehub/app/.venv/bin/python scripts/notifications/stage09_production_canary.py \
   --config /opt/roehub/app/configs/prod/notifications.yaml \
-  --mode log-only-matrix
+  --mode log-only-matrix \
+  --organization-id <organization-uuid> \
+  --owner-user-id <owner-user-uuid>
 ```
 
 Check real Telegram readiness without sending a message:
@@ -257,7 +278,10 @@ Check real Telegram readiness without sending a message:
 cd /Users/daniildegtyarev/Projects/roehub.com
 /opt/roehub/app/.venv/bin/python scripts/notifications/stage09_production_canary.py \
   --config /opt/roehub/app/configs/prod/notifications.yaml \
-  --mode real-readiness
+  --mode real-readiness \
+  --organization-id <organization-uuid> \
+  --owner-user-id <owner-user-uuid> \
+  --provider-instance-id <provider-instance-uuid>
 ```
 
 The readiness output may report only booleans and counts. Do not print or paste token values, raw chat ids or provider payloads. A real Telegram canary is allowed only after the user approves the test/admin recipient and confirms receipt.

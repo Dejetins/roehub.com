@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block page_assets %}
+  <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/admin.css') }}">
+{% endblock %}
+
+{% block content %}
+  <section
+    class="admin-console"
+    data-page="admin"
+    data-admin-root
+    data-organizations-endpoint="/api/v1/organizations"
+    data-snapshot-endpoint-template="/api/v1/admin/organizations/{organization_id}/snapshot"
+    data-operation-endpoint-template="/api/v1/admin/organizations/{organization_id}/operations"
+    data-member-endpoint-template="/api/v1/organizations/{organization_id}/members/{user_id}"
+    data-plugin-validate-template="/api/v1/organizations/{organization_id}/plugins/bundles:validate"
+    data-plugin-install-template="/api/v1/organizations/{organization_id}/plugins/installations"
+    aria-label="{{ t('admin.aria') }}"
+  >
+    <div class="admin-console__status" role="status" aria-live="polite">
+      <span class="admin-console__presence" data-admin-presence aria-hidden="true"></span>
+      <strong data-admin-state>{{ t("admin.state.loading") }}</strong>
+      <span data-admin-state-detail>{{ t("admin.state.loading_desc") }}</span>
+      <button class="rh-button rh-button--compact rh-button--secondary" type="button" data-admin-reload>
+        {{ t("admin.action.reload") }}
+      </button>
+    </div>
+
+    <div class="admin-console__layout">
+      <nav class="admin-console__rail" aria-label="{{ t('admin.sections') }}">
+        {% for section_key in ["overview", "health", "organization", "plugins", "providers", "backups", "updates", "audit"] %}
+          <button
+            class="admin-console__section{% if loop.first %} is-active{% endif %}"
+            type="button"
+            data-admin-section="{{ section_key }}"
+            aria-controls="admin-panel-{{ section_key }}"
+            aria-selected="{{ 'true' if loop.first else 'false' }}"
+          >
+            <span aria-hidden="true">{{ "%02d"|format(loop.index) }}</span>
+            {{ t("admin.section." ~ section_key) }}
+          </button>
+        {% endfor %}
+      </nav>
+
+      <div class="admin-console__workspace">
+        <section class="admin-panel" id="admin-panel-overview" data-admin-panel="overview">
+          <header class="admin-panel__header">
+            <div><p>{{ t("admin.section.overview") }}</p><h2 data-admin-organization-name>—</h2></div>
+            <span class="rh-status" data-admin-role><span class="rh-status__dot"></span>—</span>
+          </header>
+          <div class="admin-metrics" data-admin-capabilities></div>
+          <div class="admin-overview-grid">
+            <article class="admin-card">
+              <h3>{{ t("admin.installation.title") }}</h3>
+              <dl class="admin-kv">
+                <div><dt>{{ t("admin.organization") }}</dt><dd data-admin-organization-id>—</dd></div>
+                <div><dt>{{ t("admin.recent_auth") }}</dt><dd data-admin-recent-auth>—</dd></div>
+                <div><dt>{{ t("admin.permissions") }}</dt><dd data-admin-permission-count>—</dd></div>
+              </dl>
+            </article>
+            <article class="admin-card admin-card--warning" data-admin-recent-auth-banner hidden>
+              <h3>{{ t("admin.reauth.title") }}</h3>
+              <p>{{ t("admin.reauth.body") }}</p>
+              <a class="rh-button rh-button--secondary" href="/login?next=/admin">{{ t("admin.reauth.action") }}</a>
+            </article>
+            <article class="admin-card">
+              <h3>{{ t("admin.safety.title") }}</h3>
+              <p>{{ t("admin.safety.body") }}</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="admin-panel" id="admin-panel-health" data-admin-panel="health" hidden>
+          <header class="admin-panel__header">
+            <div><p>{{ t("admin.section.health") }}</p><h2>{{ t("admin.health.title") }}</h2></div>
+            <span class="rh-status" data-admin-health-state><span class="rh-status__dot"></span>—</span>
+          </header>
+          <p class="admin-panel__note">{{ t("admin.health.note") }}</p>
+          <dl class="admin-kv admin-health-summary">
+            <div><dt>{{ t("admin.health.profile") }}</dt><dd data-admin-health-profile>—</dd></div>
+            <div><dt>{{ t("admin.health.updated") }}</dt><dd data-admin-health-updated>—</dd></div>
+          </dl>
+          <div class="rh-table-wrap">
+            <table class="rh-table admin-table">
+              <thead><tr><th>{{ t("admin.health.service") }}</th><th>{{ t("admin.health.capability") }}</th><th>{{ t("common.status") }}</th><th>{{ t("admin.health.observed") }}</th><th>{{ t("admin.health.runbook") }}</th><th>{{ t("admin.health.action") }}</th></tr></thead>
+              <tbody data-admin-health-services></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="admin-panel" id="admin-panel-organization" data-admin-panel="organization" hidden>
+          <header class="admin-panel__header"><div><p>{{ t("admin.section.organization") }}</p><h2>{{ t("admin.members.title") }}</h2></div></header>
+          <p class="admin-panel__note">{{ t("admin.members.note") }}</p>
+          <div class="rh-table-wrap">
+            <table class="rh-table admin-table">
+              <thead><tr><th>{{ t("admin.members.user") }}</th><th>{{ t("admin.members.role") }}</th><th>{{ t("common.status") }}</th><th>{{ t("admin.members.action") }}</th></tr></thead>
+              <tbody data-admin-members></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="admin-panel" id="admin-panel-plugins" data-admin-panel="plugins" hidden>
+          <header class="admin-panel__header"><div><p>{{ t("admin.section.plugins") }}</p><h2>{{ t("admin.plugins.title") }}</h2></div></header>
+          <div class="admin-plugin-grid">
+            <form class="admin-card admin-form" data-admin-plugin-form autocomplete="off">
+              <h3>{{ t("admin.plugins.install") }}</h3>
+              <label><span>{{ t("admin.plugins.bundle") }}</span><input required name="bundle_id" pattern="[A-Za-z0-9][A-Za-z0-9._\-]{2,127}" maxlength="128"></label>
+              <label><span>{{ t("admin.plugins.instance") }}</span><input required name="instance_name" maxlength="120"></label>
+              <fieldset>
+                <legend>{{ t("admin.plugins.permissions") }}</legend>
+                {% for permission in ["data.read", "network.egress", "notifications.send", "ui.panel"] %}
+                  <label class="admin-check"><input type="checkbox" name="permissions" value="{{ permission }}"> <span>{{ permission }}</span></label>
+                {% endfor %}
+              </fieldset>
+              <button class="rh-button rh-button--primary" type="submit" data-plugin-submit>{{ t("admin.plugins.review") }}</button>
+              <p class="admin-form__hint">{{ t("admin.plugins.no_secrets") }}</p>
+            </form>
+            <article class="admin-card">
+              <h3>{{ t("admin.plugins.permission_diff") }}</h3>
+              <div class="admin-diff" data-admin-plugin-diff><p>{{ t("admin.plugins.diff_empty") }}</p></div>
+            </article>
+          </div>
+          <div class="rh-table-wrap">
+            <table class="rh-table admin-table">
+              <thead><tr><th>{{ t("admin.plugins.plugin") }}</th><th>{{ t("common.status") }}</th><th>{{ t("admin.plugins.permissions") }}</th><th>{{ t("admin.plugins.rollback") }}</th></tr></thead>
+              <tbody data-admin-plugins></tbody>
+            </table>
+          </div>
+          <h3 class="admin-subheading">{{ t("admin.operations.plugin") }}</h3>
+          <div data-admin-plugin-operations class="admin-operation-list"></div>
+        </section>
+
+        <section class="admin-panel" id="admin-panel-providers" data-admin-panel="providers" hidden>
+          <header class="admin-panel__header"><div><p>{{ t("admin.section.providers") }}</p><h2>{{ t("admin.providers.title") }}</h2></div></header>
+          <div class="admin-empty-state">
+            <strong>{{ t("admin.providers.available") }}</strong>
+            <p>{{ t("admin.providers.body") }}</p>
+            <a class="rh-button rh-button--primary" href="/connections">{{ t("admin.providers.action") }}</a>
+          </div>
+        </section>
+
+        <section class="admin-panel" id="admin-panel-backups" data-admin-panel="backups" hidden>
+          <header class="admin-panel__header"><div><p>{{ t("admin.section.backups") }}</p><h2>{{ t("admin.backups.title") }}</h2></div></header>
+          <div class="admin-empty-state admin-empty-state--deferred">
+            <strong>{{ t("admin.backups.deferred") }}</strong>
+            <p>{{ t("admin.backups.body") }}</p>
+            <button class="rh-button" type="button" disabled>{{ t("admin.backups.action") }}</button>
+          </div>
+        </section>
+
+        <section class="admin-panel" id="admin-panel-updates" data-admin-panel="updates" hidden>
+          <header class="admin-panel__header"><div><p>{{ t("admin.section.updates") }}</p><h2>{{ t("admin.operations.title") }}</h2></div></header>
+          <div class="admin-operation-controls">
+            <article class="admin-card">
+              <h3>{{ t("admin.operations.services") }}</h3>
+              <p>{{ t("admin.operations.services_body") }}</p>
+              <div class="admin-actions">
+                {% for action in ["diagnostics", "restart", "recover"] %}
+                  <button class="rh-button rh-button--secondary" type="button" data-admin-operation="{{ action }}"{% if action == "recover" %} data-installation-operation{% endif %}>{{ t("admin.operation." ~ action) }}</button>
+                {% endfor %}
+              </div>
+            </article>
+            <article class="admin-card admin-form">
+              <h3>{{ t("admin.operations.release") }}</h3>
+              <label><span>{{ t("admin.operations.version") }}</span><input data-admin-release-version inputmode="numeric" placeholder="0.1.1" pattern="(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"></label>
+              <div class="admin-actions">
+                {% for action in ["install", "update", "rollback"] %}
+                  <button class="rh-button rh-button--secondary" type="button" data-admin-operation="{{ action }}" data-installation-operation>{{ t("admin.operation." ~ action) }}</button>
+                {% endfor %}
+              </div>
+            </article>
+          </div>
+          <article class="admin-operation" data-admin-operation-status hidden>
+            <header><strong data-operation-title>{{ t("admin.operations.current") }}</strong><span data-operation-state>—</span></header>
+            <div class="admin-progress" aria-hidden="true"><span data-operation-progress></span></div>
+            <p data-operation-detail></p>
+            <button class="rh-button rh-button--secondary" type="button" data-operation-reconcile hidden>{{ t("admin.operations.reconcile") }}</button>
+          </article>
+        </section>
+
+        <section class="admin-panel" id="admin-panel-audit" data-admin-panel="audit" hidden>
+          <header class="admin-panel__header"><div><p>{{ t("admin.section.audit") }}</p><h2>{{ t("admin.audit.title") }}</h2></div></header>
+          <p class="admin-panel__note">{{ t("admin.audit.note") }}</p>
+          <div class="rh-table-wrap">
+            <table class="rh-table admin-table">
+              <thead><tr><th>{{ t("admin.audit.time") }}</th><th>{{ t("admin.audit.category") }}</th><th>{{ t("admin.audit.action") }}</th><th>{{ t("common.status") }}</th></tr></thead>
+              <tbody data-admin-events></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <dialog class="admin-confirm" data-admin-confirm aria-labelledby="admin-confirm-title">
+      <form method="dialog" class="admin-confirm__surface" data-admin-confirm-form>
+        <header><div><p>{{ t("admin.confirm.eyebrow") }}</p><h2 id="admin-confirm-title" data-confirm-title>{{ t("admin.confirm.title") }}</h2></div><button class="workbench-icon-button" value="cancel" aria-label="{{ t('common.close') }}">×</button></header>
+        <div class="admin-confirm__impact"><strong>{{ t("admin.confirm.impact") }}</strong><p data-confirm-impact></p></div>
+        <label><span>{{ t("admin.confirm.type") }}</span><code data-confirm-phrase>—</code><input data-confirm-input autocomplete="off" spellcheck="false"></label>
+        <p class="admin-confirm__reauth" data-confirm-reauth hidden>{{ t("admin.reauth.body") }}</p>
+        <output data-confirm-status aria-live="polite"></output>
+        <footer><button class="rh-button rh-button--secondary" value="cancel">{{ t("admin.confirm.cancel") }}</button><button class="rh-button rh-button--primary" type="submit" value="confirm" data-confirm-submit disabled>{{ t("admin.confirm.execute") }}</button></footer>
+      </form>
+    </dialog>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script type="module" src="{{ asset_url('/assets/js/pages/admin.js') }}"></script>
+{% endblock %}

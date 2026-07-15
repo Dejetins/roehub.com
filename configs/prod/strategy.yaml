@@ -41,7 +41,6 @@ strategy:
   telegram:
     enabled: true
     mode: "notifications"
-    bot_token_env: "TELEGRAM_BOT_TOKEN"
     api_base_url: "https://api.telegram.org"
     send_timeout_s: 2.0
     debounce_failed_seconds: 600

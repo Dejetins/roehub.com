@@ -38,6 +38,21 @@ htmlcov/
 
 # Build artifacts
 dist/
+!apps/web/dist/
+apps/web/dist/*
+!apps/web/dist/css/
+apps/web/dist/css/*
+!apps/web/dist/css/pages/
+apps/web/dist/css/pages/*
+!apps/web/dist/css/pages/plugin-panel-lab.css
+!apps/web/dist/js/
+apps/web/dist/js/*
+!apps/web/dist/js/components/
+apps/web/dist/js/components/*
+!apps/web/dist/js/components/plugin-panel.js
+!apps/web/dist/js/pages/
+apps/web/dist/js/pages/*
+!apps/web/dist/js/pages/plugin-panel-lab.js
 build/
 target/
 .dist/

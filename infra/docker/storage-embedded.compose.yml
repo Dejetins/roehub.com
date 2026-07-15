@@ -1,0 +1,105 @@
+name: roehub-storage
+
+services:
+  postgresql:
+    image: postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: roehub
+      POSTGRES_USER: roehub
+      POSTGRES_PASSWORD: ${ROEHUB_STORAGE_POSTGRES_PASSWORD:?required}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U roehub -d roehub"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - postgresql_data:/var/lib/postgresql/data
+    networks: [storage]
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: roehub
+      CLICKHOUSE_PASSWORD: ${ROEHUB_STORAGE_CLICKHOUSE_PASSWORD:?required}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "clickhouse-client --user roehub --password \"$$CLICKHOUSE_PASSWORD\" --query 'SELECT 1'",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 45
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+    networks: [storage]
+
+  redis:
+    image: redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42
+    restart: unless-stopped
+    environment:
+      ROEHUB_REDIS_PASSWORD: ${ROEHUB_STORAGE_REDIS_PASSWORD:?required}
+    command:
+      - /bin/sh
+      - -ec
+      - exec redis-server --appendonly yes --maxmemory-policy noeviction --requirepass "$$ROEHUB_REDIS_PASSWORD"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "REDISCLI_AUTH=\"$$ROEHUB_REDIS_PASSWORD\" redis-cli ping | grep -Fx PONG",
+        ]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - redis_data:/data
+    networks: [storage]
+
+  storage-migrations:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.storage-migrations
+    restart: "no"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ROEHUB_STORAGE_POSTGRES_DSN: ${ROEHUB_STORAGE_POSTGRES_DSN:?required}
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: ${ROEHUB_STORAGE_CLICKHOUSE_DSN:?required}
+      ROEHUB_STORAGE_REDIS_URL: ${ROEHUB_STORAGE_REDIS_URL:?required}
+    command:
+      - bootstrap
+      - --service-config
+      - /etc/roehub/service-config.json
+    cap_drop: [ALL]
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    user: "65534:65534"
+    volumes:
+      - ${ROEHUB_STORAGE_SERVICE_CONFIG:?required}:/etc/roehub/service-config.json:ro
+    networks: [storage]
+
+volumes:
+  postgresql_data: {}
+  clickhouse_data: {}
+  clickhouse_logs: {}
+  redis_data: {}
+
+networks:
+  storage:
+    internal: true

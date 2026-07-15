@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import Any, cast
 from uuid import UUID
 
 import pytest
@@ -16,16 +17,154 @@ from apps.api.exchange_control_client import (
     ExchangeControlPositionSnapshot,
     InMemoryExchangeControlClient,
 )
+from apps.api.wiring.modules import strategy as strategy_wiring
 from apps.api.wiring.modules.strategy import (
     ExchangeControlReadinessChecker,
     is_strategy_api_enabled,
+)
+from trading.contexts.backtest.application.ports import (
+    BacktestJobRepository,
+    ResearchOrganizationScope,
+    ResearchOrganizationScopeResolver,
 )
 from trading.contexts.live_execution.adapters.outbound import (
     InMemoryExchangeAccountProjectionRepository,
 )
 from trading.contexts.live_execution.application import ExchangeAccountProjectionService
 from trading.contexts.strategy.application import ExchangeConnectionReadinessContext
-from trading.shared_kernel.primitives import UserId
+from trading.platform.errors import RoehubError
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+
+class _StaticResearchScopeResolver:
+    def __init__(self, *, organization_id: OrganizationId) -> None:
+        self._organization_id = organization_id
+
+    def resolve(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        return ResearchOrganizationScope(
+            organization_id=self._organization_id,
+            user_id=user_id,
+        )
+
+
+class _AmbiguousResearchScopeResolver:
+    def resolve(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        _ = user_id
+        raise RoehubError(
+            code="research.organization_scope_ambiguous",
+            message="Research organization scope is ambiguous",
+            details={"reason": "multiple_active_memberships"},
+        )
+
+
+class _OwnershipCheckingBacktestRepository:
+    def __init__(
+        self,
+        *,
+        owner_user_id: UserId,
+        owner_organization_id: OrganizationId,
+    ) -> None:
+        self._owner_user_id = owner_user_id
+        self._owner_organization_id = owner_organization_id
+        self.get_calls: list[tuple[UUID, OrganizationId, UserId | None]] = []
+        self.variant_calls = 0
+
+    def get(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId | None = None,
+    ) -> Any | None:
+        self.get_calls.append((job_id, organization_id, user_id))
+        if (
+            organization_id != self._owner_organization_id
+            or user_id != self._owner_user_id
+        ):
+            return None
+        return cast(Any, object())
+
+    def get_top_variant_by_public_key(self, **kwargs: Any) -> Any | None:
+        _ = kwargs
+        self.variant_calls += 1
+        raise AssertionError("variant lookup must not run after ownership rejection")
+
+
+@pytest.mark.parametrize(
+    ("request_user_id", "resolved_organization_id"),
+    [
+        (
+            UserId.from_string("00000000-0000-0000-0000-000000000811"),
+            OrganizationId.from_string("00000000-0000-0000-0000-000000000902"),
+        ),
+        (
+            UserId.from_string("00000000-0000-0000-0000-000000000812"),
+            OrganizationId.from_string("00000000-0000-0000-0000-000000000901"),
+        ),
+    ],
+)
+def test_strategy_variant_reader_rejects_cross_owner_job_before_variant_lookup(
+    request_user_id: UserId,
+    resolved_organization_id: OrganizationId,
+) -> None:
+    owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000811")
+    owner_organization_id = OrganizationId.from_string(
+        "00000000-0000-0000-0000-000000000901"
+    )
+    repository = _OwnershipCheckingBacktestRepository(
+        owner_user_id=owner_user_id,
+        owner_organization_id=owner_organization_id,
+    )
+    reader = strategy_wiring._BacktestJobRepositoryVariantLaunchReader(
+        repository=cast(BacktestJobRepository, repository),
+        organization_scope_resolver=cast(
+            ResearchOrganizationScopeResolver,
+            _StaticResearchScopeResolver(
+                organization_id=resolved_organization_id,
+            ),
+        ),
+    )
+    job_id = UUID("00000000-0000-0000-0000-000000000999")
+
+    with pytest.raises(RoehubError) as error_info:
+        reader.get(
+            user_id=request_user_id,
+            job_id=job_id,
+            variant_key="variant-1",
+        )
+
+    assert error_info.value.code == "strategy_variant_launch.not_found"
+    assert repository.get_calls == [
+        (job_id, resolved_organization_id, request_user_id)
+    ]
+    assert repository.variant_calls == 0
+
+
+def test_strategy_variant_reader_fails_closed_on_ambiguous_organization_scope() -> None:
+    repository = _OwnershipCheckingBacktestRepository(
+        owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000811"),
+        owner_organization_id=OrganizationId.from_string(
+            "00000000-0000-0000-0000-000000000901"
+        ),
+    )
+    reader = strategy_wiring._BacktestJobRepositoryVariantLaunchReader(
+        repository=cast(BacktestJobRepository, repository),
+        organization_scope_resolver=cast(
+            ResearchOrganizationScopeResolver,
+            _AmbiguousResearchScopeResolver(),
+        ),
+    )
+
+    with pytest.raises(RoehubError) as error_info:
+        reader.get(
+            user_id=UserId.from_string("00000000-0000-0000-0000-000000000811"),
+            job_id=UUID("00000000-0000-0000-0000-000000000999"),
+            variant_key="variant-1",
+        )
+
+    assert error_info.value.code == "research.organization_scope_ambiguous"
+    assert repository.get_calls == []
+    assert repository.variant_calls == 0
 
 
 class _StaticClock:
@@ -236,6 +375,9 @@ def test_exchange_control_readiness_checker_accepts_safe_testnet_futures_short()
     )
 
     readiness = checker.check_trading_ready(
+        organization_id=OrganizationId(
+            UUID("00000000-0000-4000-8000-000000000010")
+        ),
         owner_user_id=owner_user_id,
         exchange_connection_id=connection_id,
         context=ExchangeConnectionReadinessContext(
@@ -265,6 +407,9 @@ def test_exchange_control_readiness_checker_blocks_without_projection_store() ->
     )
 
     readiness = checker.check_trading_ready(
+        organization_id=OrganizationId(
+            UUID("00000000-0000-4000-8000-000000000010")
+        ),
         owner_user_id=owner_user_id,
         exchange_connection_id=connection_id,
         context=ExchangeConnectionReadinessContext(

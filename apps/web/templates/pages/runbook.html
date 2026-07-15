@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block page_assets %}
+  <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/admin.css') }}">
+{% endblock %}
+
+{% block content %}
+  <article class="workbench-section" aria-labelledby="runbook-title">
+    <header class="workbench-section__header">
+      <div>
+        <p>{{ t("admin.health.runbook") }}</p>
+        <h2 id="runbook-title"><code>{{ runbook_id }}</code></h2>
+      </div>
+      <a class="rh-button rh-button--secondary" href="/admin">{{ t("admin.health.back") }}</a>
+    </header>
+    <pre class="admin-runbook">{{ runbook_content }}</pre>
+  </article>
+{% endblock %}

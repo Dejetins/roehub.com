@@ -16,7 +16,7 @@ from trading.contexts.backtest.adapters.outbound import (
     PsycopgBacktestPostgresGateway,
 )
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 log = logging.getLogger(__name__)
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
@@ -33,6 +33,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="backtest-lazy-trades-child")
     parser.add_argument("--task-id", required=True)
     parser.add_argument("--job-id", required=True)
+    parser.add_argument("--organization-id", required=True)
     parser.add_argument("--owner-user-id", required=True)
     parser.add_argument("--variant-key", required=True)
     parser.add_argument("--output-json", required=True)
@@ -44,6 +45,7 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     task_id = UUID(args.task_id)
     job_id = UUID(args.job_id)
+    organization_id = OrganizationId.from_string(args.organization_id)
     owner_user_id = UserId.from_string(args.owner_user_id)
     output_path = Path(args.output_json)
     started_at = datetime.now(UTC)
@@ -59,7 +61,11 @@ def main(argv: list[str] | None = None) -> int:
         job_repository = PostgresBacktestJobRepository(
             gateway=PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
         )
-        job = job_repository.get(job_id=job_id, user_id=owner_user_id)
+        job = job_repository.get(
+            job_id=job_id,
+            organization_id=organization_id,
+            user_id=owner_user_id,
+        )
         if job is None:
             raise RoehubError(
                 code="backtest.job_not_found",
@@ -72,6 +78,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         row = job_repository.get_top_variant_by_public_key(
             job_id=job_id,
+            organization_id=organization_id,
             public_variant_key=args.variant_key,
         )
         if row is None:

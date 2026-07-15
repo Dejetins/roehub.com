@@ -1,0 +1,95 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.roehub.io/operations/control-operation.v1alpha1.schema.json",
+  "title": "Roehub typed control operation v1alpha1",
+  "type": "object",
+  "required": ["schema", "operation_id", "action", "profile"],
+  "properties": {
+    "schema": {"const": "io.roehub.control-operation/v1alpha1"},
+    "operation_id": {"type": "string", "format": "uuid"},
+    "action": {
+      "enum": [
+        "inspect",
+        "start",
+        "stop",
+        "restart",
+        "recover",
+        "install",
+        "update",
+        "rollback",
+        "plugin.install",
+        "plugin.update",
+        "plugin.rollback",
+        "plugin.enable",
+        "plugin.disable",
+        "backup",
+        "restore",
+        "backup.cancel",
+        "restore.cancel",
+        "diagnostics"
+      ]
+    },
+    "profile": {"enum": ["base", "trading", "ml"]},
+    "services": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"}
+    },
+    "release_version": {"type": "string", "minLength": 1, "maxLength": 128},
+    "subject_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"},
+    "package_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {"action": {"enum": ["install", "update", "rollback"]}},
+        "required": ["action"]
+      },
+      "then": {"required": ["release_version"]},
+      "else": {"not": {"required": ["release_version"]}}
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "enum": [
+              "plugin.install",
+              "plugin.update",
+              "plugin.rollback",
+              "plugin.enable",
+              "plugin.disable",
+              "backup",
+              "restore",
+              "backup.cancel",
+              "restore.cancel"
+            ]
+          }
+        },
+        "required": ["action"]
+      },
+      "then": {"required": ["subject_id"]},
+      "else": {"not": {"required": ["subject_id"]}}
+    },
+    {
+      "if": {
+        "properties": {"action": {"enum": ["plugin.install", "plugin.update"]}},
+        "required": ["action"]
+      },
+      "then": {"required": ["package_digest"]},
+      "else": {"not": {"required": ["package_digest"]}}
+    },
+    {
+      "if": {
+        "properties": {
+          "action": {
+            "enum": ["inspect", "start", "stop", "restart", "recover", "diagnostics"]
+          }
+        },
+        "required": ["action"]
+      },
+      "then": {},
+      "else": {"not": {"required": ["services"]}}
+    }
+  ],
+  "additionalProperties": false
+}

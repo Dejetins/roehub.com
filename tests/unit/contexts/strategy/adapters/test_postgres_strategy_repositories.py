@@ -17,7 +17,16 @@ from trading.contexts.strategy.adapters.outbound.persistence.postgres import (
 from trading.contexts.strategy.domain import StrategyRun, StrategySignal, StrategySpecV1
 from trading.contexts.strategy.domain.errors import StrategyActiveRunConflictError
 from trading.contexts.strategy.domain.services import generate_strategy_name
-from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, Timeframe, UserId
+from trading.shared_kernel.primitives import (
+    InstrumentId,
+    MarketId,
+    OrganizationId,
+    Symbol,
+    Timeframe,
+    UserId,
+)
+
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000001010"))
 
 
 class _FakeGateway:
@@ -162,6 +171,7 @@ def test_strategy_repository_soft_delete_updates_only_is_deleted_field() -> None
     repository = PostgresStrategyRepository(gateway=gateway)
 
     changed = repository.soft_delete(
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000999"),
         strategy_id=UUID("00000000-0000-0000-0000-00000000A999"),
     )
@@ -191,6 +201,7 @@ def test_strategy_repository_list_for_user_uses_deterministic_ordering() -> None
     repository = PostgresStrategyRepository(gateway=gateway)
 
     strategies = repository.list_for_user(
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000001011"),
     )
 
@@ -226,6 +237,7 @@ def test_strategy_repository_normalizes_postgres_session_timezone_to_utc() -> No
     repository = PostgresStrategyRepository(gateway=gateway)
 
     strategies = repository.list_for_user(
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000001011"),
     )
 
@@ -251,6 +263,7 @@ def test_run_repository_find_active_includes_deterministic_order_clause() -> Non
     repository = PostgresStrategyRunRepository(gateway=gateway)
 
     run = repository.find_active_for_strategy(
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000001011"),
         strategy_id=UUID("00000000-0000-0000-0000-00000000A111"),
     )
@@ -279,6 +292,7 @@ def test_signal_repository_latest_is_owner_scoped_and_bounded() -> None:
     repository = PostgresStrategySignalRepository(gateway=gateway)
 
     signals = repository.list_latest_for_strategy(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000001011"),
         strategy_id=UUID("00000000-0000-0000-0000-00000000A111"),
         limit=500,
@@ -401,6 +415,7 @@ def test_run_repository_update_persists_metadata_json_field() -> None:
     user_id = UserId.from_string("00000000-0000-0000-0000-000000001012")
     started = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000B912"),
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         strategy_id=UUID("00000000-0000-0000-0000-00000000A112"),
         started_at=datetime(2026, 2, 15, 13, 0, tzinfo=timezone.utc),
@@ -454,6 +469,7 @@ def test_run_repository_create_serializes_metadata_json_for_jsonb_parameter() ->
 
     run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000B889"),
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000001012"),
         strategy_id=UUID("00000000-0000-0000-0000-00000000A112"),
         started_at=datetime(2026, 2, 15, 13, 0, tzinfo=timezone.utc),
@@ -487,6 +503,7 @@ def test_run_repository_create_translates_unique_violation_to_domain_conflict() 
 
     run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000B888"),
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000001012"),
         strategy_id=UUID("00000000-0000-0000-0000-00000000A112"),
         started_at=datetime(2026, 2, 15, 13, 0, tzinfo=timezone.utc),
@@ -515,6 +532,7 @@ def test_event_repository_list_for_strategy_uses_deterministic_ordering() -> Non
     repository = PostgresStrategyEventRepository(gateway=gateway)
 
     events = repository.list_for_strategy(
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000001013"),
         strategy_id=UUID("00000000-0000-0000-0000-00000000A113"),
     )
@@ -552,6 +570,7 @@ def test_event_repository_normalizes_postgres_session_timezone_to_utc() -> None:
     repository = PostgresStrategyEventRepository(gateway=gateway)
 
     events = repository.list_for_strategy(
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000001013"),
         strategy_id=UUID("00000000-0000-0000-0000-00000000A113"),
     )
@@ -614,6 +633,7 @@ def _build_strategy_row() -> Mapping[str, Any]:
     user_id = UserId.from_string("00000000-0000-0000-0000-000000001011")
     return {
         "strategy_id": "00000000-0000-0000-0000-00000000A111",
+        "organization_id": str(_ORGANIZATION_ID),
         "user_id": str(user_id),
         "name": generate_strategy_name(user_id=user_id, spec=spec),
         "instrument_id": spec.instrument_id.as_dict(),
@@ -646,6 +666,7 @@ def _build_run_row(*, state: str) -> Mapping[str, Any]:
     """
     return {
         "run_id": "00000000-0000-0000-0000-00000000B111",
+        "organization_id": str(_ORGANIZATION_ID),
         "user_id": "00000000-0000-0000-0000-000000001011",
         "strategy_id": "00000000-0000-0000-0000-00000000A111",
         "state": state,
@@ -660,6 +681,7 @@ def _build_run_row(*, state: str) -> Mapping[str, Any]:
 def _build_signal() -> StrategySignal:
     return StrategySignal(
         signal_id=UUID("00000000-0000-0000-0000-00000000F111"),
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000001011"),
         strategy_id=UUID("00000000-0000-0000-0000-00000000A111"),
         strategy_run_id=UUID("00000000-0000-0000-0000-00000000B111"),
@@ -687,6 +709,7 @@ def _build_signal_row() -> Mapping[str, Any]:
     signal = _build_signal()
     return {
         "signal_id": str(signal.signal_id),
+        "organization_id": str(signal.organization_id),
         "owner_user_id": str(signal.owner_user_id),
         "strategy_id": str(signal.strategy_id),
         "strategy_run_id": str(signal.strategy_run_id),
@@ -728,6 +751,7 @@ def _build_event_row() -> Mapping[str, Any]:
     """
     return {
         "event_id": "00000000-0000-0000-0000-00000000E111",
+        "organization_id": str(_ORGANIZATION_ID),
         "user_id": "00000000-0000-0000-0000-000000001011",
         "strategy_id": "00000000-0000-0000-0000-00000000A111",
         "run_id": None,

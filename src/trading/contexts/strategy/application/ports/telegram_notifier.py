@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Mapping, Protocol
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId, UtcTimestamp
+from trading.shared_kernel.primitives import OrganizationId, UserId, UtcTimestamp
 
 TELEGRAM_NOTIFICATION_EVENT_TYPES_V1: tuple[str, ...] = (
     "signal",
@@ -28,6 +28,7 @@ class StrategyTelegramNotificationEventV1:
       - apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py
     """
 
+    organization_id: OrganizationId
     user_id: UserId
     ts: datetime
     strategy_id: UUID
@@ -76,6 +77,7 @@ class StrategyTelegramNotificationV1:
         telegram_bot_api_notifier.py
     """
 
+    organization_id: OrganizationId
     user_id: UserId
     ts: datetime
     strategy_id: UUID

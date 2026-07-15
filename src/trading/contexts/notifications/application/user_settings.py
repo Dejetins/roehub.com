@@ -7,7 +7,7 @@ from uuid import NAMESPACE_URL, UUID, uuid5
 
 from trading.contexts.notifications.application.ports import NotificationRepository
 from trading.contexts.notifications.domain import NotificationRoute
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 UserNotificationMode = Literal["off", "critical_only", "signals", "trades", "reports", "all"]
 
@@ -48,15 +48,23 @@ class UserNotificationSettingsService:
     def get_settings(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         now: datetime,
         default_timezone: str | None,
     ) -> UserNotificationSettingsView:
-        route = self.repository.get_route(route_id=_user_route_id(owner_user_id=owner_user_id))
+        route = self.repository.get_route(
+            organization_id=organization_id,
+            route_id=_user_route_id(
+                organization_id=organization_id, owner_user_id=owner_user_id
+            ),
+        )
         if route is None:
             timezone = _normalize_timezone(default_timezone)
             return UserNotificationSettingsView(
-                route_id=_user_route_id(owner_user_id=owner_user_id),
+                route_id=_user_route_id(
+                    organization_id=organization_id, owner_user_id=owner_user_id
+                ),
                 mode="off",
                 status="disabled",
                 recipient_address_ref=None,
@@ -72,13 +80,19 @@ class UserNotificationSettingsService:
     def update_settings(
         self,
         *,
+        organization_id: OrganizationId,
+        provider_instance_id: UUID,
         owner_user_id: UserId,
         update: UserNotificationSettingsUpdate,
         now: datetime,
         default_timezone: str | None,
     ) -> UserNotificationSettingsView:
-        route_id = _user_route_id(owner_user_id=owner_user_id)
-        existing = self.repository.get_route(route_id=route_id)
+        route_id = _user_route_id(
+            organization_id=organization_id, owner_user_id=owner_user_id
+        )
+        existing = self.repository.get_route(
+            organization_id=organization_id, route_id=route_id
+        )
         timezone = _normalize_timezone(update.timezone or default_timezone)
         recipient_address_ref = (
             update.recipient_address_ref
@@ -88,6 +102,8 @@ class UserNotificationSettingsService:
         status = _route_status(mode=update.mode, recipient_address_ref=recipient_address_ref)
         route = NotificationRoute(
             route_id=route_id,
+            organization_id=organization_id,
+            provider_instance_id=provider_instance_id,
             recipient_kind="user",
             owner_user_id=owner_user_id,
             channel_key="telegram",
@@ -109,8 +125,11 @@ class UserNotificationSettingsService:
         return _settings_view(route=saved, fallback_timezone=timezone)
 
 
-def _user_route_id(*, owner_user_id: UserId) -> UUID:
-    return uuid5(NAMESPACE_URL, f"roehub:notifications:user-route:{owner_user_id}")
+def _user_route_id(*, organization_id: OrganizationId, owner_user_id: UserId) -> UUID:
+    return uuid5(
+        NAMESPACE_URL,
+        f"roehub:notifications:user-route:{organization_id}:{owner_user_id}",
+    )
 
 
 def _settings_view(

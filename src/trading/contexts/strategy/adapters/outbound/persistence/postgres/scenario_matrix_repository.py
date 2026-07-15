@@ -41,6 +41,7 @@ class PostgresStrategyVariantScenarioMatrixRepository(
                 INSERT INTO {self._table}
                 (
                     scenario_matrix_row_id,
+                    organization_id,
                     owner_user_id,
                     source_job_id,
                     source_variant_key,
@@ -70,6 +71,7 @@ class PostgresStrategyVariantScenarioMatrixRepository(
                 VALUES
                 (
                     %(scenario_matrix_row_id)s,
+                    %(organization_id)s,
                     %(owner_user_id)s,
                     %(source_job_id)s,
                     %(source_variant_key)s,
@@ -96,7 +98,10 @@ class PostgresStrategyVariantScenarioMatrixRepository(
                     %(market_data_reason_codes_json)s::jsonb,
                     %(checked_at)s
                 )
-                ON CONFLICT (owner_user_id, source_job_id, source_variant_key, scenario_key)
+                ON CONFLICT (
+                    organization_id, owner_user_id, source_job_id,
+                    source_variant_key, scenario_key
+                )
                 DO UPDATE SET
                     scenario_matrix_row_id = EXCLUDED.scenario_matrix_row_id,
                     variant_hash = EXCLUDED.variant_hash,
@@ -122,6 +127,7 @@ class PostgresStrategyVariantScenarioMatrixRepository(
 def _params(*, row: StrategyVariantScenarioMatrixRow) -> dict[str, Any]:
     return {
         "scenario_matrix_row_id": str(row.scenario_matrix_row_id),
+        "organization_id": str(row.organization_id),
         "owner_user_id": str(row.owner_user_id),
         "source_job_id": str(row.source_job_id),
         "source_variant_key": row.source_variant_key,

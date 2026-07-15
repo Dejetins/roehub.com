@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.roehub.io/plugins/roehub-app-contribution-v1.schema.json",
+  "title": "RoehubAppContribution/v1",
+  "description": "Composition of declarative panels without plugin-owned executable UI.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "contribution_id", "title", "description", "sections"],
+  "properties": {
+    "contract": {"const": "RoehubAppContribution/v1"},
+    "contribution_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,127}$"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 160},
+    "description": {"type": "string", "minLength": 1, "maxLength": 500},
+    "sections": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["section_id", "title", "panel_contribution_ids"],
+        "properties": {
+          "section_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,127}$"},
+          "title": {"type": "string", "minLength": 1, "maxLength": 160},
+          "panel_contribution_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 12,
+            "uniqueItems": true,
+            "items": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,127}$"}
+          }
+        }
+      }
+    }
+  }
+}

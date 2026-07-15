@@ -12,7 +12,17 @@ from .dispatcher import (
     NotificationDispatcher,
     NotificationDispatcherConfig,
 )
-from .ports import NotificationRepository
+from .ports import NotificationProviderRepository, NotificationRepository
+from .provider_admin import (
+    AddNotificationProviderCommand,
+    ConnectTelegramProviderCommand,
+    InstallNotificationProviderPackageCommand,
+    NotificationProviderAdministrationService,
+)
+from .replay import (
+    NotificationDeliveryReplayService,
+    ReplayNotificationDeliveryCommand,
+)
 from .report_scheduler import (
     NotificationReportScheduler,
     NotificationReportSchedulerConfig,
@@ -44,6 +54,7 @@ from .telegram_commands import (
     TelegramCommandHandlingResult,
     TelegramInboundCommand,
 )
+from .telegram_worker import TelegramProviderWorker, TelegramProviderWorkerResult
 from .user_settings import (
     UserNotificationReportSchedule,
     UserNotificationSettingsService,
@@ -53,6 +64,11 @@ from .user_settings import (
 
 __all__ = [
     "NotificationRepository",
+    "NotificationProviderRepository",
+    "AddNotificationProviderCommand",
+    "ConnectTelegramProviderCommand",
+    "InstallNotificationProviderPackageCommand",
+    "NotificationProviderAdministrationService",
     "NotificationAdminDrillResult",
     "NotificationAdminDrillService",
     "NotificationDispatchBatchResult",
@@ -63,6 +79,8 @@ __all__ = [
     "NotificationReportScheduler",
     "NotificationReportSchedulerConfig",
     "NotificationReportSchedulerResult",
+    "NotificationDeliveryReplayService",
+    "ReplayNotificationDeliveryCommand",
     "NotificationRouteDecision",
     "NotificationSourceRouter",
     "NotificationStatsQueryService",
@@ -82,6 +100,8 @@ __all__ = [
     "TelegramCommandHandler",
     "TelegramCommandHandlingResult",
     "TelegramInboundCommand",
+    "TelegramProviderWorker",
+    "TelegramProviderWorkerResult",
     "render_notification_stats_snapshot",
     "render_portfolio_report",
     "synthetic_admin_notification_facts",

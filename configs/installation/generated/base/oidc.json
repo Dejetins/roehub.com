@@ -1,0 +1,7 @@
+{
+  "oidc": {
+    "enabled": false
+  },
+  "profile": "base",
+  "schema": "io.roehub.oidc-input/v1alpha1"
+}

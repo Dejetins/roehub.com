@@ -48,7 +48,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobTopVariant,
 )
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 def test_lazy_trades_cache_miss_recomputes_and_writes_cache(tmp_path: Path) -> None:
@@ -444,6 +444,9 @@ def _service_fixture(
     job_id = uuid4()
     job = BacktestJob.create_queued(
         job_id=job_id,
+        organization_id=OrganizationId.from_string(
+            "00000000-0000-0000-0000-000000000001"
+        ),
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000401"),
         mode="template",
         created_at=datetime.now(UTC),

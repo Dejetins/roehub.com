@@ -2,21 +2,21 @@ version: 1
 notifications:
   dispatcher:
     enabled: true
-    provider_mode: "log_only"
+    provider_mode: "active_instances"
     batch_size: 100
     lease_seconds: 30
     retry_backoff_seconds: 60
+    max_retry_backoff_seconds: 300
+    retry_jitter_ratio: 0.2
     max_attempts: 3
     poll_interval_seconds: 2.0
     empty_backoff_seconds: 5.0
   providers:
+    healthcheck_interval_seconds: 30.0
     telegram:
-      enabled: false
       api_base_url: "https://api.telegram.org"
-      send_timeout_s: 2.0
-      healthcheck_enabled: true
-      healthcheck_interval_seconds: 30.0
-      healthcheck_timeout_s: 5.0
+      connect_timeout_seconds: 3.0
+      overall_timeout_seconds: 10.0
   telegram_bot:
     enabled: false
     poll_interval_seconds: 5

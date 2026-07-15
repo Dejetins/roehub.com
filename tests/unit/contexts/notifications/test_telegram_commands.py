@@ -22,7 +22,11 @@ from trading.contexts.notifications.application import (
 from trading.contexts.notifications.application.telegram_commands import (
     TelegramCommandScopeAuthorizer,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.platform.secrets import SecretValue
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+_PROVIDER_INSTANCE_ID = UUID("00000000-0000-4000-8000-000000000003")
 
 
 def _now() -> datetime:
@@ -36,7 +40,11 @@ def _user_id() -> UserId:
 def test_start_binding_uses_hashed_one_time_code_and_idempotent_updates() -> None:
     repository = InMemoryNotificationRepository()
     binding_store = InMemoryNotificationTelegramBindingStore()
-    binding_service = NotificationTelegramBindingService(store=binding_store)
+    binding_service = NotificationTelegramBindingService(
+        store=binding_store,
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
+    )
     code_view = binding_service.create_binding_code(owner_user_id=_user_id(), now=_now())
     handler = TelegramCommandHandler(
         repository=repository,
@@ -53,7 +61,8 @@ def test_start_binding_uses_hashed_one_time_code_and_idempotent_updates() -> Non
     assert first.delivery is not None
     assert repeated.idempotent_replay is True
     assert repeated.delivery is None
-    assert reuse.status == "failed"
+    assert reuse.status == "handled"
+    assert "already confirmed" in reuse.response_text
     assert len(repository.telegram_updates) == 2
     assert len(repository.deliveries) == 2
     assert code_view.code not in repr(binding_store.binding_codes)
@@ -62,6 +71,61 @@ def test_start_binding_uses_hashed_one_time_code_and_idempotent_updates() -> Non
         "arg_count": 1,
         "arg_0": "<redacted>",
     }
+
+
+def test_start_retries_after_atomic_response_failure_without_partial_state() -> None:
+    repository = _FailOnceCommandResponseRepository()
+    binding_store = InMemoryNotificationTelegramBindingStore()
+    binding_service = NotificationTelegramBindingService(
+        store=binding_store,
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
+    )
+    code_view = binding_service.create_binding_code(owner_user_id=_user_id(), now=_now())
+    handler = TelegramCommandHandler(
+        repository=repository,
+        binding_service=binding_service,
+    )
+    command = _command(update_id=151, text=f"/start {code_view.code}")
+
+    with pytest.raises(RuntimeError, match="simulated transaction failure"):
+        handler.handle(command=command)
+
+    assert repository.telegram_updates == {}
+    assert repository.routes == {}
+    assert repository.deliveries == {}
+    recovered = handler.handle(command=command)
+    assert recovered.status == "handled"
+    assert recovered.telegram_update.owner_user_id == _user_id()
+    assert recovered.delivery is not None
+    assert len(repository.telegram_updates) == 1
+    assert len(repository.deliveries) == 1
+
+
+def test_start_after_unbound_command_uses_a_distinct_user_response_route() -> None:
+    repository = InMemoryNotificationRepository()
+    binding_store = InMemoryNotificationTelegramBindingStore()
+    binding_service = NotificationTelegramBindingService(
+        store=binding_store,
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
+    )
+    code_view = binding_service.create_binding_code(owner_user_id=_user_id(), now=_now())
+    handler = TelegramCommandHandler(
+        repository=repository,
+        binding_service=binding_service,
+    )
+
+    unbound = handler.handle(command=_command(update_id=171, text="/stats today"))
+    bound = handler.handle(
+        command=_command(update_id=172, text=f"/start {code_view.code}")
+    )
+
+    assert unbound.status == "failed"
+    assert bound.status == "handled"
+    assert unbound.delivery is not None
+    assert bound.delivery is not None
+    assert unbound.delivery.route_id != bound.delivery.route_id
 
 
 @pytest.mark.parametrize(
@@ -161,6 +225,8 @@ def test_expired_binding_code_fails_closed() -> None:
     repository = InMemoryNotificationRepository()
     binding_service = NotificationTelegramBindingService(
         store=InMemoryNotificationTelegramBindingStore(),
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
         ttl_seconds=1,
     )
     code_view = binding_service.create_binding_code(owner_user_id=_user_id(), now=_now())
@@ -196,12 +262,26 @@ class _ScopeAuthorizer(TelegramCommandScopeAuthorizer):
         return exchange_ref in self.allowed_exchange_refs
 
 
+class _FailOnceCommandResponseRepository(InMemoryNotificationRepository):
+    def __init__(self) -> None:
+        super().__init__()
+        self._fail_once = True
+
+    def record_telegram_command_response(self, **kwargs):  # type: ignore[no-untyped-def]
+        if self._fail_once:
+            self._fail_once = False
+            raise RuntimeError("simulated transaction failure")
+        return super().record_telegram_command_response(**kwargs)
+
+
 def _bound_repository_and_service() -> tuple[
     InMemoryNotificationRepository, NotificationTelegramBindingService
 ]:
     repository = InMemoryNotificationRepository()
     binding_service = NotificationTelegramBindingService(
-        store=InMemoryNotificationTelegramBindingStore()
+        store=InMemoryNotificationTelegramBindingStore(),
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
     )
     code_view = binding_service.create_binding_code(owner_user_id=_user_id(), now=_now())
     binding_service.confirm_binding_code(
@@ -216,8 +296,11 @@ def _command(
     *, update_id: int, text: str, received_at: datetime | None = None
 ) -> TelegramInboundCommand:
     return TelegramInboundCommand(
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
         telegram_update_id=update_id,
         chat_id_ref="telegram_ref:test:1234",
+        chat_id=SecretValue.from_text("1234"),
         command_text=text,
         received_at=received_at or _now(),
     )

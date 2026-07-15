@@ -9,7 +9,7 @@ from uuid import UUID
 from trading.contexts.strategy.domain.entities.live_strategy_profile import (
     LiveStrategyProfileMode,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 StrategySignalAction = Literal["none", "open", "close", "reduce", "reverse"]
 StrategySignalSide = Literal["buy", "sell"]
@@ -40,6 +40,7 @@ class StrategySignal:
     """
 
     signal_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     strategy_id: UUID
     strategy_run_id: UUID

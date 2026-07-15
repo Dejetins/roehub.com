@@ -19,7 +19,11 @@ from trading.contexts.rl_trading.domain import (
     Stage13DecisionContext,
     Stage13InferenceDecision,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(
+    UUID("00000000-0000-4000-8000-000000000010")
+)
 
 
 def test_monitor_only_rl_inference_records_no_intent_source_event_only() -> None:
@@ -34,8 +38,12 @@ def test_monitor_only_rl_inference_records_no_intent_source_event_only() -> None
     context = _context()
     decision = _decision()
 
-    event = producer.record_monitor_only_decision(context=context, decision=decision)
-    replayed = producer.record_monitor_only_decision(context=context, decision=decision)
+    event = producer.record_monitor_only_decision(
+        organization_id=_ORGANIZATION_ID, context=context, decision=decision
+    )
+    replayed = producer.record_monitor_only_decision(
+        organization_id=_ORGANIZATION_ID, context=context, decision=decision
+    )
 
     assert event.source_event_id == replayed.source_event_id
     assert event.owner_user_id == UserId.from_string(context.owner_user_id)
@@ -70,6 +78,7 @@ def test_paper_rl_inference_creates_no_dispatch_intent_and_accounting_idempotent
     decision = _decision(action_id=1, action_name="open_long")
 
     first = producer.record_paper_decision(
+        organization_id=_ORGANIZATION_ID,
         context=context,
         decision=decision,
         risk_context=_paper_risk_context(),
@@ -78,6 +87,7 @@ def test_paper_rl_inference_creates_no_dispatch_intent_and_accounting_idempotent
         reference_price=Decimal("10000"),
     )
     replay = producer.record_paper_decision(
+        organization_id=_ORGANIZATION_ID,
         context=context,
         decision=decision,
         risk_context=_paper_risk_context(),
@@ -133,6 +143,7 @@ def test_paper_rl_hold_stays_source_event_only() -> None:
     )
 
     result = producer.record_paper_decision(
+        organization_id=_ORGANIZATION_ID,
         context=_context(),
         decision=_decision(),
         risk_context=_paper_risk_context(),
@@ -164,6 +175,7 @@ def test_testnet_rl_inference_creates_accepted_intent_idempotently() -> None:
     decision = _decision(action_id=1, action_name="open_long")
 
     first = producer.record_testnet_decision(
+        organization_id=_ORGANIZATION_ID,
         context=context,
         decision=decision,
         risk_context=_testnet_risk_context(),
@@ -172,6 +184,7 @@ def test_testnet_rl_inference_creates_accepted_intent_idempotently() -> None:
         quantity=Decimal("0.001"),
     )
     replay = producer.record_testnet_decision(
+        organization_id=_ORGANIZATION_ID,
         context=context,
         decision=decision,
         risk_context=_testnet_risk_context(),
@@ -219,6 +232,7 @@ def test_testnet_rl_spot_short_stays_source_event_only() -> None:
     )
 
     result = producer.record_testnet_decision(
+        organization_id=_ORGANIZATION_ID,
         context=context,
         decision=_decision(action_id=2, action_name="open_short"),
         risk_context=_testnet_risk_context(),
@@ -259,6 +273,8 @@ def _decision(*, action_id: int = 0, action_name: str = "hold") -> Stage13Infere
 
 def _paper_risk_context() -> ExecutionRiskContext:
     return ExecutionRiskContext(
+        organization_ownership_verified=True,
+        account_ownership_verified=True,
         exchange_connection_active=True,
         secret_custody_ready=True,
         source_authorized=True,
@@ -280,6 +296,8 @@ def _paper_risk_context() -> ExecutionRiskContext:
 
 def _testnet_risk_context() -> ExecutionRiskContext:
     return ExecutionRiskContext(
+        organization_ownership_verified=True,
+        account_ownership_verified=True,
         exchange_connection_active=True,
         secret_custody_ready=True,
         source_authorized=True,

@@ -105,6 +105,7 @@ class BacktestJobWorkerUseCase:
             if cancel_event.is_set() or heartbeat.cancel_requested:
                 cancelled = self.job_repository.finish_with_top_variants(
                     job_id=job.job_id,
+                    organization_id=job.organization_id,
                     user_id=job.user_id,
                     now=datetime.now(UTC),
                     locked_by=owner,
@@ -136,6 +137,7 @@ class BacktestJobWorkerUseCase:
                 )
             finished = self.job_repository.finish_with_top_variants(
                 job_id=job.job_id,
+                organization_id=job.organization_id,
                 user_id=job.user_id,
                 now=datetime.now(UTC),
                 locked_by=owner,
@@ -150,6 +152,7 @@ class BacktestJobWorkerUseCase:
         except BacktestJobCancellationRequested:
             cancelled = self.job_repository.finish_with_top_variants(
                 job_id=job.job_id,
+                organization_id=job.organization_id,
                 user_id=job.user_id,
                 now=datetime.now(UTC),
                 locked_by=owner,
@@ -165,6 +168,7 @@ class BacktestJobWorkerUseCase:
         except Exception as error:  # noqa: BLE001
             failed = self.job_repository.finish_with_top_variants(
                 job_id=job.job_id,
+                organization_id=job.organization_id,
                 user_id=job.user_id,
                 now=datetime.now(UTC),
                 locked_by=owner,

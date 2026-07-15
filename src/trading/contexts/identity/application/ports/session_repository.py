@@ -160,6 +160,11 @@ class SessionRepository(Protocol):
         """
         ...
 
+    def revoke_user_sessions(self, *, user_id: UserId, revoked_at: datetime) -> int:
+        """Revoke every active session for recovery or account-wide invalidation."""
+
+        ...
+
 
 def _ensure_utc_datetime(*, name: str, value: datetime) -> None:
     """

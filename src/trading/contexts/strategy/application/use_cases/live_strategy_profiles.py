@@ -77,6 +77,7 @@ class LiveStrategyProfileService:
             current_user=current_user,
         )
         existing = self._profile_repository.get_for_strategy(
+            organization_id=current_user.organization_id,
             owner_user_id=current_user.user_id,
             strategy_id=strategy.strategy_id,
         )
@@ -84,6 +85,7 @@ class LiveStrategyProfileService:
             return existing
         now = ensure_utc_datetime(value=self._clock.now(), field_name="clock.now")
         profile = _default_profile(
+            organization_id=current_user.organization_id,
             owner_user_id=current_user.user_id,
             strategy_id=strategy.strategy_id,
             now=now,
@@ -96,6 +98,7 @@ class LiveStrategyProfileService:
         created = self._profile_repository.create(profile=profile)
         if created is None:
             loaded = self._profile_repository.get_for_strategy(
+                organization_id=current_user.organization_id,
                 owner_user_id=current_user.user_id,
                 strategy_id=strategy.strategy_id,
             )
@@ -131,6 +134,7 @@ class LiveStrategyProfileService:
         now = ensure_utc_datetime(value=self._clock.now(), field_name="clock.now")
         configured = LiveStrategyProfile(
             profile_id=existing.profile_id,
+            organization_id=existing.organization_id,
             owner_user_id=existing.owner_user_id,
             strategy_id=existing.strategy_id,
             mode=config.mode,
@@ -198,7 +202,10 @@ class LiveStrategyProfileService:
         if self._compatibility_readiness_checker is not None:
             readiness = self._compatibility_readiness_checker.check_strategy(
                 strategy_id=profile.strategy_id,
-                current_user=CurrentUser(user_id=profile.owner_user_id),
+                current_user=CurrentUser(
+                    user_id=profile.owner_user_id,
+                    organization_id=profile.organization_id,
+                ),
             )
             if readiness.launch_blocked:
                 return profile.with_readiness(
@@ -238,6 +245,7 @@ class LiveStrategyProfileService:
             )
         try:
             readiness = self._exchange_connection_checker.check_trading_ready(
+                organization_id=profile.organization_id,
                 owner_user_id=profile.owner_user_id,
                 exchange_connection_id=profile.exchange_connection_id,
                 context=context,
@@ -257,9 +265,12 @@ class LiveStrategyProfileService:
         )
 
 
-def _default_profile(*, owner_user_id, strategy_id: UUID, now) -> LiveStrategyProfile:
+def _default_profile(
+    *, organization_id, owner_user_id, strategy_id: UUID, now
+) -> LiveStrategyProfile:
     return LiveStrategyProfile(
         profile_id=uuid4(),
+        organization_id=organization_id,
         owner_user_id=owner_user_id,
         strategy_id=strategy_id,
         mode="monitor_only",

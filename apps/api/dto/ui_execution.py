@@ -47,32 +47,6 @@ class ExecutionOrderModelRequest(BaseModel):
     legs: list[dict[str, object]] | None = None
 
 
-class ExecutionRiskContextRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    exchange_connection_active: bool = False
-    secret_custody_ready: bool = False
-    source_authorized: bool = False
-    strategy_variant_compatible: bool = False
-    market_data_state: Literal["ready", "missing", "stale", "pending"] = "missing"
-    strategy_binding_active: bool = False
-    strategy_live_profile_ready: bool = False
-    strategy_run_active: bool = False
-    exchange_config_verified: bool = False
-    account_state_fresh: bool = False
-    position_ownership_active: bool = False
-    capital_reservation_active: bool = False
-    capital_reservation_sufficient: bool = False
-    paper_accounting_ready: bool = False
-    paper_no_exchange_submit: bool = False
-    manual_recent_auth: bool = False
-    ml_agent_policy_active: bool = False
-    kill_switch_open: bool = False
-    environment_policy_allows: bool = False
-    max_order_size_ok: bool = False
-    daily_limit_ok: bool = False
-
-
 class ExecutionIntentRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -82,7 +56,6 @@ class ExecutionIntentRequest(BaseModel):
     market_type: Literal["spot", "futures"]
     instrument_key: str = Field(min_length=1, max_length=128)
     order: ExecutionOrderModelRequest
-    risk_context: ExecutionRiskContextRequest | None = None
 
 
 class ExecutionIntentResponse(BaseModel):

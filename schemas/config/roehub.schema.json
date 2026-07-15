@@ -1,0 +1,528 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.roehub.io/config/installation.v1alpha1.schema.json",
+  "title": "Roehub installation configuration v1alpha1",
+  "type": "object",
+  "required": [
+    "schema",
+    "installation_id",
+    "domain",
+    "architecture",
+    "profiles",
+    "paths",
+    "ports",
+    "stores",
+    "artifacts",
+    "resources",
+    "tls",
+    "proxy",
+    "update_checks",
+    "oidc",
+    "openbao",
+    "notifications",
+    "trading"
+  ],
+  "properties": {
+    "schema": {
+      "const": "io.roehub.installation/v1alpha1"
+    },
+    "installation_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{2,62}$"
+    },
+    "domain": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 253,
+      "pattern": "^(localhost|(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\\.(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?))*)$"
+    },
+    "architecture": {
+      "enum": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "base",
+          "trading",
+          "ml"
+        ]
+      },
+      "contains": {
+        "const": "base"
+      }
+    },
+    "paths": {
+      "type": "object",
+      "required": [
+        "data",
+        "config",
+        "artifacts"
+      ],
+      "properties": {
+        "data": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "config": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "artifacts": {
+          "$ref": "#/$defs/absolute_path"
+        }
+      },
+      "additionalProperties": false
+    },
+    "ports": {
+      "type": "object",
+      "required": [
+        "http",
+        "https",
+        "api",
+        "metrics"
+      ],
+      "properties": {
+        "http": {
+          "$ref": "#/$defs/port"
+        },
+        "https": {
+          "$ref": "#/$defs/port"
+        },
+        "api": {
+          "$ref": "#/$defs/port"
+        },
+        "metrics": {
+          "$ref": "#/$defs/port"
+        }
+      },
+      "additionalProperties": false
+    },
+    "stores": {
+      "type": "object",
+      "required": [
+        "postgresql",
+        "clickhouse",
+        "redis"
+      ],
+      "properties": {
+        "postgresql": {
+          "$ref": "#/$defs/store"
+        },
+        "clickhouse": {
+          "$ref": "#/$defs/store"
+        },
+        "redis": {
+          "$ref": "#/$defs/store"
+        }
+      },
+      "additionalProperties": false
+    },
+    "artifacts": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "path"
+          ],
+          "properties": {
+            "mode": {
+              "const": "local_cas"
+            },
+            "path": {
+              "$ref": "#/$defs/absolute_path"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "endpoint",
+            "bucket",
+            "region",
+            "credentials_ref"
+          ],
+          "properties": {
+            "mode": {
+              "const": "s3"
+            },
+            "endpoint": {
+              "$ref": "#/$defs/http_url"
+            },
+            "bucket": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$"
+            },
+            "region": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,32}$"
+            },
+            "credentials_ref": {
+              "$ref": "#/$defs/secret_ref"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "resources": {
+      "type": "object",
+      "required": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "properties": {
+        "base": {
+          "$ref": "#/$defs/resource_limit"
+        },
+        "trading": {
+          "$ref": "#/$defs/resource_limit"
+        },
+        "ml": {
+          "$ref": "#/$defs/resource_limit"
+        }
+      },
+      "additionalProperties": false
+    },
+    "tls": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "mode"
+          ],
+          "properties": {
+            "mode": {
+              "enum": [
+                "disabled",
+                "automatic"
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "mode",
+            "certificate_ref",
+            "private_key_ref"
+          ],
+          "properties": {
+            "mode": {
+              "const": "provided"
+            },
+            "certificate_ref": {
+              "$ref": "#/$defs/secret_ref"
+            },
+            "private_key_ref": {
+              "$ref": "#/$defs/secret_ref"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "proxy": {
+      "type": "object",
+      "required": [
+        "mode",
+        "trusted_proxies"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "embedded",
+            "external"
+          ]
+        },
+        "trusted_proxies": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "update_checks": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "enabled"
+          ],
+          "properties": {
+            "enabled": {
+              "const": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "enabled",
+            "endpoint"
+          ],
+          "properties": {
+            "enabled": {
+              "const": true
+            },
+            "endpoint": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "oidc": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "enabled"
+          ],
+          "properties": {
+            "enabled": {
+              "const": false
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "enabled",
+            "provider_id",
+            "display_name",
+            "issuer",
+            "client_id",
+            "client_secret_ref",
+            "redirect_uri"
+          ],
+          "properties": {
+            "enabled": {
+              "const": true
+            },
+            "issuer": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://"
+            },
+            "provider_id": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9._-]{2,63}$"
+            },
+            "display_name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "client_id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255
+            },
+            "client_secret_ref": {
+              "$ref": "#/$defs/secret_ref"
+            },
+            "redirect_uri": {
+              "type": "string",
+              "format": "uri",
+              "pattern": "^https://"
+            },
+            "connect_timeout_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 3
+            },
+            "response_timeout_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10
+            },
+            "overall_timeout_seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 15
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "openbao": {
+      "type": "object",
+      "required": [
+        "mode",
+        "address",
+        "secret_root"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "embedded",
+            "external"
+          ]
+        },
+        "address": {
+          "$ref": "#/$defs/http_url"
+        },
+        "secret_root": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9/_-]{2,127}$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "notifications": {
+      "type": "object",
+      "required": [
+        "telegram"
+      ],
+      "properties": {
+        "telegram": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": [
+                "enabled"
+              ],
+              "properties": {
+                "enabled": {
+                  "const": false
+                }
+              },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": [
+                "enabled",
+                "bot_token_ref"
+              ],
+              "properties": {
+                "enabled": {
+                  "const": true
+                },
+                "bot_token_ref": {
+                  "$ref": "#/$defs/secret_ref"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "trading": {
+      "type": "object",
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "paper",
+            "testnet"
+          ]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "absolute_path": {
+      "type": "string",
+      "pattern": "^/(?:[^/\\u0000]+/?)*$",
+      "minLength": 2,
+      "maxLength": 512
+    },
+    "port": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    },
+    "secret_ref": {
+      "type": "string",
+      "pattern": "^openbao://[a-zA-Z0-9][a-zA-Z0-9._/-]{2,255}(?:\\?version=[1-9][0-9]*)?#[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$"
+    },
+    "http_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://[^@/\\s]+(?::[0-9]{1,5})?(?:/[^\\s]*)?$"
+    },
+    "store": {
+      "type": "object",
+      "required": [
+        "mode",
+        "host",
+        "port",
+        "database",
+        "credentials_ref"
+      ],
+      "properties": {
+        "mode": {
+          "enum": [
+            "embedded",
+            "external"
+          ]
+        },
+        "host": {
+          "type": "string",
+          "pattern": "^(?!(?:localhost|127\\.0\\.0\\.1)$)[a-zA-Z0-9][a-zA-Z0-9.-]{0,252}$"
+        },
+        "port": {
+          "$ref": "#/$defs/port"
+        },
+        "database": {
+          "type": "string",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,62}$"
+        },
+        "credentials_ref": {
+          "$ref": "#/$defs/secret_ref"
+        },
+        "tls": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "resource_limit": {
+      "type": "object",
+      "required": [
+        "cpus",
+        "memory_mb"
+      ],
+      "properties": {
+        "cpus": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 128
+        },
+        "memory_mb": {
+          "type": "integer",
+          "minimum": 256,
+          "maximum": 1048576
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

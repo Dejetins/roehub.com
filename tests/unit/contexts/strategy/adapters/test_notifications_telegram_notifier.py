@@ -8,7 +8,10 @@ from trading.contexts.notifications.domain import NotificationRoute
 from trading.contexts.strategy.adapters.outbound import NotificationsTelegramNotifier
 from trading.contexts.strategy.adapters.outbound.messaging.telegram import TelegramNotifierHooks
 from trading.contexts.strategy.application import StrategyTelegramNotificationV1
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-4000-8000-000000000900")
+_PROVIDER_INSTANCE_ID = UUID("00000000-0000-4000-8000-000000000901")
 
 
 def test_notifications_telegram_notifier_creates_event_and_pending_delivery() -> None:
@@ -66,6 +69,8 @@ def _route(*, owner_user_id: UserId, mode: str) -> NotificationRoute:
     now = _now()
     return NotificationRoute(
         route_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
         recipient_kind="user",
         owner_user_id=owner_user_id,
         channel_key="telegram",
@@ -85,6 +90,7 @@ def _notification(*, owner_user_id: UserId) -> StrategyTelegramNotificationV1:
     strategy_id = UUID("00000000-0000-0000-0000-00000000a910")
     run_id = UUID("00000000-0000-0000-0000-00000000b910")
     return StrategyTelegramNotificationV1(
+        organization_id=_ORGANIZATION_ID,
         user_id=owner_user_id,
         ts=_now(),
         strategy_id=strategy_id,

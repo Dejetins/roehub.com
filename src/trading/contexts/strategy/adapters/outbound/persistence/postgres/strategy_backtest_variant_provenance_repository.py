@@ -16,7 +16,7 @@ from trading.contexts.strategy.domain.entities import (
     StrategyBacktestVariantProvenance,
 )
 from trading.contexts.strategy.domain.errors import StrategyStorageError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresStrategyBacktestVariantProvenanceRepository(
@@ -46,6 +46,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
     def find_by_idempotency_key(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         idempotency_key_hash: str,
     ) -> StrategyBacktestVariantProvenance | None:
@@ -53,12 +54,14 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
         SELECT
             {_PROVENANCE_SELECT_COLUMNS}
         FROM {self._provenance_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND idempotency_key_hash = %(idempotency_key_hash)s
         """
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "idempotency_key_hash": idempotency_key_hash,
             },
@@ -68,6 +71,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
     def find_by_source_variant(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         source_job_id: UUID,
         source_variant_key: str,
@@ -78,7 +82,8 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
         SELECT
             {_PROVENANCE_SELECT_COLUMNS}
         FROM {self._provenance_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND source_job_id = %(source_job_id)s
           AND source_variant_key = %(source_variant_key)s
           AND strategy_spec_hash = %(strategy_spec_hash)s
@@ -87,6 +92,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "source_job_id": str(source_job_id),
                 "source_variant_key": source_variant_key,
@@ -108,6 +114,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
             INSERT INTO {self._strategies_table}
             (
                 strategy_id,
+                organization_id,
                 user_id,
                 name,
                 instrument_id,
@@ -123,6 +130,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
             VALUES
             (
                 %(strategy_id)s,
+                %(organization_id)s,
                 %(user_id)s,
                 %(name)s,
                 %(instrument_id)s::jsonb,
@@ -140,6 +148,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
         INSERT INTO {self._provenance_table}
         (
             strategy_id,
+            organization_id,
             user_id,
             source_job_id,
             source_variant_key,
@@ -155,6 +164,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
         )
         SELECT
             inserted_strategy.strategy_id,
+            %(organization_id)s,
             %(user_id)s,
             %(source_job_id)s,
             %(source_variant_key)s,
@@ -175,6 +185,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
             query=query,
             parameters={
                 "strategy_id": str(strategy.strategy_id),
+                "organization_id": str(strategy.organization_id),
                 "user_id": str(strategy.user_id),
                 "name": strategy.name,
                 "instrument_id": _json_dumps(payload=strategy.spec.instrument_id.as_dict()),
@@ -208,6 +219,7 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
 
 _PROVENANCE_SELECT_COLUMNS = """
             strategy_id,
+            organization_id,
             user_id,
             source_job_id,
             source_variant_key,
@@ -227,6 +239,7 @@ def _map_provenance_row(*, row: Mapping[str, Any]) -> StrategyBacktestVariantPro
     try:
         return StrategyBacktestVariantProvenance(
             strategy_id=UUID(str(row["strategy_id"])),
+            organization_id=OrganizationId.from_string(str(row["organization_id"])),
             user_id=UserId.from_string(str(row["user_id"])),
             source_job_id=UUID(str(row["source_job_id"])),
             source_variant_key=str(row["source_variant_key"]),

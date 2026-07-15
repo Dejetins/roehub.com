@@ -6,6 +6,14 @@ Paper/Testnet Trading v1` и не Stage `18` старого
 `live-execution-universal-order-gateway-v1`; оба принятых цикла используются
 как foundation.
 
+> Связь с greenfield-платформой: Stage `16` плана
+> `roehub-self-hosted-oss-platform-v1` реализует только persisted
+> owner/recent-auth policy, двойной submit guard, атомарный claim,
+> reconcile-before-retry, allowlist и неизменяемый аудит. Он не принимает ни
+> один этап этого отдельного плана, не включает нативный `mainnet` и не
+> разрешает реальные заявки. Любая будущая real-money canary по-прежнему
+> требует собственных prerequisites и явного пользовательского разрешения.
+
 Связанные execution artifacts:
 
 | Артефакт | Путь |

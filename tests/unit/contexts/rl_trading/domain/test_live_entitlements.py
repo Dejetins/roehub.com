@@ -9,7 +9,9 @@ from trading.contexts.rl_trading.domain.live_entitlements import (
     evaluate_rl_live_ticker_entitlement,
     resolve_rl_live_ticker_limit,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000001200"))
 
 
 def test_stage12_paid_level_mapping_is_explicit_and_fail_closed() -> None:
@@ -95,6 +97,7 @@ def _owner() -> UserId:
 
 def _ticker(*, owner: UserId, symbol: str) -> RlLiveTickerIdentity:
     return RlLiveTickerIdentity(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=owner,
         exchange_name="binance",
         market_type="futures",

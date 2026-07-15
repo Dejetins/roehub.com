@@ -6,6 +6,8 @@ import argparse
 
 import uvicorn
 
+from apps.common.uvicorn_logging import build_uvicorn_log_config
+
 
 def _build_parser() -> argparse.ArgumentParser:
     """
@@ -47,7 +49,13 @@ def main(argv: list[str] | None = None) -> int:
     # Developer mode example:
     # WEB_API_BASE_URL=http://127.0.0.1:8010 WEB_API_UPSTREAM_URL=http://127.0.0.1:8000 \
     #   uv run python -m apps.web.main.main --port 8010
-    uvicorn.run("apps.web.main.app:create_app", host=args.host, port=args.port, factory=True)
+    uvicorn.run(
+        "apps.web.main.app:create_app",
+        host=args.host,
+        port=args.port,
+        factory=True,
+        log_config=build_uvicorn_log_config(),
+    )
     return 0
 
 

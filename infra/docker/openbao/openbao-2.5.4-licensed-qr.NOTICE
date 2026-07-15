@@ -1,0 +1,47 @@
+Roehub OpenBao 2.5.4 licensed QR derivative
+================================================
+
+This image is a modified build of OpenBao 2.5.4.
+
+OpenBao source:
+- repository: https://github.com/openbao/openbao
+- tag: v2.5.4
+- revision: 4f6d47246a053375271a5fd8af85c3b75695aa46
+- archive: https://github.com/openbao/openbao/archive/refs/tags/v2.5.4.tar.gz
+- archive SHA-256: f4ed87e3b6ec213e3aada0b4eba3ce1a9525620b14a0dde5be4de0c778be0291
+- license: MPL-2.0
+
+Roehub modification:
+- patch: infra/docker/openbao/openbao-2.5.4-licensed-qr.patch
+- purpose: preserve JWT-authentication terminal QR output while removing
+  github.com/yeqown/reedsolomon@v1.0.0, whose source archive has no license.
+- reproducibility: rename the unchanged flash-messages service source from
+  .ts to .js so Ember has one deterministic extension for that module, and
+  assign fixed semantic IDs to the three generated ember-auto-import modules
+  instead of hashing Broccoli's per-build temporary directory path; generated
+  JavaScript and CSS assets are named from their content rather than Webpack's
+  transient chunk graph, and the service worker cache key uses the fixed
+  project version instead of the current time and a random value.
+
+Licensed replacement:
+- module: github.com/skip2/go-qrcode
+- version: v0.0.0-20200617195104-da1b6568686e
+- revision: da1b6568686e89143e94f980a98bc2dbd5537f13
+- source: https://github.com/skip2/go-qrcode/tree/da1b6568686e89143e94f980a98bc2dbd5537f13
+- license: MIT
+- license SHA-256: 4cdab772de606bdf53e174b2f5d6a2c398156380ca1f763122198cece531d02c
+
+The complete modified OpenBao source, this patch, and the replacement module
+source must accompany a distributable Roehub offline release. The image embeds
+the full MPL-2.0 and MIT license texts under /licenses.
+
+Runtime package layers:
+- source image: ghcr.io/openbao/openbao:2.5.4
+- source image index: sha256:436eaf9778cad75507ff70ea26ace30dcbe15606e619ac3823495663d7f7c115
+- linux/amd64 package layer: sha256:3e26a337cf92c8ca21797fbf622f27b9b492f2e74d9a5af980190330fa733b8f
+- linux/arm64 package layer: sha256:a537d976b5ef3dfae7ea89f86494c71a2ce077b6c22dbf077f6f2d4dc3586196
+
+Only the upstream Alpine package-install layers are reused. They contain
+libcap, su-exec, dumb-init and tzdata plus the matching APK database. They do
+not contain OpenBao binaries or Go modules. This keeps the runtime package set
+digest-pinned without consulting a mutable Alpine package index during build.

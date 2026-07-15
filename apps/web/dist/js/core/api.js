@@ -32,11 +32,12 @@ function normalizeErrorPayload(payload) {
   if (!payload || typeof payload !== "object") {
     return {};
   }
+  const source = payload.error && typeof payload.error === "object" ? payload.error : payload;
   return {
-    code: payload.code || payload.error_code || payload.error || "request_failed",
-    message: payload.message || payload.detail || "Request failed",
-    fieldErrors: payload.field_errors || payload.errors || null,
-    retryAfterSeconds: payload.retry_after_seconds ?? null,
+    code: source.code || source.error_code || (typeof source.error === "string" ? source.error : null) || "request_failed",
+    message: source.message || source.detail || "Request failed",
+    fieldErrors: source.field_errors || source.errors || null,
+    retryAfterSeconds: source.retry_after_seconds ?? null,
   };
 }
 
@@ -110,9 +111,13 @@ export async function apiFetch(path, options = {}) {
       409: "conflict",
       422: "validation_error",
     };
+    const errorCode =
+      normalized.code && normalized.code !== "request_failed"
+        ? normalized.code
+        : codeByStatus[response.status] || "request_failed";
     throw new RoehubApiError(normalized.message, {
       status: response.status,
-      code: codeByStatus[response.status] || normalized.code,
+      code: errorCode,
       payload,
       retryAfterSeconds,
       outcomeUnknown: isMutation(method) && response.status >= 500,

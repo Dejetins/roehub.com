@@ -1,0 +1,246 @@
+{
+  "air_gapped_install": {
+    "git_metadata_present": false,
+    "image_lock": "verified-content-addressed",
+    "imported_unique_images": 12,
+    "installer_entrypoint": "tools/release/install-offline.sh",
+    "installer_python": "/usr/bin/python3",
+    "profile": "base",
+    "runtime_smoke": "passed"
+  },
+  "bundle": {
+    "asset_count": 263,
+    "corresponding_sources": [
+      "grafana",
+      "loki",
+      "openbao"
+    ],
+    "image_count": 13,
+    "manifest_sha256": "569f24ee203bc7e27a7cdef6fa4cdc0fa58cbb072fb840d86687b4005c968add",
+    "path": "/Users/daniildegtyarev/.cache/roehub/stage22-offline-release/candidates/roehub-0.1.0",
+    "retained": true,
+    "signature_verified": true,
+    "tamper_rejected": true,
+    "total_size_bytes": 5196194970,
+    "tree_sha256": "a9ca3b3cbefc7ea6329b97f60e39f9d186256186569a7cf02f6dd4b24c4d3e0d",
+    "trusted_public_key_path": "/Users/daniildegtyarev/.cache/roehub/stage22-offline-release/trust/roehub-0.1.0.pub",
+    "wheel": "roehub-0.1.0-py3-none-any.whl"
+  },
+  "cleanup": {
+    "owned_image_tags_removed": 12,
+    "residual_owned_tags": []
+  },
+  "egress_observation": {
+    "boundary": "docker-internal-bridge",
+    "bridge_gateway": "172.18.0.1",
+    "bridge_gateway_control_traffic_excluded": true,
+    "capture_sha256": "2b1896a95374c3cbc606362d29b4b105f8d322f054906b1dd7d19ecff1231005",
+    "external_packet_count": 0,
+    "grafana_phone_home_disabled": true,
+    "loki_usage_reporting_disabled": true,
+    "memory_snapshot": [
+      "roehub-stage22-airgap-33771-alertmanager-1|50.11MiB / 192MiB",
+      "roehub-stage22-airgap-33771-api-1|299MiB / 768MiB",
+      "roehub-stage22-airgap-33771-blackbox-1|34.35MiB / 128MiB",
+      "roehub-stage22-airgap-33771-capture|3.66MiB / 7.75GiB",
+      "roehub-stage22-airgap-33771-grafana-1|266.8MiB / 512MiB",
+      "roehub-stage22-airgap-33771-loki-1|141.9MiB / 512MiB",
+      "roehub-stage22-airgap-33771-notification-dispatcher-1|42.1MiB / 384MiB",
+      "roehub-stage22-airgap-33771-notification-report-scheduler-1|29MiB / 256MiB",
+      "roehub-stage22-airgap-33771-openbao-1|26.82MiB / 512MiB",
+      "roehub-stage22-airgap-33771-operational-health-1|55.02MiB / 256MiB",
+      "roehub-stage22-airgap-33771-plugin-gateway-1|64.64MiB / 384MiB",
+      "roehub-stage22-airgap-33771-postgresql-1|36.57MiB / 1GiB",
+      "roehub-stage22-airgap-33771-prometheus-1|33.68MiB / 512MiB",
+      "roehub-stage22-airgap-33771-redis-1|7.344MiB / 512MiB",
+      "roehub-stage22-airgap-33771-telegram-bot-worker-1|41.03MiB / 256MiB",
+      "roehub-stage22-airgap-33771-web-1|80.13MiB / 384MiB"
+    ],
+    "network_internal": true,
+    "permanent_services_observed": [
+      "alertmanager",
+      "api",
+      "blackbox",
+      "grafana",
+      "loki",
+      "notification-dispatcher",
+      "notification-report-scheduler",
+      "openbao",
+      "operational-health",
+      "plugin-gateway",
+      "postgresql",
+      "prometheus",
+      "redis",
+      "telegram-bot-worker",
+      "web"
+    ],
+    "service_count": 15,
+    "status": "passed"
+  },
+  "images": {
+    "alertmanager": {
+      "child_digests": {
+        "linux/amd64": "sha256:220da6995a919b9ee6e0d3da7ca5f09802f3088007af56be22160314d2485b54",
+        "linux/arm64": "sha256:bcbcab31af98f731c04917bbdb984bb09815d4724080130a3348f7741044c6d1"
+      },
+      "index_digest": "sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba",
+      "sbom": "verified"
+    },
+    "blackbox": {
+      "child_digests": {
+        "linux/amd64": "sha256:63ec596b02095ac6b09eb990d390a7a2eb21cc505f5a8f11dfc1eb796bb0aa23",
+        "linux/arm64": "sha256:88f7d7397ad4cf415b575df60c937fef09e0534cb8a3e060bedff6e61da9e613"
+      },
+      "index_digest": "sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d",
+      "sbom": "verified"
+    },
+    "clickhouse": {
+      "child_digests": {
+        "linux/amd64": "sha256:d7f76cd5ed162bf496af581a4d50498fef7d91dcedb1f55e4eab58cc9f22281b",
+        "linux/arm64": "sha256:ae7eea6602398611a8d34ed6cbee659cf355de907304a44e105cf8a97cfadd5a"
+      },
+      "index_digest": "sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b",
+      "sbom": "verified"
+    },
+    "config_consumer": {
+      "child_digests": {
+        "linux/amd64": "sha256:7c8cb692ae09657cbc4a3f3cbd0e8d5a2690ba38386aaaf252dbb060bf5eb2e6",
+        "linux/arm64": "sha256:2c9d26f410d032d5b1525aa8a873e238b05b90c4ae8618743d4311f0cc827e37"
+      },
+      "index_digest": "sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
+      "sbom": "verified"
+    },
+    "grafana": {
+      "child_digests": {
+        "linux/amd64": "sha256:fe89b739a264c78f2111d68221a1d51db67135ec50885dc93b59a981a7a5d4d5",
+        "linux/arm64": "sha256:df406be53f5a0f5592faca47629867dd83388611d72f424edcf6a5ab3f8f35b9"
+      },
+      "index_digest": "sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa",
+      "sbom": "verified"
+    },
+    "loki": {
+      "child_digests": {
+        "linux/amd64": "sha256:3a4e80320df38087263e9d450fd812010ee57e1e0b0679465672c0e227441f43",
+        "linux/arm64": "sha256:5deb619f02250103f8a3bf6cc8af10147a86a9979cb63a1acfff2afa2cd378f6"
+      },
+      "index_digest": "sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745",
+      "sbom": "verified"
+    },
+    "ml_runtime": {
+      "child_digests": {
+        "linux/amd64": "sha256:4c855946c755522e8a56fb1b061bff4a7b241229469d6262ad7f83423e326b89",
+        "linux/arm64": "sha256:2d3562dfe509917320cf3f8747f830f077685ed322aaf9c82d8228f133f66398"
+      },
+      "index_digest": "sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8",
+      "sbom": "verified"
+    },
+    "openbao": {
+      "child_digests": {
+        "linux/amd64": "sha256:8e8c45209fb3ca28cbe400d7dcc61bf4bd116a618d3154c170bdc1cbe43b615a",
+        "linux/arm64": "sha256:a3b4cca70af3a058260121ee5c79a80e51eadd262d73f9fcc2b70c6ee43b4b0e"
+      },
+      "index_digest": "sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a",
+      "sbom": "verified"
+    },
+    "postgresql": {
+      "child_digests": {
+        "linux/amd64": "sha256:67d92986b34dce02e7a8fc0c3cbed2f905356d74c8e52b96b898e48b18e20018",
+        "linux/arm64": "sha256:4d8b6faf28fe73125ec3853583f4fbbb57de2bb5d92fb663d0c6aa963c287b14"
+      },
+      "index_digest": "sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c",
+      "sbom": "verified"
+    },
+    "prometheus": {
+      "child_digests": {
+        "linux/amd64": "sha256:8672a850efe2f9874702406c8318704edb363587f8c2ca88586b4c8fdb5cea24",
+        "linux/arm64": "sha256:dfc3cce6bfa8485ccad377c66f4ef9833524fde710756faa725251b639d19d86"
+      },
+      "index_digest": "sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
+      "sbom": "verified"
+    },
+    "redis": {
+      "child_digests": {
+        "linux/amd64": "sha256:00e5bb02d896ef59532cb16443973698512f4239229f72a2033e83c079f95853",
+        "linux/arm64": "sha256:5257a590f94e173a946b5c43ed92c59961b75a28684b8fb9f59ff2752e5437f5"
+      },
+      "index_digest": "sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42",
+      "sbom": "verified"
+    },
+    "runtime": {
+      "child_digests": {
+        "linux/amd64": "sha256:2236951835b95fc5ae84ae0e182cdab26335968ce4d14d133f6bb104df714a2e",
+        "linux/arm64": "sha256:3bf72b770b88a28b86ed07fa2d1522860d0ba27727ca1f9bdc193ac9fb474eb8"
+      },
+      "index_digest": "sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
+      "sbom": "verified"
+    },
+    "secret_init": {
+      "child_digests": {
+        "linux/amd64": "sha256:7c8cb692ae09657cbc4a3f3cbd0e8d5a2690ba38386aaaf252dbb060bf5eb2e6",
+        "linux/arm64": "sha256:2c9d26f410d032d5b1525aa8a873e238b05b90c4ae8618743d4311f0cc827e37"
+      },
+      "index_digest": "sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
+      "sbom": "verified"
+    }
+  },
+  "license_audit": {
+    "classification_counts": {
+      "embedded-non-component": 112,
+      "first-party-image": 4,
+      "policy-license-file": 102,
+      "scanner-concluded": 32
+    },
+    "images": {
+      "ml_runtime": {
+        "platforms": {
+          "linux/amd64": {
+            "evidence_count": 28,
+            "evidence_set_sha256": "d6a0aa167057e87d8aa816a401961cf62611f23dc1c97b744155d79671bb22e3",
+            "status": "passed"
+          },
+          "linux/arm64": {
+            "evidence_count": 29,
+            "evidence_set_sha256": "f586b22d33182709813f9695809d7779f8db3d7d9cfa317c3b023b1055f137df",
+            "status": "passed"
+          }
+        },
+        "status": "passed"
+      },
+      "runtime": {
+        "platforms": {
+          "linux/amd64": {
+            "evidence_count": 27,
+            "evidence_set_sha256": "75e7f73bc60e29de5daf171196fbac8883599cb41d2cb0563f66834c8c4acde9",
+            "status": "passed"
+          },
+          "linux/arm64": {
+            "evidence_count": 28,
+            "evidence_set_sha256": "6d95e94fa7e93e804e7ee1aecf9d7c980d763b7a7fc119e0d8cf95055fe1f367",
+            "status": "passed"
+          }
+        },
+        "status": "passed"
+      }
+    },
+    "raw_noassertion_count": 250,
+    "status": "passed",
+    "unresolved_count": 0
+  },
+  "packet_observer": {
+    "image_id": "sha256:6d57abcdb68d18db181b72e0afa2cbdcf46cc1c0cee11276b496bf6f7e1aada2",
+    "prepared_before_air_gapped_activation": true,
+    "runtime_dependency": false
+  },
+  "reproducibility": {
+    "ml_archive_byte_identical": true,
+    "offline_bundle_byte_identical": true,
+    "offline_bundle_file_count": 265,
+    "openbao_archive_byte_identical": true,
+    "runtime_archive_byte_identical": true,
+    "wheel_byte_identical": true,
+    "wheel_first_sha256": "36d262f8c35913263bbcd7b2afa52365b7afce10815da8c9f4b744ecd7fb9ffd",
+    "wheel_repeat_sha256": "36d262f8c35913263bbcd7b2afa52365b7afce10815da8c9f4b744ecd7fb9ffd"
+  },
+  "schema": "io.roehub.stage22-runtime-proof/v1alpha1",
+  "status": "passed"
+}

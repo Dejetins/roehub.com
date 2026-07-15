@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.roehub.io/config/storage-status.v1alpha1.schema.json",
+  "title": "Roehub storage lifecycle status v1alpha1",
+  "type": "object",
+  "required": ["schema", "profile", "ready", "stores", "backup_prerequisites"],
+  "properties": {
+    "schema": {"const": "io.roehub.storage-status/v1alpha1"},
+    "profile": {"enum": ["base", "trading", "ml"]},
+    "ready": {"type": "boolean"},
+    "stores": {
+      "type": "object",
+      "required": ["postgresql", "redis"],
+      "properties": {
+        "postgresql": {"$ref": "#/$defs/store_status"},
+        "clickhouse": {"$ref": "#/$defs/store_status"},
+        "redis": {"$ref": "#/$defs/store_status"}
+      },
+      "additionalProperties": false
+    },
+    "backup_prerequisites": {
+      "type": "object",
+      "required": ["postgresql", "clickhouse", "redis"],
+      "properties": {
+        "postgresql": {"$ref": "#/$defs/string_list"},
+        "clickhouse": {"$ref": "#/$defs/string_list"},
+        "redis": {"$ref": "#/$defs/string_list"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "string_list": {
+      "type": "array",
+      "items": {"type": "string", "minLength": 1},
+      "uniqueItems": true
+    },
+    "store_status": {
+      "type": "object",
+      "required": ["mode", "engine", "version", "capabilities", "schema_versions", "ready"],
+      "properties": {
+        "mode": {"enum": ["embedded", "external"]},
+        "engine": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1},
+        "capabilities": {"$ref": "#/$defs/string_list"},
+        "schema_versions": {"$ref": "#/$defs/string_list"},
+        "ready": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

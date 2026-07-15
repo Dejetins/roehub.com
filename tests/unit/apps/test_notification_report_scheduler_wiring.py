@@ -16,7 +16,10 @@ from trading.contexts.notifications.application.stats_query import (
     NotificationStatsSourceRow,
 )
 from trading.contexts.notifications.domain import NotificationRoute
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+_PROVIDER_INSTANCE_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 
 def test_notification_report_scheduler_wiring_builds_scheduler() -> None:
@@ -26,6 +29,8 @@ def test_notification_report_scheduler_wiring_builds_scheduler() -> None:
     repository.upsert_route(
         route=NotificationRoute(
             route_id=uuid4(),
+            organization_id=_ORGANIZATION_ID,
+            provider_instance_id=_PROVIDER_INSTANCE_ID,
             recipient_kind="user",
             owner_user_id=owner_user_id,
             channel_key="telegram",

@@ -2,15 +2,34 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from apps.api.routes import build_indicators_router
+from trading.contexts.backtest.application.ports import ResearchOrganizationScope
+from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.indicators.application.dto.registry_view import MergedIndicatorView
 from trading.contexts.indicators.application.ports.registry import IndicatorRegistry
 from trading.contexts.indicators.domain.definitions import all_defs
 from trading.contexts.indicators.domain.entities import IndicatorDef, IndicatorId
 from trading.contexts.indicators.domain.errors import UnknownIndicatorError
+from trading.shared_kernel.primitives import OrganizationId, PaidLevel, UserId
+
+_USER_ID = UserId.from_string("00000000-0000-0000-0000-000000000501")
+
+
+def _current_user(_request: Request) -> CurrentUserPrincipal:
+    return CurrentUserPrincipal(user_id=_USER_ID, paid_level=PaidLevel("pro"))
+
+
+class _ScopeResolver:
+    def resolve(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        return ResearchOrganizationScope(
+            organization_id=OrganizationId.from_string(
+                "00000000-0000-0000-0000-000000000001"
+            ),
+            user_id=user_id,
+        )
 
 
 class _RegistryStub(IndicatorRegistry):
@@ -103,6 +122,8 @@ def _client(
     app.include_router(
         build_indicators_router(
             registry=registry,
+            current_user_dependency=_current_user,
+            organization_scope_resolver=_ScopeResolver(),
             max_variants_per_compute=max_variants_per_compute,
             max_compute_bytes_total=max_compute_bytes_total,
         )

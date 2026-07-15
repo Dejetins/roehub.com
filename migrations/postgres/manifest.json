@@ -1,0 +1,104 @@
+{
+  "schema": "io.roehub.postgres-migrations/v1alpha1",
+  "phases": [
+    {
+      "version": "identity-0001-0009",
+      "sha256": "b596bc191321d6cb644328b82521c68cad8d939ec8c9a3ae904f01e9082e9a0a",
+      "files": [
+        {"path": "0001_identity_v1.sql", "sha256": "cbed5f0e60961b7eefa725cb8d01afde1abf2984991bebc6d9fc540e7b9d8f4c"},
+        {"path": "0002_identity_2fa_totp_v1.sql", "sha256": "e4176ed13fda36b4fdc1f4d9f2baa38f90a3c541bab6a00d39464e2cff200bf2"},
+        {"path": "0003_identity_exchange_keys_v1.sql", "sha256": "ed428cf71c33310665b768ecba21c222b46ab12e1a3b5486533b3b96f4a1beee"},
+        {"path": "0004_identity_exchange_keys_v2.sql", "sha256": "74bf7e2fc3795b9bc390257bbf2ecb6723eb162d5ab42334ba9543ff46f00e80"},
+        {"path": "0005_identity_keycloak_cutover_v1.sql", "sha256": "9cbd50ea64173197c3c88388810584275cf356c00b2bcac6acc7466e79e6e099"},
+        {"path": "0006_identity_account_settings_v1.sql", "sha256": "0d4972a40c2935935b4f1040828f58b56f5a0b5351b48c1cc9e68ba81afbd566"},
+        {"path": "0007_identity_exchange_audit_events_v1.sql", "sha256": "e72a255df0ae771a7aac7bb856a38e416157001ce6a46dd1e5a68d3c08d4d14d"},
+        {"path": "0008_exchange_connections_v1.sql", "sha256": "b19972076a4d8bbc9e0b349fad8e96fae04a84ca63af7019542112b54a721073"},
+        {"path": "0009_identity_exchange_reclassification_audit_v1.sql", "sha256": "95f1a8c96c5c178a50b760148efb29002e091f9f673f79c373c1e867991bb246"}
+      ]
+    },
+    {
+      "version": "strategy-0010",
+      "sha256": "38bf00ca2fdc11e2a59078644ca3af33ed24adf66e42195f468ecd21e549118b",
+      "files": [
+        {"path": "0010_strategy_exchange_bindings_v1.sql", "sha256": "70e1c6045c1dcdcf0a43db854d503fe60d31a47b0f441cb3f75d098c258e1438"}
+      ]
+    },
+    {
+      "version": "organization-0011",
+      "sha256": "8a585eeee6d45217b6152a41c2b67330b487d051df3e547447dcaaf99e6afb57",
+      "files": [
+        {"path": "0011_identity_organizations_rbac_audit_v1.sql", "sha256": "ec1111df0509a261caa70158b29c9ab6fe43aeb9eb0a93133a597cbba6388567"}
+      ]
+    },
+    {
+      "version": "local-auth-0012",
+      "sha256": "1a9acaa599877513996a67c0bc2d47990f5b737326dd76ea351fe52b59c7ae66",
+      "files": [
+        {"path": "0012_identity_local_auth_v1.sql", "sha256": "a8d9c5bf9b6becb92ada7f8ee16fe206d90ca3e15bb2de28bfa232610fb9cd18"}
+      ]
+    },
+    {
+      "version": "oidc-provider-0013",
+      "sha256": "65a95708d424346a486add22367fc7dd113ee499e9faa5e03f533cd2b1e05d4f",
+      "files": [
+        {"path": "0013_identity_oidc_provider_v1.sql", "sha256": "3a1c1d713fdf920eebd420ef66294635eb47cec0892103c2277dc18fc4892628"}
+      ]
+    },
+    {
+      "version": "research-tenancy-0014",
+      "sha256": "3399f61622127baeab1b1cca35def85c890b88f3bb4908f553bd86744bd3bca6",
+      "files": [
+        {"path": "0014_research_organization_isolation_v1.sql", "sha256": "90ce17fdf55b481e705a6622f962366198db8602c57344a8286f4ab364bafc7a"}
+      ]
+    },
+    {
+      "version": "trading-tenancy-0015",
+      "sha256": "f5af81ccb02877ea51da45dc189518c2bc118d817174570eb84db606db93277d",
+      "files": [
+        {"path": "0015_trading_organization_isolation_v1.sql", "sha256": "e04daad19bbb500e7cdb17ef59570b6ee05896f98f8020e25c841a91f6ab7053"}
+      ]
+    },
+    {
+      "version": "notification-providers-0016",
+      "sha256": "d4080671d481e25b7a1c6266249c2fddb4cc59255d361ce35a8a9b7ba6173d1a",
+      "files": [
+        {"path": "0016_notification_provider_instances_v1.sql", "sha256": "9908a7ac66aa175f4448ecb17fcd9c8911637ed8ed8b0f4f5bb74983d3f4e70c"}
+      ]
+    },
+    {
+      "version": "extensions-plugin-platform-0017",
+      "sha256": "c6bf595aca5017e2b1a2c86f94ece6cc2c96c4041f53b5fecff34588ed787016",
+      "files": [
+        {"path": "0017_extensions_plugin_platform_v1alpha1.sql", "sha256": "b1865fa9b49a1b4c3212796a2e615dcc33f5eaf41e380915066e4163dab7928c"}
+      ]
+    },
+    {
+      "version": "artifact-store-0018",
+      "sha256": "7f44c87e20b118103257d0caaa3573b4c43d6c4cfb3ae530dd853704f95d5376",
+      "files": [
+        {"path": "0018_artifact_store_v1.sql", "sha256": "428b0bfcbd111352c8a8653aff7c363e051c192a950dc1e33c4caebcdda49375"}
+      ]
+    },
+    {
+      "version": "isolated-job-runtime-0019",
+      "sha256": "70f1f0e94447e37cffcc5e7dcbbfc5497016cffcca6f257de33e67bcdfc5dd91",
+      "files": [
+        {"path": "0019_isolated_job_runtime_v1.sql", "sha256": "c33e9a6a9dda70f78f42122a5c4777cd1777b04536f3d942d11ef9e44a3c103c"}
+      ]
+    },
+    {
+      "version": "execution-gateway-safety-0020",
+      "sha256": "a12f1e41c3a8b63f8780140e4a6d8c6171843ad0680c1978177f2574a2387ef9",
+      "files": [
+        {"path": "0020_execution_gateway_mainnet_safety_v1.sql", "sha256": "4e5228f53e0e40f97adf78a957d3365c7f77eef35f1ae892545a269f5fe734be"}
+      ]
+    },
+    {
+      "version": "control-operation-audit-0021",
+      "sha256": "58027d40cef9d3167cab1fbfc3efb461d6327a0566eda91e913f9df2657843bd",
+      "files": [
+        {"path": "0021_control_operation_audit_v1.sql", "sha256": "71178ba2b6c8f5aeba1dc522111ccb016fa4d7b4d6e28c67453092398e7dd988"}
+      ]
+    }
+  ]
+}

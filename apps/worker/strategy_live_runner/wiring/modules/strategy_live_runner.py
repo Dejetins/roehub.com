@@ -82,8 +82,6 @@ from trading.contexts.strategy.adapters.outbound import (
     RedisStrategyRealtimeOutputPublisherHooks,
     SystemRunnerSleeper,
     SystemStrategyClock,
-    TelegramBotApiNotifier,
-    TelegramBotApiNotifierConfig,
     TelegramNotifierHooks,
     load_strategy_live_runner_runtime_config,
 )
@@ -660,6 +658,7 @@ class StrategyLiveRunnerApp:
     metrics: StrategyLiveRunnerMetrics
     metrics_port: int
     producer_config: StrategyProducerRuntimeConfig
+    metrics_bind_host: str = "127.0.0.1"
 
     def __post_init__(self) -> None:
         """
@@ -680,6 +679,8 @@ class StrategyLiveRunnerApp:
             raise ValueError("StrategyLiveRunnerApp.poll_interval_seconds must be > 0")
         if self.metrics_port <= 0:
             raise ValueError("StrategyLiveRunnerApp.metrics_port must be > 0")
+        if self.metrics_bind_host not in {"127.0.0.1", "0.0.0.0", "::"}:
+            raise ValueError("StrategyLiveRunnerApp.metrics_bind_host is invalid")
 
     async def run(self, stop_event: asyncio.Event) -> None:
         """
@@ -700,6 +701,7 @@ class StrategyLiveRunnerApp:
         http_server = StrategyLiveRunnerHttpServer(
             metrics_port=self.metrics_port,
             metrics=self.metrics,
+            bind_host=self.metrics_bind_host,
         )
         http_server.start()
         log.info("strategy live-runner health/metrics server started on port %s", self.metrics_port)
@@ -885,24 +887,6 @@ def build_strategy_live_runner_app(
                 chat_binding_resolver=chat_binding_resolver,
                 hooks=metrics.telegram_notifier_hooks(),
             )
-        elif telegram_config.mode == "telegram":
-            chat_binding_resolver = PostgresConfirmedTelegramChatBindingResolver(
-                gateway=postgres_gateway
-            )
-            bot_token = _require_non_empty_env_value(
-                environ=environ,
-                key=telegram_config.bot_token_env,
-                setting_name="strategy_live_runner.telegram.bot_token_env",
-            )
-            telegram_notifier = TelegramBotApiNotifier(
-                config=TelegramBotApiNotifierConfig(
-                    bot_token=bot_token,
-                    api_base_url=telegram_config.api_base_url,
-                    send_timeout_s=telegram_config.send_timeout_s,
-                ),
-                chat_binding_resolver=chat_binding_resolver,
-                hooks=metrics.telegram_notifier_hooks(),
-            )
 
     producer_config = runtime_config.producer
     execution_producer_delegate: StrategyExecutionProducer = NoOpStrategyExecutionProducer()
@@ -949,6 +933,10 @@ def build_strategy_live_runner_app(
         metrics=metrics,
         metrics_port=metrics_port,
         producer_config=producer_config,
+        metrics_bind_host=environ.get(
+            "ROEHUB_METRICS_BIND_HOST",
+            "127.0.0.1",
+        ).strip(),
     )
 
 
@@ -981,42 +969,6 @@ def _resolve_notification_postgres_dsn(*, environ: Mapping[str, str]) -> str:
         if value:
             return value
     raise ValueError("strategy notifications mode requires NOTIFICATIONS_PG_DSN or fallback DSN")
-
-
-def _require_non_empty_env_value(
-    *,
-    environ: Mapping[str, str],
-    key: str | None,
-    setting_name: str,
-) -> str:
-    """
-    Resolve required environment variable and fail fast when missing or blank.
-
-    Args:
-        environ: Runtime environment mapping.
-        key: Environment variable name.
-        setting_name: Config setting path used in deterministic error messages.
-    Returns:
-        str: Non-empty environment variable value.
-    Assumptions:
-        Function is used for required secrets like `TELEGRAM_BOT_TOKEN`.
-    Raises:
-        ValueError: If environment variable name or value is missing.
-    Side Effects:
-        None.
-    """
-    if key is None or not key.strip():
-        raise ValueError(f"{setting_name} must be non-empty")
-    raw_value = environ.get(key, "")
-    value = raw_value.strip()
-    if not value:
-        raise ValueError(
-            (
-                f"{setting_name} requires environment variable {key} "
-                "with non-empty value"
-            )
-        )
-    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -1071,9 +1023,16 @@ class GuardedStrategyExecutionProducer(StrategyExecutionProducer):
 
 
 class StrategyLiveRunnerHttpServer:
-    def __init__(self, *, metrics_port: int, metrics: StrategyLiveRunnerMetrics) -> None:
+    def __init__(
+        self,
+        *,
+        metrics_port: int,
+        metrics: StrategyLiveRunnerMetrics,
+        bind_host: str = "127.0.0.1",
+    ) -> None:
         self._metrics_port = metrics_port
         self._metrics = metrics
+        self._bind_host = bind_host
         self._server: ThreadingHTTPServer | None = None
         self._thread: threading.Thread | None = None
 
@@ -1106,7 +1065,10 @@ class StrategyLiveRunnerHttpServer:
             def log_message(self, format: str, *args: object) -> None:
                 log.debug("strategy producer http: " + format, *args)
 
-        self._server = ThreadingHTTPServer(("127.0.0.1", self._metrics_port), _Handler)
+        self._server = ThreadingHTTPServer(
+            (self._bind_host, self._metrics_port),
+            _Handler,
+        )
         self._thread = threading.Thread(
             target=self._server.serve_forever,
             name="strategy-producer-http",

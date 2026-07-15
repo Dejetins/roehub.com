@@ -4,7 +4,7 @@ from typing import Protocol
 from uuid import UUID
 
 from trading.contexts.strategy.domain.entities import StrategyEvent
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class StrategyEventRepository(Protocol):
@@ -37,7 +37,9 @@ class StrategyEventRepository(Protocol):
         """
         ...
 
-    def list_for_strategy(self, *, user_id: UserId, strategy_id: UUID) -> tuple[StrategyEvent, ...]:
+    def list_for_strategy(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> tuple[StrategyEvent, ...]:
         """
         Read strategy-level event stream in deterministic order.
 
@@ -55,7 +57,9 @@ class StrategyEventRepository(Protocol):
         """
         ...
 
-    def list_for_run(self, *, user_id: UserId, run_id: UUID) -> tuple[StrategyEvent, ...]:
+    def list_for_run(
+        self, *, organization_id: OrganizationId, user_id: UserId, run_id: UUID
+    ) -> tuple[StrategyEvent, ...]:
         """
         Read run-level event stream in deterministic order.
 

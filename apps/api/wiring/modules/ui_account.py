@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Mapping
+from typing import Callable, Mapping
 
 from fastapi import APIRouter
 
@@ -19,11 +19,12 @@ from trading.contexts.identity.application.use_cases.account_settings import (
 )
 from trading.contexts.notifications.adapters import (
     InMemoryNotificationRepository,
+    PostgresNotificationProviderRepository,
     PostgresNotificationRepository,
+    PostgresNotificationTelegramBindingStore,
     PsycopgNotificationPostgresGateway,
 )
 from trading.contexts.notifications.application import (
-    InMemoryNotificationTelegramBindingStore,
     NotificationTelegramBindingService,
 )
 from trading.contexts.notifications.application.ports import NotificationRepository
@@ -37,6 +38,9 @@ from trading.contexts.strategy.adapters.outbound import (
 from trading.contexts.strategy.application.use_cases import (
     StrategyExchangeBindingService,
 )
+from trading.shared_kernel.primitives import OrganizationId
+
+from .research_tenancy import build_required_organization_scope_resolver
 
 _IDENTITY_PG_DSN_KEY = "IDENTITY_PG_DSN"
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
@@ -58,8 +62,13 @@ def build_ui_account_router(
         clock=clock,
         exchange_control_client=build_exchange_control_client_from_environ(environ=environ),
         strategy_binding_service=build_strategy_exchange_binding_service(environ=environ),
-        telegram_binding_service=build_notification_telegram_binding_service(),
+        telegram_binding_service_resolver=(
+            build_notification_telegram_binding_service_resolver(environ=environ)
+        ),
         notification_repository=build_notification_repository(environ=environ),
+        organization_scope_resolver=build_required_organization_scope_resolver(
+            environ=environ
+        ),
     )
 
 
@@ -101,10 +110,33 @@ def build_strategy_exchange_binding_service(
     )
 
 
-def build_notification_telegram_binding_service() -> NotificationTelegramBindingService:
-    return NotificationTelegramBindingService(
-        store=InMemoryNotificationTelegramBindingStore()
-    )
+def build_notification_telegram_binding_service_resolver(
+    *, environ: Mapping[str, str]
+) -> Callable[[OrganizationId], NotificationTelegramBindingService] | None:
+    gateway = _build_notification_gateway(environ=environ)
+    if gateway is None:
+        return None
+    provider_repository = PostgresNotificationProviderRepository(gateway=gateway)
+    binding_store = PostgresNotificationTelegramBindingStore(gateway=gateway)
+
+    def resolve(organization_id: OrganizationId) -> NotificationTelegramBindingService:
+        candidates = tuple(
+            instance
+            for instance in provider_repository.list_instances_for_organization(
+                organization_id=organization_id
+            )
+            if instance.provider_key == "telegram_bot_api"
+        )
+        if len(candidates) != 1:
+            raise ValueError("telegram_provider_instance_count_must_equal_one")
+        instance = candidates[0]
+        return NotificationTelegramBindingService(
+            store=binding_store,
+            organization_id=organization_id,
+            provider_instance_id=instance.instance_id,
+        )
+
+    return resolve
 
 
 def build_notification_repository(

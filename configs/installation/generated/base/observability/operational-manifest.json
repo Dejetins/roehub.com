@@ -1,0 +1,96 @@
+{
+  "profile": "base",
+  "schema": "io.roehub.operational-manifest/v1alpha1",
+  "services": [
+    {
+      "action_ref": "restart_service",
+      "capability": "product.web_api",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "web.api-health-degraded",
+      "service_id": "api",
+      "target": "http://api:8000/health",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "notifications.delivery",
+      "kind": "http_reachability",
+      "required": false,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "notification-dispatcher",
+      "target": "http://notification-dispatcher:9210/metrics",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "notifications.delivery",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "notification-report-scheduler",
+      "target": "http://notification-report-scheduler:9211/health/ready",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "secrets.openbao",
+      "kind": "openbao",
+      "required": true,
+      "runbook_id": "auth.openbao-unavailable",
+      "service_id": "openbao",
+      "target": "http://openbao:8200/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "extensions.plugins",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "plugin-gateway",
+      "target": "http://plugin-gateway:9209/health/ready",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "storage.postgresql",
+      "kind": "tcp_reachability",
+      "required": false,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "postgresql",
+      "target": "postgresql:5432",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "transport.redis",
+      "kind": "tcp_reachability",
+      "required": false,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "redis",
+      "target": "redis:6379",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "notifications.delivery",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "telegram-bot-worker",
+      "target": "http://telegram-bot-worker:9212/health/ready",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "product.web_api",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "web.api-health-degraded",
+      "service_id": "web",
+      "target": "http://web:8010/health/ready",
+      "timeout_seconds": 1.0
+    }
+  ]
+}

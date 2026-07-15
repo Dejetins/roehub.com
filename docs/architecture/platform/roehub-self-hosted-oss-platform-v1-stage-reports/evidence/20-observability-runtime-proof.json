@@ -1,0 +1,211 @@
+{
+  "alert_receiver": "local-audit-only",
+  "api_alert_lifecycle": "fired-and-resolved",
+  "baseline_overall_state": "stopped",
+  "baseline_service_states": {
+    "api": "ready",
+    "clickhouse": "unknown",
+    "openbao": "degraded",
+    "plugin-gateway": "degraded",
+    "postgresql": "unknown",
+    "redis": "unknown",
+    "strategy-live-runner": "ready",
+    "web": "ready"
+  },
+  "cleanup": {
+    "down_exit_status": 0,
+    "project": "roehub-stage20-fix2",
+    "residual_resources": {
+      "containers": [],
+      "networks": [],
+      "volumes": []
+    },
+    "status": "completed"
+  },
+  "compose_project": "roehub-stage20-fix2",
+  "external_notifications": false,
+  "external_provider_writes": false,
+  "failure_injections": [
+    {
+      "bounded_log_transitions": 4,
+      "failure_detail": "probe.unreachable",
+      "failure_state": "stopped",
+      "monitoring_running": [
+        "alertmanager",
+        "blackbox",
+        "grafana",
+        "loki",
+        "operational-health",
+        "prometheus"
+      ],
+      "new_failure_transitions": true,
+      "recovery_detail": "probe.domain_ready",
+      "recovery_state": "ready",
+      "service": "web"
+    },
+    {
+      "bounded_log_transitions": 4,
+      "failure_detail": "probe.unreachable",
+      "failure_state": "stopped",
+      "monitoring_running": [
+        "alertmanager",
+        "blackbox",
+        "grafana",
+        "loki",
+        "operational-health",
+        "prometheus"
+      ],
+      "new_failure_transitions": true,
+      "recovery_detail": "probe.domain_ready",
+      "recovery_state": "ready",
+      "service": "api"
+    },
+    {
+      "bounded_log_transitions": 4,
+      "failure_detail": "probe.unreachable",
+      "failure_state": "stopped",
+      "monitoring_running": [
+        "alertmanager",
+        "blackbox",
+        "grafana",
+        "loki",
+        "operational-health",
+        "prometheus"
+      ],
+      "new_failure_transitions": true,
+      "recovery_detail": "probe.domain_ready",
+      "recovery_state": "ready",
+      "service": "strategy-live-runner"
+    },
+    {
+      "bounded_log_transitions": 3,
+      "failure_detail": "probe.unreachable",
+      "failure_state": "stopped",
+      "monitoring_running": [
+        "alertmanager",
+        "blackbox",
+        "grafana",
+        "loki",
+        "operational-health",
+        "prometheus"
+      ],
+      "new_failure_transitions": true,
+      "recovery_detail": "probe.reachable_no_readiness",
+      "recovery_state": "unknown",
+      "service": "postgresql"
+    },
+    {
+      "bounded_log_transitions": 3,
+      "failure_detail": "probe.unreachable",
+      "failure_state": "stopped",
+      "monitoring_running": [
+        "alertmanager",
+        "blackbox",
+        "grafana",
+        "loki",
+        "operational-health",
+        "prometheus"
+      ],
+      "new_failure_transitions": true,
+      "recovery_detail": "probe.reachable_no_readiness",
+      "recovery_state": "unknown",
+      "service": "clickhouse"
+    },
+    {
+      "bounded_log_transitions": 3,
+      "failure_detail": "probe.unreachable",
+      "failure_state": "stopped",
+      "monitoring_running": [
+        "alertmanager",
+        "blackbox",
+        "grafana",
+        "loki",
+        "operational-health",
+        "prometheus"
+      ],
+      "new_failure_transitions": true,
+      "recovery_detail": "probe.reachable_no_readiness",
+      "recovery_state": "unknown",
+      "service": "redis"
+    },
+    {
+      "bounded_log_transitions": 3,
+      "failure_detail": "probe.unreachable",
+      "failure_state": "stopped",
+      "monitoring_running": [
+        "alertmanager",
+        "blackbox",
+        "grafana",
+        "loki",
+        "operational-health",
+        "prometheus"
+      ],
+      "new_failure_transitions": true,
+      "recovery_detail": "probe.openbao_not_ready",
+      "recovery_state": "degraded",
+      "service": "openbao"
+    },
+    {
+      "bounded_log_transitions": 4,
+      "failure_detail": "probe.unreachable",
+      "failure_state": "stopped",
+      "monitoring_running": [
+        "alertmanager",
+        "blackbox",
+        "grafana",
+        "loki",
+        "operational-health",
+        "prometheus"
+      ],
+      "new_failure_transitions": true,
+      "recovery_detail": "probe.domain_degraded",
+      "recovery_state": "degraded",
+      "service": "plugin-gateway"
+    }
+  ],
+  "fresh_openbao_state": "degraded",
+  "grafana_anonymous_api": "denied",
+  "loki_transition_count_after_restart": 6,
+  "loki_transition_count_before_restart": 6,
+  "monitoring_readiness": {
+    "alertmanager": "ready",
+    "blackbox": "ready",
+    "grafana": "ready",
+    "loki": "ready",
+    "operational-health": "ready",
+    "prometheus": "ready"
+  },
+  "observability_volumes": {
+    "alertmanager": "persistent-volume-present",
+    "grafana": "persistent-volume-present",
+    "loki": "persistent-volume-present",
+    "prometheus": "persistent-volume-present"
+  },
+  "observed_operational_states": [
+    "degraded",
+    "ready",
+    "stopped",
+    "unknown"
+  ],
+  "plugin_http_200_degraded_state": "degraded",
+  "production_mutation": false,
+  "profile": "trading",
+  "prometheus_failure_series_persisted": true,
+  "real_order_effects": false,
+  "schema": "io.roehub.observability-runtime-proof/v1alpha1",
+  "stale_snapshot_fault_injection": {
+    "actions": "diagnostics-only",
+    "alert": "fired-and-resolved",
+    "overall_state": "unknown",
+    "readiness_reason": "snapshot_stale",
+    "readiness_status": 503
+  },
+  "status": "passed",
+  "timeout_unknown_injection": {
+    "failure_detail": "probe.timeout",
+    "failure_state": "unknown",
+    "recovery_detail": "probe.domain_ready",
+    "recovery_state": "ready",
+    "service": "api"
+  }
+}

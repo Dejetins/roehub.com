@@ -21,7 +21,7 @@ from trading.contexts.live_execution.domain import (
 from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway import (
     StrategyPostgresGateway,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepository):
@@ -37,7 +37,7 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
             query="""
             INSERT INTO exchange_account_snapshots
             (
-                account_snapshot_id, owner_user_id, exchange_connection_id,
+                account_snapshot_id, organization_id, owner_user_id, exchange_connection_id,
                 exchange_name, market_type, environment, account_mode,
                 source_hash, sync_status, sync_reason, observed_at, synced_at,
                 balance_count, position_count, open_order_count, filter_count,
@@ -45,7 +45,8 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
             )
             VALUES
             (
-                %(account_snapshot_id)s, %(owner_user_id)s, %(exchange_connection_id)s,
+                %(account_snapshot_id)s, %(organization_id)s, %(owner_user_id)s,
+                %(exchange_connection_id)s,
                 %(exchange_name)s, %(market_type)s, %(environment)s, %(account_mode)s,
                 %(source_hash)s, %(sync_status)s, %(sync_reason)s, %(observed_at)s,
                 %(synced_at)s, %(balance_count)s, %(position_count)s,
@@ -60,12 +61,13 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
                 query="""
                 INSERT INTO exchange_balance_snapshots
                 (
-                    balance_snapshot_id, account_snapshot_id, owner_user_id,
+                    balance_snapshot_id, account_snapshot_id, organization_id, owner_user_id,
                     exchange_connection_id, asset, free, locked, total, observed_at
                 )
                 VALUES
                 (
-                    gen_random_uuid(), %(account_snapshot_id)s, %(owner_user_id)s,
+                    gen_random_uuid(), %(account_snapshot_id)s, %(organization_id)s,
+                    %(owner_user_id)s,
                     %(exchange_connection_id)s, %(asset)s, %(free)s, %(locked)s,
                     %(total)s, %(observed_at)s
                 )
@@ -77,13 +79,14 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
                 query="""
                 INSERT INTO exchange_position_snapshots
                 (
-                    position_snapshot_id, account_snapshot_id, owner_user_id,
+                    position_snapshot_id, account_snapshot_id, organization_id, owner_user_id,
                     exchange_connection_id, instrument_key, side, quantity,
                     entry_price, leverage, margin_mode, position_mode, observed_at
                 )
                 VALUES
                 (
-                    gen_random_uuid(), %(account_snapshot_id)s, %(owner_user_id)s,
+                    gen_random_uuid(), %(account_snapshot_id)s, %(organization_id)s,
+                    %(owner_user_id)s,
                     %(exchange_connection_id)s, %(instrument_key)s, %(side)s,
                     %(quantity)s, %(entry_price)s, %(leverage)s, %(margin_mode)s,
                     %(position_mode)s, %(observed_at)s
@@ -99,13 +102,14 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
                 query="""
                 INSERT INTO exchange_open_order_snapshots
                 (
-                    open_order_snapshot_id, account_snapshot_id, owner_user_id,
+                    open_order_snapshot_id, account_snapshot_id, organization_id, owner_user_id,
                     exchange_connection_id, instrument_key, exchange_order_ref,
                     side, order_type, quantity, price, status, observed_at
                 )
                 VALUES
                 (
-                    gen_random_uuid(), %(account_snapshot_id)s, %(owner_user_id)s,
+                    gen_random_uuid(), %(account_snapshot_id)s, %(organization_id)s,
+                    %(owner_user_id)s,
                     %(exchange_connection_id)s, %(instrument_key)s,
                     %(exchange_order_ref)s, %(side)s, %(order_type)s, %(quantity)s,
                     %(price)s, %(status)s, %(observed_at)s
@@ -118,13 +122,14 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
                 query="""
                 INSERT INTO exchange_instrument_filter_snapshots
                 (
-                    filter_snapshot_id, account_snapshot_id, owner_user_id,
+                    filter_snapshot_id, account_snapshot_id, organization_id, owner_user_id,
                     exchange_connection_id, instrument_key, tick_size, step_size,
                     min_qty, min_notional, max_leverage, observed_at
                 )
                 VALUES
                 (
-                    gen_random_uuid(), %(account_snapshot_id)s, %(owner_user_id)s,
+                    gen_random_uuid(), %(account_snapshot_id)s, %(organization_id)s,
+                    %(owner_user_id)s,
                     %(exchange_connection_id)s, %(instrument_key)s, %(tick_size)s,
                     %(step_size)s, %(min_qty)s, %(min_notional)s, %(max_leverage)s,
                     %(observed_at)s
@@ -141,13 +146,13 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
             query="""
             INSERT INTO exchange_account_config_guard_results
             (
-                config_guard_result_id, account_snapshot_id, owner_user_id,
+                config_guard_result_id, account_snapshot_id, organization_id, owner_user_id,
                 exchange_connection_id, instrument_key, market_type, status,
                 reason_codes_json, requirement_json, checked_at
             )
             VALUES
             (
-                %(config_guard_result_id)s, %(account_snapshot_id)s,
+                %(config_guard_result_id)s, %(account_snapshot_id)s, %(organization_id)s,
                 %(owner_user_id)s, %(exchange_connection_id)s, %(instrument_key)s,
                 %(market_type)s, %(status)s, %(reason_codes_json)s::jsonb,
                 %(requirement_json)s::jsonb, %(checked_at)s
@@ -159,18 +164,24 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
         return result
 
     def get_latest_projection(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
     ) -> ExchangeAccountProjection | None:
         row = self._gateway.fetch_one(
             query="""
             SELECT *
             FROM exchange_account_snapshots
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND exchange_connection_id = %(exchange_connection_id)s
             ORDER BY observed_at DESC, synced_at DESC, account_snapshot_id DESC
             LIMIT 1
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "exchange_connection_id": str(exchange_connection_id),
             },
@@ -180,16 +191,29 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
         account_snapshot_id = UUID(str(row["account_snapshot_id"]))
         return ExchangeAccountProjection(
             account_snapshot_id=account_snapshot_id,
+            organization_id=OrganizationId.from_string(str(row["organization_id"])),
             owner_user_id=UserId.from_string(str(row["owner_user_id"])),
             exchange_connection_id=UUID(str(row["exchange_connection_id"])),
             exchange_name=str(row["exchange_name"]),
             market_type=str(row["market_type"]),
             environment=str(row["environment"]),
             account_mode=str(row["account_mode"]),
-            balances=self._load_balances(account_snapshot_id=account_snapshot_id),
-            positions=self._load_positions(account_snapshot_id=account_snapshot_id),
-            open_orders=self._load_open_orders(account_snapshot_id=account_snapshot_id),
-            instrument_filters=self._load_filters(account_snapshot_id=account_snapshot_id),
+            balances=self._load_balances(
+                organization_id=organization_id,
+                account_snapshot_id=account_snapshot_id,
+            ),
+            positions=self._load_positions(
+                organization_id=organization_id,
+                account_snapshot_id=account_snapshot_id,
+            ),
+            open_orders=self._load_open_orders(
+                organization_id=organization_id,
+                account_snapshot_id=account_snapshot_id,
+            ),
+            instrument_filters=self._load_filters(
+                organization_id=organization_id,
+                account_snapshot_id=account_snapshot_id,
+            ),
             source_hash=str(row["source_hash"]),
             observed_at=_utc(row["observed_at"]),
             synced_at=_utc(row["synced_at"]),
@@ -201,6 +225,7 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
     def get_latest_config_guard_result(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         instrument_key: str,
@@ -210,7 +235,8 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
             query="""
             SELECT *
             FROM exchange_account_config_guard_results
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND exchange_connection_id = %(exchange_connection_id)s
               AND instrument_key = %(instrument_key)s
               AND market_type = %(market_type)s
@@ -218,6 +244,7 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
             LIMIT 1
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "exchange_connection_id": str(exchange_connection_id),
                 "instrument_key": instrument_key,
@@ -234,6 +261,7 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
                 if row.get("account_snapshot_id") is not None
                 else None
             ),
+            organization_id=OrganizationId.from_string(str(row["organization_id"])),
             owner_user_id=UserId.from_string(str(row["owner_user_id"])),
             exchange_connection_id=UUID(str(row["exchange_connection_id"])),
             instrument_key=str(row["instrument_key"]),
@@ -245,16 +273,20 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
         )
 
     def _load_balances(
-        self, *, account_snapshot_id: UUID
+        self, *, organization_id: OrganizationId, account_snapshot_id: UUID
     ) -> tuple[ExchangeBalanceSnapshot, ...]:
         rows = self._gateway.fetch_all(
             query="""
             SELECT asset, free, locked, total
             FROM exchange_balance_snapshots
-            WHERE account_snapshot_id = %(account_snapshot_id)s
+            WHERE organization_id = %(organization_id)s
+              AND account_snapshot_id = %(account_snapshot_id)s
             ORDER BY asset
             """,
-            parameters={"account_snapshot_id": str(account_snapshot_id)},
+            parameters={
+                "organization_id": str(organization_id),
+                "account_snapshot_id": str(account_snapshot_id),
+            },
         )
         return tuple(
             ExchangeBalanceSnapshot(
@@ -267,17 +299,21 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
         )
 
     def _load_positions(
-        self, *, account_snapshot_id: UUID
+        self, *, organization_id: OrganizationId, account_snapshot_id: UUID
     ) -> tuple[ExchangePositionSnapshot, ...]:
         rows = self._gateway.fetch_all(
             query="""
             SELECT instrument_key, side, quantity, entry_price, leverage,
                    margin_mode, position_mode
             FROM exchange_position_snapshots
-            WHERE account_snapshot_id = %(account_snapshot_id)s
+            WHERE organization_id = %(organization_id)s
+              AND account_snapshot_id = %(account_snapshot_id)s
             ORDER BY instrument_key, side
             """,
-            parameters={"account_snapshot_id": str(account_snapshot_id)},
+            parameters={
+                "organization_id": str(organization_id),
+                "account_snapshot_id": str(account_snapshot_id),
+            },
         )
         return tuple(
             ExchangePositionSnapshot(
@@ -293,16 +329,20 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
         )
 
     def _load_open_orders(
-        self, *, account_snapshot_id: UUID
+        self, *, organization_id: OrganizationId, account_snapshot_id: UUID
     ) -> tuple[ExchangeOpenOrderSnapshot, ...]:
         rows = self._gateway.fetch_all(
             query="""
             SELECT instrument_key, exchange_order_ref, side, order_type, quantity, price, status
             FROM exchange_open_order_snapshots
-            WHERE account_snapshot_id = %(account_snapshot_id)s
+            WHERE organization_id = %(organization_id)s
+              AND account_snapshot_id = %(account_snapshot_id)s
             ORDER BY instrument_key, exchange_order_ref
             """,
-            parameters={"account_snapshot_id": str(account_snapshot_id)},
+            parameters={
+                "organization_id": str(organization_id),
+                "account_snapshot_id": str(account_snapshot_id),
+            },
         )
         return tuple(
             ExchangeOpenOrderSnapshot(
@@ -318,16 +358,20 @@ class PostgresExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
         )
 
     def _load_filters(
-        self, *, account_snapshot_id: UUID
+        self, *, organization_id: OrganizationId, account_snapshot_id: UUID
     ) -> tuple[ExchangeInstrumentFilterSnapshot, ...]:
         rows = self._gateway.fetch_all(
             query="""
             SELECT instrument_key, tick_size, step_size, min_qty, min_notional, max_leverage
             FROM exchange_instrument_filter_snapshots
-            WHERE account_snapshot_id = %(account_snapshot_id)s
+            WHERE organization_id = %(organization_id)s
+              AND account_snapshot_id = %(account_snapshot_id)s
             ORDER BY instrument_key
             """,
-            parameters={"account_snapshot_id": str(account_snapshot_id)},
+            parameters={
+                "organization_id": str(organization_id),
+                "account_snapshot_id": str(account_snapshot_id),
+            },
         )
         return tuple(
             ExchangeInstrumentFilterSnapshot(
@@ -364,6 +408,7 @@ def _projection_params(*, projection: ExchangeAccountProjection) -> dict[str, An
 def _projection_keys(*, projection: ExchangeAccountProjection) -> dict[str, Any]:
     return {
         "account_snapshot_id": str(projection.account_snapshot_id),
+        "organization_id": str(projection.organization_id),
         "owner_user_id": str(projection.owner_user_id),
         "exchange_connection_id": str(projection.exchange_connection_id),
         "observed_at": _utc(projection.observed_at),
@@ -420,6 +465,7 @@ def _guard_params(*, result: AccountConfigGuardResult) -> dict[str, Any]:
         "account_snapshot_id": (
             str(result.account_snapshot_id) if result.account_snapshot_id else None
         ),
+        "organization_id": str(result.organization_id),
         "owner_user_id": str(result.owner_user_id),
         "exchange_connection_id": str(result.exchange_connection_id),
         "instrument_key": result.instrument_key,

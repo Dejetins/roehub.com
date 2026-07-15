@@ -116,6 +116,7 @@ class CloneStrategyUseCase:
             )
             created_at = ensure_utc_datetime(value=self._clock.now(), field_name="clock.now")
             cloned_strategy = Strategy.create(
+                organization_id=current_user.organization_id,
                 user_id=current_user.user_id,
                 spec=cloned_spec,
                 created_at=created_at,
@@ -166,11 +167,15 @@ class CloneStrategyUseCase:
         """
         if source_strategy_id is not None:
             source_strategy = self._repository.find_any_by_strategy_id(
+                organization_id=current_user.organization_id,
                 strategy_id=source_strategy_id,
             )
             if source_strategy is None or source_strategy.is_deleted:
                 raise strategy_not_found(strategy_id=source_strategy_id)
-            if source_strategy.user_id != current_user.user_id:
+            if (
+                source_strategy.organization_id != current_user.organization_id
+                or source_strategy.user_id != current_user.user_id
+            ):
                 raise strategy_forbidden(strategy_id=source_strategy_id)
             return source_strategy.spec
 

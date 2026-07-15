@@ -357,8 +357,7 @@ def validate_signal_input_source_v2(value: str) -> SignalSourceLiteralV2:
     normalized = value.strip().lower()
     if normalized not in SUPPORTED_SIGNAL_INPUT_SOURCES_V2:
         raise ValueError(
-            "inputs.source must be one of "
-            f"{SUPPORTED_SIGNAL_INPUT_SOURCES_V2}, got {value!r}"
+            "inputs.source must be one of " f"{SUPPORTED_SIGNAL_INPUT_SOURCES_V2}, got {value!r}"
         )
     return cast(SignalSourceLiteralV2, normalized)
 
@@ -3598,9 +3597,7 @@ class ArtifactPrecomputeProgressEventV2:
                     "ArtifactPrecomputeProgressEventV2.elapsed_seconds must be numeric when set"
                 )
             if float(self.elapsed_seconds) < 0.0:
-                raise ValueError(
-                    "ArtifactPrecomputeProgressEventV2.elapsed_seconds must be >= 0"
-                )
+                raise ValueError("ArtifactPrecomputeProgressEventV2.elapsed_seconds must be >= 0")
             object.__setattr__(self, "elapsed_seconds", float(self.elapsed_seconds))
         object.__setattr__(self, "details", freeze_artifact_payload_mapping_v2(self.details))
 
@@ -3808,9 +3805,7 @@ class ArtifactCanonicalPriceExportResultV2:
     stage_rebuild_stats: ArtifactStageRebuildStatsCollectionV2 = field(
         default_factory=ArtifactStageRebuildStatsCollectionV2
     )
-    tail_rebuild_bars: ArtifactTailRebuildBarsV2 = field(
-        default_factory=ArtifactTailRebuildBarsV2
-    )
+    tail_rebuild_bars: ArtifactTailRebuildBarsV2 = field(default_factory=ArtifactTailRebuildBarsV2)
 
     def __post_init__(self) -> None:
         """
@@ -4331,9 +4326,7 @@ class StageACompactTradeV2:
             self.sig_exit_signal_idx is not None
             and self.sig_exit_signal_idx < self.entry_signal_idx
         ):
-            raise ValueError(
-                "StageACompactTradeV2.sig_exit_signal_idx must be >= entry_signal_idx"
-            )
+            raise ValueError("StageACompactTradeV2.sig_exit_signal_idx must be >= entry_signal_idx")
         if self.sig_exit_exec_idx < self.entry_exec_idx:
             raise ValueError("StageACompactTradeV2.sig_exit_exec_idx must be >= entry_exec_idx")
 
@@ -6139,11 +6132,7 @@ def _validate_exact_mapping_keys_with_optional_v2(
         details.append(f"unexpected keys {extra_keys}")
     raise ValueError(
         f"{path} must contain required keys {required_keys}"
-        + (
-            f" and may contain optional keys {optional_keys}"
-            if len(optional_keys) > 0
-            else ""
-        )
+        + (f" and may contain optional keys {optional_keys}" if len(optional_keys) > 0 else "")
         + (f"; {'; '.join(details)}" if len(details) > 0 else "")
     )
 

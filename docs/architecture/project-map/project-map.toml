@@ -66,6 +66,7 @@ live_execution = "Живое исполнение, ордера и reconciliatio
 market_data = "Получение, нормализация и хранение рыночных данных."
 ml = "ML-модели и исследовательские контракты."
 notifications = "События, уведомления и каналы доставки."
+operations = "Типизированные host-операции, идемпотентность и аварийный журнал."
 optimize = "Поиск и оценка параметров стратегий."
 risk = "Риск-политики и ограничения исполнения."
 rl_trading = "Обучение, inference и эксплуатация RL-агентов."
@@ -74,11 +75,13 @@ strategy = "Модель стратегии, версии и жизненный 
 [descriptions.apps]
 api = "FastAPI API и UI-oriented DTO/routes."
 cli = "Командная строка для операторских и data workflows."
+control_agent = "Единственная host-side граница управления Docker Engine."
 exchange_control = "Сервис контроля биржевых соединений."
 exchange_execution = "Изолированный gateway исполнения на бирже."
 migrations = "Bootstrap и применение миграций."
 monitoring = "Экспорт технических метрик."
 scheduler = "Планировщики фоновых задач."
+roehubctl = "Host-side аварийная CLI для диагностики и восстановления."
 web = "Server-rendered web UI и same-origin API client."
 worker = "Фоновые consumers и runtime workers."
 
@@ -115,6 +118,24 @@ id = "api"
 title = "FastAPI API"
 kind = "service"
 paths = ["apps/api/"]
+
+[[runtime_nodes]]
+id = "roehubctl"
+title = "Host roehubctl"
+kind = "operator-tool"
+paths = ["apps/roehubctl/"]
+
+[[runtime_nodes]]
+id = "control-agent"
+title = "Host control-agent"
+kind = "service"
+paths = ["apps/control_agent/", "src/trading/contexts/operations/"]
+
+[[runtime_nodes]]
+id = "docker-engine"
+title = "Docker Engine / Compose"
+kind = "runtime"
+paths = ["infra/docker/", "configs/installation/generated/"]
 
 [[runtime_nodes]]
 id = "workers"
@@ -178,6 +199,18 @@ label = "same-origin API"
 source = "api"
 target = "postgres"
 label = "identity/config/jobs"
+[[flows]]
+source = "api"
+target = "control-agent"
+label = "typed operation + short-lived identity"
+[[flows]]
+source = "roehubctl"
+target = "control-agent"
+label = "Unix socket emergency operation"
+[[flows]]
+source = "control-agent"
+target = "docker-engine"
+label = "allowlisted Compose / OCI control"
 [[flows]]
 source = "api"
 target = "clickhouse"

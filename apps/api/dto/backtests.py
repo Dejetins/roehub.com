@@ -71,6 +71,7 @@ class BacktestJobResponse(BaseModel):
     """
 
     job_id: str
+    organization_id: str
     state: str
     request_hash: str
     result_config_hash: str

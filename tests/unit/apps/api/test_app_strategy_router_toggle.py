@@ -103,6 +103,8 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
     strategy_router = _build_ping_router(path="/strategies/ping")
     indicators_router = _build_ping_router(path="/indicators/ping")
     market_data_router = _build_ping_router(path="/market-data/markets")
+    extensions_router = _build_ping_router(path="/plugins/ping")
+    admin_router = _build_ping_router(path="/admin/ping")
     ui_dashboard_router = _build_ping_router(path="/ui/dashboard/summary")
 
     monkeypatch.setattr(app_module, "build_indicators_registry", lambda *, environ: object())
@@ -129,6 +131,8 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
         "build_indicators_router",
         lambda *,
         registry,
+        current_user_dependency,
+        organization_scope_resolver,
         compute,
         max_variants_per_compute,
         max_compute_bytes_total: indicators_router,
@@ -139,7 +143,23 @@ def _patch_create_app_dependencies(*, app_module, monkeypatch, strategy_enabled:
         lambda *, environ: SimpleNamespace(
             router=identity_router,
             current_user_dependency=lambda _request: None,
+            organization_repository=object(),
+            organization_access_service=object(),
+            clock=object(),
         ),
+    )
+    monkeypatch.setattr(
+        app_module,
+        "build_extensions_api_module",
+        lambda *, environ, current_user_dependency, organization_repository: SimpleNamespace(
+            router=extensions_router,
+            service=object(),
+        ),
+    )
+    monkeypatch.setattr(
+        app_module,
+        "build_admin_router",
+        lambda **_kwargs: admin_router,
     )
     monkeypatch.setattr(
         app_module,
@@ -196,6 +216,7 @@ def test_create_app_includes_strategy_router_when_enabled(monkeypatch) -> None:
     assert "/metrics" in paths
     assert "/strategies/ping" in paths
     assert "/market-data/markets" in paths
+    assert "/admin/ping" in paths
     assert "/ui/dashboard/summary" in paths
 
 

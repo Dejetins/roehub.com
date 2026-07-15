@@ -1,0 +1,50 @@
+apiVersion: ops.roehub.io/v1
+kind: RunbookLocale
+metadata:
+  runbook_id: identity.oidc-provider-unavailable
+  locale: ru
+translations:
+  title: Настроенный OIDC-провайдер недоступен
+  summary: Изолировать отказ провайдера, сохранив локальный вход и действующие сессии Roehub.
+  prerequisites:
+    confirm_provider_scope: Подтвердите, что сигнал относится к настроенному провайдеру, а не к локальной границе аутентификации.
+    preserve_local_access: Подтвердите доступность локального входа владельца и действующих сессий Roehub до любых действий с сервисами.
+  symptoms:
+    provider_requests_failed: Операции discovery, ключей подписи или token endpoint возвращают очищенные результаты недоступности.
+    oidc_login_failed: Новые попытки OIDC-входа или привязки завершаются ошибкой, тогда как локальный вход остаётся независимым.
+  diagnostics:
+    inspect_provider_metrics:
+      instruction: Проверьте ограниченные метки операций провайдера и классов результата за окно сигнала.
+      expected_evidence: Идентификатор провайдера, операция, класс результата, количество и длительность без содержимого запросов.
+    probe_discovery:
+      instruction: Проверьте настроенный discovery endpoint ограниченным неаутентифицированным запросом.
+      expected_evidence: Класс статуса, задержка и результат совпадения issuer с отметкой времени без сохранения тела ответа.
+    verify_local_boundary:
+      instruction: Независимо от OIDC проверьте статус локальной аутентификации и одну синтетическую действующую сессию.
+      expected_evidence: Очищенные классы доступности без cookies, credentials или пользовательских атрибутов.
+  allowed_actions:
+    restart_api: Перезапустите только Roehub API, если доказательства указывают на локальный отказ клиента или кэша.
+    rollback_release: Откатите текущий выпуск, если отказ вызван проверенным изменением OIDC-клиента.
+  rollback:
+    restore_verified_release:
+      instruction: Восстановите последний проверенный выпуск без изменения внешних идентичностей или данных приглашений.
+      expected_evidence: Ограниченные проверки discovery и OIDC успешно проходят, а локальный доступ остаётся доступным.
+  evidence_collect:
+    provider_outcome_timeline: Очищенные результаты операций провайдера и классы задержки за окно сигнала.
+    local_access_state: Классы доступности локальной аутентификации и действующих сессий во время отказа провайдера.
+  success_conditions:
+    provider_recovered: Ограниченная OIDC-проверка успешна, а сигнал продолжительного отказа снят.
+    local_access_preserved: Локальный вход и действующие сессии остаются доступными во время восстановления.
+  failure_conditions:
+    provider_still_unknown: Результат провайдера остаётся недоступным либо результат token exchange неизвестен.
+    local_access_degraded: Локальный вход или действующие сессии также недоступны, что означает более широкий инцидент идентификации.
+  redaction_rules:
+    no_protocol_material: Никогда не сохраняйте коды авторизации, tokens, state, nonce, cookies, client credentials или provider payloads.
+    bounded_identity_labels: Сохраняйте только настроенный идентификатор провайдера и ограниченные классы результата, но не внешние subjects или адреса электронной почты.
+  monitoring_gaps: {}
+  warnings:
+    no_token_retry: Никогда не повторяйте token request с неизвестным результатом и не создавайте сессию Roehub из такой попытки.
+    no_local_disable: Не отключайте локальную аутентификацию во время расследования отказа внешнего провайдера.
+  stop_conditions:
+    provider_change_requires_authority: Остановитесь перед изменением конфигурации провайдера, client credentials, redirect addresses или внешних идентичностей без разрешения владельца установки.
+    wider_identity_incident: Эскалируйте инцидент и остановите изолированное восстановление провайдера, если локальный вход или действующие сессии также работают с деградацией.

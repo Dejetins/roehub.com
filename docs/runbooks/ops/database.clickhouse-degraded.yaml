@@ -1,0 +1,89 @@
+apiVersion: ops.roehub.io/v1
+kind: Runbook
+metadata:
+  id: database.clickhouse-degraded
+  revision: 1
+  source_legacy: docs/runbooks/clickhouse-memory-profiles.md
+spec:
+  title: ClickHouse service is unavailable or query capacity is degraded
+  summary: Safely distinguish connectivity, memory pressure, and query overload before changing the service.
+  severity: high
+  component_ids: [app:monitoring, context:market_data]
+  prerequisites:
+    - id: identify_installation
+      text: Confirm the installation and environment that emitted the alert.
+    - id: preserve_writes
+      text: Identify active writers before any disruptive action.
+  symptoms:
+    - id: health_probe_failed
+      text: The ClickHouse HTTP health probe is failing.
+    - id: exporter_degraded
+      text: The exporter cannot complete a bounded metrics query.
+  diagnostics:
+    - id: read_health
+      capability: observe.health.read
+      instruction: Read the ClickHouse health and readiness result without changing state.
+      expected_evidence: A timestamped healthy or unhealthy result with the installation identifier.
+    - id: inspect_metrics
+      capability: observe.metrics.query
+      instruction: Compare memory, active query, rejected query, and disk pressure signals.
+      expected_evidence: A bounded metric snapshot with no query text or credentials.
+  allowed_actions:
+    - id: diagnostics
+      capability: observe.health.read
+      instruction: Keep the boundary read-only until storage integrity, writer state, and capacity are known.
+      approval: none
+      effect: read_only
+    - id: pause_writers
+      capability: control.worker.pause
+      instruction: Pause ClickHouse writers if continued writes increase corruption or pressure risk.
+      approval: operator
+      effect: reversible
+    - id: resume_writers
+      capability: control.worker.resume
+      instruction: Resume writers only after health and bounded write evidence are stable.
+      approval: operator
+      effect: reversible
+    - id: rollback_release
+      capability: control.release.rollback
+      instruction: Roll back the current release when degradation is tied to a verified release change.
+      approval: installation_owner
+      effect: disruptive
+  rollback:
+    - id: resume_after_stability
+      action_ref: resume_writers
+      instruction: Return paused writers to service after stable health and capacity evidence.
+      expected_evidence: Writers are ready and the error rate remains within policy.
+  evidence:
+    collect:
+      - id: health_snapshot
+        text: Timestamped ClickHouse health and exporter readiness results.
+      - id: pressure_snapshot
+        text: Redacted memory, disk, query, and writer pressure metrics.
+    success_conditions:
+      - id: stable_queries
+        text: Health succeeds and bounded read and write checks stay stable for the observation window.
+    failure_conditions:
+      - id: continued_degradation
+        text: Health, disk, or memory pressure remains unsafe after the approved action.
+  secret_redaction:
+    forbidden_evidence_keys: [authorization, cookie, dsn, password, token]
+    rules:
+      - id: redact_connection
+        text: Replace connection credentials and user information with a redaction marker.
+      - id: omit_query_values
+        text: Record query class and duration, not raw values or customer-owned query text.
+  owner:
+    team: platform.storage
+    escalation_role: installation_owner
+  related_alerts: [ClickHouseHttpPingDown, ClickHouseServiceDegraded]
+  monitoring_gaps: []
+  safety:
+    warnings:
+      - id: no_unbounded_queries
+        text: Do not run unbounded diagnostic queries on a degraded database.
+      - id: no_restart_loop
+        text: Do not repeat restarts without new evidence and owner escalation.
+    stop_conditions:
+      - id: unknown_data_state
+        text: Stop if data integrity or replication state is unknown.

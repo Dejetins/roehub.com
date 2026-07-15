@@ -5,10 +5,17 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from fastapi import FastAPI
+import pytest
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
+from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_indicators_router
+from trading.contexts.backtest.application.ports import (
+    ResearchOrganizationScope,
+    ResearchOrganizationScopeResolver,
+)
+from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.indicators.adapters.outbound.compute_numba import NumbaIndicatorCompute
 from trading.contexts.indicators.application.dto import (
     CandleArrays,
@@ -25,13 +32,43 @@ from trading.contexts.indicators.domain.entities import IndicatorDef, IndicatorI
 from trading.contexts.indicators.domain.errors import UnknownIndicatorError
 from trading.contexts.indicators.domain.specifications import GridSpec
 from trading.platform.config import IndicatorsComputeNumbaConfig
+from trading.platform.errors import RoehubError
 from trading.shared_kernel.primitives import (
     MarketId,
+    OrganizationId,
+    PaidLevel,
     Symbol,
     Timeframe,
     TimeRange,
+    UserId,
     UtcTimestamp,
 )
+
+_USER_ID = UserId.from_string("00000000-0000-0000-0000-000000000501")
+
+
+def _current_user(_request: Request) -> CurrentUserPrincipal:
+    return CurrentUserPrincipal(user_id=_USER_ID, paid_level=PaidLevel("pro"))
+
+
+class _ScopeResolver:
+    def resolve(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        return ResearchOrganizationScope(
+            organization_id=OrganizationId.from_string(
+                "00000000-0000-0000-0000-000000000001"
+            ),
+            user_id=user_id,
+        )
+
+
+class _AmbiguousScopeResolver:
+    def resolve(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        _ = user_id
+        raise RoehubError(
+            code="research.organization_scope_ambiguous",
+            message="Research organization scope is ambiguous",
+            details={"reason": "multiple_active_memberships"},
+        )
 
 
 class _RegistryStub(IndicatorRegistry):
@@ -324,6 +361,8 @@ def _client(*, compute: IndicatorCompute, candle_feed: CandleFeed) -> TestClient
     app.include_router(
         build_indicators_router(
             registry=registry,
+            current_user_dependency=_current_user,
+            organization_scope_resolver=_ScopeResolver(),
             compute=compute,
             candle_feed=candle_feed,
             max_variants_per_compute=600_000,
@@ -331,6 +370,43 @@ def _client(*, compute: IndicatorCompute, candle_feed: CandleFeed) -> TestClient
         )
     )
     return TestClient(app)
+
+
+class _RegistryReadForbidden(_RegistryStub):
+    def list_merged(self) -> tuple[MergedIndicatorView, ...]:
+        raise AssertionError("registry read must not run before organization scope resolution")
+
+
+@pytest.mark.parametrize(
+    ("scope_resolver", "expected_status", "expected_code"),
+    [
+        (None, 503, "research.organization_scope_unavailable"),
+        (
+            _AmbiguousScopeResolver(),
+            409,
+            "research.organization_scope_ambiguous",
+        ),
+    ],
+)
+def test_indicators_registry_fails_closed_before_registry_read(
+    scope_resolver: ResearchOrganizationScopeResolver | None,
+    expected_status: int,
+    expected_code: str,
+) -> None:
+    app = FastAPI()
+    register_api_error_handlers(app=app)
+    app.include_router(
+        build_indicators_router(
+            registry=_RegistryReadForbidden(defs=all_defs()),
+            current_user_dependency=_current_user,
+            organization_scope_resolver=scope_resolver,
+        )
+    )
+
+    response = TestClient(app).get("/indicators")
+
+    assert response.status_code == expected_status
+    assert response.json()["error"]["code"] == expected_code
 
 
 def _valid_compute_payload() -> dict[str, Any]:

@@ -1,0 +1,37 @@
+{
+  "audit_events": 18,
+  "checks": {
+    "api_audit_reconciliation": "passed",
+    "api_postgresql_audit_reconciliation": {
+      "api_startup_wiring": "passed",
+      "cursor": 18,
+      "events": 18,
+      "schema": "io.roehub.api-control-audit-proof/v1alpha1",
+      "sink": "postgresql",
+      "status": "passed"
+    },
+    "arbitrary_shell_rejection": "passed",
+    "crash_unknown_reconciliation": "operation.reconciled",
+    "degraded_doctor": "topology.degraded",
+    "image_mount_environment_rejection": {
+      "environment": "control_agent.service_policy_mismatch",
+      "image": "control_agent.service_policy_mismatch",
+      "mount": "control_agent.service_policy_mismatch"
+    },
+    "job_control_rpc": "passed",
+    "keycloak_absence_typed": "not_installed",
+    "local_journal_without_postgresql": "passed",
+    "operation_id_idempotency": "passed",
+    "recover": "topology.recovered",
+    "rollback": "release.rolled_back",
+    "typed_start": "succeeded"
+  },
+  "external_provider_writes": false,
+  "journal_entries": 18,
+  "production_mutation": false,
+  "project": "roehub-stage18-cc1d69d5d6",
+  "real_order_effects": false,
+  "schema": "io.roehub.control-agent-runtime-proof/v1alpha1",
+  "secrets_recorded": false,
+  "status": "passed"
+}

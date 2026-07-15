@@ -10,7 +10,7 @@ from trading.contexts.strategy.domain.entities import (
     StrategyBacktestVariantProvenance,
 )
 from trading.contexts.strategy.domain.errors import StrategyStorageError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 from .strategy_repository import InMemoryStrategyRepository
 
@@ -33,12 +33,14 @@ class InMemoryStrategyBacktestVariantProvenanceRepository(
     def find_by_idempotency_key(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         idempotency_key_hash: str,
     ) -> StrategyBacktestVariantProvenance | None:
         for provenance in self._by_strategy_id.values():
             if (
-                provenance.user_id == user_id
+                provenance.organization_id == organization_id
+                and provenance.user_id == user_id
                 and provenance.idempotency_key_hash == idempotency_key_hash
             ):
                 return provenance
@@ -47,6 +49,7 @@ class InMemoryStrategyBacktestVariantProvenanceRepository(
     def find_by_source_variant(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         source_job_id: UUID,
         source_variant_key: str,
@@ -55,7 +58,8 @@ class InMemoryStrategyBacktestVariantProvenanceRepository(
     ) -> StrategyBacktestVariantProvenance | None:
         for provenance in self._by_strategy_id.values():
             if (
-                provenance.user_id == user_id
+                provenance.organization_id == organization_id
+                and provenance.user_id == user_id
                 and provenance.source_job_id == source_job_id
                 and provenance.source_variant_key == source_variant_key
                 and provenance.strategy_spec_hash == strategy_spec_hash
@@ -73,11 +77,13 @@ class InMemoryStrategyBacktestVariantProvenanceRepository(
         if strategy.strategy_id in self._by_strategy_id:
             raise StrategyStorageError("duplicate strategy backtest variant provenance")
         if self.find_by_idempotency_key(
+            organization_id=provenance.organization_id,
             user_id=provenance.user_id,
             idempotency_key_hash=provenance.idempotency_key_hash,
         ):
             raise StrategyStorageError("duplicate strategy variant idempotency hash")
         if self.find_by_source_variant(
+            organization_id=provenance.organization_id,
             user_id=provenance.user_id,
             source_job_id=provenance.source_job_id,
             source_variant_key=provenance.source_variant_key,

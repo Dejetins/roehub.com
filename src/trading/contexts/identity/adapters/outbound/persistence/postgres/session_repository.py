@@ -19,7 +19,7 @@ class PostgresIdentitySessionRepository(SessionRepository):
     PostgresIdentitySessionRepository — Postgres adapter for persisted Roehub sessions.
 
     Docs:
-      - docs/architecture/identity/keycloak-cutover-plan-v1.md
+      - docs/architecture/identity/oidc-authentication-provider-v1.md
     Related:
       - src/trading/contexts/identity/application/ports/session_repository.py
       - src/trading/contexts/identity/adapters/outbound/persistence/postgres/gateway.py
@@ -209,6 +209,19 @@ class PostgresIdentitySessionRepository(SessionRepository):
         if row is None:
             return None
         return _map_identity_session_row(row=row)
+
+    def revoke_user_sessions(self, *, user_id: UserId, revoked_at: datetime) -> int:
+        query = f"""
+        UPDATE {self._sessions_table}
+        SET revoked_at = %(revoked_at)s
+        WHERE user_id = %(user_id)s AND revoked_at IS NULL
+        RETURNING session_id
+        """
+        rows = self._gateway.fetch_all(
+            query=query,
+            parameters={"user_id": str(user_id), "revoked_at": revoked_at},
+        )
+        return len(rows)
 
 
 def _map_identity_session_row(*, row: Mapping[str, Any]) -> IdentitySession:

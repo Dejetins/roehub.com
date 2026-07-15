@@ -9,7 +9,7 @@ from trading.contexts.live_execution.domain import (
     AccountConfigGuardResult,
     ExchangeAccountProjection,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class InMemoryExchangeAccountProjectionRepository(ExchangeAccountProjectionRepository):
@@ -30,12 +30,17 @@ class InMemoryExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
         return result
 
     def get_latest_projection(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
     ) -> ExchangeAccountProjection | None:
         matches = [
             item
             for item in self.projections
-            if item.owner_user_id == owner_user_id
+            if item.organization_id == organization_id
+            and item.owner_user_id == owner_user_id
             and item.exchange_connection_id == exchange_connection_id
         ]
         if not matches:
@@ -45,6 +50,7 @@ class InMemoryExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
     def get_latest_config_guard_result(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         instrument_key: str,
@@ -53,7 +59,8 @@ class InMemoryExchangeAccountProjectionRepository(ExchangeAccountProjectionRepos
         matches = [
             item
             for item in self.config_results
-            if item.owner_user_id == owner_user_id
+            if item.organization_id == organization_id
+            and item.owner_user_id == owner_user_id
             and item.exchange_connection_id == exchange_connection_id
             and item.instrument_key == instrument_key
             and item.market_type == market_type

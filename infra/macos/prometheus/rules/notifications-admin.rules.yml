@@ -2,7 +2,7 @@ groups:
   - name: notifications-admin
     rules:
       - alert: NotificationsCriticalUnknownDelivery
-        expr: increase(notifications_delivery_unknown_total{category=~"execution_unknown|kill_switch|admin_critical"}[5m]) > 0
+        expr: increase(notifications_delivery_unknown_total{category=~"strategy_run_failed|trade_fill|execution_rejected|execution_terminal|execution_unknown|kill_switch|admin_critical"}[5m]) > 0
         for: 0m
         labels:
           severity: critical
@@ -14,8 +14,21 @@ groups:
           runbook: docs/runbooks/notifications-admin-alerts.md#critical-unknown-delivery
           action: Locate the delivery by sanitized ids, inspect last_error_code, and decide whether manual replay is safe.
 
+      - alert: NotificationsProviderInstanceDegraded
+        expr: notification_provider_instance_ready == 0
+        for: 2m
+        labels:
+          severity: warning
+          owner: notifications
+        annotations:
+          summary: A notification provider instance is degraded
+          description: The affected provider instance failed its latest redacted health probe; other instances remain independent and critical traffic must not fall back automatically.
+          escalation: Inspect only the affected provider and provider_instance labels, its bounded health code, and recent delivery outcomes.
+          runbook: docs/runbooks/notifications-admin-alerts.md#provider-instance-degraded
+          action: Pause the affected instance if necessary, preserve unknown deliveries, and restore it without routing organization traffic through another bot.
+
       - alert: NotificationsDispatcherPendingOld
-        expr: notifications_pending_oldest_age_seconds > 300
+        expr: notification_dispatcher_pending_age_seconds > 300
         for: 5m
         labels:
           severity: warning

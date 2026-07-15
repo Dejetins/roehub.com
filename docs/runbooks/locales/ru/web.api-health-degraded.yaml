@@ -1,0 +1,45 @@
+apiVersion: ops.roehub.io/v1
+kind: RunbookLocale
+metadata:
+  runbook_id: web.api-health-degraded
+  locale: ru
+translations:
+  title: Web-шлюз или API работают с деградацией
+  summary: Отделить отказ edge, same-origin шлюза, готовности API и зависимостей без раскрытия сессий.
+  prerequisites:
+    identify_route: Подтвердите установку, публичный маршрут и отказавшую границу здоровья.
+    avoid_session_capture: Используйте синтетическую неаутентифицированную проверку и не захватывайте сессии пользователей.
+  symptoms:
+    api_health_failed: Проверка здоровья API завершается ошибкой или возвращает деградацию зависимости.
+    gateway_unavailable: Web-шлюз не может обратиться к same-origin границе API.
+  diagnostics:
+    probe_health:
+      instruction: Выполните ограниченную синтетическую проверку публичного health и маршрутов same-origin шлюза.
+      expected_evidence: Класс статуса, задержка и очищенный route id без headers или cookies.
+    inspect_readiness:
+      instruction: Сопоставьте классы готовности Web, API и обязательных зависимостей.
+      expected_evidence: Классы готовности с отметкой времени без значений среды или credentials.
+  allowed_actions:
+    diagnostics: Сохраняйте границу только для чтения, пока не определены готовность Web/API и состояние зависимостей.
+    restart_service: Перезапустите изолированный отказавший сервис после доказательства его границы.
+    rollback_release: Откатите выпуск, если отказ вызван проверенным изменением Web или API.
+  rollback:
+    restore_previous_release:
+      instruction: Восстановите последний проверенный выпуск и повторите health и same-origin проверки.
+      expected_evidence: Публичный health, готовность Web и same-origin API стабильны.
+  evidence_collect:
+    route_matrix: Очищенная матрица статусов и задержек edge, Web, API и зависимостей.
+    readiness_timeline: Переходы готовности затронутых сервисов с отметками времени.
+  success_conditions:
+    stable_same_origin: Синтетические public и same-origin проверки стабильны в течение окна наблюдения.
+  failure_conditions:
+    dependency_unknown: Обязательная зависимость недоступна или граница отказа неоднозначна.
+  redaction_rules:
+    no_browser_session: Никогда не сохраняйте cookies, CSRF, session id или authorization headers.
+    sanitize_routes: Сохраняйте шаблоны маршрутов и классы статуса, но не пользовательские URL или payload.
+  monitoring_gaps: {}
+  warnings:
+    no_sensitive_trace: Не включайте трассировку, захватывающую headers, bodies или session material.
+    no_broad_restart: Не перезапускайте все зависимости, если отказавшая граница неизвестна.
+  stop_conditions:
+    auth_boundary_unclear: Остановитесь, если проверка требует реальной пользовательской сессии или запроса с секретом.

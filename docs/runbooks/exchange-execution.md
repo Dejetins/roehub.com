@@ -7,7 +7,9 @@ adapters. In disabled mode it only observes Redis dispatch messages and the
 durable intent ledger. In testnet mode it may submit, status-check and cancel
 native Binance/Bybit testnet orders after durable guards pass, then write
 order events, fill facts, funding facts and reconciliation runs. Mainnet submit
-remains forbidden.
+through native Binance/Bybit adapters remains forbidden. Stage `16` adds a
+persisted domain policy and a no-network emulator proof; it does not add a
+configuration or Compose switch for real-money trading.
 
 ## Runtime Contract
 
@@ -30,8 +32,18 @@ remains forbidden.
 
 - `adapter_mode=disabled` keeps Stage 13 no-submit behavior.
 - `adapter_mode=testnet` enables Stage 14 native testnet adapters only.
+- `adapter_mode=emulator` is reserved for isolated acceptance evidence and is
+  not a production enablement value in generated user configuration.
 - Any connection whose environment is not `testnet` is hard-blocked before
-  submit as `mainnet_hard_block`.
+  native submit as `mainnet_hard_block`. Only the exact
+  `core:exchange-emulator` identity may exercise the persisted `mainnet`
+  policy without an external effect.
+- `mainnet` cannot be enabled through an environment variable, Compose profile
+  or adapter mode. It requires a current persisted owner approval after
+  `recent-auth` and still does not make a native adapter mainnet-capable.
+- `execution_kill_switch_state.active=true` always means stop. The older
+  producer-side `kill_switch_open` fact remains an ingress compatibility fact
+  and can never authorize submit.
 - Valid dispatched intents are observed and recorded, but not acknowledged while
   adapters are disabled.
 - Poison or non-dispatchable messages are recorded to
@@ -41,6 +53,33 @@ remains forbidden.
   order/reconciliation ledgers are the durable source of truth.
 - Unknown side effects must be reconciled from durable state or provider state
   before retry. Blind retry is forbidden.
+- An active `submit claim` survives worker restart: the Redis delivery remains
+  pending and no second submit occurs. Final order/error writes require the
+  current `submit_claim_id` and an unexpired lease. After an unknown result,
+  status lookup by `client_order_id` is mandatory and returns
+  `found|confirmed_absent|unknown`. A found order is never resubmitted; a new
+  attempt after confirmed absence requires a separate later delivery;
+  `unknown` remains pending without acknowledgement.
+- An accepted pre-submit audit is an order-level risk reservation, not a
+  worker-lease reservation. It remains counted after `submit_claim_expires_at`
+  until typed reconciliation or a terminal order state proves that the daily
+  and exposure capacity can be released. A crash after provider acceptance
+  therefore cannot reopen capacity before reconciliation.
+- Every HTTP error during POST submit is `unknown`, including Binance `-2013`;
+  the Redis delivery remains unacknowledged. Binance `-2013` is
+  `confirmed_absent` only on the separate status lookup endpoint.
+- The preflight and immediate pre-submit guards use one PostgreSQL
+  `REPEATABLE READ` snapshot each. Guards for one account first serialize on a
+  session-level advisory lock; an accepted pre-submit audit is the durable risk
+  reservation counted by concurrent intent independently of the worker claim
+  lease. They compare current Identity
+  session/owner authority, organization/account, mode, fresh account/config
+  state, server-derived notional/daily/exposure limits, risk revision,
+  kill-switch, provider capability/module revision, canonical intent hash,
+  account revision and the current credential-version reference. Credentials
+  are resolved again immediately before the last guard and submit. Missing
+  policy, authority, current risk facts or atomic audit persistence fails
+  closed.
 - In prod and test config, `ledger.pitr_required=true`; readiness is degraded
   or not ready as `pitr_restore_not_verified` until the configured PITR marker
   is set after a restore drill.
@@ -90,8 +129,11 @@ curl -fsS -X POST http://127.0.0.1:9206/internal/v1/run-once
 In disabled mode, if the message maps to a durable dispatched/accepted intent,
 the process records `adapter_disabled` and leaves the Redis message pending. In
 testnet mode, a valid message is acknowledged only after a durable
-`execution_orders` guard, submit, status/cancel or adapter-error decision. If
-the message is malformed or not dispatchable, the process records
+`execution_orders` guard and a confirmed submit, status/cancel or terminal
+adapter decision. Timeout, `OSError`, any HTTP submit error, Bybit
+`retCode != 0`, invalid provider payload and ambiguous lookup remain `unknown`
+and are not acknowledged. If the message is
+malformed or not dispatchable, the process records
 `quarantined`, publishes a DLQ marker, and acks the original message only after
 the durable observation.
 
@@ -141,7 +183,33 @@ SELECT target_time, status, reason, verified_at, row_counts_json
 FROM execution_ledger_pitr_drills
 ORDER BY verified_at DESC
 LIMIT 5;
+
+SELECT event_type, decision, reason, created_at
+FROM execution_gateway_audit_events
+ORDER BY created_at DESC
+LIMIT 50;
+
+SELECT organization_id, exchange_connection_id, mode, risk_allows_submit,
+       max_order_notional, daily_notional_limit,
+       max_account_exposure_notional, risk_valid_until, updated_at
+FROM execution_account_safety_state
+ORDER BY updated_at DESC;
+
+SELECT approval_id, organization_id, exchange_connection_id, provider_id,
+       recent_auth_session_id, recent_auth_at, approved_at, expires_at,
+       revoked_at, revocation_reason
+FROM execution_mainnet_approvals
+ORDER BY approved_at DESC
+LIMIT 20;
+
+SELECT scope_type, organization_id, exchange_connection_id, active, reason, updated_at
+FROM execution_kill_switch_state
+ORDER BY updated_at DESC;
 ```
+
+Не выводите в диагностику `metadata_json`, ciphertext, ключи, подписи или
+необработанные ответы поставщика. Для расследования используйте reason codes,
+идентификаторы аудита и безопасные агрегаты.
 
 ## Reconciliation And PITR
 

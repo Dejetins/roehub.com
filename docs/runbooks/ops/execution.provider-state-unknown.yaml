@@ -1,0 +1,84 @@
+apiVersion: ops.roehub.io/v1
+kind: Runbook
+metadata:
+  id: execution.provider-state-unknown
+  revision: 1
+  source_legacy: docs/runbooks/exchange-execution.md
+spec:
+  title: Exchange execution entered an unknown provider state
+  summary: Pause new submissions and reconcile provider facts before any retry or resume decision.
+  severity: critical
+  component_ids: [app:exchange_execution, context:live_execution]
+  prerequisites:
+    - id: identify_account
+      text: Confirm the installation, organization, account reference, and operation identifier without credentials.
+    - id: preserve_ledger
+      text: Preserve the durable execution and reconciliation ledger before acting.
+  symptoms:
+    - id: submit_unknown
+      text: A submit, cancel, or status request has an ambiguous provider result.
+    - id: reconciliation_pending
+      text: A durable order remains unmatched to provider facts.
+  diagnostics:
+    - id: read_ledger
+      capability: observe.database.read
+      instruction: Read the bounded operation, order, event, and reconciliation state by stable identifiers.
+      expected_evidence: Redacted state transitions and timestamps without credentials or raw provider payloads.
+    - id: read_metrics
+      capability: observe.metrics.query
+      instruction: Compare unknown-state, reconciliation, stream, and adapter error metrics.
+      expected_evidence: A bounded metric snapshot labeled only by approved low-cardinality identifiers.
+  allowed_actions:
+    - id: pause_submissions
+      capability: control.execution.pause
+      instruction: Pause new submissions for the affected account scope.
+      approval: operator
+      effect: reversible
+    - id: trigger_reconciliation
+      capability: control.reconciliation.trigger
+      instruction: Trigger bounded reconciliation using the existing operation and provider identifiers.
+      approval: operator
+      effect: reversible
+    - id: resume_submissions
+      capability: control.execution.resume
+      instruction: Resume only after every unknown operation has a verified terminal or quarantined state.
+      approval: installation_owner
+      effect: disruptive
+  rollback:
+    - id: resume_after_reconciliation
+      action_ref: resume_submissions
+      instruction: Restore submissions only after reconciliation evidence is complete and independently checked.
+      expected_evidence: No unknown operations remain and account state matches provider facts.
+  evidence:
+    collect:
+      - id: operation_timeline
+        text: Redacted durable operation, event, order, and reconciliation transitions.
+      - id: provider_identity
+        text: Hashed or redacted provider operation references sufficient for correlation.
+    success_conditions:
+      - id: reconciled_terminal_state
+        text: Each unknown operation has a provider-backed terminal or explicitly quarantined state.
+    failure_conditions:
+      - id: provider_facts_missing
+        text: Provider facts are unavailable or conflict with the durable ledger.
+  secret_redaction:
+    forbidden_evidence_keys: [api_key, authorization, cookie, passphrase, secret, signature, token]
+    rules:
+      - id: redact_provider_payload
+        text: Keep only approved identifiers and state classes from provider responses.
+      - id: redact_account_identity
+        text: Use internal account references, not raw exchange account details.
+  owner:
+    team: execution.operations
+    escalation_role: installation_owner
+  related_alerts: [LiveExecutionReconciliationPending, LiveExecutionUnknownState]
+  monitoring_gaps: []
+  safety:
+    warnings:
+      - id: no_blind_retry
+        text: Never retry a money-moving request while the provider result is unknown.
+      - id: keep_kill_switch
+        text: Keep submissions paused until reconciliation is complete.
+    stop_conditions:
+      - id: ledger_conflict
+        text: Stop and escalate if durable ledger and provider facts conflict.

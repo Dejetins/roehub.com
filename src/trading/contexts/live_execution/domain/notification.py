@@ -6,7 +6,7 @@ from typing import Literal, Mapping
 from uuid import UUID
 
 from trading.contexts.live_execution.domain.execution_source import ExecutionSourceType
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 ExecutionNotificationEventType = Literal[
     "producer_rejected",
@@ -60,6 +60,7 @@ class ExecutionNotificationValidationError(ValueError):
 @dataclass(frozen=True, slots=True)
 class ExecutionNotificationOutboxEvent:
     notification_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     source_type: ExecutionSourceType
     event_type: ExecutionNotificationEventType

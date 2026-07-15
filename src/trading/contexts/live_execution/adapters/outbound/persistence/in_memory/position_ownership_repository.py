@@ -13,7 +13,7 @@ from trading.contexts.live_execution.domain import (
     StrategyPositionOwnershipConflictError,
     StrategyPositionOwnershipState,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class InMemoryStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepository):
@@ -22,6 +22,7 @@ class InMemoryStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
 
     def reserve(self, *, ownership: StrategyPositionOwnership) -> StrategyPositionOwnership:
         existing = self.get_blocking_for_scope(
+            organization_id=ownership.organization_id,
             owner_user_id=ownership.owner_user_id,
             exchange_connection_id=ownership.exchange_connection_id,
             market_type=ownership.market_type,
@@ -35,6 +36,7 @@ class InMemoryStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
     def update_state(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         state: str,
@@ -42,7 +44,11 @@ class InMemoryStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         changed_at: datetime,
     ) -> StrategyPositionOwnership | None:
         for index, item in enumerate(self.ownerships):
-            if item.owner_user_id == owner_user_id and item.strategy_run_id == strategy_run_id:
+            if (
+                item.organization_id == organization_id
+                and item.owner_user_id == owner_user_id
+                and item.strategy_run_id == strategy_run_id
+            ):
                 updated = item.with_state(
                     state=cast(StrategyPositionOwnershipState, state),
                     reason=reason,
@@ -53,12 +59,18 @@ class InMemoryStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         return None
 
     def get_for_run(
-        self, *, owner_user_id: UserId, strategy_run_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_run_id: UUID,
     ) -> StrategyPositionOwnership | None:
         matches = [
             item
             for item in self.ownerships
-            if item.owner_user_id == owner_user_id and item.strategy_run_id == strategy_run_id
+            if item.organization_id == organization_id
+            and item.owner_user_id == owner_user_id
+            and item.strategy_run_id == strategy_run_id
         ]
         if not matches:
             return None
@@ -67,6 +79,7 @@ class InMemoryStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
     def get_blocking_for_scope(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         market_type: str,
@@ -75,7 +88,8 @@ class InMemoryStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         matches = [
             item
             for item in self.ownerships
-            if item.owner_user_id == owner_user_id
+            if item.organization_id == organization_id
+            and item.owner_user_id == owner_user_id
             and item.exchange_connection_id == exchange_connection_id
             and item.market_type == market_type
             and item.instrument_key == instrument_key

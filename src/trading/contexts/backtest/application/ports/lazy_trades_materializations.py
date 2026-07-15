@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Literal, Mapping, Protocol
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 BacktestLazyTradesMaterializationStatus = Literal[
     "queued",
@@ -18,6 +18,7 @@ BacktestLazyTradesMaterializationStatus = Literal[
 
 @dataclass(frozen=True, slots=True)
 class BacktestLazyTradesMaterializationRequest:
+    organization_id: OrganizationId
     owner_user_id: UserId
     job_id: UUID
     public_variant_key: str
@@ -35,6 +36,7 @@ class BacktestLazyTradesMaterializationRequest:
 @dataclass(frozen=True, slots=True)
 class BacktestLazyTradesMaterializationTask:
     task_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     job_id: UUID
     public_variant_key: str
@@ -65,6 +67,7 @@ class BacktestLazyTradesMaterializationRepository(Protocol):
     def find_by_identity(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         job_id: UUID,
         public_variant_key: str,
@@ -93,7 +96,12 @@ class BacktestLazyTradesMaterializationRepository(Protocol):
         """
         ...
 
-    def count_active_for_user(self, *, owner_user_id: UserId) -> int:
+    def count_active_for_user(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+    ) -> int:
         """
         Count owner active lazy detail tasks (`queued + running`) for admission.
         """
@@ -102,6 +110,7 @@ class BacktestLazyTradesMaterializationRepository(Protocol):
     def count_created_for_user_since(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         created_after: datetime,
     ) -> int:

@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.roehub.io/plugins/roehub-data-frame-v1.schema.json",
+  "title": "RoehubDataFrame/v1",
+  "$comment": "Cross-field semantics are normative: column keys are unique, every row has exactly those keys, values match declared types, timestamps are timezone-aware, numbers are finite, and errors require partial=true. The host enforces these rules with trading.integration.RoehubDataFrame.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "frame_id", "title", "columns", "rows", "metadata", "freshness", "notices", "partial", "errors"],
+  "properties": {
+    "contract": {"const": "RoehubDataFrame/v1"},
+    "frame_id": {"type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:-]{2,127}$"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 200},
+    "columns": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/column"}
+    },
+    "rows": {
+      "type": "array",
+      "maxItems": 1000,
+      "items": {
+        "type": "object",
+        "maxProperties": 64,
+        "additionalProperties": {"type": ["string", "integer", "number", "boolean", "null"]}
+      }
+    },
+    "metadata": {"$ref": "#/$defs/metadata"},
+    "freshness": {"$ref": "#/$defs/freshness"},
+    "notices": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/notice"}},
+    "partial": {"type": "boolean"},
+    "errors": {"type": "array", "maxItems": 16, "items": {"$ref": "#/$defs/error"}}
+  },
+  "$defs": {
+    "unit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "symbol", "scale"],
+      "properties": {
+        "kind": {"enum": ["currency", "percent", "ratio", "quantity", "duration", "timestamp", "count", "custom"]},
+        "symbol": {"type": "string", "minLength": 1, "maxLength": 24},
+        "scale": {"type": "number", "exclusiveMinimum": 0}
+      }
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "data_type", "role", "unit", "nullable"],
+      "properties": {
+        "key": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"},
+        "label": {"type": "string", "minLength": 1, "maxLength": 160},
+        "data_type": {"enum": ["timestamp", "number", "integer", "string", "boolean"]},
+        "role": {"enum": ["dimension", "measure"]},
+        "unit": {"oneOf": [{"$ref": "#/$defs/unit"}, {"type": "null"}]},
+        "nullable": {"type": "boolean"}
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_label", "query_label", "generated_at", "attributes"],
+      "properties": {
+        "source_label": {"type": "string", "minLength": 1, "maxLength": 160},
+        "query_label": {"type": "string", "minLength": 1, "maxLength": 160},
+        "generated_at": {"type": "string", "format": "date-time"},
+        "attributes": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {"pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"},
+          "additionalProperties": {"type": ["string", "integer", "number", "boolean", "null"]}
+        }
+      }
+    },
+    "freshness": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "observed_at", "age_seconds", "max_age_seconds"],
+      "properties": {
+        "status": {"enum": ["fresh", "stale", "unknown"]},
+        "observed_at": {"type": ["string", "null"], "format": "date-time"},
+        "age_seconds": {"type": ["integer", "null"], "minimum": 0},
+        "max_age_seconds": {"type": ["integer", "null"], "minimum": 0}
+      }
+    },
+    "notice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "code", "message"],
+      "properties": {
+        "level": {"enum": ["info", "warning"]},
+        "code": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,127}$"},
+        "message": {"type": "string", "minLength": 1, "maxLength": 500}
+      }
+    },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message", "retryable", "field"],
+      "properties": {
+        "code": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,127}$"},
+        "message": {"type": "string", "minLength": 1, "maxLength": 500},
+        "retryable": {"type": "boolean"},
+        "field": {"type": ["string", "null"], "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"}
+      }
+    }
+  }
+}

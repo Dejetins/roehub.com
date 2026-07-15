@@ -1,0 +1,2207 @@
+name: roehub-ml
+networks:
+  roehub:
+    internal: true
+    labels:
+      io.roehub.profile: ml
+      io.roehub.trust-boundary: installation-internal
+services:
+  alertmanager:
+    cap_drop: &id001
+    - ALL
+    command:
+    - --config.file=/etc/alertmanager/alertmanager.yml
+    - --storage.path=/alertmanager
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 192M
+    image: prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba
+    networks: &id002
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt: &id003
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=16m
+    user: 65534:65534
+    volumes:
+    - ./observability/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    - alertmanager-data:/alertmanager
+  api:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.api.main.main
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8000'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONNECTIONS_PUBLIC_ROUTES_ENABLED: 'true'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_OPERATIONAL_HEALTH_URL: http://operational-health:9300
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: api
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - ./service-configs/plugin-publisher-keys.json:/etc/roehub/plugin-publisher-keys.json:ro
+    - ./service-configs/strategy.yaml:/etc/roehub/strategy.yaml:ro
+    - artifacts:/var/lib/roehub/artifacts
+  backtest-artifact-publisher:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.scheduler.backtest_artifact_publisher.main.main
+    - --config
+    - /etc/roehub/backtest-artifacts.yaml
+    - --metrics-port
+    - '9203'
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9203/metrics', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: backtest-artifact-publisher
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - ./service-configs/backtest-artifacts.yaml:/etc/roehub/backtest-artifacts.yaml:ro
+    - artifacts:/var/lib/roehub/artifacts
+  backtest-job-runner:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.worker.backtest_job_runner.main.main
+    - --metrics-port
+    - '9204'
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9204/metrics', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: backtest-job-runner
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - artifacts:/var/lib/roehub/artifacts
+  blackbox:
+    cap_drop: *id001
+    command:
+    - --config.file=/etc/blackbox_exporter/config.yml
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 128M
+    image: prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d
+    networks: *id002
+    read_only: true
+    restart: unless-stopped
+    security_opt: *id003
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=16m
+    user: 65534:65534
+    volumes:
+    - ./observability/blackbox.yml:/etc/blackbox_exporter/config.yml:ro
+  clickhouse:
+    depends_on:
+      secret-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+    environment:
+      CLICKHOUSE_DB: roehub
+      CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      CLICKHOUSE_USER: default
+    healthcheck:
+      interval: 3s
+      retries: 40
+      test:
+      - CMD-SHELL
+      - clickhouse-client --user default --password $$(cat /run/roehub-secrets/clickhouse-password) --query 'SELECT 1'
+      timeout: 3s
+    image: clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b
+    labels:
+      io.roehub.root-justification: official init entrypoint owns fresh data/log volumes then execs ClickHouse non-root
+    networks:
+    - roehub
+    restart: unless-stopped
+    volumes:
+    - clickhouse-data:/var/lib/clickhouse
+    - clickhouse-logs:/var/log/clickhouse-server
+    - runtime-secrets:/run/roehub-secrets:ro
+  clickhouse-exporter:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.monitoring.clickhouse_exporter
+    - --host
+    - 0.0.0.0
+    - --port
+    - '9116'
+    - --scrape-uri
+    - http://clickhouse:8123/
+    - --database
+    - roehub
+    - --user
+    - default
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9116/metrics', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: clickhouse-exporter
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+  domain-cli:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.cli.main.main
+    depends_on:
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    labels:
+      io.roehub.lifecycle: operator-tool
+      io.roehub.profile: ml
+      io.roehub.role: domain-cli
+    networks:
+    - roehub
+    profiles:
+    - tools
+    read_only: true
+    restart: 'no'
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+  exchange-control:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.exchange_control.main.main
+    - --host
+    - 0.0.0.0
+    - --port
+    - '9205'
+    depends_on:
+      openbao:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      OPENBAO_ADDR: http://openbao:8200
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_CONTAINER_BIND: 'true'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER: openbao_transit_v1
+      ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN_FILE: /run/roehub-secrets/exchange-control-transit-token
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9205/health/live', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: exchange-control
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+  exchange-execution:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.exchange_execution.main.main
+    - --host
+    - 0.0.0.0
+    - --port
+    - '9206'
+    depends_on:
+      exchange-control:
+        condition: service_healthy
+      openbao:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      OPENBAO_ADDR: http://openbao:8200
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN_FILE: /run/roehub-secrets/exchange-control-transit-token
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXCHANGE_EXECUTION_CONTAINER_BIND: 'true'
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9206/health/live', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: exchange-execution
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - ./service-configs/exchange-execution.yaml:/etc/roehub/exchange-execution.yaml:ro
+  grafana:
+    cap_drop: *id001
+    depends_on:
+      secret-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES: 'false'
+      GF_ANALYTICS_CHECK_FOR_UPDATES: 'false'
+      GF_ANALYTICS_REPORTING_ENABLED: 'false'
+      GF_AUTH_ANONYMOUS_ENABLED: 'false'
+      GF_PLUGINS_PREINSTALL_DISABLED: 'true'
+      GF_PLUGINS_PUBLIC_KEY_RETRIEVAL_DISABLED: 'true'
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/grafana-secrets/admin-password
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    image: grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa
+    networks: *id002
+    read_only: true
+    restart: unless-stopped
+    security_opt: *id003
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=32m
+    user: 472:472
+    volumes:
+    - ./observability/grafana-datasources.yml:/etc/grafana/provisioning/datasources/roehub.yml:ro
+    - ./observability/grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/roehub.yml:ro
+    - ./observability/grafana-dashboard.json:/var/lib/grafana/dashboards/roehub/operational.json:ro
+    - grafana-data:/var/lib/grafana
+    - grafana-secrets:/run/grafana-secrets:ro
+  job-runtime:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.worker.job_runtime.main
+    - doctor
+    - --artifact-root
+    - /var/lib/roehub/artifacts
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    labels:
+      io.roehub.lifecycle: isolated-job
+      io.roehub.profile: ml
+      io.roehub.role: job-runtime
+    networks:
+    - roehub
+    profiles:
+    - jobs
+    read_only: true
+    restart: 'no'
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - artifacts:/var/lib/roehub/artifacts
+  loki:
+    cap_drop: *id001
+    command:
+    - -config.file=/etc/loki/local-config.yaml
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    image: grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745
+    networks: *id002
+    read_only: true
+    restart: unless-stopped
+    security_opt: *id003
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=16m
+    user: 10001:10001
+    volumes:
+    - ./observability/loki.yml:/etc/loki/local-config.yaml:ro
+    - loki-data:/loki
+  market-data-scheduler:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.scheduler.market_data_scheduler.main.main
+    - --config
+    - /etc/roehub/market-data.yaml
+    - --whitelist
+    - /etc/roehub/whitelist.csv
+    - --metrics-port
+    - '9202'
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.75'
+          memory: 512M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9202/metrics', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: market-data-scheduler
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - ./service-configs/market-data.yaml:/etc/roehub/market-data.yaml:ro
+    - ./service-configs/whitelist.csv:/etc/roehub/whitelist.csv:ro
+  market-data-ws:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.worker.market_data_ws.main.main
+    - --config
+    - /etc/roehub/market-data.yaml
+    - --metrics-port
+    - '9201'
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9201/metrics', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: market-data-ws
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - ./service-configs/market-data.yaml:/etc/roehub/market-data.yaml:ro
+  notification-dispatcher:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.worker.notification_dispatcher.main.main
+    - --config
+    - /etc/roehub/notifications.yaml
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9210/metrics', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: notification-dispatcher
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - ./service-configs/notifications.yaml:/etc/roehub/notifications.yaml:ro
+  notification-report-scheduler:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.worker.notification_report_scheduler.main.main
+    - --config
+    - /etc/roehub/notifications.yaml
+    - --port
+    - '9211'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9211/health/ready', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: notification-report-scheduler
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - ./service-configs/notifications.yaml:/etc/roehub/notifications.yaml:ro
+  openbao:
+    cap_drop:
+    - ALL
+    command:
+    - server
+    - -config=/openbao/config/openbao.hcl
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    entrypoint:
+    - bao
+    healthcheck:
+      interval: 3s
+      retries: 30
+      test:
+      - CMD-SHELL
+      - bao status -address=http://127.0.0.1:8200 >/dev/null 2>&1; code=$$?; [ "$$code" -eq 0 ] || [ "$$code" -eq 2 ]
+      timeout: 3s
+    image: ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a
+    networks:
+    - roehub
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    user: 100:1000
+    volumes:
+    - ../../../../infra/openbao/config/openbao.hcl:/openbao/config/openbao.hcl:ro
+    - openbao-data:/openbao/file
+    - openbao-audit:/openbao/logs
+  operational-health:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.monitoring.operational_health
+    - --manifest
+    - /etc/roehub/operational-manifest.json
+    - --host
+    - 0.0.0.0
+    - --port
+    - '9300'
+    - --interval-seconds
+    - '2'
+    - --loki-url
+    - http://loki:3100
+    depends_on: {}
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    environment:
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_ENV: prod
+      ROEHUB_PROFILE: ml
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9300/health/ready', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: operational-health
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./observability/operational-manifest.json:/etc/roehub/operational-manifest.json:ro
+  plugin-gateway:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.plugin_gateway.main.main
+    - --host
+    - 0.0.0.0
+    - --port
+    - '9209'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9209/health/ready', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: plugin-gateway
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+  postgresql:
+    depends_on:
+      secret-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+    environment:
+      POSTGRES_DB: roehub
+      POSTGRES_PASSWORD_FILE: /run/roehub-secrets/postgresql-password
+      POSTGRES_USER: roehub
+    healthcheck:
+      interval: 2s
+      retries: 30
+      test:
+      - CMD-SHELL
+      - pg_isready -U roehub -d roehub
+      timeout: 2s
+    image: postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c
+    labels:
+      io.roehub.root-justification: official init entrypoint owns a fresh volume then execs PostgreSQL non-root
+    networks:
+    - roehub
+    restart: unless-stopped
+    volumes:
+    - postgres-data:/var/lib/postgresql/data
+    - runtime-secrets:/run/roehub-secrets:ro
+  prometheus:
+    cap_drop: *id001
+    command:
+    - --config.file=/etc/prometheus/prometheus.yml
+    - --storage.tsdb.path=/prometheus
+    - --storage.tsdb.retention.time=15d
+    - --web.enable-lifecycle
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    image: prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996
+    networks: *id002
+    read_only: true
+    restart: unless-stopped
+    security_opt: *id003
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=16m
+    user: 65534:65534
+    volumes:
+    - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    - ./observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+    - prometheus-data:/prometheus
+  redis:
+    command:
+    - redis-server
+    - /run/roehub-secrets/redis.conf
+    depends_on:
+      secret-init:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    healthcheck:
+      interval: 2s
+      retries: 30
+      test:
+      - CMD-SHELL
+      - redis-cli --no-auth-warning -a $$(cat /run/roehub-secrets/redis-password-server) ping
+      timeout: 2s
+    image: redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42
+    labels:
+      io.roehub.root-justification: official init entrypoint verifies a fresh volume then execs Redis non-root
+    networks:
+    - roehub
+    restart: unless-stopped
+    volumes:
+    - redis-data:/data
+    - runtime-secrets:/run/roehub-secrets:ro
+  rl-inference:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.worker.rl_trading_inference.main.main
+    - serve
+    - --config
+    - /etc/roehub/rl-runtime.yaml
+    - --metrics-port
+    - '9213'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4096M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9213/health/live', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: rl-inference
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - ./service-configs/rl-runtime.yaml:/etc/roehub/rl-runtime.yaml:ro
+    - ml-state:/var/lib/roehub/ml
+  rl-trainer:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.worker.rl_trading_trainer.main.main
+    - --help
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 6144M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    image: roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8
+    labels:
+      io.roehub.lifecycle: isolated-job
+      io.roehub.profile: ml
+      io.roehub.role: rl-trainer
+    networks:
+    - roehub
+    profiles:
+    - jobs
+    read_only: true
+    restart: 'no'
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - artifacts:/var/lib/roehub/artifacts
+    - ml-state:/var/lib/roehub/ml
+  secret-init:
+    cap_add:
+    - CHOWN
+    cap_drop:
+    - ALL
+    command:
+    - /bin/sh
+    - -eu
+    - -c
+    - umask 077; if [ ! -s /run/roehub-secrets/postgresql-password ]; then head -c 48 /dev/urandom | base64 > /run/roehub-secrets/postgresql-password; chmod 0400 /run/roehub-secrets/postgresql-password; fi; if [ ! -s /run/roehub-secrets/clickhouse-password ]; then head -c 48 /dev/urandom | base64 > /run/roehub-secrets/clickhouse-password; chmod 0400 /run/roehub-secrets/clickhouse-password; chown 65532:65532 /run/roehub-secrets/clickhouse-password; fi; if [ ! -s /run/roehub-secrets/redis-password ]; then head -c 48 /dev/urandom | base64 > /run/roehub-secrets/redis-password; chmod 0400 /run/roehub-secrets/redis-password; fi; chown 0:0 /run/roehub-secrets/redis-password; if [ -e /run/roehub-secrets/redis-password-server ]; then chown 0:0 /run/roehub-secrets/redis-password-server; fi; if [ -e /run/roehub-secrets/redis.conf ]; then chown 0:0 /run/roehub-secrets/redis.conf; fi; cp /run/roehub-secrets/redis-password /run/roehub-secrets/redis-password-server; chmod 0400 /run/roehub-secrets/redis-password-server;
+      chown 999:999 /run/roehub-secrets/redis-password-server; { printf 'bind 0.0.0.0\nprotected-mode yes\nport 6379\n' ; printf 'appendonly yes\nmaxmemory-policy noeviction\ndir /data\nrequirepass '; cat /run/roehub-secrets/redis-password; } > /run/roehub-secrets/redis.conf; chmod 0400 /run/roehub-secrets/redis.conf; chown 999:999 /run/roehub-secrets/redis.conf; chown 65532:65532 /run/roehub-secrets/redis-password; if [ ! -s /run/roehub-secrets/identity-exchange-kek ]; then head -c 32 /dev/urandom | base64 > /run/roehub-secrets/identity-exchange-kek; chmod 0400 /run/roehub-secrets/identity-exchange-kek; chown 65532:65532 /run/roehub-secrets/identity-exchange-kek; fi; if [ ! -s /run/roehub-secrets/pgpass ]; then printf 'postgresql:5432:roehub:roehub:' > /run/roehub-secrets/pgpass; cat /run/roehub-secrets/postgresql-password >> /run/roehub-secrets/pgpass; chmod 0400 /run/roehub-secrets/pgpass; chown 65532:65532 /run/roehub-secrets/pgpass; fi; if [ ! -s /run/roehub-secrets/exchange-control-internal-api-token
+      ]; then head -c 48 /dev/urandom | base64 > /run/roehub-secrets/exchange-control-internal-api-token; chmod 0400 /run/roehub-secrets/exchange-control-internal-api-token; chown 65532:65532 /run/roehub-secrets/exchange-control-internal-api-token; fi; if [ ! -s /run/roehub-secrets/exchange-control-transit-token ]; then head -c 48 /dev/urandom | base64 > /run/roehub-secrets/exchange-control-transit-token; chmod 0400 /run/roehub-secrets/exchange-control-transit-token; chown 65532:65532 /run/roehub-secrets/exchange-control-transit-token; fi; if [ ! -s /run/grafana-secrets/admin-password ]; then head -c 48 /dev/urandom | base64 > /run/grafana-secrets/admin-password; chmod 0400 /run/grafana-secrets/admin-password; chown 472:472 /run/grafana-secrets/admin-password; fi
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+    image: alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce
+    labels:
+      io.roehub.root-justification: one-shot ownership handoff for generated runtime secret files
+    network_mode: none
+    read_only: true
+    restart: 'no'
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=8m
+    volumes:
+    - runtime-secrets:/run/roehub-secrets
+    - grafana-secrets:/run/grafana-secrets
+  storage-migrations:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.migrations.storage_main
+    - --service-config
+    - /etc/roehub/service-config.json
+    - bootstrap
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    labels:
+      io.roehub.lifecycle: one-shot
+      io.roehub.profile: ml
+      io.roehub.role: storage-migrations
+    networks:
+    - roehub
+    read_only: true
+    restart: 'no'
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+  strategy-live-runner:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.worker.strategy_live_runner.main.main
+    - --config
+    - /etc/roehub/strategy.yaml
+    - --metrics-port
+    - '9207'
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 768M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_METRICS_BIND_HOST: 0.0.0.0
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9207/health/ready', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: strategy-live-runner
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - ./service-configs/strategy.yaml:/etc/roehub/strategy.yaml:ro
+  telegram-bot-worker:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.worker.telegram_bot_worker.main.main
+    - --config
+    - /etc/roehub/notifications.yaml
+    - --port
+    - '9212'
+    depends_on:
+      postgresql:
+        condition: service_healthy
+      storage-migrations:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:9212/health/ready', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: telegram-bot-worker
+    networks:
+    - roehub
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+    - ./service-configs/notifications.yaml:/etc/roehub/notifications.yaml:ro
+  web:
+    cap_drop:
+    - ALL
+    command:
+    - python
+    - -m
+    - apps.web.main.main
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8010'
+    depends_on:
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+    environment:
+      CH_DATABASE: roehub
+      CH_HOST: clickhouse
+      CH_PORT: '8123'
+      CH_USER: default
+      EXTENSIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_EXCHANGE_KEYS_KEK_B64_FILE: /run/roehub-secrets/identity-exchange-kek
+      IDENTITY_FAIL_FAST: 'true'
+      IDENTITY_LOCAL_ALLOW_INSECURE_LOCALHOST: 'true'
+      IDENTITY_LOCAL_ORIGIN: http://localhost:8080
+      IDENTITY_LOCAL_RP_ID: localhost
+      IDENTITY_LOCAL_RP_NAME: Roehub
+      IDENTITY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      IDENTITY_SESSION_ABSOLUTE_TTL_SECONDS: '43200'
+      IDENTITY_SESSION_IDLE_TTL_SECONDS: '1800'
+      NOTIFICATIONS_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      PGPASSFILE: /run/roehub-secrets/pgpass
+      POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      PYTHONUNBUFFERED: '1'
+      ROEHUB_CLICKHOUSE_PASSWORD_FILE: /run/roehub-secrets/clickhouse-password
+      ROEHUB_ENV: prod
+      ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED: 'false'
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE: /run/roehub-secrets/exchange-control-internal-api-token
+      ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL: http://exchange-control:9205
+      ROEHUB_EXCHANGE_CONTROL_REAL_EXCHANGE_VALIDATION_ENABLED: 'false'
+      ROEHUB_EXCHANGE_EXECUTION_CONFIG: /etc/roehub/exchange-execution.yaml
+      ROEHUB_EXECUTION_STRATEGY_PRODUCER_ENABLED: 'false'
+      ROEHUB_NUMBA_CACHE_DIR: /tmp/roehub-numba-cache
+      ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT: /var/lib/roehub/artifacts/plugin-bundles
+      ROEHUB_PLUGIN_GATEWAY_URL: http://plugin-gateway:9209
+      ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE: /etc/roehub/plugin-publisher-keys.json
+      ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT: 'false'
+      ROEHUB_PROFILE: ml
+      ROEHUB_REDIS_HOST: redis
+      ROEHUB_REDIS_PASSWORD_FILE: /run/roehub-secrets/redis-password
+      ROEHUB_REDIS_PORT: '6379'
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: http://clickhouse:8123
+      ROEHUB_STORAGE_POSTGRES_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      ROEHUB_STORAGE_REDIS_URL: redis://redis:6379/0
+      ROEHUB_STRATEGY_CONFIG: /etc/roehub/strategy.yaml
+      STRATEGY_PG_DSN: host=postgresql port=5432 dbname=roehub user=roehub
+      WEB_API_BASE_URL: http://web:8010
+      WEB_API_UPSTREAM_URL: http://api:8000
+    healthcheck:
+      interval: 5s
+      retries: 20
+      start_period: 5s
+      test:
+      - CMD
+      - python
+      - -c
+      - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/health/ready', timeout=2).read(1)
+      timeout: 3s
+    image: roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f
+    init: true
+    labels:
+      io.roehub.lifecycle: service
+      io.roehub.profile: ml
+      io.roehub.role: web
+    networks:
+    - roehub
+    ports:
+    - 127.0.0.1:8080:8010
+    read_only: true
+    restart: unless-stopped
+    security_opt:
+    - no-new-privileges:true
+    tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+    - /run:rw,noexec,nosuid,size=16m
+    user: 65532:65532
+    volumes:
+    - ./service-config.json:/etc/roehub/service-config.json:ro
+    - ./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro
+    - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
+    - runtime-secrets:/run/roehub-secrets:ro
+volumes:
+  alertmanager-data:
+    labels:
+      io.roehub.state-owner: alertmanager
+  artifacts:
+    labels:
+      io.roehub.state-owner: artifact-store
+  clickhouse-data:
+    labels:
+      io.roehub.state-owner: clickhouse
+  clickhouse-logs:
+    labels:
+      io.roehub.state-owner: clickhouse-logs
+  grafana-data:
+    labels:
+      io.roehub.state-owner: grafana
+  grafana-secrets:
+    labels:
+      io.roehub.state-owner: grafana-auth
+  loki-data:
+    labels:
+      io.roehub.state-owner: loki
+  ml-state:
+    labels:
+      io.roehub.state-owner: ml-runtime
+  openbao-audit:
+    labels:
+      io.roehub.state-owner: openbao-audit
+  openbao-data:
+    labels:
+      io.roehub.state-owner: openbao
+  postgres-data:
+    labels:
+      io.roehub.state-owner: postgresql
+  prometheus-data:
+    labels:
+      io.roehub.state-owner: prometheus
+  redis-data:
+    labels:
+      io.roehub.state-owner: redis
+  runtime-secrets:
+    labels:
+      io.roehub.state-owner: installation
+x-roehub:
+  generated: true
+  profile: ml
+  schema: io.roehub.runtime-topology/v1alpha1

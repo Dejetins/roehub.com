@@ -1,0 +1,49 @@
+{
+  "$id": "https://schemas.roehub.io/backup/installation-backup-signature.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Detached Ed25519 signature for one canonical manifest.",
+  "properties": {
+    "algorithm": {
+      "const": "Ed25519",
+      "default": "Ed25519",
+      "enum": [
+        "Ed25519"
+      ],
+      "title": "Algorithm",
+      "type": "string"
+    },
+    "key_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Key Id",
+      "type": "string"
+    },
+    "manifest_sha256": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Manifest Sha256",
+      "type": "string"
+    },
+    "schema": {
+      "const": "io.roehub.installation-backup-signature/v1alpha1",
+      "default": "io.roehub.installation-backup-signature/v1alpha1",
+      "enum": [
+        "io.roehub.installation-backup-signature/v1alpha1"
+      ],
+      "title": "Schema",
+      "type": "string"
+    },
+    "signature_base64": {
+      "maxLength": 88,
+      "minLength": 88,
+      "title": "Signature Base64",
+      "type": "string"
+    }
+  },
+  "required": [
+    "key_id",
+    "manifest_sha256",
+    "signature_base64"
+  ],
+  "title": "BackupManifestSignature",
+  "type": "object"
+}

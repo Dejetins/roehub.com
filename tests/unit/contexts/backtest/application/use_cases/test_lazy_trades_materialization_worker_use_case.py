@@ -14,13 +14,17 @@ from trading.contexts.backtest.application.use_cases import (
     BacktestLazyTradesMaterializationExecutionResult,
     BacktestLazyTradesMaterializationWorkerUseCase,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 def test_lazy_trades_worker_claims_executes_and_finishes_task() -> None:
     task = _task()
     repository = _MaterializationRepository(task=task)
-    jobs = _JobRepository(owner_user_id=task.owner_user_id, job_id=task.job_id)
+    jobs = _JobRepository(
+        organization_id=task.organization_id,
+        owner_user_id=task.owner_user_id,
+        job_id=task.job_id,
+    )
     executor = _LazyTradesChildExecutor()
     use_case = BacktestLazyTradesMaterializationWorkerUseCase(
         materialization_repository=cast(Any, repository),
@@ -47,6 +51,7 @@ def test_lazy_trades_worker_marks_task_failed_when_variant_missing() -> None:
     task = _task()
     repository = _MaterializationRepository(task=task)
     jobs = _JobRepository(
+        organization_id=task.organization_id,
         owner_user_id=task.owner_user_id,
         job_id=task.job_id,
         row=None,
@@ -76,7 +81,12 @@ def test_lazy_trades_worker_maps_child_failure_to_failed_task() -> None:
     use_case = BacktestLazyTradesMaterializationWorkerUseCase(
         materialization_repository=cast(Any, repository),
         job_repository=cast(
-            Any, _JobRepository(owner_user_id=task.owner_user_id, job_id=task.job_id)
+            Any,
+            _JobRepository(
+                organization_id=task.organization_id,
+                owner_user_id=task.owner_user_id,
+                job_id=task.job_id,
+            ),
         ),
         lazy_trades_service=cast(Any, _LazyTradesService()),
         lease_seconds=60,
@@ -187,25 +197,44 @@ class _MaterializationRepository:
 
 @dataclass
 class _JobRepository:
+    organization_id: OrganizationId
     owner_user_id: UserId
     job_id: UUID
     row: Any = field(default_factory=lambda: SimpleNamespace(variant_key="b" * 64))
-    owner_scoped_gets: tuple[tuple[UUID, UserId | None], ...] = ()
+    owner_scoped_gets: tuple[tuple[UUID, OrganizationId, UserId | None], ...] = ()
 
-    def get(self, *, job_id: UUID, user_id: UserId | None = None) -> Any:
-        self.owner_scoped_gets = (*self.owner_scoped_gets, (job_id, user_id))
-        if job_id != self.job_id or user_id != self.owner_user_id:
+    def get(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId | None = None,
+    ) -> Any:
+        self.owner_scoped_gets = (
+            *self.owner_scoped_gets,
+            (job_id, organization_id, user_id),
+        )
+        if (
+            job_id != self.job_id
+            or organization_id != self.organization_id
+            or user_id != self.owner_user_id
+        ):
             return None
-        return SimpleNamespace(job_id=job_id, user_id=user_id)
+        return SimpleNamespace(
+            job_id=job_id,
+            organization_id=organization_id,
+            user_id=user_id,
+        )
 
     def get_top_variant_by_public_key(
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         public_variant_key: str,
     ) -> Any:
         _ = public_variant_key
-        if job_id != self.job_id:
+        if job_id != self.job_id or organization_id != self.organization_id:
             return None
         return self.row
 
@@ -257,6 +286,9 @@ def _task() -> BacktestLazyTradesMaterializationTask:
     now = datetime.now(UTC)
     return BacktestLazyTradesMaterializationTask(
         task_id=uuid4(),
+        organization_id=OrganizationId.from_string(
+            "00000000-0000-0000-0000-000000000001"
+        ),
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000401"),
         job_id=uuid4(),
         public_variant_key="ma.dema:source=close,window=5",
@@ -290,6 +322,7 @@ def _replace_task(
 ) -> BacktestLazyTradesMaterializationTask:
     payload = {
         "task_id": task.task_id,
+        "organization_id": task.organization_id,
         "owner_user_id": task.owner_user_id,
         "job_id": task.job_id,
         "public_variant_key": task.public_variant_key,

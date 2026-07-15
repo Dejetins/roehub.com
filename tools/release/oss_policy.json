@@ -1,0 +1,310 @@
+{
+  "schema_version": 1,
+  "project": {
+    "document_created": "2026-07-13T00:00:00Z",
+    "license": "Apache-2.0",
+    "license_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+    "version_source": "pyproject.toml#project.version"
+  },
+  "license_evidence": {
+    "Apache-2.0": "https://www.apache.org/licenses/LICENSE-2.0.txt",
+    "SPDX-Apache-2.0": "https://spdx.org/licenses/Apache-2.0.html",
+    "PostgreSQL": "https://www.postgresql.org/about/licence/",
+    "Redis-7.2": "https://github.com/redis/redis/blob/7.2/COPYING",
+    "Grafana": "https://github.com/grafana/grafana/blob/main/LICENSING.md",
+    "htmx-1.9.12": "https://github.com/bigskysoftware/htmx/blob/v1.9.12/LICENSE",
+    "lightweight-charts-5.2.0": "https://github.com/tradingview/lightweight-charts/blob/v5.2.0/LICENSE"
+  },
+  "python_licenses": {
+    "alembic": {"license": "MIT", "status": "compatible"},
+    "argon2-cffi": {"license": "MIT", "status": "compatible"},
+    "beautifulsoup4": {"license": "MIT", "status": "compatible"},
+    "binance-historical-data": {"license": "MIT", "status": "compatible"},
+    "clickhouse-connect": {"license": "Apache-2.0", "status": "compatible"},
+    "confluent-kafka": {"license": "Apache-2.0", "status": "compatible"},
+    "cryptography": {"license": "Apache-2.0 OR BSD-3-Clause", "status": "compatible"},
+    "fastapi": {"license": "MIT", "status": "compatible"},
+    "hatchling": {"license": "MIT", "status": "compatible"},
+    "httpx": {"license": "BSD-3-Clause", "status": "compatible"},
+    "itsdangerous": {"license": "BSD-3-Clause", "status": "compatible"},
+    "jinja2": {"license": "BSD-3-Clause", "status": "compatible"},
+    "jsonschema": {"license": "MIT", "status": "compatible"},
+    "lxml": {"license": "BSD-3-Clause", "status": "compatible"},
+    "mypy": {"license": "MIT", "status": "compatible"},
+    "numba": {"license": "BSD-2-Clause", "status": "compatible"},
+    "numpy": {"license": "BSD-3-Clause", "status": "compatible"},
+    "opentelemetry-api": {"license": "Apache-2.0", "status": "compatible"},
+    "opentelemetry-exporter-otlp": {"license": "Apache-2.0", "status": "compatible"},
+    "opentelemetry-instrumentation": {"license": "Apache-2.0", "status": "compatible"},
+    "opentelemetry-instrumentation-fastapi": {"license": "Apache-2.0", "status": "compatible"},
+    "opentelemetry-instrumentation-requests": {"license": "Apache-2.0", "status": "compatible"},
+    "opentelemetry-sdk": {"license": "Apache-2.0", "status": "compatible"},
+    "optuna": {"license": "MIT", "status": "compatible"},
+    "orjson": {"license": "Apache-2.0 OR MIT", "status": "compatible"},
+    "pandas": {"license": "BSD-3-Clause", "status": "compatible"},
+    "prometheus-client": {"license": "Apache-2.0", "status": "compatible"},
+    "psycopg": {
+      "license": "LGPL-3.0-only",
+      "status": "conditional",
+      "obligation": "Keep Psycopg separable; ship its license and source-location notice. The pinned runtime artifacts are covered by per-platform SPDX and the digest-bound runtime license audit; changing a wheel or image digest requires re-audit."
+    },
+    "pyarrow": {"license": "Apache-2.0", "status": "compatible"},
+    "pydantic": {"license": "MIT", "status": "compatible"},
+    "pydantic-settings": {"license": "MIT", "status": "compatible"},
+    "pyotp": {"license": "MIT", "status": "compatible"},
+    "pybit": {"license": "MIT", "status": "compatible"},
+    "pyright": {"license": "MIT", "status": "compatible"},
+    "pytest": {"license": "MIT", "status": "compatible"},
+    "pytest-asyncio": {"license": "Apache-2.0", "status": "compatible"},
+    "pytest-cov": {"license": "MIT", "status": "compatible"},
+    "python-dateutil": {"license": "Apache-2.0 OR BSD-3-Clause", "status": "compatible"},
+    "python-dotenv": {"license": "BSD-3-Clause", "status": "compatible"},
+    "python-multipart": {"license": "Apache-2.0", "status": "compatible"},
+    "pyyaml": {"license": "MIT", "status": "compatible"},
+    "redis": {"license": "MIT", "status": "compatible"},
+    "ruff": {"license": "MIT", "status": "compatible"},
+    "sqlalchemy": {"license": "MIT", "status": "compatible"},
+    "structlog": {"license": "Apache-2.0 OR MIT", "status": "compatible"},
+    "tenacity": {"license": "Apache-2.0", "status": "compatible"},
+    "torch": {"license": "BSD-3-Clause", "status": "compatible"},
+    "types-python-dateutil": {"license": "Apache-2.0", "status": "compatible"},
+    "types-pyyaml": {"license": "Apache-2.0", "status": "compatible"},
+    "ujson": {"license": "BSD-3-Clause", "status": "compatible"},
+    "uvicorn": {"license": "BSD-3-Clause", "status": "compatible"},
+    "webauthn": {"license": "BSD-3-Clause", "status": "compatible"}
+  },
+  "prototype_javascript": {
+    "@phosphor-icons/react": {"license": "MIT", "status": "excluded"},
+    "@vitejs/plugin-react": {"license": "MIT", "status": "excluded"},
+    "react": {"license": "MIT", "status": "excluded"},
+    "react-dom": {"license": "MIT", "status": "excluded"},
+    "recharts": {"license": "MIT", "status": "excluded"},
+    "vite": {"license": "MIT", "status": "excluded"}
+  },
+  "release_supported_architectures": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "release_images": {
+    "config_consumer": {
+      "reference": "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "license": "LicenseRef-Alpine-Base-Image",
+      "status": "conditional",
+      "obligation": "Audit every package and layer for the final release digest; preserve required notices and corresponding-source offers before distribution."
+    },
+    "runtime": {
+      "reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "Apache-2.0",
+      "status": "compatible"
+    },
+    "ml_runtime": {
+      "reference": "roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "Apache-2.0",
+      "status": "compatible"
+    },
+    "postgresql": {
+      "reference": "postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "PostgreSQL",
+      "status": "compatible"
+    },
+    "clickhouse": {
+      "reference": "clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "Apache-2.0",
+      "status": "compatible"
+    },
+    "redis": {
+      "reference": "redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "BSD-3-Clause",
+      "status": "compatible"
+    },
+    "openbao": {
+      "reference": "ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "MPL-2.0 AND MIT",
+      "status": "conditional",
+      "obligation": "Preserve the exact modified OpenBao corresponding source, Roehub patch, MPL-2.0 and MIT license texts, and derivative notice for this digest."
+    },
+    "secret_init": {
+      "reference": "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "LicenseRef-Alpine-Base-Image",
+      "status": "conditional",
+      "obligation": "Audit every package and layer for the final release digest; preserve required notices and corresponding-source offers before distribution."
+    },
+    "prometheus": {
+      "reference": "prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "Apache-2.0",
+      "status": "compatible"
+    },
+    "alertmanager": {
+      "reference": "prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "Apache-2.0",
+      "status": "compatible"
+    },
+    "blackbox": {
+      "reference": "prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "Apache-2.0",
+      "status": "compatible"
+    },
+    "grafana": {
+      "reference": "grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "AGPL-3.0-only",
+      "status": "conditional",
+      "obligation": "Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest."
+    },
+    "loki": {
+      "reference": "grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745",
+      "platforms": ["linux/amd64", "linux/arm64"],
+      "license": "AGPL-3.0-only",
+      "status": "conditional",
+      "obligation": "Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest."
+    }
+  },
+  "container_images": {
+    "${ROEHUB_APP_IMAGE:?ROEHUB_APP_IMAGE is required}": {
+      "license": "Apache-2.0",
+      "status": "compatible",
+      "obligation": "First-party image; release manifest must replace the variable with a digest-pinned Roehub image."
+    },
+    "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce": {
+      "license": "LicenseRef-Alpine-Base-Image",
+      "status": "conditional",
+      "obligation": "Audit packages and layers for the final release digest and preserve all required notices and corresponding-source offers."
+    },
+    "clickhouse/clickhouse-server:24.8": {"license": "Apache-2.0", "status": "compatible"},
+    "clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b": {"license": "Apache-2.0", "status": "compatible"},
+    "docker.io/library/alpine@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11": {
+      "license": "LicenseRef-Alpine-Base-Image",
+      "status": "conditional",
+      "obligation": "Build-only and runtime base for the OpenBao derivative; preserve exact package notices and audit the final digest."
+    },
+    "docker.io/library/golang@sha256:8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45": {
+      "license": "BSD-3-Clause AND LicenseRef-Alpine-Base-Image",
+      "status": "conditional",
+      "obligation": "Build-only image for the OpenBao derivative; preserve toolchain and base-image notices in provenance."
+    },
+    "docker.io/library/node@sha256:ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6": {
+      "license": "MIT AND LicenseRef-Debian-Base-Image",
+      "status": "conditional",
+      "obligation": "Build-only image for the OpenBao UI; preserve toolchain and base-image notices in provenance."
+    },
+    "ghcr.io/astral-sh/uv:0.8.4@sha256:40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0": {"license": "Apache-2.0 OR MIT", "status": "compatible"},
+    "ghcr.io/google/cadvisor:v0.56.2": {"license": "Apache-2.0", "status": "compatible"},
+    "ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a": {
+      "license": "MPL-2.0 AND MIT",
+      "status": "conditional",
+      "obligation": "Preserve the exact modified OpenBao corresponding source, Roehub patch, MPL-2.0 and MIT license texts, and derivative notice for this digest."
+    },
+    "grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa": {
+      "license": "AGPL-3.0-only",
+      "status": "conditional",
+      "obligation": "Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest."
+    },
+    "grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745": {
+      "license": "AGPL-3.0-only",
+      "status": "conditional",
+      "obligation": "Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest."
+    },
+    "oliver006/redis_exporter:v1.80.1": {"license": "MIT", "status": "compatible"},
+    "postgres:16": {"license": "PostgreSQL", "status": "compatible"},
+    "postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c": {"license": "PostgreSQL", "status": "compatible"},
+    "prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d": {
+      "license": "Apache-2.0",
+      "status": "compatible"
+    },
+    "prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba": {
+      "license": "Apache-2.0",
+      "status": "compatible"
+    },
+    "prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996": {
+      "license": "Apache-2.0",
+      "status": "compatible"
+    },
+    "python:3.12-slim": {
+      "license": "PSF-2.0",
+      "status": "conditional",
+      "obligation": "Audit and notice Debian packages and all transitive image layers for the final digest."
+    },
+    "python:3.12-slim-bookworm@sha256:8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b": {
+      "license": "PSF-2.0",
+      "status": "conditional",
+      "obligation": "Audit and notice Debian packages and all transitive image layers for the final digest."
+    },
+    "python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7": {
+      "license": "PSF-2.0",
+      "status": "conditional",
+      "obligation": "Audit and notice Debian packages and all transitive image layers for the final digest."
+    },
+    "quay.io/prometheuscommunity/postgres-exporter:v0.18.1": {"license": "Apache-2.0", "status": "compatible"},
+    "redis:7.2-bookworm": {"license": "BSD-3-Clause", "status": "compatible"},
+    "redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42": {"license": "BSD-3-Clause", "status": "compatible"},
+    "roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8": {"license": "Apache-2.0", "status": "compatible"},
+    "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f": {"license": "Apache-2.0", "status": "compatible"}
+  },
+  "bundled_assets": {
+    "apps/web/dist/vendor/htmx.min.js": {
+      "component": "htmx",
+      "version": "1.9.12",
+      "license": "0BSD",
+      "status": "compatible",
+      "sha256": "449317ade7881e949510db614991e195c3a099c4c791c24dacec55f9f4a2a452",
+      "source": "https://raw.githubusercontent.com/bigskysoftware/htmx/v1.9.12/dist/htmx.min.js"
+    },
+    "apps/web/dist/vendor/lightweight-charts.standalone.production.js": {
+      "component": "lightweight-charts",
+      "version": "5.2.0",
+      "license": "Apache-2.0 AND 0BSD",
+      "status": "compatible",
+      "sha256": "c0992580867c4912cc9385b3c2728315bcc1a76c7f1087dca908430fccdf31d7",
+      "source": "https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js",
+      "notice": "apps/web/dist/vendor/lightweight-charts.NOTICE.txt",
+      "attribution_file": "apps/web/dist/js/charts/backtest_series.js",
+      "attribution_pattern": "attributionLogo: true",
+      "obligation": "Preserve the upstream NOTICE and user-visible TradingView attribution/link requirement."
+    },
+    "apps/web/dist/vendor/lightweight-charts.NOTICE.txt": {
+      "component": "lightweight-charts-notice",
+      "version": "5.2.0",
+      "license": "Apache-2.0 AND 0BSD",
+      "status": "compatible",
+      "sha256": "f76c6afab94884448f0426e30d6e9d555ca7247894cd3484e477d2f87513036e",
+      "source": "https://raw.githubusercontent.com/tradingview/lightweight-charts/v5.2.0/NOTICE"
+    }
+  },
+  "first_party_assets": {
+    "apps/web/dist/favicon.svg": {
+      "license": "Apache-2.0",
+      "sha256": "08d56b70ff1cad000fa25cbce10cd3de3c63bf172654e3db06c88fe698f86ee9"
+    },
+    "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/23-greenfield-admin.png": {
+      "license": "Apache-2.0",
+      "sha256": "04bb8ff4efee0c20da5eb9356231c7f4000bd9addf7e19ae63a6a7036f5f7dc8"
+    },
+    "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/24-macos-docker-desktop-admin.png": {
+      "license": "Apache-2.0",
+      "sha256": "04bb8ff4efee0c20da5eb9356231c7f4000bd9addf7e19ae63a6a7036f5f7dc8"
+    }
+  },
+  "excluded_path_prefixes": {
+    "prototypes/": "Design-only source and evidence; not part of source or binary release artifacts."
+  },
+  "known_transitive_risks": [
+    "Raw Syft NOASSERTION records in first-party runtime images must be resolved by the digest-bound runtime license audit; any new or unmatched record blocks release.",
+    "External image package and layer obligations remain bound to their per-platform SPDX and corresponding-source records; changing an image digest requires re-audit.",
+    "The pinned psycopg-binary and torch artifacts are covered by per-platform runtime SPDX and embedded license evidence; changing a wheel or image digest requires re-audit.",
+    "Images using latest tags are inventory evidence only and are forbidden in a release manifest until digest-pinned."
+  ]
+}

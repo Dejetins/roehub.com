@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.parse import urlencode
+from uuid import UUID
 
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -36,6 +38,8 @@ from apps.web.main.settings import WebRuntimeSettings, resolve_web_runtime_setti
 _PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 _TEMPLATES_PATH = _PACKAGE_ROOT / "templates"
 _DIST_PATH = _PACKAGE_ROOT / "dist"
+_DEFAULT_RUNBOOKS_PATH = Path(__file__).resolve().parents[3] / "docs/runbooks/generated/ru"
+_RUNBOOK_ID = re.compile(r"^[a-z][a-z0-9.-]{1,127}$")
 _HOP_BY_HOP_HEADERS = {
     "connection",
     "content-length",
@@ -111,6 +115,13 @@ _NAV_ITEMS: tuple[_NavItem, ...] = (
         active_path="/connections",
     ),
     _NavItem(
+        key="admin",
+        label_key="nav.admin",
+        short_label="AD",
+        path="/admin",
+        active_path="/admin",
+    ),
+    _NavItem(
         key="settings",
         label_key="nav.settings",
         short_label="SE",
@@ -173,6 +184,12 @@ _PROTECTED_PAGES: dict[str, _ProtectedPage] = {
         title_key="page.connections.title",
         description_key="page.connections.desc",
     ),
+    "/admin": _ProtectedPage(
+        page_path="/admin",
+        active_path="/admin",
+        title_key="page.admin.title",
+        description_key="page.admin.desc",
+    ),
 }
 _THEME_OPTIONS: tuple[dict[str, str], ...] = (
     {"key": "abyss", "label_key": "theme.abyss"},
@@ -205,6 +222,20 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     )
     app.state.api_proxy_transport = None
     app.state.asset_version = _resolve_asset_version(environ=effective_environ)
+    app.state.runbooks_path = Path(
+        effective_environ.get("ROEHUB_RUNBOOKS_PATH", str(_DEFAULT_RUNBOOKS_PATH))
+    )
+    app.state.plugin_panel_lab_enabled = (
+        effective_environ.get("ROEHUB_PLUGIN_PANEL_LAB", "false").lower() == "true"
+    )
+    lab_instance_id = effective_environ.get(
+        "ROEHUB_PLUGIN_PANEL_LAB_INSTANCE_ID",
+        "00000000-0000-0000-0000-000000000000",
+    )
+    try:
+        app.state.plugin_panel_lab_instance_id = str(UUID(lab_instance_id))
+    except ValueError as error:
+        raise ValueError("ROEHUB_PLUGIN_PANEL_LAB_INSTANCE_ID must be a UUID") from error
     _register_routes(app=app, templates=templates, runtime_settings=runtime_settings)
     return app
 
@@ -216,6 +247,33 @@ def _register_routes(
     runtime_settings: WebRuntimeSettings,
 ) -> None:
     """Register public shell, auth UX, protected placeholders, and `/api/*` proxy."""
+
+    @app.get("/health/live", include_in_schema=False)
+    def health_live() -> dict[str, bool]:
+        return {"live": True}
+
+    @app.get("/health/ready", include_in_schema=False)
+    def health_ready() -> Response:
+        try:
+            response = httpx.get(
+                f"{runtime_settings.api_upstream_url}/health",
+                timeout=2.0,
+            )
+            response.raise_for_status()
+        except httpx.HTTPError:
+            return Response(
+                content=json.dumps(
+                    {"ready": False, "reason": "api_unavailable"},
+                    sort_keys=True,
+                ),
+                status_code=503,
+                media_type="application/json",
+            )
+        return Response(
+            content=json.dumps({"ready": True}, sort_keys=True),
+            status_code=200,
+            media_type="application/json",
+        )
 
     @app.get("/", response_class=HTMLResponse)
     def get_landing_page(request: Request) -> Response:
@@ -305,7 +363,10 @@ def _register_routes(
         methods=["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"],
     )
     async def proxy_api_request(request: Request, upstream_path: str) -> Response:
-        upstream_url = f"{runtime_settings.api_upstream_url}/{upstream_path}"
+        upstream_suffix = (
+            f"api/{upstream_path}" if upstream_path.startswith("v1/") else upstream_path
+        )
+        upstream_url = f"{runtime_settings.api_upstream_url}/{upstream_suffix}"
         request_body = await request.body()
         request_headers = _build_proxy_request_headers(request=request)
         transport = getattr(request.app.state, "api_proxy_transport", None)
@@ -322,10 +383,10 @@ def _register_routes(
                     headers=request_headers,
                     params=request.query_params,
                 )
-        except httpx.HTTPError as error:
+        except httpx.HTTPError:
             return Response(
                 status_code=502,
-                content=f"API proxy request failed: {error}",
+                content="API proxy request failed",
                 media_type="text/plain",
             )
 
@@ -349,6 +410,27 @@ def _register_routes(
             page_title_key="page.dashboard.title",
             page_description_key="page.dashboard.desc",
             template_name="pages/dashboard.html",
+        )
+
+    @app.get("/__qa/plugin-panels", response_class=HTMLResponse, include_in_schema=False)
+    def get_plugin_panel_lab_page(request: Request) -> Response:
+        if not bool(getattr(request.app.state, "plugin_panel_lab_enabled", False)):
+            raise HTTPException(status_code=404)
+        instance_id = str(request.app.state.plugin_panel_lab_instance_id)
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path="/__qa/plugin-panels",
+            active_path="/dashboard",
+            page_title_key="plugin_panel_lab.page_title",
+            page_description_key="plugin_panel_lab.page_description",
+            template_name="pages/plugin_panel_lab.html",
+            template_context={
+                "plugin_panel_instance_id": instance_id,
+                "plugin_panel_query_endpoint": (
+                    f"/api/v1/plugins/data-sources/{instance_id}:query"
+                ),
+            },
         )
 
     @app.get("/settings", response_class=HTMLResponse)
@@ -497,6 +579,38 @@ def _register_routes(
             page_title_key="page.connections.title",
             page_description_key="page.connections.desc",
             template_name="pages/connections.html",
+        )
+
+    @app.get("/admin", response_class=HTMLResponse)
+    def get_admin_page(request: Request) -> Response:
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path="/admin",
+            active_path="/admin",
+            page_title_key="page.admin.title",
+            page_description_key="page.admin.desc",
+            template_name="pages/admin.html",
+        )
+
+    @app.get("/runbooks/{runbook_id}", response_class=HTMLResponse)
+    def get_runbook_page(request: Request, runbook_id: str) -> Response:
+        if _RUNBOOK_ID.fullmatch(runbook_id) is None:
+            raise HTTPException(status_code=404)
+        runbook_path = Path(request.app.state.runbooks_path) / f"{runbook_id}.md"
+        if not runbook_path.is_file():
+            raise HTTPException(status_code=404)
+        return _render_protected_page(
+            request=request,
+            templates=templates,
+            page_path=f"/runbooks/{runbook_id}",
+            active_path="/admin",
+            page_title_key="page.admin.title",
+            template_name="pages/runbook.html",
+            template_context={
+                "runbook_id": runbook_id,
+                "runbook_content": runbook_path.read_text(encoding="utf-8"),
+            },
         )
 
 
@@ -757,4 +871,4 @@ def _build_language_options(
 
 def _build_oidc_login_url(*, next_path: str) -> str:
     safe_next_path = sanitize_next_path(raw_next=next_path)
-    return f"/api/auth/login?{urlencode({'next': safe_next_path})}"
+    return f"/api/auth/oidc/login?{urlencode({'next': safe_next_path})}"

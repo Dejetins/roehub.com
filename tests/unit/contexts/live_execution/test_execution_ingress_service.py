@@ -21,8 +21,10 @@ from trading.contexts.live_execution.domain import (
     ExecutionRiskContext,
     ExecutionSourceValidationError,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000010000"))
+_SECOND_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000010999"))
 _USER_ID = UserId.from_string("00000000-0000-0000-0000-000000010001")
 _NOW = datetime(2026, 5, 31, 13, 0, tzinfo=UTC)
 
@@ -44,6 +46,7 @@ def test_records_source_event_and_intent_for_strategy_signal_idempotently() -> N
 
     source = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="strategy_signal",
             source_event_ref="strategy-signal-1",
@@ -54,6 +57,7 @@ def test_records_source_event_and_intent_for_strategy_signal_idempotently() -> N
     )
     replay = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="strategy_signal",
             source_event_ref="strategy-signal-1",
@@ -81,6 +85,55 @@ def test_records_source_event_and_intent_for_strategy_signal_idempotently() -> N
     assert repository.risk_audit_events[0].event_type == "risk_gate_accepted"
 
 
+def test_same_idempotency_keys_are_isolated_by_organization() -> None:
+    repository = InMemoryExecutionIntentRepository()
+    service = ExecutionIngressService(repository=repository, clock=_Clock())
+    signal_id = UUID("00000000-0000-0000-0000-000000010199")
+
+    sources = tuple(
+        service.record_source_event(
+            command=RecordExecutionSourceEventCommand(
+                organization_id=organization_id,
+                owner_user_id=_USER_ID,
+                source_type="strategy_signal",
+                source_event_ref="shared-reference",
+                source_ref_json={"signal_id": str(signal_id)},
+                strategy_signal_id=signal_id,
+                idempotency_key="shared-source-key",
+            )
+        )
+        for organization_id in (_ORGANIZATION_ID, _SECOND_ORGANIZATION_ID)
+    )
+    intents = tuple(
+        service.create_intent(
+            command=_intent_command(
+                source.event.source_event_id,
+                organization_id=organization_id,
+                idempotency_key="shared-intent-key",
+            )
+        )
+        for organization_id, source in zip(
+            (_ORGANIZATION_ID, _SECOND_ORGANIZATION_ID), sources, strict=True
+        )
+    )
+
+    assert all(source.duplicate is False for source in sources)
+    assert all(intent.duplicate is False for intent in intents)
+    assert sources[0].event.source_event_id != sources[1].event.source_event_id
+    assert intents[0].intent.intent_id != intents[1].intent.intent_id
+    assert len(repository.source_events) == 2
+    assert len(repository.intents) == 2
+
+    with pytest.raises(ExecutionSourceValidationError):
+        service.create_intent(
+            command=_intent_command(
+                sources[0].event.source_event_id,
+                organization_id=_SECOND_ORGANIZATION_ID,
+                idempotency_key="cross-organization-intent-key",
+            )
+        )
+
+
 @pytest.mark.parametrize(
     "source_type",
     ("strategy_signal", "manual_request", "ml_agent_decision", "ops_test"),
@@ -94,6 +147,7 @@ def test_supported_source_types_share_the_same_ingress(source_type: str) -> None
 
     source = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type=source_type,
             source_event_ref=f"{source_type}-ref",
@@ -119,6 +173,7 @@ def test_risk_gate_rejects_missing_context_and_records_audit() -> None:
     service = ExecutionIngressService(repository=repository, clock=_Clock())
     source = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="ops_test",
             source_event_ref="ops-missing-risk",
@@ -130,6 +185,7 @@ def test_risk_gate_rejects_missing_context_and_records_audit() -> None:
 
     intent = service.create_intent(
         command=CreateExecutionIntentCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_event_id=source.event.source_event_id,
             idempotency_key="missing-risk-intent-key",
@@ -162,6 +218,7 @@ def test_paper_strategy_signal_records_no_dispatch_intent() -> None:
     signal_id = UUID("00000000-0000-0000-0000-000000010102")
     source = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="strategy_signal",
             source_event_ref=str(signal_id),
@@ -202,6 +259,8 @@ def test_paper_strategy_signal_records_no_dispatch_intent() -> None:
 @pytest.mark.parametrize(
     ("source_type", "context_overrides", "reason"),
     (
+        ("ops_test", {"organization_ownership_verified": False}, "organization_ownership_mismatch"),
+        ("ops_test", {"account_ownership_verified": False}, "account_ownership_mismatch"),
         ("ops_test", {"exchange_connection_active": False}, "exchange_connection_inactive"),
         ("ops_test", {"exchange_config_verified": False}, "exchange_config_mismatch"),
         ("ops_test", {"account_state_fresh": False}, "account_projection_stale"),
@@ -261,6 +320,7 @@ def test_risk_gate_rejects_source_aware_safety_cases(
     signal_id = uuid4() if source_type == "strategy_signal" else None
     source = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type=source_type,
             source_event_ref=f"{source_type}-{reason}",
@@ -294,6 +354,7 @@ def test_rejects_unsupported_order_model_and_links_source_event_outcome() -> Non
     service = ExecutionIngressService(repository=repository, clock=_Clock())
     source = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="manual_request",
             source_event_ref="manual-1",
@@ -325,6 +386,7 @@ def test_manual_request_paper_no_exchange_submit_uses_no_dispatch_risk_branch() 
     service = ExecutionIngressService(repository=repository, clock=_Clock())
     source = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="manual_request",
             source_event_ref="manual-paper-entry",
@@ -358,6 +420,7 @@ def test_ml_agent_decision_paper_no_exchange_submit_uses_no_dispatch_risk_branch
     service = ExecutionIngressService(repository=repository, clock=_Clock())
     source = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="ml_agent_decision",
             source_event_ref="rl-paper-open-long",
@@ -422,6 +485,7 @@ def test_manual_exit_paper_no_exchange_submit_emits_manual_exit_notification() -
     service = ExecutionIngressService(repository=repository, clock=_Clock())
     source = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="manual_request",
             source_event_ref="manual:exit:00000000-0000-0000-0000-000000010303",
@@ -465,6 +529,7 @@ def test_rejects_invalid_source_policy() -> None:
     with pytest.raises(ExecutionSourceValidationError) as error_info:
         service.record_source_event(
             command=RecordExecutionSourceEventCommand(
+                organization_id=_ORGANIZATION_ID,
                 owner_user_id=_USER_ID,
                 source_type="strategy_signal",
                 source_event_ref="missing-signal-id",
@@ -482,6 +547,7 @@ def test_emits_redacted_notification_outbox_event_idempotently() -> None:
     service = ExecutionIngressService(repository=repository, clock=_Clock())
     source = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="ops_test",
             source_event_ref="ops-terminal",
@@ -493,6 +559,7 @@ def test_emits_redacted_notification_outbox_event_idempotently() -> None:
 
     first = service.emit_notification(
         command=EmitExecutionNotificationCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="ops_test",
             event_type="producer_terminal",
@@ -504,6 +571,7 @@ def test_emits_redacted_notification_outbox_event_idempotently() -> None:
     )
     replay = service.emit_notification(
         command=EmitExecutionNotificationCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="ops_test",
             event_type="producer_terminal",
@@ -543,6 +611,7 @@ def test_stage13_notification_event_types_are_supported(event_type: str) -> None
 
     result = service.emit_notification(
         command=EmitExecutionNotificationCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="ops_test",
             event_type=event_type,
@@ -565,6 +634,7 @@ def test_rejects_sensitive_notification_labels() -> None:
     with pytest.raises(ExecutionNotificationValidationError) as error_info:
         service.emit_notification(
             command=EmitExecutionNotificationCommand(
+                organization_id=_ORGANIZATION_ID,
                 owner_user_id=_USER_ID,
                 source_type="ops_test",
                 event_type="producer_unknown",
@@ -580,6 +650,7 @@ def test_rejects_sensitive_notification_labels() -> None:
 def _intent_command(
     source_event_id: UUID,
     *,
+    organization_id: OrganizationId = _ORGANIZATION_ID,
     idempotency_key: str = "intent-key",
     order_type: str = "market",
     market_type: str = "spot",
@@ -588,6 +659,7 @@ def _intent_command(
     risk_context: ExecutionRiskContext | None = None,
 ) -> CreateExecutionIntentCommand:
     return CreateExecutionIntentCommand(
+        organization_id=organization_id,
         owner_user_id=_USER_ID,
         source_event_id=source_event_id,
         idempotency_key=idempotency_key,
@@ -606,6 +678,8 @@ def _intent_command(
 
 def _accepted_context(**overrides: object) -> ExecutionRiskContext:
     values = {
+        "organization_ownership_verified": True,
+        "account_ownership_verified": True,
         "exchange_connection_active": True,
         "secret_custody_ready": True,
         "source_authorized": True,

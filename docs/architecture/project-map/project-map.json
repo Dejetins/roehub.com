@@ -130,7 +130,7 @@
   ],
   "areas": [
     {
-      "file_count": 593,
+      "file_count": 667,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -139,7 +139,7 @@
       "title": "Доменные контексты"
     },
     {
-      "file_count": 22,
+      "file_count": 36,
       "id": "shared-core",
       "paths": [
         "src/trading/__init__.py",
@@ -152,7 +152,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 224,
+      "file_count": 287,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -161,7 +161,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 170,
+      "file_count": 291,
       "id": "operations",
       "paths": [
         "infra/",
@@ -174,7 +174,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 91,
+      "file_count": 127,
       "id": "automation",
       "paths": [
         "tools/",
@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 324,
+      "file_count": 418,
       "id": "quality",
       "paths": [
         "tests/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 996,
+      "file_count": 1104,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -244,15 +244,22 @@
     {
       "depends_on": [
         "app:cli",
+        "app:common",
+        "app:control_agent",
+        "app:migrations",
+        "app:monitoring",
         "context:backtest",
         "context:backtest_artifacts",
+        "context:extensions",
         "context:identity",
         "context:indicators",
         "context:live_execution",
         "context:market_data",
         "context:notifications",
+        "context:operations",
         "context:rl_trading",
         "context:strategy",
+        "core:integration",
         "core:platform",
         "core:shared_kernel"
       ],
@@ -264,7 +271,7 @@
         "apps/api/main/app.py",
         "apps/api/main/main.py"
       ],
-      "file_count": 41,
+      "file_count": 47,
       "id": "app:api",
       "kind": "app",
       "name": "api",
@@ -286,8 +293,11 @@
       "depends_on": [
         "app:api",
         "context:backtest_artifacts",
+        "context:extensions",
+        "context:identity",
         "context:indicators",
         "context:market_data",
+        "context:notifications",
         "core:platform",
         "core:shared_kernel"
       ],
@@ -296,7 +306,7 @@
       "entrypoints": [
         "apps/cli/main/main.py"
       ],
-      "file_count": 17,
+      "file_count": 22,
       "id": "app:cli",
       "kind": "app",
       "name": "cli",
@@ -311,9 +321,52 @@
       ],
       "used_by": [
         "app:api",
+        "app:roehubctl",
         "app:scheduler",
         "worker:market_data_ws",
         "worker:strategy_live_runner"
+      ]
+    },
+    {
+      "depends_on": [],
+      "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
+      "docs": [],
+      "entrypoints": [],
+      "file_count": 3,
+      "id": "app:common",
+      "kind": "app",
+      "name": "common",
+      "roots": [
+        "apps/common"
+      ],
+      "used_by": [
+        "app:api",
+        "app:web",
+        "worker:notification_report_scheduler",
+        "worker:telegram_bot_worker"
+      ]
+    },
+    {
+      "depends_on": [
+        "context:operations"
+      ],
+      "description": "Единственная host-side граница управления Docker Engine.",
+      "docs": [],
+      "entrypoints": [
+        "apps/control_agent/main/main.py"
+      ],
+      "file_count": 9,
+      "id": "app:control_agent",
+      "kind": "app",
+      "name": "control_agent",
+      "roots": [
+        "apps/control_agent",
+        "apps/control_agent/main"
+      ],
+      "used_by": [
+        "app:api",
+        "app:roehubctl",
+        "worker:job_runtime"
       ]
     },
     {
@@ -349,7 +402,7 @@
         "apps/exchange_execution/main/app.py",
         "apps/exchange_execution/main/main.py"
       ],
-      "file_count": 7,
+      "file_count": 8,
       "id": "app:exchange_execution",
       "kind": "app",
       "name": "exchange_execution",
@@ -361,32 +414,104 @@
       "used_by": []
     },
     {
-      "depends_on": [],
+      "depends_on": [
+        "context:backtest",
+        "context:extensions",
+        "context:identity",
+        "context:live_execution",
+        "context:market_data",
+        "context:notifications",
+        "context:strategy",
+        "core:integration",
+        "core:platform",
+        "core:shared_kernel"
+      ],
       "description": "Bootstrap и применение миграций.",
       "docs": [],
       "entrypoints": [
         "apps/migrations/main.py"
       ],
-      "file_count": 4,
+      "file_count": 14,
       "id": "app:migrations",
       "kind": "app",
       "name": "migrations",
       "roots": [
         "apps/migrations"
       ],
-      "used_by": []
+      "used_by": [
+        "app:api"
+      ]
     },
     {
       "depends_on": [],
       "description": "Экспорт технических метрик.",
       "docs": [],
       "entrypoints": [],
-      "file_count": 2,
+      "file_count": 3,
       "id": "app:monitoring",
       "kind": "app",
       "name": "monitoring",
       "roots": [
         "apps/monitoring"
+      ],
+      "used_by": [
+        "app:api"
+      ]
+    },
+    {
+      "depends_on": [
+        "core:integration"
+      ],
+      "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
+      "docs": [],
+      "entrypoints": [
+        "apps/plugin_gateway/main/app.py",
+        "apps/plugin_gateway/main/main.py"
+      ],
+      "file_count": 4,
+      "id": "app:plugin_gateway",
+      "kind": "app",
+      "name": "plugin_gateway",
+      "roots": [
+        "apps/plugin_gateway",
+        "apps/plugin_gateway/main"
+      ],
+      "used_by": []
+    },
+    {
+      "depends_on": [
+        "app:cli",
+        "app:control_agent",
+        "context:operations"
+      ],
+      "description": "Host-side аварийная CLI для диагностики и восстановления.",
+      "docs": [],
+      "entrypoints": [
+        "apps/roehubctl/main/main.py"
+      ],
+      "file_count": 3,
+      "id": "app:roehubctl",
+      "kind": "app",
+      "name": "roehubctl",
+      "roots": [
+        "apps/roehubctl",
+        "apps/roehubctl/main"
+      ],
+      "used_by": []
+    },
+    {
+      "depends_on": [],
+      "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
+      "docs": [],
+      "entrypoints": [
+        "apps/runtime_probe/main.py"
+      ],
+      "file_count": 2,
+      "id": "app:runtime_probe",
+      "kind": "app",
+      "name": "runtime_probe",
+      "roots": [
+        "apps/runtime_probe"
       ],
       "used_by": []
     },
@@ -423,14 +548,16 @@
       "used_by": []
     },
     {
-      "depends_on": [],
+      "depends_on": [
+        "app:common"
+      ],
       "description": "Server-rendered web UI и same-origin API client.",
       "docs": [],
       "entrypoints": [
         "apps/web/main/app.py",
         "apps/web/main/main.py"
       ],
-      "file_count": 88,
+      "file_count": 94,
       "id": "app:web",
       "kind": "app",
       "name": "web",
@@ -454,6 +581,7 @@
       "depends_on": [
         "context:backtest_artifacts",
         "context:indicators",
+        "context:market_data",
         "core:platform",
         "core:shared_kernel"
       ],
@@ -486,7 +614,7 @@
         "docs/architecture/backtest/benchmark_iterations/2026-05-01_iteration_4_1_no_risk_boundary/README.md"
       ],
       "entrypoints": [],
-      "file_count": 86,
+      "file_count": 90,
       "id": "context:backtest",
       "kind": "context",
       "name": "backtest",
@@ -506,6 +634,7 @@
       ],
       "used_by": [
         "app:api",
+        "app:migrations",
         "context:backtest_artifacts",
         "worker:backtest_job_runner"
       ]
@@ -515,13 +644,14 @@
         "context:backtest",
         "context:indicators",
         "context:market_data",
+        "core:integration",
         "core:platform",
         "core:shared_kernel"
       ],
       "description": "Публикация и чтение артефактов бектеста.",
       "docs": [],
       "entrypoints": [],
-      "file_count": 28,
+      "file_count": 39,
       "id": "context:backtest_artifacts",
       "kind": "context",
       "name": "backtest_artifacts",
@@ -529,26 +659,29 @@
         "src/trading/contexts/backtest_artifacts",
         "src/trading/contexts/backtest_artifacts/adapters",
         "src/trading/contexts/backtest_artifacts/adapters/outbound",
+        "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_cas",
         "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs",
+        "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_s3",
         "src/trading/contexts/backtest_artifacts/adapters/outbound/config",
         "src/trading/contexts/backtest_artifacts/adapters/outbound/defaults",
         "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence",
         "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres",
         "src/trading/contexts/backtest_artifacts/application",
-        "src/trading/contexts/backtest_artifacts/application/services",
-        "src/trading/contexts/backtest_artifacts/application/services/v2",
-        "src/trading/contexts/backtest_artifacts/application/use_cases"
+        "src/trading/contexts/backtest_artifacts/application/ports"
       ],
       "used_by": [
         "app:api",
         "app:cli",
         "app:scheduler",
         "context:backtest",
-        "worker:backtest_job_runner"
+        "worker:backtest_job_runner",
+        "worker:job_runtime"
       ]
     },
     {
       "depends_on": [
+        "context:identity",
+        "core:platform",
         "core:shared_kernel"
       ],
       "description": "Политики доступности биржевых соединений и ключей.",
@@ -576,6 +709,35 @@
     },
     {
       "depends_on": [
+        "context:identity",
+        "core:integration",
+        "core:shared_kernel"
+      ],
+      "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
+      "docs": [],
+      "entrypoints": [],
+      "file_count": 15,
+      "id": "context:extensions",
+      "kind": "context",
+      "name": "extensions",
+      "roots": [
+        "src/trading/contexts/extensions",
+        "src/trading/contexts/extensions/adapters",
+        "src/trading/contexts/extensions/adapters/persistence",
+        "src/trading/contexts/extensions/application",
+        "src/trading/contexts/extensions/domain"
+      ],
+      "used_by": [
+        "app:api",
+        "app:cli",
+        "app:migrations",
+        "core:integration",
+        "worker:job_runtime"
+      ]
+    },
+    {
+      "depends_on": [
+        "core:platform",
         "core:shared_kernel"
       ],
       "description": "Пользователь, сессия, владение и доступ.",
@@ -607,7 +769,7 @@
         "docs/architecture/identity/identity-2fa-totp-policy-v1.md"
       ],
       "entrypoints": [],
-      "file_count": 53,
+      "file_count": 71,
       "id": "context:identity",
       "kind": "context",
       "name": "identity",
@@ -626,7 +788,11 @@
         "src/trading/contexts/identity/adapters/outbound/security"
       ],
       "used_by": [
-        "app:api"
+        "app:api",
+        "app:cli",
+        "app:migrations",
+        "context:exchange_control",
+        "context:extensions"
       ]
     },
     {
@@ -719,7 +885,7 @@
         "docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/04-btcusdt-market-readiness.md"
       ],
       "entrypoints": [],
-      "file_count": 57,
+      "file_count": 64,
       "id": "context:live_execution",
       "kind": "context",
       "name": "live_execution",
@@ -740,6 +906,7 @@
       "used_by": [
         "app:api",
         "app:exchange_execution",
+        "app:migrations",
         "context:rl_trading",
         "context:strategy",
         "worker:rl_trading_inference",
@@ -793,7 +960,9 @@
       "used_by": [
         "app:api",
         "app:cli",
+        "app:migrations",
         "app:scheduler",
+        "context:backtest",
         "context:backtest_artifacts",
         "context:indicators",
         "context:strategy",
@@ -844,6 +1013,7 @@
     },
     {
       "depends_on": [
+        "core:platform",
         "core:shared_kernel"
       ],
       "description": "События, уведомления и каналы доставки.",
@@ -865,7 +1035,7 @@
         "docs/architecture/notifications/web-execution-telegram-notifications-v1.md"
       ],
       "entrypoints": [],
-      "file_count": 32,
+      "file_count": 42,
       "id": "context:notifications",
       "kind": "context",
       "name": "notifications",
@@ -885,11 +1055,35 @@
       ],
       "used_by": [
         "app:api",
+        "app:cli",
+        "app:migrations",
         "context:strategy",
         "worker:notification_dispatcher",
         "worker:notification_report_scheduler",
         "worker:strategy_live_runner",
         "worker:telegram_bot_worker"
+      ]
+    },
+    {
+      "depends_on": [],
+      "description": "Типизированные host-операции, идемпотентность и аварийный журнал.",
+      "docs": [
+        "docs/architecture/operations/native-service-control-monitoring-admin-target-v1.md"
+      ],
+      "entrypoints": [],
+      "file_count": 9,
+      "id": "context:operations",
+      "kind": "context",
+      "name": "operations",
+      "roots": [
+        "src/trading/contexts/operations",
+        "src/trading/contexts/operations/adapters"
+      ],
+      "used_by": [
+        "app:api",
+        "app:control_agent",
+        "app:roehubctl",
+        "worker:job_runtime"
       ]
     },
     {
@@ -986,6 +1180,7 @@
       "used_by": [
         "app:api",
         "app:exchange_execution",
+        "app:migrations",
         "context:live_execution",
         "context:rl_trading",
         "worker:rl_trading_inference",
@@ -1007,18 +1202,27 @@
       "used_by": []
     },
     {
-      "depends_on": [],
+      "depends_on": [
+        "context:extensions"
+      ],
       "description": "Общая техническая основа и кросс-контекстные примитивы.",
       "docs": [],
       "entrypoints": [],
-      "file_count": 1,
+      "file_count": 6,
       "id": "core:integration",
       "kind": "core",
       "name": "integration",
       "roots": [
         "src/trading/integration"
       ],
-      "used_by": []
+      "used_by": [
+        "app:api",
+        "app:migrations",
+        "app:plugin_gateway",
+        "context:backtest_artifacts",
+        "context:extensions",
+        "worker:job_runtime"
+      ]
     },
     {
       "depends_on": [
@@ -1026,9 +1230,35 @@
         "core:shared_kernel"
       ],
       "description": "Общая техническая основа и кросс-контекстные примитивы.",
-      "docs": [],
+      "docs": [
+        "docs/architecture/platform/artifact-store-v1.md",
+        "docs/architecture/platform/data-sources-panels-and-design-system-v1.md",
+        "docs/architecture/platform/isolated-job-runtime-v1.md",
+        "docs/architecture/platform/plugin-api-v1alpha1.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/00-freeze-current-state-and-contracts.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/01-open-source-license-and-release-governance.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/02-machine-readable-runbooks.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/03-installation-config-and-release-manifest.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/04-storage-bootstrap-and-migrations.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/05-organizations-rbac-and-audit.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/06-local-auth-sessions-and-recovery.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/07-oidc-provider-integration.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/08-openbao-secrets-and-recovery.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/09-research-context-organization-isolation.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/10-trading-context-organization-isolation.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/11-notification-and-telegram-provider-plugins.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/12-plugin-platform-api-and-sdk.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/13-data-sources-panels-and-design-system.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/14-artifact-store-and-default-bundles.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/15-isolated-job-and-strategy-runtimes.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/16-execution-gateway-and-mainnet-safety.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/17-containerize-all-services-and-profiles.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/18-control-agent-and-roehubctl.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/19-administration-web-ui.md",
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/20-observability-and-operational-actions.md"
+      ],
       "entrypoints": [],
-      "file_count": 6,
+      "file_count": 13,
       "id": "core:platform",
       "kind": "core",
       "name": "platform",
@@ -1036,19 +1266,26 @@
         "src/trading/platform",
         "src/trading/platform/config",
         "src/trading/platform/errors",
+        "src/trading/platform/secrets",
         "src/trading/platform/time"
       ],
       "used_by": [
         "app:api",
         "app:cli",
+        "app:migrations",
         "app:scheduler",
         "context:backtest",
         "context:backtest_artifacts",
+        "context:exchange_control",
+        "context:identity",
         "context:indicators",
+        "context:notifications",
         "context:strategy",
         "worker:backtest_job_runner",
         "worker:market_data_ws",
-        "worker:strategy_live_runner"
+        "worker:notification_dispatcher",
+        "worker:strategy_live_runner",
+        "worker:telegram_bot_worker"
       ]
     },
     {
@@ -1056,7 +1293,7 @@
       "description": "Общая техническая основа и кросс-контекстные примитивы.",
       "docs": [],
       "entrypoints": [],
-      "file_count": 13,
+      "file_count": 15,
       "id": "core:shared_kernel",
       "kind": "core",
       "name": "shared_kernel",
@@ -1068,10 +1305,12 @@
         "app:api",
         "app:cli",
         "app:exchange_execution",
+        "app:migrations",
         "app:scheduler",
         "context:backtest",
         "context:backtest_artifacts",
         "context:exchange_control",
+        "context:extensions",
         "context:identity",
         "context:indicators",
         "context:live_execution",
@@ -1081,7 +1320,10 @@
         "context:strategy",
         "core:platform",
         "worker:backtest_job_runner",
-        "worker:market_data_ws"
+        "worker:job_runtime",
+        "worker:market_data_ws",
+        "worker:rl_trading_inference",
+        "worker:telegram_bot_worker"
       ]
     },
     {
@@ -1105,6 +1347,29 @@
         "apps/worker/backtest_job_runner/main",
         "apps/worker/backtest_job_runner/wiring",
         "apps/worker/backtest_job_runner/wiring/modules"
+      ],
+      "used_by": []
+    },
+    {
+      "depends_on": [
+        "app:control_agent",
+        "context:backtest_artifacts",
+        "context:extensions",
+        "context:operations",
+        "core:integration",
+        "core:shared_kernel"
+      ],
+      "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
+      "docs": [],
+      "entrypoints": [
+        "apps/worker/job_runtime/main.py"
+      ],
+      "file_count": 9,
+      "id": "worker:job_runtime",
+      "kind": "worker",
+      "name": "job_runtime",
+      "roots": [
+        "apps/worker/job_runtime"
       ],
       "used_by": []
     },
@@ -1134,7 +1399,8 @@
     },
     {
       "depends_on": [
-        "context:notifications"
+        "context:notifications",
+        "core:platform"
       ],
       "description": "Доставка подготовленных уведомлений.",
       "docs": [],
@@ -1155,17 +1421,21 @@
     },
     {
       "depends_on": [
+        "app:common",
         "context:notifications"
       ],
       "description": "Планирование отчётных уведомлений.",
       "docs": [],
-      "entrypoints": [],
-      "file_count": 2,
+      "entrypoints": [
+        "apps/worker/notification_report_scheduler/main/main.py"
+      ],
+      "file_count": 4,
       "id": "worker:notification_report_scheduler",
       "kind": "worker",
       "name": "notification_report_scheduler",
       "roots": [
         "apps/worker/notification_report_scheduler",
+        "apps/worker/notification_report_scheduler/main",
         "apps/worker/notification_report_scheduler/wiring"
       ],
       "used_by": []
@@ -1174,7 +1444,8 @@
       "depends_on": [
         "context:live_execution",
         "context:rl_trading",
-        "context:strategy"
+        "context:strategy",
+        "core:shared_kernel"
       ],
       "description": "Inference RL-политик.",
       "docs": [],
@@ -1238,17 +1509,23 @@
     },
     {
       "depends_on": [
-        "context:notifications"
+        "app:common",
+        "context:notifications",
+        "core:platform",
+        "core:shared_kernel"
       ],
       "description": "Telegram-команды и пользовательские уведомления.",
       "docs": [],
-      "entrypoints": [],
-      "file_count": 4,
+      "entrypoints": [
+        "apps/worker/telegram_bot_worker/main/main.py"
+      ],
+      "file_count": 6,
       "id": "worker:telegram_bot_worker",
       "kind": "worker",
       "name": "telegram_bot_worker",
       "roots": [
         "apps/worker/telegram_bot_worker",
+        "apps/worker/telegram_bot_worker/main",
         "apps/worker/telegram_bot_worker/wiring",
         "apps/worker/telegram_bot_worker/wiring/modules"
       ],
@@ -1264,12 +1541,37 @@
     {
       "kind": "python-import",
       "source": "app:api",
+      "target": "app:common"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:api",
+      "target": "app:control_agent"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:api",
+      "target": "app:migrations"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:api",
+      "target": "app:monitoring"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:api",
       "target": "context:backtest"
     },
     {
       "kind": "python-import",
       "source": "app:api",
       "target": "context:backtest_artifacts"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:api",
+      "target": "context:extensions"
     },
     {
       "kind": "python-import",
@@ -1299,12 +1601,22 @@
     {
       "kind": "python-import",
       "source": "app:api",
+      "target": "context:operations"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:api",
       "target": "context:rl_trading"
     },
     {
       "kind": "python-import",
       "source": "app:api",
       "target": "context:strategy"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:api",
+      "target": "core:integration"
     },
     {
       "kind": "python-import",
@@ -1329,6 +1641,16 @@
     {
       "kind": "python-import",
       "source": "app:cli",
+      "target": "context:extensions"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:cli",
+      "target": "context:identity"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:cli",
       "target": "context:indicators"
     },
     {
@@ -1339,12 +1661,22 @@
     {
       "kind": "python-import",
       "source": "app:cli",
+      "target": "context:notifications"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:cli",
       "target": "core:platform"
     },
     {
       "kind": "python-import",
       "source": "app:cli",
       "target": "core:shared_kernel"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:control_agent",
+      "target": "context:operations"
     },
     {
       "kind": "python-import",
@@ -1370,6 +1702,76 @@
       "kind": "python-import",
       "source": "app:exchange_execution",
       "target": "core:shared_kernel"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:migrations",
+      "target": "context:backtest"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:migrations",
+      "target": "context:extensions"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:migrations",
+      "target": "context:identity"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:migrations",
+      "target": "context:live_execution"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:migrations",
+      "target": "context:market_data"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:migrations",
+      "target": "context:notifications"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:migrations",
+      "target": "context:strategy"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:migrations",
+      "target": "core:integration"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:migrations",
+      "target": "core:platform"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:migrations",
+      "target": "core:shared_kernel"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:plugin_gateway",
+      "target": "core:integration"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:roehubctl",
+      "target": "app:cli"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:roehubctl",
+      "target": "app:control_agent"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:roehubctl",
+      "target": "context:operations"
     },
     {
       "kind": "python-import",
@@ -1408,6 +1810,11 @@
     },
     {
       "kind": "python-import",
+      "source": "app:web",
+      "target": "app:common"
+    },
+    {
+      "kind": "python-import",
       "source": "context:backtest",
       "target": "context:backtest_artifacts"
     },
@@ -1415,6 +1822,11 @@
       "kind": "python-import",
       "source": "context:backtest",
       "target": "context:indicators"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:backtest",
+      "target": "context:market_data"
     },
     {
       "kind": "python-import",
@@ -1444,6 +1856,11 @@
     {
       "kind": "python-import",
       "source": "context:backtest_artifacts",
+      "target": "core:integration"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:backtest_artifacts",
       "target": "core:platform"
     },
     {
@@ -1454,7 +1871,37 @@
     {
       "kind": "python-import",
       "source": "context:exchange_control",
+      "target": "context:identity"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:exchange_control",
+      "target": "core:platform"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:exchange_control",
       "target": "core:shared_kernel"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:extensions",
+      "target": "context:identity"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:extensions",
+      "target": "core:integration"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:extensions",
+      "target": "core:shared_kernel"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:identity",
+      "target": "core:platform"
     },
     {
       "kind": "python-import",
@@ -1495,6 +1942,11 @@
       "kind": "python-import",
       "source": "context:market_data",
       "target": "core:shared_kernel"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:notifications",
+      "target": "core:platform"
     },
     {
       "kind": "python-import",
@@ -1543,6 +1995,11 @@
     },
     {
       "kind": "python-import",
+      "source": "core:integration",
+      "target": "context:extensions"
+    },
+    {
+      "kind": "python-import",
       "source": "core:platform",
       "target": "context:market_data"
     },
@@ -1573,6 +2030,36 @@
     },
     {
       "kind": "python-import",
+      "source": "worker:job_runtime",
+      "target": "app:control_agent"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:job_runtime",
+      "target": "context:backtest_artifacts"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:job_runtime",
+      "target": "context:extensions"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:job_runtime",
+      "target": "context:operations"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:job_runtime",
+      "target": "core:integration"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:job_runtime",
+      "target": "core:shared_kernel"
+    },
+    {
+      "kind": "python-import",
       "source": "worker:market_data_ws",
       "target": "app:cli"
     },
@@ -1598,6 +2085,16 @@
     },
     {
       "kind": "python-import",
+      "source": "worker:notification_dispatcher",
+      "target": "core:platform"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:notification_report_scheduler",
+      "target": "app:common"
+    },
+    {
+      "kind": "python-import",
       "source": "worker:notification_report_scheduler",
       "target": "context:notifications"
     },
@@ -1615,6 +2112,11 @@
       "kind": "python-import",
       "source": "worker:rl_trading_inference",
       "target": "context:strategy"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:rl_trading_inference",
+      "target": "core:shared_kernel"
     },
     {
       "kind": "python-import",
@@ -1649,7 +2151,22 @@
     {
       "kind": "python-import",
       "source": "worker:telegram_bot_worker",
+      "target": "app:common"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:telegram_bot_worker",
       "target": "context:notifications"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:telegram_bot_worker",
+      "target": "core:platform"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:telegram_bot_worker",
+      "target": "core:shared_kernel"
     }
   ],
   "description": "Торговая платформа: исследование, рыночные данные, стратегии, бектест, исполнение и эксплуатация.",
@@ -2479,6 +2996,136 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/agents/generated/rl-trading-agent-platform-v1/22-final-docs-prompt-closure.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/00-freeze-current-state-and-contracts.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/01-open-source-license-and-release-governance.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/02-machine-readable-runbooks.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/03-installation-config-and-release-manifest.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/04-storage-bootstrap-and-migrations.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/05-organizations-rbac-and-audit.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/06-local-auth-sessions-and-recovery.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/07-oidc-provider-integration.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/08-openbao-secrets-and-recovery.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/09-research-context-organization-isolation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/10-trading-context-organization-isolation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/11-notification-and-telegram-provider-plugins.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/12-plugin-platform-api-and-sdk.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/13-data-sources-panels-and-design-system.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/14-artifact-store-and-default-bundles.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/15-isolated-job-and-strategy-runtimes.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/16-execution-gateway-and-mainnet-safety.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/17-containerize-all-services-and-profiles.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/18-control-agent-and-roehubctl.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/19-administration-web-ui.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/20-observability-and-operational-actions.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/21-backup-restore-upgrade-and-rollback.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/22-signed-offline-release-bundle.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/23-greenfield-installation-lifecycle-rehearsal.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/24-platform-matrix-release-candidate.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/25-greenfield-production-launch.md"
     },
     {
       "area": "knowledge",
@@ -3786,6 +4433,11 @@
       "path": "AGENTS.md"
     },
     {
+      "area": "repository-root",
+      "kind": "documentation",
+      "path": "CONTRIBUTING.md"
+    },
+    {
       "area": "repository-meta",
       "kind": "other",
       "path": "Dockerfile.api"
@@ -3796,9 +4448,19 @@
       "path": "LICENSE"
     },
     {
+      "area": "repository-root",
+      "kind": "other",
+      "path": "NOTICE"
+    },
+    {
       "area": "knowledge",
       "kind": "documentation",
       "path": "README.md"
+    },
+    {
+      "area": "repository-root",
+      "kind": "documentation",
+      "path": "SECURITY.md"
     },
     {
       "area": "repository-meta",
@@ -4053,6 +4715,11 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/api/control_agent_client.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/api/dto/__init__.py"
     },
     {
@@ -4123,12 +4790,27 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/api/operational_health_client.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/api/routes/__init__.py"
     },
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/api/routes/admin.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/api/routes/backtests.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/api/routes/extensions.py"
     },
     {
       "area": "delivery",
@@ -4198,6 +4880,11 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/api/wiring/modules/extensions.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/api/wiring/modules/identity.py"
     },
     {
@@ -4214,6 +4901,11 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/api/wiring/modules/market_data_reference.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/api/wiring/modules/research_tenancy.py"
     },
     {
       "area": "delivery",
@@ -4253,6 +4945,11 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/cli/commands/artifacts.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/cli/commands/backfill_1m.py"
     },
     {
@@ -4268,12 +4965,32 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/cli/commands/local_auth_bootstrap.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/cli/commands/plugins.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/cli/commands/providers.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/cli/commands/rest_catchup_1m.py"
     },
     {
       "area": "delivery",
       "kind": "python",
       "path": "apps/cli/commands/sync_instruments.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/cli/commands/telegram.py"
     },
     {
       "area": "delivery",
@@ -4328,6 +5045,66 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/common/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/common/runtime_health.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/common/uvicorn_logging.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/control_agent/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/control_agent/auth.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/control_agent/backup_backend.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/control_agent/docker_backend.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/control_agent/job_rpc.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/control_agent/job_runtime_backend.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/control_agent/main/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/control_agent/main/main.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/control_agent/server.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/exchange_control/__init__.py"
     },
     {
@@ -4354,6 +5131,11 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/exchange_execution/adapters/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/exchange_execution/adapters/emulator.py"
     },
     {
       "area": "delivery",
@@ -4398,7 +5180,57 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/migrations/extensions_plugin_runtime_probe.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/migrations/local_auth_runtime_probe.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/migrations/main.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/migrations/notification_provider_runtime_probe.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/migrations/oidc_runtime_probe.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/migrations/organization_runtime_probe.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/migrations/research_runtime_probe.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/migrations/storage.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/migrations/storage_main.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/migrations/trading_runtime_probe.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/migrations/verify_storage_runtime.py"
     },
     {
       "area": "delivery",
@@ -4409,6 +5241,56 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/monitoring/clickhouse_exporter.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/monitoring/operational_health.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/plugin_gateway/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/plugin_gateway/main/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/plugin_gateway/main/app.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/plugin_gateway/main/main.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/roehubctl/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/roehubctl/main/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/roehubctl/main/main.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/runtime_probe/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/runtime_probe/main.py"
     },
     {
       "area": "delivery",
@@ -4523,6 +5405,11 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/web/dist/css/pages/plugin-panel-lab.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/web/dist/css/pages/settings.css"
     },
     {
@@ -4574,6 +5461,11 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/web/dist/js/components/listbox.js"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/web/dist/js/components/plugin-panel.js"
     },
     {
       "area": "delivery",
@@ -4654,6 +5546,11 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/web/dist/js/pages/landing.js"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/web/dist/js/pages/plugin-panel-lab.js"
     },
     {
       "area": "delivery",
@@ -4843,6 +5740,11 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/web/templates/pages/admin.html"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/web/templates/pages/backtests.html"
     },
     {
@@ -4883,7 +5785,17 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/web/templates/pages/plugin_panel_lab.html"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/web/templates/pages/register.html"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/web/templates/pages/runbook.html"
     },
     {
       "area": "delivery",
@@ -4983,6 +5895,51 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/worker/job_runtime/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/job_runtime/authority.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/job_runtime/capabilities.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/job_runtime/control.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/job_runtime/control_agent_client.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/job_runtime/executor.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/job_runtime/main.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/job_runtime/oci_runner.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/job_runtime/recovery.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/worker/market_data_ws/__init__.py"
     },
     {
@@ -5044,6 +6001,16 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/worker/notification_report_scheduler/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/notification_report_scheduler/main/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/notification_report_scheduler/main/main.py"
     },
     {
       "area": "delivery",
@@ -5138,6 +6105,16 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/worker/telegram_bot_worker/main/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/telegram_bot_worker/main/main.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/worker/telegram_bot_worker/wiring/__init__.py"
     },
     {
@@ -5199,6 +6176,441 @@
       "area": "operations",
       "kind": "other",
       "path": "configs/dev/whitelist.csv"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/compose.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/control-policy.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/effective-config.redacted.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/generation-manifest.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/observability/alertmanager.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/observability/alerts.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/observability/blackbox.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/observability/grafana-dashboard.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/observability/grafana-dashboards.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/observability/grafana-datasources.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/observability/loki.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/observability/operational-manifest.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/oidc.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/openbao.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/prometheus.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/runtime-topology.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/service-config.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/service-configs/backtest-artifacts.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/service-configs/exchange-execution.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/service-configs/indicators.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/service-configs/market-data.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/service-configs/market_data.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/service-configs/notifications.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/service-configs/plugin-publisher-keys.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/service-configs/rl-runtime.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/base/service-configs/strategy.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "configs/installation/generated/base/service-configs/whitelist.csv"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/compose.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/control-policy.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/effective-config.redacted.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/generation-manifest.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/observability/alertmanager.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/observability/alerts.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/observability/blackbox.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/observability/grafana-dashboard.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/observability/grafana-dashboards.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/observability/grafana-datasources.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/observability/loki.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/observability/operational-manifest.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/oidc.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/openbao.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/prometheus.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/runtime-topology.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/service-config.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/service-configs/backtest-artifacts.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/service-configs/exchange-execution.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/service-configs/indicators.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/service-configs/market-data.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/service-configs/market_data.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/service-configs/notifications.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/service-configs/plugin-publisher-keys.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/service-configs/rl-runtime.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/ml/service-configs/strategy.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "configs/installation/generated/ml/service-configs/whitelist.csv"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/compose.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/control-policy.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/effective-config.redacted.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/generation-manifest.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/observability/alertmanager.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/observability/alerts.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/observability/blackbox.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/observability/grafana-dashboard.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/observability/grafana-dashboards.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/observability/grafana-datasources.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/observability/loki.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/observability/operational-manifest.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/oidc.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/openbao.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/prometheus.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/runtime-topology.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/service-config.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/service-configs/backtest-artifacts.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/service-configs/exchange-execution.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/service-configs/indicators.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/service-configs/market-data.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/service-configs/market_data.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/service-configs/notifications.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/service-configs/plugin-publisher-keys.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/service-configs/rl-runtime.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/generated/trading/service-configs/strategy.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "configs/installation/generated/trading/service-configs/whitelist.csv"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/roehub.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/runtime-input-inventory.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/installation/runtime-service-manifest.json"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/openbao/backup.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/openbao/bootstrap.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "configs/openbao/service-identities.yaml"
     },
     {
       "area": "operations",
@@ -7303,6 +8715,21 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/architecture/identity/local-auth-sessions-recovery-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/identity/oidc-authentication-provider-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/identity/organizations-rbac-audit-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/architecture/indicators/README.md"
     },
     {
@@ -8017,6 +9444,231 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/artifact-store-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/data-sources-panels-and-design-system-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/isolated-job-runtime-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/plugin-api-v1alpha1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/00-freeze-current-state-and-contracts.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/01-open-source-license-and-release-governance.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/02-machine-readable-runbooks.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/03-installation-config-and-release-manifest.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/04-storage-bootstrap-and-migrations.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/05-organizations-rbac-and-audit.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/06-local-auth-sessions-and-recovery.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/07-oidc-provider-integration.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/08-openbao-secrets-and-recovery.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/09-research-context-organization-isolation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/10-trading-context-organization-isolation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/11-notification-and-telegram-provider-plugins.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/12-plugin-platform-api-and-sdk.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/13-data-sources-panels-and-design-system.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/14-artifact-store-and-default-bundles.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/15-isolated-job-and-strategy-runtimes.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/16-execution-gateway-and-mainnet-safety.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/17-containerize-all-services-and-profiles.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/18-control-agent-and-roehubctl.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/19-administration-web-ui.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/20-observability-and-operational-actions.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/21-backup-restore-upgrade-and-rollback.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/22-signed-offline-release-bundle.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/23-greenfield-installation-lifecycle-rehearsal.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/24-platform-matrix-release-candidate.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/15-isolated-job-runtime-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/16-execution-gateway-runtime-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/17-runtime-topology-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/18-control-agent-runtime-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/19-admin-browser-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/20-admin-operational-health-browser-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/20-observability-runtime-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/21-backup-restore-upgrade-runtime-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/22-signed-offline-release-bundle-runtime-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/23-greenfield-admin.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/23-greenfield-installation-lifecycle-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/24-macos-docker-desktop-admin.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/24-macos-docker-desktop-greenfield-lifecycle-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/24-platform-matrix-readiness-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/roehub-self-hosted-oss-platform-v1-stage-ledger.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/project-map/project-map.toml"
     },
@@ -8093,12 +9745,62 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/runbooks/control-agent-emergency-recovery.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/runbooks/exchange-execution.md"
     },
     {
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/runbooks/exchange-secret-management.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/generated/ru/auth.openbao-unavailable.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/generated/ru/database.clickhouse-degraded.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/generated/ru/execution.provider-state-unknown.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/generated/ru/identity.oidc-provider-unavailable.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/generated/ru/runtime.control-agent-unavailable.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/generated/ru/runtime.observability-unavailable.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/generated/ru/runtime.service-degraded.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/generated/ru/web.api-health-degraded.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/generated/ru/worker.market-data-live-tail-gap.md"
     },
     {
       "area": "knowledge",
@@ -8123,12 +9825,62 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/runbooks/installation-backup-restore-upgrade.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/runbooks/keycloak-local-setup-and-ops.md"
     },
     {
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/runbooks/live-execution-redis-dispatch.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/locales/ru/auth.openbao-unavailable.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/locales/ru/database.clickhouse-degraded.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/locales/ru/execution.provider-state-unknown.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/locales/ru/identity.oidc-provider-unavailable.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/locales/ru/runtime.control-agent-unavailable.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/locales/ru/runtime.observability-unavailable.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/locales/ru/runtime.service-degraded.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/locales/ru/web.api-health-degraded.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/locales/ru/worker.market-data-live-tail-gap.yaml"
     },
     {
       "area": "knowledge",
@@ -8178,6 +9930,66 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/runbooks/offline-release-installation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/openbao-secrets-and-recovery.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/ops/auth.openbao-unavailable.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/ops/database.clickhouse-degraded.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/ops/execution.provider-state-unknown.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/ops/identity.oidc-provider-unavailable.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/ops/runtime.control-agent-unavailable.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/ops/runtime.observability-unavailable.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/ops/runtime.service-degraded.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/ops/web.api-health-degraded.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/ops/worker.market-data-live-tail-gap.yaml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/plugin-runtime-and-rollback.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/runbooks/prod-dashboard-metrics-reference-ru.md"
     },
     {
@@ -8189,6 +10001,16 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/runbooks/roehub-ui-autostart-systemd.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/runbooks/runbooks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/storage-bootstrap-and-migrations.md"
     },
     {
       "area": "knowledge",
@@ -8227,6 +10049,16 @@
     },
     {
       "area": "operations",
+      "kind": "other",
+      "path": "infra/docker/Dockerfile.runtime"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/docker/Dockerfile.storage-migrations"
+    },
+    {
+      "area": "operations",
       "kind": "configuration",
       "path": "infra/docker/docker-compose.backend.yml"
     },
@@ -8244,6 +10076,46 @@
       "area": "operations",
       "kind": "configuration",
       "path": "infra/docker/docker-compose.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "infra/docker/openbao-embedded.compose.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/docker/openbao/Dockerfile"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "infra/docker/openbao/buildkitd.toml"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/docker/openbao/openbao-2.5.4-licensed-qr.NOTICE"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/docker/openbao/openbao-2.5.4-licensed-qr.patch"
+    },
+    {
+      "area": "operations",
+      "kind": "python",
+      "path": "infra/docker/runtime-entrypoint.py"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "infra/docker/storage-embedded.compose.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "infra/docker/storage-external.compose.yml"
     },
     {
       "area": "operations",
@@ -8547,6 +10419,61 @@
     },
     {
       "area": "operations",
+      "kind": "other",
+      "path": "infra/openbao/config/openbao.hcl"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/openbao/policies/roehub-api.hcl"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/openbao/policies/roehub-backup-recovery.hcl"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/openbao/policies/roehub-exchange-execution.hcl"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/openbao/policies/roehub-identity.hcl"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/openbao/policies/roehub-notification-dispatcher.hcl"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/openbao/policies/roehub-plugin-runtime.template.hcl"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/openbao/policies/roehub-secret-operator.hcl"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/openbao/policies/roehub-telegram-bot-worker.hcl"
+    },
+    {
+      "area": "operations",
+      "kind": "python",
+      "path": "infra/openbao/snapshot.py"
+    },
+    {
+      "area": "operations",
+      "kind": "python",
+      "path": "infra/openbao/verify_runtime.py"
+    },
+    {
+      "area": "operations",
       "kind": "script",
       "path": "infra/scripts/monit/launchctl_service_control.sh"
     },
@@ -8602,6 +10529,11 @@
     },
     {
       "area": "operations",
+      "kind": "configuration",
+      "path": "migrations/clickhouse/manifest.json"
+    },
+    {
+      "area": "operations",
       "kind": "migration",
       "path": "migrations/clickhouse/market_data_ddl.sql"
     },
@@ -8654,6 +10586,66 @@
       "area": "operations",
       "kind": "migration",
       "path": "migrations/postgres/0010_strategy_exchange_bindings_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0011_identity_organizations_rbac_audit_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0012_identity_local_auth_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0013_identity_oidc_provider_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0014_research_organization_isolation_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0015_trading_organization_isolation_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0016_notification_provider_instances_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0017_extensions_plugin_platform_v1alpha1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0018_artifact_store_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0019_isolated_job_runtime_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0020_execution_gateway_mainnet_safety_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0021_control_operation_audit_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": "migrations/postgres/manifest.json"
     },
     {
       "area": "automation",
@@ -8954,6 +10946,151 @@
       "area": "repository-meta",
       "kind": "documentation",
       "path": "repo_tree.md"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/artifacts/artifact-backup-v1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/artifacts/artifact-manifest-v1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/artifacts/artifact-store-v1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/backup/installation-backup-manifest.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/backup/installation-backup-policy.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/backup/installation-backup-signature.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/backup/installation-capture-record.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/backup/installation-release-policy.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/config/release-manifest.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/config/roehub.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/config/runtime-service-manifest.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/config/storage-status.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/jobs/job-envelope-v1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/jobs/job-result-manifest-v1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/operations/control-agent-request.v1alpha1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/operations/control-operation.v1alpha1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/operations/control-policy.v1alpha1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/ops/action-capabilities.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/ops/operational-health.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/ops/operational-manifest.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/ops/runbook-locale.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/ops/runbook.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/plugins/conformance/plugin-response.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/plugins/plugin-rpc-v1alpha1.openapi.yaml"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/plugins/roehub-app-contribution-v1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/plugins/roehub-data-frame-v1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/plugins/roehub-panel-contribution-v1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/plugins/roehub-plugin-manifest-v1alpha1.schema.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "schemas/release/offline-release-manifest.schema.json"
     },
     {
       "area": "automation",
@@ -9271,6 +11408,31 @@
       "path": "scripts/rl_trading/stage18a_accelerated_monitor_validation.py"
     },
     {
+      "area": "repository-root",
+      "kind": "documentation",
+      "path": "sdk/README.md"
+    },
+    {
+      "area": "repository-root",
+      "kind": "python",
+      "path": "sdk/python/roehub_plugin_sdk/__init__.py"
+    },
+    {
+      "area": "repository-root",
+      "kind": "python",
+      "path": "sdk/python/roehub_plugin_sdk/v1alpha1.py"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "sdk/typescript/package.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "frontend",
+      "path": "sdk/typescript/src/index.ts"
+    },
+    {
       "area": "shared-core",
       "kind": "python",
       "path": "src/trading/__init__.py"
@@ -9388,6 +11550,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/research_organization_scope.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest/adapters/outbound/queue.py"
     },
     {
@@ -9478,12 +11645,27 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest/application/ports/research_organization_scope.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest/application/ports/staged_runner.py"
     },
     {
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/backtest/application/services/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest/application/services/organization_scoped_market_data.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest/application/services/research_identity.py"
     },
     {
       "area": "domain",
@@ -9728,6 +11910,16 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_cas/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_cas/local.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/__init__.py"
     },
     {
@@ -9739,6 +11931,16 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/path_builder.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_s3/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_s3/s3.py"
     },
     {
       "area": "domain",
@@ -9768,7 +11970,17 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/in_memory_artifact_catalog.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/artifact_catalog_repository.py"
     },
     {
       "area": "domain",
@@ -9784,6 +11996,21 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/backtest_artifacts/application/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/application/artifact_store.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/application/ports/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/application/ports/artifact_store.py"
     },
     {
       "area": "domain",
@@ -9849,6 +12076,16 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/domain/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/domain/artifact_store.py"
     },
     {
       "area": "domain",
@@ -9938,6 +12175,81 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/extensions/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/adapters/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/adapters/data_source_gateway.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/adapters/identity_authorization.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/adapters/persistence/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/adapters/persistence/in_memory.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/adapters/persistence/postgres.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/application/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/application/data_source.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/application/manifest.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/application/ports.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/application/service.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/domain/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/domain/models.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/extensions/domain/runtime_policy.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/identity/__init__.py"
     },
     {
@@ -9978,12 +12290,27 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/inbound/api/routes/auth_current_user.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/inbound/api/routes/auth_local.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/identity/adapters/inbound/api/routes/auth_oidc.py"
     },
     {
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/identity/adapters/inbound/api/routes/exchange_keys.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/inbound/api/routes/organizations.py"
     },
     {
       "area": "domain",
@@ -10009,6 +12336,21 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/identity/adapters/outbound/persistence/in_memory/exchange_keys_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/outbound/persistence/in_memory/local_auth_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/outbound/persistence/in_memory/oidc_identity_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/outbound/persistence/in_memory/organization_repository.py"
     },
     {
       "area": "domain",
@@ -10039,6 +12381,21 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/identity/adapters/outbound/persistence/postgres/gateway.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/outbound/persistence/postgres/local_auth_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/outbound/persistence/postgres/oidc_identity_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/outbound/persistence/postgres/organization_repository.py"
     },
     {
       "area": "domain",
@@ -10083,6 +12440,16 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/outbound/security/oidc/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/outbound/security/oidc/http_oidc_provider.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/identity/adapters/outbound/time/__init__.py"
     },
     {
@@ -10108,6 +12475,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/identity/application/ports/authentication_provider.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/identity/application/ports/clock.py"
     },
     {
@@ -10124,6 +12496,16 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/identity/application/ports/exchange_keys_secret_cipher.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/ports/local_auth_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/ports/organization_repository.py"
     },
     {
       "area": "domain",
@@ -10173,6 +12555,21 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/identity/application/use_cases/local_auth.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/use_cases/oidc_auth.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/use_cases/organizations.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/identity/domain/__init__.py"
     },
     {
@@ -10184,6 +12581,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/identity/domain/entities/exchange_key.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/domain/entities/organization.py"
     },
     {
       "area": "domain",
@@ -10623,6 +13025,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/live_execution/adapters/outbound/persistence/in_memory/execution_gateway_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/live_execution/adapters/outbound/persistence/in_memory/execution_intent_repository.py"
     },
     {
@@ -10663,7 +13070,17 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/live_execution/adapters/outbound/persistence/postgres/execution_gateway_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/live_execution/adapters/outbound/persistence/postgres/execution_intent_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/live_execution/adapters/outbound/persistence/postgres/execution_risk_context_resolver.py"
     },
     {
       "area": "domain",
@@ -10753,7 +13170,17 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/live_execution/application/ports/execution_gateway.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/live_execution/application/ports/execution_intent_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/live_execution/application/ports/execution_risk_context.py"
     },
     {
       "area": "domain",
@@ -10798,6 +13225,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/live_execution/application/use_cases/execution_gateway.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/live_execution/application/use_cases/execution_ingress.py"
     },
     {
@@ -10829,6 +13261,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/live_execution/domain/exchange_execution_process.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/live_execution/domain/execution_gateway.py"
     },
     {
       "area": "domain",
@@ -11413,7 +13850,22 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/notifications/adapters/outbound/persistence/postgres/provider_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/notifications/adapters/outbound/persistence/postgres/telegram_binding_store.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/notifications/adapters/outbound/providers/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/notifications/adapters/outbound/providers/http_notification_provider.py"
     },
     {
       "area": "domain",
@@ -11429,6 +13881,16 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/notifications/adapters/outbound/providers/telegram_bot_api_notification_provider.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/notifications/adapters/outbound/providers/telegram_recipient_resolver.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/notifications/adapters/outbound/providers/telegram_update_source.py"
     },
     {
       "area": "domain",
@@ -11468,6 +13930,21 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/notifications/application/ports/provider_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/notifications/application/provider_admin.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/notifications/application/replay.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/notifications/application/report_scheduler.py"
     },
     {
@@ -11493,6 +13970,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/notifications/application/telegram_worker.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/notifications/application/user_settings.py"
     },
     {
@@ -11504,6 +13986,56 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/notifications/domain/notification.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/notifications/domain/provider.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/operations/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/operations/adapters/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/operations/adapters/local_journal.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/operations/adapters/unix_client.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/operations/auth.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/operations/backup_contracts.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/operations/contracts.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/operations/ports.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/operations/service.py"
     },
     {
       "area": "domain",
@@ -12253,6 +14785,31 @@
     {
       "area": "shared-core",
       "kind": "python",
+      "path": "src/trading/integration/artifact_store.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
+      "path": "src/trading/integration/data_frame.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
+      "path": "src/trading/integration/job_runtime.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
+      "path": "src/trading/integration/job_runtime_postgres.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
+      "path": "src/trading/integration/plugin_rpc.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
       "path": "src/trading/platform/__init__.py"
     },
     {
@@ -12268,6 +14825,21 @@
     {
       "area": "shared-core",
       "kind": "python",
+      "path": "src/trading/platform/config/installation.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
+      "path": "src/trading/platform/config/operational_topology.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
+      "path": "src/trading/platform/config/runtime_topology.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
       "path": "src/trading/platform/errors/__init__.py"
     },
     {
@@ -12278,7 +14850,57 @@
     {
       "area": "shared-core",
       "kind": "python",
+      "path": "src/trading/platform/secrets/__init__.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
+      "path": "src/trading/platform/secrets/openbao.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
+      "path": "src/trading/platform/secrets/reference.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
+      "path": "src/trading/platform/secrets/transport.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
       "path": "src/trading/platform/time/system_clock.py"
+    },
+    {
+      "area": "repository-root",
+      "kind": "python",
+      "path": "src/trading/resources/__init__.py"
+    },
+    {
+      "area": "repository-root",
+      "kind": "python",
+      "path": "src/trading/resources/artifacts/__init__.py"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "src/trading/resources/artifacts/demo_bundle/artifact.bundle.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "src/trading/resources/artifacts/demo_bundle/payload/demo/hello.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "other",
+      "path": "src/trading/resources/artifacts/demo_bundle/payload/demo/model-card.txt"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "src/trading/resources/artifacts/demo_bundle/publisher-keys.json"
     },
     {
       "area": "shared-core",
@@ -12308,12 +14930,22 @@
     {
       "area": "shared-core",
       "kind": "python",
+      "path": "src/trading/shared_kernel/primitives/installation_id.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
       "path": "src/trading/shared_kernel/primitives/instrument_id.py"
     },
     {
       "area": "shared-core",
       "kind": "python",
       "path": "src/trading/shared_kernel/primitives/market_id.py"
+    },
+    {
+      "area": "shared-core",
+      "kind": "python",
+      "path": "src/trading/shared_kernel/primitives/organization_id.py"
     },
     {
       "area": "shared-core",
@@ -12344,6 +14976,156 @@
       "area": "shared-core",
       "kind": "python",
       "path": "src/trading/shared_kernel/primitives/utc_timestamp.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/admin_console_browser_app.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/admin_operational_runtime_api.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/admin_operational_runtime_web.py"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/artifacts/demo_bundle/artifact.bundle.json"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/artifacts/demo_bundle/expected-digests.json"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/artifacts/demo_bundle/expected-signed-payload.json"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/artifacts/demo_bundle/payload/demo/hello.json"
+    },
+    {
+      "area": "quality",
+      "kind": "other",
+      "path": "tests/fixtures/artifacts/demo_bundle/payload/demo/model-card.txt"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/artifacts/demo_bundle/publisher-keys.json"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/artifacts/restart_probe.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/artifacts/runtime_proof.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/control_agent/api_audit_probe.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/control_agent/runtime_proof.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/control_agent/socket_bridge.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/execution_gateway/runtime_proof.py"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/installation/roehub-external.yaml"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/jobs/crash_worker.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/jobs/restart_probe.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/jobs/runtime_proof.py"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/observability-runtime-override.yaml"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/observability-stale-override.yaml"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/plugin_panel_browser_app.py"
+    },
+    {
+      "area": "quality",
+      "kind": "other",
+      "path": "tests/fixtures/plugins/external_db_data_source/Dockerfile"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/plugins/external_db_data_source/proof.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/plugins/external_db_data_source/server.py"
+    },
+    {
+      "area": "quality",
+      "kind": "other",
+      "path": "tests/fixtures/plugins/signed_data_source/Dockerfile"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/fixtures/plugins/signed_data_source/server.py"
+    },
+    {
+      "area": "quality",
+      "kind": "migration",
+      "path": "tests/fixtures/storage/clickhouse-interrupted/0001_interrupted.sql"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/storage/clickhouse-interrupted/manifest.json"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/golden/installation/profile-output-sha256.json"
     },
     {
       "area": "quality",
@@ -12458,6 +15240,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/api/test_admin_routes.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/api/test_api_error_handlers.py"
     },
     {
@@ -12474,6 +15261,16 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/api/test_backtests_routes.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/api/test_control_agent_client.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/api/test_extensions_routes.py"
     },
     {
       "area": "quality",
@@ -12518,7 +15315,17 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/api/test_operational_health_client.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/api/test_operations_routes.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/api/test_organizations_routes.py"
     },
     {
       "area": "quality",
@@ -12568,7 +15375,32 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/cli/test_artifacts_cli.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/control_agent/test_auth.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/control_agent/test_backup_backend.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/control_agent/test_docker_backend.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/control_agent/test_job_rpc.py"
     },
     {
       "area": "quality",
@@ -12584,6 +15416,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/exchange_execution/test_native_http_binance_endpoints.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/migrations/test_artifact_store_sql.py"
     },
     {
       "area": "quality",
@@ -12608,6 +15445,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/migrations/test_control_operation_audit_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/migrations/test_exchange_account_projection_config_guard_sql.py"
     },
     {
@@ -12619,6 +15461,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/migrations/test_exchange_execution_process_skeleton_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/migrations/test_execution_gateway_mainnet_safety_sql.py"
     },
     {
       "area": "quality",
@@ -12648,12 +15495,37 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/migrations/test_extensions_plugin_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/migrations/test_identity_account_settings_sql.py"
     },
     {
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/migrations/test_identity_exchange_audit_events_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/migrations/test_identity_local_auth_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/migrations/test_identity_oidc_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/migrations/test_identity_organizations_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/migrations/test_isolated_job_runtime_sql.py"
     },
     {
       "area": "quality",
@@ -12673,12 +15545,22 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/migrations/test_notification_provider_instances_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/migrations/test_notification_telegram_observability_sql.py"
     },
     {
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/migrations/test_notifications_context_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/migrations/test_research_organization_isolation_sql.py"
     },
     {
       "area": "quality",
@@ -12694,6 +15576,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/migrations/test_rl_trading_model_registry_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/migrations/test_storage_lifecycle.py"
     },
     {
       "area": "quality",
@@ -12753,7 +15640,17 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/migrations/test_trading_organization_isolation_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/monitoring/test_clickhouse_exporter.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/roehubctl/test_roehubctl.py"
     },
     {
       "area": "quality",
@@ -12778,7 +15675,17 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/test_operational_health.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/test_strategy_live_runner_main.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/test_uvicorn_logging.py"
     },
     {
       "area": "quality",
@@ -12863,6 +15770,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/worker/test_stage17_runtime_roles.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/worker/test_telegram_bot_worker_wiring.py"
     },
     {
@@ -12893,12 +15805,27 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/backtest/adapters/outbound/test_postgres_research_organization_scope.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/backtest/adapters/test_backtest_artifacts_runtime_config.py"
     },
     {
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/contexts/backtest/adapters/test_indicators_yaml_defaults_provider.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/test_organization_scoped_market_data.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/test_research_identity.py"
     },
     {
       "area": "quality",
@@ -13058,6 +15985,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/backtest_artifacts/test_artifact_store_v1.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/exchange_control/test_exchange_account_state_reader.py"
     },
     {
@@ -13093,6 +16025,26 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/extensions/test_data_source.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/extensions/test_data_source_gateway.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/extensions/test_lifecycle.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/extensions/test_manifest.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/identity/adapters/outbound/persistence/postgres/test_identity_session_repository.py"
     },
     {
@@ -13109,6 +16061,21 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/contexts/identity/application/test_exchange_keys_use_cases.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/identity/application/test_local_auth.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/identity/application/test_organization_access.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/identity/test_http_oidc_provider.py"
     },
     {
       "area": "quality",
@@ -13278,6 +16245,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/live_execution/test_execution_gateway_safety.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/live_execution/test_execution_ingress_service.py"
     },
     {
@@ -13289,6 +16261,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/contexts/live_execution/test_paper_coverage_service.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/live_execution/test_position_ownership_service.py"
     },
     {
       "area": "quality",
@@ -13518,6 +16495,16 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/notifications/test_provider_contract.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/notifications/test_replay.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/notifications/test_report_scheduler.py"
     },
     {
@@ -13544,6 +16531,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/contexts/notifications/test_telegram_update_mapper.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/operations/test_control_operations.py"
     },
     {
       "area": "quality",
@@ -13783,6 +16775,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/infra/test_openbao_assets.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/infra/test_prod_compose_files.py"
     },
     {
@@ -13793,7 +16790,52 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/integration/test_artifact_store.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/integration/test_data_frame.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/integration/test_job_runtime.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/integration/test_plugin_rpc.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/platform/config/test_indicators_compute_numba_config.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/platform/config/test_installation.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/platform/config/test_operational_topology.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/platform/secrets/test_openbao.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/platform/secrets/test_reference.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/platform/secrets/test_transport.py"
     },
     {
       "area": "quality",
@@ -13878,6 +16920,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/sdk/test_plugin_sdk_conformance.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/shared_kernel/primitives/test_candle.py"
     },
     {
@@ -13909,6 +16956,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/shared_kernel/primitives/test_user_id.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_build_openbao_image.py"
     },
     {
       "area": "quality",
@@ -13948,12 +17000,97 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/tools/test_generate_backup_schemas.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/tools/test_generate_docs_index.py"
     },
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/tools/test_generate_installation_config.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/tools/test_generate_project_map.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_generate_runbooks.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_generate_runtime_topology.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_greenfield_lifecycle.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_installation_backup_bundle.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_offline_release_bundle.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_oss_metadata.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_runtime_input_inventory.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_runtime_license_audit.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/artifacts/__init__.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/artifacts/generate_schemas.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/backup/__init__.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/backup/bundle.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/backup/generate_schemas.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/backup/release_lifecycle.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/backup/verify_runtime.py"
     },
     {
       "area": "automation",
@@ -14058,6 +17195,11 @@
     {
       "area": "automation",
       "kind": "python",
+      "path": "tools/docs/generate_runbooks.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
       "path": "tools/exchange_connection_cleanup.py"
     },
     {
@@ -14071,6 +17213,146 @@
       "path": "tools/exchange_connections/reclassify_non_trading_active.py"
     },
     {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/jobs/__init__.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/jobs/generate_schemas.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/plugins/__init__.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/plugins/validate.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/plugins/verify_runtime.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/__init__.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/local_auth_browser_app.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/oidc_browser_app.py"
+    },
+    {
+      "area": "automation",
+      "kind": "documentation",
+      "path": "tools/release/README.md"
+    },
+    {
+      "area": "automation",
+      "kind": "documentation",
+      "path": "tools/release/THIRD_PARTY_NOTICES.md"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/build_openbao_image.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/generate_installation_config.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/generate_runtime_topology.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/greenfield_oidc_fixture.py"
+    },
+    {
+      "area": "automation",
+      "kind": "script",
+      "path": "tools/release/install-offline.sh"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/offline_bundle.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/oss_metadata.py"
+    },
+    {
+      "area": "automation",
+      "kind": "configuration",
+      "path": "tools/release/oss_policy.json"
+    },
+    {
+      "area": "automation",
+      "kind": "configuration",
+      "path": "tools/release/preliminary-sbom.spdx.json"
+    },
+    {
+      "area": "automation",
+      "kind": "configuration",
+      "path": "tools/release/release-metadata.json"
+    },
+    {
+      "area": "automation",
+      "kind": "configuration",
+      "path": "tools/release/runtime-license-policy.json"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/runtime_input_inventory.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/runtime_license_audit.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/verify_greenfield_lifecycle.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/verify_installation_runtime.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/verify_observability_runtime.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/verify_offline_bundle_runtime.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/release/verify_runtime_topology.py"
+    },
+    {
       "area": "quality",
       "kind": "other",
       "path": "typings/numba/__init__.pyi"
@@ -14081,7 +17363,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 2485,
+  "inventory_file_count": 3038,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -14108,6 +17390,21 @@
       "label": "identity/config/jobs",
       "source": "api",
       "target": "postgres"
+    },
+    {
+      "label": "typed operation + short-lived identity",
+      "source": "api",
+      "target": "control-agent"
+    },
+    {
+      "label": "Unix socket emergency operation",
+      "source": "roehubctl",
+      "target": "control-agent"
+    },
+    {
+      "label": "allowlisted Compose / OCI control",
+      "source": "control-agent",
+      "target": "docker-engine"
     },
     {
       "label": "market/backtest reads",
@@ -14195,6 +17492,32 @@
       "title": "FastAPI API"
     },
     {
+      "id": "roehubctl",
+      "kind": "operator-tool",
+      "paths": [
+        "apps/roehubctl/"
+      ],
+      "title": "Host roehubctl"
+    },
+    {
+      "id": "control-agent",
+      "kind": "service",
+      "paths": [
+        "apps/control_agent/",
+        "src/trading/contexts/operations/"
+      ],
+      "title": "Host control-agent"
+    },
+    {
+      "id": "docker-engine",
+      "kind": "runtime",
+      "paths": [
+        "infra/docker/",
+        "configs/installation/generated/"
+      ],
+      "title": "Docker Engine / Compose"
+    },
+    {
       "id": "workers",
       "kind": "service-group",
       "paths": [
@@ -14257,5 +17580,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "b0ff3e6ce72f55ef1010419e09d684279fa59bb4b481face7770704032834427"
+  "structural_digest": "ee45c315b667a4bc6317843660d2d02107b1454a438345a9a4c9667208fb71ad"
 }

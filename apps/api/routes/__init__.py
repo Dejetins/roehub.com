@@ -1,4 +1,6 @@
+from .admin import build_admin_router
 from .backtests import build_backtests_router
+from .extensions import build_extensions_router
 from .identity import build_identity_router
 from .indicators import build_indicators_router
 from .market_data_reference import build_market_data_reference_router
@@ -11,7 +13,9 @@ from .ui_execution import build_ui_execution_router
 from .ui_strategies_dashboard import build_ui_strategies_dashboard_router
 
 __all__ = [
+    "build_admin_router",
     "build_backtests_router",
+    "build_extensions_router",
     "build_identity_router",
     "build_indicators_router",
     "build_market_data_reference_router",

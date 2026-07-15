@@ -50,6 +50,7 @@ from trading.contexts.rl_trading.domain.stage08k_monitor_runtime import (
     open_stage08k_virtual_trade_v1,
     stage08k_entry_decision_id_v1,
 )
+from trading.shared_kernel.primitives import OrganizationId
 
 DEFAULT_DATASET_MANIFEST = Path(
     "/opt/roehub/state/rl_trading/datasets/"
@@ -64,6 +65,9 @@ EXECUTION_STREAMS = (
     "execution.requests.v1",
     "execution.requests.retry.v1",
     "execution.requests.dlq.v1",
+)
+_OFFLINE_ORGANIZATION_ID = OrganizationId.from_string(
+    "00000000-0000-4000-8000-000000000010"
 )
 
 
@@ -424,7 +428,11 @@ def replay_historical_sessions(
         )
     source_count_before_replay = len(repository.source_events)
     for context, decision in replay_calls:
-        producer.record_monitor_only_decision(context=context, decision=decision)
+        producer.record_monitor_only_decision(
+            organization_id=_OFFLINE_ORGANIZATION_ID,
+            context=context,
+            decision=decision,
+        )
     return {
         "decision_latency_p95_ms": _p95(
             [row.decision_latency_ms for row in selected]
@@ -537,6 +545,7 @@ def run_close_boundary_validation(
         worker = Stage08kMonitorWorker(
             instruments=tuple(instruments),
             operator_context=RlTradingInferenceOperatorContextConfig(
+                organization_id=str(_OFFLINE_ORGANIZATION_ID),
                 owner_user_id=owner_id,
                 strategy_id=strategy_id,
                 strategy_run_id=strategy_run_id,
@@ -685,7 +694,11 @@ def _record(
     decision: Stage13InferenceDecision,
 ) -> float:
     started = time.perf_counter()
-    event = producer.record_monitor_only_decision(context=context, decision=decision)
+    event = producer.record_monitor_only_decision(
+        organization_id=_OFFLINE_ORGANIZATION_ID,
+        context=context,
+        decision=decision,
+    )
     if event.intent_id is not None:
         raise RuntimeError("accelerated monitor source event unexpectedly has intent")
     if event.outcome_reason != STAGE13_SOURCE_EVENT_OUTCOME_REASON_V1:

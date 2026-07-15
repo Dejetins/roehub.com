@@ -88,6 +88,7 @@ class DeleteStrategyUseCase:
 
         try:
             changed = self._repository.soft_delete(
+                organization_id=current_user.organization_id,
                 user_id=current_user.user_id,
                 strategy_id=strategy.strategy_id,
             )

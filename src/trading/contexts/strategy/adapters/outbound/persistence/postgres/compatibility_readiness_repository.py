@@ -41,6 +41,7 @@ class PostgresStrategyCompatibilityReadinessRepository(
             INSERT INTO {self._checks_table}
             (
                 compatibility_check_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 source_job_id,
@@ -56,6 +57,7 @@ class PostgresStrategyCompatibilityReadinessRepository(
             VALUES
             (
                 %(compatibility_check_id)s,
+                %(organization_id)s,
                 %(owner_user_id)s,
                 %(strategy_id)s,
                 %(source_job_id)s,
@@ -78,6 +80,7 @@ class PostgresStrategyCompatibilityReadinessRepository(
             (
                 market_data_requirement_id,
                 compatibility_check_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 source_job_id,
@@ -98,6 +101,7 @@ class PostgresStrategyCompatibilityReadinessRepository(
             (
                 %(market_data_requirement_id)s,
                 %(compatibility_check_id)s,
+                %(organization_id)s,
                 %(owner_user_id)s,
                 %(strategy_id)s,
                 %(source_job_id)s,
@@ -125,6 +129,7 @@ def _params(*, report: StrategyCompatibilityReadinessReport) -> dict[str, Any]:
     return {
         "compatibility_check_id": str(report.compatibility_check_id),
         "market_data_requirement_id": str(report.market_data_requirement_id),
+        "organization_id": str(report.organization_id),
         "owner_user_id": str(report.owner_user_id),
         "strategy_id": str(report.strategy_id) if report.strategy_id is not None else None,
         "source_job_id": str(report.source_job_id) if report.source_job_id is not None else None,

@@ -95,6 +95,7 @@ class CreateStrategyUseCase:
             spec = StrategySpecV1.from_json(payload=dict(spec_payload))
             created_at = ensure_utc_datetime(value=self._clock.now(), field_name="clock.now")
             strategy = Strategy.create(
+                organization_id=current_user.organization_id,
                 user_id=current_user.user_id,
                 spec=spec,
                 created_at=created_at,

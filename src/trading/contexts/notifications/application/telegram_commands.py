@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Protocol, TypeGuard
-from uuid import UUID, uuid4
+from uuid import NAMESPACE_URL, UUID, uuid5
 
 from trading.contexts.notifications.application.ports import NotificationRepository
 from trading.contexts.notifications.application.stats_query import (
@@ -15,16 +15,24 @@ from trading.contexts.notifications.application.telegram_binding import (
     NotificationTelegramBindingError,
     NotificationTelegramBindingService,
 )
-from trading.contexts.notifications.domain import NotificationDelivery, TelegramUpdate
-from trading.shared_kernel.primitives import UserId
+from trading.contexts.notifications.domain import (
+    NotificationDelivery,
+    NotificationRoute,
+    TelegramUpdate,
+)
+from trading.platform.secrets import SecretValue
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 TelegramCommandStatus = Literal["handled", "ignored", "failed"]
 
 
 @dataclass(frozen=True, slots=True)
 class TelegramInboundCommand:
+    organization_id: OrganizationId
+    provider_instance_id: UUID
     telegram_update_id: int
     chat_id_ref: str
+    chat_id: SecretValue
     command_text: str
     received_at: datetime
 
@@ -70,6 +78,8 @@ class TelegramCommandHandler:
 
     def handle(self, *, command: TelegramInboundCommand) -> TelegramCommandHandlingResult:
         existing = self._repository.get_telegram_update(
+            organization_id=command.organization_id,
+            provider_instance_id=command.provider_instance_id,
             telegram_update_id=command.telegram_update_id
         )
         if existing is not None:
@@ -89,11 +99,14 @@ class TelegramCommandHandler:
         response_text = ""
 
         if parsed.name == "start":
-            status, owner_user_id, response_text = self._handle_start(
+            status, bound_owner_user_id, response_text = self._handle_start(
                 code=parsed.args[0] if parsed.args else "",
                 chat_id_ref=command.chat_id_ref,
+                chat_id=command.chat_id,
+                existing_owner_user_id=owner_user_id,
                 now=command.received_at,
             )
+            owner_user_id = bound_owner_user_id or owner_user_id
         elif owner_user_id is None:
             status = "failed"
             response_text = (
@@ -107,6 +120,8 @@ class TelegramCommandHandler:
             )
 
         update = TelegramUpdate(
+            organization_id=command.organization_id,
+            provider_instance_id=command.provider_instance_id,
             telegram_update_id=command.telegram_update_id,
             received_at=command.received_at,
             chat_id_ref=command.chat_id_ref,
@@ -117,33 +132,54 @@ class TelegramCommandHandler:
                 args=parsed.args,
             ),
             status=status,
-            idempotency_key=f"telegram_update:{command.telegram_update_id}",
+            idempotency_key=(
+                f"telegram_update:{command.provider_instance_id}:"
+                f"{command.telegram_update_id}"
+            ),
             created_at=command.received_at,
             handled_at=command.received_at if status == "handled" else None,
         )
-        recorded = self._repository.record_telegram_update(update=update)
+        route = _command_response_route(update=update, created_at=command.received_at)
         delivery = _command_response_delivery(
-            update=recorded,
+            organization_id=command.organization_id,
+            provider_instance_id=command.provider_instance_id,
+            update=update,
+            route=route,
             response_text=response_text,
             created_at=command.received_at,
         )
-        self._repository.record_delivery(delivery=delivery)
+        recorded, _recorded_route, recorded_delivery = (
+            self._repository.record_telegram_command_response(
+                update=update,
+                route=route,
+                delivery=delivery,
+            )
+        )
         return TelegramCommandHandlingResult(
             telegram_update=recorded,
             status=status,
             response_text=response_text,
-            delivery=delivery,
+            delivery=recorded_delivery,
         )
 
     def _handle_start(
-        self, *, code: str, chat_id_ref: str, now: datetime
+        self,
+        *,
+        code: str,
+        chat_id_ref: str,
+        chat_id: SecretValue,
+        existing_owner_user_id: UserId | None,
+        now: datetime,
     ) -> tuple[TelegramCommandStatus, UserId | None, str]:
+        if existing_owner_user_id is not None:
+            return "handled", existing_owner_user_id, "Telegram binding already confirmed."
         if not code:
             return "failed", None, "Open Roehub settings and send /start with a fresh code."
         try:
             status = self._binding_service.confirm_binding_code(
                 code=code,
                 chat_id_ref=chat_id_ref,
+                chat_id=chat_id,
                 now=now,
             )
         except NotificationTelegramBindingError:
@@ -263,15 +299,29 @@ def _command_args_json(
 
 
 def _command_response_delivery(
-    *, update: TelegramUpdate, response_text: str, created_at: datetime
+    *,
+    organization_id: OrganizationId,
+    provider_instance_id: UUID,
+    update: TelegramUpdate,
+    route: NotificationRoute,
+    response_text: str,
+    created_at: datetime,
 ) -> NotificationDelivery:
     return NotificationDelivery(
-        delivery_id=uuid4(),
+        delivery_id=uuid5(
+            NAMESPACE_URL,
+            (
+                "roehub:notifications:telegram-command-delivery:"
+                f"{organization_id}:{provider_instance_id}:{update.telegram_update_id}"
+            ),
+        ),
+        organization_id=organization_id,
+        provider_instance_id=provider_instance_id,
         event_id=None,
         report_run_id=None,
         command_id=UUID(int=update.telegram_update_id),
-        route_id=uuid4(),
-        provider_key="log_only",
+        route_id=route.route_id,
+        provider_key="telegram_bot_api",
         channel_key="telegram",
         recipient_address_ref=update.chat_id_ref,
         template_key="telegram_command_response",
@@ -283,4 +333,39 @@ def _command_response_delivery(
         status="pending",
         attempt_count=0,
         created_at=created_at,
+    )
+
+
+def _command_response_route(
+    *, update: TelegramUpdate, created_at: datetime
+) -> NotificationRoute:
+    recipient_identity = (
+        f"user:{update.owner_user_id}"
+        if update.owner_user_id is not None
+        else "admin:unbound"
+    )
+    route_id = uuid5(
+        NAMESPACE_URL,
+        (
+            "roehub:notifications:telegram-command-response:"
+            f"{update.organization_id}:{update.provider_instance_id}:"
+            f"{update.chat_id_ref}:{recipient_identity}"
+        ),
+    )
+    return NotificationRoute(
+        route_id=route_id,
+        organization_id=update.organization_id,
+        provider_instance_id=update.provider_instance_id,
+        recipient_kind="user" if update.owner_user_id is not None else "admin",
+        owner_user_id=update.owner_user_id,
+        channel_key="telegram",
+        provider_key="telegram_bot_api",
+        mode="all",
+        category_filter=(),
+        scope_filter_json={"source": "telegram_command"},
+        schedule_json={},
+        recipient_address_ref=update.chat_id_ref,
+        status="active",
+        created_at=created_at,
+        updated_at=created_at,
     )

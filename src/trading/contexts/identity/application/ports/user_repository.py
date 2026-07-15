@@ -75,3 +75,23 @@ class UserRepository(Protocol):
             Writes one record in identity storage.
         """
         ...
+
+    def create_local_user(
+        self,
+        *,
+        user_id: UserId,
+        created_at: datetime,
+    ) -> User:
+        """Create a greenfield local identity user with a caller-assigned stable id."""
+
+        ...
+
+    def record_local_login(
+        self,
+        *,
+        user_id: UserId,
+        login_at: datetime,
+    ) -> User:
+        """Record a successful local authentication without changing identity bindings."""
+
+        ...

@@ -25,6 +25,10 @@ from .lazy_trades_materializations import (
     BacktestLazyTradesMaterializationStatus,
     BacktestLazyTradesMaterializationTask,
 )
+from .research_organization_scope import (
+    ResearchOrganizationScope,
+    ResearchOrganizationScopeResolver,
+)
 from .staged_runner import BacktestGridDefaultsProvider
 
 __all__ = [
@@ -33,6 +37,8 @@ __all__ = [
     "BacktestGridDefaultsProvider",
     "BacktestJobLeaseRepository",
     "BacktestJobExecutionTrigger",
+    "ResearchOrganizationScope",
+    "ResearchOrganizationScopeResolver",
     "BacktestJobListPage",
     "BacktestJobListQuery",
     "BacktestJobRepository",

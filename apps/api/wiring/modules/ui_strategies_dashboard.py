@@ -63,6 +63,7 @@ from apps.api.routes.ui_strategies_dashboard import (
     build_ui_strategies_dashboard_router as build_ui_strategies_dashboard_api_router,
 )
 from apps.api.wiring.modules.market_data_reference import build_market_data_reference_use_cases
+from apps.api.wiring.modules.research_tenancy import build_required_organization_scope_resolver
 from apps.api.wiring.modules.strategy import (
     _build_compatibility_readiness_service,
     _build_live_profile_repository,
@@ -73,6 +74,7 @@ from apps.api.wiring.modules.strategy import (
     _resolve_strategy_runtime_settings,
     is_strategy_api_enabled,
 )
+from trading.contexts.backtest.application.ports import ResearchOrganizationScopeResolver
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.live_execution.adapters.outbound import (
@@ -119,7 +121,7 @@ from trading.contexts.strategy.domain.entities import (
     StrategyRun,
     StrategySignal,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 _DEFAULT_REFRESH_INTERVAL_SECONDS = 15
 _MINIMUM_MANUAL_REFRESH_SECONDS = 10
@@ -163,6 +165,7 @@ class AccountProjectionReadinessService(Protocol):
     def get_readiness(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID | None,
         requirement: ExpectedInstrumentConfig | None,
@@ -171,13 +174,18 @@ class AccountProjectionReadinessService(Protocol):
 
 class PaperAccountingReadService(Protocol):
     def get_latest_accounting_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID
+        self, *, organization_id: OrganizationId, owner_user_id: UserId, strategy_id: UUID
     ) -> StrategyPaperAccountingSnapshot | None: ...
 
 
 class ExecutionOutcomeReadService(Protocol):
     def list_producer_outcome_links_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID, limit: int
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+        limit: int,
     ) -> tuple[ExecutionProducerOutcomeLink, ...]: ...
 
 
@@ -236,6 +244,7 @@ class StrategyDashboardQueryService:
         execution_outcome_service: ExecutionOutcomeReadService | None = None,
         rl_live_ticker_entitlement_service: RlLiveTickerEntitlementService | None = None,
         rl_risk_sizing_policy_service: RlRiskSizingPolicyService | None = None,
+        organization_scope_resolver: ResearchOrganizationScopeResolver | None = None,
         refresh_limiter: StrategyDashboardManualRefreshLimiter | None = None,
     ) -> None:
         self._strategy_repository = strategy_repository
@@ -249,6 +258,7 @@ class StrategyDashboardQueryService:
         self._execution_outcome_service = execution_outcome_service
         self._rl_live_ticker_entitlement_service = rl_live_ticker_entitlement_service
         self._rl_risk_sizing_policy_service = rl_risk_sizing_policy_service
+        self._organization_scope_resolver = organization_scope_resolver
         self._refresh_limiter = refresh_limiter or StrategyDashboardManualRefreshLimiter()
 
     def get_dashboard(
@@ -261,12 +271,18 @@ class StrategyDashboardQueryService:
         refresh: Literal["initial", "auto", "manual"],
     ) -> StrategyDashboardResponse:
         generated_at = datetime.now(UTC)
+        if self._organization_scope_resolver is None:
+            raise ValueError("Strategy dashboard requires organization scope resolver")
+        organization_id = self._organization_scope_resolver.resolve(
+            user_id=principal.user_id
+        ).organization_id
         refresh_decision = self._refresh_limiter.resolve(
             user_id=str(principal.user_id),
             requested_at=generated_at,
             refresh=refresh,
         )
         strategies, runs_by_strategy_id, dynamic_sources = self._load_strategy_state(
+            organization_id=organization_id,
             user_id=principal.user_id,
             generated_at=generated_at,
         )
@@ -515,6 +531,7 @@ class StrategyDashboardQueryService:
             )
         try:
             links = self._execution_outcome_service.list_producer_outcome_links_for_strategy(
+                organization_id=strategy.organization_id,
                 owner_user_id=principal.user_id,
                 strategy_id=strategy.strategy_id,
                 limit=_EXECUTION_OUTCOME_LIMIT,
@@ -588,6 +605,7 @@ class StrategyDashboardQueryService:
             )
         try:
             accounting = self._paper_accounting_service.get_latest_accounting_for_strategy(
+                organization_id=strategy.organization_id,
                 owner_user_id=principal.user_id,
                 strategy_id=strategy.strategy_id,
             )
@@ -685,6 +703,7 @@ class StrategyDashboardQueryService:
         )
         try:
             readiness = self._account_projection_service.get_readiness(
+                organization_id=strategy.organization_id,
                 owner_user_id=principal.user_id,
                 exchange_connection_id=exchange_connection_id,
                 requirement=requirement,
@@ -787,7 +806,10 @@ class StrategyDashboardQueryService:
         try:
             report = self._compatibility_readiness_service.check_strategy(
                 strategy_id=strategy.strategy_id,
-                current_user=CurrentUser(user_id=principal.user_id),
+                current_user=CurrentUser(
+                    user_id=principal.user_id,
+                    organization_id=strategy.organization_id,
+                ),
             )
         except Exception as error:  # noqa: BLE001
             return (
@@ -860,6 +882,7 @@ class StrategyDashboardQueryService:
             )
         try:
             signals = self._signal_repository.list_latest_for_strategy(
+                organization_id=strategy.organization_id,
                 owner_user_id=principal.user_id,
                 strategy_id=strategy.strategy_id,
                 limit=_SIGNAL_JOURNAL_LIMIT,
@@ -938,6 +961,7 @@ class StrategyDashboardQueryService:
             )
         try:
             profile = self._profile_repository.get_for_strategy(
+                organization_id=strategy.organization_id,
                 owner_user_id=principal.user_id,
                 strategy_id=strategy.strategy_id,
             )
@@ -979,6 +1003,7 @@ class StrategyDashboardQueryService:
     def _load_strategy_state(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         generated_at: datetime,
     ) -> tuple[
@@ -1008,6 +1033,7 @@ class StrategyDashboardQueryService:
 
         try:
             strategies = self._strategy_repository.list_for_user(
+                organization_id=organization_id,
                 user_id=user_id,
                 include_deleted=False,
             )
@@ -1061,6 +1087,7 @@ class StrategyDashboardQueryService:
         for strategy in tuple(strategies)[:_STRATEGY_SELECTOR_LIMIT]:
             try:
                 active_run = self._run_repository.find_active_for_strategy(
+                    organization_id=organization_id,
                     user_id=user_id,
                     strategy_id=strategy.strategy_id,
                 )
@@ -1109,6 +1136,9 @@ def build_strategy_dashboard_service(
     *,
     environ: Mapping[str, str],
 ) -> StrategyDashboardQueryService:
+    organization_scope_resolver = build_required_organization_scope_resolver(
+        environ=environ
+    )
     if not is_strategy_api_enabled(environ=environ):
         return StrategyDashboardQueryService(
             strategy_repository=None,
@@ -1122,6 +1152,7 @@ def build_strategy_dashboard_service(
             execution_outcome_service=None,
             rl_live_ticker_entitlement_service=None,
             rl_risk_sizing_policy_service=None,
+            organization_scope_resolver=organization_scope_resolver,
         )
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, _event_repository = _build_repositories(settings=settings)
@@ -1151,6 +1182,7 @@ def build_strategy_dashboard_service(
         rl_risk_sizing_policy_service=_build_rl_risk_sizing_policy_service(
             settings=settings,
         ),
+        organization_scope_resolver=organization_scope_resolver,
     )
 
 
@@ -1640,6 +1672,7 @@ def _rl_risk_policy_key(
 ) -> RlRiskSizingPolicyKey:
     exchange, market_type, symbol = _parse_instrument_key(strategy.spec.instrument_key)
     return RlRiskSizingPolicyKey(
+        organization_id=strategy.organization_id,
         owner_user_id=principal.user_id,
         strategy_id=strategy.strategy_id,
         exchange_name=exchange or "binance",
@@ -1755,13 +1788,27 @@ def _build_rl_ticker_slots(
         else (None, None, None)
     )
     mode = _profile_mode_or_monitor(profile=profile)
-    requested_ticker = RlLiveTickerIdentity(
-        owner_user_id=principal.user_id,
-        exchange_name=exchange or "binance",
-        market_type=market_type or "futures",
-        symbol=symbol,
+    requested_ticker = (
+        RlLiveTickerIdentity(
+            organization_id=strategy.organization_id,
+            owner_user_id=principal.user_id,
+            exchange_name=exchange or "binance",
+            market_type=market_type or "futures",
+            symbol=symbol,
+        )
+        if strategy is not None
+        else None
     )
-    if rl_live_ticker_entitlement_service is None:
+    if strategy is None:
+        snapshot = evaluate_rl_live_ticker_entitlement(
+            paid_level="unknown",
+            mode=mode,
+            requested_ticker=None,
+            active_tickers=(),
+        )
+        state = "degraded"
+        degradation_reason = "rl_live_ticker_organization_scope_unavailable"
+    elif rl_live_ticker_entitlement_service is None:
         snapshot = evaluate_rl_live_ticker_entitlement(
             paid_level="unknown",
             mode=mode,
@@ -1772,6 +1819,7 @@ def _build_rl_ticker_slots(
         degradation_reason = "rl_live_ticker_entitlement_repository_unavailable"
     else:
         snapshot = rl_live_ticker_entitlement_service.snapshot(
+            organization_id=strategy.organization_id,
             owner_user_id=principal.user_id,
             paid_level=paid_level,
             mode=mode,

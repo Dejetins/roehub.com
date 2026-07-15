@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
+from hashlib import sha256
 from typing import Protocol
 from uuid import uuid4
 
@@ -24,12 +26,21 @@ class NotificationDispatcherClock(Protocol):
 
 
 class NotificationDispatcherMetrics(Protocol):
-    def on_delivery_claimed(self, *, provider_key: str) -> None: ...
+    def on_delivery_claimed(
+        self, *, provider_key: str, provider_instance_id: str
+    ) -> None: ...
 
-    def on_delivery_result(self, *, provider_key: str, status: str) -> None: ...
+    def on_delivery_result(
+        self,
+        *,
+        provider_key: str,
+        provider_instance_id: str,
+        category: str,
+        status: str,
+    ) -> None: ...
 
     def observe_delivery_latency_seconds(
-        self, *, provider_key: str, seconds: float
+        self, *, provider_key: str, provider_instance_id: str, seconds: float
     ) -> None: ...
 
     def set_pending_age_seconds(self, *, seconds: float) -> None: ...
@@ -42,6 +53,8 @@ class NotificationDispatcherConfig:
     batch_size: int = 100
     lease_seconds: int = 30
     retry_backoff_seconds: int = 60
+    max_retry_backoff_seconds: int = 900
+    retry_jitter_ratio: float = 0.2
     max_attempts: int = 3
     allowed_provider_keys: frozenset[str] | None = None
 
@@ -54,6 +67,12 @@ class NotificationDispatcherConfig:
             raise ValueError(
                 "NotificationDispatcherConfig.retry_backoff_seconds must be > 0"
             )
+        if self.max_retry_backoff_seconds < self.retry_backoff_seconds:
+            raise ValueError(
+                "NotificationDispatcherConfig.max_retry_backoff_seconds must be >= base backoff"
+            )
+        if not 0 <= self.retry_jitter_ratio <= 0.5:
+            raise ValueError("NotificationDispatcherConfig.retry_jitter_ratio must be 0..0.5")
         if self.max_attempts <= 0:
             raise ValueError("NotificationDispatcherConfig.max_attempts must be > 0")
 
@@ -81,17 +100,22 @@ class NotificationDispatcher:
         metrics: NotificationDispatcherMetrics | None = None,
     ) -> None:
         self._repository = repository
-        self._providers = {provider.provider_key: provider for provider in providers}
+        self._providers = {
+            provider.provider_instance_id: provider for provider in providers
+        }
+        if len(self._providers) != len(providers):
+            raise ValueError("provider instance identifiers must be unique")
         self._clock = clock
         self._config = config or NotificationDispatcherConfig()
         self._metrics = metrics
 
     def drain_once(self) -> NotificationDispatchBatchResult:
         now = self._clock.now()
+        recovered_unknown = self._repository.recover_expired_claims(now=now)
         due = self._repository.list_due_deliveries(
             now=now, limit=self._config.batch_size
         )
-        counts = _MutableBatchCounts(scanned=len(due))
+        counts = _MutableBatchCounts(scanned=len(due), unknown=recovered_unknown)
         self._update_pending_age_metric(deliveries=due, now=now)
 
         for delivery in due:
@@ -109,15 +133,35 @@ class NotificationDispatcher:
                 continue
             counts.claimed += 1
             if self._metrics is not None:
-                self._metrics.on_delivery_claimed(provider_key=claimed.provider_key)
+                self._metrics.on_delivery_claimed(
+                    provider_key=claimed.provider_key,
+                    provider_instance_id=str(claimed.provider_instance_id),
+                )
 
-            provider = self._providers.get(claimed.provider_key)
+            provider = self._providers.get(claimed.provider_instance_id)
             if provider is None:
                 counts.provider_missing += 1
                 self._apply_result(
                     delivery=claimed,
                     result=NotificationProviderResult(
-                        status="dead_letter", error_code="provider_missing"
+                        status="dead_letter", error_code="provider_disabled"
+                    ),
+                    now=now,
+                    counts=counts,
+                )
+                continue
+
+            if (
+                provider.provider_key != claimed.provider_key
+                or (
+                    provider.organization_id is not None
+                    and provider.organization_id != claimed.organization_id
+                )
+            ):
+                self._apply_result(
+                    delivery=claimed,
+                    result=NotificationProviderResult(
+                        status="dead_letter", error_code="provider_scope_mismatch"
                     ),
                     now=now,
                     counts=counts,
@@ -126,9 +170,20 @@ class NotificationDispatcher:
 
             try:
                 result = provider.send(delivery=claimed)
+            except (asyncio.CancelledError, KeyboardInterrupt):
+                self._apply_result(
+                    delivery=claimed,
+                    result=NotificationProviderResult(
+                        status="unknown", error_code="provider_cancelled"
+                    ),
+                    now=now,
+                    counts=counts,
+                )
+                self._update_unknown_metric()
+                raise
             except Exception:  # noqa: BLE001
                 result = NotificationProviderResult(
-                    status="unknown", error_code="provider_exception"
+                    status="unknown", error_code="provider_transport_error"
                 )
             self._apply_result(delivery=claimed, result=result, now=now, counts=counts)
 
@@ -145,6 +200,8 @@ class NotificationDispatcher:
     ) -> None:
         attempt = NotificationDeliveryAttempt(
             attempt_id=uuid4(),
+            organization_id=delivery.organization_id,
+            provider_instance_id=delivery.provider_instance_id,
             delivery_id=delivery.delivery_id,
             provider_key=delivery.provider_key,
             started_at=now,
@@ -185,7 +242,11 @@ class NotificationDispatcher:
                 )
                 counts.dead_letter += 1
             else:
-                retry_after = result.retry_after_seconds or self._config.retry_backoff_seconds
+                retry_after = _bounded_retry_delay_seconds(
+                    delivery=delivery,
+                    requested=result.retry_after_seconds,
+                    config=self._config,
+                )
                 updated = replace(
                     delivery,
                     status="retry",
@@ -224,10 +285,14 @@ class NotificationDispatcher:
         )
         if self._metrics is not None:
             self._metrics.on_delivery_result(
-                provider_key=delivery.provider_key, status=updated.status
+                provider_key=delivery.provider_key,
+                provider_instance_id=str(delivery.provider_instance_id),
+                category=str(delivery.rendered_payload_json.get("category", "unknown")),
+                status=updated.status,
             )
             self._metrics.observe_delivery_latency_seconds(
                 provider_key=delivery.provider_key,
+                provider_instance_id=str(delivery.provider_instance_id),
                 seconds=max((now - delivery.created_at).total_seconds(), 0.0),
             )
 
@@ -273,3 +338,26 @@ class _MutableBatchCounts:
             suppressed=self.suppressed,
             provider_missing=self.provider_missing,
         )
+
+
+def _bounded_retry_delay_seconds(
+    *,
+    delivery: NotificationDelivery,
+    requested: int | None,
+    config: NotificationDispatcherConfig,
+) -> int:
+    if requested is not None:
+        return max(1, min(requested, config.max_retry_backoff_seconds))
+    exponent = max(delivery.attempt_count - 1, 0)
+    base = min(
+        config.retry_backoff_seconds * (2**exponent),
+        config.max_retry_backoff_seconds,
+    )
+    if config.retry_jitter_ratio == 0:
+        return base
+    digest = sha256(
+        f"{delivery.delivery_id}:{delivery.attempt_count}".encode()
+    ).digest()
+    unit = int.from_bytes(digest[:8], "big") / ((1 << 64) - 1)
+    factor = 1 - config.retry_jitter_ratio + (2 * config.retry_jitter_ratio * unit)
+    return max(1, min(round(base * factor), config.max_retry_backoff_seconds))

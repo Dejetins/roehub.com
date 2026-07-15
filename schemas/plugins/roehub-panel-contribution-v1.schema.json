@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.roehub.io/plugins/roehub-panel-contribution-v1.schema.json",
+  "title": "RoehubPanelContribution/v1",
+  "description": "Declarative host-rendered panel. Executable code, markup, and script URLs are not part of this contract.",
+  "$comment": "All presentation columns must be selected by source.query; x_column must be a dimension and y_columns must be measures. The host enforces these cross-field rules with trading.integration.RoehubPanelContribution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract", "contribution_id", "title", "description", "renderer", "source", "presentation"],
+  "properties": {
+    "contract": {"const": "RoehubPanelContribution/v1"},
+    "contribution_id": {"type": "string", "pattern": "^[a-z][a-z0-9_.-]{2,127}$"},
+    "title": {"type": "string", "minLength": 1, "maxLength": 160},
+    "description": {"type": "string", "minLength": 1, "maxLength": 500},
+    "renderer": {"enum": ["trading-time-series", "analytics-series", "analytics-table", "research-summary"]},
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["instance_id", "query"],
+      "properties": {
+        "instance_id": {"type": "string", "format": "uuid"},
+        "query": {"$ref": "#/$defs/query"}
+      }
+    },
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x_column", "y_columns", "table_columns", "default_view"],
+      "properties": {
+        "x_column": {"type": ["string", "null"], "maxLength": 128, "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"},
+        "y_columns": {"type": "array", "maxItems": 6, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"}},
+        "table_columns": {"type": "array", "minItems": 1, "maxItems": 24, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"}},
+        "default_view": {"enum": ["visual", "table"]}
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "renderer": {"enum": ["trading-time-series", "analytics-series"]}
+        },
+        "required": ["renderer"]
+      },
+      "then": {
+        "properties": {
+          "presentation": {
+            "properties": {
+              "x_column": {"type": "string"},
+              "y_columns": {"minItems": 1}
+            }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "filter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["field", "operator", "value"],
+      "properties": {
+        "field": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"},
+        "operator": {"enum": ["eq", "in", "gt", "gte", "lt", "lte"]},
+        "value": {
+          "oneOf": [
+            {"type": ["string", "integer", "number", "boolean", "null"]},
+            {"type": "array", "minItems": 1, "maxItems": 100, "items": {"type": ["string", "integer", "number", "boolean", "null"]}}
+          ]
+        }
+      }
+    },
+    "query": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract", "dataset", "dimensions", "measures", "filters", "row_limit", "byte_limit", "point_limit", "timeout_ms", "read_only"],
+      "properties": {
+        "contract": {"const": "DataSourceQuery/v1"},
+        "dataset": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"},
+        "dimensions": {"type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"}},
+        "measures": {"type": "array", "minItems": 1, "maxItems": 16, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-zA-Z][a-zA-Z0-9_.-]{0,127}$"}},
+        "filters": {"type": "array", "maxItems": 32, "items": {"$ref": "#/$defs/filter"}},
+        "row_limit": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "byte_limit": {"type": "integer", "minimum": 1024, "maximum": 1048576},
+        "point_limit": {"type": "integer", "minimum": 1, "maximum": 5000},
+        "timeout_ms": {"type": "integer", "minimum": 50, "maximum": 5000},
+        "read_only": {"const": true}
+      }
+    }
+  }
+}

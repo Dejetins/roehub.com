@@ -4,7 +4,7 @@ from typing import Protocol
 from uuid import UUID
 
 from trading.contexts.strategy.domain.entities import StrategySignal
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class StrategySignalRepository(Protocol):
@@ -13,6 +13,7 @@ class StrategySignalRepository(Protocol):
     def list_latest_for_strategy(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         limit: int,

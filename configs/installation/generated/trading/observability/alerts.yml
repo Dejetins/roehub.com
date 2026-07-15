@@ -1,0 +1,46 @@
+groups:
+- name: roehub-operational-health
+  rules:
+  - alert: RoehubOperationalServiceDegraded
+    annotations:
+      action_ref: '{{ $labels.action_ref }}'
+      description: Generated domain health is not ready; use only the linked allowlisted action.
+      runbook: /runbooks/{{ $labels.runbook_id }}
+      summary: Roehub service {{ $labels.service }} is {{ $labels.state }}
+    expr: roehub_operational_service_state{state!="ready"} == 1
+    for: 0s
+    labels:
+      severity: warning
+  - alert: RoehubOperationalHealthUnavailable
+    annotations:
+      action_ref: diagnostics
+      description: Prometheus cannot scrape the independent health service.
+      runbook: /runbooks/runtime.observability-unavailable
+      summary: Roehub operational health service is unavailable
+    expr: up{job="operational-health"} == 0
+    for: 0s
+    labels:
+      runbook_id: runtime.observability-unavailable
+      severity: critical
+  - alert: RoehubOperationalLogPushFailed
+    annotations:
+      action_ref: diagnostics
+      description: The bounded transition sink is unavailable; do not treat missing logs as healthy state.
+      runbook: /runbooks/runtime.observability-unavailable
+      summary: Roehub operational transitions are not reaching Loki
+    expr: roehub_operational_log_push_success == 0
+    for: 0s
+    labels:
+      runbook_id: runtime.observability-unavailable
+      severity: warning
+  - alert: RoehubOperationalSnapshotStale
+    annotations:
+      action_ref: diagnostics
+      description: The health worker has not completed a fresh bounded refresh.
+      runbook: /runbooks/runtime.observability-unavailable
+      summary: Roehub operational snapshot is stale
+    expr: roehub_operational_snapshot_fresh == 0
+    for: 0s
+    labels:
+      runbook_id: runtime.observability-unavailable
+      severity: critical

@@ -106,6 +106,7 @@ Do not rewrite this file for minor code-only progress.
 ### 3.1 Mission
 Roehub is an algorithmic trading platform covering the full cycle:
 
+- self-hosted open-source installation and lifecycle management,
 - market data ingestion,
 - deterministic indicator computation,
 - strategy configuration and live monitoring,
@@ -188,6 +189,7 @@ This section tracks the major project streams at a strategic level.
 | ML | future feature registry and inference path | planned | planned | no active checkpoint |
 | Live Execution | future order routing and execution gateway | planned | planned | no active checkpoint |
 | Notifications | provider-neutral user/admin notifications, Telegram bot, stats and reports | staged pack closed | active | Stages `00`-`11` closed on `main`; next step is a separate user-approved real Telegram canary/rollout beyond test/smoke recipients |
+| Self-Hosted OSS Platform | one release bundle, local-first auth, multi-org RBAC, plugins, admin/control plane, container runtime and migration | accepted architecture / staged execution not started | active | Stage `00` current; use `docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md` and its linked ledger/prompt pack |
 | Cross-cutting Architecture / Docs | roadmap integrity, design docs, milestone coordination | always-on | active | keep architecture docs aligned with delivery |
 
 ---
@@ -288,6 +290,18 @@ Always-on responsibilities:
 - prevent milestone overlap and accidental scope drift,
 - maintain a clear “what is canonical now” picture.
 
+### 6.10 Self-Hosted OSS Platform
+
+Canonical execution sources:
+
+- `plan_doc`: `docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md`;
+- `prompt_pack_dir`: `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/`;
+- `stage_ledger`: `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/roehub-self-hosted-oss-platform-v1-stage-ledger.md`;
+- `execution_mode`: `goal_driven`.
+
+The autonomous goal covers Stages `00`–`24`. Stage `25` production cutover is
+manual-only and requires a new explicit user approval.
+
 ---
 
 ## 7) Current focus
@@ -295,6 +309,7 @@ Always-on responsibilities:
 This section is operational and should stay current.
 
 ### Primary active project focus
+- Self-Hosted OSS Platform Stage `00`: current-state/component/contract freeze before implementation
 - Backtest runtime evolution under staged, rollout-safe architecture
 - Notifications final rollout boundary: staged pack closed; real Telegram canary requires user-approved recipient scope
 - Web/runtime contract consistency for browser-visible flows
@@ -307,10 +322,10 @@ This section is operational and should stay current.
 - Strategy/live operational hardening
 
 ### Currently deferred
-- ML implementation
-- Live execution implementation
+- Self-Hosted OSS Platform production cutover Stage `25` until Stage `24` acceptance and new user approval
+- Kubernetes, Podman, Colima and multi-node HA for the self-hosted release
 - broad cross-repo cleanup
-- non-essential platform polish
+- unmeasured macOS MPS/GPU support claims
 
 ---
 
@@ -319,7 +334,9 @@ This section is operational and should stay current.
 This section should describe the single most important current planning checkpoint.
 
 ### Current checkpoint
-Maintain and evolve the project through **bounded milestone execution** rather than broad redesign.
+Execute Self-Hosted OSS Platform Stage `00` from the linked plan/ledger/prompt
+pack before any implementation stage, while other accepted workstreams keep
+their own ledgers and scope.
 
 ### What “good” looks like right now
 - each major change belongs to a named workstream and checkpoint
@@ -399,6 +416,9 @@ Keep this list short and current.
 - Notifications real Telegram provider expansion remains deferred until an approved recipient/canary scope and active route readiness are available.
 - A single global `PLANS.md` can become noisy unless old decisions and outcomes are rotated aggressively.
 - Future ML and live execution work can distort current architecture if introduced too early into active planning.
+- The self-hosted migration is a repository-wide breaking change; Stage `00`
+  must keep component coverage, current runtime facts and contract migrations
+  explicit before code changes begin.
 
 ---
 
@@ -406,11 +426,11 @@ Keep this list short and current.
 
 Keep only the most recent, still-relevant decisions here.
 
-1. Use one global `PLANS.md` for all workstreams, not per-subsystem plans.
-2. Keep `.codex/AGENTS.md` for durable repo rules; keep `PLANS.md` for long-horizon execution state.
-3. Prefer bounded, milestone-shaped prompts over broad “read and redesign everything” prompts.
-4. Treat browser-visible verification as a first-class requirement when web/UI behavior is in scope.
-5. Keep Notifications provider-neutral: producer contexts publish source facts, while delivery providers live behind the `notifications` bounded context.
+1. Roehub target is a self-hosted Apache-2.0 release bundle: one supported command, multiple containers, Linux amd64/arm64 and Docker Desktop macOS.
+2. Keep the control plane as a modular monolith; isolate workers, heavy jobs, exchange execution, plugins and host operations at real failure/trust boundaries.
+3. Clean install uses local passkey-first auth; generic OIDC is optional and current Keycloak migrates through hybrid mode without changing internal `user_id`.
+4. Roehub DB owns organizations/RBAC; `admin` manages roles and plugins while owner/recovery/mainnet invariants remain separately protected.
+5. Execute the new goal only from its linked plan, 26-prompt pack and single ledger; autonomous completion stops at Stage `24` before production cutover.
 
 ---
 
@@ -418,11 +438,11 @@ Keep only the most recent, still-relevant decisions here.
 
 Keep this list current and short.
 
-1. Repo-level agent guidance has been tightened for bounded context loading and anti-legacy prompt shaping.
-2. Prompt-generation workflow has been migrated away from flat broad-reading prompt structure.
-3. Browser/runtime verification is being incorporated as a first-class concern through available browser automation surfaces.
-4. A single project-level execution map is now recognized as necessary for multi-iteration design and roadmap work.
-5. Notifications Stages `00`-`11` are closed as a main-only staged prompt pack; broad real Telegram rollout remains a separate approval-gated follow-up.
+1. The self-hosted target architecture was accepted after iterative decisions on packaging, boundaries, auth, plugins, administration and observability.
+2. A Russian plan, one execution ledger and an English goal-driven prompt pack for Stages `00`–`25` were created and linked.
+3. All 33 current project-map components are mapped to implementation stages; four target components are planned: `context:extensions`, `context:operations`, `app:control_agent`, `app:roehubctl`.
+4. Native/Monit and Keycloak-only target documents were marked superseded while current runtime facts remain valid until migration evidence exists.
+5. Notifications Stages `00`-`11` remain closed historical evidence; their provider semantics feed the new plugin migration stage.
 
 ---
 

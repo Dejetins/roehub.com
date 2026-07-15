@@ -397,7 +397,9 @@ class PublishBacktestArtifactsV2UseCase:
             time_range=build_time_range,
             asof_date=(
                 requested_time_range.end.value.astimezone(timezone.utc) - timedelta(minutes=1)
-            ).date().isoformat(),
+            )
+            .date()
+            .isoformat(),
             generated_at_utc=_utc_timestamp_literal_v2(started_at_utc),
             target_slot=precheck.inactive_slot,
             target_slot_generation=precheck.target_slot_generation,

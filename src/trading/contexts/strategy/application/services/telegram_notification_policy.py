@@ -138,6 +138,7 @@ class TelegramNotificationPolicy:
             )
 
         return StrategyTelegramNotificationV1(
+            organization_id=event.organization_id,
             user_id=event.user_id,
             ts=event.ts,
             strategy_id=event.strategy_id,

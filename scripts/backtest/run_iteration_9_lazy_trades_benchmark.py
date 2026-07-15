@@ -40,7 +40,7 @@ from trading.contexts.backtest.domain.entities import (  # noqa: E402
     BacktestJob,
     BacktestJobArtifactPin,
 )
-from trading.shared_kernel.primitives import UserId  # noqa: E402
+from trading.shared_kernel.primitives import OrganizationId, UserId  # noqa: E402
 
 DEFAULT_CANONICAL_JSON = Path(
     "docs/architecture/backtest/benchmark_iterations/"
@@ -289,6 +289,9 @@ def _job(
     request_json["artifact_metadata"] = artifact_metadata.as_mapping()
     return BacktestJob.create_queued(
         job_id=job_id,
+        organization_id=OrganizationId.from_string(
+            "00000000-0000-0000-0000-000000000001"
+        ),
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000909"),
         mode="template",
         created_at=created_at,

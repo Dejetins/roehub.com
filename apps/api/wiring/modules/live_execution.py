@@ -22,6 +22,7 @@ from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUs
 from trading.contexts.live_execution.adapters.outbound import (
     InMemoryExecutionIntentRepository,
     PostgresExecutionIntentRepository,
+    PostgresExecutionRiskContextResolver,
     RedisExecutionDispatchTransport,
     RedisExecutionDispatchTransportConfig,
     SystemLiveExecutionClock,
@@ -31,7 +32,13 @@ from trading.contexts.live_execution.application import (
     ExecutionDispatchService,
     ExecutionIngressService,
 )
+from trading.contexts.live_execution.application.ports import (
+    ExecutionRiskContextResolver,
+    FailClosedExecutionRiskContextResolver,
+)
 from trading.contexts.strategy.adapters.outbound import PsycopgStrategyPostgresGateway
+
+from .research_tenancy import build_required_organization_scope_resolver
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
 _STRATEGY_FAIL_FAST_KEY = "STRATEGY_FAIL_FAST"
@@ -77,6 +84,7 @@ class LiveExecutionServices:
     ingress_service: ExecutionIngressService
     dispatch_service: ExecutionDispatchService | None
     repository: object
+    risk_context_resolver: ExecutionRiskContextResolver
 
 
 def build_ui_execution_router_module(
@@ -86,18 +94,25 @@ def build_ui_execution_router_module(
     services: LiveExecutionServices | None = None,
 ) -> APIRouter:
     live_execution_services = services or build_live_execution_services(environ=environ)
+    organization_scope_resolver = build_required_organization_scope_resolver(
+        environ=environ
+    )
     return build_ui_execution_router(
         ingress_service=live_execution_services.ingress_service,
         dispatch_service=live_execution_services.dispatch_service,
         current_user_dependency=current_user_dependency,
+        organization_scope_resolver=organization_scope_resolver,
+        risk_context_resolver=live_execution_services.risk_context_resolver,
     )
 
 
 def build_live_execution_services(*, environ: Mapping[str, str]) -> LiveExecutionServices:
     settings = _resolve_runtime_settings(environ=environ)
     if settings.postgres_dsn:
-        repository = PostgresExecutionIntentRepository(
-            gateway=PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
+        gateway = PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn)
+        repository = PostgresExecutionIntentRepository(gateway=gateway)
+        risk_context_resolver: ExecutionRiskContextResolver = (
+            PostgresExecutionRiskContextResolver(gateway=gateway)
         )
     elif settings.fail_fast:
         raise ValueError(
@@ -105,6 +120,7 @@ def build_live_execution_services(*, environ: Mapping[str, str]) -> LiveExecutio
         )
     else:
         repository = InMemoryExecutionIntentRepository()
+        risk_context_resolver = FailClosedExecutionRiskContextResolver()
     clock = SystemLiveExecutionClock()
     ingress_service = ExecutionIngressService(
         repository=repository,
@@ -179,6 +195,7 @@ def build_live_execution_services(*, environ: Mapping[str, str]) -> LiveExecutio
         ingress_service=ingress_service,
         dispatch_service=dispatch_service,
         repository=repository,
+        risk_context_resolver=risk_context_resolver,
     )
 
 

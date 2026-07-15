@@ -1,0 +1,348 @@
+{
+  "$defs": {
+    "BackupPolicySource": {
+      "additionalProperties": false,
+      "description": "One fixed source path in an owner-protected host backup policy.",
+      "properties": {
+        "consistency_mode": {
+          "enum": [
+            "application_quiesced",
+            "database_snapshot",
+            "durable_checkpoint",
+            "encrypted_raft_snapshot",
+            "content_addressed_snapshot",
+            "bounded_history_snapshot"
+          ],
+          "title": "Consistency Mode",
+          "type": "string"
+        },
+        "filename": {
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$",
+          "title": "Filename",
+          "type": "string"
+        },
+        "limitations": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Limitations",
+          "type": "array"
+        },
+        "media_type": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "owner": {
+          "$ref": "#/$defs/BackupStateOwner"
+        },
+        "source_schema_version": {
+          "pattern": "^[a-z0-9][a-z0-9._+-]{0,63}$",
+          "title": "Source Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "filename",
+        "media_type",
+        "consistency_mode",
+        "source_schema_version"
+      ],
+      "title": "BackupPolicySource",
+      "type": "object"
+    },
+    "BackupStateOwner": {
+      "enum": [
+        "release_config",
+        "postgresql",
+        "clickhouse",
+        "redis_checkpoint",
+        "openbao",
+        "artifacts",
+        "plugin_operation_audit",
+        "observability"
+      ],
+      "title": "BackupStateOwner",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.roehub.io/backup/installation-backup-policy.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Closed host-side policy for installation backup and fresh restore.",
+  "properties": {
+    "age_identity_file": {
+      "format": "path",
+      "title": "Age Identity File",
+      "type": "string"
+    },
+    "age_recipient_file": {
+      "format": "path",
+      "title": "Age Recipient File",
+      "type": "string"
+    },
+    "backup_root": {
+      "format": "path",
+      "title": "Backup Root",
+      "type": "string"
+    },
+    "cancellation_root": {
+      "format": "path",
+      "title": "Cancellation Root",
+      "type": "string"
+    },
+    "capture_record_file": {
+      "format": "path",
+      "title": "Capture Record File",
+      "type": "string"
+    },
+    "cleanup_plaintext_sources": {
+      "const": true,
+      "default": true,
+      "enum": [
+        true
+      ],
+      "title": "Cleanup Plaintext Sources",
+      "type": "boolean"
+    },
+    "installation_fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Installation Fingerprint",
+      "type": "string"
+    },
+    "profile": {
+      "enum": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "title": "Profile",
+      "type": "string"
+    },
+    "release_policy_file": {
+      "format": "path",
+      "title": "Release Policy File",
+      "type": "string"
+    },
+    "release_version": {
+      "pattern": "^[a-z0-9][a-z0-9._+-]{0,63}$",
+      "title": "Release Version",
+      "type": "string"
+    },
+    "restore_root": {
+      "format": "path",
+      "title": "Restore Root",
+      "type": "string"
+    },
+    "schema": {
+      "const": "io.roehub.installation-backup-policy/v1alpha1",
+      "default": "io.roehub.installation-backup-policy/v1alpha1",
+      "enum": [
+        "io.roehub.installation-backup-policy/v1alpha1"
+      ],
+      "title": "Schema",
+      "type": "string"
+    },
+    "signing_private_key_file": {
+      "format": "path",
+      "title": "Signing Private Key File",
+      "type": "string"
+    },
+    "source_root": {
+      "format": "path",
+      "title": "Source Root",
+      "type": "string"
+    },
+    "sources": {
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "application_quiesced"
+              },
+              "owner": {
+                "const": "release_config"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "database_snapshot"
+              },
+              "owner": {
+                "const": "postgresql"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "database_snapshot"
+              },
+              "owner": {
+                "const": "clickhouse"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "durable_checkpoint"
+              },
+              "owner": {
+                "const": "redis_checkpoint"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "encrypted_raft_snapshot"
+              },
+              "owner": {
+                "const": "openbao"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "content_addressed_snapshot"
+              },
+              "owner": {
+                "const": "artifacts"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "application_quiesced"
+              },
+              "owner": {
+                "const": "plugin_operation_audit"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "bounded_history_snapshot"
+              },
+              "owner": {
+                "const": "observability"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        }
+      ],
+      "items": {
+        "$ref": "#/$defs/BackupPolicySource"
+      },
+      "maxItems": 8,
+      "minItems": 8,
+      "title": "Sources",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "verification_public_key_file": {
+      "format": "path",
+      "title": "Verification Public Key File",
+      "type": "string"
+    }
+  },
+  "required": [
+    "profile",
+    "installation_fingerprint",
+    "release_version",
+    "source_root",
+    "backup_root",
+    "restore_root",
+    "age_recipient_file",
+    "age_identity_file",
+    "signing_private_key_file",
+    "verification_public_key_file",
+    "cancellation_root",
+    "capture_record_file",
+    "release_policy_file",
+    "sources"
+  ],
+  "title": "InstallationBackupPolicy",
+  "type": "object"
+}

@@ -4,13 +4,11 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
 
-import pytest
 from prometheus_client import CollectorRegistry, generate_latest
 
 from apps.worker.strategy_live_runner.wiring.modules.strategy_live_runner import (
     GuardedStrategyExecutionProducer,
     StrategyLiveRunnerMetrics,
-    _require_non_empty_env_value,
 )
 from trading.contexts.live_execution.adapters.outbound.persistence.in_memory import (
     InMemoryExecutionIntentRepository,
@@ -21,7 +19,9 @@ from trading.contexts.strategy.adapters.outbound.acl.live_execution_producer imp
 )
 from trading.contexts.strategy.adapters.outbound.config import StrategyProducerRuntimeConfig
 from trading.contexts.strategy.domain.entities import StrategySignal
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-4000-8000-000000000700")
 
 
 class _ExecutionProducerSpy:
@@ -35,38 +35,6 @@ class _ExecutionProducerSpy:
 class _Clock:
     def now(self) -> datetime:
         return datetime(2026, 6, 17, 10, 2, tzinfo=timezone.utc)
-
-
-def test_require_non_empty_env_value_returns_secret() -> None:
-    """
-    Ensure helper returns configured non-empty environment variable value.
-    """
-    value = _require_non_empty_env_value(
-        environ={"TELEGRAM_BOT_TOKEN": "token-value"},
-        key="TELEGRAM_BOT_TOKEN",
-        setting_name="strategy_live_runner.telegram.bot_token_env",
-    )
-
-    assert value == "token-value"
-
-
-def test_require_non_empty_env_value_rejects_missing_or_blank_value() -> None:
-    """
-    Ensure helper fails fast when required environment variable is missing or blank.
-    """
-    with pytest.raises(ValueError):
-        _require_non_empty_env_value(
-            environ={},
-            key="TELEGRAM_BOT_TOKEN",
-            setting_name="strategy_live_runner.telegram.bot_token_env",
-        )
-
-    with pytest.raises(ValueError):
-        _require_non_empty_env_value(
-            environ={"TELEGRAM_BOT_TOKEN": "   "},
-            key="TELEGRAM_BOT_TOKEN",
-            setting_name="strategy_live_runner.telegram.bot_token_env",
-        )
 
 
 def test_guarded_strategy_execution_producer_blocks_disabled_switch() -> None:
@@ -267,12 +235,11 @@ def test_live_tail_metrics_are_bounded_and_scrapable() -> None:
     assert "run-00000000-0000-0000-0000-000000000001" not in payload
 
 
-def _signal(
-    *, mode: str, expected_order_json: dict[str, object] | None = None
-) -> StrategySignal:
+def _signal(*, mode: str, expected_order_json: dict[str, object] | None = None) -> StrategySignal:
     bar_ts_open = datetime(2026, 6, 17, 10, 0, tzinfo=timezone.utc)
     return StrategySignal(
         signal_id=UUID("00000000-0000-0000-0000-000000000903"),
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000901"),
         strategy_id=UUID("00000000-0000-0000-0000-000000000902"),
         strategy_run_id=UUID("00000000-0000-0000-0000-000000000904"),

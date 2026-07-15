@@ -1,0 +1,131 @@
+{
+  "$defs": {
+    "ArtifactStoreCapabilities": {
+      "additionalProperties": false,
+      "properties": {
+        "atomic_publish": {
+          "const": true,
+          "default": true,
+          "enum": [
+            true
+          ],
+          "title": "Atomic Publish",
+          "type": "boolean"
+        },
+        "backup_restore": {
+          "const": true,
+          "default": true,
+          "enum": [
+            true
+          ],
+          "title": "Backup Restore",
+          "type": "boolean"
+        },
+        "digest_verification": {
+          "const": true,
+          "default": true,
+          "enum": [
+            true
+          ],
+          "title": "Digest Verification",
+          "type": "boolean"
+        },
+        "garbage_collection": {
+          "const": true,
+          "default": true,
+          "enum": [
+            true
+          ],
+          "title": "Garbage Collection",
+          "type": "boolean"
+        },
+        "leases": {
+          "const": true,
+          "default": true,
+          "enum": [
+            true
+          ],
+          "title": "Leases",
+          "type": "boolean"
+        },
+        "local_materialization": {
+          "const": true,
+          "default": true,
+          "enum": [
+            true
+          ],
+          "title": "Local Materialization",
+          "type": "boolean"
+        },
+        "pins": {
+          "const": true,
+          "default": true,
+          "enum": [
+            true
+          ],
+          "title": "Pins",
+          "type": "boolean"
+        },
+        "quotas": {
+          "const": true,
+          "default": true,
+          "enum": [
+            true
+          ],
+          "title": "Quotas",
+          "type": "boolean"
+        }
+      },
+      "title": "ArtifactStoreCapabilities",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.roehub.io/artifacts/artifact-store-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "backend": {
+      "enum": [
+        "local_cas",
+        "s3_compatible"
+      ],
+      "title": "Backend",
+      "type": "string"
+    },
+    "capabilities": {
+      "$ref": "#/$defs/ArtifactStoreCapabilities"
+    },
+    "digest_algorithm": {
+      "const": "sha256",
+      "default": "sha256",
+      "enum": [
+        "sha256"
+      ],
+      "title": "Digest Algorithm",
+      "type": "string"
+    },
+    "immutable": {
+      "const": true,
+      "default": true,
+      "enum": [
+        true
+      ],
+      "title": "Immutable",
+      "type": "boolean"
+    },
+    "schema": {
+      "const": "ArtifactStore/v1",
+      "enum": [
+        "ArtifactStore/v1"
+      ],
+      "title": "Schema",
+      "type": "string"
+    }
+  },
+  "required": [
+    "schema",
+    "backend"
+  ],
+  "title": "ArtifactStoreDescriptor",
+  "type": "object"
+}

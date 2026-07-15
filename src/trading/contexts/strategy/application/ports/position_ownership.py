@@ -4,13 +4,14 @@ from datetime import datetime
 from typing import Any, Protocol
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class StrategyPositionOwnershipCoordinator(Protocol):
     def reserve_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         strategy_id: UUID,
@@ -24,12 +25,18 @@ class StrategyPositionOwnershipCoordinator(Protocol):
     ) -> Any: ...
 
     def activate_for_strategy_run(
-        self, *, owner_user_id: UserId, strategy_run_id: UUID, now: datetime
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_run_id: UUID,
+        now: datetime,
     ) -> Any: ...
 
     def mark_releasing_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         now: datetime,
@@ -39,6 +46,7 @@ class StrategyPositionOwnershipCoordinator(Protocol):
     def release_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         now: datetime,

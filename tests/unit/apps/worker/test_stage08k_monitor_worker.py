@@ -68,6 +68,7 @@ def test_worker_records_open_and_one_minute_virtual_close_without_intents(
     worker = Stage08kMonitorWorker(
         instruments=(instrument,),
         operator_context=RlTradingInferenceOperatorContextConfig(
+            organization_id="00000000-0000-4000-8000-000000000010",
             owner_user_id="00000000-0000-0000-0000-000000013001",
             strategy_id="00000000-0000-0000-0000-000000013101",
             strategy_run_id="00000000-0000-0000-0000-000000013201",
@@ -123,6 +124,7 @@ def test_worker_replay_after_ack_failure_is_idempotent(tmp_path: Path) -> None:
     worker = Stage08kMonitorWorker(
         instruments=(instrument,),
         operator_context=RlTradingInferenceOperatorContextConfig(
+            organization_id="00000000-0000-4000-8000-000000000010",
             owner_user_id="00000000-0000-0000-0000-000000013001",
             strategy_id="00000000-0000-0000-0000-000000013101",
             strategy_run_id="00000000-0000-0000-0000-000000013201",
@@ -181,6 +183,7 @@ def test_worker_retries_early_stream_message_without_accepting_unclosed_candle(
     worker = Stage08kMonitorWorker(
         instruments=(instrument,),
         operator_context=RlTradingInferenceOperatorContextConfig(
+            organization_id="00000000-0000-4000-8000-000000000010",
             owner_user_id="00000000-0000-0000-0000-000000013001",
             strategy_id="00000000-0000-0000-0000-000000013101",
             strategy_run_id="00000000-0000-0000-0000-000000013201",

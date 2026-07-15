@@ -1,0 +1,122 @@
+{
+  "contract": "io.roehub.admin-operational-health-browser-proof/v1alpha1",
+  "stage": "20",
+  "generated_at": "2026-07-14T16:54:11+03:00",
+  "target": "real local Chromium chain: Web HTTP proxy -> typed API router -> operational-health HTTP service -> generated Docker topology",
+  "identity_boundary": "synthetic local role and recent-auth principals only",
+  "control_boundary": "typed harmless local control backend; no Docker effect is delegated by the browser fixture",
+  "production_mutation": false,
+  "external_provider_writes": false,
+  "real_order_effects": false,
+  "sensitive_data_present": false,
+  "checks": {
+    "versioned_proxy_namespace": {
+      "result": "passed",
+      "browser_path": "/api/v1/admin/organizations/{organization_id}/snapshot",
+      "api_path": "/api/v1/admin/organizations/{organization_id}/snapshot",
+      "preflight_defect_fixed": "Web previously stripped the API namespace and produced HTTP 404 against the real router"
+    },
+    "real_domain_states": {
+      "result": "passed",
+      "api_ready": "ready",
+      "api_after_container_stop": "stopped",
+      "api_after_container_start": "ready",
+      "plugin_http_200_domain_state": "degraded",
+      "postgresql_reachability_state": "unknown",
+      "redis_reachability_state": "unknown",
+      "openbao_state": "degraded"
+    },
+    "typed_restart_confirmation": {
+      "result": "passed",
+      "action": "restart",
+      "service": "api",
+      "submit_disabled_before_exact_phrase": true,
+      "submit_enabled_after_exact_phrase": true,
+      "http_status": 202,
+      "operation_submitted": true,
+      "recorded_by_harmless_backend": true
+    },
+    "viewer_restart_denied": {
+      "result": "passed",
+      "http_status": 403,
+      "error_code": "organization_permission_denied"
+    },
+    "stale_recent_auth_restart_denied": {
+      "result": "passed",
+      "http_status": 403,
+      "error_code": "recent_auth_required"
+    },
+    "state_action_matrix": {
+      "result": "passed",
+      "ready_api_action": "diagnostics",
+      "stopped_api_action": "restart_service",
+      "unknown_postgresql_action": "diagnostics",
+      "unknown_redis_action": "diagnostics",
+      "degraded_openbao_action": "diagnostics",
+      "non_restart_actions_disabled": true
+    },
+    "runbook_drill_down": {
+      "result": "passed",
+      "path": "/runbooks/web.api-health-degraded",
+      "rendered_runbook_id": "web.api-health-degraded"
+    },
+    "russian_locale": {
+      "result": "passed",
+      "section": "Операционное здоровье",
+      "ready_label": "Готов",
+      "stopped_label": "Остановлен",
+      "restart_label": "Перезапустить",
+      "diagnostics_label": "Диагностика"
+    },
+    "authorized_flow_http_responses": {
+      "result": "passed",
+      "statuses": [
+        200,
+        202
+      ],
+      "unexpected_responses_at_or_above_400": []
+    },
+    "negative_flow_console_errors": [
+      "expected HTTP 403 viewer denial",
+      "expected HTTP 403 stale recent-auth denial"
+    ],
+    "grafana_anonymous_embedding_absent": {
+      "result": "passed",
+      "iframe_count": 0
+    },
+    "cleanup": {
+      "result": "passed",
+      "compose_project": "roehub-stage20-browser1",
+      "residual_containers": [],
+      "residual_volumes": [],
+      "residual_networks": []
+    }
+  },
+  "responsive": {
+    "375": {
+      "document_overflow": false,
+      "layout": "responsive bounded columns"
+    },
+    "768": {
+      "document_overflow": false,
+      "layout": "responsive bounded columns"
+    },
+    "1440": {
+      "document_overflow": false,
+      "layout": "full operational table"
+    }
+  },
+  "screenshots": [
+    {
+      "path": "output/playwright/stage20-admin-real/stage20-admin-operational-health-real-ru-375.png",
+      "viewport": "375x812",
+      "sha256": "3f9b3609486ad4546b31a5844593c10013827ea8fdc55199d8df7181698c6ed5"
+    },
+    {
+      "path": "output/playwright/stage20-admin-real/stage20-admin-operational-health-real-ru-1440.png",
+      "viewport": "1440x900",
+      "sha256": "f0caf4bc4e5d0f71c7c86ecde8845c83f0911b7854b5fa713ef15fef778d2e81"
+    }
+  ],
+  "proof_boundary": "N/A: local generated runtime, synthetic identities, and harmless typed control backend only; no production admin mutation, provider write, external notification, release operation, deployment, secret access, or order effect"
+}

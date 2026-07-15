@@ -14,6 +14,7 @@ def test_lazy_trades_cache_views_report_hit_after_materialized_miss(
 ) -> None:
     cache = LocalFileBacktestLazyTradesCache(root=tmp_path)
     cache_key = BacktestLazyTradesCacheKey(
+        organization_id="00000000-0000-0000-0000-000000000001",
         job_id="job-1",
         variant_key="variant-public",
         variant_hash="variant-hash",
@@ -98,6 +99,7 @@ def test_lazy_trades_cache_views_report_hit_after_materialized_miss(
 
 def test_lazy_trades_cache_key_accounts_for_funding_manifest_hash() -> None:
     base = BacktestLazyTradesCacheKey(
+        organization_id="00000000-0000-0000-0000-000000000001",
         job_id="job-1",
         variant_key="variant-public",
         variant_hash="variant-hash",
@@ -107,6 +109,7 @@ def test_lazy_trades_cache_key_accounts_for_funding_manifest_hash() -> None:
         funding_manifest_hash="f" * 64,
     )
     changed = BacktestLazyTradesCacheKey(
+        organization_id="00000000-0000-0000-0000-000000000001",
         job_id="job-1",
         variant_key="variant-public",
         variant_hash="variant-hash",

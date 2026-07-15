@@ -1,0 +1,15 @@
+apiVersion: io.roehub.openbao-backup/v1alpha1
+kind: OpenBaoBackupPolicy
+destination:
+  type: filesystem
+  directory: /var/lib/roehub/backups/openbao
+  require_separate_volume: true
+encryption:
+  scheme: age-x25519
+  recipient_file: /etc/roehub/openbao/backup-recipient.txt
+retention:
+  snapshots: 14
+ownership:
+  backup_operator: control-agent
+  recovery_custodian: installation_owner
+  unseal_custodian: installation_owner

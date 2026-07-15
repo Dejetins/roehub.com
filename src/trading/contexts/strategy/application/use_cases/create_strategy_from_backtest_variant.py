@@ -100,6 +100,7 @@ class CreateStrategyFromBacktestVariantUseCase:
             launch_request_hash = _sha256_json(
                 {
                     "schema": "strategy_backtest_variant_launch_request_v1",
+                    "organization_id": str(current_user.organization_id),
                     "user_id": str(current_user.user_id),
                     "source_job_id": str(snapshot.job_id),
                     "source_variant_key": snapshot.variant_key,
@@ -109,6 +110,7 @@ class CreateStrategyFromBacktestVariantUseCase:
                 }
             )
             idempotent = self._provenance_repository.find_by_idempotency_key(
+                organization_id=current_user.organization_id,
                 user_id=current_user.user_id,
                 idempotency_key_hash=key_hash,
             )
@@ -124,11 +126,13 @@ class CreateStrategyFromBacktestVariantUseCase:
                         details={"idempotency_key_hash": key_hash},
                     )
                 return self._duplicate_result(
+                    current_user=current_user,
                     provenance=idempotent,
                     duplicate_reason="idempotent_replay",
                 )
 
             existing = self._provenance_repository.find_by_source_variant(
+                organization_id=current_user.organization_id,
                 user_id=current_user.user_id,
                 source_job_id=snapshot.job_id,
                 source_variant_key=snapshot.variant_key,
@@ -137,18 +141,21 @@ class CreateStrategyFromBacktestVariantUseCase:
             )
             if existing is not None:
                 return self._duplicate_result(
+                    current_user=current_user,
                     provenance=existing,
                     duplicate_reason="source_variant_exists",
                 )
 
             created_at = ensure_utc_datetime(value=self._clock.now(), field_name="clock.now")
             strategy = Strategy.create(
+                organization_id=current_user.organization_id,
                 user_id=current_user.user_id,
                 spec=spec,
                 created_at=created_at,
             )
             provenance = StrategyBacktestVariantProvenance(
                 strategy_id=strategy.strategy_id,
+                organization_id=current_user.organization_id,
                 user_id=current_user.user_id,
                 source_job_id=snapshot.job_id,
                 source_variant_key=snapshot.variant_key,
@@ -201,10 +208,12 @@ class CreateStrategyFromBacktestVariantUseCase:
     def _duplicate_result(
         self,
         *,
+        current_user: CurrentUser,
         provenance: StrategyBacktestVariantProvenance,
         duplicate_reason: str,
     ) -> CreateStrategyFromBacktestVariantResult:
         strategy = self._strategy_repository.find_any_by_strategy_id(
+            organization_id=current_user.organization_id,
             strategy_id=provenance.strategy_id,
         )
         if strategy is None:

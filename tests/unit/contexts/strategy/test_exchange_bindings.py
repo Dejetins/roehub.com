@@ -16,7 +16,9 @@ from trading.contexts.strategy.application import (
     StrategyExchangeBindingService,
 )
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000000122"))
 
 
 class _Clock:
@@ -33,7 +35,10 @@ def test_strategy_exchange_binding_lifecycle_is_owner_scoped() -> None:
         strategy_repository=strategy_repository,
         binding_repository=InMemoryStrategyExchangeBindingRepository(),
     )
-    owner = CurrentUser(user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"))
+    owner = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
+        organization_id=_ORGANIZATION_ID,
+    )
     other_user_id = UserId.from_string("00000000-0000-0000-0000-000000000456")
     strategy = CreateStrategyUseCase(
         repository=strategy_repository,
@@ -43,6 +48,7 @@ def test_strategy_exchange_binding_lifecycle_is_owner_scoped() -> None:
     connection_id = UUID("00000000-0000-0000-0000-000000000999")
 
     binding = service.create_binding(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=owner.user_id,
         strategy_id=strategy.strategy_id,
         exchange_connection_id=connection_id,
@@ -52,11 +58,13 @@ def test_strategy_exchange_binding_lifecycle_is_owner_scoped() -> None:
 
     assert binding.binding_status == "active"
     assert service.list_bindings(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=owner.user_id,
         strategy_id=strategy.strategy_id,
     ) == (binding,)
     with pytest.raises(RoehubError) as duplicate_error:
         service.create_binding(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=owner.user_id,
             strategy_id=strategy.strategy_id,
             exchange_connection_id=connection_id,
@@ -67,12 +75,14 @@ def test_strategy_exchange_binding_lifecycle_is_owner_scoped() -> None:
 
     with pytest.raises(RoehubError) as owner_error:
         service.list_bindings(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=other_user_id,
             strategy_id=strategy.strategy_id,
         )
     assert owner_error.value.code == "not_found"
 
     disabled = service.disable_binding(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=owner.user_id,
         strategy_id=strategy.strategy_id,
         binding_id=binding.binding_id,

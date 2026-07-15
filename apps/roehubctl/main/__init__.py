@@ -1,0 +1,1 @@
+"""roehubctl composition root."""

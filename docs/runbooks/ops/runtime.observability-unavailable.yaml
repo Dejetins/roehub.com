@@ -1,0 +1,81 @@
+apiVersion: ops.roehub.io/v1
+kind: Runbook
+metadata:
+  id: runtime.observability-unavailable
+  revision: 1
+  source_legacy: docs/runbooks/notifications-admin-alerts.md
+spec:
+  title: Independent operational health service is unavailable
+  summary: Restore the generated health boundary without treating missing telemetry as a healthy runtime.
+  severity: critical
+  component_ids: [app:monitoring, context:operations]
+  prerequisites:
+    - id: preserve_storage
+      text: Preserve Prometheus, Alertmanager, Grafana, and Loki persistent volumes.
+    - id: confirm_independence
+      text: Confirm that Web and API state is not being used as the monitoring availability signal.
+  symptoms:
+    - id: health_scrape_down
+      text: Prometheus cannot scrape the independent operational health service.
+    - id: state_unknown
+      text: The administrative operational view reports unknown because fresh bounded evidence is unavailable.
+  diagnostics:
+    - id: inspect_monitoring
+      capability: observe.health.read
+      instruction: Inspect the generated monitoring containers and their persistent storage mounts.
+      expected_evidence: Sanitized container state and volume presence without environment or secret values.
+    - id: inspect_scrape
+      capability: observe.metrics.query
+      instruction: Query the bounded Prometheus target and rule state for operational health.
+      expected_evidence: Target, rule, and alert state using only generated low-cardinality labels.
+  allowed_actions:
+    - id: diagnostics
+      capability: observe.health.read
+      instruction: Keep the boundary read-only while snapshot freshness, worker state, log delivery, and persistent storage are classified.
+      approval: none
+      effect: read_only
+    - id: restart_service
+      capability: control.service.restart
+      instruction: Restart only the operational health service after its generated manifest and mounts validate.
+      approval: operator
+      effect: reversible
+  rollback:
+    - id: reconcile_restart
+      action_ref: restart_service
+      instruction: Reconcile the same restart and preserve the monitoring volumes if recovery fails.
+      expected_evidence: A terminal operation state plus a fresh bounded health snapshot and resolved alert.
+  evidence:
+    collect:
+      - id: monitoring_state
+        text: Sanitized monitoring container, target, rule, and persistent-volume state.
+      - id: recovery_timeline
+        text: Alert firing and resolution timestamps plus the recovered snapshot timestamp.
+    success_conditions:
+      - id: independent_health_ready
+        text: Operational health is scrapeable and remains available while Web or API is stopped.
+    failure_conditions:
+      - id: telemetry_missing
+        text: Metrics, alerts, or bounded state transitions remain missing after the approved action.
+  secret_redaction:
+    forbidden_evidence_keys: [authorization, cookie, datasource_password, environment, password, token]
+    rules:
+      - id: no_datasource_secrets
+        text: Never record Grafana credentials, datasource secrets, cookies, or authorization headers.
+      - id: no_raw_logs
+        text: Record bounded operational transitions only, never arbitrary application log payloads.
+  owner:
+    team: platform.operations
+    escalation_role: installation_owner
+  related_alerts: [RoehubOperationalHealthUnavailable, RoehubOperationalLogPushFailed, RoehubOperationalSnapshotStale]
+  monitoring_gaps: []
+  safety:
+    warnings:
+      - id: no_volume_removal
+        text: Do not remove monitoring volumes as a recovery shortcut.
+      - id: no_anonymous_access
+        text: Do not enable anonymous Grafana access or expose monitoring ports publicly.
+    stop_conditions:
+      - id: manifest_invalid
+        text: Stop if the generated manifest, alert rule, or runbook reference does not validate.
+      - id: storage_state_unknown
+        text: Stop before any destructive action when observability storage state is unknown.

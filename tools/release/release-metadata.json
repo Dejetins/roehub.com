@@ -1,0 +1,126 @@
+{
+  "artifacts": {
+    "preliminary_sbom": {
+      "path": "tools/release/preliminary-sbom.spdx.json",
+      "sha256": "335a336d579bcd68ea1afe6b5e41e7cb4dcf900d3c1cd0d1f1b39cec392f9788"
+    },
+    "third_party_notices": {
+      "path": "tools/release/THIRD_PARTY_NOTICES.md",
+      "sha256": "73e58dee1d721b3ccc717e31a3f84878561875edf73a3e9d1e4e6c9de9d03957"
+    }
+  },
+  "compatibility": {
+    "manifest_schema": "io.roehub.release/v1alpha1",
+    "manifest_schema_rule": "Unknown optional fields are ignored; removing or changing a required field requires a manifest schema version change.",
+    "pre_1_0_breaking_change": "minor",
+    "stable_breaking_change": "major",
+    "versioning": "SemVer 2.0.0"
+  },
+  "images": {
+    "alertmanager": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba"
+    },
+    "blackbox": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d"
+    },
+    "clickhouse": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b"
+    },
+    "config_consumer": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
+    },
+    "grafana": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa"
+    },
+    "loki": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745"
+    },
+    "ml_runtime": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8"
+    },
+    "openbao": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a"
+    },
+    "postgresql": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c"
+    },
+    "prometheus": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996"
+    },
+    "redis": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42"
+    },
+    "runtime": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f"
+    },
+    "secret_init": {
+      "platforms": [
+        "linux/amd64",
+        "linux/arm64"
+      ],
+      "reference": "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
+    }
+  },
+  "known_transitive_license_risks": [
+    "Raw Syft NOASSERTION records in first-party runtime images must be resolved by the digest-bound runtime license audit; any new or unmatched record blocks release.",
+    "External image package and layer obligations remain bound to their per-platform SPDX and corresponding-source records; changing an image digest requires re-audit.",
+    "The pinned psycopg-binary and torch artifacts are covered by per-platform runtime SPDX and embedded license evidence; changing a wheel or image digest requires re-audit.",
+    "Images using latest tags are inventory evidence only and are forbidden in a release manifest until digest-pinned."
+  ],
+  "license": "Apache-2.0",
+  "schema": "io.roehub.release/v1alpha1",
+  "supported_architectures": [
+    "linux/amd64",
+    "linux/arm64"
+  ],
+  "version": "0.1.0",
+  "version_source": "pyproject.toml#project.version"
+}

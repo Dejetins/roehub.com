@@ -1,29 +1,45 @@
 from .acl import InMemoryNotificationStatsSourceReader
 from .persistence import (
     InMemoryNotificationRepository,
+    PostgresNotificationProviderRepository,
     PostgresNotificationRepository,
+    PostgresNotificationTelegramBindingStore,
     PsycopgNotificationPostgresGateway,
 )
 from .providers import (
     FakeNotificationProvider,
+    HttpNotificationProvider,
+    HttpNotificationProviderConfig,
     LogOnlyNotificationProvider,
+    OpenBaoTelegramRecipientSecretStore,
+    PostgresOpenBaoTelegramRecipientResolver,
+    PostgresTelegramRecipientScopeResolver,
     TelegramApiHealthProbeConfig,
     TelegramApiHealthProbeResult,
     TelegramBotApiHealthProbe,
     TelegramBotApiNotificationProvider,
+    TelegramBotApiUpdateSource,
     TelegramNotificationProviderConfig,
 )
 
 __all__ = [
     "FakeNotificationProvider",
+    "HttpNotificationProvider",
+    "HttpNotificationProviderConfig",
     "InMemoryNotificationRepository",
     "InMemoryNotificationStatsSourceReader",
     "LogOnlyNotificationProvider",
+    "OpenBaoTelegramRecipientSecretStore",
     "PostgresNotificationRepository",
+    "PostgresNotificationProviderRepository",
+    "PostgresNotificationTelegramBindingStore",
     "PsycopgNotificationPostgresGateway",
     "TelegramApiHealthProbeConfig",
     "TelegramApiHealthProbeResult",
     "TelegramBotApiHealthProbe",
     "TelegramBotApiNotificationProvider",
     "TelegramNotificationProviderConfig",
+    "PostgresOpenBaoTelegramRecipientResolver",
+    "PostgresTelegramRecipientScopeResolver",
+    "TelegramBotApiUpdateSource",
 ]

@@ -20,8 +20,9 @@ from trading.contexts.live_execution.application.ports import (
     ExecutionDispatchUnavailableError,
 )
 from trading.contexts.live_execution.domain import ExecutionIntent, ExecutionRiskContext
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000012000"))
 _USER_ID = UserId.from_string("00000000-0000-0000-0000-000000012001")
 _NOW = datetime(2026, 5, 31, 16, 0, tzinfo=UTC)
 
@@ -232,6 +233,7 @@ def _create_intent(
     service = ExecutionIngressService(repository=repository, clock=_Clock())
     source = service.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_type="ops_test",
             source_event_ref=str(uuid4()),
@@ -242,6 +244,7 @@ def _create_intent(
     )
     return service.create_intent(
         command=CreateExecutionIntentCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             source_event_id=source.event.source_event_id,
             idempotency_key=str(uuid4()),
@@ -261,6 +264,8 @@ def _create_intent(
 
 def _accepted_context() -> ExecutionRiskContext:
     return ExecutionRiskContext(
+        organization_ownership_verified=True,
+        account_ownership_verified=True,
         exchange_connection_active=True,
         secret_custody_ready=True,
         source_authorized=True,

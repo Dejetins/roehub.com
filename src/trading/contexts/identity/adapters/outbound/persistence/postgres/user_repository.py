@@ -17,7 +17,7 @@ class PostgresIdentityUserRepository(UserRepository):
     PostgresIdentityUserRepository — Postgres adapter for identity user storage port.
 
     Docs:
-      - docs/architecture/identity/keycloak-cutover-plan-v1.md
+      - docs/architecture/identity/oidc-authentication-provider-v1.md
     Related:
       - src/trading/contexts/identity/application/ports/user_repository.py
       - src/trading/contexts/identity/adapters/outbound/persistence/postgres/gateway.py
@@ -206,6 +206,39 @@ class PostgresIdentityUserRepository(UserRepository):
         if row is None:
             raise ValueError("PostgresIdentityUserRepository upsert returned no row")
         return _map_user_row(row=row)
+
+    def create_local_user(
+        self,
+        *,
+        user_id: UserId,
+        created_at: datetime,
+    ) -> User:
+        query = f"""
+        INSERT INTO {self._users_table}
+        (user_id, paid_level, created_at, last_login_at, is_deleted)
+        VALUES (%(user_id)s, 'free', %(created_at)s, %(created_at)s, FALSE)
+        RETURNING user_id, paid_level, created_at, last_login_at, is_deleted
+        """
+        row = self._gateway.fetch_one(
+            query=query,
+            parameters={"user_id": str(user_id), "created_at": created_at},
+        )
+        if row is None:
+            raise ValueError("PostgresIdentityUserRepository local insert returned no row")
+        return _map_user_row(row=row)
+
+    def record_local_login(
+        self,
+        *,
+        user_id: UserId,
+        login_at: datetime,
+    ) -> User:
+        return _update_existing_user_login(
+            gateway=self._gateway,
+            users_table=self._users_table,
+            user_id=user_id,
+            login_at=login_at,
+        )
 
 
 def _update_existing_user_login(

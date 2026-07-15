@@ -45,6 +45,7 @@ inference:
   postgres_dsn_env: STRATEGY_PG_DSN
   state_path: /opt/roehub/state/rl_trading/monitor_state/stage08k_long_only_hold_1m_monitor_v1.json
   operator_context:
+    organization_id: 00000000-0000-4000-8000-000000000010
     owner_user_id: ab094ba2-61d7-4fbf-be8f-cbad9f351572
     strategy_id: ee15e181-309f-478e-8726-04a299f1292f
     strategy_run_id: 2ed77f4d-ee5f-4c2c-b86f-6a57c553fa5d

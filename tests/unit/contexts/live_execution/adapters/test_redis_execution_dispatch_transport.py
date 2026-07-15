@@ -17,7 +17,9 @@ from trading.contexts.live_execution.application.ports import (
     ExecutionDispatchUnavailableError,
 )
 from trading.contexts.live_execution.domain import ExecutionIntent
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000012200"))
 
 
 class _FakeRedis:
@@ -126,6 +128,7 @@ def _intent(*, instrument_key: str = "binance:spot:BTCUSDT") -> ExecutionIntent:
     return ExecutionIntent(
         intent_id=uuid4(),
         source_event_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000012201"),
         source_type="ops_test",
         strategy_signal_id=None,

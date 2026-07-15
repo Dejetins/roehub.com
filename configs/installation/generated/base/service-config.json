@@ -1,0 +1,76 @@
+{
+  "architecture": "linux/arm64",
+  "artifacts": {
+    "mode": "local_cas",
+    "path": "/var/lib/roehub/artifacts"
+  },
+  "capabilities": [
+    "core",
+    "local_artifacts",
+    "notifications",
+    "telegram_capability"
+  ],
+  "domain": "localhost",
+  "installation_id": "roehub-local",
+  "notifications": {
+    "telegram": {
+      "enabled": false
+    }
+  },
+  "oidc": {
+    "enabled": false
+  },
+  "openbao": {
+    "address": "http://openbao:8200",
+    "mode": "embedded",
+    "secret_root": "kv/roehub"
+  },
+  "paths": {
+    "artifacts": "/var/lib/roehub/artifacts",
+    "config": "/etc/roehub",
+    "data": "/var/lib/roehub"
+  },
+  "ports": {
+    "api": 8000,
+    "http": 8080,
+    "https": 8443,
+    "metrics": 9090
+  },
+  "profile": "base",
+  "proxy": {
+    "mode": "embedded",
+    "trusted_proxies": []
+  },
+  "resources": {
+    "cpus": 2,
+    "memory_mb": 2048
+  },
+  "schema": "io.roehub.runtime-config/v1alpha1",
+  "stores": {
+    "postgresql": {
+      "credentials_ref": "openbao://kv/roehub/storage/postgresql#credentials",
+      "database": "roehub",
+      "host": "postgresql",
+      "mode": "embedded",
+      "port": 5432,
+      "tls": false
+    },
+    "redis": {
+      "credentials_ref": "openbao://kv/roehub/storage/redis#credentials",
+      "database": "roehub",
+      "host": "redis",
+      "mode": "embedded",
+      "port": 6379,
+      "tls": false
+    }
+  },
+  "tls": {
+    "mode": "disabled"
+  },
+  "trading": {
+    "mode": "paper"
+  },
+  "update_checks": {
+    "enabled": false
+  }
+}

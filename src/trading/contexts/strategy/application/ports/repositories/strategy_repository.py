@@ -4,7 +4,7 @@ from typing import Protocol
 from uuid import UUID
 
 from trading.contexts.strategy.domain.entities import Strategy
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class StrategyRepository(Protocol):
@@ -36,7 +36,13 @@ class StrategyRepository(Protocol):
         """
         ...
 
-    def find_by_strategy_id(self, *, user_id: UserId, strategy_id: UUID) -> Strategy | None:
+    def find_by_strategy_id(
+        self,
+        *,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        strategy_id: UUID,
+    ) -> Strategy | None:
         """
         Load strategy by owner id and strategy id.
 
@@ -54,7 +60,12 @@ class StrategyRepository(Protocol):
         """
         ...
 
-    def find_any_by_strategy_id(self, *, strategy_id: UUID) -> Strategy | None:
+    def find_any_by_strategy_id(
+        self,
+        *,
+        organization_id: OrganizationId,
+        strategy_id: UUID,
+    ) -> Strategy | None:
         """
         Load strategy by identifier without owner filtering for explicit use-case ownership checks.
 
@@ -74,6 +85,7 @@ class StrategyRepository(Protocol):
     def list_for_user(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         include_deleted: bool = False,
     ) -> tuple[Strategy, ...]:
@@ -94,7 +106,13 @@ class StrategyRepository(Protocol):
         """
         ...
 
-    def soft_delete(self, *, user_id: UserId, strategy_id: UUID) -> bool:
+    def soft_delete(
+        self,
+        *,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        strategy_id: UUID,
+    ) -> bool:
         """
         Mark strategy as soft-deleted (`is_deleted=True`) as the only mutable operation.
 

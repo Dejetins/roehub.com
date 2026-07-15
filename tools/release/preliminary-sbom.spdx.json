@@ -1,0 +1,1460 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "creationInfo": {
+    "created": "2026-07-13T00:00:00Z",
+    "creators": [
+      "Tool: tools/release/oss_metadata.py"
+    ]
+  },
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://github.com/Dejetins/roehub.com/spdx/roehub-0.1.0-preliminary-54b505c712bea0a8381a",
+  "name": "roehub-0.1.0-preliminary",
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-Roehub",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "roehub",
+      "supplier": "Organization: Roehub contributors",
+      "versionInfo": "0.1.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-hatchling-1",
+      "comment": "kind=python; group=build-system; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/hatchling/1.31.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "hatchling",
+      "versionInfo": "1.31.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-pandas-2",
+      "comment": "kind=python; group=development:data; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/pandas/2.2.3/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "pandas",
+      "versionInfo": "2.2.3"
+    },
+    {
+      "SPDXID": "SPDXRef-python-pyarrow-3",
+      "comment": "kind=python; group=development:data; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/pyarrow/18.0.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "pyarrow",
+      "versionInfo": "18.0.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-mypy-4",
+      "comment": "kind=python; group=development:dev; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/mypy/1.13.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "mypy",
+      "versionInfo": "1.13.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-pyright-5",
+      "comment": "kind=python; group=development:dev; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/pyright/1.1.408/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "pyright",
+      "versionInfo": "1.1.408"
+    },
+    {
+      "SPDXID": "SPDXRef-python-pytest-6",
+      "comment": "kind=python; group=development:dev; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/pytest/8.3.3/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "pytest",
+      "versionInfo": "8.3.3"
+    },
+    {
+      "SPDXID": "SPDXRef-python-pytest-asyncio-7",
+      "comment": "kind=python; group=development:dev; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/pytest-asyncio/0.24.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "pytest-asyncio",
+      "versionInfo": "0.24.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-pytest-cov-8",
+      "comment": "kind=python; group=development:dev; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/pytest-cov/5.0.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "pytest-cov",
+      "versionInfo": "5.0.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-ruff-9",
+      "comment": "kind=python; group=development:dev; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/ruff/0.7.4/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "ruff",
+      "versionInfo": "0.7.4"
+    },
+    {
+      "SPDXID": "SPDXRef-python-types-python-dateutil-10",
+      "comment": "kind=python; group=development:dev; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/types-python-dateutil/2.9.0.20241003/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "types-python-dateutil",
+      "versionInfo": "2.9.0.20241003"
+    },
+    {
+      "SPDXID": "SPDXRef-python-types-pyyaml-11",
+      "comment": "kind=python; group=development:dev; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/types-pyyaml/6.0.12.20240917/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "types-pyyaml",
+      "versionInfo": "6.0.12.20240917"
+    },
+    {
+      "SPDXID": "SPDXRef-python-optuna-12",
+      "comment": "kind=python; group=optional:rl-ml; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/optuna/4.9.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "optuna",
+      "versionInfo": "4.9.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-torch-13",
+      "comment": "kind=python; group=optional:rl-ml; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/torch/2.7.1+cpu/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "torch",
+      "versionInfo": "2.7.1+cpu"
+    },
+    {
+      "SPDXID": "SPDXRef-python-alembic-14",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/alembic/1.14.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "alembic",
+      "versionInfo": "1.14.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-argon2-cffi-15",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/argon2-cffi/25.1.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "argon2-cffi",
+      "versionInfo": "25.1.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-beautifulsoup4-16",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/beautifulsoup4/4.14.3/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "beautifulsoup4",
+      "versionInfo": "4.14.3"
+    },
+    {
+      "SPDXID": "SPDXRef-python-binance-historical-data-17",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/binance-historical-data/0.1.14/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "binance-historical-data",
+      "versionInfo": "0.1.14"
+    },
+    {
+      "SPDXID": "SPDXRef-python-clickhouse-connect-18",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/clickhouse-connect/0.8.10/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "clickhouse-connect",
+      "versionInfo": "0.8.10"
+    },
+    {
+      "SPDXID": "SPDXRef-python-confluent-kafka-19",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/confluent-kafka/2.6.1/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "confluent-kafka",
+      "versionInfo": "2.6.1"
+    },
+    {
+      "SPDXID": "SPDXRef-python-cryptography-20",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/cryptography/43.0.3/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0 OR BSD-3-Clause",
+      "licenseDeclared": "Apache-2.0 OR BSD-3-Clause",
+      "name": "cryptography",
+      "versionInfo": "43.0.3"
+    },
+    {
+      "SPDXID": "SPDXRef-python-fastapi-21",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/fastapi/0.115.5/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "fastapi",
+      "versionInfo": "0.115.5"
+    },
+    {
+      "SPDXID": "SPDXRef-python-httpx-22",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/httpx/0.27.2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "httpx",
+      "versionInfo": "0.27.2"
+    },
+    {
+      "SPDXID": "SPDXRef-python-itsdangerous-23",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/itsdangerous/2.2.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "itsdangerous",
+      "versionInfo": "2.2.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-jinja2-24",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/jinja2/3.1.4/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "jinja2",
+      "versionInfo": "3.1.4"
+    },
+    {
+      "SPDXID": "SPDXRef-python-jsonschema-25",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/jsonschema/4.23.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "jsonschema",
+      "versionInfo": "4.23.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-lxml-26",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/lxml/6.0.2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "lxml",
+      "versionInfo": "6.0.2"
+    },
+    {
+      "SPDXID": "SPDXRef-python-numba-27",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/numba/0.60.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-2-Clause",
+      "licenseDeclared": "BSD-2-Clause",
+      "name": "numba",
+      "versionInfo": "0.60.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-numpy-28",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/numpy/2.0.2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "numpy",
+      "versionInfo": "2.0.2"
+    },
+    {
+      "SPDXID": "SPDXRef-python-opentelemetry-api-29",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/opentelemetry-api/1.28.2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "opentelemetry-api",
+      "versionInfo": "1.28.2"
+    },
+    {
+      "SPDXID": "SPDXRef-python-opentelemetry-exporter-otlp-30",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/opentelemetry-exporter-otlp/1.28.2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "opentelemetry-exporter-otlp",
+      "versionInfo": "1.28.2"
+    },
+    {
+      "SPDXID": "SPDXRef-python-opentelemetry-instrumentation-31",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/opentelemetry-instrumentation/0.49b2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "opentelemetry-instrumentation",
+      "versionInfo": "0.49b2"
+    },
+    {
+      "SPDXID": "SPDXRef-python-opentelemetry-instrumentation-fastapi-32",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/opentelemetry-instrumentation-fastapi/0.49b2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "opentelemetry-instrumentation-fastapi",
+      "versionInfo": "0.49b2"
+    },
+    {
+      "SPDXID": "SPDXRef-python-opentelemetry-instrumentation-requests-33",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/opentelemetry-instrumentation-requests/0.49b2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "opentelemetry-instrumentation-requests",
+      "versionInfo": "0.49b2"
+    },
+    {
+      "SPDXID": "SPDXRef-python-opentelemetry-sdk-34",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/opentelemetry-sdk/1.28.2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "opentelemetry-sdk",
+      "versionInfo": "1.28.2"
+    },
+    {
+      "SPDXID": "SPDXRef-python-orjson-35",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/orjson/3.10.12/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0 OR MIT",
+      "licenseDeclared": "Apache-2.0 OR MIT",
+      "name": "orjson",
+      "versionInfo": "3.10.12"
+    },
+    {
+      "SPDXID": "SPDXRef-python-prometheus-client-36",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/prometheus-client/0.21.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "prometheus-client",
+      "versionInfo": "0.21.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-psycopg-37",
+      "comment": "kind=python; group=runtime; review_status=conditional; obligation=Keep Psycopg separable; ship its license and source-location notice. The pinned runtime artifacts are covered by per-platform SPDX and the digest-bound runtime license audit; changing a wheel or image digest requires re-audit.",
+      "downloadLocation": "https://pypi.org/project/psycopg/3.2.4/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "LGPL-3.0-only",
+      "licenseDeclared": "LGPL-3.0-only",
+      "name": "psycopg",
+      "versionInfo": "3.2.4"
+    },
+    {
+      "SPDXID": "SPDXRef-python-pybit-38",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/pybit/5.13.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "pybit",
+      "versionInfo": "5.13.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-pydantic-39",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/pydantic/2.9.2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "pydantic",
+      "versionInfo": "2.9.2"
+    },
+    {
+      "SPDXID": "SPDXRef-python-pydantic-settings-40",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/pydantic-settings/2.6.1/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "pydantic-settings",
+      "versionInfo": "2.6.1"
+    },
+    {
+      "SPDXID": "SPDXRef-python-pyotp-41",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/pyotp/2.9.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "pyotp",
+      "versionInfo": "2.9.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-python-dateutil-42",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/python-dateutil/2.9.0.post0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0 OR BSD-3-Clause",
+      "licenseDeclared": "Apache-2.0 OR BSD-3-Clause",
+      "name": "python-dateutil",
+      "versionInfo": "2.9.0.post0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-python-dotenv-43",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/python-dotenv/1.0.1/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "python-dotenv",
+      "versionInfo": "1.0.1"
+    },
+    {
+      "SPDXID": "SPDXRef-python-python-multipart-44",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/python-multipart/0.0.9/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "python-multipart",
+      "versionInfo": "0.0.9"
+    },
+    {
+      "SPDXID": "SPDXRef-python-pyyaml-45",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/pyyaml/6.0.2/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "pyyaml",
+      "versionInfo": "6.0.2"
+    },
+    {
+      "SPDXID": "SPDXRef-python-redis-46",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/redis/5.2.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "redis",
+      "versionInfo": "5.2.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-sqlalchemy-47",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/sqlalchemy/2.0.36/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "sqlalchemy",
+      "versionInfo": "2.0.36"
+    },
+    {
+      "SPDXID": "SPDXRef-python-structlog-48",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/structlog/24.4.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0 OR MIT",
+      "licenseDeclared": "Apache-2.0 OR MIT",
+      "name": "structlog",
+      "versionInfo": "24.4.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-tenacity-49",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/tenacity/9.0.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "tenacity",
+      "versionInfo": "9.0.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-ujson-50",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/ujson/5.10.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "ujson",
+      "versionInfo": "5.10.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-uvicorn-51",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/uvicorn/0.32.0/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "uvicorn",
+      "versionInfo": "0.32.0"
+    },
+    {
+      "SPDXID": "SPDXRef-python-webauthn-52",
+      "comment": "kind=python; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "https://pypi.org/project/webauthn/2.5.1/",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "webauthn",
+      "versionInfo": "2.5.1"
+    },
+    {
+      "SPDXID": "SPDXRef-container--ROEHUB-APP-IMAGE-ROEHUB-APP-IMAGE-is-required-53",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=First-party image; release manifest must replace the variable with a digest-pinned Roehub image.",
+      "downloadLocation": "pkg:docker/${ROEHUB_APP_IMAGE:?ROEHUB_APP_IMAGE is required}",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "${ROEHUB_APP_IMAGE:?ROEHUB_APP_IMAGE is required}",
+      "versionInfo": "?ROEHUB_APP_IMAGE is required}"
+    },
+    {
+      "SPDXID": "SPDXRef-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-54",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Audit packages and layers for the final release digest and preserve all required notices and corresponding-source offers.",
+      "downloadLocation": "pkg:docker/alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
+      "filesAnalyzed": false,
+      "licenseConcluded": "LicenseRef-Alpine-Base-Image",
+      "licenseDeclared": "LicenseRef-Alpine-Base-Image",
+      "name": "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
+      "versionInfo": "14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
+    },
+    {
+      "SPDXID": "SPDXRef-container-clickhouse-clickhouse-server-24.8-55",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/clickhouse/clickhouse-server:24.8",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "clickhouse/clickhouse-server:24.8",
+      "versionInfo": "24.8"
+    },
+    {
+      "SPDXID": "SPDXRef-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-56",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b",
+      "versionInfo": "1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b"
+    },
+    {
+      "SPDXID": "SPDXRef-container-docker.io-library-alpine-sha256-5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11-57",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Build-only and runtime base for the OpenBao derivative; preserve exact package notices and audit the final digest.",
+      "downloadLocation": "pkg:docker/docker.io/library/alpine@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11",
+      "filesAnalyzed": false,
+      "licenseConcluded": "LicenseRef-Alpine-Base-Image",
+      "licenseDeclared": "LicenseRef-Alpine-Base-Image",
+      "name": "docker.io/library/alpine@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11",
+      "versionInfo": "5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11"
+    },
+    {
+      "SPDXID": "SPDXRef-container-docker.io-library-golang-sha256-8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45-58",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Build-only image for the OpenBao derivative; preserve toolchain and base-image notices in provenance.",
+      "downloadLocation": "pkg:docker/docker.io/library/golang@sha256:8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause AND LicenseRef-Alpine-Base-Image",
+      "licenseDeclared": "BSD-3-Clause AND LicenseRef-Alpine-Base-Image",
+      "name": "docker.io/library/golang@sha256:8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45",
+      "versionInfo": "8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45"
+    },
+    {
+      "SPDXID": "SPDXRef-container-docker.io-library-node-sha256-ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6-59",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Build-only image for the OpenBao UI; preserve toolchain and base-image notices in provenance.",
+      "downloadLocation": "pkg:docker/docker.io/library/node@sha256:ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT AND LicenseRef-Debian-Base-Image",
+      "licenseDeclared": "MIT AND LicenseRef-Debian-Base-Image",
+      "name": "docker.io/library/node@sha256:ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6",
+      "versionInfo": "ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6"
+    },
+    {
+      "SPDXID": "SPDXRef-container-ghcr.io-astral-sh-uv-0.8.4-sha256-40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0-60",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/ghcr.io/astral-sh/uv:0.8.4@sha256:40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0 OR MIT",
+      "licenseDeclared": "Apache-2.0 OR MIT",
+      "name": "ghcr.io/astral-sh/uv:0.8.4@sha256:40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0",
+      "versionInfo": "40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0"
+    },
+    {
+      "SPDXID": "SPDXRef-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-61",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Preserve the exact modified OpenBao corresponding source, Roehub patch, MPL-2.0 and MIT license texts, and derivative notice for this digest.",
+      "downloadLocation": "pkg:docker/ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MPL-2.0 AND MIT",
+      "licenseDeclared": "MPL-2.0 AND MIT",
+      "name": "ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a",
+      "versionInfo": "8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a"
+    },
+    {
+      "SPDXID": "SPDXRef-container-ghcr.io-google-cadvisor-v0.56.2-62",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/ghcr.io/google/cadvisor:v0.56.2",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "ghcr.io/google/cadvisor:v0.56.2",
+      "versionInfo": "v0.56.2"
+    },
+    {
+      "SPDXID": "SPDXRef-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-63",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest.",
+      "downloadLocation": "pkg:docker/grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa",
+      "filesAnalyzed": false,
+      "licenseConcluded": "AGPL-3.0-only",
+      "licenseDeclared": "AGPL-3.0-only",
+      "name": "grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa",
+      "versionInfo": "b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa"
+    },
+    {
+      "SPDXID": "SPDXRef-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-64",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest.",
+      "downloadLocation": "pkg:docker/grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745",
+      "filesAnalyzed": false,
+      "licenseConcluded": "AGPL-3.0-only",
+      "licenseDeclared": "AGPL-3.0-only",
+      "name": "grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745",
+      "versionInfo": "a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745"
+    },
+    {
+      "SPDXID": "SPDXRef-container-oliver006-redis-exporter-v1.80.1-65",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/oliver006/redis_exporter:v1.80.1",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MIT",
+      "licenseDeclared": "MIT",
+      "name": "oliver006/redis_exporter:v1.80.1",
+      "versionInfo": "v1.80.1"
+    },
+    {
+      "SPDXID": "SPDXRef-container-postgres-16-66",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/postgres:16",
+      "filesAnalyzed": false,
+      "licenseConcluded": "PostgreSQL",
+      "licenseDeclared": "PostgreSQL",
+      "name": "postgres:16",
+      "versionInfo": "16"
+    },
+    {
+      "SPDXID": "SPDXRef-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-67",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c",
+      "filesAnalyzed": false,
+      "licenseConcluded": "PostgreSQL",
+      "licenseDeclared": "PostgreSQL",
+      "name": "postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c",
+      "versionInfo": "be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c"
+    },
+    {
+      "SPDXID": "SPDXRef-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-68",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba",
+      "versionInfo": "27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba"
+    },
+    {
+      "SPDXID": "SPDXRef-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-69",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d",
+      "versionInfo": "a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d"
+    },
+    {
+      "SPDXID": "SPDXRef-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-70",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
+      "versionInfo": "63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996"
+    },
+    {
+      "SPDXID": "SPDXRef-container-python-3.12-slim-71",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Audit and notice Debian packages and all transitive image layers for the final digest.",
+      "downloadLocation": "pkg:docker/python:3.12-slim",
+      "filesAnalyzed": false,
+      "licenseConcluded": "PSF-2.0",
+      "licenseDeclared": "PSF-2.0",
+      "name": "python:3.12-slim",
+      "versionInfo": "3.12-slim"
+    },
+    {
+      "SPDXID": "SPDXRef-container-python-3.12-slim-bookworm-sha256-8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b-72",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Audit and notice Debian packages and all transitive image layers for the final digest.",
+      "downloadLocation": "pkg:docker/python:3.12-slim-bookworm@sha256:8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b",
+      "filesAnalyzed": false,
+      "licenseConcluded": "PSF-2.0",
+      "licenseDeclared": "PSF-2.0",
+      "name": "python:3.12-slim-bookworm@sha256:8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b",
+      "versionInfo": "8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b"
+    },
+    {
+      "SPDXID": "SPDXRef-container-python-3.12.11-slim-bookworm-sha256-519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7-73",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Audit and notice Debian packages and all transitive image layers for the final digest.",
+      "downloadLocation": "pkg:docker/python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7",
+      "filesAnalyzed": false,
+      "licenseConcluded": "PSF-2.0",
+      "licenseDeclared": "PSF-2.0",
+      "name": "python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7",
+      "versionInfo": "519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7"
+    },
+    {
+      "SPDXID": "SPDXRef-container-quay.io-prometheuscommunity-postgres-exporter-v0.18.1-74",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/quay.io/prometheuscommunity/postgres-exporter:v0.18.1",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "quay.io/prometheuscommunity/postgres-exporter:v0.18.1",
+      "versionInfo": "v0.18.1"
+    },
+    {
+      "SPDXID": "SPDXRef-container-redis-7.2-bookworm-75",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/redis:7.2-bookworm",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "redis:7.2-bookworm",
+      "versionInfo": "7.2-bookworm"
+    },
+    {
+      "SPDXID": "SPDXRef-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-76",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42",
+      "versionInfo": "e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42"
+    },
+    {
+      "SPDXID": "SPDXRef-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-77",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8",
+      "versionInfo": "32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8"
+    },
+    {
+      "SPDXID": "SPDXRef-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-78",
+      "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
+      "versionInfo": "35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-79",
+      "comment": "kind=release-container; group=alertmanager; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba",
+      "versionInfo": "27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-80",
+      "comment": "kind=release-container; group=blackbox; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d",
+      "versionInfo": "a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-81",
+      "comment": "kind=release-container; group=clickhouse; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b",
+      "versionInfo": "1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-82",
+      "comment": "kind=release-container; group=config_consumer; review_status=conditional; obligation=Audit every package and layer for the final release digest; preserve required notices and corresponding-source offers before distribution.",
+      "downloadLocation": "pkg:docker/alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
+      "filesAnalyzed": false,
+      "licenseConcluded": "LicenseRef-Alpine-Base-Image",
+      "licenseDeclared": "LicenseRef-Alpine-Base-Image",
+      "name": "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
+      "versionInfo": "14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-83",
+      "comment": "kind=release-container; group=grafana; review_status=conditional; obligation=Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest.",
+      "downloadLocation": "pkg:docker/grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa",
+      "filesAnalyzed": false,
+      "licenseConcluded": "AGPL-3.0-only",
+      "licenseDeclared": "AGPL-3.0-only",
+      "name": "grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa",
+      "versionInfo": "b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-84",
+      "comment": "kind=release-container; group=loki; review_status=conditional; obligation=Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest.",
+      "downloadLocation": "pkg:docker/grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745",
+      "filesAnalyzed": false,
+      "licenseConcluded": "AGPL-3.0-only",
+      "licenseDeclared": "AGPL-3.0-only",
+      "name": "grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745",
+      "versionInfo": "a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-85",
+      "comment": "kind=release-container; group=ml_runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8",
+      "versionInfo": "32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-86",
+      "comment": "kind=release-container; group=openbao; review_status=conditional; obligation=Preserve the exact modified OpenBao corresponding source, Roehub patch, MPL-2.0 and MIT license texts, and derivative notice for this digest.",
+      "downloadLocation": "pkg:docker/ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a",
+      "filesAnalyzed": false,
+      "licenseConcluded": "MPL-2.0 AND MIT",
+      "licenseDeclared": "MPL-2.0 AND MIT",
+      "name": "ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a",
+      "versionInfo": "8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-87",
+      "comment": "kind=release-container; group=postgresql; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c",
+      "filesAnalyzed": false,
+      "licenseConcluded": "PostgreSQL",
+      "licenseDeclared": "PostgreSQL",
+      "name": "postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c",
+      "versionInfo": "be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-88",
+      "comment": "kind=release-container; group=prometheus; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
+      "versionInfo": "63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-89",
+      "comment": "kind=release-container; group=redis; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42",
+      "filesAnalyzed": false,
+      "licenseConcluded": "BSD-3-Clause",
+      "licenseDeclared": "BSD-3-Clause",
+      "name": "redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42",
+      "versionInfo": "e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-90",
+      "comment": "kind=release-container; group=runtime; review_status=compatible; obligation=none",
+      "downloadLocation": "pkg:docker/roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "name": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
+      "versionInfo": "35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f"
+    },
+    {
+      "SPDXID": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-91",
+      "comment": "kind=release-container; group=secret_init; review_status=conditional; obligation=Audit every package and layer for the final release digest; preserve required notices and corresponding-source offers before distribution.",
+      "downloadLocation": "pkg:docker/alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
+      "filesAnalyzed": false,
+      "licenseConcluded": "LicenseRef-Alpine-Base-Image",
+      "licenseDeclared": "LicenseRef-Alpine-Base-Image",
+      "name": "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
+      "versionInfo": "14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
+    },
+    {
+      "SPDXID": "SPDXRef-bundled-asset-htmx-92",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "449317ade7881e949510db614991e195c3a099c4c791c24dacec55f9f4a2a452"
+        }
+      ],
+      "comment": "kind=bundled-asset; group=apps/web/dist/vendor/htmx.min.js; review_status=compatible; obligation=none",
+      "downloadLocation": "https://raw.githubusercontent.com/bigskysoftware/htmx/v1.9.12/dist/htmx.min.js",
+      "filesAnalyzed": false,
+      "licenseConcluded": "0BSD",
+      "licenseDeclared": "0BSD",
+      "name": "htmx",
+      "versionInfo": "1.9.12"
+    },
+    {
+      "SPDXID": "SPDXRef-bundled-asset-lightweight-charts-notice-93",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "f76c6afab94884448f0426e30d6e9d555ca7247894cd3484e477d2f87513036e"
+        }
+      ],
+      "comment": "kind=bundled-asset; group=apps/web/dist/vendor/lightweight-charts.NOTICE.txt; review_status=compatible; obligation=none",
+      "downloadLocation": "https://raw.githubusercontent.com/tradingview/lightweight-charts/v5.2.0/NOTICE",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0 AND 0BSD",
+      "licenseDeclared": "Apache-2.0 AND 0BSD",
+      "name": "lightweight-charts-notice",
+      "versionInfo": "5.2.0"
+    },
+    {
+      "SPDXID": "SPDXRef-bundled-asset-lightweight-charts-94",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "c0992580867c4912cc9385b3c2728315bcc1a76c7f1087dca908430fccdf31d7"
+        }
+      ],
+      "comment": "kind=bundled-asset; group=apps/web/dist/vendor/lightweight-charts.standalone.production.js; review_status=compatible; obligation=Preserve the upstream NOTICE and user-visible TradingView attribution/link requirement.",
+      "downloadLocation": "https://unpkg.com/lightweight-charts@5.2.0/dist/lightweight-charts.standalone.production.js",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0 AND 0BSD",
+      "licenseDeclared": "Apache-2.0 AND 0BSD",
+      "name": "lightweight-charts",
+      "versionInfo": "5.2.0"
+    }
+  ],
+  "relationships": [
+    {
+      "relatedSpdxElement": "SPDXRef-Package-Roehub",
+      "relationshipType": "DESCRIBES",
+      "spdxElementId": "SPDXRef-DOCUMENT"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-hatchling-1",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-pandas-2",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-pyarrow-3",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-mypy-4",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-pyright-5",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-pytest-6",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-pytest-asyncio-7",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-pytest-cov-8",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-ruff-9",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-types-python-dateutil-10",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-types-pyyaml-11",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-optuna-12",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-torch-13",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-alembic-14",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-argon2-cffi-15",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-beautifulsoup4-16",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-binance-historical-data-17",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-clickhouse-connect-18",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-confluent-kafka-19",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-cryptography-20",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-fastapi-21",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-httpx-22",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-itsdangerous-23",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-jinja2-24",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-jsonschema-25",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-lxml-26",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-numba-27",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-numpy-28",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-opentelemetry-api-29",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-opentelemetry-exporter-otlp-30",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-opentelemetry-instrumentation-31",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-opentelemetry-instrumentation-fastapi-32",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-opentelemetry-instrumentation-requests-33",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-opentelemetry-sdk-34",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-orjson-35",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-prometheus-client-36",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-psycopg-37",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-pybit-38",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-pydantic-39",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-pydantic-settings-40",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-pyotp-41",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-python-dateutil-42",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-python-dotenv-43",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-python-multipart-44",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-pyyaml-45",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-redis-46",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-sqlalchemy-47",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-structlog-48",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-tenacity-49",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-ujson-50",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-uvicorn-51",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-python-webauthn-52",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container--ROEHUB-APP-IMAGE-ROEHUB-APP-IMAGE-is-required-53",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-54",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-clickhouse-clickhouse-server-24.8-55",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-56",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-docker.io-library-alpine-sha256-5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11-57",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-docker.io-library-golang-sha256-8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45-58",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-docker.io-library-node-sha256-ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6-59",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-ghcr.io-astral-sh-uv-0.8.4-sha256-40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0-60",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-61",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-ghcr.io-google-cadvisor-v0.56.2-62",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-63",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-64",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-oliver006-redis-exporter-v1.80.1-65",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-postgres-16-66",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-67",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-68",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-69",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-70",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-python-3.12-slim-71",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-python-3.12-slim-bookworm-sha256-8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b-72",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-python-3.12.11-slim-bookworm-sha256-519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7-73",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-quay.io-prometheuscommunity-postgres-exporter-v0.18.1-74",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-redis-7.2-bookworm-75",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-76",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-77",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-78",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-79",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-80",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-81",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-82",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-83",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-84",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-85",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-86",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-87",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-88",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-89",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-90",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-91",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-bundled-asset-htmx-92",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-bundled-asset-lightweight-charts-notice-93",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-bundled-asset-lightweight-charts-94",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    }
+  ],
+  "spdxVersion": "SPDX-2.3"
+}

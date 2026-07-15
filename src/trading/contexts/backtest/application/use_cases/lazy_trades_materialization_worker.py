@@ -119,7 +119,11 @@ class BacktestLazyTradesMaterializationWorkerUseCase:
         *,
         task: BacktestLazyTradesMaterializationTask,
     ) -> BacktestLazyTradesDetailReadModel:
-        job = self.job_repository.get(job_id=task.job_id, user_id=task.owner_user_id)
+        job = self.job_repository.get(
+            job_id=task.job_id,
+            organization_id=task.organization_id,
+            user_id=task.owner_user_id,
+        )
         if job is None:
             raise RoehubError(
                 code="backtest.job_not_found",
@@ -132,6 +136,7 @@ class BacktestLazyTradesMaterializationWorkerUseCase:
             )
         row = self.job_repository.get_top_variant_by_public_key(
             job_id=task.job_id,
+            organization_id=task.organization_id,
             public_variant_key=task.public_variant_key,
         )
         if row is None:

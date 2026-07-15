@@ -69,6 +69,29 @@ def test_prometheus_monitoring_contract_includes_required_jobs_and_targets() -> 
     ]
 
 
+def test_oidc_provider_alert_covers_transport_deadline_and_validation_failures() -> None:
+    payload = _load_yaml(
+        relative_path=(
+            "infra/monitoring/monitoring/prometheus/rules/"
+            "mac-studio-monitoring.rules.yml"
+        )
+    )
+    alerts = {
+        rule["alert"]: rule
+        for group in payload["groups"]
+        for rule in group["rules"]
+        if "alert" in rule
+    }
+    expression = alerts["OidcProviderUnavailable"]["expr"]
+    for outcome in (
+        "transport_error",
+        "result_unknown",
+        "deadline_exceeded",
+        "validation_error",
+    ):
+        assert outcome in expression
+
+
 def test_macos_prometheus_stage17_rules_are_repo_managed() -> None:
     payload = _load_yaml(relative_path="infra/macos/prometheus/prometheus.prod.yml")
     assert payload["rule_files"] == [
@@ -195,6 +218,7 @@ def test_macos_prometheus_notifications_admin_rules_are_repo_managed() -> None:
     alerts = {rule["alert"]: rule for rule in rules}
     assert set(alerts) == {
         "NotificationsCriticalUnknownDelivery",
+        "NotificationsProviderInstanceDegraded",
         "NotificationsDispatcherPendingOld",
         "NotificationsWorkerDown",
         "NotificationsTelegramApiDown",
@@ -212,6 +236,13 @@ def test_macos_prometheus_notifications_admin_rules_are_repo_managed() -> None:
     telegram_expr = alerts["NotificationsTelegramApiDown"]["expr"]
     assert "absent(notifications_telegram_api_up)" in telegram_expr
     assert "notifications_telegram_api_last_success_unixtime" in telegram_expr
+    assert (
+        alerts["NotificationsProviderInstanceDegraded"]["expr"]
+        == "notification_provider_instance_ready == 0"
+    )
+    critical_unknown_expr = alerts["NotificationsCriticalUnknownDelivery"]["expr"]
+    assert "strategy_run_failed" in critical_unknown_expr
+    assert "trade_fill" in critical_unknown_expr
 
 
 def test_macos_prometheus_funding_rules_are_repo_managed() -> None:

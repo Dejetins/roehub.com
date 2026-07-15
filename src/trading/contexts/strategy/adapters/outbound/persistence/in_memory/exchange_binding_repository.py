@@ -8,7 +8,7 @@ from trading.contexts.strategy.application.ports.repositories import (
     StrategyExchangeBindingRepository,
 )
 from trading.contexts.strategy.domain.entities import StrategyExchangeBinding
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class InMemoryStrategyExchangeBindingRepository(StrategyExchangeBindingRepository):
@@ -19,6 +19,8 @@ class InMemoryStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
         self, *, binding: StrategyExchangeBinding
     ) -> StrategyExchangeBinding | None:
         for existing in self._bindings.values():
+            if existing.organization_id != binding.organization_id:
+                continue
             if existing.owner_user_id != binding.owner_user_id:
                 continue
             if existing.strategy_id != binding.strategy_id:
@@ -33,22 +35,37 @@ class InMemoryStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
         return binding
 
     def get(
-        self, *, owner_user_id: UserId, strategy_id: UUID, binding_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+        binding_id: UUID,
     ) -> StrategyExchangeBinding | None:
         binding = self._bindings.get(binding_id)
         if binding is None:
             return None
-        if binding.owner_user_id != owner_user_id or binding.strategy_id != strategy_id:
+        if (
+            binding.organization_id != organization_id
+            or binding.owner_user_id != owner_user_id
+            or binding.strategy_id != strategy_id
+        ):
             return None
         return binding
 
     def list_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_id: UUID,
     ) -> tuple[StrategyExchangeBinding, ...]:
         rows = [
             binding
             for binding in self._bindings.values()
-            if binding.owner_user_id == owner_user_id and binding.strategy_id == strategy_id
+            if binding.organization_id == organization_id
+            and binding.owner_user_id == owner_user_id
+            and binding.strategy_id == strategy_id
         ]
         rows.sort(key=lambda item: (item.created_at, str(item.binding_id)))
         return tuple(rows)
@@ -56,12 +73,14 @@ class InMemoryStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
     def disable(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         binding_id: UUID,
         disabled_at: datetime,
     ) -> StrategyExchangeBinding | None:
         binding = self.get(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             binding_id=binding_id,

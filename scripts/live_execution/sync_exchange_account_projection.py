@@ -28,7 +28,7 @@ from trading.contexts.live_execution.domain import (
     ExpectedInstrumentConfig,
 )
 from trading.contexts.strategy.adapters.outbound import PsycopgStrategyPostgresGateway
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class _ExchangeControlAccountStateReader:
@@ -42,7 +42,11 @@ class _ExchangeControlAccountStateReader:
         self._instrument_keys = instrument_keys
 
     def read_account_projection(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
     ) -> ExchangeAccountProjection:
         snapshot = self._client.read_account_state(
             owner_user_id=str(owner_user_id),
@@ -51,6 +55,7 @@ class _ExchangeControlAccountStateReader:
         )
         synced_at = datetime.now(UTC)
         return _projection_from_exchange_control(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_connection_id=exchange_connection_id,
             snapshot=snapshot,
@@ -65,6 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     )
     parser.add_argument("--owner-user-id", required=True)
+    parser.add_argument("--organization-id", required=True)
     parser.add_argument("--exchange-connection-id", required=True)
     parser.add_argument("--instrument-key", action="append", default=[])
     parser.add_argument("--min-notional", default="0")
@@ -96,6 +102,7 @@ def main(argv: list[str] | None = None) -> int:
         for instrument_key in instrument_keys
     )
     projection = service.sync_connection(
+        organization_id=OrganizationId.from_string(args.organization_id),
         owner_user_id=UserId.from_string(args.owner_user_id),
         exchange_connection_id=UUID(args.exchange_connection_id),
         reader=_ExchangeControlAccountStateReader(
@@ -130,6 +137,7 @@ def main(argv: list[str] | None = None) -> int:
 
 def _projection_from_exchange_control(
     *,
+    organization_id: OrganizationId,
     owner_user_id: UserId,
     exchange_connection_id: UUID,
     snapshot: ExchangeControlAccountStateSnapshot,
@@ -137,6 +145,7 @@ def _projection_from_exchange_control(
 ) -> ExchangeAccountProjection:
     return ExchangeAccountProjection(
         account_snapshot_id=uuid4(),
+        organization_id=organization_id,
         owner_user_id=owner_user_id,
         exchange_connection_id=exchange_connection_id,
         exchange_name=snapshot.exchange_name,

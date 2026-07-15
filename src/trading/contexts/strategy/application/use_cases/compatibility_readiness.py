@@ -33,6 +33,7 @@ from trading.contexts.strategy.application.use_cases.create_strategy_from_backte
 from trading.contexts.strategy.application.use_cases.errors import map_strategy_exception
 from trading.contexts.strategy.domain.entities import Strategy, StrategySpecV1
 from trading.platform.errors import RoehubError
+from trading.shared_kernel.primitives import OrganizationId
 
 CompatibilityState = Literal["launchable", "not_launchable", "degraded"]
 
@@ -41,6 +42,7 @@ CompatibilityState = Literal["launchable", "not_launchable", "degraded"]
 class StrategyCompatibilityReadinessReport:
     compatibility_check_id: UUID
     market_data_requirement_id: UUID
+    organization_id: OrganizationId
     owner_user_id: Any
     strategy_id: UUID | None
     source_job_id: UUID | None
@@ -128,6 +130,7 @@ class StrategyCompatibilityReadinessService:
             )
         spec = strategy_spec_from_backtest_variant_snapshot(snapshot=snapshot)
         synthetic_strategy = Strategy.create(
+            organization_id=current_user.organization_id,
             user_id=current_user.user_id,
             spec=spec,
             created_at=ensure_utc_datetime(value=self._clock.now(), field_name="clock.now"),
@@ -158,6 +161,7 @@ class StrategyCompatibilityReadinessService:
             report = StrategyCompatibilityReadinessReport(
                 compatibility_check_id=uuid4(),
                 market_data_requirement_id=uuid4(),
+                organization_id=current_user.organization_id,
                 owner_user_id=current_user.user_id,
                 strategy_id=strategy.strategy_id if persist_strategy_id else None,
                 source_job_id=source_job_id,

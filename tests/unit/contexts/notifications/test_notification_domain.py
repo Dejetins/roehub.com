@@ -16,7 +16,7 @@ from trading.contexts.notifications.domain import (
     build_notification_dedupe_key,
     sanitize_notification_mapping,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 def _now() -> datetime:
@@ -27,9 +27,18 @@ def _user_id() -> UserId:
     return UserId(UUID("11111111-1111-4111-8111-111111111111"))
 
 
+def _organization_id() -> OrganizationId:
+    return OrganizationId(UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+
+
+def _provider_instance_id() -> UUID:
+    return UUID("00000000-0000-4000-8000-000000000001")
+
+
 def test_notification_event_validates_dedupe_and_rejects_secret_like_payload() -> None:
     event = NotificationEvent(
         event_id=uuid4(),
+        organization_id=_organization_id(),
         owner_user_id=_user_id(),
         recipient_kind="user",
         source_context="strategy",
@@ -39,6 +48,7 @@ def test_notification_event_validates_dedupe_and_rejects_secret_like_payload() -
         scope_json={"strategy_id": str(uuid4())},
         payload_json={"reason": "run failed"},
         dedupe_key=build_notification_dedupe_key(
+            organization_id=_organization_id(),
             source_context="strategy",
             source_event_type="strategy_run_failed",
             source_id=str(uuid4()),
@@ -52,6 +62,7 @@ def test_notification_event_validates_dedupe_and_rejects_secret_like_payload() -
     with pytest.raises(NotificationValidationError, match="payload_json"):
         NotificationEvent(
             event_id=uuid4(),
+            organization_id=_organization_id(),
             owner_user_id=_user_id(),
             recipient_kind="user",
             source_context="strategy",
@@ -69,6 +80,8 @@ def test_notification_event_validates_dedupe_and_rejects_secret_like_payload() -
 def test_notification_route_separates_user_and_admin_recipients() -> None:
     NotificationRoute(
         route_id=uuid4(),
+        organization_id=_organization_id(),
+        provider_instance_id=_provider_instance_id(),
         recipient_kind="user",
         owner_user_id=_user_id(),
         channel_key="telegram",
@@ -84,6 +97,8 @@ def test_notification_route_separates_user_and_admin_recipients() -> None:
     )
     NotificationRoute(
         route_id=uuid4(),
+        organization_id=_organization_id(),
+        provider_instance_id=_provider_instance_id(),
         recipient_kind="admin",
         owner_user_id=None,
         channel_key="telegram",
@@ -101,6 +116,8 @@ def test_notification_route_separates_user_and_admin_recipients() -> None:
     with pytest.raises(NotificationValidationError, match="user_route_requires_owner_user_id"):
         NotificationRoute(
             route_id=uuid4(),
+            organization_id=_organization_id(),
+            provider_instance_id=_provider_instance_id(),
             recipient_kind="user",
             owner_user_id=None,
             channel_key="telegram",
@@ -119,6 +136,8 @@ def test_notification_route_separates_user_and_admin_recipients() -> None:
     ):
         NotificationRoute(
             route_id=uuid4(),
+            organization_id=_organization_id(),
+            provider_instance_id=_provider_instance_id(),
             recipient_kind="admin",
             owner_user_id=_user_id(),
             channel_key="telegram",
@@ -137,6 +156,8 @@ def test_notification_route_separates_user_and_admin_recipients() -> None:
 def test_delivery_attempt_statuses_and_hashes_are_validated() -> None:
     NotificationDelivery(
         delivery_id=uuid4(),
+        organization_id=_organization_id(),
+        provider_instance_id=_provider_instance_id(),
         event_id=uuid4(),
         report_run_id=None,
         command_id=None,
@@ -152,6 +173,8 @@ def test_delivery_attempt_statuses_and_hashes_are_validated() -> None:
     )
     NotificationDeliveryAttempt(
         attempt_id=uuid4(),
+        organization_id=_organization_id(),
+        provider_instance_id=_provider_instance_id(),
         delivery_id=uuid4(),
         provider_key="log_only",
         started_at=_now(),
@@ -165,6 +188,8 @@ def test_delivery_attempt_statuses_and_hashes_are_validated() -> None:
     with pytest.raises(NotificationValidationError, match="redacted_request_hash"):
         NotificationDeliveryAttempt(
             attempt_id=uuid4(),
+            organization_id=_organization_id(),
+            provider_instance_id=_provider_instance_id(),
             delivery_id=uuid4(),
             provider_key="log_only",
             started_at=_now(),
@@ -176,6 +201,7 @@ def test_delivery_attempt_statuses_and_hashes_are_validated() -> None:
 def test_report_and_telegram_update_scaffolds_validate_status_and_periods() -> None:
     NotificationReportRun(
         report_run_id=uuid4(),
+        organization_id=_organization_id(),
         owner_user_id=_user_id(),
         report_type="portfolio_weekly",
         period_start=datetime(2026, 6, 1, tzinfo=timezone.utc),
@@ -184,6 +210,7 @@ def test_report_and_telegram_update_scaffolds_validate_status_and_periods() -> N
         quality_status="partial",
         status="pending",
         dedupe_key=build_notification_dedupe_key(
+            organization_id=_organization_id(),
             source_context="notifications",
             source_event_type="portfolio_weekly",
             source_id="2026-W23",
@@ -191,6 +218,8 @@ def test_report_and_telegram_update_scaffolds_validate_status_and_periods() -> N
         created_at=_now(),
     )
     TelegramUpdate(
+        organization_id=_organization_id(),
+        provider_instance_id=_provider_instance_id(),
         telegram_update_id=123,
         received_at=_now(),
         chat_id_ref="telegram_ref:user:abc123",
@@ -199,6 +228,7 @@ def test_report_and_telegram_update_scaffolds_validate_status_and_periods() -> N
         command_args_json={"period": "week"},
         status="pending",
         idempotency_key=build_notification_dedupe_key(
+            organization_id=_organization_id(),
             source_context="notifications",
             source_event_type="telegram_update",
             source_id="123",
@@ -209,6 +239,7 @@ def test_report_and_telegram_update_scaffolds_validate_status_and_periods() -> N
     with pytest.raises(NotificationValidationError, match="report_period_must_be_non_empty"):
         NotificationReportRun(
             report_run_id=uuid4(),
+            organization_id=_organization_id(),
             owner_user_id=_user_id(),
             report_type="portfolio_weekly",
             period_start=_now(),

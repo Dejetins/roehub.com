@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
+from pathlib import Path
 from uuid import UUID
 
 from fastapi import FastAPI, Header, HTTPException, Request, Response
@@ -57,7 +58,11 @@ from trading.contexts.exchange_control.application.validation import (
     ExchangeCredentialValidator,
     SkippedExchangeCredentialValidator,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.contexts.identity.adapters.outbound.persistence.postgres import (
+    PostgresOrganizationRepository,
+)
+from trading.platform.secrets import SecureCredentialFile
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 EXCHANGE_CONTROL_DEFAULT_HOST = "127.0.0.1"
 EXCHANGE_CONTROL_METRICS_PORT = 9205
@@ -79,6 +84,7 @@ EXCHANGE_CONTROL_INTERNAL_CAPABILITIES = (
     "exchange_account_state.read",
     "exchange_account_config.write",
 )
+DEVELOPMENT_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000000010"))
 SECRET_CIPHER_IN_MEMORY_DEV = "in_memory_dev"
 SECRET_CIPHER_OPENBAO_TRANSIT_V1 = "openbao_transit_v1"
 SECRET_CIPHER_VAULT_TRANSIT_V1 = "vault_transit_v1"
@@ -98,11 +104,11 @@ class ExchangeControlRuntimeConfig:
     account_state_sync_enabled: bool = False
     secret_cipher_backend: str = SECRET_CIPHER_IN_MEMORY_DEV
     openbao_addr: str | None = None
-    exchange_control_transit_token: str | None = None
-    api_transit_token_configured: bool = False
+    exchange_control_transit_credential: SecureCredentialFile | None = None
     transit_key_name: str = TRANSIT_KEY_NAME
-    internal_api_token: str | None = None
+    internal_api_credential: SecureCredentialFile | None = None
     identity_postgres_dsn: str | None = None
+    container_bind_enabled: bool = False
 
     @classmethod
     def from_environ(
@@ -138,21 +144,24 @@ class ExchangeControlRuntimeConfig:
             value=environ.get("ROEHUB_EXCHANGE_ACCOUNT_STATE_SYNC_ENABLED"),
             default=False,
         )
+        container_bind_enabled = _read_bool(
+            value=environ.get("ROEHUB_EXCHANGE_CONTROL_CONTAINER_BIND"),
+            default=False,
+        )
         secret_cipher_backend = environ.get(
             "ROEHUB_EXCHANGE_CONTROL_SECRET_CIPHER",
             SECRET_CIPHER_IN_MEMORY_DEV,
         ).strip()
         openbao_addr = _read_optional_str(environ.get("OPENBAO_ADDR"))
-        exchange_control_transit_token = _read_optional_str(
-            environ.get("ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN")
+        exchange_control_transit_path = _read_optional_str(
+            environ.get("ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN_FILE")
         )
-        api_transit_token = _read_optional_str(environ.get("ROEHUB_API_TRANSIT_TOKEN"))
         transit_key_name = environ.get(
             "ROEHUB_EXCHANGE_CONTROL_TRANSIT_KEY",
             TRANSIT_KEY_NAME,
         ).strip()
-        internal_api_token = _read_optional_str(
-            environ.get("ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN")
+        internal_api_path = _read_optional_str(
+            environ.get("ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE")
         )
         identity_postgres_dsn = _read_optional_str(environ.get("IDENTITY_PG_DSN"))
         config = cls(
@@ -164,11 +173,17 @@ class ExchangeControlRuntimeConfig:
             account_state_sync_enabled=account_state_sync_enabled,
             secret_cipher_backend=secret_cipher_backend,
             openbao_addr=openbao_addr,
-            exchange_control_transit_token=exchange_control_transit_token,
-            api_transit_token_configured=api_transit_token is not None,
+            exchange_control_transit_credential=(
+                SecureCredentialFile(Path(exchange_control_transit_path))
+                if exchange_control_transit_path
+                else None
+            ),
             transit_key_name=transit_key_name,
-            internal_api_token=internal_api_token,
+            internal_api_credential=(
+                SecureCredentialFile(Path(internal_api_path)) if internal_api_path else None
+            ),
             identity_postgres_dsn=identity_postgres_dsn,
+            container_bind_enabled=container_bind_enabled,
         )
         config.validate(environment_name=environment_name)
         return config
@@ -178,9 +193,7 @@ class ExchangeControlRuntimeConfig:
         if self.metrics_port <= 0:
             raise ValueError("exchange-control metrics_port must be > 0")
         if self.real_exchange_validation_enabled:
-            raise ValueError(
-                "use ROEHUB_EXCHANGE_VALIDATION_LIVE for Stage 5 validation"
-            )
+            raise ValueError("use ROEHUB_EXCHANGE_VALIDATION_LIVE for Stage 5 validation")
         if self.transit_key_name != TRANSIT_KEY_NAME:
             raise ValueError("exchange-control Transit key must be roehub-exchange-credentials")
         if self.secret_cipher_backend not in {
@@ -189,8 +202,12 @@ class ExchangeControlRuntimeConfig:
         }:
             raise ValueError("unsupported exchange-control secret cipher backend")
         if environment_name == "prod":
-            if self.bind_host != EXCHANGE_CONTROL_DEFAULT_HOST:
-                raise ValueError("prod exchange-control must bind to 127.0.0.1")
+            allowed_container_bind = self.container_bind_enabled and self.bind_host == "0.0.0.0"
+            if self.bind_host != EXCHANGE_CONTROL_DEFAULT_HOST and not allowed_container_bind:
+                raise ValueError(
+                    "prod exchange-control must bind to 127.0.0.1 or use the "
+                    "explicit container bind"
+                )
             if self.metrics_port != EXCHANGE_CONTROL_METRICS_PORT:
                 raise ValueError("prod exchange-control must use metrics port 9205")
             if self.secret_cipher_backend not in SUPPORTED_TRANSIT_SECRET_CIPHERS:
@@ -199,24 +216,25 @@ class ExchangeControlRuntimeConfig:
                 )
             if not self.openbao_addr:
                 raise ValueError("prod exchange-control requires OPENBAO_ADDR")
-            if not self.exchange_control_transit_token:
+            if self.exchange_control_transit_credential is None:
                 raise ValueError(
-                    "prod exchange-control requires ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN"
+                    "prod exchange-control requires ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN_FILE"
                 )
-            if not self.api_transit_token_configured:
-                raise ValueError("prod exchange-control requires ROEHUB_API_TRANSIT_TOKEN")
-            if not self.internal_api_token:
+            if self.internal_api_credential is None:
                 raise ValueError(
-                    "prod exchange-control requires ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN"
+                    "prod exchange-control requires "
+                    "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE"
                 )
             if not self.identity_postgres_dsn:
                 raise ValueError("prod exchange-control requires IDENTITY_PG_DSN")
+            self.exchange_control_transit_credential.read()
+            self.internal_api_credential.read()
 
     def build_secret_cipher(self) -> ExchangeSecretCipher:
         if self.secret_cipher_backend == SECRET_CIPHER_IN_MEMORY_DEV:
             return DeterministicInMemoryExchangeSecretCipher(key_name=self.transit_key_name)
         if self.secret_cipher_backend in SUPPORTED_TRANSIT_SECRET_CIPHERS:
-            if not self.openbao_addr or not self.exchange_control_transit_token:
+            if not self.openbao_addr or self.exchange_control_transit_credential is None:
                 raise ValueError("Transit secret cipher config is incomplete")
             return OpenBaoTransitExchangeSecretCipher(
                 address=self.openbao_addr,
@@ -224,6 +242,22 @@ class ExchangeControlRuntimeConfig:
                 key_name=self.transit_key_name,
             )
         raise ValueError("unsupported exchange-control secret cipher backend")
+
+    @property
+    def exchange_control_transit_token(self) -> str | None:
+        """Compatibility name carrying a file path, never raw credential material."""
+
+        if self.exchange_control_transit_credential is None:
+            return None
+        return str(self.exchange_control_transit_credential.path)
+
+    @property
+    def internal_api_token(self) -> str | None:
+        """Reload the internal service credential without retaining it in config repr."""
+
+        if self.internal_api_credential is None:
+            return None
+        return self.internal_api_credential.read()
 
     def build_connection_repository(self) -> ExchangeConnectionRepository:
         if self.identity_postgres_dsn:
@@ -475,24 +509,18 @@ class ExchangeControlMetrics:
             reason=reason,
         ).inc()
 
-    def set_active_strategy_bindings(
-        self, *, exchange: str, status: str, count: int
-    ) -> None:
+    def set_active_strategy_bindings(self, *, exchange: str, status: str, count: int) -> None:
         self.active_strategy_bindings.labels(exchange=exchange, status=status).set(count)
         self.strategy_binding_total.labels(action="list", result="observed").inc(0)
 
-    def record_account_state_read(
-        self, *, exchange: str, result: str, reason: str
-    ) -> None:
+    def record_account_state_read(self, *, exchange: str, result: str, reason: str) -> None:
         self.account_state_read_total.labels(
             exchange=exchange,
             result=result,
             reason=reason,
         ).inc()
 
-    def record_account_config_write(
-        self, *, exchange: str, result: str, reason: str
-    ) -> None:
+    def record_account_config_write(self, *, exchange: str, result: str, reason: str) -> None:
         self.account_config_write_total.labels(
             exchange=exchange,
             result=result,
@@ -506,7 +534,7 @@ class CreateExchangeConnectionInternalRequest(BaseModel):
     owner_user_id: str
     exchange_name: str
     market_type: str
-    environment: str = "mainnet"
+    environment: str = "testnet"
     label: str | None = Field(default=None, max_length=80)
     permissions: str = "read"
     api_key: str
@@ -576,6 +604,22 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         secret_cipher=secret_cipher,
         usage_guard=config.build_usage_guard(),
     )
+    organization_repository = (
+        PostgresOrganizationRepository(dsn=config.identity_postgres_dsn)
+        if config.identity_postgres_dsn
+        else None
+    )
+
+    def resolve_organization_id(*, owner_user_id: UserId) -> OrganizationId:
+        if organization_repository is None:
+            return DEVELOPMENT_ORGANIZATION_ID
+        accesses = organization_repository.list_accesses_for_user(user_id=owner_user_id)
+        if not accesses:
+            raise _internal_error(status_code=403, code="organization_scope_forbidden")
+        if len(accesses) != 1:
+            raise _internal_error(status_code=409, code="organization_scope_ambiguous")
+        return accesses[0].organization.organization_id
+
     credential_validator = config.build_credential_validator()
     readiness_probe = ExchangeControlReadinessProbe(
         service_identity=service_identity,
@@ -600,6 +644,14 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         if readiness.status != "ready":
             response.status_code = 503
         return readiness.as_response_payload()
+
+    @app.get("/health/live")
+    def get_liveness() -> dict[str, object]:
+        return {
+            "status": "live",
+            "service": "exchange-control",
+            "service_identity": service_identity.name,
+        }
 
     @app.get("/metrics", include_in_schema=False)
     def get_metrics() -> Response:
@@ -661,19 +713,18 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
             request_id=x_request_id,
         )
         owner = _parse_user_id(raw_value=owner_user_id)
-        views = connection_service.list_connections(owner_user_id=owner)
+        organization_id = resolve_organization_id(owner_user_id=owner)
+        views = connection_service.list_connections(
+            organization_id=organization_id,
+            owner_user_id=owner,
+        )
         for view in views:
             metrics.set_active_strategy_bindings(
                 exchange=view.exchange_name,
                 status=view.status,
                 count=view.active_strategy_bindings_count,
             )
-        return {
-            "items": [
-                _exchange_connection_response(view=view)
-                for view in views
-            ]
-        }
+        return {"items": [_exchange_connection_response(view=view) for view in views]}
 
     @app.post("/internal/v1/exchange-connections", include_in_schema=False)
     def create_internal_exchange_connection(
@@ -695,6 +746,9 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         )
         try:
             view = connection_service.create_connection_with_validation(
+                organization_id=resolve_organization_id(
+                    owner_user_id=_parse_user_id(raw_value=payload.owner_user_id)
+                ),
                 owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
                 exchange_name=payload.exchange_name,
                 market_type=payload.market_type,
@@ -740,15 +794,16 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
             request_id=x_request_id,
         )
         try:
-            view = (
-                connection_service.create_market_connection_from_existing_with_validation(
-                    owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
-                    source_connection_id=connection_id,
-                    market_type=payload.market_type,
-                    label=payload.label,
-                    validator=credential_validator,
-                    now=_utc_now(),
-                )
+            view = connection_service.create_market_connection_from_existing_with_validation(
+                organization_id=resolve_organization_id(
+                    owner_user_id=_parse_user_id(raw_value=payload.owner_user_id)
+                ),
+                owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
+                source_connection_id=connection_id,
+                market_type=payload.market_type,
+                label=payload.label,
+                validator=credential_validator,
+                now=_utc_now(),
             )
         except ExchangeConnectionError as error:
             raise _exchange_connection_http_error(error=error) from error
@@ -784,6 +839,9 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         )
         try:
             view = connection_service.rotate_connection_with_validation(
+                organization_id=resolve_organization_id(
+                    owner_user_id=_parse_user_id(raw_value=payload.owner_user_id)
+                ),
                 owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
                 connection_id=connection_id,
                 api_key=payload.api_key,
@@ -832,12 +890,18 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         try:
             if payload.status_reason == RECLASSIFIED_NON_TRADING_STATUS_REASON:
                 view = connection_service.reclassify_non_trading_active_connection(
+                    organization_id=resolve_organization_id(
+                        owner_user_id=_parse_user_id(raw_value=payload.owner_user_id)
+                    ),
                     owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
                     connection_id=connection_id,
                     now=_utc_now(),
                 )
             else:
                 view = connection_service.disable_connection(
+                    organization_id=resolve_organization_id(
+                        owner_user_id=_parse_user_id(raw_value=payload.owner_user_id)
+                    ),
                     owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
                     connection_id=connection_id,
                     now=_utc_now(),
@@ -866,9 +930,7 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         )
         if payload.status_reason == RECLASSIFIED_NON_TRADING_STATUS_REASON:
             metrics.record_reclassification(
-                source=_cleanup_metric_source(
-                    value=payload.reclassification_source or "stage10d"
-                ),
+                source=_cleanup_metric_source(value=payload.reclassification_source or "stage10d"),
                 result=view.status,
                 reason=view.connection_readiness_reason,
             )
@@ -903,6 +965,9 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         )
         try:
             view = connection_service.archive_connection(
+                organization_id=resolve_organization_id(
+                    owner_user_id=_parse_user_id(raw_value=payload.owner_user_id)
+                ),
                 owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
                 connection_id=connection_id,
                 now=_utc_now(),
@@ -966,6 +1031,9 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         )
         try:
             view = connection_service.validate_connection(
+                organization_id=resolve_organization_id(
+                    owner_user_id=_parse_user_id(raw_value=payload.owner_user_id)
+                ),
                 owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
                 connection_id=connection_id,
                 validator=credential_validator,
@@ -1000,6 +1068,9 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         )
         try:
             result = connection_service.read_account_state(
+                organization_id=resolve_organization_id(
+                    owner_user_id=_parse_user_id(raw_value=payload.owner_user_id)
+                ),
                 owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
                 connection_id=connection_id,
                 reader=account_state_reader,
@@ -1054,6 +1125,9 @@ def create_exchange_control_app(*, config: ExchangeControlRuntimeConfig) -> Fast
         )
         try:
             result = connection_service.configure_account(
+                organization_id=resolve_organization_id(
+                    owner_user_id=_parse_user_id(raw_value=payload.owner_user_id)
+                ),
                 owner_user_id=_parse_user_id(raw_value=payload.owner_user_id),
                 connection_id=connection_id,
                 configurator=account_configurator,
@@ -1198,8 +1272,7 @@ def _cleanup_metric_source(*, value: str) -> str:
         return "unknown"
     normalized = "".join(
         character
-        if character.isascii()
-        and (character.isalnum() or character in {"_", "-"})
+        if character.isascii() and (character.isalnum() or character in {"_", "-"})
         else "_"
         for character in stripped
     )
@@ -1222,6 +1295,7 @@ def _exchange_connection_response(*, view: ExchangeConnectionView) -> dict[str, 
     return {
         "connection_id": str(view.connection_id),
         "credential_version_id": str(view.credential_version_id),
+        "organization_id": str(view.organization_id),
         "exchange_name": view.exchange_name,
         "market_type": view.market_type,
         "environment": view.environment,
@@ -1280,9 +1354,7 @@ def _exchange_account_state_response(
                 "instrument_key": item.instrument_key,
                 "side": item.side,
                 "quantity": str(item.quantity),
-                "entry_price": (
-                    str(item.entry_price) if item.entry_price is not None else None
-                ),
+                "entry_price": (str(item.entry_price) if item.entry_price is not None else None),
                 "leverage": str(item.leverage) if item.leverage is not None else None,
                 "margin_mode": item.margin_mode,
                 "position_mode": item.position_mode,
@@ -1307,12 +1379,8 @@ def _exchange_account_state_response(
                 "tick_size": str(item.tick_size) if item.tick_size is not None else None,
                 "step_size": str(item.step_size) if item.step_size is not None else None,
                 "min_qty": str(item.min_qty) if item.min_qty is not None else None,
-                "min_notional": (
-                    str(item.min_notional) if item.min_notional is not None else None
-                ),
-                "max_leverage": (
-                    str(item.max_leverage) if item.max_leverage is not None else None
-                ),
+                "min_notional": (str(item.min_notional) if item.min_notional is not None else None),
+                "max_leverage": (str(item.max_leverage) if item.max_leverage is not None else None),
             }
             for item in result.instrument_filters
         ],
@@ -1331,9 +1399,7 @@ def _exchange_account_config_response(
         "target_leverage": str(result.target_leverage),
         "observed_margin_mode": result.observed_margin_mode,
         "observed_leverage": (
-            str(result.observed_leverage)
-            if result.observed_leverage is not None
-            else None
+            str(result.observed_leverage) if result.observed_leverage is not None else None
         ),
         "observed_position_mode": result.observed_position_mode,
         "account_mode": result.account_mode,

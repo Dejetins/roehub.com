@@ -11,17 +11,27 @@ from typing import Mapping
 from fastapi import FastAPI
 
 from apps.api.common import register_api_error_handlers
+from apps.api.control_agent_client import build_control_agent_audit_runtime_from_environ
 from apps.api.exchange_control_client import build_exchange_control_client_from_environ
 from apps.api.monitoring import install_metrics_middleware
-from apps.api.routes import build_indicators_router, build_operations_router
+from apps.api.operational_health_client import (
+    build_operational_health_client_from_environ,
+)
+from apps.api.routes import (
+    build_admin_router,
+    build_indicators_router,
+    build_operations_router,
+)
 from apps.api.wiring.modules import (
     bind_indicators_runtime_dependencies,
     build_backtests_router,
+    build_extensions_api_module,
     build_identity_api_module,
     build_indicators_compute,
     build_indicators_registry,
     build_live_execution_services,
     build_market_data_reference_router,
+    build_research_organization_scope_resolver,
     build_strategy_router,
     build_ui_account_router,
     build_ui_backtests_router,
@@ -40,7 +50,8 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     Build FastAPI app with indicators, identity, and strategy modules wired at startup.
 
     Docs: docs/architecture/indicators/indicators-ma-compute-numba-v1.md,
-      docs/architecture/identity/identity-telegram-login-user-model-v1.md,
+      docs/architecture/identity/local-auth-sessions-recovery-v1.md,
+      docs/architecture/identity/oidc-authentication-provider-v1.md,
       docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md,
       docs/architecture/market_data/market-data-reference-api-v1.md,
       docs/architecture/api/api-errors-and-422-payload-v1.md,
@@ -81,11 +92,43 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     app.state.exchange_control_client = build_exchange_control_client_from_environ(
         environ=effective_environ
     )
+    app.state.operational_health_client = build_operational_health_client_from_environ(
+        environ=effective_environ
+    )
+    control_runtime = build_control_agent_audit_runtime_from_environ(
+        environ=effective_environ
+    )
+    if control_runtime is not None:
+        control_client, control_audit_sink = control_runtime
+        app.state.control_agent_client = control_client
+        app.state.control_agent_audit_sink = control_audit_sink
+        app.state.control_agent_audit_cursor = control_client.reconcile_audit(
+            sink=control_audit_sink
+        )
     install_metrics_middleware(app=app)
     register_api_error_handlers(app=app)
     app.include_router(build_operations_router())
     identity_module = build_identity_api_module(environ=effective_environ)
+    research_scope_resolver = build_research_organization_scope_resolver(
+        environ=effective_environ
+    )
     app.include_router(identity_module.router)
+    extensions_module = build_extensions_api_module(
+        environ=effective_environ,
+        current_user_dependency=identity_module.current_user_dependency,
+        organization_repository=identity_module.organization_repository,
+    )
+    app.include_router(extensions_module.router)
+    app.include_router(
+        build_admin_router(
+            organization_service=identity_module.organization_access_service,
+            plugin_service=extensions_module.service,
+            current_user_dependency=identity_module.current_user_dependency,
+            clock=identity_module.clock,
+            control_agent_client=getattr(app.state, "control_agent_client", None),
+            operational_health_client=app.state.operational_health_client,
+        )
+    )
     live_execution_services = build_live_execution_services(environ=effective_environ)
     if is_strategy_api_enabled(environ=effective_environ):
         app.include_router(
@@ -148,6 +191,8 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     app.include_router(
         build_indicators_router(
             registry=registry,
+            current_user_dependency=identity_module.current_user_dependency,
+            organization_scope_resolver=research_scope_resolver,
             compute=compute,
             max_variants_per_compute=compute_config.max_variants_per_compute,
             max_compute_bytes_total=compute_config.max_compute_bytes_total,

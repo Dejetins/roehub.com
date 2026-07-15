@@ -12,7 +12,7 @@ from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway im
 from trading.contexts.strategy.application.ports.repositories import StrategySignalRepository
 from trading.contexts.strategy.domain.entities import StrategySignal
 from trading.contexts.strategy.domain.errors import StrategyStorageError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresStrategySignalRepository(StrategySignalRepository):
@@ -36,6 +36,7 @@ class PostgresStrategySignalRepository(StrategySignalRepository):
             INSERT INTO {self._table_name}
             (
                 signal_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 strategy_run_id,
@@ -60,6 +61,7 @@ class PostgresStrategySignalRepository(StrategySignalRepository):
             VALUES
             (
                 %(signal_id)s,
+                %(organization_id)s,
                 %(owner_user_id)s,
                 %(strategy_id)s,
                 %(strategy_run_id)s,
@@ -84,6 +86,7 @@ class PostgresStrategySignalRepository(StrategySignalRepository):
             ON CONFLICT (signal_id) DO NOTHING
             RETURNING
                 signal_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 strategy_run_id,
@@ -112,6 +115,7 @@ class PostgresStrategySignalRepository(StrategySignalRepository):
                 query=f"""
                 SELECT
                     signal_id,
+                    organization_id,
                     owner_user_id,
                     strategy_id,
                     strategy_run_id,
@@ -133,9 +137,13 @@ class PostgresStrategySignalRepository(StrategySignalRepository):
                     evaluator_version,
                     created_at
                 FROM {self._table_name}
-                WHERE signal_id = %(signal_id)s
+                WHERE organization_id = %(organization_id)s
+                  AND signal_id = %(signal_id)s
                 """,
-                parameters={"signal_id": str(signal.signal_id)},
+                parameters={
+                    "organization_id": str(signal.organization_id),
+                    "signal_id": str(signal.signal_id),
+                },
             )
         if row is None:
             raise StrategyStorageError("PostgresStrategySignalRepository.record returned no row")
@@ -144,6 +152,7 @@ class PostgresStrategySignalRepository(StrategySignalRepository):
     def list_latest_for_strategy(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         limit: int,
@@ -153,6 +162,7 @@ class PostgresStrategySignalRepository(StrategySignalRepository):
             query=f"""
             SELECT
                 signal_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 strategy_run_id,
@@ -174,12 +184,14 @@ class PostgresStrategySignalRepository(StrategySignalRepository):
                 evaluator_version,
                 created_at
             FROM {self._table_name}
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND strategy_id = %(strategy_id)s
             ORDER BY created_at DESC, signal_id DESC
             LIMIT %(limit)s
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_id": str(strategy_id),
                 "limit": bounded_limit,
@@ -191,6 +203,7 @@ class PostgresStrategySignalRepository(StrategySignalRepository):
 def _signal_parameters(*, signal: StrategySignal) -> dict[str, object]:
     return {
         "signal_id": str(signal.signal_id),
+        "organization_id": str(signal.organization_id),
         "owner_user_id": str(signal.owner_user_id),
         "strategy_id": str(signal.strategy_id),
         "strategy_run_id": str(signal.strategy_run_id),
@@ -222,6 +235,7 @@ def _signal_parameters(*, signal: StrategySignal) -> dict[str, object]:
 def _map_signal(*, row: Mapping[str, Any]) -> StrategySignal:
     return StrategySignal(
         signal_id=UUID(str(row["signal_id"])),
+        organization_id=OrganizationId.from_string(str(row["organization_id"])),
         owner_user_id=UserId.from_string(str(row["owner_user_id"])),
         strategy_id=UUID(str(row["strategy_id"])),
         strategy_run_id=UUID(str(row["strategy_run_id"])),

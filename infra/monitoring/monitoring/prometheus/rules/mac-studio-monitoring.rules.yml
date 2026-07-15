@@ -64,6 +64,16 @@ groups:
           summary: API /health probe is failing
           description: Blackbox probe to http://api:8000/health has failed for 2 minutes.
 
+      - alert: OidcProviderUnavailable
+        expr: sum by (provider_id) (increase(identity_oidc_provider_requests_total{outcome=~"transport_error|http_[0-9]+|result_unknown|deadline_exceeded|validation_error"}[10m])) >= 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Configured OIDC provider is persistently unavailable
+          description: Three or more sanitized OIDC provider failures were observed within 10 minutes and persisted for 5 minutes; local authentication and existing sessions remain independent.
+          runbook: docs/runbooks/generated/ru/identity.oidc-provider-unavailable.md
+
       - alert: ExchangeExecutionDown
         expr: max(up{job="exchange-execution"}) == 0
         for: 2m

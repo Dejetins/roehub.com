@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 PaperScenarioCoverageState = Literal["covered", "blocked"]
 
@@ -13,6 +13,7 @@ PaperScenarioCoverageState = Literal["covered", "blocked"]
 @dataclass(frozen=True, slots=True)
 class PaperScenarioCoverageResult:
     coverage_result_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     scenario_matrix_row_id: UUID
     scenario_key: str

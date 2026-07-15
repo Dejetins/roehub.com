@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.roehub.io/operations/control-agent-request.v1alpha1.schema.json",
+  "title": "Roehub authenticated local control-agent request v1alpha1",
+  "type": "object",
+  "required": ["schema", "identity", "credential", "method"],
+  "properties": {
+    "schema": {"const": "io.roehub.control-agent-request/v1alpha1"},
+    "identity": {"enum": ["api", "installation_owner"]},
+    "credential": {"type": "string", "minLength": 32, "maxLength": 512},
+    "method": {"enum": ["submit", "get", "reconcile", "journal"]},
+    "operation": {
+      "$ref": "control-operation.v1alpha1.schema.json"
+    },
+    "operation_id": {"type": "string", "format": "uuid"},
+    "after_sequence": {"type": "integer", "minimum": 0}
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "method": {"const": "submit"},
+        "after_sequence": {"const": 0}
+      },
+      "required": ["operation"],
+      "not": {"required": ["operation_id"]}
+    },
+    {
+      "properties": {
+        "method": {"enum": ["get", "reconcile"]},
+        "after_sequence": {"const": 0}
+      },
+      "required": ["operation_id"],
+      "not": {"required": ["operation"]}
+    },
+    {
+      "properties": {"method": {"const": "journal"}},
+      "not": {
+        "anyOf": [
+          {"required": ["operation"]},
+          {"required": ["operation_id"]}
+        ]
+      }
+    }
+  ],
+  "additionalProperties": false
+}

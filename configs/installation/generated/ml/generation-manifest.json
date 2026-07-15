@@ -1,0 +1,89 @@
+{
+  "inputs": {
+    "release_manifest_sha256": "706afe5a368eea2ab6b72cea4e7a700ec60622904e55c4f8630237ac32bca6a3",
+    "roehub_yaml_sha256": "a8eb8d0a622e16997de60bba23f06b42477b7fb4d41f8289d77e40fce8d26383",
+    "runtime_service_manifest_sha256": "4cfafef968a666caf3471d36cee496ab3b132d4beec7e1a809b7028712fe2666"
+  },
+  "outputs": {
+    "compose.yaml": {
+      "sha256": "aed9c4c4978946706acdb363e63920f9c8e79219a6aac3e11b1fde0d8e00341f"
+    },
+    "control-policy.json": {
+      "sha256": "c1f235e66936fb701fc38717a9205cc7bb77e78038885d81a46184d57823d630"
+    },
+    "effective-config.redacted.json": {
+      "sha256": "6586db3d13c1088efd8f49ac657b8bd63eb17322daa8f6157d83ad3930ed8c74"
+    },
+    "observability/alertmanager.yml": {
+      "sha256": "d09d22004e0bd58be49d827b1f0dada6298eef1e7ed4da82d78c2e243376337f"
+    },
+    "observability/alerts.yml": {
+      "sha256": "5c385591923905dea449209a8cf9882c65c4993eeb9f2caf44ea5cff16249404"
+    },
+    "observability/blackbox.yml": {
+      "sha256": "f8208c55d2946e541f089d4ceb0243579f5e8f64cf19d57cb700001a0123e5fd"
+    },
+    "observability/grafana-dashboard.json": {
+      "sha256": "63afb45b4a604de16f2f1b764b86b19cf89c8279ef503701f69a4a42ba5369ce"
+    },
+    "observability/grafana-dashboards.yml": {
+      "sha256": "74a945ed7c092524c06229bd9a607a9fe2ee48aa5c33984d4a44b4721ea7f760"
+    },
+    "observability/grafana-datasources.yml": {
+      "sha256": "11baca0d71f687c2b3d8d1bc39d43cffc31a42a04d1540660cc2cd5f4840c5c2"
+    },
+    "observability/loki.yml": {
+      "sha256": "eb1b7d7b533ec2e2b0445fea94607f4829acdb32997981e0cef9ddd151629b30"
+    },
+    "observability/operational-manifest.json": {
+      "sha256": "94431584470c772c25f9334a55dcdebf3d15574d09c8e78fff3bf899997762e0"
+    },
+    "oidc.json": {
+      "sha256": "4bb8bfe89f79c3d50c9547b97aac9cc309fb2fefcbf5986d18dddf4f216c7c16"
+    },
+    "openbao.json": {
+      "sha256": "f1c1a54a7468f12fcc391f0885ea82e28082b34122d4292e3513da8f256f88c5"
+    },
+    "prometheus.yml": {
+      "sha256": "aa766bb57d280d6f6fa67febed729b46747381db79cf9b2fff96fae9cc0cc15a"
+    },
+    "runtime-topology.json": {
+      "sha256": "be6e71a35b76c8cf8a99372ad4df60ea486c2e6d4642f8d678e0ef90ac3724fc"
+    },
+    "service-config.json": {
+      "sha256": "e7d2ee7df720e02818c2ebbadf8406146584140d0b9c79dd41a25f0032015de2"
+    },
+    "service-configs/backtest-artifacts.yaml": {
+      "sha256": "0118b4ea49767cf25958140ec572a5daa41beadbc8347eb2e6f6e77dad600609"
+    },
+    "service-configs/exchange-execution.yaml": {
+      "sha256": "02b7941207f181129aa1b1d77070091eac54a7259e3d545a0fe841f137f1067a"
+    },
+    "service-configs/indicators.yaml": {
+      "sha256": "c9b127e8710a3f158d251a084ea2ee42c5a7660d45ae9673f16eef9a6c5a775c"
+    },
+    "service-configs/market-data.yaml": {
+      "sha256": "5e169213dc2ad946db9a5113f24f9525e6ba7253c7a54740948acc3bcb60c312"
+    },
+    "service-configs/market_data.yaml": {
+      "sha256": "5e169213dc2ad946db9a5113f24f9525e6ba7253c7a54740948acc3bcb60c312"
+    },
+    "service-configs/notifications.yaml": {
+      "sha256": "c268241754499249ccb045012a578e166f07abe5193b2b9b897e51086d7bebf8"
+    },
+    "service-configs/plugin-publisher-keys.json": {
+      "sha256": "17ce0a6d83be82050c56ab643f2343806b779f53a5dd47519ca469076c37008f"
+    },
+    "service-configs/rl-runtime.yaml": {
+      "sha256": "bfbe91c381cb9042cb89dc93fdfaa6f3e29da65c7bc0948c358d002df7963a39"
+    },
+    "service-configs/strategy.yaml": {
+      "sha256": "e5c19f65eeb30251b01ca6f84e52f5f8e41c86229f1b310b036db6056091e0bc"
+    },
+    "service-configs/whitelist.csv": {
+      "sha256": "f503bc4a72993a9a729266f9c19efab99c86236db2641bd488ac5176a440f7d7"
+    }
+  },
+  "profile": "ml",
+  "schema": "io.roehub.runtime-topology-generation/v1alpha1"
+}

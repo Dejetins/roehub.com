@@ -11,7 +11,7 @@ from trading.contexts.live_execution.domain import PaperScenarioCoverageResult
 from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway import (
     StrategyPostgresGateway,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresPaperScenarioCoverageRepository(PaperScenarioCoverageRepository):
@@ -35,7 +35,8 @@ class PostgresPaperScenarioCoverageRepository(PaperScenarioCoverageRepository):
             query=f"""
             INSERT INTO {self._table}
             (
-                coverage_result_id, owner_user_id, scenario_matrix_row_id,
+                coverage_result_id, organization_id, owner_user_id,
+                scenario_matrix_row_id,
                 scenario_key, source_job_id, source_variant_key, mode, market_type,
                 symbol, entry_sizing, risk_mode, direction, coverage_state,
                 coverage_reason, strategy_id, live_profile_id, strategy_run_id,
@@ -45,7 +46,8 @@ class PostgresPaperScenarioCoverageRepository(PaperScenarioCoverageRepository):
             )
             VALUES
             (
-                %(coverage_result_id)s, %(owner_user_id)s, %(scenario_matrix_row_id)s,
+                %(coverage_result_id)s, %(organization_id)s, %(owner_user_id)s,
+                %(scenario_matrix_row_id)s,
                 %(scenario_key)s, %(source_job_id)s, %(source_variant_key)s,
                 %(mode)s, %(market_type)s, %(symbol)s, %(entry_sizing)s,
                 %(risk_mode)s, %(direction)s, %(coverage_state)s,
@@ -55,7 +57,7 @@ class PostgresPaperScenarioCoverageRepository(PaperScenarioCoverageRepository):
                 %(accounting_id)s, %(fee_model)s, %(funding_model)s,
                 %(pnl_complete)s, %(no_exchange_dispatch)s, %(checked_at)s
             )
-            ON CONFLICT (owner_user_id, scenario_key)
+            ON CONFLICT (organization_id, owner_user_id, scenario_key)
             DO UPDATE SET
                 coverage_result_id = EXCLUDED.coverage_result_id,
                 scenario_matrix_row_id = EXCLUDED.scenario_matrix_row_id,
@@ -92,18 +94,24 @@ class PostgresPaperScenarioCoverageRepository(PaperScenarioCoverageRepository):
         return _map_result(row)
 
     def get_latest_by_scenario_key(
-        self, *, owner_user_id: UserId, scenario_key: str
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        scenario_key: str,
     ) -> PaperScenarioCoverageResult | None:
         row = self._gateway.fetch_one(
             query=f"""
             SELECT *
             FROM {self._table}
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND scenario_key = %(scenario_key)s
             ORDER BY checked_at DESC, coverage_result_id DESC
             LIMIT 1
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "scenario_key": scenario_key,
             },
@@ -114,6 +122,7 @@ class PostgresPaperScenarioCoverageRepository(PaperScenarioCoverageRepository):
 def _params(*, result: PaperScenarioCoverageResult) -> dict[str, object]:
     return {
         "coverage_result_id": str(result.coverage_result_id),
+        "organization_id": str(result.organization_id),
         "owner_user_id": str(result.owner_user_id),
         "scenario_matrix_row_id": str(result.scenario_matrix_row_id),
         "scenario_key": result.scenario_key,
@@ -147,6 +156,7 @@ def _params(*, result: PaperScenarioCoverageResult) -> dict[str, object]:
 def _map_result(row: Mapping[str, Any]) -> PaperScenarioCoverageResult:
     return PaperScenarioCoverageResult(
         coverage_result_id=UUID(str(row["coverage_result_id"])),
+        organization_id=OrganizationId.from_string(str(row["organization_id"])),
         owner_user_id=UserId.from_string(str(row["owner_user_id"])),
         scenario_matrix_row_id=UUID(str(row["scenario_matrix_row_id"])),
         scenario_key=str(row["scenario_key"]),

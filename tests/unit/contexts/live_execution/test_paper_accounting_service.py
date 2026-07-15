@@ -18,8 +18,10 @@ from trading.contexts.live_execution.domain import (
     ExchangeInstrumentFilterSnapshot,
 )
 from trading.contexts.strategy.domain.entities import StrategySignal
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000009000"))
+_SECOND_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000009999"))
 _USER_ID = UserId.from_string("00000000-0000-0000-0000-000000009001")
 _CONNECTION_ID = UUID("00000000-0000-0000-0000-000000009101")
 _STRATEGY_ID = UUID("00000000-0000-0000-0000-000000009201")
@@ -46,6 +48,7 @@ def test_capital_reservation_uses_fresh_projection_and_releases() -> None:
     )
 
     reservation = service.reserve_for_strategy_run(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         strategy_id=_STRATEGY_ID,
@@ -55,6 +58,7 @@ def test_capital_reservation_uses_fresh_projection_and_releases() -> None:
         now=_NOW,
     )
     released = service.release_for_strategy_run(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         strategy_run_id=_RUN_ID,
         now=_NOW + timedelta(minutes=1),
@@ -66,6 +70,7 @@ def test_capital_reservation_uses_fresh_projection_and_releases() -> None:
     assert released is not None
     assert released.state == "released"
     assert accounting_repository.sum_active_reserved(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         asset="USDT",
@@ -81,6 +86,7 @@ def test_virtual_paper_capital_reservation_does_not_require_projection() -> None
     )
 
     reservation = service.reserve_virtual_for_strategy_run(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         strategy_id=_STRATEGY_ID,
         live_profile_id=_PROFILE_ID,
@@ -105,6 +111,7 @@ def test_manual_paper_execution_records_idempotent_order_fill_and_accounting() -
     source_event_id = UUID("00000000-0000-0000-0000-000000009501")
 
     first = service.record_manual_paper_execution(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         strategy_id=_STRATEGY_ID,
         live_profile_id=_PROFILE_ID,
@@ -118,6 +125,7 @@ def test_manual_paper_execution_records_idempotent_order_fill_and_accounting() -
         now=_NOW,
     )
     replay = service.record_manual_paper_execution(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         strategy_id=_STRATEGY_ID,
         live_profile_id=_PROFILE_ID,
@@ -139,6 +147,55 @@ def test_manual_paper_execution_records_idempotent_order_fill_and_accounting() -
     assert len(accounting_repository.accounting) == 1
 
 
+def test_paper_execution_identity_and_reads_are_isolated_by_organization() -> None:
+    repository = InMemoryPaperAccountingRepository()
+    service = CapitalReservationPaperAccountingService(
+        repository=repository,
+        account_projection_repository=None,
+        clock=_Clock(),
+    )
+    source_event_id = UUID("00000000-0000-0000-0000-000000009599")
+
+    snapshots = tuple(
+        service.record_manual_paper_execution(
+            organization_id=organization_id,
+            owner_user_id=_USER_ID,
+            strategy_id=_STRATEGY_ID,
+            live_profile_id=_PROFILE_ID,
+            strategy_run_id=_RUN_ID,
+            source_event_id=source_event_id,
+            instrument_key="binance:spot:BTCUSDT",
+            market_type="spot",
+            side="buy",
+            quote_notional=Decimal("50"),
+            reference_price=Decimal("50000"),
+            now=_NOW,
+        )
+        for organization_id in (_ORGANIZATION_ID, _SECOND_ORGANIZATION_ID)
+    )
+
+    assert snapshots[0].accounting_id != snapshots[1].accounting_id
+    assert len(repository.orders) == 2
+    assert len(repository.fills) == 2
+    assert len(repository.accounting) == 2
+    assert (
+        repository.get_latest_accounting_for_strategy(
+            organization_id=_ORGANIZATION_ID,
+            owner_user_id=_USER_ID,
+            strategy_id=_STRATEGY_ID,
+        )
+        == snapshots[0]
+    )
+    assert (
+        repository.get_latest_accounting_for_strategy(
+            organization_id=_SECOND_ORGANIZATION_ID,
+            owner_user_id=_USER_ID,
+            strategy_id=_STRATEGY_ID,
+        )
+        == snapshots[1]
+    )
+
+
 def test_rl_paper_execution_records_idempotent_order_fill_and_accounting_parity() -> None:
     accounting_repository = InMemoryPaperAccountingRepository()
     service = CapitalReservationPaperAccountingService(
@@ -149,6 +206,7 @@ def test_rl_paper_execution_records_idempotent_order_fill_and_accounting_parity(
     source_event_id = UUID("00000000-0000-0000-0000-000000009511")
 
     first = service.record_rl_paper_execution(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         strategy_id=_STRATEGY_ID,
         live_profile_id=_PROFILE_ID,
@@ -162,6 +220,7 @@ def test_rl_paper_execution_records_idempotent_order_fill_and_accounting_parity(
         now=_NOW,
     )
     replay = service.record_rl_paper_execution(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         strategy_id=_STRATEGY_ID,
         live_profile_id=_PROFILE_ID,
@@ -230,6 +289,7 @@ def test_capital_reservation_rejects_insufficient_or_stale_projection(
 
     with pytest.raises(CapitalReservationBlockedError) as error_info:
         service.reserve_for_strategy_run(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_USER_ID,
             exchange_connection_id=_CONNECTION_ID,
             strategy_id=_STRATEGY_ID,
@@ -256,6 +316,7 @@ def test_paper_signal_records_order_fill_accounting_idempotently() -> None:
         clock=_Clock(),
     )
     service.reserve_for_strategy_run(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         strategy_id=_STRATEGY_ID,
@@ -291,6 +352,7 @@ def test_paper_short_records_negative_position_and_incomplete_borrow_model() -> 
         clock=_Clock(),
     )
     service.reserve_virtual_for_strategy_run(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         strategy_id=_STRATEGY_ID,
         live_profile_id=_PROFILE_ID,
@@ -316,6 +378,7 @@ def test_paper_short_records_negative_position_and_incomplete_borrow_model() -> 
 def _projection(*, free: Decimal, observed_at: datetime) -> ExchangeAccountProjection:
     return ExchangeAccountProjection(
         account_snapshot_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         exchange_connection_id=_CONNECTION_ID,
         exchange_name="binance",
@@ -340,6 +403,7 @@ def _projection(*, free: Decimal, observed_at: datetime) -> ExchangeAccountProje
 def _signal(*, signal_id: UUID, side: str = "buy") -> StrategySignal:
     return StrategySignal(
         signal_id=signal_id,
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         strategy_id=_STRATEGY_ID,
         strategy_run_id=_RUN_ID,

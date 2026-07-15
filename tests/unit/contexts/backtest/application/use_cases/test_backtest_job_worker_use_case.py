@@ -37,7 +37,9 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobState,
     BacktestJobTopVariant,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-0000-0000-000000000001")
 
 
 def test_worker_claims_updates_progress_executes_and_finishes_job() -> None:
@@ -328,6 +330,7 @@ class _LeaseRepository:
         }
         requeued = BacktestJob.create_queued(
             job_id=self.repository.job.job_id,
+            organization_id=self.repository.job.organization_id,
             user_id=self.repository.job.user_id,
             mode=self.repository.job.mode,
             created_at=self.repository.job.created_at,
@@ -364,6 +367,7 @@ class _Repository:
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         now: datetime,
         locked_by: str,
@@ -373,7 +377,11 @@ class _Repository:
         last_error_json: BacktestJobErrorPayload | None = None,
     ) -> BacktestJob | None:
         _ = locked_by
-        if self.job.job_id != job_id or self.job.user_id != user_id:
+        if (
+            self.job.job_id != job_id
+            or self.job.organization_id != organization_id
+            or self.job.user_id != user_id
+        ):
             return None
         if self.finish_returns_none:
             return None
@@ -562,6 +570,7 @@ def _queued_job() -> BacktestJob:
     request["artifact_metadata"] = metadata.as_mapping()
     return BacktestJob.create_queued(
         job_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000401"),
         mode="template",
         created_at=datetime.now(UTC) - timedelta(seconds=1),

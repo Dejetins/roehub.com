@@ -109,13 +109,16 @@ def _serialize_current_pointer_v2(pointer: ArtifactCurrentPointerV2) -> str:
       - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
-    return "\n".join(
-        (
-            f"schema_version: {pointer.schema_version}",
-            f"active_slot: {pointer.active_slot}",
-            f"slot_generation: {pointer.slot_generation}",
-            f'asof_date: "{pointer.asof_date}"',
-            f'manifest_sha256: "{pointer.manifest_sha256}"',
-            f'published_at_utc: "{pointer.published_at_utc}"',
+    return (
+        "\n".join(
+            (
+                f"schema_version: {pointer.schema_version}",
+                f"active_slot: {pointer.active_slot}",
+                f"slot_generation: {pointer.slot_generation}",
+                f'asof_date: "{pointer.asof_date}"',
+                f'manifest_sha256: "{pointer.manifest_sha256}"',
+                f'published_at_utc: "{pointer.published_at_utc}"',
+            )
         )
-    ) + "\n"
+        + "\n"
+    )

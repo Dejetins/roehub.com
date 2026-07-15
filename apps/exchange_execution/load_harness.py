@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 from trading.contexts.live_execution.adapters.outbound.persistence.in_memory import (
     InMemoryExchangeExecutionOrderRepository,
     InMemoryExchangeExecutionProcessRepository,
+    InMemoryExecutionGatewayPolicyRepository,
     InMemoryExecutionIntentRepository,
 )
 from trading.contexts.live_execution.application import (
@@ -39,13 +40,16 @@ from trading.contexts.live_execution.domain import (
     ExchangeOrderStatusResult,
     ExchangeOrderSubmitResult,
     ExchangePrivateStreamSession,
+    ExecutionAccountSafetyState,
     ExecutionFillFact,
     ExecutionFundingFact,
     ExecutionIntent,
+    ExecutionProviderRegistration,
     ExecutionRiskContext,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-4000-8000-000000011010")
 _OWNER_USER_ID = UserId.from_string("00000000-0000-0000-0000-000000011011")
 _REQUEST_STREAM = "execution.requests.v1"
 _RETRY_STREAM = "execution.requests.retry.v1"
@@ -126,6 +130,7 @@ class _ControlledRedis:
             message_id=message_id,
             payload={
                 "intent_id": str(intent.intent_id),
+                "organization_id": str(intent.organization_id),
                 "owner_user_id": str(intent.owner_user_id),
                 "attempt_count": str(attempt_count),
             },
@@ -153,9 +158,7 @@ class _ControlledRedis:
         _ = attempt_count
         message_id = f"3-{len(self._dlq_markers) + 1}"
         marker_id = (
-            str(intent.intent_id)
-            if intent is not None
-            else message.message_id if message else ""
+            str(intent.intent_id) if intent is not None else message.message_id if message else ""
         )
         self._dlq_markers.append((marker_id, reason))
         return ExecutionDispatchPublishResult(stream_name=_DLQ_STREAM, message_id=message_id)
@@ -233,22 +236,32 @@ class _CredentialResolver:
         self._connections = {
             connection_id: ExchangeExecutionConnection(
                 connection_id=connection_id,
+                organization_id=_ORGANIZATION_ID,
                 owner_user_id=_OWNER_USER_ID,
                 exchange_name=exchange,
                 market_type=market_type,
                 environment="testnet",
                 connection_readiness="ready_for_trading",
                 effective_capability="trading",
+                secret_reference_hash="4" * 64,
+                account_revision_hash="3" * 64,
                 credential=ExchangeExecutionCredential(**credential_fields),
             )
             for (exchange, market_type), connection_id in _CONNECTIONS.items()
         }
 
     def resolve(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
     ) -> ExchangeExecutionConnection:
         connection = self._connections[exchange_connection_id]
-        if connection.owner_user_id != owner_user_id:
+        if (
+            connection.organization_id != organization_id
+            or connection.owner_user_id != owner_user_id
+        ):
             raise KeyError("connection owner mismatch")
         return connection
 
@@ -256,6 +269,10 @@ class _CredentialResolver:
 class _ControlledOrderAdapter:
     def __init__(self, *, exchange_name: str) -> None:
         self.exchange_name = exchange_name
+        self.provider_id = f"core:controlled-{exchange_name}"
+        self.provider_version = "v1"
+        self.provider_kind = "core"
+        self.revision_hash = "c" * 64
         self.operation_counts: Counter[str] = Counter()
 
     def server_time_ms(self) -> int:
@@ -269,6 +286,7 @@ class _ControlledOrderAdapter:
         now = datetime.now(tz=UTC)
         return ExchangePrivateStreamSession(
             session_id=uuid4(),
+            organization_id=connection.organization_id,
             exchange_name=connection.exchange_name,
             environment=connection.environment,
             market_type=connection.market_type,
@@ -338,6 +356,19 @@ class _ControlledOrderAdapter:
             funding_events=funding_events,
         )
 
+    def get_order_status_by_client_order_id(
+        self,
+        *,
+        command: ExchangeOrderCommand,
+        client_order_id: str,
+        credential: object,
+    ) -> ExchangeOrderStatusResult:
+        return self.get_order_status(
+            command=command,
+            exchange_order_id=f"reconciled-{client_order_id}",
+            credential=credential,
+        )
+
     def cancel_order(
         self,
         *,
@@ -363,6 +394,40 @@ def run_controlled_load(config: LoadHarnessConfig | None = None) -> dict[str, An
     intent_repository = InMemoryExecutionIntentRepository()
     process_repository = InMemoryExchangeExecutionProcessRepository()
     order_repository = InMemoryExchangeExecutionOrderRepository()
+    gateway_policy_repository = InMemoryExecutionGatewayPolicyRepository()
+    policy_now = clock.now()
+    for exchange_name in {exchange for exchange, _market_type in _CONNECTIONS}:
+        provider_id = f"core:controlled-{exchange_name}"
+        gateway_policy_repository.providers[provider_id] = ExecutionProviderRegistration(
+            provider_id=provider_id,
+            provider_version="v1",
+            provider_kind="core",
+            exchange_name=exchange_name,
+            revision_hash="c" * 64,
+            order_submit_capability=True,
+            enabled=True,
+            approved_by_user_id=_OWNER_USER_ID,
+            updated_at=policy_now,
+        )
+    for connection_id in _CONNECTIONS.values():
+        gateway_policy_repository.safety_states[
+            (_ORGANIZATION_ID, connection_id)
+        ] = ExecutionAccountSafetyState(
+            organization_id=_ORGANIZATION_ID,
+            owner_user_id=_OWNER_USER_ID,
+            exchange_connection_id=connection_id,
+            mode="testnet",
+            risk_revision_hash="2" * 64,
+            account_revision_hash="3" * 64,
+            secret_reference_hash="4" * 64,
+            risk_allows_submit=True,
+            max_order_notional=Decimal("1000"),
+            daily_notional_limit=Decimal("10000"),
+            max_account_exposure_notional=Decimal("25000"),
+            risk_valid_until=policy_now + timedelta(hours=1),
+            updated_by_user_id=_OWNER_USER_ID,
+            updated_at=policy_now,
+        )
     stream = _ControlledRedis()
     risk_latencies: list[float] = []
     rate_limit_waits: list[tuple[str, str, float]] = []
@@ -404,6 +469,7 @@ def run_controlled_load(config: LoadHarnessConfig | None = None) -> dict[str, An
             _ControlledOrderAdapter(exchange_name="binance"),
             _ControlledOrderAdapter(exchange_name="bybit"),
         ),
+        gateway_policy_repository=gateway_policy_repository,
         consumer=stream,
         clock=clock,
         on_rate_limit_wait=lambda exchange, operation, wait: rate_limit_waits.append(
@@ -424,6 +490,7 @@ def run_controlled_load(config: LoadHarnessConfig | None = None) -> dict[str, An
         signal_started = time.perf_counter()
         source = ingress.record_source_event(
             command=RecordExecutionSourceEventCommand(
+                organization_id=_ORGANIZATION_ID,
                 owner_user_id=_OWNER_USER_ID,
                 source_type="strategy_signal",
                 source_event_ref=f"stage11-load-{index}",
@@ -445,6 +512,7 @@ def run_controlled_load(config: LoadHarnessConfig | None = None) -> dict[str, An
 
         intent = ingress.create_intent(
             command=CreateExecutionIntentCommand(
+                organization_id=_ORGANIZATION_ID,
                 owner_user_id=_OWNER_USER_ID,
                 source_event_id=source.event.source_event_id,
                 idempotency_key=f"stage11-intent-{index}",
@@ -453,8 +521,8 @@ def run_controlled_load(config: LoadHarnessConfig | None = None) -> dict[str, An
                 instrument_key=scenario.instrument_key,
                 order_type="market",
                 side=scenario.side,
-                quantity=Decimal("0.001"),
-                quote_notional=None,
+                quantity=None,
+                quote_notional=Decimal("10"),
                 limit_price=None,
                 advanced_order_flags={},
                 risk_context=_accepted_testnet_risk_context(),
@@ -585,6 +653,8 @@ def _build_scenarios(*, count: int) -> list[_Scenario]:
 
 def _accepted_testnet_risk_context() -> ExecutionRiskContext:
     return ExecutionRiskContext(
+        organization_ownership_verified=True,
+        account_ownership_verified=True,
         exchange_connection_active=True,
         secret_custody_ready=True,
         source_authorized=True,
@@ -668,6 +738,7 @@ def _run_retry_budget_probe(*, retry_budget: int) -> dict[str, Any]:
 def _probe_intent(*, ingress: ExecutionIngressService, index: int) -> ExecutionIntent:
     source = ingress.record_source_event(
         command=RecordExecutionSourceEventCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_OWNER_USER_ID,
             source_type="strategy_signal",
             source_event_ref=f"stage11-probe-{index}",
@@ -684,6 +755,7 @@ def _probe_intent(*, ingress: ExecutionIngressService, index: int) -> ExecutionI
     )
     result = ingress.create_intent(
         command=CreateExecutionIntentCommand(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=_OWNER_USER_ID,
             source_event_id=source.event.source_event_id,
             idempotency_key=f"stage11-probe-intent-{index}",
@@ -692,8 +764,8 @@ def _probe_intent(*, ingress: ExecutionIngressService, index: int) -> ExecutionI
             instrument_key="bybit:spot:BTCUSDT",
             order_type="market",
             side="buy",
-            quantity=Decimal("0.001"),
-            quote_notional=None,
+            quantity=None,
+            quote_notional=Decimal("10"),
             limit_price=None,
             advanced_order_flags={},
             risk_context=_accepted_testnet_risk_context(),

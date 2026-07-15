@@ -7,7 +7,7 @@ from typing import Any, Literal, Mapping, Sequence
 from uuid import UUID
 
 from trading.contexts.strategy.domain.errors import StrategyRunTransitionError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 StrategyRunState = Literal["starting", "warming_up", "running", "stopping", "stopped", "failed"]
 
@@ -38,6 +38,7 @@ class StrategyRun:
     """
 
     run_id: UUID
+    organization_id: OrganizationId
     user_id: UserId
     strategy_id: UUID
     state: StrategyRunState
@@ -110,6 +111,7 @@ class StrategyRun:
         cls,
         *,
         run_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         strategy_id: UUID,
         started_at: datetime,
@@ -135,6 +137,7 @@ class StrategyRun:
         """
         return cls(
             run_id=run_id,
+            organization_id=organization_id,
             user_id=user_id,
             strategy_id=strategy_id,
             state="starting",
@@ -222,6 +225,7 @@ class StrategyRun:
         next_stopped_at = changed_at if next_state in _TERMINAL_RUN_STATES else None
         return StrategyRun(
             run_id=self.run_id,
+            organization_id=self.organization_id,
             user_id=self.user_id,
             strategy_id=self.strategy_id,
             state=next_state,

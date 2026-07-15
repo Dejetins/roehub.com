@@ -18,6 +18,7 @@ BacktestLazyTradesCacheStatus = Literal[
 
 @dataclass(frozen=True, slots=True)
 class BacktestLazyTradesCacheKey:
+    organization_id: str
     job_id: str
     variant_key: str
     variant_hash: str
@@ -25,9 +26,12 @@ class BacktestLazyTradesCacheKey:
     engine_params_hash: str
     artifact_manifest_hash: str
     funding_manifest_hash: str | None = None
+    namespace: str = "research-cache/v1"
 
     def as_mapping(self) -> dict[str, str | None]:
         payload: dict[str, str | None] = {
+            "namespace": self.namespace,
+            "organization_id": self.organization_id,
             "job_id": self.job_id,
             "variant_key": self.variant_key,
             "variant_hash": self.variant_hash,
@@ -125,6 +129,7 @@ class BacktestLazyTradesCache(Protocol):
 
 def build_lazy_trades_cache_key(
     *,
+    organization_id: str,
     job_id: str,
     variant_key: str,
     variant_hash: str,
@@ -134,6 +139,7 @@ def build_lazy_trades_cache_key(
     funding_manifest_hash: str | None = None,
 ) -> BacktestLazyTradesCacheKey:
     return BacktestLazyTradesCacheKey(
+        organization_id=organization_id,
         job_id=job_id,
         variant_key=variant_key,
         variant_hash=variant_hash,

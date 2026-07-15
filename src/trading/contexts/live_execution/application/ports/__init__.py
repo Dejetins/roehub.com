@@ -13,7 +13,17 @@ from .execution_dispatch_transport import (
     ExecutionDispatchTransport,
     ExecutionDispatchUnavailableError,
 )
+from .execution_gateway import (
+    ExecutionGatewayPolicyRepository,
+    FailClosedExecutionGatewayPolicyRepository,
+)
 from .execution_intent_repository import ExecutionIntentRepository
+from .execution_risk_context import (
+    ExecutionRiskContextQuery,
+    ExecutionRiskContextResolutionError,
+    ExecutionRiskContextResolver,
+    FailClosedExecutionRiskContextResolver,
+)
 from .order_execution import (
     ExchangeExecutionCredentialResolver,
     ExchangeExecutionCredentialUnavailable,
@@ -38,6 +48,12 @@ __all__ = [
     "ExchangeOrderAdapter",
     "ExchangeOrderAdapterError",
     "ExecutionIntentRepository",
+    "ExecutionGatewayPolicyRepository",
+    "FailClosedExecutionGatewayPolicyRepository",
+    "ExecutionRiskContextQuery",
+    "ExecutionRiskContextResolutionError",
+    "ExecutionRiskContextResolver",
+    "FailClosedExecutionRiskContextResolver",
     "ExecutionDispatchPoisonMessageError",
     "ExecutionDispatchPublishResult",
     "ExecutionDispatchTransport",

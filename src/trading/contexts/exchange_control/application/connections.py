@@ -27,7 +27,7 @@ from trading.contexts.exchange_control.application.validation import (
     ExchangeCredentialValidationResult,
     ExchangeCredentialValidator,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 ALLOWED_EXCHANGES = {"binance", "bybit"}
 ALLOWED_MARKET_TYPES = {"spot", "futures"}
@@ -61,6 +61,7 @@ class ExchangeConnectionError(RuntimeError):
 class ExchangeConnectionView:
     connection_id: UUID
     credential_version_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     exchange_name: str
     market_type: str
@@ -95,6 +96,7 @@ class ExchangeConnectionView:
 class ExchangeCredentialVersionRecord:
     credential_version_id: UUID
     connection_id: UUID
+    organization_id: OrganizationId
     api_key_ciphertext: str
     api_secret_ciphertext: str
     passphrase_ciphertext: str | None
@@ -113,6 +115,7 @@ class ExchangeCredentialVersionRecord:
 @dataclass(frozen=True, slots=True)
 class ExchangeConnectionRecord:
     connection_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     exchange_name: str
     market_type: str
@@ -143,7 +146,9 @@ class ExchangeConnectionRepository(Protocol):
 
     def get(self, *, connection_id: UUID) -> ExchangeConnectionRecord | None: ...
 
-    def list_for_user(self, *, owner_user_id: UserId) -> tuple[ExchangeConnectionRecord, ...]: ...
+    def list_for_user(
+        self, *, organization_id: OrganizationId, owner_user_id: UserId
+    ) -> tuple[ExchangeConnectionRecord, ...]: ...
 
     def get_active_credential(
         self, *, connection_id: UUID
@@ -187,15 +192,23 @@ class ExchangeConnectionRepository(Protocol):
 
 class ExchangeConnectionUsageGuard(Protocol):
     def active_trading_bindings_count(
-        self, *, owner_user_id: UserId, connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        connection_id: UUID,
     ) -> int: ...
 
 
 class AllowAllExchangeConnectionUsageGuard(ExchangeConnectionUsageGuard):
     def active_trading_bindings_count(
-        self, *, owner_user_id: UserId, connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        connection_id: UUID,
     ) -> int:
-        _ = owner_user_id, connection_id
+        _ = organization_id, owner_user_id, connection_id
         return 0
 
 
@@ -211,6 +224,8 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
         credential_version: ExchangeCredentialVersionRecord,
     ) -> ExchangeConnectionRecord | None:
         for existing in self._connections.values():
+            if existing.organization_id != connection.organization_id:
+                continue
             if existing.status != "active":
                 continue
             if existing.owner_user_id != connection.owner_user_id:
@@ -238,11 +253,14 @@ class InMemoryExchangeConnectionRepository(ExchangeConnectionRepository):
     def get(self, *, connection_id: UUID) -> ExchangeConnectionRecord | None:
         return self._connections.get(connection_id)
 
-    def list_for_user(self, *, owner_user_id: UserId) -> tuple[ExchangeConnectionRecord, ...]:
+    def list_for_user(
+        self, *, organization_id: OrganizationId, owner_user_id: UserId
+    ) -> tuple[ExchangeConnectionRecord, ...]:
         rows = [
             connection
             for connection in self._connections.values()
-            if connection.owner_user_id == owner_user_id
+            if connection.organization_id == organization_id
+            and connection.owner_user_id == owner_user_id
         ]
         rows.sort(key=lambda item: (item.created_at, str(item.connection_id)))
         return tuple(rows)
@@ -431,6 +449,7 @@ class ExchangeConnectionService:
         repository: ExchangeConnectionRepository,
         secret_cipher: ExchangeSecretCipher,
         usage_guard: ExchangeConnectionUsageGuard | None = None,
+        mainnet_enabled: bool = False,
     ) -> None:
         if repository is None:  # type: ignore[truthy-bool]
             raise ValueError("ExchangeConnectionService requires repository")
@@ -439,10 +458,12 @@ class ExchangeConnectionService:
         self._repository = repository
         self._secret_cipher = secret_cipher
         self._usage_guard = usage_guard or AllowAllExchangeConnectionUsageGuard()
+        self._mainnet_enabled = bool(mainnet_enabled)
 
     def create_connection(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_name: str,
         market_type: str,
@@ -464,15 +485,18 @@ class ExchangeConnectionService:
             api_secret=api_secret,
             passphrase=passphrase,
         )
+        self._assert_environment_allowed(environment=normalized.environment)
         connection_id = uuid4()
         credential_version = self._build_credential_version(
             connection_id=connection_id,
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             normalized=normalized,
             now=now,
         )
         connection = ExchangeConnectionRecord(
             connection_id=connection_id,
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_name=normalized.exchange_name,
             market_type=normalized.market_type,
@@ -509,6 +533,7 @@ class ExchangeConnectionService:
     def create_connection_with_validation(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_name: str,
         market_type: str,
@@ -531,6 +556,7 @@ class ExchangeConnectionService:
             api_secret=api_secret,
             passphrase=passphrase,
         )
+        self._assert_environment_allowed(environment=normalized.environment)
         result = self._validate_plaintext(
             exchange_name=normalized.exchange_name,
             market_type=normalized.market_type,
@@ -545,6 +571,7 @@ class ExchangeConnectionService:
             now=now,
         )
         return self._create_validated_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             normalized=normalized,
             result=result,
@@ -554,6 +581,7 @@ class ExchangeConnectionService:
     def create_market_connection_from_existing_with_validation(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         source_connection_id: UUID,
         market_type: str,
@@ -562,9 +590,11 @@ class ExchangeConnectionService:
         now: datetime,
     ) -> ExchangeConnectionView:
         source_connection = self._require_active_owned_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=source_connection_id,
         )
+        self._assert_environment_allowed(environment=source_connection.environment)
         plaintext = self._decrypt_active_credential(
             connection_id=source_connection_id,
             unavailable_code="exchange_connection_validation_unavailable",
@@ -594,6 +624,7 @@ class ExchangeConnectionService:
             now=now,
         )
         return self._create_validated_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             normalized=normalized,
             result=result,
@@ -603,6 +634,7 @@ class ExchangeConnectionService:
     def _create_validated_connection(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         normalized: "_NormalizedConnectionInput",
         result: ExchangeCredentialValidationResult,
@@ -621,6 +653,7 @@ class ExchangeConnectionService:
         connection_id = uuid4()
         credential_version = self._build_credential_version(
             connection_id=connection_id,
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             normalized=normalized,
             now=now,
@@ -637,6 +670,7 @@ class ExchangeConnectionService:
             )
         connection = ExchangeConnectionRecord(
             connection_id=connection_id,
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_name=normalized.exchange_name,
             market_type=normalized.market_type,
@@ -667,15 +701,21 @@ class ExchangeConnectionService:
             )
         return self._to_view(connection=created)
 
-    def list_connections(self, *, owner_user_id: UserId) -> tuple[ExchangeConnectionView, ...]:
+    def list_connections(
+        self, *, organization_id: OrganizationId, owner_user_id: UserId
+    ) -> tuple[ExchangeConnectionView, ...]:
         return tuple(
             self._to_view(connection=connection)
-            for connection in self._repository.list_for_user(owner_user_id=owner_user_id)
+            for connection in self._repository.list_for_user(
+                organization_id=organization_id,
+                owner_user_id=owner_user_id,
+            )
         )
 
     def rotate_connection(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         connection_id: UUID,
         api_key: str,
@@ -684,6 +724,7 @@ class ExchangeConnectionService:
         now: datetime,
     ) -> ExchangeConnectionView:
         connection = self._require_active_owned_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
@@ -694,6 +735,7 @@ class ExchangeConnectionService:
         )
         credential_version = self._build_credential_version(
             connection_id=connection_id,
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             normalized=_NormalizedConnectionInput(
                 exchange_name=connection.exchange_name,
@@ -720,6 +762,7 @@ class ExchangeConnectionService:
     def rotate_connection_with_validation(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         connection_id: UUID,
         api_key: str,
@@ -729,6 +772,7 @@ class ExchangeConnectionService:
         now: datetime,
     ) -> ExchangeConnectionView:
         connection = self._require_active_owned_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
@@ -771,6 +815,7 @@ class ExchangeConnectionService:
             )
         credential_version = self._build_credential_version(
             connection_id=connection_id,
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             normalized=_NormalizedConnectionInput(
                 exchange_name=connection.exchange_name,
@@ -805,16 +850,19 @@ class ExchangeConnectionService:
     def disable_connection(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         connection_id: UUID,
         now: datetime,
         status_reason: str = "user_disabled",
     ) -> ExchangeConnectionView:
         self._require_active_owned_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
         self._assert_not_in_use(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
             action="disconnect",
@@ -832,11 +880,13 @@ class ExchangeConnectionService:
     def reclassify_non_trading_active_connection(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         connection_id: UUID,
         now: datetime,
     ) -> ExchangeConnectionView:
         connection = self._require_existing_owned_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
@@ -858,6 +908,7 @@ class ExchangeConnectionService:
                 status_code=409,
             )
         return self.disable_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
             now=now,
@@ -867,16 +918,19 @@ class ExchangeConnectionService:
     def archive_connection(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         connection_id: UUID,
         now: datetime,
     ) -> ExchangeConnectionView:
         connection = self._require_existing_owned_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
         if connection.status != "archived":
             self._assert_not_in_use(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 connection_id=connection_id,
                 action="archive",
@@ -901,12 +955,14 @@ class ExchangeConnectionService:
     def validate_connection(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         connection_id: UUID,
         validator: ExchangeCredentialValidator,
         now: datetime,
     ) -> ExchangeConnectionView:
         connection = self._require_active_owned_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
@@ -967,6 +1023,7 @@ class ExchangeConnectionService:
             or view.connection_readiness != "ready_for_trading"
         ):
             return self.disable_connection(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 connection_id=connection_id,
                 now=now,
@@ -977,6 +1034,7 @@ class ExchangeConnectionService:
     def read_account_state(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         connection_id: UUID,
         reader: ExchangeAccountStateReader,
@@ -984,6 +1042,7 @@ class ExchangeConnectionService:
         now: datetime,
     ) -> ExchangeAccountStateReadResult:
         connection = self._require_active_owned_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
@@ -1018,6 +1077,7 @@ class ExchangeConnectionService:
     def configure_account(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         connection_id: UUID,
         configurator: ExchangeAccountConfigurator,
@@ -1027,6 +1087,7 @@ class ExchangeConnectionService:
         now: datetime,
     ) -> ExchangeAccountConfigWriteResult:
         connection = self._require_active_owned_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
@@ -1098,9 +1159,14 @@ class ExchangeConnectionService:
         )
 
     def _require_active_owned_connection(
-        self, *, owner_user_id: UserId, connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        connection_id: UUID,
     ) -> ExchangeConnectionRecord:
         connection = self._require_existing_owned_connection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
@@ -1108,13 +1174,28 @@ class ExchangeConnectionService:
             raise _not_found()
         return connection
 
+    def _assert_environment_allowed(self, *, environment: str) -> None:
+        if environment == "mainnet" and not self._mainnet_enabled:
+            raise ExchangeConnectionError(
+                code="exchange_mainnet_not_enabled",
+                message="Mainnet exchange connections are not enabled.",
+                status_code=403,
+            )
+
     def _require_existing_owned_connection(
-        self, *, owner_user_id: UserId, connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        connection_id: UUID,
     ) -> ExchangeConnectionRecord:
         connection = self._repository.get(connection_id=connection_id)
         if connection is None:
             raise _not_found()
-        if connection.owner_user_id != owner_user_id:
+        if (
+            connection.organization_id != organization_id
+            or connection.owner_user_id != owner_user_id
+        ):
             raise ExchangeConnectionError(
                 code="exchange_connection_not_owned",
                 message="Exchange connection is not owned by current user.",
@@ -1125,11 +1206,13 @@ class ExchangeConnectionService:
     def _assert_not_in_use(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         connection_id: UUID,
         action: str,
     ) -> None:
         active_bindings_count = self._active_strategy_bindings_count(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             connection_id=connection_id,
         )
@@ -1148,11 +1231,13 @@ class ExchangeConnectionService:
     def _active_strategy_bindings_count(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         connection_id: UUID,
     ) -> int:
         try:
             count = self._usage_guard.active_trading_bindings_count(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 connection_id=connection_id,
             )
@@ -1203,6 +1288,7 @@ class ExchangeConnectionService:
         self,
         *,
         connection_id: UUID,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         normalized: "_NormalizedConnectionInput",
         now: datetime,
@@ -1219,6 +1305,7 @@ class ExchangeConnectionService:
         return ExchangeCredentialVersionRecord(
             credential_version_id=uuid4(),
             connection_id=connection_id,
+            organization_id=organization_id,
             api_key_ciphertext=self._secret_cipher.encrypt(api_key_secret).value,
             api_secret_ciphertext=self._secret_cipher.encrypt(api_secret_secret).value,
             passphrase_ciphertext=(
@@ -1300,12 +1387,14 @@ class ExchangeConnectionService:
             ),
         )
         active_bindings_count = self._active_strategy_bindings_count(
+            organization_id=connection.organization_id,
             owner_user_id=connection.owner_user_id,
             connection_id=connection.connection_id,
         )
         return ExchangeConnectionView(
             connection_id=connection.connection_id,
             credential_version_id=connection.active_credential_version_id,
+            organization_id=connection.organization_id,
             owner_user_id=connection.owner_user_id,
             exchange_name=connection.exchange_name,
             market_type=connection.market_type,

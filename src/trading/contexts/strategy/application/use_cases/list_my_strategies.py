@@ -54,6 +54,7 @@ class ListMyStrategiesUseCase:
         """
         try:
             strategies = self._repository.list_for_user(
+                organization_id=current_user.organization_id,
                 user_id=current_user.user_id,
                 include_deleted=False,
             )

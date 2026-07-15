@@ -16,7 +16,9 @@ from trading.contexts.backtest.domain.errors import (
     BacktestJobLeaseError,
     BacktestJobTransitionError,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-0000-0000-000000000001")
 
 
 def test_backtest_job_saved_mode_requires_spec_snapshot() -> None:
@@ -39,6 +41,7 @@ def test_backtest_job_saved_mode_requires_spec_snapshot() -> None:
     with pytest.raises(BacktestJobTransitionError, match="spec_hash"):
         BacktestJob.create_queued(
             job_id=UUID("00000000-0000-0000-0000-000000000901"),
+            organization_id=_ORGANIZATION_ID,
             user_id=UserId.from_string("00000000-0000-0000-0000-000000000101"),
             mode="saved",
             created_at=now,
@@ -49,7 +52,6 @@ def test_backtest_job_saved_mode_requires_spec_snapshot() -> None:
             engine_params_hash="b" * 64,
             backtest_runtime_config_hash="c" * 64,
         )
-
 
 
 def test_backtest_job_template_mode_rejects_spec_snapshot_fields() -> None:
@@ -72,6 +74,7 @@ def test_backtest_job_template_mode_rejects_spec_snapshot_fields() -> None:
     with pytest.raises(BacktestJobTransitionError, match="template"):
         BacktestJob.create_queued(
             job_id=UUID("00000000-0000-0000-0000-000000000902"),
+            organization_id=_ORGANIZATION_ID,
             user_id=UserId.from_string("00000000-0000-0000-0000-000000000102"),
             mode="template",
             created_at=now,
@@ -82,7 +85,6 @@ def test_backtest_job_template_mode_rejects_spec_snapshot_fields() -> None:
             engine_params_hash="b" * 64,
             backtest_runtime_config_hash="c" * 64,
         )
-
 
 
 def test_backtest_job_forbids_queued_to_failed_transition() -> None:
@@ -113,7 +115,6 @@ def test_backtest_job_forbids_queued_to_failed_transition() -> None:
                 details={"stage": "stage_a"},
             ),
         )
-
 
 
 def test_backtest_job_claim_sets_running_state_and_lease_fields() -> None:
@@ -168,6 +169,7 @@ def test_backtest_job_preserves_artifact_pin_across_claim_and_finish() -> None:
     now = datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc)
     queued = BacktestJob.create_queued(
         job_id=UUID("00000000-0000-0000-0000-000000000950"),
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000101"),
         mode="template",
         created_at=now,
@@ -218,6 +220,7 @@ def test_backtest_job_preserves_normalized_persisted_run_metadata_across_transit
     now = datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc)
     queued = BacktestJob.create_queued(
         job_id=UUID("00000000-0000-0000-0000-000000000951"),
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000101"),
         mode="template",
         created_at=now,
@@ -259,10 +262,7 @@ def test_backtest_job_preserves_normalized_persisted_run_metadata_across_transit
     assert queued.ranking_secondary_metric == "total_return_pct_net_of_funding"
     assert claimed.execution_mode == queued.execution_mode
     assert claimed.execution_profile_mode_hint == queued.execution_profile_mode_hint
-    assert (
-        claimed.effective_execution_profile_mode
-        == queued.effective_execution_profile_mode
-    )
+    assert claimed.effective_execution_profile_mode == queued.effective_execution_profile_mode
     assert claimed.market_id == queued.market_id
     assert claimed.symbol == queued.symbol
     assert claimed.timeframe == queued.timeframe
@@ -271,10 +271,7 @@ def test_backtest_job_preserves_normalized_persisted_run_metadata_across_transit
     assert claimed.ranking_secondary_metric == queued.ranking_secondary_metric
     assert finished.execution_mode == queued.execution_mode
     assert finished.execution_profile_mode_hint == queued.execution_profile_mode_hint
-    assert (
-        finished.effective_execution_profile_mode
-        == queued.effective_execution_profile_mode
-    )
+    assert finished.effective_execution_profile_mode == queued.effective_execution_profile_mode
     assert finished.market_id == queued.market_id
     assert finished.symbol == queued.symbol
     assert finished.timeframe == queued.timeframe
@@ -307,6 +304,7 @@ def test_backtest_job_rejects_execution_profile_metadata_without_persisted_run_m
     ):
         BacktestJob.create_queued(
             job_id=UUID("00000000-0000-0000-0000-000000000954"),
+            organization_id=_ORGANIZATION_ID,
             user_id=UserId.from_string("00000000-0000-0000-0000-000000000101"),
             mode="template",
             created_at=now,
@@ -399,6 +397,7 @@ def test_backtest_job_rejects_lease_fields_outside_running_state() -> None:
     with pytest.raises(BacktestJobLeaseError, match="lease fields must be null"):
         BacktestJob(
             job_id=queued.job_id,
+            organization_id=queued.organization_id,
             user_id=queued.user_id,
             mode=queued.mode,
             state=queued.state,
@@ -451,7 +450,6 @@ def test_backtest_job_request_cancel_converts_queued_to_cancelled() -> None:
     assert cancelled.finished_at == cancelled_at
     assert cancelled.cancel_requested_at == cancelled_at
     assert cancelled.locked_by is None
-
 
 
 def test_backtest_job_request_cancel_for_running_marks_cancel_requested_only() -> None:
@@ -575,7 +573,6 @@ def test_backtest_job_finish_failed_requires_error_payload() -> None:
         )
 
 
-
 def test_backtest_job_update_progress_rejects_backward_stage_transition() -> None:
     """
     Verify progress updates reject stage rollback (`stage_b -> stage_a`).
@@ -690,15 +687,20 @@ def test_backtest_job_eta_seconds_requires_signal_and_estimates_from_weighted_pr
         total_units=20,
     )
 
-    assert running.eta_seconds(
-        stage_weights=weights,
-        now=datetime(2026, 2, 22, 18, 0, 30, tzinfo=timezone.utc),
-    ) is None
-    assert progressed.eta_seconds(
-        stage_weights=weights,
-        now=datetime(2026, 2, 22, 18, 1, 1, tzinfo=timezone.utc),
-    ) == 40
-
+    assert (
+        running.eta_seconds(
+            stage_weights=weights,
+            now=datetime(2026, 2, 22, 18, 0, 30, tzinfo=timezone.utc),
+        )
+        is None
+    )
+    assert (
+        progressed.eta_seconds(
+            stage_weights=weights,
+            now=datetime(2026, 2, 22, 18, 1, 1, tzinfo=timezone.utc),
+        )
+        == 40
+    )
 
 
 def _build_queued_job() -> BacktestJob:
@@ -719,6 +721,7 @@ def _build_queued_job() -> BacktestJob:
     created_at = datetime(2026, 2, 22, 18, 0, tzinfo=timezone.utc)
     return BacktestJob.create_queued(
         job_id=UUID("00000000-0000-0000-0000-000000000900"),
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000100"),
         mode="template",
         created_at=created_at,

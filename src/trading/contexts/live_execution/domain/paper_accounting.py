@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID = UUID("00000000-0000-0000-0000-00000000a007")
 
@@ -24,6 +24,7 @@ class CapitalReservationBlockedError(ValueError):
 @dataclass(frozen=True, slots=True)
 class CapitalReservation:
     reservation_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     exchange_connection_id: UUID
     strategy_id: UUID
@@ -45,6 +46,7 @@ class CapitalReservation:
 @dataclass(frozen=True, slots=True)
 class PaperOrder:
     paper_order_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     strategy_id: UUID
     strategy_run_id: UUID
@@ -67,6 +69,7 @@ class PaperOrder:
 class PaperFill:
     paper_fill_id: UUID
     paper_order_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     strategy_id: UUID
     strategy_run_id: UUID
@@ -85,6 +88,7 @@ class PaperFill:
 @dataclass(frozen=True, slots=True)
 class StrategyPaperAccountingSnapshot:
     accounting_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     strategy_id: UUID
     strategy_run_id: UUID

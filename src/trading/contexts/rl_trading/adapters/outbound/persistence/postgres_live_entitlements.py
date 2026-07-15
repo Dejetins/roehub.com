@@ -14,7 +14,7 @@ from trading.contexts.rl_trading.domain.live_entitlements import (
 from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway import (
     StrategyPostgresGateway,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresRlLiveTickerEntitlementRepository:
@@ -34,6 +34,7 @@ class PostgresRlLiveTickerEntitlementRepository:
     def snapshot(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         paid_level: str,
         mode: RlLiveTickerMode,
@@ -43,13 +44,20 @@ class PostgresRlLiveTickerEntitlementRepository:
             paid_level=paid_level,
             mode=mode,
             requested_ticker=requested_ticker,
-            active_tickers=self._active_tickers(owner_user_id=owner_user_id),
-            override_live_slots_allowed=self._override_limit(owner_user_id=owner_user_id),
+            active_tickers=self._active_tickers(
+                organization_id=organization_id,
+                owner_user_id=owner_user_id,
+            ),
+            override_live_slots_allowed=self._override_limit(
+                organization_id=organization_id,
+                owner_user_id=owner_user_id,
+            ),
         )
 
     def sync_profile(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         paid_level: str,
         strategy_id: UUID,
@@ -61,11 +69,13 @@ class PostgresRlLiveTickerEntitlementRepository:
     ) -> RlLiveTickerEntitlementSnapshot:
         if mode != "live" or not profile_ready or requested_ticker is None:
             self._deactivate_profile(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 strategy_id=strategy_id,
                 observed_at=observed_at,
             )
             return self.snapshot(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 paid_level=paid_level,
                 mode=mode,
@@ -76,14 +86,17 @@ class PostgresRlLiveTickerEntitlementRepository:
         self._gateway.fetch_one(
             query=f"""
             WITH owner_lock AS (
-                SELECT pg_advisory_xact_lock(hashtext(%(owner_user_id)s))
+                SELECT pg_advisory_xact_lock(
+                    hashtext(%(organization_id)s || ':' || %(owner_user_id)s)
+                )
             ),
             deactivated_previous_profile_ticker AS (
                 UPDATE {self._activation_table_name}
                    SET active = FALSE,
                        deactivated_at = %(observed_at)s,
                        updated_at = %(observed_at)s
-                 WHERE owner_user_id = %(owner_user_id)s::uuid
+                 WHERE organization_id = %(organization_id)s::uuid
+                   AND owner_user_id = %(owner_user_id)s::uuid
                    AND strategy_id = %(strategy_id)s::uuid
                    AND active = TRUE
                    AND NOT (
@@ -96,7 +109,8 @@ class PostgresRlLiveTickerEntitlementRepository:
             override_limit AS (
                 SELECT live_slots_allowed
                   FROM {self._override_table_name}
-                 WHERE owner_user_id = %(owner_user_id)s::uuid
+                 WHERE organization_id = %(organization_id)s::uuid
+                   AND owner_user_id = %(owner_user_id)s::uuid
                    AND active = TRUE
                  LIMIT 1
             ),
@@ -111,14 +125,16 @@ class PostgresRlLiveTickerEntitlementRepository:
                   FROM (
                       SELECT DISTINCT exchange_name, market_type, symbol
                         FROM {self._activation_table_name}
-                       WHERE owner_user_id = %(owner_user_id)s::uuid
+                       WHERE organization_id = %(organization_id)s::uuid
+                         AND owner_user_id = %(owner_user_id)s::uuid
                          AND active = TRUE
                   ) active_distinct
             ),
             existing_requested AS (
                 SELECT activation_id
                   FROM {self._activation_table_name}
-                 WHERE owner_user_id = %(owner_user_id)s::uuid
+                 WHERE organization_id = %(organization_id)s::uuid
+                   AND owner_user_id = %(owner_user_id)s::uuid
                    AND exchange_name = %(exchange_name)s
                    AND market_type = %(market_type)s
                    AND symbol = %(symbol)s
@@ -129,6 +145,7 @@ class PostgresRlLiveTickerEntitlementRepository:
                 INSERT INTO {self._activation_table_name}
                 (
                     activation_id,
+                    organization_id,
                     owner_user_id,
                     strategy_id,
                     live_profile_id,
@@ -144,6 +161,7 @@ class PostgresRlLiveTickerEntitlementRepository:
                 )
                 SELECT
                     %(activation_id)s::uuid,
+                    %(organization_id)s::uuid,
                     %(owner_user_id)s::uuid,
                     %(strategy_id)s::uuid,
                     %(live_profile_id)s::uuid,
@@ -159,7 +177,13 @@ class PostgresRlLiveTickerEntitlementRepository:
                   FROM active_before, effective_limit, owner_lock
                  WHERE EXISTS (SELECT 1 FROM existing_requested)
                     OR active_before.live_slots_used < effective_limit.live_slots_allowed
-                ON CONFLICT (owner_user_id, exchange_name, market_type, symbol)
+                ON CONFLICT (
+                    organization_id,
+                    owner_user_id,
+                    exchange_name,
+                    market_type,
+                    symbol
+                )
                     WHERE active
                 DO UPDATE SET
                     strategy_id = EXCLUDED.strategy_id,
@@ -175,6 +199,7 @@ class PostgresRlLiveTickerEntitlementRepository:
             """,
             parameters={
                 "activation_id": str(uuid4()),
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_id": str(strategy_id),
                 "live_profile_id": str(live_profile_id),
@@ -186,43 +211,68 @@ class PostgresRlLiveTickerEntitlementRepository:
             },
         )
         return self.snapshot(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             paid_level=paid_level,
             mode=mode,
             requested_ticker=requested_ticker,
         )
 
-    def _override_limit(self, *, owner_user_id: UserId) -> int | None:
+    def _override_limit(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+    ) -> int | None:
         row = self._gateway.fetch_one(
             query=f"""
             SELECT live_slots_allowed
               FROM {self._override_table_name}
-             WHERE owner_user_id = %(owner_user_id)s
+             WHERE organization_id = %(organization_id)s
+               AND owner_user_id = %(owner_user_id)s
                AND active = TRUE
              LIMIT 1
             """,
-            parameters={"owner_user_id": str(owner_user_id)},
+            parameters={
+                "organization_id": str(organization_id),
+                "owner_user_id": str(owner_user_id),
+            },
         )
         if row is None:
             return None
         return int(row["live_slots_allowed"])
 
-    def _active_tickers(self, *, owner_user_id: UserId) -> tuple[RlLiveTickerIdentity, ...]:
+    def _active_tickers(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+    ) -> tuple[RlLiveTickerIdentity, ...]:
         rows = self._gateway.fetch_all(
             query=f"""
-            SELECT DISTINCT owner_user_id, exchange_name, market_type, symbol
+            SELECT DISTINCT
+                   organization_id,
+                   owner_user_id,
+                   exchange_name,
+                   market_type,
+                   symbol
               FROM {self._activation_table_name}
-             WHERE owner_user_id = %(owner_user_id)s
+             WHERE organization_id = %(organization_id)s
+               AND owner_user_id = %(owner_user_id)s
                AND active = TRUE
              ORDER BY exchange_name, market_type, symbol
             """,
-            parameters={"owner_user_id": str(owner_user_id)},
+            parameters={
+                "organization_id": str(organization_id),
+                "owner_user_id": str(owner_user_id),
+            },
         )
         return tuple(_row_to_identity(row=row) for row in rows)
 
     def _deactivate_profile(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         observed_at: datetime,
@@ -233,11 +283,13 @@ class PostgresRlLiveTickerEntitlementRepository:
                SET active = FALSE,
                    deactivated_at = %(observed_at)s,
                    updated_at = %(observed_at)s
-             WHERE owner_user_id = %(owner_user_id)s
+             WHERE organization_id = %(organization_id)s
+               AND owner_user_id = %(owner_user_id)s
                AND strategy_id = %(strategy_id)s
                AND active = TRUE
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_id": str(strategy_id),
                 "observed_at": observed_at,
@@ -247,6 +299,7 @@ class PostgresRlLiveTickerEntitlementRepository:
 
 def _row_to_identity(*, row: Mapping[str, Any]) -> RlLiveTickerIdentity:
     return RlLiveTickerIdentity(
+        organization_id=OrganizationId.from_string(str(row["organization_id"])),
         owner_user_id=UserId.from_string(str(row["owner_user_id"])),
         exchange_name=str(row["exchange_name"]),
         market_type=str(row["market_type"]),

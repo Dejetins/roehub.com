@@ -19,7 +19,7 @@ from trading.contexts.exchange_control.application.connections import (
 from trading.contexts.exchange_control.application.validation import (
     ExchangeCredentialValidationResult,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresExchangeConnectionUsageGuard(ExchangeConnectionUsageGuard):
@@ -30,7 +30,11 @@ class PostgresExchangeConnectionUsageGuard(ExchangeConnectionUsageGuard):
         self._dsn = normalized_dsn
 
     def active_trading_bindings_count(
-        self, *, owner_user_id: UserId, connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        connection_id: UUID,
     ) -> int:
         with psycopg.connect(
             self._dsn,
@@ -43,13 +47,15 @@ class PostgresExchangeConnectionUsageGuard(ExchangeConnectionUsageGuard):
                         """
                         SELECT COUNT(*) AS active_count
                         FROM strategy_exchange_bindings
-                        WHERE owner_user_id = %(owner_user_id)s
+                        WHERE organization_id = %(organization_id)s
+                          AND owner_user_id = %(owner_user_id)s
                           AND exchange_connection_id = %(connection_id)s
                           AND usage_mode = 'trading'
                           AND binding_status = 'active'
                         """,
                     ),
                     {
+                        "organization_id": str(organization_id),
                         "owner_user_id": str(owner_user_id),
                         "connection_id": str(connection_id),
                     },
@@ -88,7 +94,8 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             JOIN exchange_credential_versions AS credential
                               ON credential.credential_version_id =
                                  connection.active_credential_version_id
-                            WHERE connection.owner_user_id = %(owner_user_id)s
+                            WHERE connection.organization_id = %(organization_id)s
+                              AND connection.owner_user_id = %(owner_user_id)s
                               AND connection.exchange_name = %(exchange_name)s
                               AND connection.market_type = %(market_type)s
                               AND connection.environment = %(environment)s
@@ -99,6 +106,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             """,
                         ),
                         {
+                            "organization_id": str(connection.organization_id),
                             "owner_user_id": str(connection.owner_user_id),
                             "exchange_name": connection.exchange_name,
                             "market_type": connection.market_type,
@@ -117,6 +125,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             """
                             INSERT INTO exchange_connections (
                                 connection_id,
+                                organization_id,
                                 owner_user_id,
                                 exchange_name,
                                 market_type,
@@ -135,6 +144,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             )
                             VALUES (
                                 %(connection_id)s,
+                                %(organization_id)s,
                                 %(owner_user_id)s,
                                 %(exchange_name)s,
                                 %(market_type)s,
@@ -153,6 +163,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             )
                             RETURNING
                                 connection_id,
+                                organization_id,
                                 owner_user_id,
                                 exchange_name,
                                 market_type,
@@ -185,6 +196,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             INSERT INTO exchange_credential_versions (
                                 credential_version_id,
                                 connection_id,
+                                organization_id,
                                 api_key_ciphertext,
                                 api_secret_ciphertext,
                                 passphrase_ciphertext,
@@ -203,6 +215,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             VALUES (
                                 %(credential_version_id)s,
                                 %(connection_id)s,
+                                %(organization_id)s,
                                 %(api_key_ciphertext)s,
                                 %(api_secret_ciphertext)s,
                                 %(passphrase_ciphertext)s,
@@ -235,7 +248,9 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
         )
         return _map_connection(row=row) if row is not None else None
 
-    def list_for_user(self, *, owner_user_id: UserId) -> tuple[ExchangeConnectionRecord, ...]:
+    def list_for_user(
+        self, *, organization_id: OrganizationId, owner_user_id: UserId
+    ) -> tuple[ExchangeConnectionRecord, ...]:
         with psycopg.connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
@@ -247,6 +262,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                         """
                         SELECT
                             connection.connection_id,
+                            connection.organization_id,
                             connection.owner_user_id,
                             connection.exchange_name,
                             connection.market_type,
@@ -269,11 +285,15 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                             connection.disabled_at,
                             connection.archived_at
                         FROM exchange_connections AS connection
-                        WHERE connection.owner_user_id = %(owner_user_id)s
+                        WHERE connection.organization_id = %(organization_id)s
+                          AND connection.owner_user_id = %(owner_user_id)s
                         ORDER BY connection.created_at ASC, connection.connection_id ASC
                         """,
                     ),
-                    {"owner_user_id": str(owner_user_id)},
+                    {
+                        "organization_id": str(organization_id),
+                        "owner_user_id": str(owner_user_id),
+                    },
                 )
                 rows = cursor.fetchall()
         return tuple(_map_connection(row=dict(row)) for row in rows)
@@ -415,6 +435,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                           AND connection.status = 'active'
                         RETURNING
                             connection.connection_id,
+                            connection.organization_id,
                             connection.owner_user_id,
                             connection.exchange_name,
                             connection.market_type,
@@ -544,6 +565,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                           AND connection.owner_user_id = %(owner_user_id)s
                         RETURNING
                             connection.connection_id,
+                            connection.organization_id,
                             connection.owner_user_id,
                             connection.exchange_name,
                             connection.market_type,
@@ -664,6 +686,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                           AND connection.status = 'disabled'
                         RETURNING
                             connection.connection_id,
+                            connection.organization_id,
                             connection.owner_user_id,
                             connection.exchange_name,
                             connection.market_type,
@@ -764,6 +787,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                           AND connection.status = 'active'
                         RETURNING
                             connection.connection_id,
+                            connection.organization_id,
                             connection.owner_user_id,
                             connection.exchange_name,
                             connection.market_type,
@@ -820,6 +844,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                         f"""
                         SELECT
                             connection.connection_id,
+                            connection.organization_id,
                             connection.owner_user_id,
                             connection.exchange_name,
                             connection.market_type,
@@ -857,6 +882,7 @@ def _connection_parameters(
 ) -> dict[str, object]:
     return {
         "connection_id": str(connection.connection_id),
+        "organization_id": str(connection.organization_id),
         "owner_user_id": str(connection.owner_user_id),
         "exchange_name": connection.exchange_name,
         "market_type": connection.market_type,
@@ -896,6 +922,7 @@ def _credential_parameters(
     return {
         "credential_version_id": str(credential_version.credential_version_id),
         "connection_id": str(credential_version.connection_id),
+        "organization_id": str(credential_version.organization_id),
         "api_key_ciphertext": credential_version.api_key_ciphertext,
         "api_secret_ciphertext": credential_version.api_secret_ciphertext,
         "passphrase_ciphertext": credential_version.passphrase_ciphertext,
@@ -918,6 +945,7 @@ def _map_connection(*, row: Mapping[str, Any]) -> ExchangeConnectionRecord:
     permissions = row.get("permissions")
     return ExchangeConnectionRecord(
         connection_id=UUID(str(row["connection_id"])),
+        organization_id=OrganizationId.from_string(str(row["organization_id"])),
         owner_user_id=UserId.from_string(str(row["owner_user_id"])),
         exchange_name=str(row["exchange_name"]),
         market_type=str(row["market_type"]),
@@ -966,6 +994,7 @@ def _map_credential(*, row: Mapping[str, Any]) -> ExchangeCredentialVersionRecor
     return ExchangeCredentialVersionRecord(
         credential_version_id=UUID(str(row["credential_version_id"])),
         connection_id=UUID(str(row["connection_id"])),
+        organization_id=OrganizationId.from_string(str(row["organization_id"])),
         api_key_ciphertext=str(row["api_key_ciphertext"]),
         api_secret_ciphertext=str(row["api_secret_ciphertext"]),
         passphrase_ciphertext=(

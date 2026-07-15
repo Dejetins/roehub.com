@@ -11,7 +11,7 @@ from trading.contexts.rl_trading.domain.risk_sizing_policy import (
     evaluate_rl_decision_policy,
     validate_rl_risk_sizing_policy,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 def test_stage14_policy_validates_balance_between_risk_inputs_and_synthetic_exits() -> None:
@@ -79,6 +79,9 @@ def test_stage14_open_preview_sizes_existing_execution_order_without_native_exit
 
 def test_stage14_policy_key_is_owner_strategy_ticker_market_scoped() -> None:
     key = RlRiskSizingPolicyKey(
+        organization_id=OrganizationId(
+            UUID("00000000-0000-4000-8000-000000001400")
+        ),
         owner_user_id=UserId(UUID("00000000-0000-0000-0000-000000001401")),
         strategy_id=UUID("00000000-0000-0000-0000-000000001402"),
         exchange_name=" Binance ",
@@ -87,6 +90,7 @@ def test_stage14_policy_key_is_owner_strategy_ticker_market_scoped() -> None:
     )
 
     assert key.persistence_key == (
+        "00000000-0000-4000-8000-000000001400",
         "00000000-0000-0000-0000-000000001401",
         "00000000-0000-0000-0000-000000001402",
         "binance",

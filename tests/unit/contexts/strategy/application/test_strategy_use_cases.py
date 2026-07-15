@@ -40,7 +40,9 @@ from trading.contexts.strategy.application.ports.market_data_readiness import (
 from trading.contexts.strategy.domain.entities import StrategySpecV1
 from trading.contexts.strategy.domain.entities.live_strategy_profile import LiveStrategyProfile
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000000100"))
 
 
 class _SequenceClock:
@@ -87,7 +89,6 @@ class _SequenceClock:
         return self._values.pop(0)
 
 
-
 def test_get_my_strategy_use_case_rejects_non_owner_access() -> None:
     """
     Verify explicit ownership rule denies strategy access to non-owner user.
@@ -112,8 +113,14 @@ def test_get_my_strategy_use_case_rejects_non_owner_access() -> None:
     )
     get_use_case = GetMyStrategyUseCase(repository=strategy_repository)
 
-    owner = CurrentUser(user_id=UserId.from_string("00000000-0000-0000-0000-000000000101"))
-    another_user = CurrentUser(user_id=UserId.from_string("00000000-0000-0000-0000-000000000202"))
+    owner = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000101"),
+        organization_id=_ORGANIZATION_ID,
+    )
+    another_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000202"),
+        organization_id=_ORGANIZATION_ID,
+    )
 
     created_strategy = create_use_case.execute(
         spec_payload=_build_spec_payload(),
@@ -137,18 +144,15 @@ def test_create_strategy_from_backtest_variant_persists_provenance_and_replays()
         strategy_repository=strategy_repository,
     )
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000123")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
+        organization_id=_ORGANIZATION_ID,
     )
     use_case = CreateStrategyFromBacktestVariantUseCase(
         variant_reader=_StaticBacktestVariantReader(snapshot=_launch_snapshot(current_user)),
         strategy_repository=strategy_repository,
         provenance_repository=provenance_repository,
         event_repository=event_repository,
-        clock=_SequenceClock(
-            values=(
-                datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),
-            )
-        ),
+        clock=_SequenceClock(values=(datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),)),
     )
 
     created = use_case.execute(
@@ -178,6 +182,7 @@ def test_create_strategy_from_backtest_variant_persists_provenance_and_replays()
         "params": {"row_id": 7, "source": "close", "window": 5},
     }
     events = event_repository.list_for_strategy(
+        organization_id=_ORGANIZATION_ID,
         user_id=current_user.user_id,
         strategy_id=created.strategy.strategy_id,
     )
@@ -190,17 +195,14 @@ def test_create_strategy_from_backtest_variant_returns_duplicate_for_same_source
         strategy_repository=strategy_repository,
     )
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000124")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000124"),
+        organization_id=_ORGANIZATION_ID,
     )
     use_case = CreateStrategyFromBacktestVariantUseCase(
         variant_reader=_StaticBacktestVariantReader(snapshot=_launch_snapshot(current_user)),
         strategy_repository=strategy_repository,
         provenance_repository=provenance_repository,
-        clock=_SequenceClock(
-            values=(
-                datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),
-            )
-        ),
+        clock=_SequenceClock(values=(datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),)),
     )
 
     created = use_case.execute(
@@ -227,7 +229,8 @@ def test_create_strategy_from_backtest_variant_allows_distinct_launch_configs() 
         strategy_repository=strategy_repository,
     )
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000127")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000127"),
+        organization_id=_ORGANIZATION_ID,
     )
     use_case = CreateStrategyFromBacktestVariantUseCase(
         variant_reader=_StaticBacktestVariantReader(snapshot=_launch_snapshot(current_user)),
@@ -273,7 +276,8 @@ def test_create_strategy_from_backtest_variant_allows_distinct_launch_configs() 
 def test_create_strategy_from_backtest_variant_rejects_direction_override() -> None:
     strategy_repository = InMemoryStrategyRepository()
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000128")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000128"),
+        organization_id=_ORGANIZATION_ID,
     )
     use_case = CreateStrategyFromBacktestVariantUseCase(
         variant_reader=_StaticBacktestVariantReader(
@@ -308,13 +312,17 @@ def test_create_strategy_from_backtest_variant_rejects_direction_override() -> N
     assert exc_info.value.code == "strategy_launch.invalid_config"
     assert exc_info.value.details is not None
     assert exc_info.value.details["reason"] == "direction_mismatch"
-    assert not strategy_repository.list_for_user(user_id=current_user.user_id)
+    assert not strategy_repository.list_for_user(
+        organization_id=_ORGANIZATION_ID,
+        user_id=current_user.user_id,
+    )
 
 
 def test_create_strategy_from_backtest_variant_rejects_spot_short_like_snapshot() -> None:
     strategy_repository = InMemoryStrategyRepository()
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000129")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000129"),
+        organization_id=_ORGANIZATION_ID,
     )
     use_case = CreateStrategyFromBacktestVariantUseCase(
         variant_reader=_StaticBacktestVariantReader(
@@ -341,17 +349,18 @@ def test_create_strategy_from_backtest_variant_rejects_spot_short_like_snapshot(
 
     assert exc_info.value.code == "strategy_launch.invalid_config"
     assert exc_info.value.details is not None
-    assert (
-        exc_info.value.details["reason"]
-        == "short_direction_requires_futures_market"
-    )
+    assert exc_info.value.details["reason"] == "short_direction_requires_futures_market"
     assert exc_info.value.details["field"] == "market_type"
-    assert not strategy_repository.list_for_user(user_id=current_user.user_id)
+    assert not strategy_repository.list_for_user(
+        organization_id=_ORGANIZATION_ID,
+        user_id=current_user.user_id,
+    )
 
 
 def test_create_strategy_from_backtest_variant_fails_closed_for_not_launchable_job() -> None:
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000125")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000125"),
+        organization_id=_ORGANIZATION_ID,
     )
     strategy_repository = InMemoryStrategyRepository()
     use_case = CreateStrategyFromBacktestVariantUseCase(
@@ -362,9 +371,7 @@ def test_create_strategy_from_backtest_variant_fails_closed_for_not_launchable_j
         provenance_repository=InMemoryStrategyBacktestVariantProvenanceRepository(
             strategy_repository=strategy_repository,
         ),
-        clock=_SequenceClock(
-            values=(datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),)
-        ),
+        clock=_SequenceClock(values=(datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),)),
     )
 
     with pytest.raises(RoehubError) as error_info:
@@ -378,7 +385,6 @@ def test_create_strategy_from_backtest_variant_fails_closed_for_not_launchable_j
     assert error_info.value.code == "strategy_variant_launch.not_launchable"
     assert error_info.value.details is not None
     assert error_info.value.details["reason"] == "not_launchable"
-
 
 
 def test_clone_strategy_applies_whitelisted_overrides_and_rejects_unknown_fields() -> None:
@@ -416,7 +422,10 @@ def test_clone_strategy_applies_whitelisted_overrides_and_rejects_unknown_fields
         clock=clock,
     )
 
-    current_user = CurrentUser(user_id=UserId.from_string("00000000-0000-0000-0000-000000000303"))
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000303"),
+        organization_id=_ORGANIZATION_ID,
+    )
     source_strategy = create_use_case.execute(
         spec_payload=_build_spec_payload(),
         current_user=current_user,
@@ -459,7 +468,6 @@ def test_clone_strategy_applies_whitelisted_overrides_and_rejects_unknown_fields
             }
         ]
     }
-
 
 
 def test_run_stop_use_cases_allow_second_run_and_enforce_single_active_run() -> None:
@@ -509,7 +517,10 @@ def test_run_stop_use_cases_allow_second_run_and_enforce_single_active_run() -> 
         clock=clock,
     )
 
-    current_user = CurrentUser(user_id=UserId.from_string("00000000-0000-0000-0000-000000000404"))
+    current_user = CurrentUser(
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000404"),
+        organization_id=_ORGANIZATION_ID,
+    )
     created_strategy = create_use_case.execute(
         spec_payload=_build_spec_payload(),
         current_user=current_user,
@@ -556,7 +567,8 @@ def test_position_ownership_blocks_second_strategy_on_same_connection_instrument
     ownership_repository = InMemoryStrategyPositionOwnershipRepository()
     ownership_service = StrategyPositionOwnershipService(repository=ownership_repository)
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000408")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000408"),
+        organization_id=_ORGANIZATION_ID,
     )
     connection_id = UUID("00000000-0000-0000-0000-00000000c408")
     clock = _SequenceClock(
@@ -618,6 +630,7 @@ def test_position_ownership_blocks_second_strategy_on_same_connection_instrument
         current_user=current_user,
     )
     first_ownership = ownership_repository.get_for_run(
+        organization_id=current_user.organization_id,
         owner_user_id=current_user.user_id,
         strategy_run_id=first_run.run_id,
     )
@@ -639,6 +652,7 @@ def test_position_ownership_blocks_second_strategy_on_same_connection_instrument
         current_user=current_user,
     )
     releasing = ownership_repository.get_for_run(
+        organization_id=current_user.organization_id,
         owner_user_id=current_user.user_id,
         strategy_run_id=stopping.run_id,
     )
@@ -652,7 +666,8 @@ def test_run_strategy_blocks_when_market_data_readiness_is_missing() -> None:
     event_repository = InMemoryStrategyEventRepository()
     compatibility_repository = InMemoryStrategyCompatibilityReadinessRepository()
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000406")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000406"),
+        organization_id=_ORGANIZATION_ID,
     )
     clock = _SequenceClock(
         values=(
@@ -696,7 +711,8 @@ def test_compatibility_readiness_reports_degraded_and_ready_feed_for_rollup() ->
     compatibility_repository = InMemoryStrategyCompatibilityReadinessRepository()
     event_repository = InMemoryStrategyEventRepository()
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000407")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000407"),
+        organization_id=_ORGANIZATION_ID,
     )
     clock = _SequenceClock(
         values=(
@@ -733,7 +749,8 @@ def test_compatibility_readiness_reports_degraded_and_ready_feed_for_rollup() ->
 
 def test_scenario_matrix_derives_spot_rows_and_blocks_short_like_spot() -> None:
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000408")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000408"),
+        organization_id=_ORGANIZATION_ID,
     )
     compatibility_repository = InMemoryStrategyCompatibilityReadinessRepository()
     matrix_repository = InMemoryStrategyVariantScenarioMatrixRepository()
@@ -789,9 +806,7 @@ def test_scenario_matrix_derives_spot_rows_and_blocks_short_like_spot() -> None:
     assert paper_short.scenario_state == "blocked"
     assert paper_short.launch_blocked_reason == "short_direction_requires_futures_market"
     assert paper_short.order_capability == "unsupported"
-    assert paper_short.order_capability_reason_codes == (
-        "short_direction_requires_futures_market",
-    )
+    assert paper_short.order_capability_reason_codes == ("short_direction_requires_futures_market",)
 
     testnet_short = _find_matrix_row(
         report=report,
@@ -810,7 +825,8 @@ def test_scenario_matrix_derives_spot_rows_and_blocks_short_like_spot() -> None:
 
 def test_scenario_matrix_marks_futures_short_real_order_capable_but_not_bound() -> None:
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000409")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000409"),
+        organization_id=_ORGANIZATION_ID,
     )
     clock = _SequenceClock(
         values=(
@@ -886,7 +902,8 @@ def test_restart_use_case_records_durable_pending_operation() -> None:
         clock=clock,
     )
     current_user = CurrentUser(
-        user_id=UserId.from_string("00000000-0000-0000-0000-000000000405")
+        user_id=UserId.from_string("00000000-0000-0000-0000-000000000405"),
+        organization_id=_ORGANIZATION_ID,
     )
     created_strategy = create_use_case.execute(
         spec_payload=_build_spec_payload(),
@@ -909,6 +926,7 @@ def test_restart_use_case_records_durable_pending_operation() -> None:
     assert restart["requested_at"] == "2026-05-31T08:02:00Z"
     assert restart["operation_id"] != ""
     events = event_repository.list_for_strategy(
+        organization_id=_ORGANIZATION_ID,
         user_id=current_user.user_id,
         strategy_id=created_strategy.strategy_id,
     )
@@ -922,7 +940,6 @@ def test_restart_use_case_records_durable_pending_operation() -> None:
         )
     assert error_info.value.code == "conflict"
     assert error_info.value.message == "Strategy restart is already pending"
-
 
 
 def test_warmup_estimator_is_deterministic_for_equal_strategy_specs() -> None:
@@ -949,7 +966,6 @@ def test_warmup_estimator_is_deterministic_for_equal_strategy_specs() -> None:
     assert warmup_a == 50
     assert warmup_b == 50
     assert warmup_a == warmup_b
-
 
 
 class _StaticBacktestVariantReader:
@@ -1098,6 +1114,7 @@ def _profile(
 ) -> LiveStrategyProfile:
     return LiveStrategyProfile(
         profile_id=uuid4(),
+        organization_id=current_user.organization_id,
         owner_user_id=current_user.user_id,
         strategy_id=strategy_id,
         mode="paper",

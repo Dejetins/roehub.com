@@ -310,6 +310,8 @@ def test_canary_cli_records_source_event_without_intent(
             str(manifest_path),
             "--feature-window-json",
             str(feature_path),
+            "--organization-id",
+            "00000000-0000-4000-8000-000000000010",
             "--owner-user-id",
             "00000000-0000-0000-0000-000000013001",
             "--strategy-id",
@@ -368,6 +370,8 @@ def test_paper_cli_records_intent_order_and_parity(
             str(manifest_path),
             "--feature-window-json",
             str(feature_path),
+            "--organization-id",
+            "00000000-0000-4000-8000-000000000010",
             "--owner-user-id",
             "00000000-0000-0000-0000-000000013001",
             "--strategy-id",
@@ -404,7 +408,7 @@ def test_paper_cli_records_intent_order_and_parity(
     }
 
 
-def test_testnet_cli_dispatches_intent_and_duplicate_dispatch(
+def test_testnet_cli_fails_closed_without_trusted_risk_authority(
     tmp_path: Path,
     capsys,
     monkeypatch,
@@ -446,6 +450,8 @@ def test_testnet_cli_dispatches_intent_and_duplicate_dispatch(
             str(manifest_path),
             "--feature-window-json",
             str(feature_path),
+            "--organization-id",
+            "00000000-0000-4000-8000-000000000010",
             "--owner-user-id",
             "00000000-0000-0000-0000-000000013001",
             "--strategy-id",
@@ -459,19 +465,20 @@ def test_testnet_cli_dispatches_intent_and_duplicate_dispatch(
             "--quantity",
             "0.001",
         ]
-    ) == 0
+    ) == 2
     payload = json.loads(capsys.readouterr().out)
     assert payload["source_type"] == "ml_agent_decision"
     assert payload["action"] == "open_long"
-    assert payload["outcome"] == "intent_created"
-    assert payload["risk_status"] == "accepted"
-    assert payload["risk_reason"] == "risk_gate_accepted"
-    assert payload["intent_status"] == "dispatched"
-    assert payload["dispatch"]["result"] == "dispatched"
-    assert payload["duplicate_dispatch"]["result"] == "duplicate"
+    assert payload["outcome"] == "risk_rejected"
+    assert payload["outcome_reason"] == "organization_ownership_mismatch"
+    assert payload["risk_status"] == "rejected"
+    assert payload["risk_reason"] == "organization_ownership_mismatch"
+    assert payload["intent_status"] == "rejected"
+    assert payload["dispatch"]["result"] == "skipped"
+    assert payload["duplicate_dispatch"]["result"] == "skipped"
     assert payload["duplicate_replay"] is True
     assert payload["memory_counts"] == {
-        "dispatch_messages": 1,
+        "dispatch_messages": 0,
         "intents": 1,
         "source_events": 1,
     }
@@ -521,6 +528,8 @@ def test_testnet_cli_blocks_spot_short_without_dispatch(
             str(manifest_path),
             "--feature-window-json",
             str(feature_path),
+            "--organization-id",
+            "00000000-0000-4000-8000-000000000010",
             "--owner-user-id",
             "00000000-0000-0000-0000-000000013001",
             "--strategy-id",

@@ -4,6 +4,7 @@ from .gateway import BacktestPostgresGateway, PsycopgBacktestPostgresGateway
 from .lazy_trades_materialization_repository import (
     PostgresBacktestLazyTradesMaterializationRepository,
 )
+from .research_organization_scope import PostgresResearchOrganizationScopeResolver
 
 __all__ = [
     "BacktestPostgresGateway",
@@ -11,4 +12,5 @@ __all__ = [
     "PostgresBacktestJobRepository",
     "PostgresBacktestLazyTradesMaterializationRepository",
     "PsycopgBacktestPostgresGateway",
+    "PostgresResearchOrganizationScopeResolver",
 ]

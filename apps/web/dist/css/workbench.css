@@ -483,6 +483,16 @@ body {
 .auth-gateway__session dd { overflow: hidden; margin: 0; color: var(--rh-text-strong); text-align: right; text-overflow: ellipsis; white-space: nowrap; }
 .auth-gateway__continue { width: 100%; min-height: 48px; }
 .auth-gateway__security { margin: 14px 0 0; font-size: 11px; text-align: center; }
+.local-auth__fallbacks { margin-top: 16px; border-top: 1px solid var(--rh-divider); padding-top: 14px; }
+.local-auth__fallbacks summary { cursor: pointer; color: var(--rh-text-strong); font-weight: 650; }
+.local-auth__form { display: grid; gap: 12px; margin-top: 16px; }
+.local-auth__form label { display: grid; gap: 6px; color: var(--rh-muted); font-size: 12px; }
+.local-auth__form input { width: 100%; min-height: 42px; padding: 9px 11px; border: 1px solid var(--rh-line-muted); border-radius: 7px; background: var(--rh-bg-elevated); color: var(--rh-text-strong); }
+.local-auth__notice { margin: 0 0 4px; padding: 12px; border-left: 2px solid var(--rh-accent); background: color-mix(in srgb, var(--rh-accent) 8%, transparent); font-size: 12px; line-height: 1.5; }
+.local-auth__status { min-height: 20px; margin: 14px 0 0; color: var(--rh-accent-2); font-size: 12px; }
+.local-auth__recovery { margin-top: 16px; padding: 16px; border: 1px solid var(--rh-accent); border-radius: 8px; background: var(--rh-bg-elevated); }
+.local-auth__recovery h3 { margin: 0 0 8px; }
+.local-auth__recovery ol { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 18px; margin: 14px 0; padding-left: 24px; font-family: var(--rh-font-mono); font-size: 12px; }
 
 .shell-preferences { display: flex; gap: 8px; }
 .workbench-user-menu__panel .shell-preferences { display: grid; grid-template-columns: 1fr 72px; }

@@ -13,7 +13,7 @@ class InMemoryIdentityUserRepository(UserRepository):
     InMemoryIdentityUserRepository — deterministic in-memory identity repository for dev/test.
 
     Docs:
-      - docs/architecture/identity/keycloak-cutover-plan-v1.md
+      - docs/architecture/identity/oidc-authentication-provider-v1.md
     Related:
       - src/trading/contexts/identity/application/ports/user_repository.py
       - src/trading/contexts/identity/adapters/outbound/persistence/postgres/user_repository.py
@@ -119,6 +119,37 @@ class InMemoryIdentityUserRepository(UserRepository):
 
         updated = existing.reactivated(login_at=login_at)
         self._by_user_id[str(updated.user_id)] = updated
+        return updated
+
+    def create_local_user(
+        self,
+        *,
+        user_id: UserId,
+        created_at: datetime,
+    ) -> User:
+        if str(user_id) in self._by_user_id:
+            raise ValueError("local user already exists")
+        user = User(
+            user_id=user_id,
+            paid_level=PaidLevel.free(),
+            created_at=created_at,
+            last_login_at=created_at,
+            is_deleted=False,
+        )
+        self._by_user_id[str(user_id)] = user
+        return user
+
+    def record_local_login(
+        self,
+        *,
+        user_id: UserId,
+        login_at: datetime,
+    ) -> User:
+        existing = self._by_user_id.get(str(user_id))
+        if existing is None:
+            raise ValueError("local user is not found")
+        updated = existing.reactivated(login_at=login_at)
+        self._by_user_id[str(user_id)] = updated
         return updated
 
 

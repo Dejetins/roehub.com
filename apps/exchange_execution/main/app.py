@@ -28,9 +28,11 @@ from trading.contexts.live_execution.adapters.outbound import (
     ExchangeControlCredentialResolver,
     InMemoryExchangeExecutionOrderRepository,
     InMemoryExchangeExecutionProcessRepository,
+    InMemoryExecutionGatewayPolicyRepository,
     InMemoryExecutionIntentRepository,
     PostgresExchangeExecutionOrderRepository,
     PostgresExchangeExecutionProcessRepository,
+    PostgresExecutionGatewayPolicyRepository,
     PostgresExecutionIntentRepository,
     RedisExchangeExecutionConsumer,
     RedisExecutionDispatchTransportConfig,
@@ -57,6 +59,7 @@ _CANCEL_AFTER_SUBMIT_KEY = "ROEHUB_EXCHANGE_EXECUTION_CANCEL_AFTER_SUBMIT"
 _STRATEGY_FAIL_FAST_KEY = "STRATEGY_FAIL_FAST"
 _STRATEGY_PG_DSN_KEY = "STRATEGY_PG_DSN"
 _PITR_VERIFIED_KEY = "ROEHUB_EXECUTION_PITR_VERIFIED"
+_CONTAINER_BIND_KEY = "ROEHUB_EXCHANGE_EXECUTION_CONTAINER_BIND"
 
 
 @dataclass(frozen=True, slots=True)
@@ -291,6 +294,10 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     def get_health() -> dict[str, object]:
         return {"status": "ok", "service": settings.process_config.service_id}
 
+    @app.get("/health/live")
+    def get_liveness() -> dict[str, object]:
+        return {"status": "ok", "service": settings.process_config.service_id}
+
     @app.get("/health/ready")
     def get_readiness(response: Response) -> dict[str, object]:
         snapshot = service.readiness()
@@ -368,10 +375,12 @@ def build_runtime(
             gateway=gateway
         )
         order_repository = PostgresExchangeExecutionOrderRepository(gateway=gateway)
+        gateway_policy_repository = PostgresExecutionGatewayPolicyRepository(gateway=gateway)
     else:
         process_repository = InMemoryExchangeExecutionProcessRepository()
         intent_repository = InMemoryExecutionIntentRepository()
         order_repository = InMemoryExchangeExecutionOrderRepository()
+        gateway_policy_repository = InMemoryExecutionGatewayPolicyRepository()
     consumer: ExchangeExecutionConsumer | None = None
     if settings.redis_enabled:
         consumer = RedisExchangeExecutionConsumer(
@@ -419,6 +428,7 @@ def build_runtime(
         order_repository=order_repository,
         credential_resolver=credential_resolver,
         order_adapters=order_adapters,
+        gateway_policy_repository=gateway_policy_repository,
         consumer=consumer,
         clock=clock,
         on_observation=metrics.record_observation,
@@ -434,9 +444,7 @@ def build_runtime(
     return service, metrics
 
 
-def resolve_runtime_settings(
-    *, environ: Mapping[str, str]
-) -> ExchangeExecutionRuntimeSettings:
+def resolve_runtime_settings(*, environ: Mapping[str, str]) -> ExchangeExecutionRuntimeSettings:
     env_name = environ.get(_ENV_NAME_KEY, "dev").strip().lower()
     config_path = Path(
         environ.get(
@@ -506,8 +514,13 @@ def resolve_runtime_settings(
         fail_fast=fail_fast,
     )
     if env_name == "prod":
-        if bind_host != EXCHANGE_EXECUTION_DEFAULT_HOST:
-            raise ValueError("prod exchange-execution must bind to 127.0.0.1")
+        container_bind_enabled = _parse_bool(environ.get(_CONTAINER_BIND_KEY, "false"))
+        allowed_container_bind = container_bind_enabled and bind_host == "0.0.0.0"
+        if bind_host != EXCHANGE_EXECUTION_DEFAULT_HOST and not allowed_container_bind:
+            raise ValueError(
+                "prod exchange-execution must bind to 127.0.0.1 or use the "
+                "explicit container bind"
+            )
         if metrics_port != EXCHANGE_EXECUTION_METRICS_PORT:
             raise ValueError("prod exchange-execution must use metrics port 9206")
     return ExchangeExecutionRuntimeSettings(
@@ -538,7 +551,7 @@ def resolve_runtime_settings(
             "adapter.timeout_seconds",
         ),
         transit_address=environ.get("OPENBAO_ADDR", "").strip(),
-        transit_token=environ.get("ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN", "").strip(),
+        transit_token=environ.get("ROEHUB_EXCHANGE_CONTROL_TRANSIT_TOKEN_FILE", "").strip(),
         pitr_verified_env=str(ledger.get("pitr_verified_env", _PITR_VERIFIED_KEY)),
     )
 

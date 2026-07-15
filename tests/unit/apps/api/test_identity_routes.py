@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-import base64
-import json
-from datetime import datetime, timezone
-from urllib.parse import parse_qs, urlparse
-from uuid import UUID
+import hashlib
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
+from threading import Event, Lock
+from urllib.parse import parse_qs, urlencode, urlparse
+from uuid import uuid4
 
-import httpx
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -15,591 +18,382 @@ from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUs
 from trading.contexts.identity.adapters.outbound.persistence.in_memory import (
     InMemoryIdentitySessionRepository,
     InMemoryIdentityUserRepository,
+    InMemoryOidcIdentityRepository,
+    InMemoryOrganizationRepository,
 )
 from trading.contexts.identity.adapters.outbound.security.current_user import (
     RoehubSessionCurrentUser,
 )
-from trading.contexts.identity.application import IdentityClock
-
-_KEYCLOAK_AUTH_URL = "https://auth.roehub.local/realms/roehub/protocol/openid-connect/auth"
-_KEYCLOAK_TOKEN_URL = "https://auth.roehub.local/realms/roehub/protocol/openid-connect/token"
-_KEYCLOAK_INTROSPECTION_URL = (
-    "https://auth.roehub.local/realms/roehub/protocol/openid-connect/token/introspect"
+from trading.contexts.identity.application import (
+    AuthenticationProviderError,
+    IdentityClock,
+    OidcAuthenticationError,
+    OidcAuthenticationService,
+    VerifiedExternalIdentity,
 )
-_KEYCLOAK_CLIENT_ID = "roehub-api"
-_KEYCLOAK_CLIENT_SECRET = "test-client-secret"
-_KEYCLOAK_REDIRECT_URI = "http://127.0.0.1:8010/auth/callback"
-_KEYCLOAK_LOGOUT_REDIRECT_URI = "http://127.0.0.1:8010/login"
+from trading.shared_kernel.primitives import UserId
+
 _SESSION_COOKIE_NAME = "roehub_session_id"
-_KEYCLOAK_SUBJECT = "keycloak-subject-1"
-_BASE_NOW = datetime(2026, 4, 22, 12, 0, tzinfo=timezone.utc)
+_BASE_NOW = datetime(2026, 7, 13, 12, 0, tzinfo=timezone.utc)
+_ISSUER = "https://identity.example.test"
+_INVITED_EMAIL = "invited@example.test"
 
 
 class _MutableClock(IdentityClock):
-    """
-    Mutable deterministic UTC clock for identity route tests.
-    """
-
-    def __init__(self, *, now_value: datetime) -> None:
-        """
-        Initialize deterministic clock with initial UTC value.
-
-        Args:
-            now_value: Initial timezone-aware UTC datetime.
-        Returns:
-            None.
-        Assumptions:
-            Tests advance time explicitly with `set_now`.
-        Raises:
-            ValueError: If datetime is naive or non-UTC.
-        Side Effects:
-            None.
-        """
-        self._now_value = _ensure_utc_datetime(value=now_value, field_name="now_value")
-
-    def set_now(self, *, now_value: datetime) -> None:
-        """
-        Replace deterministic clock value.
-
-        Args:
-            now_value: New timezone-aware UTC datetime.
-        Returns:
-            None.
-        Assumptions:
-            Tests control timeline for login/logout deterministically.
-        Raises:
-            ValueError: If datetime is naive or non-UTC.
-        Side Effects:
-            Mutates internal clock state.
-        """
-        self._now_value = _ensure_utc_datetime(value=now_value, field_name="now_value")
+    def __init__(self) -> None:
+        self.value = _BASE_NOW
 
     def now(self) -> datetime:
-        """
-        Return current deterministic UTC timestamp.
+        return self.value
 
-        Args:
-            None.
-        Returns:
-            datetime: Current fixed UTC datetime.
-        Assumptions:
-            Time does not auto-progress during a test.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        """
-        return self._now_value
+
+@dataclass
+class _FixtureProvider:
+    external: VerifiedExternalIdentity
+    unavailable: bool = False
+    last_verifier: str | None = None
+    last_nonce_hash: str | None = None
+    block_exchange: bool = False
+    exchange_calls: int = 0
+    exchange_started: Event = field(init=False)
+    exchange_release: Event = field(init=False)
+    exchange_lock: Lock = field(init=False)
+    exchange_hook: Callable[[], None] | None = None
+
+    def __post_init__(self) -> None:
+        self.exchange_started = Event()
+        self.exchange_release = Event()
+        self.exchange_lock = Lock()
+
+    @property
+    def provider_id(self) -> str:
+        return "fixture"
+
+    @property
+    def issuer(self) -> str:
+        return _ISSUER
+
+    @property
+    def display_name(self) -> str:
+        return "Fixture Identity"
+
+    def authorization_url(self, *, state: str, nonce: str, code_challenge: str) -> str:
+        if self.unavailable:
+            raise AuthenticationProviderError(code="provider_unavailable", retryable=True)
+        return "https://identity.example.test/authorize?" + urlencode(
+            {
+                "state": state,
+                "nonce": nonce,
+                "code_challenge": code_challenge,
+                "code_challenge_method": "S256",
+            }
+        )
+
+    def exchange_code(
+        self,
+        *,
+        code: str,
+        code_verifier: str,
+        expected_nonce_sha256: str,
+    ) -> VerifiedExternalIdentity:
+        with self.exchange_lock:
+            self.exchange_calls += 1
+        self.exchange_started.set()
+        if self.block_exchange:
+            assert self.exchange_release.wait(timeout=2)
+        if self.exchange_hook is not None:
+            self.exchange_hook()
+        if self.unavailable:
+            raise AuthenticationProviderError(
+                code="token_result_unknown", token_result_unknown=True
+            )
+        assert code == "disposable-code"
+        self.last_verifier = code_verifier
+        self.last_nonce_hash = expected_nonce_sha256
+        return self.external
 
 
 def test_current_user_dependency_rejects_missing_cookie() -> None:
-    """
-    Verify protected endpoint returns 401 when opaque session cookie is missing.
+    fixture = _build_fixture()
 
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Current-user dependency is backed by local Roehub session storage.
-    Raises:
-        AssertionError: If endpoint does not return expected 401 payload.
-    Side Effects:
-        None.
-    """
-    client, _clock, _user_repository, _session_repository = _build_identity_test_client()
-
-    response = client.get("/auth/current-user")
+    response = fixture.client.get("/auth/current-user")
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": {
-            "error": "missing_session_id",
-            "message": "Session id is required",
-        }
-    }
+    assert response.json()["detail"]["error"] == "missing_session_id"
 
 
 def test_current_user_dependency_rejects_unknown_session_cookie() -> None:
-    """
-    Verify protected endpoint returns 401 for unknown persisted Roehub session id.
+    fixture = _build_fixture()
+    fixture.client.cookies.set(
+        _SESSION_COOKIE_NAME, "00000000-0000-0000-0000-000000000001"
+    )
 
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Session cookie format may be valid UUID even when no local session row exists.
-    Raises:
-        AssertionError: If endpoint accepts non-existent local session.
-    Side Effects:
-        None.
-    """
-    client, _clock, _user_repository, _session_repository = _build_identity_test_client()
-    client.cookies.set(_SESSION_COOKIE_NAME, "00000000-0000-0000-0000-000000000001")
-
-    response = client.get("/auth/current-user")
+    response = fixture.client.get("/auth/current-user")
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": {
-            "error": "session_not_found",
-            "message": "Session is not found",
-        }
-    }
+    assert response.json()["detail"]["error"] == "session_not_found"
 
 
-def test_get_auth_login_redirects_to_keycloak_and_sets_state_cookie() -> None:
-    """
-    Verify login endpoint redirects to Keycloak authorize URL and writes state cookies.
+def test_oidc_login_uses_state_nonce_and_pkce_without_provider_payload_cookies() -> None:
+    fixture = _build_fixture()
 
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Login flow uses OIDC code grant and callback state correlation.
-    Raises:
-        AssertionError: If redirect query or state cookies are missing.
-    Side Effects:
-        None.
-    """
-    client, _clock, _user_repository, _session_repository = _build_identity_test_client()
-
-    response = client.get("/auth/login?next=/strategies", follow_redirects=False)
-
-    assert response.status_code == 307
-    location = response.headers["location"]
-    parsed_location = urlparse(location)
-    assert f"{parsed_location.scheme}://{parsed_location.netloc}{parsed_location.path}" == (
-        _KEYCLOAK_AUTH_URL
+    response = fixture.client.get(
+        "/auth/oidc/login?next=/strategies", follow_redirects=False
     )
-    query = parse_qs(parsed_location.query)
-    assert query["client_id"] == [_KEYCLOAK_CLIENT_ID]
-    assert query["redirect_uri"] == [_KEYCLOAK_REDIRECT_URI]
-    assert query["response_type"] == ["code"]
-    assert query["scope"] == ["openid profile email"]
-    assert len(query["state"][0]) >= 16
-    assert client.cookies.get("roehub_oidc_state") == query["state"][0]
-    stored_next_cookie = client.cookies.get("roehub_oidc_next")
-    assert stored_next_cookie is not None
-    assert stored_next_cookie.strip('"') == "/strategies"
+
+    assert response.status_code == 303
+    query = parse_qs(urlparse(response.headers["location"]).query)
+    assert len(query["state"][0]) >= 32
+    assert len(query["nonce"][0]) >= 32
+    assert query["code_challenge_method"] == ["S256"]
+    assert len(query["code_challenge"][0]) == 43
+    assert fixture.client.cookies.get("roehub_oidc_attempt") is not None
+    assert fixture.client.cookies.get("roehub_oidc_state") is None
 
 
-def test_get_auth_callback_creates_local_user_and_session_cookie() -> None:
-    """
-    Verify callback exchanges code, upserts local user, issues opaque session
-    cookie, and current-user reads Roehub DB state.
+def test_oidc_invitation_provisions_user_and_issues_opaque_session() -> None:
+    fixture = _build_fixture(invite=True)
+    state = _begin_login(fixture.client)
 
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Introspection may return provider claims, but Roehub DB remains paid-level source of truth.
-    Raises:
-        AssertionError: If callback fails to persist local auth state or leaks provider token.
-    Side Effects:
-        Performs deterministic mock token and introspection exchanges.
-    """
-    captured_token_form_data: dict[str, list[str]] = {}
-    captured_introspection_form_data: dict[str, list[str]] = {}
-    client, _clock, user_repository, session_repository = _build_identity_test_client(
-        oidc_http_transport=_build_oidc_transport(
-            captured_token_form_data=captured_token_form_data,
-            captured_introspection_form_data=captured_introspection_form_data,
-            introspection_paid_level="pro",
-        )
-    )
-    login_response = client.get("/auth/login?next=/strategies", follow_redirects=False)
-    assert login_response.status_code == 307
-    state = client.cookies.get("roehub_oidc_state")
-    assert state is not None
-
-    callback_response = client.get(
-        f"/auth/callback?code=test-auth-code&state={state}",
+    response = fixture.client.get(
+        f"/auth/oidc/callback?code=disposable-code&state={state}",
         follow_redirects=False,
     )
 
-    assert callback_response.status_code == 307
-    assert callback_response.headers["location"] == "/strategies"
-    assert captured_token_form_data["grant_type"] == ["authorization_code"]
-    assert captured_token_form_data["code"] == ["test-auth-code"]
-    assert captured_token_form_data["client_id"] == [_KEYCLOAK_CLIENT_ID]
-    assert captured_token_form_data["client_secret"] == [_KEYCLOAK_CLIENT_SECRET]
-    assert captured_token_form_data["redirect_uri"] == [_KEYCLOAK_REDIRECT_URI]
-    assert captured_introspection_form_data["token"] == ["oidc-access-token"]
-    assert captured_introspection_form_data["token_type_hint"] == ["access_token"]
-    assert client.cookies.get("roehub_oidc_state") is None
-    assert client.cookies.get("roehub_oidc_next") is None
-
-    session_cookie_value = client.cookies.get(_SESSION_COOKIE_NAME)
-    assert session_cookie_value is not None
-    assert session_cookie_value != "oidc-access-token"
-    parsed_session_id = UUID(session_cookie_value)
-    persisted_user = user_repository.find_by_keycloak_subject(
-        keycloak_subject=_KEYCLOAK_SUBJECT
-    )
-    assert persisted_user is not None
-    persisted_session = session_repository.find_by_session_id(session_id=parsed_session_id)
-    assert persisted_session is not None
-    assert persisted_session.user_id == persisted_user.user_id
-
-    current_user_response = client.get("/auth/current-user")
-
-    assert current_user_response.status_code == 200
-    assert current_user_response.json() == {
-        "user_id": str(persisted_user.user_id),
-        "paid_level": "free",
-    }
+    assert response.status_code == 303
+    assert response.headers["location"] == "/strategies"
+    session_value = fixture.client.cookies.get(_SESSION_COOKIE_NAME)
+    assert session_value is not None and session_value != "disposable-code"
+    current_user = fixture.client.get("/auth/current-user")
+    assert current_user.status_code == 200
+    assert current_user.json()["user_id"] != str(fixture.owner_user_id)
+    assert fixture.provider.last_verifier is not None
+    assert fixture.provider.last_nonce_hash is not None
 
 
-def test_get_auth_callback_falls_back_to_jwt_subject_when_introspection_inactive() -> None:
-    """
-    Verify callback can resolve user subject from access-token payload when
-    introspection returns inactive token.
+def test_oidc_uninvited_identity_is_rejected_without_session() -> None:
+    fixture = _build_fixture(invite=False)
+    state = _begin_login(fixture.client)
 
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Access token comes from successful code exchange for confidential client.
-    Raises:
-        AssertionError: If callback does not create local session via fallback path.
-    Side Effects:
-        Performs deterministic mock token and introspection exchanges.
-    """
-    fallback_access_token = _build_jwt_with_subject(subject=_KEYCLOAK_SUBJECT)
-    client, _clock, user_repository, session_repository = _build_identity_test_client(
-        oidc_http_transport=_build_oidc_transport(
-            token_access_token=fallback_access_token,
-            introspection_active=False,
-        )
-    )
-    login_response = client.get("/auth/login?next=/strategies", follow_redirects=False)
-    assert login_response.status_code == 307
-    state = client.cookies.get("roehub_oidc_state")
-    assert state is not None
-
-    callback_response = client.get(
-        f"/auth/callback?code=test-auth-code&state={state}",
+    response = fixture.client.get(
+        f"/auth/oidc/callback?code=disposable-code&state={state}",
         follow_redirects=False,
     )
 
-    assert callback_response.status_code == 307
-    assert callback_response.headers["location"] == "/strategies"
-    session_cookie_value = client.cookies.get(_SESSION_COOKIE_NAME)
-    assert session_cookie_value is not None
-    persisted_user = user_repository.find_by_keycloak_subject(
-        keycloak_subject=_KEYCLOAK_SUBJECT
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "oidc_invitation_required"
+    assert fixture.client.cookies.get(_SESSION_COOKIE_NAME) is None
+    replay = fixture.client.get(
+        f"/auth/oidc/callback?code=disposable-code&state={state}",
+        follow_redirects=False,
     )
-    assert persisted_user is not None
-    persisted_session = session_repository.find_by_session_id(
-        session_id=UUID(session_cookie_value)
-    )
-    assert persisted_session is not None
-    assert persisted_session.user_id == persisted_user.user_id
-
-    current_user_response = client.get("/auth/current-user")
-    assert current_user_response.status_code == 200
-    assert current_user_response.json() == {
-        "user_id": str(persisted_user.user_id),
-        "paid_level": "free",
-    }
+    assert replay.status_code == 400
 
 
-def test_get_auth_callback_rejects_state_mismatch() -> None:
-    """
-    Verify callback endpoint rejects mismatched state with deterministic 401 payload.
+def test_oidc_state_mismatch_is_rejected_before_code_exchange() -> None:
+    fixture = _build_fixture(invite=True)
+    _begin_login(fixture.client)
 
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Callback state must match one-time state cookie value from `/auth/login`.
-    Raises:
-        AssertionError: If state mismatch is not rejected.
-    Side Effects:
-        None.
-    """
-    client, _clock, _user_repository, _session_repository = _build_identity_test_client()
-    login_response = client.get("/auth/login?next=/strategies", follow_redirects=False)
-    assert login_response.status_code == 307
-
-    response = client.get(
-        "/auth/callback?code=test-auth-code&state=wrong-state",
+    response = fixture.client.get(
+        "/auth/oidc/callback?code=disposable-code&state=wrong",
         follow_redirects=False,
     )
 
     assert response.status_code == 401
-    assert response.json() == {
-        "detail": {
-            "error": "oidc_state_mismatch",
-            "message": "OIDC state validation failed",
-        }
-    }
+    assert fixture.provider.last_verifier is None
+    assert fixture.client.cookies.get(_SESSION_COOKIE_NAME) is None
 
 
-def test_post_auth_logout_revokes_local_session_and_clears_auth_cookie() -> None:
-    """
-    Verify logout endpoint revokes persisted Roehub session and clears opaque session cookie.
+def test_concurrent_oidc_callbacks_exchange_code_exactly_once() -> None:
+    fixture = _build_fixture(invite=True)
+    fixture.provider.block_exchange = True
+    start = fixture.service.begin_login(next_path="/strategies")
 
-    Args:
-        None.
-    Returns:
-        None.
-    Assumptions:
-        Logout is local-session invalidation plus browser cookie cleanup.
-    Raises:
-        AssertionError: If persisted session stays active or cookie-clearing headers are missing.
-    Side Effects:
-        Performs deterministic mock token and introspection exchanges.
-    """
-    client, clock, _user_repository, session_repository = _build_identity_test_client(
-        oidc_http_transport=_build_oidc_transport()
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(
+            fixture.service.complete,
+            attempt_id=start.attempt_id,
+            state=start.state,
+            code="disposable-code",
+            callback_user_id=None,
+        )
+        assert fixture.provider.exchange_started.wait(timeout=1)
+        second = executor.submit(
+            fixture.service.complete,
+            attempt_id=start.attempt_id,
+            state=start.state,
+            code="disposable-code",
+            callback_user_id=None,
+        )
+        with pytest.raises(OidcAuthenticationError, match="oidc_attempt_invalid"):
+            second.result(timeout=1)
+        fixture.provider.exchange_release.set()
+        result = first.result(timeout=1)
+
+    assert result.provisioned is True
+    assert fixture.provider.exchange_calls == 1
+
+
+def test_attempt_expiring_during_provider_exchange_cannot_create_session() -> None:
+    fixture = _build_fixture(invite=True)
+    start = fixture.service.begin_login(next_path="/strategies")
+    fixture.provider.exchange_hook = lambda: setattr(
+        fixture.clock, "value", _BASE_NOW + timedelta(minutes=11)
     )
-    login_response = client.get("/auth/login?next=/strategies", follow_redirects=False)
-    assert login_response.status_code == 307
-    state = client.cookies.get("roehub_oidc_state")
-    assert state is not None
 
-    callback_response = client.get(
-        f"/auth/callback?code=test-auth-code&state={state}",
+    with pytest.raises(OidcAuthenticationError, match="oidc_attempt_invalid"):
+        fixture.service.complete(
+            attempt_id=start.attempt_id,
+            state=start.state,
+            code="disposable-code",
+            callback_user_id=None,
+        )
+
+    assert fixture.provider.exchange_calls == 1
+
+
+def test_authenticated_linking_binds_provider_without_replacing_local_session() -> None:
+    fixture = _build_fixture()
+    owner_session = fixture.sessions.create_session(
+        user_id=fixture.owner_user_id,
+        now=_BASE_NOW,
+        idle_ttl_seconds=1800,
+        absolute_ttl_seconds=43200,
+    )
+    fixture.client.cookies.set(_SESSION_COOKIE_NAME, str(owner_session.session_id))
+
+    start = fixture.client.get("/auth/oidc/link?next=/account", follow_redirects=False)
+    state = parse_qs(urlparse(start.headers["location"]).query)["state"][0]
+    callback = fixture.client.get(
+        f"/auth/oidc/callback?code=disposable-code&state={state}",
         follow_redirects=False,
     )
-    assert callback_response.status_code == 307
-    session_cookie_value = client.cookies.get(_SESSION_COOKIE_NAME)
-    assert session_cookie_value is not None
-    parsed_session_id = UUID(session_cookie_value)
 
-    clock.set_now(now_value=_BASE_NOW.replace(minute=5))
-    response = client.post("/auth/logout")
+    assert callback.status_code == 303
+    assert callback.headers["location"] == "/account"
+    assert fixture.client.cookies.get(_SESSION_COOKIE_NAME) == str(owner_session.session_id)
 
-    assert response.status_code == 204
-    set_cookie_header = response.headers.get("set-cookie", "")
-    assert f"{_SESSION_COOKIE_NAME}=" in set_cookie_header
-    revoked_session = session_repository.find_by_session_id(session_id=parsed_session_id)
-    assert revoked_session is not None
-    assert revoked_session.revoked_at == clock.now()
-
-    client.cookies.set(_SESSION_COOKIE_NAME, session_cookie_value)
-    current_user_response = client.get("/auth/current-user")
-
-    assert current_user_response.status_code == 401
-    assert current_user_response.json() == {
-        "detail": {
-            "error": "inactive_session",
-            "message": "Session is inactive",
-        }
-    }
+    fixture.client.cookies.clear()
+    login_state = _begin_login(fixture.client)
+    login = fixture.client.get(
+        f"/auth/oidc/callback?code=disposable-code&state={login_state}",
+        follow_redirects=False,
+    )
+    assert login.status_code == 303
+    assert fixture.client.get("/auth/current-user").json()["user_id"] == str(
+        fixture.owner_user_id
+    )
 
 
-def _build_identity_test_client(
-    *,
-    oidc_http_transport: httpx.BaseTransport | None = None,
-) -> tuple[
-    TestClient,
-    _MutableClock,
-    InMemoryIdentityUserRepository,
-    InMemoryIdentitySessionRepository,
-]:
-    """
-    Build test client with identity router and in-memory Roehub auth storage.
+def test_provider_outage_does_not_break_local_existing_session() -> None:
+    fixture = _build_fixture(provider_unavailable=True)
+    owner_session = fixture.sessions.create_session(
+        user_id=fixture.owner_user_id,
+        now=_BASE_NOW,
+        idle_ttl_seconds=1800,
+        absolute_ttl_seconds=43200,
+    )
+    fixture.client.cookies.set(_SESSION_COOKIE_NAME, str(owner_session.session_id))
 
-    Args:
-        oidc_http_transport: Optional httpx transport override for token/introspection flow.
-    Returns:
-        tuple[
-            TestClient,
-            _MutableClock,
-            InMemoryIdentityUserRepository,
-            InMemoryIdentitySessionRepository,
-        ]:
-            FastAPI test client, mutable clock, local user repository, and
-            local session repository.
-    Assumptions:
-        Test app uses final browser auth model: opaque session cookie plus local session lookup.
-    Raises:
-        ValueError: If dependency construction is invalid.
-    Side Effects:
-        Creates in-memory FastAPI application.
-    """
-    clock = _MutableClock(now_value=_BASE_NOW)
-    user_repository = InMemoryIdentityUserRepository()
-    session_repository = InMemoryIdentitySessionRepository()
-    current_user_port = RoehubSessionCurrentUser(
-        session_repository=session_repository,
-        user_repository=user_repository,
+    provider_response = fixture.client.get("/auth/oidc/login", follow_redirects=False)
+    local_response = fixture.client.get("/auth/current-user")
+
+    assert provider_response.status_code == 503
+    assert local_response.status_code == 200
+    assert local_response.json()["user_id"] == str(fixture.owner_user_id)
+
+
+@dataclass
+class _Fixture:
+    client: TestClient
+    provider: _FixtureProvider
+    sessions: InMemoryIdentitySessionRepository
+    owner_user_id: UserId
+    service: OidcAuthenticationService
+    clock: _MutableClock
+
+
+def _build_fixture(
+    *, invite: bool = False, provider_unavailable: bool = False
+) -> _Fixture:
+    clock = _MutableClock()
+    users = InMemoryIdentityUserRepository()
+    sessions = InMemoryIdentitySessionRepository()
+    organizations = InMemoryOrganizationRepository()
+    owner_user_id = UserId(uuid4())
+    users.create_local_user(user_id=owner_user_id, created_at=_BASE_NOW)
+    _, organization = organizations.bootstrap_installation(
+        owner_user_id=owner_user_id,
+        installation_name="Fixture",
+        organization_slug="fixture",
+        organization_name="Fixture",
+        created_at=_BASE_NOW,
+    )
+    if invite:
+        organizations.create_invitation(
+            organization_id=organization.organization_id,
+            recipient_email_sha256=hashlib.sha256(_INVITED_EMAIL.encode()).hexdigest(),
+            role="viewer",
+            actor_user_id=owner_user_id,
+            expires_at=_BASE_NOW.replace(day=14),
+            created_at=_BASE_NOW,
+        )
+    oidc_repository = InMemoryOidcIdentityRepository(
+        user_repository=users,
+        organization_repository=organizations,
+    )
+    provider = _FixtureProvider(
+        external=VerifiedExternalIdentity(
+            issuer=_ISSUER,
+            subject="disposable-subject",
+            email=_INVITED_EMAIL,
+            email_verified=True,
+        ),
+        unavailable=provider_unavailable,
+    )
+    service = OidcAuthenticationService(
+        provider=provider,
+        repository=oidc_repository,
+        session_repository=sessions,
         clock=clock,
+        session_idle_ttl_seconds=1800,
+        session_absolute_ttl_seconds=43200,
     )
-    current_user_dependency = RequireCurrentUserDependency(
-        current_user=current_user_port,
+    current_user = RequireCurrentUserDependency(
+        current_user=RoehubSessionCurrentUser(
+            session_repository=sessions,
+            user_repository=users,
+            clock=clock,
+        ),
         cookie_name=_SESSION_COOKIE_NAME,
     )
-
     app = FastAPI()
     app.include_router(
         build_identity_router(
-            keycloak_auth_url=_KEYCLOAK_AUTH_URL,
-            keycloak_token_url=_KEYCLOAK_TOKEN_URL,
-            keycloak_introspection_url=_KEYCLOAK_INTROSPECTION_URL,
-            keycloak_client_id=_KEYCLOAK_CLIENT_ID,
-            keycloak_client_secret=_KEYCLOAK_CLIENT_SECRET,
-            keycloak_redirect_uri=_KEYCLOAK_REDIRECT_URI,
-            keycloak_logout_redirect_uri=_KEYCLOAK_LOGOUT_REDIRECT_URI,
-            current_user_dependency=current_user_dependency,
-            user_repository=user_repository,
-            session_repository=session_repository,
+            current_user_dependency=current_user,
+            user_repository=users,
+            session_repository=sessions,
             clock=clock,
             cookie_name=_SESSION_COOKIE_NAME,
             cookie_secure=False,
             session_idle_ttl_seconds=1800,
             session_absolute_ttl_seconds=43200,
-            cookie_samesite="lax",
-            cookie_path="/",
-            oidc_http_transport=oidc_http_transport,
+            oidc_authentication_service=service,
         )
     )
-    return TestClient(app), clock, user_repository, session_repository
+    return _Fixture(
+        client=TestClient(app),
+        provider=provider,
+        sessions=sessions,
+        owner_user_id=owner_user_id,
+        service=service,
+        clock=clock,
+    )
 
 
-def _build_oidc_transport(
-    *,
-    captured_token_form_data: dict[str, list[str]] | None = None,
-    captured_introspection_form_data: dict[str, list[str]] | None = None,
-    introspection_paid_level: str = "free",
-    token_access_token: str = "oidc-access-token",
-    introspection_active: bool = True,
-) -> httpx.MockTransport:
-    """
-    Build deterministic transport handling both token exchange and introspection calls.
-
-    Args:
-        captured_token_form_data: Optional container receiving token-exchange form fields.
-        captured_introspection_form_data: Optional container receiving introspection form fields.
-        introspection_paid_level: Paid-level claim returned by introspection payload.
-        token_access_token: Access token value returned by token endpoint.
-        introspection_active: Active-flag value returned by introspection payload.
-    Returns:
-        httpx.MockTransport: Transport returning deterministic OIDC responses by URL.
-    Assumptions:
-        Callback flow uses one token exchange followed by one backend introspection call.
-    Raises:
-        AssertionError: If request shape or target URL differs from expected contract.
-    Side Effects:
-        Mutates optional capture dictionaries for test assertions.
-    """
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        """
-        Return deterministic OIDC response based on request URL.
-
-        Args:
-            request: Outbound request sent by auth callback flow.
-        Returns:
-            httpx.Response: Deterministic token or introspection payload.
-        Assumptions:
-            Requests are URL-encoded form POSTs.
-        Raises:
-            AssertionError: If request URL/method differs from expected contract.
-        Side Effects:
-            Mutates optional capture dictionaries for assertions.
-        """
-        assert request.method == "POST"
-        if str(request.url) == _KEYCLOAK_TOKEN_URL:
-            if captured_token_form_data is not None:
-                captured_token_form_data.update(parse_qs(request.content.decode("utf-8")))
-            return httpx.Response(
-                status_code=200,
-                json={
-                    "access_token": token_access_token,
-                    "expires_in": 3600,
-                    "token_type": "Bearer",
-                },
-            )
-        if str(request.url) == _KEYCLOAK_INTROSPECTION_URL:
-            if captured_introspection_form_data is not None:
-                captured_introspection_form_data.update(
-                    parse_qs(request.content.decode("utf-8"))
-                )
-            return httpx.Response(
-                status_code=200,
-                json={
-                    "active": introspection_active,
-                    "sub": _KEYCLOAK_SUBJECT,
-                    "paid_level": introspection_paid_level,
-                },
-            )
-        raise AssertionError(f"Unexpected OIDC request URL: {request.url}")
-
-    return httpx.MockTransport(handler)
-
-
-def _ensure_utc_datetime(*, value: datetime, field_name: str) -> datetime:
-    """
-    Validate timezone-aware UTC datetime and return the same value.
-
-    Args:
-        value: Datetime value to validate.
-        field_name: Field name used in deterministic error messages.
-    Returns:
-        datetime: Original validated datetime.
-    Assumptions:
-        Route tests operate only on UTC datetimes.
-    Raises:
-        ValueError: If datetime is naive or not UTC.
-    Side Effects:
-        None.
-    """
-    offset = value.utcoffset()
-    if value.tzinfo is None or offset is None:
-        raise ValueError(f"{field_name} must be timezone-aware UTC datetime")
-    if offset.total_seconds() != 0:
-        raise ValueError(f"{field_name} must be UTC datetime")
-    return value
-
-
-def _build_jwt_with_subject(*, subject: str) -> str:
-    """
-    Build deterministic unsigned JWT-like token containing one `sub` claim.
-
-    Args:
-        subject: Subject claim value to embed in payload.
-    Returns:
-        str: Compact JWT string with deterministic `alg=none` header.
-    Assumptions:
-        Test helper token is consumed only by payload parser in callback fallback.
-    Raises:
-        ValueError: If subject is empty.
-    Side Effects:
-        None.
-    """
-    normalized_subject = subject.strip()
-    if not normalized_subject:
-        raise ValueError("_build_jwt_with_subject requires non-empty subject")
-    header_segment = _encode_json_to_base64url(payload={"alg": "none", "typ": "JWT"})
-    payload_segment = _encode_json_to_base64url(payload={"sub": normalized_subject})
-    return f"{header_segment}.{payload_segment}.signature"
-
-
-def _encode_json_to_base64url(*, payload: dict[str, str]) -> str:
-    """
-    Encode compact JSON payload to URL-safe base64 without padding.
-
-    Args:
-        payload: Flat JSON object encoded into one JWT segment.
-    Returns:
-        str: URL-safe base64 token segment without trailing `=` padding.
-    Assumptions:
-        Payload is JSON-serializable and deterministic for tests.
-    Raises:
-        ValueError: If payload is empty.
-    Side Effects:
-        None.
-    """
-    if not payload:
-        raise ValueError("_encode_json_to_base64url requires non-empty payload")
-    encoded_bytes = json.dumps(payload, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    return base64.urlsafe_b64encode(encoded_bytes).decode("ascii").rstrip("=")
+def _begin_login(client: TestClient) -> str:
+    response = client.get(
+        "/auth/oidc/login?next=/strategies", follow_redirects=False
+    )
+    assert response.status_code == 303
+    return parse_qs(urlparse(response.headers["location"]).query)["state"][0]

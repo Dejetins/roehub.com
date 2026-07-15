@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,7 +16,7 @@ class NotificationDeliveryCounters:
 
 class NotificationDeliveryCounterReader(Protocol):
     def get_delivery_counters(
-        self, *, owner_user_id: UserId, now: datetime
+        self, *, organization_id: OrganizationId, owner_user_id: UserId, now: datetime
     ) -> NotificationDeliveryCounters: ...
 
 
@@ -25,6 +25,10 @@ class NotificationDeliveryCounterService:
     reader: NotificationDeliveryCounterReader
 
     def get_counters(
-        self, *, owner_user_id: UserId, now: datetime
+        self, *, organization_id: OrganizationId, owner_user_id: UserId, now: datetime
     ) -> NotificationDeliveryCounters:
-        return self.reader.get_delivery_counters(owner_user_id=owner_user_id, now=now)
+        return self.reader.get_delivery_counters(
+            organization_id=organization_id,
+            owner_user_id=owner_user_id,
+            now=now,
+        )

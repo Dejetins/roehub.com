@@ -52,7 +52,9 @@ from trading.contexts.strategy.domain.entities import (
     StrategyBacktestVariantProvenance,
     StrategySpecV1,
 )
-from trading.shared_kernel.primitives import PaidLevel, UserId
+from trading.shared_kernel.primitives import OrganizationId, PaidLevel, UserId
+
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-4000-8000-000000000700")
 
 
 class _SequenceClock:
@@ -141,7 +143,7 @@ class _StaticCurrentUserProvider(CurrentUserProvider):
         Side Effects:
             None.
         """
-        return CurrentUser(user_id=self._user_id)
+        return CurrentUser(organization_id=_ORGANIZATION_ID, user_id=self._user_id)
 
 
 class _HeaderCurrentUserDependency:
@@ -209,6 +211,7 @@ class _StaticExchangeReadinessChecker:
     def check_trading_ready(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         context: ExchangeConnectionReadinessContext | None = None,
@@ -220,7 +223,6 @@ class _StaticExchangeReadinessChecker:
             exchange_name=self._exchange_name,
             market_type=self._market_type,
         )
-
 
 
 def _build_client() -> TestClient:
@@ -400,11 +402,13 @@ def _build_live_profile_client(
     return TestClient(app)
 
 
-def _build_manual_execution_client() -> tuple[
-    TestClient,
-    InMemoryExecutionIntentRepository,
-    InMemoryPaperAccountingRepository,
-]:
+def _build_manual_execution_client() -> (
+    tuple[
+        TestClient,
+        InMemoryExecutionIntentRepository,
+        InMemoryPaperAccountingRepository,
+    ]
+):
     strategy_repository = InMemoryStrategyRepository()
     event_repository = InMemoryStrategyEventRepository()
     run_repository = InMemoryStrategyRunRepository()
@@ -483,7 +487,6 @@ def _build_manual_execution_client() -> tuple[
         )
     )
     return TestClient(app), execution_repository, paper_repository
-
 
 
 def test_strategies_list_endpoint_returns_deterministic_sort_order() -> None:
@@ -954,8 +957,7 @@ def test_launch_from_backtest_variant_blocks_paper_spot_long_short() -> None:
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "strategy_launch.invalid_config"
     assert (
-        response.json()["error"]["details"]["reason"]
-        == "short_direction_requires_futures_market"
+        response.json()["error"]["details"]["reason"] == "short_direction_requires_futures_market"
     )
 
 
@@ -1105,8 +1107,7 @@ def test_launch_from_backtest_variant_blocks_testnet_spot_long_short() -> None:
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "strategy_launch.invalid_config"
     assert (
-        response.json()["error"]["details"]["reason"]
-        == "short_direction_requires_futures_market"
+        response.json()["error"]["details"]["reason"] == "short_direction_requires_futures_market"
     )
 
 
@@ -1191,8 +1192,7 @@ def test_launch_from_backtest_variant_accepts_verified_testnet_futures_short() -
     payload = response.json()
     assert payload["profile"]["mode"] == "testnet"
     assert (
-        payload["profile"]["readiness_reason"]
-        == "safe_testnet_futures_short_1x_isolated_verified"
+        payload["profile"]["readiness_reason"] == "safe_testnet_futures_short_1x_isolated_verified"
     )
     assert payload["run"]["metadata"]["launch_config"]["direction"] == "short"
     assert checker.contexts[-1] is not None
@@ -1231,10 +1231,8 @@ def test_launch_from_backtest_variant_blocks_invalid_sizing_and_min_notional() -
     assert invalid_sizing.json()["error"]["details"]["reason"] == "invalid_entry_sizing"
     assert low_notional.status_code == 422
     assert (
-        low_notional.json()["error"]["details"]["reason"]
-        == "insufficient_allocation_min_notional"
+        low_notional.json()["error"]["details"]["reason"] == "insufficient_allocation_min_notional"
     )
-
 
 
 def test_strategy_get_endpoint_enforces_owner_only_visibility() -> None:
@@ -1274,7 +1272,6 @@ def test_strategy_get_endpoint_enforces_owner_only_visibility() -> None:
             "details": {"strategy_id": strategy_id},
         }
     }
-
 
 
 def test_strategy_run_stop_endpoints_expose_starting_and_stopping_states() -> None:
@@ -1358,9 +1355,7 @@ class _FakeCreateStrategyFromVariantUseCase:
         self.calls: tuple[tuple[str, str | None, str], ...] = ()
         self._strategy_repository: InMemoryStrategyRepository | None = None
 
-    def bind_strategy_repository(
-        self, repository: InMemoryStrategyRepository
-    ) -> None:
+    def bind_strategy_repository(self, repository: InMemoryStrategyRepository) -> None:
         self._strategy_repository = repository
 
     def execute(
@@ -1377,6 +1372,7 @@ class _FakeCreateStrategyFromVariantUseCase:
             (variant_key, idempotency_key, str((launch_config or {}).get("mode"))),
         )
         strategy = Strategy.create(
+            organization_id=current_user.organization_id,
             user_id=current_user.user_id,
             spec=StrategySpecV1.from_json(payload=_build_create_payload(symbol="BTCUSDT")),
             created_at=datetime(2026, 5, 30, 10, 0, tzinfo=timezone.utc),
@@ -1385,6 +1381,7 @@ class _FakeCreateStrategyFromVariantUseCase:
         if self._strategy_repository is not None:
             self._strategy_repository.create(strategy=strategy)
         provenance = StrategyBacktestVariantProvenance(
+            organization_id=current_user.organization_id,
             strategy_id=strategy.strategy_id,
             user_id=current_user.user_id,
             source_job_id=job_id,
@@ -1404,7 +1401,6 @@ class _FakeCreateStrategyFromVariantUseCase:
             provenance=provenance,
             duplicate=False,
         )
-
 
 
 def _build_create_payload(*, symbol: str) -> dict[str, Any]:

@@ -32,11 +32,15 @@ from apps.api.dto.ui_dashboard import (
     SourceStatus,
 )
 from apps.api.routes.ui_dashboard import build_ui_dashboard_router as build_ui_dashboard_api_router
+from apps.api.wiring.modules.research_tenancy import (
+    build_required_organization_scope_resolver,
+)
 from apps.api.wiring.modules.strategy import (
     _build_repositories,
     _resolve_strategy_runtime_settings,
     is_strategy_api_enabled,
 )
+from trading.contexts.backtest.application.ports import ResearchOrganizationScopeResolver
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.strategy.application.ports.repositories import (
@@ -44,7 +48,7 @@ from trading.contexts.strategy.application.ports.repositories import (
     StrategyRunRepository,
 )
 from trading.contexts.strategy.domain.entities import Strategy, StrategyRun
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 _DEFAULT_REFRESH_INTERVAL_SECONDS = 15
 _MINIMUM_MANUAL_REFRESH_SECONDS = 10
@@ -106,10 +110,12 @@ class DashboardSummaryQueryService:
         *,
         strategy_repository: StrategyRepository | None,
         run_repository: StrategyRunRepository | None,
+        organization_scope_resolver: ResearchOrganizationScopeResolver | None,
         refresh_limiter: DashboardManualRefreshLimiter | None = None,
     ) -> None:
         self._strategy_repository = strategy_repository
         self._run_repository = run_repository
+        self._organization_scope_resolver = organization_scope_resolver
         self._refresh_limiter = refresh_limiter or DashboardManualRefreshLimiter()
 
     def get_summary(
@@ -120,12 +126,18 @@ class DashboardSummaryQueryService:
     ) -> DashboardSummaryResponse:
         generated_at = datetime.now(UTC)
         user_id = principal.user_id
+        organization_id = (
+            self._organization_scope_resolver.resolve(user_id=user_id).organization_id
+            if self._organization_scope_resolver is not None
+            else None
+        )
         refresh_decision = self._refresh_limiter.resolve(
             user_id=str(user_id),
             requested_at=generated_at,
             refresh=refresh,
         )
         strategies, runs_by_strategy_id, dynamic_sources = self._load_strategy_state(
+            organization_id=organization_id,
             user_id=user_id,
             generated_at=generated_at,
         )
@@ -262,10 +274,11 @@ class DashboardSummaryQueryService:
     def _load_strategy_state(
         self,
         *,
+        organization_id: OrganizationId | None,
         user_id: UserId,
         generated_at: datetime,
     ) -> tuple[tuple[Strategy, ...], dict[UUID, StrategyRun], list[DashboardSourceResponse]]:
-        if self._strategy_repository is None:
+        if self._strategy_repository is None or organization_id is None:
             return (
                 (),
                 {},
@@ -287,6 +300,7 @@ class DashboardSummaryQueryService:
 
         try:
             strategies = self._strategy_repository.list_for_user(
+                organization_id=organization_id,
                 user_id=user_id,
                 include_deleted=False,
             )
@@ -340,6 +354,7 @@ class DashboardSummaryQueryService:
         for strategy in tuple(strategies)[:_STRATEGY_LIST_LIMIT]:
             try:
                 active_run = self._run_repository.find_active_for_strategy(
+                    organization_id=organization_id,
                     user_id=user_id,
                     strategy_id=strategy.strategy_id,
                 )
@@ -383,12 +398,16 @@ def build_dashboard_summary_service(*, environ: Mapping[str, str]) -> DashboardS
         return DashboardSummaryQueryService(
             strategy_repository=None,
             run_repository=None,
+            organization_scope_resolver=None,
         )
     settings = _resolve_strategy_runtime_settings(environ=environ)
     strategy_repository, run_repository, _event_repository = _build_repositories(settings=settings)
     return DashboardSummaryQueryService(
         strategy_repository=strategy_repository,
         run_repository=run_repository,
+        organization_scope_resolver=build_required_organization_scope_resolver(
+            environ=environ
+        ),
     )
 
 

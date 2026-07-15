@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from hashlib import sha256
-from typing import Literal, Mapping
+from typing import Literal, Mapping, TypeAlias
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 NotificationRecipientKind = Literal["user", "admin", "both"]
 NotificationRouteRecipientKind = Literal["user", "admin"]
@@ -36,9 +37,7 @@ NotificationSourceContext = Literal[
     "notifications",
 ]
 NotificationChannelKey = Literal["telegram", "email", "webhook", "push", "in_app"]
-NotificationProviderKey = Literal[
-    "telegram_bot_api", "log_only", "fake", "email", "webhook", "push"
-]
+NotificationProviderKey: TypeAlias = str
 NotificationMode = Literal["off", "critical_only", "trades", "signals", "reports", "all"]
 NotificationRouteStatus = Literal["active", "paused", "requires_rebind", "disabled"]
 NotificationDeliveryStatus = Literal[
@@ -81,9 +80,6 @@ SUPPORTED_SOURCE_CONTEXTS: frozenset[str] = frozenset(
 )
 SUPPORTED_CHANNEL_KEYS: frozenset[str] = frozenset(
     {"telegram", "email", "webhook", "push", "in_app"}
-)
-SUPPORTED_PROVIDER_KEYS: frozenset[str] = frozenset(
-    {"telegram_bot_api", "log_only", "fake", "email", "webhook", "push"}
 )
 SUPPORTED_MODES: frozenset[str] = frozenset(
     {"off", "critical_only", "trades", "signals", "reports", "all"}
@@ -133,6 +129,7 @@ class NotificationValidationError(ValueError):
 @dataclass(frozen=True, slots=True)
 class NotificationEvent:
     event_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId | None
     recipient_kind: NotificationRecipientKind
     source_context: NotificationSourceContext
@@ -163,6 +160,8 @@ class NotificationEvent:
 @dataclass(frozen=True, slots=True)
 class NotificationRoute:
     route_id: UUID
+    organization_id: OrganizationId
+    provider_instance_id: UUID
     recipient_kind: NotificationRouteRecipientKind
     owner_user_id: UserId | None
     channel_key: NotificationChannelKey
@@ -183,7 +182,7 @@ class NotificationRoute:
         if self.recipient_kind == "admin" and self.owner_user_id is not None:
             raise NotificationValidationError(reason="admin_route_must_not_have_owner_user_id")
         _require_supported(self.channel_key, SUPPORTED_CHANNEL_KEYS, "channel_key")
-        _require_supported(self.provider_key, SUPPORTED_PROVIDER_KEYS, "provider_key")
+        _require_provider_key(self.provider_key)
         _require_supported(self.mode, SUPPORTED_MODES, "mode")
         _require_supported(self.status, SUPPORTED_ROUTE_STATUSES, "status")
         for category in self.category_filter:
@@ -196,6 +195,8 @@ class NotificationRoute:
 @dataclass(frozen=True, slots=True)
 class NotificationDelivery:
     delivery_id: UUID
+    organization_id: OrganizationId
+    provider_instance_id: UUID
     event_id: UUID | None
     report_run_id: UUID | None
     command_id: UUID | None
@@ -213,6 +214,7 @@ class NotificationDelivery:
     last_error_code: str | None = None
     provider_message_id: str | None = None
     sent_at: datetime | None = None
+    replayed_from_delivery_id: UUID | None = None
 
     def __post_init__(self) -> None:
         source_ref_count = sum(
@@ -220,7 +222,7 @@ class NotificationDelivery:
         )
         if source_ref_count != 1:
             raise NotificationValidationError(reason="delivery_requires_exactly_one_source_ref")
-        _require_supported(self.provider_key, SUPPORTED_PROVIDER_KEYS, "provider_key")
+        _require_provider_key(self.provider_key)
         _require_supported(self.channel_key, SUPPORTED_CHANNEL_KEYS, "channel_key")
         _require_redacted_ref(self.recipient_address_ref, "recipient_address_ref")
         _require_non_empty_text(self.template_key, "template_key")
@@ -228,11 +230,15 @@ class NotificationDelivery:
         _require_supported(self.status, SUPPORTED_DELIVERY_STATUSES, "status")
         if self.attempt_count < 0:
             raise NotificationValidationError(reason="attempt_count_must_be_non_negative")
+        if self.replayed_from_delivery_id == self.delivery_id:
+            raise NotificationValidationError(reason="delivery_cannot_replay_itself")
 
 
 @dataclass(frozen=True, slots=True)
 class NotificationDeliveryAttempt:
     attempt_id: UUID
+    organization_id: OrganizationId
+    provider_instance_id: UUID
     delivery_id: UUID
     provider_key: NotificationProviderKey
     started_at: datetime
@@ -245,7 +251,7 @@ class NotificationDeliveryAttempt:
     redacted_response_hash: str | None = None
 
     def __post_init__(self) -> None:
-        _require_supported(self.provider_key, SUPPORTED_PROVIDER_KEYS, "provider_key")
+        _require_provider_key(self.provider_key)
         _require_supported(self.status, SUPPORTED_DELIVERY_STATUSES, "status")
         if self.http_status is not None and not 100 <= self.http_status <= 599:
             raise NotificationValidationError(reason="http_status_out_of_range")
@@ -257,6 +263,8 @@ class NotificationDeliveryAttempt:
 
 @dataclass(frozen=True, slots=True)
 class TelegramUpdate:
+    organization_id: OrganizationId
+    provider_instance_id: UUID
     telegram_update_id: int
     received_at: datetime
     chat_id_ref: str
@@ -282,6 +290,7 @@ class TelegramUpdate:
 @dataclass(frozen=True, slots=True)
 class NotificationReportRun:
     report_run_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     report_type: NotificationReportType
     period_start: datetime
@@ -307,12 +316,18 @@ class NotificationReportRun:
 
 
 def build_notification_dedupe_key(
-    *, source_context: str, source_event_type: str, source_id: str
+    *,
+    organization_id: OrganizationId,
+    source_context: str,
+    source_event_type: str,
+    source_id: str,
 ) -> str:
     _require_non_empty_text(source_context, "source_context")
     _require_non_empty_text(source_event_type, "source_event_type")
     _require_non_empty_text(source_id, "source_id")
-    digest = sha256(f"{source_context}:{source_event_type}:{source_id}".encode()).hexdigest()
+    digest = sha256(
+        f"{organization_id}:{source_context}:{source_event_type}:{source_id}".encode()
+    ).hexdigest()
     return f"{source_context}:{source_event_type}:{digest}"
 
 
@@ -360,6 +375,11 @@ def _require_supported(value: str, supported: frozenset[str], field: str) -> Non
 def _require_non_empty_text(value: str, field: str) -> None:
     if not value.strip():
         raise NotificationValidationError(reason=f"{field}_required")
+
+
+def _require_provider_key(value: str) -> None:
+    if not re.fullmatch(r"[a-z][a-z0-9._-]{2,127}", value):
+        raise NotificationValidationError(reason="unsupported_provider_key")
 
 
 def _require_dedupe_key(value: str) -> None:

@@ -1,0 +1,7 @@
+{
+  "manifest": "sha256:491d02eee84938864541a56a94860e7d3e10ce0a6f50e6065d180780b0a23f32",
+  "payload": {
+    "demo/hello.json": "sha256:11da6c2c2f8dafd34e3954e0db6764ef9beb4d5d25ab9b18fdb4c78e2661fe27",
+    "demo/model-card.txt": "sha256:2a5916d7d52bf2ae95b7e8862ec85def22a0e97eb2655d617e6e31d50794a028"
+  }
+}

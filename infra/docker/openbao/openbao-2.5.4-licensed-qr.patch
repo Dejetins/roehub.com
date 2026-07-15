@@ -1,0 +1,250 @@
+diff --git a/builtin/credential/jwt/cli_qr.go b/builtin/credential/jwt/cli_qr.go
+--- a/builtin/credential/jwt/cli_qr.go
++++ b/builtin/credential/jwt/cli_qr.go
+@@ -9,29 +9,38 @@ import (
+ 	"os"
+ 	"strings"
+ 
+-	"github.com/yeqown/go-qrcode/v2"
++	qrcode "github.com/skip2/go-qrcode"
+ )
+ 
+ type qrWriter struct {
+ 	writer io.Writer
+ }
+ 
+-// Close implements qrcode.Writer.
+-func (q qrWriter) Close() error {
+-	return nil
+-}
+-
+-// Write implements qrcode.Writer.
+-func (q qrWriter) Write(mat qrcode.Matrix) error {
+-	b := mat.Bitmap()
++func (q qrWriter) Write(bitmap [][]bool) error {
++	// skip2 includes the standard four-module quiet zone. The terminal renderer
++	// adds OpenBao's established two-module border itself, so render the symbol.
++	const trim = 4
++	if len(bitmap) <= trim*2 {
++		return fmt.Errorf("QR bitmap is too small: %d", len(bitmap))
++	}
++	height := len(bitmap) - trim*2
++	width := len(bitmap[0]) - trim*2
++	if width <= 0 {
++		return fmt.Errorf("QR bitmap is too narrow: %d", len(bitmap[0]))
++	}
++	for row, modules := range bitmap {
++		if len(modules) != len(bitmap[0]) {
++			return fmt.Errorf("QR bitmap row %d has width %d, expected %d", row, len(modules), len(bitmap[0]))
++		}
++	}
+ 	get := func(row int, col int) bool {
+ 		if row < 0 || col < 0 {
+ 			return false
+ 		}
+-		if row >= len(b) || col >= len(b[row]) {
++		if row >= height || col >= width {
+ 			return false
+ 		}
+-		return b[row][col]
++		return bitmap[row+trim][col+trim]
+ 	}
+ 
+ 	builder := strings.Builder{}
+@@ -44,10 +53,10 @@ func (q qrWriter) Write(mat qrcode.Matrix) error {
+ 		clearColors = "\033[0m"
+ 	}
+ 
+-	for row := -2; row < mat.Height()+2; row += 2 {
++	for row := -2; row < height+2; row += 2 {
+ 		builder.WriteString(setColors)
+ 
+-		for col := -2; col < mat.Width()+2; col += 1 {
++		for col := -2; col < width+2; col += 1 {
+ 			top := get(row, col)
+ 			bottom := get(row+1, col)
+ 
+@@ -72,14 +81,15 @@ func (q qrWriter) Write(mat qrcode.Matrix) error {
+ }
+ 
+ func printQR(writer io.Writer, authURL string) {
+-	qr, err := qrcode.NewWith(authURL, qrcode.WithErrorCorrectionLevel(qrcode.ErrorCorrectionLow))
++	qr, err := qrcode.New(authURL, qrcode.Low)
+ 	if err != nil {
+ 		fmt.Fprintln(writer, "could not generate QR code:", err.Error()) //nolint:errcheck
++		return
+ 	}
+ 
+-	err = qr.Save(qrWriter{
++	err = (qrWriter{
+ 		writer: writer,
+-	})
++	}).Write(qr.Bitmap())
+ 	if err != nil {
+ 		fmt.Fprintln(writer, "could not display QR code:", err.Error()) //nolint:errcheck
+ 	}
+diff --git a/builtin/credential/jwt/cli_qr_test.go b/builtin/credential/jwt/cli_qr_test.go
+--- a/builtin/credential/jwt/cli_qr_test.go
++++ b/builtin/credential/jwt/cli_qr_test.go
+@@ -15,17 +15,17 @@ func TestPrintQR(t *testing.T) {
+ 	expectedQR := strings.Join([]string{
+ 		"\033[38;2;255;255;255m\033[48;2;0;0;0m█████████████████████████\033[0m",
+-		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ ▄▄▄▄▄ █▀ ▀███ ▄▄▄▄▄ ██\033[0m",
+-		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ █   █ █▄▀  ██ █   █ ██\033[0m",
+-		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ █▄▄▄█ █ ▄  ██ █▄▄▄█ ██\033[0m",
+-		"\033[38;2;255;255;255m\033[48;2;0;0;0m██▄▄▄▄▄▄▄█ ▀ █▄█▄▄▄▄▄▄▄██\033[0m",
+-		"\033[38;2;255;255;255m\033[48;2;0;0;0m██▄▄█▄▀█▄▄██ █ █   █▄▄▀██\033[0m",
+-		"\033[38;2;255;255;255m\033[48;2;0;0;0m████ █▄ ▄▀ █▀▄ █▀█▀▀▄▀ ██\033[0m",
+-		"\033[38;2;255;255;255m\033[48;2;0;0;0m██▄▄▄█▄█▄▄▀▄█ ▀██ █▄██▀██\033[0m",
+-		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ ▄▄▄▄▄ █▄█▄ ▄▄█▀ ▄▄▄███\033[0m",
+-		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ █   █ █▀▄▀█▀█▀█ ▄█▄ ██\033[0m",
+-		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ █▄▄▄█ █▀█▄ ▄ ▄█▄█▄█▄██\033[0m",
+-		"\033[38;2;255;255;255m\033[48;2;0;0;0m██▄▄▄▄▄▄▄█▄▄▄█▄▄▄█▄██▄███\033[0m",
++		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ ▄▄▄▄▄ ██ ████ ▄▄▄▄▄ ██\033[0m",
++		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ █   █ █▄▀ ▀██ █   █ ██\033[0m",
++		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ █▄▄▄█ ██▄▀▄██ █▄▄▄█ ██\033[0m",
++		"\033[38;2;255;255;255m\033[48;2;0;0;0m██▄▄▄▄▄▄▄█ ▀▄█▄█▄▄▄▄▄▄▄██\033[0m",
++		"\033[38;2;255;255;255m\033[48;2;0;0;0m██▄▄▄█ ▄▄▄▄█ ▄ ▄ ▀▀█▄█▀██\033[0m",
++		"\033[38;2;255;255;255m\033[48;2;0;0;0m███▄▄██▄▄ ▄█   ▄██ █▄ ▄██\033[0m",
++		"\033[38;2;255;255;255m\033[48;2;0;0;0m██▄▄▄█▄█▄▄▀▄▀ ▀▀█ ▀▄█▀▀██\033[0m",
++		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ ▄▄▄▄▄ █ █▄▀▄▄▄▀ █▄▄▄██\033[0m",
++		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ █   █ █▄▄ ▀▀▄██▀ ██▄██\033[0m",
++		"\033[38;2;255;255;255m\033[48;2;0;0;0m██ █▄▄▄█ █ █  ▄▄▄█ █▄▀▄██\033[0m",
++		"\033[38;2;255;255;255m\033[48;2;0;0;0m██▄▄▄▄▄▄▄█▄▄▄▄▄▄██▄▄█▄▄██\033[0m",
+		"\033[38;2;255;255;255m\033[48;2;0;0;0m█████████████████████████\033[0m\n",
+	}, "\n")
+
+	t.Run("with 24-bit color support", func(t *testing.T) {
+diff --git a/go.mod b/go.mod
+--- a/go.mod
++++ b/go.mod
+@@ -128,9 +128,9 @@ require (
+ 	github.com/sasha-s/go-deadlock v0.3.6
+ 	github.com/sethvargo/go-limiter v1.1.0
+ 	github.com/shirou/gopsutil/v4 v4.25.12
++	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
+ 	github.com/stretchr/testify v1.11.1
+ 	github.com/tink-crypto/tink-go/v2 v2.6.0
+-	github.com/yeqown/go-qrcode/v2 v2.2.5
+ 	go.etcd.io/bbolt v1.4.3
+ 	go.opentelemetry.io/otel v1.43.0
+ 	go.opentelemetry.io/otel/sdk v1.43.0
+@@ -357,7 +357,6 @@ require (
+ 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
+ 	github.com/xeipuuv/gojsonreference v0.0.0-20180127040603-bd5ef7bd5415 // indirect
+ 	github.com/xeipuuv/gojsonschema v1.2.0 // indirect
+-	github.com/yeqown/reedsolomon v1.0.0 // indirect
+ 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
+ 	github.com/zclconf/go-cty v1.16.3 // indirect
+ 	github.com/zeebo/blake3 v0.2.4 // indirect
+diff --git a/go.sum b/go.sum
+--- a/go.sum
++++ b/go.sum
+@@ -908,6 +908,4 @@
+ github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
+-github.com/yeqown/go-qrcode/v2 v2.2.5 h1:HCOe2bSjkhZyYoyyNaXNzh4DJZll6inVJQQw+8228Zk=
+-github.com/yeqown/go-qrcode/v2 v2.2.5/go.mod h1:uHpt9CM0V1HeXLz+Wg5MN50/sI/fQhfkZlOM+cOTHxw=
+-github.com/yeqown/reedsolomon v1.0.0 h1:x1h/Ej/uJnNu8jaX7GLHBWmZKCAWjEJTetkqaabr4B0=
+-github.com/yeqown/reedsolomon v1.0.0/go.mod h1:P76zpcn2TCuL0ul1Fso373qHRc69LKwAw/Iy6g1WiiM=
++github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e h1:MRM5ITcdelLK2j1vwZ3Je0FKVCfqOLp5zO6trqMLYs0=
++github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e/go.mod h1:XV66xRDqSt+GTGFMVlhk3ULuV0y9ZmzeVGR4mloJI3M=
+ github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
+diff --git a/ui/ember-cli-build.js b/ui/ember-cli-build.js
+--- a/ui/ember-cli-build.js
++++ b/ui/ember-cli-build.js
+@@ -14,9 +14,41 @@ const isProd = environment === 'production';
+ const isTest = environment === 'test';
+ // const isCI = !!process.env.CI;
+ 
++const STABLE_EAI_MODULE_IDS = new Map([
++  ['l', 'eai-loader'],
++  ['app', 'eai-app'],
++  ['tests', 'eai-tests'],
++]);
++
++class StableEmberAutoImportModuleIdsPlugin {
++  apply(compiler) {
++    compiler.hooks.compilation.tap('RoehubStableEmberAutoImportModuleIds', (compilation) => {
++      compilation.hooks.moduleIds.tap(
++        { name: 'RoehubStableEmberAutoImportModuleIds', stage: -1000 },
++        () => {
++          const assigned = new Set();
++          for (const module of compilation.modules) {
++            const match = module.identifier().match(/[\\/](l|app|tests)\.cjs$/);
++            if (!match) continue;
++            if (assigned.has(match[1])) {
++              throw new Error(`duplicate ember-auto-import module: ${match[1]}.cjs`);
++            }
++            compilation.chunkGraph.setModuleId(module, STABLE_EAI_MODULE_IDS.get(match[1]));
++            assigned.add(match[1]);
++          }
++          if (isProd && assigned.size !== STABLE_EAI_MODULE_IDS.size) {
++            throw new Error(`expected three ember-auto-import modules, found ${assigned.size}`);
++          }
++        }
++      );
++    });
++  }
++}
++
+ const appConfig = {
+   'ember-service-worker': {
+     serviceWorkerScope: config.serviceWorkerScope,
++    versionStrategy: 'project-version',
+     skipWaitingOnMessage: true,
+   },
+   svgJar: {
+@@ -63,6 +95,17 @@ const appConfig = {
+   },
+   autoImport: {
+     forbidEval: true,
++    miniCssExtractPluginOptions: {
++      filename: 'chunk.[id].[contenthash].css',
++      chunkFilename: 'chunk.[id].[contenthash].css',
++    },
++    webpack: {
++      output: {
++        filename: 'chunk.[id].[contenthash].js',
++        chunkFilename: 'chunk.[id].[contenthash].js',
++      },
++      plugins: [new StableEmberAutoImportModuleIdsPlugin()],
++    },
+   },
+   'ember-test-selectors': {
+     strip: isProd,
+diff --git a/ui/app/services/flash-messages.js b/ui/app/services/flash-messages.js
+new file mode 100644
+--- /dev/null
++++ b/ui/app/services/flash-messages.js
+@@ -0,0 +1,13 @@
++/**
++ * Copyright (c) HashiCorp, Inc.
++ * SPDX-License-Identifier: MPL-2.0
++ */
++
++import FlashMessages from 'ember-cli-flash/services/flash-messages';
++
++/*
++we extend the ember-cli-flash service here so each ember engine can
++import 'flash-messages' as a dependency giving it access to the
++<FlashMessage> template in the main app's cluster.hbs file
++*/
++export default class FlashMessageService extends FlashMessages {}
+diff --git a/ui/app/services/flash-messages.ts b/ui/app/services/flash-messages.ts
+deleted file mode 100644
+--- a/ui/app/services/flash-messages.ts
++++ /dev/null
+@@ -1,13 +0,0 @@
+-/**
+- * Copyright (c) HashiCorp, Inc.
+- * SPDX-License-Identifier: MPL-2.0
+- */
+-
+-import FlashMessages from 'ember-cli-flash/services/flash-messages';
+-
+-/*
+-we extend the ember-cli-flash service here so each ember engine can
+-import 'flash-messages' as a dependency giving it access to the 
+-<FlashMessage> template in the main app's cluster.hbs file
+-*/
+-export default class FlashMessageService extends FlashMessages {}

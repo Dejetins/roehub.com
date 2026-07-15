@@ -32,6 +32,22 @@ _REQUESTS_IN_PROGRESS = Gauge(
     "http_requests_in_progress",
     "Number of in-flight Roehub API HTTP requests.",
 )
+_IDENTITY_OIDC_PROVIDER_REQUESTS_TOTAL = Counter(
+    "identity_oidc_provider_requests_total",
+    "Bounded OIDC provider operations by safe outcome class.",
+    ("provider_id", "operation", "outcome"),
+)
+_IDENTITY_OIDC_PROVIDER_DURATION_SECONDS = Histogram(
+    "identity_oidc_provider_request_duration_seconds",
+    "OIDC provider operation duration in seconds.",
+    ("provider_id", "operation", "outcome"),
+    buckets=(0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 15),
+)
+_IDENTITY_OIDC_PROVIDER_LAST_SUCCESS_UNIXTIME = Gauge(
+    "identity_oidc_provider_last_success_unixtime",
+    "Unix time of the latest successful OIDC provider operation.",
+    ("provider_id",),
+)
 _STRATEGY_VARIANT_LAUNCH_TOTAL = Counter(
     "strategy_variant_launch_total",
     "Strategy create-from-backtest-variant attempts by result.",
@@ -167,6 +183,34 @@ _NOTIFICATIONS_REPORT_SCHEDULE_MISSED_TOTAL = Counter(
     "Missed scheduled notification reports by report type and timezone.",
     ("report_type", "timezone"),
 )
+
+
+class PrometheusOidcProviderMetrics:
+    """Low-cardinality `AuthenticationProvider/v1` metrics adapter."""
+
+    def record(
+        self,
+        *,
+        provider_id: str,
+        operation: str,
+        outcome: str,
+        duration_seconds: float,
+        success_unixtime: float | None,
+    ) -> None:
+        _IDENTITY_OIDC_PROVIDER_REQUESTS_TOTAL.labels(
+            provider_id=provider_id,
+            operation=operation,
+            outcome=outcome,
+        ).inc()
+        _IDENTITY_OIDC_PROVIDER_DURATION_SECONDS.labels(
+            provider_id=provider_id,
+            operation=operation,
+            outcome=outcome,
+        ).observe(duration_seconds)
+        if success_unixtime is not None:
+            _IDENTITY_OIDC_PROVIDER_LAST_SUCCESS_UNIXTIME.labels(
+                provider_id=provider_id
+            ).set(success_unixtime)
 
 
 def install_metrics_middleware(*, app: FastAPI) -> None:

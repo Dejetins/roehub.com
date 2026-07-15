@@ -20,7 +20,9 @@ from trading.contexts.exchange_control.application.validation import (
     ExchangeCredentialValidationRequest,
     ExchangeCredentialValidationResult,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000000122"))
 
 
 @dataclass(frozen=True)
@@ -43,9 +45,13 @@ class _StaticUsageGuard(ExchangeConnectionUsageGuard):
     active_count: int
 
     def active_trading_bindings_count(
-        self, *, owner_user_id: UserId, connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        connection_id: UUID,
     ) -> int:
-        _ = owner_user_id, connection_id
+        _ = organization_id, owner_user_id, connection_id
         return self.active_count
 
 
@@ -184,6 +190,7 @@ def test_validation_maps_to_trading_capability_readiness_truth_table(
     created = _create_connection(service=service, permissions="trade")
 
     validated = service.validate_connection(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
         connection_id=created.connection_id,
         validator=_StaticValidator(result=result),
@@ -202,6 +209,7 @@ def test_legacy_permissions_remain_readable_but_not_authoritative() -> None:
     created = _create_connection(service=service, permissions="trade")
 
     validated = service.validate_connection(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
         connection_id=created.connection_id,
         validator=_StaticValidator(
@@ -358,10 +366,11 @@ def test_auto_validation_create_only_keeps_trading_ready_active(
     service = _service()
 
     created = service.create_connection_with_validation(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
         exchange_name="bybit",
         market_type="spot",
-        environment="mainnet",
+        environment="testnet",
         label="auto-validation",
         permissions="trade",
         api_key="ACCOUNTKEY1234",
@@ -383,10 +392,11 @@ def test_auto_validation_create_only_keeps_trading_ready_active(
 def test_auto_validation_rotate_failure_preserves_active_credential_version() -> None:
     service = _service()
     created = service.create_connection_with_validation(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
         exchange_name="bybit",
         market_type="spot",
-        environment="mainnet",
+        environment="testnet",
         label="auto-validation-rotate",
         permissions="trade",
         api_key="ACCOUNTKEY1234",
@@ -411,6 +421,7 @@ def test_auto_validation_rotate_failure_preserves_active_credential_version() ->
 
     with pytest.raises(ExchangeConnectionError) as error:
         service.rotate_connection_with_validation(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
             connection_id=created.connection_id,
             api_key="ROTATEDKEY9876",
@@ -435,6 +446,7 @@ def test_auto_validation_rotate_failure_preserves_active_credential_version() ->
 
     assert error.value.code == "read_only_not_supported"
     listed = service.list_connections(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123")
     )
     assert listed[0].connection_id == created.connection_id
@@ -448,6 +460,7 @@ def test_reclassification_moves_active_readonly_to_history_without_losing_reason
     service = _service()
     created = _create_connection(service=service, permissions="trade")
     validated = service.validate_connection(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
         connection_id=created.connection_id,
         validator=_StaticValidator(
@@ -468,6 +481,7 @@ def test_reclassification_moves_active_readonly_to_history_without_losing_reason
     )
 
     reclassified = service.reclassify_non_trading_active_connection(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
         connection_id=validated.connection_id,
         now=datetime(2026, 5, 26, 15, 1, tzinfo=timezone.utc),
@@ -480,6 +494,7 @@ def test_reclassification_moves_active_readonly_to_history_without_losing_reason
     assert reclassified.connection_readiness_reason == "read_only_not_supported"
 
     repeated = service.reclassify_non_trading_active_connection(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
         connection_id=validated.connection_id,
         now=datetime(2026, 5, 26, 15, 2, tzinfo=timezone.utc),
@@ -493,10 +508,11 @@ def test_validate_reclassifies_readonly_active_connection_and_frees_duplicate_ke
     service = _service()
     owner_user_id = UserId.from_string("00000000-0000-0000-0000-000000000123")
     created = service.create_connection_with_validation(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=owner_user_id,
         exchange_name="bybit",
         market_type="spot",
-        environment="mainnet",
+        environment="testnet",
         label="bybit-recheck",
         permissions="trade",
         api_key="ACCOUNTKEY1234",
@@ -507,6 +523,7 @@ def test_validate_reclassifies_readonly_active_connection_and_frees_duplicate_ke
     )
 
     rechecked = service.validate_connection(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=owner_user_id,
         connection_id=created.connection_id,
         validator=_StaticValidator(result=_readonly_validation_result()),
@@ -520,10 +537,11 @@ def test_validate_reclassifies_readonly_active_connection_and_frees_duplicate_ke
     assert rechecked.connection_readiness_reason == "read_only_not_supported"
 
     recreated = service.create_connection_with_validation(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=owner_user_id,
         exchange_name="bybit",
         market_type="spot",
-        environment="mainnet",
+        environment="testnet",
         label="bybit-recreated",
         permissions="trade",
         api_key="ACCOUNTKEY1234",
@@ -541,10 +559,11 @@ def test_validate_reclassifies_readonly_active_connection_and_frees_duplicate_ke
 def test_reclassification_refuses_active_trading_ready_connection() -> None:
     service = _service()
     created = service.create_connection_with_validation(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
         exchange_name="bybit",
         market_type="spot",
-        environment="mainnet",
+        environment="testnet",
         label="ready",
         permissions="trade",
         api_key="ACCOUNTKEY1234",
@@ -569,6 +588,7 @@ def test_reclassification_refuses_active_trading_ready_connection() -> None:
 
     with pytest.raises(ExchangeConnectionError) as error:
         service.reclassify_non_trading_active_connection(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
             connection_id=created.connection_id,
             now=datetime(2026, 5, 26, 16, 1, tzinfo=timezone.utc),
@@ -580,6 +600,7 @@ def test_reclassification_refuses_active_trading_ready_connection() -> None:
 def test_active_strategy_binding_blocks_disconnect_and_archive_but_not_rotate() -> None:
     service = _service(usage_guard=_StaticUsageGuard(active_count=2))
     created = service.create_connection(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
         exchange_name="bybit",
         market_type="spot",
@@ -594,6 +615,7 @@ def test_active_strategy_binding_blocks_disconnect_and_archive_but_not_rotate() 
 
     with pytest.raises(ExchangeConnectionError) as disable_error:
         service.disable_connection(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=created.owner_user_id,
             connection_id=created.connection_id,
             now=datetime(2026, 5, 27, 10, 1, tzinfo=timezone.utc),
@@ -603,6 +625,7 @@ def test_active_strategy_binding_blocks_disconnect_and_archive_but_not_rotate() 
 
     with pytest.raises(ExchangeConnectionError) as archive_error:
         service.archive_connection(
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=created.owner_user_id,
             connection_id=created.connection_id,
             now=datetime(2026, 5, 27, 10, 2, tzinfo=timezone.utc),
@@ -610,6 +633,7 @@ def test_active_strategy_binding_blocks_disconnect_and_archive_but_not_rotate() 
     assert archive_error.value.code == "exchange_connection_in_use"
 
     rotated = service.rotate_connection(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=created.owner_user_id,
         connection_id=created.connection_id,
         api_key="ACCOUNTKEY5678",
@@ -638,6 +662,7 @@ def _create_connection(
     permissions: str = "read",
 ):
     return service.create_connection(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId.from_string("00000000-0000-0000-0000-000000000123"),
         exchange_name="binance",
         market_type="spot",

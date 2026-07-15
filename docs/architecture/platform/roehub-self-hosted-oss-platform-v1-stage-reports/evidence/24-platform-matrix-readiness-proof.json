@@ -1,0 +1,112 @@
+{
+  "candidate": {
+    "manifest_sha256": "569f24ee203bc7e27a7cdef6fa4cdc0fa58cbb072fb840d86687b4005c968add",
+    "path": "/Users/daniildegtyarev/.cache/roehub/stage22-offline-release/candidates/roehub-0.1.0",
+    "retained": true,
+    "signature_verified": true,
+    "size_bytes": 5196194970,
+    "tree_sha256": "a9ca3b3cbefc7ea6329b97f60e39f9d186256186569a7cf02f6dd4b24c4d3e0d",
+    "version": "0.1.0"
+  },
+  "checked_at": "2026-07-15T19:31:48+03:00",
+  "cleanup": {
+    "build_cache_bytes": 0,
+    "containers": 0,
+    "images": 0,
+    "networks": 0,
+    "status": "completed",
+    "volumes": 0
+  },
+  "docker": {
+    "client_version": "29.6.1",
+    "current_context": "desktop-linux",
+    "docker_desktop_present": true,
+    "docker_desktop_version": "4.82.0",
+    "native_amd64_contexts": [],
+    "server_api_version": "1.55",
+    "server_architecture": "arm64",
+    "server_operating_system": "linux",
+    "server_version": "29.6.1"
+  },
+  "host": {
+    "architecture": "arm64",
+    "chip": "Apple M3 Pro",
+    "cpu_cores": 11,
+    "display_resolution": "3024 x 1964 Retina",
+    "memory_gib": 18,
+    "model_identifier": "Mac15,6",
+    "model_name": "MacBook Pro",
+    "operating_system": "macOS 15.7.4"
+  },
+  "interactive_demo": {
+    "bootstrap_required": true,
+    "bootstrap_ticket_exposed": false,
+    "bootstrap_ticket_mode": "0600",
+    "bootstrap_ticket_path": "/Users/daniildegtyarev/.local/share/roehub/demo-0.1.0/bootstrap-ticket.txt",
+    "browser_console_errors": 0,
+    "browser_locale": "ru",
+    "completed_one_shot_services": 2,
+    "container_memory_mib": 2788.6,
+    "network_workaround": "web container manually attached to local bridge because the internal-only Compose network did not activate the declared host port binding",
+    "profile": "trading",
+    "running_services": 24,
+    "status": "passed_with_local_workaround",
+    "system_free_percent": 45,
+    "url": "http://127.0.0.1:8080/",
+    "web_http_status": 200
+  },
+  "local_lifecycle": {
+    "browser_console_errors": 0,
+    "cleanup": "completed",
+    "cross_organization_permission_status": 404,
+    "duration_seconds": 471.74,
+    "evidence": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/24-macos-docker-desktop-greenfield-lifecycle-proof.json",
+    "production_access": false,
+    "recovery_attempt_count": 1,
+    "recovery_lifecycle": "passed",
+    "restored_passkey_login": true,
+    "screenshot": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/evidence/24-macos-docker-desktop-admin.png",
+    "screenshot_sha256": "sha256:04bb8ff4efee0c20da5eb9356231c7f4000bd9addf7e19ae63a6a7036f5f7dc8",
+    "status": "passed"
+  },
+  "memory": {
+    "execution": "sequential",
+    "free_disk_gib_after_cleanup": 171,
+    "minimum_observed_system_free_percent": 35,
+    "stage22_cache_gib": 12,
+    "system_free_percent_after_cleanup": 52
+  },
+  "platforms": {
+    "linux_amd64": {
+      "native_execution": false,
+      "reason": "no configured native linux/amd64 Docker context or host; emulation is not acceptance evidence",
+      "status": "blocked"
+    },
+    "linux_arm64": {
+      "native_execution": true,
+      "runtime": "Docker Desktop 4.82.0 on Apple M3 Pro",
+      "stage22_offline_runtime": "passed",
+      "stage24_greenfield_lifecycle": "passed",
+      "status": "passed"
+    },
+    "macos_m3_pro_docker_desktop": {
+      "hardware_available": true,
+      "runtime": "linux/arm64",
+      "stage24_matrix_executed": true,
+      "status": "passed"
+    }
+  },
+  "production_mutation": false,
+  "proof_boundary": "N/A: disposable local Docker projects and generated fixture data only",
+  "remaining_acceptance_surfaces": [
+    "native linux/amd64 greenfield lifecycle without emulation",
+    "cross-platform comparable backtest, ML and runtime benchmarks",
+    "final project-map component and release-manifest service reconciliation",
+    "responsive and accessibility browser matrix",
+    "supported Docker Desktop web ingress without manual network mutation"
+  ],
+  "schema": "io.roehub.platform-matrix-readiness-proof/v1alpha1",
+  "stage25_started": false,
+  "status": "blocked",
+  "stop_rule": "native linux/amd64 execution and supported Docker Desktop web ingress without manual network mutation are mandatory before Stage 24 acceptance"
+}

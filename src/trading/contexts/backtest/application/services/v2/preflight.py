@@ -26,6 +26,9 @@ from trading.contexts.backtest.application.ports import (
 from trading.contexts.backtest.application.ports.staged_runner import (
     BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1,
 )
+from trading.contexts.backtest.application.services.research_identity import (
+    build_research_content_hash,
+)
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
     ArtifactCoordinatesV2,
@@ -290,7 +293,7 @@ class BacktestPreflightService:
             "top_n": top_n,
             "quality_constraints": quality_constraints,
         }
-        request_hash = _canonical_json_sha256(normalized_request)
+        request_hash = build_research_content_hash(payload=normalized_request)
         result_config_hash = self._result_config_hash()
         artifact_metadata = self._resolve_artifact_metadata(coordinates=coordinates)
         self._validate_time_range_against_artifacts(

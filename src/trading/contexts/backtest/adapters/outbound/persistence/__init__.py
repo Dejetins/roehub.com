@@ -3,6 +3,7 @@ from .postgres import (
     PostgresBacktestJobLeaseRepository,
     PostgresBacktestJobRepository,
     PostgresBacktestLazyTradesMaterializationRepository,
+    PostgresResearchOrganizationScopeResolver,
     PsycopgBacktestPostgresGateway,
 )
 
@@ -11,5 +12,6 @@ __all__ = [
     "PostgresBacktestJobLeaseRepository",
     "PostgresBacktestJobRepository",
     "PostgresBacktestLazyTradesMaterializationRepository",
+    "PostgresResearchOrganizationScopeResolver",
     "PsycopgBacktestPostgresGateway",
 ]

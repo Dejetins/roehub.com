@@ -1,10 +1,19 @@
 # Native Service Control, Monitoring, and Admin Target (v1)
 
+> Статус: `superseded` как целевая архитектура с 2026-07-13.
+> Новый источник целевого устройства:
+> `docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md`.
+> Этот документ сохраняется как историческое описание native/Monit-направления
+> и части текущей production-системы до отдельного принятого cutover. Он не
+> разрешает будущим этапам возвращать обязательные `launchd`, Monit, Keycloak
+> или billing в self-hosted OSS target.
+
 Документ фиксирует целевую production-картину управления, контроля и мониторинга сервисов Roehub на `Mac Studio` в native-модели (без обязательного Docker runtime).
 
 ## Статус и границы
 
-- Статус: target state (планируемое целевое устройство контура).
+- Статус: historical superseded target; часть текста всё ещё описывает текущий
+  runtime до выполнения нового миграционного плана.
 - Хост backend: `Mac Studio`.
 - Публичный edge остается на VPS (`roehub.com`), backend на `Mac Studio` остается private.
 - Собственный billing-модуль не разрабатывается.

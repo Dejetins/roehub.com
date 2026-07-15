@@ -52,12 +52,15 @@ from trading.shared_kernel.primitives import (
     CandleMeta,
     InstrumentId,
     MarketId,
+    OrganizationId,
     Symbol,
     Timeframe,
     TimeRange,
     UserId,
     UtcTimestamp,
 )
+
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-4000-8000-000000000700")
 
 
 class _FixedClock:
@@ -403,9 +406,7 @@ class _RealtimeOutputProbe:
         """
         self.batches: list[tuple[StrategyRealtimeOutputRecordV1, ...]] = []
 
-    def publish_records_v1(
-        self, *, records: Sequence[StrategyRealtimeOutputRecordV1]
-    ) -> None:
+    def publish_records_v1(self, *, records: Sequence[StrategyRealtimeOutputRecordV1]) -> None:
         """
         Record one realtime publish batch.
 
@@ -537,7 +538,9 @@ def test_live_runner_checkpoint_monotonicity_ignores_duplicates_and_out_of_order
     )
 
     report = runner.run_once()
-    persisted = run_repository.find_by_run_id(user_id=user_id, run_id=run.run_id)
+    persisted = run_repository.find_by_run_id(
+        organization_id=_ORGANIZATION_ID, user_id=user_id, run_id=run.run_id
+    )
 
     assert persisted is not None
     assert persisted.checkpoint_ts_open == datetime(2026, 2, 17, 10, 2, tzinfo=timezone.utc)
@@ -591,7 +594,9 @@ def test_live_runner_gap_repair_retries_and_advances_only_after_full_continuity(
     )
 
     report = runner.run_once()
-    persisted = run_repository.find_by_run_id(user_id=user_id, run_id=run.run_id)
+    persisted = run_repository.find_by_run_id(
+        organization_id=_ORGANIZATION_ID, user_id=user_id, run_id=run.run_id
+    )
 
     assert persisted is not None
     assert persisted.checkpoint_ts_open == datetime(2026, 2, 17, 10, 3, tzinfo=timezone.utc)
@@ -626,9 +631,7 @@ def test_live_runner_gap_repair_keeps_checkpoint_when_continuity_not_restored() 
         }
     )
     canonical_reader = _CanonicalReaderStub(
-        responses=(
-            (_candle_at(datetime(2026, 2, 17, 10, 1, tzinfo=timezone.utc)),),
-        )
+        responses=((_candle_at(datetime(2026, 2, 17, 10, 1, tzinfo=timezone.utc)),),)
     )
     runner = _build_runner(
         strategy_repository=strategy_repository,
@@ -639,7 +642,9 @@ def test_live_runner_gap_repair_keeps_checkpoint_when_continuity_not_restored() 
     )
 
     report = runner.run_once()
-    persisted = run_repository.find_by_run_id(user_id=user_id, run_id=run.run_id)
+    persisted = run_repository.find_by_run_id(
+        organization_id=_ORGANIZATION_ID, user_id=user_id, run_id=run.run_id
+    )
 
     assert persisted is not None
     assert persisted.checkpoint_ts_open == datetime(2026, 2, 17, 10, 0, tzinfo=timezone.utc)
@@ -700,7 +705,9 @@ def test_live_runner_failed_repair_leaves_message_pending_and_later_retry_succee
     )
 
     first_report = runner.run_once()
-    first_persisted = run_repository.find_by_run_id(user_id=user_id, run_id=run.run_id)
+    first_persisted = run_repository.find_by_run_id(
+        organization_id=_ORGANIZATION_ID, user_id=user_id, run_id=run.run_id
+    )
 
     assert first_persisted is not None
     assert first_persisted.checkpoint_ts_open == datetime(2026, 2, 17, 10, 0, tzinfo=timezone.utc)
@@ -711,8 +718,11 @@ def test_live_runner_failed_repair_leaves_message_pending_and_later_retry_succee
     assert deferred_acks == ["repair_incomplete"]
 
     second_report = runner.run_once()
-    second_persisted = run_repository.find_by_run_id(user_id=user_id, run_id=run.run_id)
+    second_persisted = run_repository.find_by_run_id(
+        organization_id=_ORGANIZATION_ID, user_id=user_id, run_id=run.run_id
+    )
     signals = signal_repository.list_latest_for_strategy(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=user_id,
         strategy_id=strategy.strategy_id,
         limit=10,
@@ -741,6 +751,7 @@ def test_live_runner_computes_warmup_and_transitions_to_running() -> None:
 
     started_run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000E904"),
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         strategy_id=strategy.strategy_id,
         started_at=datetime(2026, 2, 17, 12, 0, tzinfo=timezone.utc),
@@ -752,8 +763,7 @@ def test_live_runner_computes_warmup_and_transitions_to_running() -> None:
         _message(
             f"m-{index}",
             _candle_at(
-                datetime(2026, 2, 17, 12, 0, tzinfo=timezone.utc)
-                + timedelta(minutes=index)
+                datetime(2026, 2, 17, 12, 0, tzinfo=timezone.utc) + timedelta(minutes=index)
             ),
         )
         for index in range(50)
@@ -768,7 +778,9 @@ def test_live_runner_computes_warmup_and_transitions_to_running() -> None:
     )
 
     runner.run_once()
-    persisted = run_repository.find_by_run_id(user_id=user_id, run_id=started_run.run_id)
+    persisted = run_repository.find_by_run_id(
+        organization_id=_ORGANIZATION_ID, user_id=user_id, run_id=started_run.run_id
+    )
 
     assert persisted is not None
     assert persisted.state == "running"
@@ -883,6 +895,7 @@ def test_live_runner_publishes_realtime_output_records_after_persistence() -> No
 
     started_run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000E906"),
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         strategy_id=strategy.strategy_id,
         started_at=datetime(2026, 2, 17, 16, 0, tzinfo=timezone.utc),
@@ -910,14 +923,10 @@ def test_live_runner_publishes_realtime_output_records_after_persistence() -> No
 
     emitted = [record for batch in realtime_output_probe.batches for record in batch]
     metric_types = [
-        record.metric_type
-        for record in emitted
-        if isinstance(record, StrategyRealtimeMetricV1)
+        record.metric_type for record in emitted if isinstance(record, StrategyRealtimeMetricV1)
     ]
     event_types = [
-        record.event_type
-        for record in emitted
-        if isinstance(record, StrategyRealtimeEventV1)
+        record.event_type for record in emitted if isinstance(record, StrategyRealtimeEventV1)
     ]
 
     assert "checkpoint_ts_open" in metric_types
@@ -942,6 +951,7 @@ def test_live_runner_emits_failed_telegram_notification_on_failed_run() -> None:
 
     started_run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000E907"),
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         strategy_id=strategy.strategy_id,
         started_at=datetime(2026, 2, 17, 17, 0, tzinfo=timezone.utc),
@@ -968,7 +978,9 @@ def test_live_runner_emits_failed_telegram_notification_on_failed_run() -> None:
     )
 
     runner.run_once()
-    persisted = run_repository.find_by_run_id(user_id=user_id, run_id=started_run.run_id)
+    persisted = run_repository.find_by_run_id(
+        organization_id=_ORGANIZATION_ID, user_id=user_id, run_id=started_run.run_id
+    )
 
     assert persisted is not None
     assert persisted.state == "failed"
@@ -996,6 +1008,7 @@ def test_live_runner_queues_failed_notification_through_notifications_context() 
 
     started_run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000E917"),
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         strategy_id=strategy.strategy_id,
         started_at=datetime(2026, 2, 17, 17, 30, tzinfo=timezone.utc),
@@ -1051,6 +1064,7 @@ def test_live_runner_keeps_best_effort_when_telegram_notifier_raises() -> None:
 
     started_run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000E908"),
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         strategy_id=strategy.strategy_id,
         started_at=datetime(2026, 2, 17, 18, 0, tzinfo=timezone.utc),
@@ -1076,7 +1090,9 @@ def test_live_runner_keeps_best_effort_when_telegram_notifier_raises() -> None:
     )
 
     report = runner.run_once()
-    persisted = run_repository.find_by_run_id(user_id=user_id, run_id=started_run.run_id)
+    persisted = run_repository.find_by_run_id(
+        organization_id=_ORGANIZATION_ID, user_id=user_id, run_id=started_run.run_id
+    )
 
     assert persisted is not None
     assert persisted.state == "failed"
@@ -1104,6 +1120,7 @@ def test_live_runner_drains_restart_and_creates_successor_after_stop() -> None:
     )
     stopping = StrategyRun(
         run_id=stopping.run_id,
+        organization_id=stopping.organization_id,
         user_id=stopping.user_id,
         strategy_id=stopping.strategy_id,
         state=stopping.state,
@@ -1131,7 +1148,11 @@ def test_live_runner_drains_restart_and_creates_successor_after_stop() -> None:
     )
 
     report = runner.run_once()
-    runs = run_repository.list_for_strategy(user_id=user_id, strategy_id=strategy.strategy_id)
+    runs = run_repository.list_for_strategy(
+        organization_id=_ORGANIZATION_ID,
+        user_id=user_id,
+        strategy_id=strategy.strategy_id,
+    )
     stopped, successor = runs
 
     assert report.polled_runs == 1
@@ -1146,10 +1167,14 @@ def test_live_runner_drains_restart_and_creates_successor_after_stop() -> None:
         "requested_at": "2026-02-17T10:03:00Z",
         "state": "successor_started",
     }
-    assert run_repository.find_active_for_strategy(
-        user_id=user_id,
-        strategy_id=strategy.strategy_id,
-    ) == successor
+    assert (
+        run_repository.find_active_for_strategy(
+            organization_id=_ORGANIZATION_ID,
+            user_id=user_id,
+            strategy_id=strategy.strategy_id,
+        )
+        == successor
+    )
 
 
 def test_live_runner_releases_position_ownership_after_terminal_stop() -> None:
@@ -1173,6 +1198,7 @@ def test_live_runner_releases_position_ownership_after_terminal_stop() -> None:
     )
     run_repository.create(run=stopping)
     ownership_service.reserve_for_strategy_run(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=user_id,
         exchange_connection_id=UUID("00000000-0000-0000-0000-00000000c920"),
         strategy_id=strategy.strategy_id,
@@ -1184,6 +1210,7 @@ def test_live_runner_releases_position_ownership_after_terminal_stop() -> None:
         now=datetime(2026, 2, 17, 10, 1, tzinfo=timezone.utc),
     )
     ownership_service.activate_for_strategy_run(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=user_id,
         strategy_run_id=stopping.run_id,
         now=datetime(2026, 2, 17, 10, 1, tzinfo=timezone.utc),
@@ -1199,6 +1226,7 @@ def test_live_runner_releases_position_ownership_after_terminal_stop() -> None:
 
     runner.run_once()
     ownership = ownership_repository.get_for_run(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=user_id,
         strategy_run_id=stopping.run_id,
     )
@@ -1218,6 +1246,7 @@ def test_live_runner_records_warmup_no_signal_and_signal_journal() -> None:
     run_repository.create(
         run=StrategyRun.start(
             run_id=UUID("00000000-0000-0000-0000-00000000E925"),
+            organization_id=_ORGANIZATION_ID,
             user_id=user_id,
             strategy_id=strategy.strategy_id,
             started_at=datetime(2026, 2, 17, 19, 0, tzinfo=timezone.utc),
@@ -1242,6 +1271,7 @@ def test_live_runner_records_warmup_no_signal_and_signal_journal() -> None:
 
     report = runner.run_once()
     signals = signal_repository.list_latest_for_strategy(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=user_id,
         strategy_id=strategy.strategy_id,
         limit=10,
@@ -1274,6 +1304,7 @@ def test_live_runner_attaches_expected_paper_order_payload_for_paper_signal() ->
     profile_repository.create(
         profile=LiveStrategyProfile(
             profile_id=UUID("00000000-0000-0000-0000-00000000F927"),
+            organization_id=_ORGANIZATION_ID,
             owner_user_id=user_id,
             strategy_id=strategy.strategy_id,
             mode="paper",
@@ -1292,6 +1323,7 @@ def test_live_runner_attaches_expected_paper_order_payload_for_paper_signal() ->
     run_repository.create(
         run=StrategyRun.start(
             run_id=UUID("00000000-0000-0000-0000-00000000E927"),
+            organization_id=_ORGANIZATION_ID,
             user_id=user_id,
             strategy_id=strategy.strategy_id,
             started_at=datetime(2026, 2, 17, 19, 0, tzinfo=timezone.utc),
@@ -1317,6 +1349,7 @@ def test_live_runner_attaches_expected_paper_order_payload_for_paper_signal() ->
 
     runner.run_once()
     signals = signal_repository.list_latest_for_strategy(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=user_id,
         strategy_id=strategy.strategy_id,
         limit=10,
@@ -1348,6 +1381,7 @@ def test_live_runner_blocks_unsupported_signal_template_without_order_dispatch()
     strategy_repository.create(strategy=strategy)
     started = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000E926"),
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         strategy_id=strategy.strategy_id,
         started_at=datetime(2026, 2, 17, 20, 0, tzinfo=timezone.utc),
@@ -1374,8 +1408,11 @@ def test_live_runner_blocks_unsupported_signal_template_without_order_dispatch()
     )
 
     runner.run_once()
-    persisted = run_repository.find_by_run_id(user_id=user_id, run_id=started.run_id)
+    persisted = run_repository.find_by_run_id(
+        organization_id=_ORGANIZATION_ID, user_id=user_id, run_id=started.run_id
+    )
     signals = signal_repository.list_latest_for_strategy(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=user_id,
         strategy_id=strategy.strategy_id,
         limit=10,
@@ -1455,6 +1492,8 @@ def _notification_route(*, owner_user_id: UserId) -> NotificationRoute:
     now = datetime(2026, 2, 17, 17, 30, tzinfo=timezone.utc)
     return NotificationRoute(
         route_id=UUID("00000000-0000-0000-0000-00000000F917"),
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=UUID("00000000-0000-4000-8000-00000000F917"),
         recipient_kind="user",
         owner_user_id=owner_user_id,
         channel_key="telegram",
@@ -1511,6 +1550,7 @@ def _create_strategy(
         signal_template=signal_template or f"MA({fast},{slow})",
     )
     return Strategy.create(
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         spec=spec,
         created_at=datetime(2026, 2, 17, 0, 0, tzinfo=timezone.utc),
@@ -1547,6 +1587,7 @@ def _create_running_run(
     effective_started_at = started_at or datetime(2026, 2, 17, 10, 0, tzinfo=timezone.utc)
     starting = StrategyRun.start(
         run_id=effective_run_id,
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         strategy_id=strategy_id,
         started_at=effective_started_at,

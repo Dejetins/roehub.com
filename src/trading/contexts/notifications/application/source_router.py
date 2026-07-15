@@ -19,7 +19,7 @@ from trading.contexts.notifications.domain.notification import (
     NotificationSeverity,
     NotificationSourceContext,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 _SIGNAL_CATEGORIES = frozenset({"strategy_signal"})
 _TRADE_CATEGORIES = frozenset({"trade_fill", "execution_rejected", "execution_terminal"})
@@ -39,6 +39,7 @@ _ADMIN_CATEGORIES = frozenset({"admin_critical", "admin_alert", "admin_report"})
 @dataclass(frozen=True, slots=True)
 class SyntheticNotificationSourceFact:
     fact_id: str
+    organization_id: OrganizationId
     owner_user_id: UserId | None
     recipient_kind: NotificationRecipientKind
     source_context: NotificationSourceContext
@@ -93,6 +94,8 @@ class NotificationSourceRouter:
                 continue
             delivery = NotificationDelivery(
                 delivery_id=uuid4(),
+                organization_id=event.organization_id,
+                provider_instance_id=route.provider_instance_id,
                 event_id=event.event_id,
                 report_run_id=None,
                 command_id=None,
@@ -112,6 +115,8 @@ class NotificationSourceRouter:
             )
             attempt = NotificationDeliveryAttempt(
                 attempt_id=uuid4(),
+                organization_id=event.organization_id,
+                provider_instance_id=route.provider_instance_id,
                 delivery_id=delivery.delivery_id,
                 provider_key=route.provider_key,
                 started_at=now,
@@ -135,12 +140,14 @@ class NotificationSourceRouter:
     ) -> NotificationEvent:
         source_id = fact.fact_id.strip()
         dedupe_key = build_notification_dedupe_key(
+            organization_id=fact.organization_id,
             source_context=fact.source_context,
             source_event_type=fact.source_event_type,
             source_id=source_id,
         )
         return NotificationEvent(
             event_id=uuid4(),
+            organization_id=fact.organization_id,
             owner_user_id=fact.owner_user_id,
             recipient_kind=fact.recipient_kind,
             source_context=fact.source_context,
@@ -156,6 +163,8 @@ class NotificationSourceRouter:
 
 
 def decide_route(*, event: NotificationEvent, route: NotificationRoute) -> tuple[str, str]:
+    if event.organization_id != route.organization_id:
+        return "suppress", "organization_mismatch"
     if route.status != "active":
         return "suppress", "route_not_active"
     if route.provider_key not in {"fake", "log_only"}:
@@ -194,8 +203,11 @@ def _mode_allows(*, route: NotificationRoute, event: NotificationEvent) -> bool:
 
 
 def synthetic_notification_matrix(
-    *, owner_user_id: UserId, now: datetime
+    *, organization_id: OrganizationId, owner_user_id: UserId, now: datetime
 ) -> tuple[SyntheticNotificationSourceFact, ...]:
+    def _fact(*args: object) -> SyntheticNotificationSourceFact:
+        return _scoped_fact(organization_id, *args)  # type: ignore[arg-type]
+
     strategy_id = UUID("22222222-2222-4222-8222-222222222222")
     exchange_connection_id = UUID("33333333-3333-4333-8333-333333333333")
     base_scope = {
@@ -468,7 +480,8 @@ def synthetic_notification_matrix(
     )
 
 
-def _fact(
+def _scoped_fact(
+    organization_id: OrganizationId,
     owner_user_id: UserId | None,
     recipient_kind: NotificationRecipientKind,
     source_context: NotificationSourceContext,
@@ -481,6 +494,7 @@ def _fact(
     fact_id = f"{source_context}:{source_event_type}:{recipient_kind}"
     return SyntheticNotificationSourceFact(
         fact_id=fact_id,
+        organization_id=organization_id,
         owner_user_id=owner_user_id,
         recipient_kind=recipient_kind,
         source_context=source_context,

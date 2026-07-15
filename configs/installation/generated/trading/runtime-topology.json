@@ -1,0 +1,733 @@
+{
+  "infrastructure": [
+    "postgresql",
+    "redis",
+    "openbao",
+    "clickhouse"
+  ],
+  "observability": [
+    "operational-health",
+    "prometheus",
+    "alertmanager",
+    "blackbox",
+    "grafana",
+    "loki"
+  ],
+  "profile": "trading",
+  "roles": [
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.monitoring.operational_health",
+        "--manifest",
+        "/etc/roehub/operational-manifest.json",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9300",
+        "--interval-seconds",
+        "2",
+        "--loki-url",
+        "http://loki:3100"
+      ],
+      "component_ids": [
+        "app:monitoring"
+      ],
+      "depends_on": [],
+      "entrypoints": [
+        "apps/monitoring/operational_health.py"
+      ],
+      "health_path": "/health/ready",
+      "image": "runtime",
+      "internal_port": 9300,
+      "lifecycle": "service",
+      "name": "operational-health",
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.5,
+        "memory_mb": 256
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.migrations.storage_main",
+        "--service-config",
+        "/etc/roehub/service-config.json",
+        "bootstrap"
+      ],
+      "component_ids": [
+        "app:migrations"
+      ],
+      "depends_on": [
+        "postgresql",
+        "redis",
+        "clickhouse"
+      ],
+      "entrypoints": [
+        "apps/migrations/main.py",
+        "apps/migrations/storage_main.py"
+      ],
+      "image": "runtime",
+      "lifecycle": "one-shot",
+      "name": "storage-migrations",
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.5,
+        "memory_mb": 512
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.api.main.main",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000"
+      ],
+      "component_ids": [
+        "app:api",
+        "app:common"
+      ],
+      "depends_on": [
+        "postgresql",
+        "redis",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/api/main/app.py",
+        "apps/api/main/main.py"
+      ],
+      "health_path": "/health",
+      "image": "runtime",
+      "internal_port": 8000,
+      "lifecycle": "service",
+      "name": "api",
+      "persistent_paths": [
+        "/var/lib/roehub/artifacts"
+      ],
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 1.0,
+        "memory_mb": 768
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.web.main.main",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8010"
+      ],
+      "component_ids": [
+        "app:web"
+      ],
+      "depends_on": [
+        "api"
+      ],
+      "entrypoints": [
+        "apps/web/main/app.py",
+        "apps/web/main/main.py"
+      ],
+      "health_path": "/health/ready",
+      "image": "runtime",
+      "internal_port": 8010,
+      "lifecycle": "service",
+      "name": "web",
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.5,
+        "memory_mb": 384
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.plugin_gateway.main.main",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9209"
+      ],
+      "component_ids": [
+        "app:plugin_gateway"
+      ],
+      "depends_on": [
+        "postgresql",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/plugin_gateway/main/app.py",
+        "apps/plugin_gateway/main/main.py"
+      ],
+      "health_path": "/health/ready",
+      "image": "runtime",
+      "internal_port": 9209,
+      "lifecycle": "service",
+      "name": "plugin-gateway",
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.5,
+        "memory_mb": 384
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.worker.notification_dispatcher.main.main",
+        "--config",
+        "/etc/roehub/notifications.yaml"
+      ],
+      "component_ids": [
+        "worker:notification_dispatcher"
+      ],
+      "config_mount": "notifications.yaml",
+      "depends_on": [
+        "postgresql",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/worker/notification_dispatcher/main/main.py"
+      ],
+      "health_path": "/metrics",
+      "image": "runtime",
+      "internal_port": 9210,
+      "lifecycle": "service",
+      "name": "notification-dispatcher",
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.5,
+        "memory_mb": 384
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.worker.notification_report_scheduler.main.main",
+        "--config",
+        "/etc/roehub/notifications.yaml",
+        "--port",
+        "9211"
+      ],
+      "component_ids": [
+        "worker:notification_report_scheduler"
+      ],
+      "config_mount": "notifications.yaml",
+      "depends_on": [
+        "postgresql",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/worker/notification_report_scheduler/main/main.py"
+      ],
+      "health_path": "/health/ready",
+      "image": "runtime",
+      "internal_port": 9211,
+      "lifecycle": "service",
+      "name": "notification-report-scheduler",
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.25,
+        "memory_mb": 256
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.worker.telegram_bot_worker.main.main",
+        "--config",
+        "/etc/roehub/notifications.yaml",
+        "--port",
+        "9212"
+      ],
+      "component_ids": [
+        "worker:telegram_bot_worker"
+      ],
+      "config_mount": "notifications.yaml",
+      "depends_on": [
+        "postgresql",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/worker/telegram_bot_worker/main/main.py"
+      ],
+      "health_path": "/health/ready",
+      "image": "runtime",
+      "internal_port": 9212,
+      "lifecycle": "service",
+      "name": "telegram-bot-worker",
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.25,
+        "memory_mb": 256
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.cli.main.main"
+      ],
+      "component_ids": [
+        "app:cli"
+      ],
+      "depends_on": [
+        "api"
+      ],
+      "entrypoints": [
+        "apps/cli/main/main.py"
+      ],
+      "image": "runtime",
+      "lifecycle": "operator-tool",
+      "name": "domain-cli",
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.5,
+        "memory_mb": 256
+      }
+    },
+    {
+      "command": [
+        "roehub-control-agent",
+        "--help"
+      ],
+      "component_ids": [
+        "app:control_agent"
+      ],
+      "depends_on": [],
+      "entrypoints": [
+        "apps/control_agent/main/main.py"
+      ],
+      "image": "runtime",
+      "lifecycle": "host-service",
+      "name": "control-agent",
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.5,
+        "memory_mb": 256
+      }
+    },
+    {
+      "command": [
+        "roehubctl",
+        "--help"
+      ],
+      "component_ids": [
+        "app:roehubctl"
+      ],
+      "depends_on": [
+        "control-agent"
+      ],
+      "entrypoints": [
+        "apps/roehubctl/main/main.py"
+      ],
+      "image": "runtime",
+      "lifecycle": "host-tool",
+      "name": "roehubctl",
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.25,
+        "memory_mb": 128
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.worker.market_data_ws.main.main",
+        "--config",
+        "/etc/roehub/market-data.yaml",
+        "--metrics-port",
+        "9201"
+      ],
+      "component_ids": [
+        "worker:market_data_ws"
+      ],
+      "config_mount": "market-data.yaml",
+      "depends_on": [
+        "clickhouse",
+        "redis",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/worker/market_data_ws/main/main.py"
+      ],
+      "health_path": "/metrics",
+      "image": "runtime",
+      "internal_port": 9201,
+      "lifecycle": "service",
+      "name": "market-data-ws",
+      "profiles": [
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 1.0,
+        "memory_mb": 768
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.scheduler.market_data_scheduler.main.main",
+        "--config",
+        "/etc/roehub/market-data.yaml",
+        "--whitelist",
+        "/etc/roehub/whitelist.csv",
+        "--metrics-port",
+        "9202"
+      ],
+      "component_ids": [
+        "app:scheduler"
+      ],
+      "config_mount": "market-data.yaml",
+      "depends_on": [
+        "clickhouse",
+        "redis",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/scheduler/market_data_scheduler/main/main.py"
+      ],
+      "health_path": "/metrics",
+      "image": "runtime",
+      "internal_port": 9202,
+      "lifecycle": "service",
+      "name": "market-data-scheduler",
+      "profiles": [
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.75,
+        "memory_mb": 512
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.scheduler.backtest_artifact_publisher.main.main",
+        "--config",
+        "/etc/roehub/backtest-artifacts.yaml",
+        "--metrics-port",
+        "9203"
+      ],
+      "component_ids": [
+        "app:scheduler"
+      ],
+      "config_mount": "backtest-artifacts.yaml",
+      "depends_on": [
+        "clickhouse",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/scheduler/backtest_artifact_publisher/main/main.py"
+      ],
+      "health_path": "/metrics",
+      "image": "runtime",
+      "internal_port": 9203,
+      "lifecycle": "service",
+      "name": "backtest-artifact-publisher",
+      "persistent_paths": [
+        "/var/lib/roehub/artifacts"
+      ],
+      "profiles": [
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 1.0,
+        "memory_mb": 1024
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.worker.backtest_job_runner.main.main",
+        "--metrics-port",
+        "9204"
+      ],
+      "component_ids": [
+        "worker:backtest_job_runner"
+      ],
+      "depends_on": [
+        "clickhouse",
+        "postgresql",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/worker/backtest_job_runner/main/main.py"
+      ],
+      "health_path": "/metrics",
+      "image": "runtime",
+      "internal_port": 9204,
+      "lifecycle": "service",
+      "name": "backtest-job-runner",
+      "persistent_paths": [
+        "/var/lib/roehub/artifacts"
+      ],
+      "profiles": [
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 2.0,
+        "memory_mb": 2048
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.exchange_control.main.main",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9205"
+      ],
+      "component_ids": [
+        "app:exchange_control"
+      ],
+      "container_health_path": "/health/live",
+      "depends_on": [
+        "openbao",
+        "postgresql",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/exchange_control/main/app.py",
+        "apps/exchange_control/main/main.py"
+      ],
+      "health_path": "/health/ready",
+      "image": "runtime",
+      "internal_port": 9205,
+      "lifecycle": "service",
+      "name": "exchange-control",
+      "profiles": [
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.5,
+        "memory_mb": 512
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.exchange_execution.main.main",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9206"
+      ],
+      "component_ids": [
+        "app:exchange_execution"
+      ],
+      "config_mount": "exchange-execution.yaml",
+      "container_health_path": "/health/live",
+      "depends_on": [
+        "exchange-control",
+        "openbao",
+        "postgresql",
+        "redis",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/exchange_execution/main/app.py",
+        "apps/exchange_execution/main/main.py"
+      ],
+      "health_path": "/health/ready",
+      "image": "runtime",
+      "internal_port": 9206,
+      "lifecycle": "service",
+      "name": "exchange-execution",
+      "profiles": [
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 1.0,
+        "memory_mb": 768
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.worker.strategy_live_runner.main.main",
+        "--config",
+        "/etc/roehub/strategy.yaml",
+        "--metrics-port",
+        "9207"
+      ],
+      "component_ids": [
+        "worker:strategy_live_runner"
+      ],
+      "config_mount": "strategy.yaml",
+      "depends_on": [
+        "clickhouse",
+        "postgresql",
+        "redis",
+        "storage-migrations"
+      ],
+      "entrypoints": [
+        "apps/worker/strategy_live_runner/main/main.py"
+      ],
+      "health_path": "/health/ready",
+      "image": "runtime",
+      "internal_port": 9207,
+      "lifecycle": "service",
+      "name": "strategy-live-runner",
+      "profiles": [
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 1.0,
+        "memory_mb": 768
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.monitoring.clickhouse_exporter",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "9116",
+        "--scrape-uri",
+        "http://clickhouse:8123/",
+        "--database",
+        "roehub",
+        "--user",
+        "default"
+      ],
+      "component_ids": [
+        "app:monitoring"
+      ],
+      "depends_on": [
+        "clickhouse"
+      ],
+      "entrypoints": [
+        "apps/monitoring/clickhouse_exporter.py"
+      ],
+      "health_path": "/metrics",
+      "image": "runtime",
+      "internal_port": 9116,
+      "lifecycle": "service",
+      "name": "clickhouse-exporter",
+      "profiles": [
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 0.25,
+        "memory_mb": 256
+      }
+    },
+    {
+      "command": [
+        "python",
+        "-m",
+        "apps.worker.job_runtime.main",
+        "doctor",
+        "--artifact-root",
+        "/var/lib/roehub/artifacts"
+      ],
+      "component_ids": [
+        "worker:job_runtime"
+      ],
+      "depends_on": [
+        "postgresql"
+      ],
+      "entrypoints": [
+        "apps/worker/job_runtime/main.py",
+        "apps/worker/job_runtime/oci_runner.py"
+      ],
+      "image": "runtime",
+      "lifecycle": "isolated-job",
+      "name": "job-runtime",
+      "persistent_paths": [
+        "/var/lib/roehub/artifacts"
+      ],
+      "profiles": [
+        "base",
+        "trading",
+        "ml"
+      ],
+      "resources": {
+        "cpus": 2.0,
+        "memory_mb": 2048
+      }
+    }
+  ],
+  "safe_defaults": {
+    "mainnet": false,
+    "notification_provider_mode": "log_only",
+    "rl_inference_enabled": false,
+    "trading_mode": "paper",
+    "update_checks": false
+  },
+  "schema": "io.roehub.runtime-topology/v1alpha1"
+}

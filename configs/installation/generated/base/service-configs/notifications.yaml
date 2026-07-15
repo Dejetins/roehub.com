@@ -1,0 +1,30 @@
+notifications:
+  dispatcher:
+    batch_size: 100
+    empty_backoff_seconds: 5.0
+    enabled: true
+    lease_seconds: 30
+    max_attempts: 3
+    max_retry_backoff_seconds: 300
+    poll_interval_seconds: 2.0
+    provider_mode: log_only
+    retry_backoff_seconds: 60
+    retry_jitter_ratio: 0.2
+  metrics:
+    port: 9210
+  providers:
+    healthcheck_interval_seconds: 30.0
+    telegram:
+      api_base_url: https://api.telegram.org
+      connect_timeout_seconds: 3.0
+      overall_timeout_seconds: 10.0
+  report_scheduler:
+    enabled: false
+    metrics_port: 9211
+    poll_interval_seconds: 60
+  telegram_bot:
+    enabled: false
+    long_poll_timeout_seconds: 30
+    metrics_port: 9212
+    poll_interval_seconds: 5
+version: 1

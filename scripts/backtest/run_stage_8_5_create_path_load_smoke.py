@@ -25,6 +25,7 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobListPage,
     BacktestJobListQuery,
     BacktestJobRepository,
+    ResearchOrganizationScope,
 )
 from trading.contexts.backtest.application.services.v2 import (
     BacktestPreflightService,
@@ -40,7 +41,17 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobTopVariant,
 )
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
-from trading.shared_kernel.primitives import PaidLevel, UserId
+from trading.shared_kernel.primitives import OrganizationId, PaidLevel, UserId
+
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-0000-0000-000000000001")
+
+
+class _ScopeResolver:
+    def resolve(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        return ResearchOrganizationScope(
+            organization_id=_ORGANIZATION_ID,
+            user_id=user_id,
+        )
 
 
 def main() -> None:
@@ -73,9 +84,7 @@ def main() -> None:
         elapsed_ms = (time.perf_counter() - started) * 1000.0
         latencies_ms.append(elapsed_ms)
         if response.status_code != 201:
-            raise RuntimeError(
-                f"unexpected status {response.status_code}: {response.text[:500]}"
-            )
+            raise RuntimeError(f"unexpected status {response.status_code}: {response.text[:500]}")
         states.append(str(response.json()["state"]))
 
     wall_seconds = time.perf_counter() - wall_start
@@ -129,10 +138,12 @@ def _build_client(*, repository: "_Repository", trigger: "_Trigger") -> TestClie
             ),
             preflight_service=cast(BacktestPreflightService, _PreflightService()),
             current_user_dependency=_current_user,
+            organization_scope_resolver=_ScopeResolver(),
             jobs_use_case=BacktestJobsUseCase(
                 job_repository=cast(BacktestJobRepository, repository),
                 preflight_service=cast(BacktestPreflightService, _PreflightService()),
                 runtime_config=runtime_config,
+                organization_scope_resolver=_ScopeResolver(),
                 execution_trigger=trigger,
             ),
         )
@@ -178,8 +189,15 @@ class _PreflightService:
 class _Trigger:
     calls: list[UUID] = field(default_factory=list)
 
-    def enqueue(self, *, job_id: UUID, user_id: UserId, request_hash: str) -> None:
-        _ = user_id, request_hash
+    def enqueue(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        request_hash: str,
+    ) -> None:
+        _ = organization_id, user_id, request_hash
         self.calls.append(job_id)
 
 
@@ -194,46 +212,71 @@ class _Repository:
     def find_by_idempotency_key(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         idempotency_key_hash: str,
         created_after: datetime,
     ) -> BacktestJob | None:
-        _ = user_id, idempotency_key_hash, created_after
+        _ = organization_id, user_id, idempotency_key_hash, created_after
         return None
 
-    def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
+    def get(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId | None = None,
+    ) -> BacktestJob | None:
         job = self.jobs.get(job_id)
         if job is None:
+            return None
+        if job.organization_id != organization_id:
             return None
         if user_id is not None and job.user_id != user_id:
             return None
         return job
 
     def list_for_user(self, *, query: BacktestJobListQuery) -> BacktestJobListPage:
-        items = tuple(job for job in self.jobs.values() if job.user_id == query.user_id)
+        items = tuple(
+            job
+            for job in self.jobs.values()
+            if job.organization_id == query.organization_id and job.user_id == query.user_id
+        )
         return BacktestJobListPage(items=items[: query.limit], next_cursor=None)
 
-    def list_top_variants(self, *, job_id: UUID) -> tuple[BacktestJobTopVariant, ...]:
-        _ = job_id
+    def list_top_variants(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        limit: int | None = None,
+    ) -> tuple[BacktestJobTopVariant, ...]:
+        _ = job_id, organization_id, limit
         return ()
 
     def get_top_variant_by_public_key(
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         public_variant_key: str,
     ) -> BacktestJobTopVariant | None:
-        _ = job_id, public_variant_key
+        _ = job_id, organization_id, public_variant_key
         return None
 
     def cancel(
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         cancel_requested_at: datetime,
     ) -> BacktestJob | None:
-        job = self.get(job_id=job_id, user_id=user_id)
+        job = self.get(
+            job_id=job_id,
+            organization_id=organization_id,
+            user_id=user_id,
+        )
         if job is None:
             return None
         cancelled = job.request_cancel(changed_at=cancel_requested_at)
@@ -254,6 +297,7 @@ class _Repository:
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         now: datetime,
         locked_by: str,
@@ -263,7 +307,11 @@ class _Repository:
         last_error_json: BacktestJobErrorPayload | None = None,
     ) -> BacktestJob | None:
         _ = locked_by, top_variants
-        job = self.get(job_id=job_id, user_id=user_id)
+        job = self.get(
+            job_id=job_id,
+            organization_id=organization_id,
+            user_id=user_id,
+        )
         if job is None:
             return None
         finished = job.finish(
@@ -275,8 +323,8 @@ class _Repository:
         self.jobs[job_id] = finished
         return finished
 
-    def count_active_for_user(self, *, user_id: UserId) -> int:
-        _ = user_id
+    def count_active_for_user(self, *, organization_id: OrganizationId, user_id: UserId) -> int:
+        _ = organization_id, user_id
         return 0
 
     def count_active_global(self) -> int:

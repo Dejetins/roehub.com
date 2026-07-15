@@ -12,7 +12,7 @@ from trading.contexts.live_execution.domain import (
     ExecutionRiskAuditEvent,
     ExecutionSourceEvent,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
@@ -24,6 +24,7 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
 
     def record_source_event(self, *, event: ExecutionSourceEvent) -> ExecutionSourceEvent:
         existing = self.get_source_event_by_idempotency(
+            organization_id=event.organization_id,
             owner_user_id=event.owner_user_id,
             source_type=event.source_type,
             idempotency_key_hash=event.idempotency_key_hash,
@@ -34,13 +35,19 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
         return event
 
     def get_source_event_by_id(
-        self, *, owner_user_id: UserId, source_event_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        source_event_id: UUID,
     ) -> ExecutionSourceEvent | None:
         return next(
             (
                 item
                 for item in self.source_events
-                if item.owner_user_id == owner_user_id and item.source_event_id == source_event_id
+                if item.organization_id == organization_id
+                and item.owner_user_id == owner_user_id
+                and item.source_event_id == source_event_id
             ),
             None,
         )
@@ -48,6 +55,7 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
     def get_source_event_by_idempotency(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         source_type: str,
         idempotency_key_hash: str,
@@ -56,7 +64,8 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
             (
                 item
                 for item in self.source_events
-                if item.owner_user_id == owner_user_id
+                if item.organization_id == organization_id
+                and item.owner_user_id == owner_user_id
                 and item.source_type == source_type
                 and item.idempotency_key_hash == idempotency_key_hash
             ),
@@ -66,6 +75,7 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
     def update_source_event_outcome(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         source_event_id: UUID,
         outcome: str,
@@ -73,7 +83,11 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
         intent_id: UUID | None,
     ) -> ExecutionSourceEvent | None:
         for index, item in enumerate(self.source_events):
-            if item.owner_user_id == owner_user_id and item.source_event_id == source_event_id:
+            if (
+                item.organization_id == organization_id
+                and item.owner_user_id == owner_user_id
+                and item.source_event_id == source_event_id
+            ):
                 updated = replace(
                     item,
                     outcome=outcome,
@@ -86,6 +100,7 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
 
     def record_intent(self, *, intent: ExecutionIntent) -> ExecutionIntent:
         existing = self.get_intent_by_idempotency(
+            organization_id=intent.organization_id,
             owner_user_id=intent.owner_user_id,
             idempotency_key_hash=intent.idempotency_key_hash,
         )
@@ -95,36 +110,53 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
         return intent
 
     def get_intent_by_idempotency(
-        self, *, owner_user_id: UserId, idempotency_key_hash: str
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        idempotency_key_hash: str,
     ) -> ExecutionIntent | None:
         return next(
             (
                 item
                 for item in self.intents
-                if item.owner_user_id == owner_user_id
+                if item.organization_id == organization_id
+                and item.owner_user_id == owner_user_id
                 and item.idempotency_key_hash == idempotency_key_hash
             ),
             None,
         )
 
     def get_intent_by_id(
-        self, *, owner_user_id: UserId, intent_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        intent_id: UUID,
     ) -> ExecutionIntent | None:
         return next(
             (
                 item
                 for item in self.intents
-                if item.owner_user_id == owner_user_id and item.intent_id == intent_id
+                if item.organization_id == organization_id
+                and item.owner_user_id == owner_user_id
+                and item.intent_id == intent_id
             ),
             None,
         )
 
     def claim_intent_for_dispatch(
-        self, *, intent_id: UUID, now: datetime, retry_budget: int
+        self,
+        *,
+        organization_id: OrganizationId,
+        intent_id: UUID,
+        now: datetime,
+        retry_budget: int,
     ) -> ExecutionIntent | None:
         for index, item in enumerate(self.intents):
             if (
-                item.intent_id == intent_id
+                item.organization_id == organization_id
+                and item.intent_id == intent_id
                 and item.status in {"accepted", "retry"}
                 and item.risk_status == "accepted"
                 and item.dispatch_attempt_count < retry_budget
@@ -144,12 +176,14 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
     def mark_intent_dispatched(
         self,
         *,
+        organization_id: OrganizationId,
         intent_id: UUID,
         stream_name: str,
         redis_message_id: str,
         now: datetime,
     ) -> ExecutionIntent | None:
         return self._replace_intent(
+            organization_id=organization_id,
             intent_id=intent_id,
             status="dispatched",
             status_reason="redis_xadd_ok",
@@ -160,9 +194,15 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
         )
 
     def mark_intent_dispatch_retry(
-        self, *, intent_id: UUID, reason: str, now: datetime
+        self,
+        *,
+        organization_id: OrganizationId,
+        intent_id: UUID,
+        reason: str,
+        now: datetime,
     ) -> ExecutionIntent | None:
         return self._replace_intent(
+            organization_id=organization_id,
             intent_id=intent_id,
             status="retry",
             status_reason=reason,
@@ -171,9 +211,16 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
         )
 
     def mark_intent_quarantined(
-        self, *, intent_id: UUID, reason: str, stream_name: str | None, now: datetime
+        self,
+        *,
+        organization_id: OrganizationId,
+        intent_id: UUID,
+        reason: str,
+        stream_name: str | None,
+        now: datetime,
     ) -> ExecutionIntent | None:
         return self._replace_intent(
+            organization_id=organization_id,
             intent_id=intent_id,
             status="quarantined",
             status_reason=reason,
@@ -195,7 +242,8 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
             (
                 item
                 for item in self.notifications
-                if item.owner_user_id == event.owner_user_id
+                if item.organization_id == event.organization_id
+                and item.owner_user_id == event.owner_user_id
                 and item.event_type == event.event_type
                 and item.source_event_id == event.source_event_id
                 and item.intent_id == event.intent_id
@@ -212,11 +260,17 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
     def list_recent_notifications(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         limit: int,
         strategy_id: UUID | None = None,
     ) -> tuple[ExecutionNotificationOutboxEvent, ...]:
-        items = [item for item in self.notifications if item.owner_user_id == owner_user_id]
+        items = [
+            item
+            for item in self.notifications
+            if item.organization_id == organization_id
+            and item.owner_user_id == owner_user_id
+        ]
         if strategy_id is not None:
             items = [
                 item
@@ -226,16 +280,28 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
         return tuple(sorted(items, key=lambda item: item.created_at, reverse=True)[:limit])
 
     def list_producer_outcome_links_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID, limit: int
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+        limit: int,
     ) -> tuple[ExecutionProducerOutcomeLink, ...]:
         rows: list[ExecutionProducerOutcomeLink] = []
         for event in self.source_events:
-            if event.owner_user_id != owner_user_id:
+            if (
+                event.organization_id != organization_id
+                or event.owner_user_id != owner_user_id
+            ):
                 continue
             if event.source_ref_json.get("strategy_id") != str(strategy_id):
                 continue
             intent = (
-                self.get_intent_by_id(owner_user_id=owner_user_id, intent_id=event.intent_id)
+                self.get_intent_by_id(
+                    organization_id=organization_id,
+                    owner_user_id=owner_user_id,
+                    intent_id=event.intent_id,
+                )
                 if event.intent_id is not None
                 else None
             )
@@ -254,6 +320,7 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
             rows.append(
                 ExecutionProducerOutcomeLink(
                     source_event_id=event.source_event_id,
+                    organization_id=event.organization_id,
                     owner_user_id=event.owner_user_id,
                     source_type=event.source_type,
                     source_event_ref=event.source_event_ref,
@@ -281,9 +348,15 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
             )
         return tuple(sorted(rows, key=lambda item: item.updated_at, reverse=True)[:limit])
 
-    def _replace_intent(self, *, intent_id: UUID, **updates: object) -> ExecutionIntent | None:
+    def _replace_intent(
+        self,
+        *,
+        organization_id: OrganizationId,
+        intent_id: UUID,
+        **updates: object,
+    ) -> ExecutionIntent | None:
         for index, item in enumerate(self.intents):
-            if item.intent_id == intent_id:
+            if item.organization_id == organization_id and item.intent_id == intent_id:
                 updated = replace(item, **updates)
                 self.intents[index] = updated
                 return updated
@@ -295,6 +368,7 @@ class InMemoryExecutionIntentRepository(ExecutionIntentRepository):
         if item.source_event_id is None:
             return False
         event = self.get_source_event_by_id(
+            organization_id=item.organization_id,
             owner_user_id=item.owner_user_id,
             source_event_id=item.source_event_id,
         )

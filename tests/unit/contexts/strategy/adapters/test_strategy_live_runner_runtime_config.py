@@ -39,7 +39,7 @@ def test_load_strategy_live_runner_runtime_config_parses_shim_file() -> None:
 
     assert cfg.telegram.enabled is True
     assert cfg.telegram.mode == "notifications"
-    assert cfg.telegram.bot_token_env == "TELEGRAM_BOT_TOKEN"
+    assert cfg.telegram.bot_token_env is None
     assert cfg.telegram.api_base_url == "https://api.telegram.org"
     assert cfg.telegram.send_timeout_s == 1.0
     assert cfg.telegram.debounce_failed_seconds == 600
@@ -303,11 +303,11 @@ strategy_live_runner:
         load_strategy_live_runner_runtime_config(config_path)
 
 
-def test_load_strategy_live_runner_runtime_config_rejects_telegram_mode_without_token_env(
+def test_load_strategy_live_runner_runtime_config_rejects_direct_telegram_mode(
     tmp_path: Path,
 ) -> None:
     """
-    Ensure parser rejects `telegram` mode with missing `bot_token_env`.
+    Ensure direct raw-token `telegram` mode is rejected in favor of providers.
     """
     config_path = tmp_path / "strategy_live_runner.yaml"
     config_path.write_text(

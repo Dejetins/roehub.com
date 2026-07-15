@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Callable, Mapping
 from uuid import UUID, uuid4
@@ -10,6 +10,7 @@ from trading.contexts.live_execution.application.ports import (
     LiveExecutionClock,
 )
 from trading.contexts.live_execution.domain import (
+    SOURCE_EVENT_ACCOUNT_NAMESPACE,
     ExecutionIntent,
     ExecutionNotificationEventType,
     ExecutionNotificationOutboxEvent,
@@ -20,17 +21,20 @@ from trading.contexts.live_execution.domain import (
     ExecutionRiskContext,
     ExecutionSourceEvent,
     ExecutionSourceValidationError,
+    canonicalize_execution_constraints,
     evaluate_execution_risk,
+    hash_canonical_execution_intent,
     hash_idempotency_key,
     sanitize_notification_labels,
     validate_order_model,
     validate_source_event_fields,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 @dataclass(frozen=True, slots=True)
 class RecordExecutionSourceEventCommand:
+    organization_id: OrganizationId
     owner_user_id: UserId
     source_type: str
     source_event_ref: str
@@ -41,6 +45,7 @@ class RecordExecutionSourceEventCommand:
 
 @dataclass(frozen=True, slots=True)
 class CreateExecutionIntentCommand:
+    organization_id: OrganizationId
     owner_user_id: UserId
     source_event_id: UUID
     idempotency_key: str
@@ -53,11 +58,13 @@ class CreateExecutionIntentCommand:
     quote_notional: Decimal | None
     limit_price: Decimal | None
     advanced_order_flags: Mapping[str, object]
+    constraints: Mapping[str, object] = field(default_factory=dict)
     risk_context: ExecutionRiskContext | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class EmitExecutionNotificationCommand:
+    organization_id: OrganizationId
     owner_user_id: UserId
     source_type: str
     event_type: str
@@ -122,8 +129,13 @@ class ExecutionIngressService:
             source_ref_json=command.source_ref_json,
             strategy_signal_id=command.strategy_signal_id,
         )
-        idempotency_key_hash = hash_idempotency_key(command.idempotency_key)
+        idempotency_key_hash = hash_idempotency_key(
+            command.idempotency_key,
+            organization_id=command.organization_id,
+            account_namespace=SOURCE_EVENT_ACCOUNT_NAMESPACE,
+        )
         existing = self._repository.get_source_event_by_idempotency(
+            organization_id=command.organization_id,
             owner_user_id=command.owner_user_id,
             source_type=source_type,
             idempotency_key_hash=idempotency_key_hash,
@@ -132,6 +144,7 @@ class ExecutionIngressService:
             return ExecutionSourceEventResult(event=existing, duplicate=True)
         event = ExecutionSourceEvent(
             source_event_id=uuid4(),
+            organization_id=command.organization_id,
             owner_user_id=command.owner_user_id,
             source_type=source_type,
             source_event_ref=command.source_event_ref.strip(),
@@ -149,29 +162,19 @@ class ExecutionIngressService:
 
     def create_intent(self, *, command: CreateExecutionIntentCommand) -> ExecutionIntentResult:
         event = self._repository.get_source_event_by_id(
+            organization_id=command.organization_id,
             owner_user_id=command.owner_user_id,
             source_event_id=command.source_event_id,
         )
         if event is None:
             raise ExecutionSourceValidationError(reason="source_event_not_found")
-        idempotency_key_hash = hash_idempotency_key(command.idempotency_key)
-        existing = self._repository.get_intent_by_idempotency(
-            owner_user_id=command.owner_user_id,
-            idempotency_key_hash=idempotency_key_hash,
-        )
-        if existing is not None:
-            linked = self._repository.update_source_event_outcome(
-                owner_user_id=command.owner_user_id,
-                source_event_id=event.source_event_id,
-                outcome="intent_created",
-                outcome_reason="idempotent_replay",
-                intent_id=existing.intent_id,
-            )
-            return ExecutionIntentResult(event=linked or event, intent=existing, duplicate=True)
+        if event.organization_id != command.organization_id:
+            raise ExecutionSourceValidationError(reason="organization_ownership_mismatch")
         try:
             request = self._build_request(command=command, event=event)
         except ExecutionOrderModelRejectedError as error:
             self._repository.update_source_event_outcome(
+                organization_id=command.organization_id,
                 owner_user_id=command.owner_user_id,
                 source_event_id=event.source_event_id,
                 outcome="order_model_rejected",
@@ -180,6 +183,7 @@ class ExecutionIngressService:
             )
             self.emit_notification(
                 command=EmitExecutionNotificationCommand(
+                    organization_id=command.organization_id,
                     owner_user_id=command.owner_user_id,
                     source_type=event.source_type,
                     event_type="producer_order_rejected",
@@ -195,10 +199,42 @@ class ExecutionIngressService:
             )
             self._record_order_model_rejected(source_type=event.source_type, reason=error.reason)
             raise
+        idempotency_key_hash = request.idempotency_key_hash
+        canonical_intent_hash = hash_canonical_execution_intent(
+            organization_id=request.organization_id,
+            exchange_connection_id=request.exchange_connection_id,
+            market_type=request.market_type,
+            instrument_key=request.instrument_key,
+            side=request.order.side,
+            order_type=request.order.order_type,
+            quantity=request.order.quantity,
+            quote_notional=request.order.quote_notional,
+            limit_price=request.order.limit_price,
+            constraints=request.constraints,
+            idempotency_key_hash=idempotency_key_hash,
+        )
+        existing = self._repository.get_intent_by_idempotency(
+            organization_id=command.organization_id,
+            owner_user_id=command.owner_user_id,
+            idempotency_key_hash=idempotency_key_hash,
+        )
+        if existing is not None:
+            if existing.canonical_intent_hash != canonical_intent_hash:
+                raise ExecutionSourceValidationError(reason="idempotency_payload_mismatch")
+            linked = self._repository.update_source_event_outcome(
+                organization_id=command.organization_id,
+                owner_user_id=command.owner_user_id,
+                source_event_id=event.source_event_id,
+                outcome="intent_created",
+                outcome_reason="idempotent_replay",
+                intent_id=existing.intent_id,
+            )
+            return ExecutionIntentResult(event=linked or event, intent=existing, duplicate=True)
         now = self._clock.now()
         draft_intent = ExecutionIntent(
             intent_id=uuid4(),
             source_event_id=request.source_event_id,
+            organization_id=request.organization_id,
             owner_user_id=command.owner_user_id,
             source_type=request.source_type,
             strategy_signal_id=event.strategy_signal_id,
@@ -216,6 +252,8 @@ class ExecutionIngressService:
             risk_reason="risk_gate_pending",
             idempotency_key_hash=idempotency_key_hash,
             created_at=now,
+            constraints=request.constraints,
+            canonical_intent_hash=canonical_intent_hash,
         )
         risk_started_at = self._clock.now()
         decision = evaluate_execution_risk(intent=draft_intent, context=command.risk_context)
@@ -223,6 +261,7 @@ class ExecutionIngressService:
         intent = ExecutionIntent(
             intent_id=draft_intent.intent_id,
             source_event_id=draft_intent.source_event_id,
+            organization_id=draft_intent.organization_id,
             owner_user_id=draft_intent.owner_user_id,
             source_type=draft_intent.source_type,
             strategy_signal_id=draft_intent.strategy_signal_id,
@@ -240,6 +279,8 @@ class ExecutionIngressService:
             risk_reason=decision.reason,
             idempotency_key_hash=draft_intent.idempotency_key_hash,
             created_at=draft_intent.created_at,
+            constraints=draft_intent.constraints,
+            canonical_intent_hash=draft_intent.canonical_intent_hash,
         )
         recorded = self._repository.record_intent(intent=intent)
         self._repository.record_risk_audit_event(
@@ -247,6 +288,7 @@ class ExecutionIngressService:
                 event_id=uuid4(),
                 intent_id=recorded.intent_id,
                 source_event_id=recorded.source_event_id,
+                organization_id=recorded.organization_id,
                 owner_user_id=recorded.owner_user_id,
                 source_type=recorded.source_type,
                 event_type=f"risk_gate_{recorded.risk_status}",
@@ -259,6 +301,7 @@ class ExecutionIngressService:
         )
         source_outcome = "risk_rejected" if recorded.risk_status == "rejected" else "intent_created"
         linked = self._repository.update_source_event_outcome(
+            organization_id=command.organization_id,
             owner_user_id=command.owner_user_id,
             source_event_id=event.source_event_id,
             outcome=source_outcome,
@@ -276,6 +319,7 @@ class ExecutionIngressService:
             )
             self.emit_notification(
                 command=EmitExecutionNotificationCommand(
+                    organization_id=recorded.organization_id,
                     owner_user_id=recorded.owner_user_id,
                     source_type=recorded.source_type,
                     event_type=event_type,
@@ -314,6 +358,7 @@ class ExecutionIngressService:
         labels = sanitize_notification_labels(command.labels or {})
         notification = ExecutionNotificationOutboxEvent(
             notification_id=uuid4(),
+            organization_id=command.organization_id,
             owner_user_id=command.owner_user_id,
             source_type=source_type,
             event_type=command.event_type,  # type: ignore[arg-type]
@@ -341,20 +386,28 @@ class ExecutionIngressService:
     def list_recent_notifications(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         limit: int,
         strategy_id: UUID | None = None,
     ) -> tuple[ExecutionNotificationOutboxEvent, ...]:
         return self._repository.list_recent_notifications(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             limit=limit,
         )
 
     def list_producer_outcome_links_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID, limit: int
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+        limit: int,
     ) -> tuple[ExecutionProducerOutcomeLink, ...]:
         return self._repository.list_producer_outcome_links_for_strategy(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             limit=limit,
@@ -375,14 +428,25 @@ class ExecutionIngressService:
             limit_price=command.limit_price,
             advanced_order_flags=command.advanced_order_flags,
         )
+        constraints = canonicalize_execution_constraints(
+            constraints=command.constraints,
+            market_type=command.market_type.strip(),
+            order_type=order.order_type,
+        )
         return ExecutionRequest(
             source_event_id=event.source_event_id,
+            organization_id=event.organization_id,
             source_type=event.source_type,
-            idempotency_key_hash=hash_idempotency_key(command.idempotency_key),
+            idempotency_key_hash=hash_idempotency_key(
+                command.idempotency_key,
+                organization_id=command.organization_id,
+                account_namespace=command.exchange_connection_id,
+            ),
             exchange_connection_id=command.exchange_connection_id,
             market_type=command.market_type.strip(),
             instrument_key=command.instrument_key.strip(),
             order=order,
+            constraints=constraints,
         )
 
     def _record_source_event(self, *, source_type: str, result: str) -> None:

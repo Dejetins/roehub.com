@@ -1,0 +1,220 @@
+{
+  "$defs": {
+    "BackupCaptureEntry": {
+      "additionalProperties": false,
+      "description": "Digest-bound capture timestamp emitted by a state-owner coordinator.",
+      "properties": {
+        "captured_at": {
+          "format": "date-time",
+          "title": "Captured At",
+          "type": "string"
+        },
+        "owner": {
+          "$ref": "#/$defs/BackupStateOwner"
+        },
+        "plaintext_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Plaintext Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "captured_at",
+        "plaintext_sha256"
+      ],
+      "title": "BackupCaptureEntry",
+      "type": "object"
+    },
+    "BackupStateOwner": {
+      "enum": [
+        "release_config",
+        "postgresql",
+        "clickhouse",
+        "redis_checkpoint",
+        "openbao",
+        "artifacts",
+        "plugin_operation_audit",
+        "observability"
+      ],
+      "title": "BackupStateOwner",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.roehub.io/backup/installation-capture-record.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "One closed quiesce window covering all installation state owners.",
+  "properties": {
+    "entries": {
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "owner": {
+                "const": "release_config"
+              }
+            },
+            "required": [
+              "owner"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "owner": {
+                "const": "postgresql"
+              }
+            },
+            "required": [
+              "owner"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "owner": {
+                "const": "clickhouse"
+              }
+            },
+            "required": [
+              "owner"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "owner": {
+                "const": "redis_checkpoint"
+              }
+            },
+            "required": [
+              "owner"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "owner": {
+                "const": "openbao"
+              }
+            },
+            "required": [
+              "owner"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "owner": {
+                "const": "artifacts"
+              }
+            },
+            "required": [
+              "owner"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "owner": {
+                "const": "plugin_operation_audit"
+              }
+            },
+            "required": [
+              "owner"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "owner": {
+                "const": "observability"
+              }
+            },
+            "required": [
+              "owner"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        }
+      ],
+      "items": {
+        "$ref": "#/$defs/BackupCaptureEntry"
+      },
+      "maxItems": 8,
+      "minItems": 8,
+      "title": "Entries",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "installation_fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Installation Fingerprint",
+      "type": "string"
+    },
+    "quiesce_completed_at": {
+      "format": "date-time",
+      "title": "Quiesce Completed At",
+      "type": "string"
+    },
+    "quiesce_started_at": {
+      "format": "date-time",
+      "title": "Quiesce Started At",
+      "type": "string"
+    },
+    "schema": {
+      "const": "io.roehub.installation-capture/v1alpha1",
+      "default": "io.roehub.installation-capture/v1alpha1",
+      "enum": [
+        "io.roehub.installation-capture/v1alpha1"
+      ],
+      "title": "Schema",
+      "type": "string"
+    },
+    "source_release_version": {
+      "pattern": "^[a-z0-9][a-z0-9._+-]{0,63}$",
+      "title": "Source Release Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "installation_fingerprint",
+    "source_release_version",
+    "quiesce_started_at",
+    "quiesce_completed_at",
+    "entries"
+  ],
+  "title": "InstallationCaptureRecord",
+  "type": "object"
+}

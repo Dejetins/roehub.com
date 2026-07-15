@@ -10,6 +10,12 @@ flowchart LR
   class n_web service
   n_api["FastAPI API"]
   class n_api service
+  n_roehubctl["Host roehubctl"]
+  class n_roehubctl service
+  n_control_agent["Host control-agent"]
+  class n_control_agent service
+  n_docker_engine["Docker Engine / Compose"]
+  class n_docker_engine service
   n_workers["Workers / schedulers"]
   class n_workers service
   n_execution["Exchange control / execution"]
@@ -29,6 +35,9 @@ flowchart LR
   n_edge -->|"/api/*"| n_api
   n_web -->|"same-origin API"| n_api
   n_api -->|"identity/config/jobs"| n_postgres
+  n_api -->|"typed operation + short-lived identity"| n_control_agent
+  n_roehubctl -->|"Unix socket emergency operation"| n_control_agent
+  n_control_agent -->|"allowlisted Compose / OCI control"| n_docker_engine
   n_api -->|"market/backtest reads"| n_clickhouse
   n_api -->|"commands/streams/cache"| n_redis
   n_workers -->|"consume/publish"| n_redis

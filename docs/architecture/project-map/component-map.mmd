@@ -7,6 +7,10 @@ flowchart TB
   class n_app_api app
   n_app_cli["app:cli"]
   class n_app_cli app
+  n_app_common["app:common"]
+  class n_app_common app
+  n_app_control_agent["app:control_agent"]
+  class n_app_control_agent app
   n_app_exchange_control["app:exchange_control"]
   class n_app_exchange_control app
   n_app_exchange_execution["app:exchange_execution"]
@@ -15,6 +19,12 @@ flowchart TB
   class n_app_migrations app
   n_app_monitoring["app:monitoring"]
   class n_app_monitoring app
+  n_app_plugin_gateway["app:plugin_gateway"]
+  class n_app_plugin_gateway app
+  n_app_roehubctl["app:roehubctl"]
+  class n_app_roehubctl app
+  n_app_runtime_probe["app:runtime_probe"]
+  class n_app_runtime_probe app
   n_app_scheduler["app:scheduler"]
   class n_app_scheduler app
   n_app_web["app:web"]
@@ -25,6 +35,8 @@ flowchart TB
   class n_context_backtest_artifacts context
   n_context_exchange_control["context:exchange_control"]
   class n_context_exchange_control context
+  n_context_extensions["context:extensions"]
+  class n_context_extensions context
   n_context_identity["context:identity"]
   class n_context_identity context
   n_context_indicators["context:indicators"]
@@ -37,6 +49,8 @@ flowchart TB
   class n_context_ml context
   n_context_notifications["context:notifications"]
   class n_context_notifications context
+  n_context_operations["context:operations"]
+  class n_context_operations context
   n_context_optimize["context:optimize"]
   class n_context_optimize context
   n_context_risk["context:risk"]
@@ -55,6 +69,8 @@ flowchart TB
   class n_core_shared_kernel core
   n_worker_backtest_job_runner["worker:backtest_job_runner"]
   class n_worker_backtest_job_runner worker
+  n_worker_job_runtime["worker:job_runtime"]
+  class n_worker_job_runtime worker
   n_worker_market_data_ws["worker:market_data_ws"]
   class n_worker_market_data_ws worker
   n_worker_notification_dispatcher["worker:notification_dispatcher"]
@@ -70,28 +86,53 @@ flowchart TB
   n_worker_telegram_bot_worker["worker:telegram_bot_worker"]
   class n_worker_telegram_bot_worker worker
   n_app_api --> n_app_cli
+  n_app_api --> n_app_common
+  n_app_api --> n_app_control_agent
+  n_app_api --> n_app_migrations
+  n_app_api --> n_app_monitoring
   n_app_api --> n_context_backtest
   n_app_api --> n_context_backtest_artifacts
+  n_app_api --> n_context_extensions
   n_app_api --> n_context_identity
   n_app_api --> n_context_indicators
   n_app_api --> n_context_live_execution
   n_app_api --> n_context_market_data
   n_app_api --> n_context_notifications
+  n_app_api --> n_context_operations
   n_app_api --> n_context_rl_trading
   n_app_api --> n_context_strategy
+  n_app_api --> n_core_integration
   n_app_api --> n_core_platform
   n_app_api --> n_core_shared_kernel
   n_app_cli --> n_app_api
   n_app_cli --> n_context_backtest_artifacts
+  n_app_cli --> n_context_extensions
+  n_app_cli --> n_context_identity
   n_app_cli --> n_context_indicators
   n_app_cli --> n_context_market_data
+  n_app_cli --> n_context_notifications
   n_app_cli --> n_core_platform
   n_app_cli --> n_core_shared_kernel
+  n_app_control_agent --> n_context_operations
   n_app_exchange_control --> n_context_exchange_control
   n_app_exchange_execution --> n_context_exchange_control
   n_app_exchange_execution --> n_context_live_execution
   n_app_exchange_execution --> n_context_strategy
   n_app_exchange_execution --> n_core_shared_kernel
+  n_app_migrations --> n_context_backtest
+  n_app_migrations --> n_context_extensions
+  n_app_migrations --> n_context_identity
+  n_app_migrations --> n_context_live_execution
+  n_app_migrations --> n_context_market_data
+  n_app_migrations --> n_context_notifications
+  n_app_migrations --> n_context_strategy
+  n_app_migrations --> n_core_integration
+  n_app_migrations --> n_core_platform
+  n_app_migrations --> n_core_shared_kernel
+  n_app_plugin_gateway --> n_core_integration
+  n_app_roehubctl --> n_app_cli
+  n_app_roehubctl --> n_app_control_agent
+  n_app_roehubctl --> n_context_operations
   n_app_scheduler --> n_app_api
   n_app_scheduler --> n_app_cli
   n_app_scheduler --> n_context_backtest_artifacts
@@ -99,16 +140,25 @@ flowchart TB
   n_app_scheduler --> n_context_market_data
   n_app_scheduler --> n_core_platform
   n_app_scheduler --> n_core_shared_kernel
+  n_app_web --> n_app_common
   n_context_backtest --> n_context_backtest_artifacts
   n_context_backtest --> n_context_indicators
+  n_context_backtest --> n_context_market_data
   n_context_backtest --> n_core_platform
   n_context_backtest --> n_core_shared_kernel
   n_context_backtest_artifacts --> n_context_backtest
   n_context_backtest_artifacts --> n_context_indicators
   n_context_backtest_artifacts --> n_context_market_data
+  n_context_backtest_artifacts --> n_core_integration
   n_context_backtest_artifacts --> n_core_platform
   n_context_backtest_artifacts --> n_core_shared_kernel
+  n_context_exchange_control --> n_context_identity
+  n_context_exchange_control --> n_core_platform
   n_context_exchange_control --> n_core_shared_kernel
+  n_context_extensions --> n_context_identity
+  n_context_extensions --> n_core_integration
+  n_context_extensions --> n_core_shared_kernel
+  n_context_identity --> n_core_platform
   n_context_identity --> n_core_shared_kernel
   n_context_indicators --> n_context_market_data
   n_context_indicators --> n_core_platform
@@ -117,6 +167,7 @@ flowchart TB
   n_context_live_execution --> n_context_strategy
   n_context_live_execution --> n_core_shared_kernel
   n_context_market_data --> n_core_shared_kernel
+  n_context_notifications --> n_core_platform
   n_context_notifications --> n_core_shared_kernel
   n_context_rl_trading --> n_context_live_execution
   n_context_rl_trading --> n_context_strategy
@@ -126,25 +177,38 @@ flowchart TB
   n_context_strategy --> n_context_notifications
   n_context_strategy --> n_core_platform
   n_context_strategy --> n_core_shared_kernel
+  n_core_integration --> n_context_extensions
   n_core_platform --> n_context_market_data
   n_core_platform --> n_core_shared_kernel
   n_worker_backtest_job_runner --> n_context_backtest
   n_worker_backtest_job_runner --> n_context_backtest_artifacts
   n_worker_backtest_job_runner --> n_core_platform
   n_worker_backtest_job_runner --> n_core_shared_kernel
+  n_worker_job_runtime --> n_app_control_agent
+  n_worker_job_runtime --> n_context_backtest_artifacts
+  n_worker_job_runtime --> n_context_extensions
+  n_worker_job_runtime --> n_context_operations
+  n_worker_job_runtime --> n_core_integration
+  n_worker_job_runtime --> n_core_shared_kernel
   n_worker_market_data_ws --> n_app_cli
   n_worker_market_data_ws --> n_context_market_data
   n_worker_market_data_ws --> n_core_platform
   n_worker_market_data_ws --> n_core_shared_kernel
   n_worker_notification_dispatcher --> n_context_notifications
+  n_worker_notification_dispatcher --> n_core_platform
+  n_worker_notification_report_scheduler --> n_app_common
   n_worker_notification_report_scheduler --> n_context_notifications
   n_worker_rl_trading_inference --> n_context_live_execution
   n_worker_rl_trading_inference --> n_context_rl_trading
   n_worker_rl_trading_inference --> n_context_strategy
+  n_worker_rl_trading_inference --> n_core_shared_kernel
   n_worker_strategy_live_runner --> n_app_cli
   n_worker_strategy_live_runner --> n_context_live_execution
   n_worker_strategy_live_runner --> n_context_market_data
   n_worker_strategy_live_runner --> n_context_notifications
   n_worker_strategy_live_runner --> n_context_strategy
   n_worker_strategy_live_runner --> n_core_platform
+  n_worker_telegram_bot_worker --> n_app_common
   n_worker_telegram_bot_worker --> n_context_notifications
+  n_worker_telegram_bot_worker --> n_core_platform
+  n_worker_telegram_bot_worker --> n_core_shared_kernel

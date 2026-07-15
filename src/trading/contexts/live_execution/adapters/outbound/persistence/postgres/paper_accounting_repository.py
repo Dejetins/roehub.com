@@ -15,7 +15,7 @@ from trading.contexts.live_execution.domain import (
 from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway import (
     StrategyPostgresGateway,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresPaperAccountingRepository(PaperAccountingRepository):
@@ -29,14 +29,15 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
             query="""
             INSERT INTO strategy_capital_reservations
             (
-                reservation_id, owner_user_id, exchange_connection_id, strategy_id,
+                reservation_id, organization_id, owner_user_id, exchange_connection_id, strategy_id,
                 live_profile_id, strategy_run_id, asset, requested_amount,
                 reserved_amount, state, source_account_snapshot_id, acquired_at,
                 released_at, reason, fee_model, funding_model, pnl_complete
             )
             VALUES
             (
-                %(reservation_id)s, %(owner_user_id)s, %(exchange_connection_id)s,
+                %(reservation_id)s, %(organization_id)s, %(owner_user_id)s,
+                %(exchange_connection_id)s,
                 %(strategy_id)s, %(live_profile_id)s, %(strategy_run_id)s,
                 %(asset)s, %(requested_amount)s, %(reserved_amount)s, %(state)s,
                 %(source_account_snapshot_id)s, %(acquired_at)s, %(released_at)s,
@@ -52,9 +53,13 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
                 query="""
                 SELECT *
                 FROM strategy_capital_reservations
-                WHERE reservation_id = %(reservation_id)s
+                WHERE organization_id = %(organization_id)s
+                  AND reservation_id = %(reservation_id)s
                 """,
-                parameters={"reservation_id": str(reservation.reservation_id)},
+                parameters={
+                    "organization_id": str(reservation.organization_id),
+                    "reservation_id": str(reservation.reservation_id),
+                },
             )
         if row is None:
             raise ValueError("reservation insert returned no row")
@@ -63,6 +68,7 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
     def release_reservation_for_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         changed_at: datetime,
@@ -74,12 +80,14 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
             SET state = 'released',
                 released_at = %(changed_at)s,
                 reason = %(reason)s
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND strategy_run_id = %(strategy_run_id)s
               AND state = 'reserved'
             RETURNING *
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_run_id": str(strategy_run_id),
                 "changed_at": changed_at,
@@ -89,19 +97,21 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
         return _map_reservation(row) if row is not None else None
 
     def get_active_reservation_for_run(
-        self, *, owner_user_id: UserId, strategy_run_id: UUID
+        self, *, organization_id: OrganizationId, owner_user_id: UserId, strategy_run_id: UUID
     ) -> CapitalReservation | None:
         row = self._gateway.fetch_one(
             query="""
             SELECT *
             FROM strategy_capital_reservations
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND strategy_run_id = %(strategy_run_id)s
               AND state = 'reserved'
             ORDER BY acquired_at DESC, reservation_id DESC
             LIMIT 1
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_run_id": str(strategy_run_id),
             },
@@ -109,18 +119,25 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
         return _map_reservation(row) if row is not None else None
 
     def sum_active_reserved(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID, asset: str
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
+        asset: str,
     ) -> Decimal:
         row = self._gateway.fetch_one(
             query="""
             SELECT COALESCE(SUM(reserved_amount), 0) AS amount
             FROM strategy_capital_reservations
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND exchange_connection_id = %(exchange_connection_id)s
               AND asset = %(asset)s
               AND state = 'reserved'
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "exchange_connection_id": str(exchange_connection_id),
                 "asset": asset,
@@ -139,20 +156,20 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
             query="""
             INSERT INTO paper_orders
             (
-                paper_order_id, owner_user_id, strategy_id, strategy_run_id,
+                paper_order_id, organization_id, owner_user_id, strategy_id, strategy_run_id,
                 reservation_id, source_signal_id, source_event_id, instrument_key,
                 market_type, side, order_type, quantity, quote_notional,
                 reference_price, status, reason, created_at
             )
             VALUES
             (
-                %(paper_order_id)s, %(owner_user_id)s, %(strategy_id)s,
+                %(paper_order_id)s, %(organization_id)s, %(owner_user_id)s, %(strategy_id)s,
                 %(strategy_run_id)s, %(reservation_id)s, %(source_signal_id)s,
                 %(source_event_id)s, %(instrument_key)s, %(market_type)s,
                 %(side)s, %(order_type)s, %(quantity)s, %(quote_notional)s,
                 %(reference_price)s, %(status)s, %(reason)s, %(created_at)s
             )
-            ON CONFLICT (source_signal_id) DO NOTHING
+            ON CONFLICT (organization_id, source_signal_id) DO NOTHING
             """,
             parameters=_order_params(order),
         )
@@ -160,20 +177,20 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
             query="""
             INSERT INTO paper_fills
             (
-                paper_fill_id, paper_order_id, owner_user_id, strategy_id,
+                paper_fill_id, paper_order_id, organization_id, owner_user_id, strategy_id,
                 strategy_run_id, instrument_key, side, quantity, fill_price,
                 quote_notional, fee_amount, fee_asset, funding_amount,
                 funding_asset, filled_at
             )
             VALUES
             (
-                %(paper_fill_id)s, %(paper_order_id)s, %(owner_user_id)s,
+                %(paper_fill_id)s, %(paper_order_id)s, %(organization_id)s, %(owner_user_id)s,
                 %(strategy_id)s, %(strategy_run_id)s, %(instrument_key)s,
                 %(side)s, %(quantity)s, %(fill_price)s, %(quote_notional)s,
                 %(fee_amount)s, %(fee_asset)s, %(funding_amount)s,
                 %(funding_asset)s, %(filled_at)s
             )
-            ON CONFLICT (paper_fill_id) DO NOTHING
+            ON CONFLICT (organization_id, paper_fill_id) DO NOTHING
             """,
             parameters=_fill_params(fill),
         )
@@ -181,7 +198,7 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
             query="""
             INSERT INTO strategy_paper_accounting
             (
-                accounting_id, owner_user_id, strategy_id, strategy_run_id,
+                accounting_id, organization_id, owner_user_id, strategy_id, strategy_run_id,
                 reservation_id, paper_fill_id, instrument_key, market_type,
                 position_quantity, average_entry_price, reserved_budget,
                 cash_balance, equity, realized_pnl, unrealized_pnl, fee_total,
@@ -190,7 +207,7 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
             )
             VALUES
             (
-                %(accounting_id)s, %(owner_user_id)s, %(strategy_id)s,
+                %(accounting_id)s, %(organization_id)s, %(owner_user_id)s, %(strategy_id)s,
                 %(strategy_run_id)s, %(reservation_id)s, %(paper_fill_id)s,
                 %(instrument_key)s, %(market_type)s, %(position_quantity)s,
                 %(average_entry_price)s, %(reserved_budget)s, %(cash_balance)s,
@@ -198,7 +215,7 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
                 %(funding_total)s, %(fee_model)s, %(funding_model)s,
                 %(pnl_complete)s, %(completeness_reason)s, %(created_at)s
             )
-            ON CONFLICT (paper_fill_id) DO NOTHING
+            ON CONFLICT (organization_id, paper_fill_id) DO NOTHING
             RETURNING *
             """,
             parameters=_accounting_params(accounting),
@@ -208,27 +225,33 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
                 query="""
                 SELECT *
                 FROM strategy_paper_accounting
-                WHERE paper_fill_id = %(paper_fill_id)s
+                WHERE organization_id = %(organization_id)s
+                  AND paper_fill_id = %(paper_fill_id)s
                 """,
-                parameters={"paper_fill_id": str(accounting.paper_fill_id)},
+                parameters={
+                    "organization_id": str(accounting.organization_id),
+                    "paper_fill_id": str(accounting.paper_fill_id),
+                },
             )
         if row is None:
             raise ValueError("paper accounting insert returned no row")
         return _map_accounting(row)
 
     def get_latest_accounting_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID
+        self, *, organization_id: OrganizationId, owner_user_id: UserId, strategy_id: UUID
     ) -> StrategyPaperAccountingSnapshot | None:
         row = self._gateway.fetch_one(
             query="""
             SELECT *
             FROM strategy_paper_accounting
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND strategy_id = %(strategy_id)s
             ORDER BY created_at DESC, accounting_id DESC
             LIMIT 1
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_id": str(strategy_id),
             },
@@ -239,6 +262,7 @@ class PostgresPaperAccountingRepository(PaperAccountingRepository):
 def _reservation_params(item: CapitalReservation) -> dict[str, object]:
     return {
         "reservation_id": str(item.reservation_id),
+        "organization_id": str(item.organization_id),
         "owner_user_id": str(item.owner_user_id),
         "exchange_connection_id": str(item.exchange_connection_id),
         "strategy_id": str(item.strategy_id),
@@ -263,6 +287,7 @@ def _reservation_params(item: CapitalReservation) -> dict[str, object]:
 def _order_params(item: PaperOrder) -> dict[str, object]:
     return {
         "paper_order_id": str(item.paper_order_id),
+        "organization_id": str(item.organization_id),
         "owner_user_id": str(item.owner_user_id),
         "strategy_id": str(item.strategy_id),
         "strategy_run_id": str(item.strategy_run_id),
@@ -286,6 +311,7 @@ def _fill_params(item: PaperFill) -> dict[str, object]:
     return {
         "paper_fill_id": str(item.paper_fill_id),
         "paper_order_id": str(item.paper_order_id),
+        "organization_id": str(item.organization_id),
         "owner_user_id": str(item.owner_user_id),
         "strategy_id": str(item.strategy_id),
         "strategy_run_id": str(item.strategy_run_id),
@@ -305,6 +331,7 @@ def _fill_params(item: PaperFill) -> dict[str, object]:
 def _accounting_params(item: StrategyPaperAccountingSnapshot) -> dict[str, object]:
     return {
         "accounting_id": str(item.accounting_id),
+        "organization_id": str(item.organization_id),
         "owner_user_id": str(item.owner_user_id),
         "strategy_id": str(item.strategy_id),
         "strategy_run_id": str(item.strategy_run_id),
@@ -332,6 +359,7 @@ def _accounting_params(item: StrategyPaperAccountingSnapshot) -> dict[str, objec
 def _map_reservation(row: Mapping[str, Any]) -> CapitalReservation:
     return CapitalReservation(
         reservation_id=UUID(str(row["reservation_id"])),
+        organization_id=OrganizationId.from_string(str(row["organization_id"])),
         owner_user_id=UserId.from_string(str(row["owner_user_id"])),
         exchange_connection_id=UUID(str(row["exchange_connection_id"])),
         strategy_id=UUID(str(row["strategy_id"])),
@@ -358,6 +386,7 @@ def _map_reservation(row: Mapping[str, Any]) -> CapitalReservation:
 def _map_accounting(row: Mapping[str, Any]) -> StrategyPaperAccountingSnapshot:
     return StrategyPaperAccountingSnapshot(
         accounting_id=UUID(str(row["accounting_id"])),
+        organization_id=OrganizationId.from_string(str(row["organization_id"])),
         owner_user_id=UserId.from_string(str(row["owner_user_id"])),
         strategy_id=UUID(str(row["strategy_id"])),
         strategy_run_id=UUID(str(row["strategy_run_id"])),

@@ -21,6 +21,7 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobListQuery,
     BacktestLazyTradesMaterializationRequest,
     BacktestLazyTradesMaterializationTask,
+    ResearchOrganizationScope,
 )
 from trading.contexts.backtest.application.services.v2 import (
     BacktestAdmissionService,
@@ -38,7 +39,17 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobTopVariant,
 )
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import PaidLevel, UserId
+from trading.shared_kernel.primitives import OrganizationId, PaidLevel, UserId
+
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-0000-0000-000000000001")
+
+
+class _ScopeResolver:
+    def resolve(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        return ResearchOrganizationScope(
+            organization_id=_ORGANIZATION_ID,
+            user_id=user_id,
+        )
 
 
 def test_trades_resolves_public_variant_key_only() -> None:
@@ -427,6 +438,7 @@ def _use_case(
             runtime_config=runtime_config,
         ),
         runtime_config=runtime_config,
+        organization_scope_resolver=_ScopeResolver(),
         lazy_trades_service=cast(Any, lazy_service or _LazyService()),
         lazy_trades_materialization_repository=materialization_repository,
         admission_service=admission_service,
@@ -444,6 +456,7 @@ def _create_use_case(
         job_repository=cast(Any, repository),
         preflight_service=cast(BacktestPreflightService, _PreflightService()),
         runtime_config=runtime_config,
+        organization_scope_resolver=_ScopeResolver(),
         execution_trigger=trigger,
         admission_service=admission_service,
     )
@@ -477,7 +490,9 @@ class _LazyService:
             variant_hash=row.variant_key,
             request_hash=job.request_hash,
             engine_params_hash=job.engine_params_hash,
-            artifact_manifest_hash=str(job.request_json["artifact_metadata"]["artifact_manifest_hash"]),
+            artifact_manifest_hash=str(
+                job.request_json["artifact_metadata"]["artifact_manifest_hash"]
+            ),
             summary_metrics=dict(row.summary_metrics_json),
             canonical_variant_params=dict(row.payload_json["canonical_variant_params"]),
             readable_params=dict(row.payload_json["readable_params"]),
@@ -525,7 +540,7 @@ class _Probe:
 
 @dataclass
 class _MaterializationRepository:
-    tasks: dict[tuple[str, UUID, str, str], BacktestLazyTradesMaterializationTask] = field(
+    tasks: dict[tuple[str, str, UUID, str, str], BacktestLazyTradesMaterializationTask] = field(
         default_factory=dict
     )
 
@@ -535,6 +550,7 @@ class _MaterializationRepository:
         request: BacktestLazyTradesMaterializationRequest,
     ) -> BacktestLazyTradesMaterializationTask:
         key = (
+            str(request.organization_id),
             str(request.owner_user_id),
             request.job_id,
             request.public_variant_key,
@@ -564,6 +580,7 @@ class _MaterializationRepository:
             return existing
         task = BacktestLazyTradesMaterializationTask(
             task_id=uuid4(),
+            organization_id=request.organization_id,
             owner_user_id=request.owner_user_id,
             job_id=request.job_id,
             public_variant_key=request.public_variant_key,
@@ -595,30 +612,49 @@ class _MaterializationRepository:
     def find_by_identity(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         job_id: UUID,
         public_variant_key: str,
         cache_key: str,
     ) -> BacktestLazyTradesMaterializationTask | None:
-        return self.tasks.get((str(owner_user_id), job_id, public_variant_key, cache_key))
+        return self.tasks.get(
+            (
+                str(organization_id),
+                str(owner_user_id),
+                job_id,
+                public_variant_key,
+                cache_key,
+            )
+        )
 
-    def count_active_for_user(self, *, owner_user_id: UserId) -> int:
+    def count_active_for_user(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+    ) -> int:
         return sum(
             1
             for task in self.tasks.values()
-            if task.owner_user_id == owner_user_id and task.status in {"queued", "running"}
+            if task.organization_id == organization_id
+            and task.owner_user_id == owner_user_id
+            and task.status in {"queued", "running"}
         )
 
     def count_created_for_user_since(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         created_after: datetime,
     ) -> int:
         return sum(
             1
             for task in self.tasks.values()
-            if task.owner_user_id == owner_user_id and task.created_at >= created_after
+            if task.organization_id == organization_id
+            and task.owner_user_id == owner_user_id
+            and task.created_at >= created_after
         )
 
     def count_active_global(self) -> int:
@@ -631,8 +667,16 @@ class _Repository:
     top_rows: tuple[BacktestJobTopVariant, ...]
     public_variant_lookups: tuple[str, ...] = ()
 
-    def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
+    def get(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId | None = None,
+    ) -> BacktestJob | None:
         if self.job.job_id != job_id:
+            return None
+        if self.job.organization_id != organization_id:
             return None
         if user_id is not None and self.job.user_id != user_id:
             return None
@@ -642,10 +686,11 @@ class _Repository:
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         public_variant_key: str,
     ) -> BacktestJobTopVariant | None:
         self.public_variant_lookups = (*self.public_variant_lookups, public_variant_key)
-        if self.job.job_id != job_id:
+        if self.job.job_id != job_id or self.job.organization_id != organization_id:
             return None
         for row in self.top_rows:
             if row.payload_json.get("public_variant_key") == public_variant_key:
@@ -656,9 +701,14 @@ class _Repository:
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         limit: int | None = None,
     ) -> tuple[BacktestJobTopVariant, ...]:
-        rows = self.top_rows if self.job.job_id == job_id else ()
+        rows = (
+            self.top_rows
+            if self.job.job_id == job_id and self.job.organization_id == organization_id
+            else ()
+        )
         return rows if limit is None else rows[:limit]
 
     def list_for_user(self, *, query: BacktestJobListQuery) -> BacktestJobListPage:
@@ -670,29 +720,32 @@ class _Repository:
     def find_by_idempotency_key(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         idempotency_key_hash: str,
         created_after: datetime,
     ) -> BacktestJob | None:
-        _ = user_id, idempotency_key_hash, created_after
+        _ = organization_id, user_id, idempotency_key_hash, created_after
         return None
 
     def claim_for_inline_execution(
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         now: datetime,
         locked_by: str,
         lease_expires_at: datetime,
     ) -> BacktestJob | None:
-        _ = job_id, user_id, now, locked_by, lease_expires_at
+        _ = job_id, organization_id, user_id, now, locked_by, lease_expires_at
         return None
 
     def finish_with_top_variants(
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         now: datetime,
         locked_by: str,
@@ -703,6 +756,7 @@ class _Repository:
     ) -> BacktestJob | None:
         _ = (
             job_id,
+            organization_id,
             user_id,
             now,
             locked_by,
@@ -727,32 +781,45 @@ class _Repository:
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         cancel_requested_at: datetime,
     ) -> BacktestJob | None:
-        if self.job.job_id != job_id or self.job.user_id != user_id:
+        if (
+            self.job.job_id != job_id
+            or self.job.organization_id != organization_id
+            or self.job.user_id != user_id
+        ):
             return None
         self.job = self.job.request_cancel(changed_at=cancel_requested_at)
         return self.job
 
-    def delete_terminal(self, *, job_id: UUID, user_id: UserId) -> bool:
+    def delete_terminal(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId,
+    ) -> bool:
         return (
             self.job.job_id == job_id
+            and self.job.organization_id == organization_id
             and self.job.user_id == user_id
             and self.job.state in {"succeeded", "failed", "cancelled"}
         )
 
-    def count_active_for_user(self, *, user_id: UserId) -> int:
-        _ = user_id
+    def count_active_for_user(self, *, organization_id: OrganizationId, user_id: UserId) -> int:
+        _ = organization_id, user_id
         return 0
 
     def count_created_for_user_since(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         created_after: datetime,
     ) -> int:
-        _ = user_id, created_after
+        _ = organization_id, user_id, created_after
         return 0
 
     def count_active_global(self) -> int:
@@ -782,6 +849,7 @@ class _CreateRepository:
     def find_by_idempotency_key(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         idempotency_key_hash: str,
         created_after: datetime,
@@ -789,7 +857,8 @@ class _CreateRepository:
         for job in self.jobs.values():
             idempotency = dict(job.request_json).get("idempotency")
             if (
-                job.user_id == user_id
+                job.organization_id == organization_id
+                and job.user_id == user_id
                 and job.created_at >= created_after
                 and isinstance(idempotency, dict)
                 and idempotency.get("key_hash") == idempotency_key_hash
@@ -797,9 +866,17 @@ class _CreateRepository:
                 return job
         return None
 
-    def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
+    def get(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId | None = None,
+    ) -> BacktestJob | None:
         job = self.jobs.get(job_id)
         if job is None:
+            return None
+        if job.organization_id != organization_id:
             return None
         if user_id is not None and job.user_id != user_id:
             return None
@@ -809,45 +886,69 @@ class _CreateRepository:
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         limit: int | None = None,
     ) -> tuple[BacktestJobTopVariant, ...]:
-        rows = self.top_rows.get(job_id, ())
+        job = self.jobs.get(job_id)
+        rows = (
+            self.top_rows.get(job_id, ())
+            if job is not None and job.organization_id == organization_id
+            else ()
+        )
         return rows if limit is None else rows[:limit]
 
     def list_for_user(self, *, query: BacktestJobListQuery) -> BacktestJobListPage:
-        items = tuple(job for job in self.jobs.values() if job.user_id == query.user_id)
+        items = tuple(
+            job
+            for job in self.jobs.values()
+            if job.organization_id == query.organization_id and job.user_id == query.user_id
+        )
         return BacktestJobListPage(items=items, next_cursor=None)
 
     def get_top_variant_by_public_key(
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         public_variant_key: str,
     ) -> BacktestJobTopVariant | None:
-        _ = job_id, public_variant_key
+        _ = job_id, organization_id, public_variant_key
         return None
 
     def cancel(
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         cancel_requested_at: datetime,
     ) -> BacktestJob | None:
         job = self.jobs.get(job_id)
-        if job is None or job.user_id != user_id:
+        if job is None or job.organization_id != organization_id or job.user_id != user_id:
             return None
         cancelled = job.request_cancel(changed_at=cancel_requested_at)
         self.jobs[job_id] = cancelled
         return cancelled
 
-    def delete_terminal(self, *, job_id: UUID, user_id: UserId) -> bool:
+    def delete_terminal(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId,
+    ) -> bool:
         job = self.jobs.get(job_id)
-        if job is None or job.user_id != user_id or job.state not in {
-            "succeeded",
-            "failed",
-            "cancelled",
-        }:
+        if (
+            job is None
+            or job.organization_id != organization_id
+            or job.user_id != user_id
+            or job.state
+            not in {
+                "succeeded",
+                "failed",
+                "cancelled",
+            }
+        ):
             return False
         del self.jobs[job_id]
         self.top_rows.pop(job_id, None)
@@ -867,6 +968,7 @@ class _CreateRepository:
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         now: datetime,
         locked_by: str,
@@ -877,7 +979,7 @@ class _CreateRepository:
     ) -> BacktestJob | None:
         _ = locked_by
         job = self.jobs.get(job_id)
-        if job is None or job.user_id != user_id:
+        if job is None or job.organization_id != organization_id or job.user_id != user_id:
             return None
         finished = job.finish(
             next_state=next_state,
@@ -889,19 +991,26 @@ class _CreateRepository:
         self.top_rows[job_id] = top_variants
         return finished
 
-    def count_active_for_user(self, *, user_id: UserId) -> int:
-        return sum(1 for job in self.jobs.values() if job.user_id == user_id and job.is_active())
+    def count_active_for_user(self, *, organization_id: OrganizationId, user_id: UserId) -> int:
+        return sum(
+            1
+            for job in self.jobs.values()
+            if job.organization_id == organization_id and job.user_id == user_id and job.is_active()
+        )
 
     def count_created_for_user_since(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         created_after: datetime,
     ) -> int:
         return sum(
             1
             for job in self.jobs.values()
-            if job.user_id == user_id and job.created_at >= created_after
+            if job.organization_id == organization_id
+            and job.user_id == user_id
+            and job.created_at >= created_after
         )
 
     def count_active_global(self) -> int:
@@ -923,8 +1032,15 @@ class _CreateRepository:
 class _Trigger:
     calls: tuple[tuple[UUID, str], ...] = ()
 
-    def enqueue(self, *, job_id: UUID, user_id: UserId, request_hash: str) -> None:
-        _ = user_id
+    def enqueue(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        request_hash: str,
+    ) -> None:
+        _ = organization_id, user_id
         self.calls = (*self.calls, (job_id, request_hash))
 
 
@@ -955,6 +1071,7 @@ def _job_and_row(*, user_id: UserId) -> tuple[BacktestJob, BacktestJobTopVariant
     request["artifact_metadata"] = metadata.as_mapping()
     job = BacktestJob.create_queued(
         job_id=job_id,
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         mode="template",
         created_at=created_at,
@@ -984,12 +1101,16 @@ def _job_and_row(*, user_id: UserId) -> tuple[BacktestJob, BacktestJobTopVariant
         metrics={"total_return_pct": 12.5, "trade_count": 2.0},
         metadata={"ma.dema.source": "close", "ma.dema.window": 5},
     )
-    row = BacktestTopResultAssemblyService().assemble(
-        job_id=job_id,
-        normalized_request=request,
-        top_results=(top_result,),
-        updated_at=created_at,
-    ).top_variants[0]
+    row = (
+        BacktestTopResultAssemblyService()
+        .assemble(
+            job_id=job_id,
+            normalized_request=request,
+            top_results=(top_result,),
+            updated_at=created_at,
+        )
+        .top_variants[0]
+    )
     return job, row
 
 

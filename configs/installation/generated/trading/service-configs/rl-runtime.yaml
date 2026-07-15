@@ -1,0 +1,106 @@
+artifact_root: /var/lib/roehub/ml
+backtest_jobs:
+  max_concurrent_when_inference_only: 1
+  max_concurrent_when_training: 1
+device_policy: cpu_only_for_container_default
+disk:
+  block_training_below_free_gb: 30
+  cleanup_may_delete_accepted_artifacts: false
+  min_free_gb: 20
+inference:
+  enabled: false
+  health_check_enabled: true
+  instruments:
+  - exchange: binance
+    instrument_key: binance:futures:BTCUSDT
+    market_type: futures
+    symbol: BTCUSDT
+  latency_budget_ms:
+    candle_close_to_feature_ready_p95: 250
+    decision_to_source_event_p95: 50
+    feature_to_decision_p95: 100
+  max_concurrent_processes: 1
+  max_rss_mb: 1024
+  metrics_port: 9213
+  mode: monitor_only
+  monitor_policy:
+    artifacts:
+      candidate_manifest_path: /var/lib/roehub/ml/candidates/not-configured/candidate-manifest.json
+      candidate_manifest_sha256: '0000000000000000000000000000000000000000000000000000000000000000'
+      checkpoint_path: /var/lib/roehub/ml/candidates/not-configured/checkpoint.pth
+      checkpoint_sha256: '0000000000000000000000000000000000000000000000000000000000000000'
+      evaluation_manifest_path: /var/lib/roehub/ml/candidates/not-configured/evaluation-manifest.json
+      evaluation_manifest_sha256: '0000000000000000000000000000000000000000000000000000000000000000'
+      normalization_stats_file_sha256: '0000000000000000000000000000000000000000000000000000000000000000'
+      normalization_stats_path: /var/lib/roehub/ml/candidates/not-configured/normalization-stats.json
+    direction_policy: long_only
+    funding_model: not_modeled_for_1m_monitor
+    policy_id: stage08k_long_only_hold_1m_monitor_v1
+    slippage_rate: 0.00025
+    taker_fee_rate: 0.0005
+    virtual_hold_minutes: 1
+    virtual_notional_quote: 5000.0
+  operator_context:
+    organization_id: 00000000-0000-4000-8000-000000000001
+    owner_user_id: 00000000-0000-4000-8000-000000000002
+    strategy_id: 00000000-0000-4000-8000-000000000003
+    strategy_run_id: 00000000-0000-4000-8000-000000000004
+  postgres_dsn_env: STRATEGY_PG_DSN
+  redis_streams:
+    auth_env: null
+    block_ms: 1000
+    connect_timeout_s: 2.0
+    consumer_group: rl.inference.monitor.v1
+    consumer_name: auto
+    db: 0
+    enabled: false
+    host: redis
+    pending_claim_min_idle_ms: 60000
+    port: 6379
+    read_count: 20
+    socket_timeout_s: 2.0
+    stream_prefix: md.candles.1m
+    window_size: 90
+  rollout_phase: disabled
+  source_events:
+    enabled: false
+    outcome: no_intent
+    outcome_reason: monitor_only_no_intent
+    source_type: ml_agent_decision
+  state_path: /var/lib/roehub/ml/inference/monitor-state.json
+  torch_num_interop_threads: 1
+  torch_num_threads: 1
+profile: trading
+promotion:
+  auto_promote: false
+  require_admin_approval: true
+  require_operator_approval: true
+  threshold_profile: stage10a_promotion_threshold_profile_v1
+retraining:
+  allowed_modes:
+  - full_retrain
+  - fine_tune
+  drift_trigger:
+    auto_promote: false
+    creates_candidate_task: true
+  enabled: false
+  manual_trigger:
+    enabled: false
+    host_local_cli_only: true
+  max_concurrent_candidate_jobs: 1
+  scheduled_trigger:
+    enabled: false
+    schedule_id: null
+rollback:
+  delete_artifacts_on_rollback: false
+  host_local_command_enabled: true
+runtime_artifacts:
+  allowed_root: /var/lib/roehub/ml
+  commit_to_git: false
+trainer:
+  enabled: false
+  max_concurrent_jobs: 1
+  max_rss_mb: 2048
+  nice: 10
+  torch_num_interop_threads: 1
+  torch_num_threads: 1

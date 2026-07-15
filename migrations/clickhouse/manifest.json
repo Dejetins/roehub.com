@@ -1,0 +1,18 @@
+{
+  "schema": "io.roehub.clickhouse-migrations/v1alpha1",
+  "database_token": "market_data",
+  "migrations": [
+    {
+      "version": "0001",
+      "name": "market-data",
+      "path": "market_data_ddl.sql",
+      "sha256": "e6e2e75f53291f5b9c1fb66a632e213afc3ed83e9e415c63f39e049f3d834161"
+    },
+    {
+      "version": "0002",
+      "name": "funding-rates",
+      "path": "funding_rates_ddl.sql",
+      "sha256": "b9b6ca495027e84fe66d5d31a36b3977a187513529a56791b8ff0f5baf8e34e3"
+    }
+  ]
+}

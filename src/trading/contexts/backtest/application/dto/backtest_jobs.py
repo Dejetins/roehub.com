@@ -39,6 +39,7 @@ class BacktestJobProgressReadModel:
 @dataclass(frozen=True, slots=True)
 class BacktestJobReadModel:
     job_id: str
+    organization_id: str
     state: str
     request_hash: str
     result_config_hash: str
@@ -77,6 +78,7 @@ class BacktestJobReadModel:
     def as_mapping(self) -> dict[str, Any]:
         return {
             "job_id": self.job_id,
+            "organization_id": self.organization_id,
             "state": self.state,
             "request_hash": self.request_hash,
             "result_config_hash": self.result_config_hash,
@@ -289,6 +291,7 @@ def build_backtest_job_read_model(
     retry_after_seconds = _retry_after_seconds(job=job)
     return BacktestJobReadModel(
         job_id=str(job.job_id),
+        organization_id=str(job.organization_id),
         state=job.state,
         request_hash=job.request_hash,
         result_config_hash=job.backtest_runtime_config_hash,

@@ -9,6 +9,19 @@ from .notification import (
     build_notification_dedupe_key,
     sanitize_notification_mapping,
 )
+from .provider import (
+    NOTIFICATION_PROVIDER_CONTRACT,
+    NOTIFICATION_PROVIDER_ERROR_CODES,
+    TELEGRAM_BOT_PROVIDER_KEY,
+    NotificationProviderDescriptor,
+    NotificationProviderHealth,
+    NotificationProviderInstance,
+    NotificationProviderPackage,
+    NotificationProviderValidationError,
+    TelegramCommandDescriptor,
+    TelegramUpdateCursor,
+    telegram_bot_provider_descriptor,
+)
 
 __all__ = [
     "NotificationDelivery",
@@ -20,4 +33,15 @@ __all__ = [
     "TelegramUpdate",
     "build_notification_dedupe_key",
     "sanitize_notification_mapping",
+    "NOTIFICATION_PROVIDER_CONTRACT",
+    "NOTIFICATION_PROVIDER_ERROR_CODES",
+    "TELEGRAM_BOT_PROVIDER_KEY",
+    "NotificationProviderDescriptor",
+    "NotificationProviderHealth",
+    "NotificationProviderInstance",
+    "NotificationProviderPackage",
+    "NotificationProviderValidationError",
+    "TelegramCommandDescriptor",
+    "TelegramUpdateCursor",
+    "telegram_bot_provider_descriptor",
 ]

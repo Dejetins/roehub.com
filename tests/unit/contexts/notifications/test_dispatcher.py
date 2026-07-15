@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Literal
@@ -13,7 +14,12 @@ from trading.contexts.notifications.application import (
     NotificationDispatcherConfig,
 )
 from trading.contexts.notifications.application.ports import NotificationProviderResult
-from trading.contexts.notifications.domain import NotificationDelivery
+from trading.contexts.notifications.domain import (
+    NotificationDelivery,
+    NotificationProviderDescriptor,
+    NotificationProviderHealth,
+)
+from trading.shared_kernel.primitives import OrganizationId
 
 
 def _now() -> datetime:
@@ -40,18 +46,29 @@ class CapturingMetrics:
         self.results = []
         self.latencies = []
 
-    def on_delivery_claimed(self, *, provider_key: str) -> None:
+    def on_delivery_claimed(
+        self, *, provider_key: str, provider_instance_id: str
+    ) -> None:
+        _ = provider_instance_id
         _ = provider_key
         self.claimed += 1
 
-    def on_delivery_result(self, *, provider_key: str, status: str) -> None:
+    def on_delivery_result(
+        self,
+        *,
+        provider_key: str,
+        provider_instance_id: str,
+        category: str,
+        status: str,
+    ) -> None:
+        _ = provider_instance_id, category
         assert self.results is not None
         self.results.append((provider_key, status))
 
     def observe_delivery_latency_seconds(
-        self, *, provider_key: str, seconds: float
+        self, *, provider_key: str, provider_instance_id: str, seconds: float
     ) -> None:
-        _ = provider_key
+        _ = provider_key, provider_instance_id
         assert self.latencies is not None
         self.latencies.append(seconds)
 
@@ -68,6 +85,27 @@ class StaticProvider:
     error_code: str | None = None
     retry_after_seconds: int | None = None
     provider_key: str = "log_only"
+    provider_instance_id: UUID = UUID("00000000-0000-4000-8000-000000000001")
+    organization_id: OrganizationId | None = None
+
+    @property
+    def descriptor(self) -> NotificationProviderDescriptor:
+        return NotificationProviderDescriptor(
+            provider_key=self.provider_key,
+            display_name="Static provider",
+            package_version="1.0.0",
+            config_schema={"type": "object"},
+            channels=("telegram",),
+            templates=("plain_text.v1",),
+            error_codes=("provider_disabled",),
+        )
+
+    def health(self) -> NotificationProviderHealth:
+        return NotificationProviderHealth(
+            instance_id=self.provider_instance_id,
+            status="ready",
+            checked_at=_now(),
+        )
 
     def send(self, *, delivery: NotificationDelivery) -> NotificationProviderResult:
         return NotificationProviderResult(
@@ -80,6 +118,13 @@ class StaticProvider:
             redacted_request_hash="0" * 64,
             redacted_response_hash="1" * 64,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class CancellingProvider(StaticProvider):
+    def send(self, *, delivery: NotificationDelivery) -> NotificationProviderResult:
+        _ = delivery
+        raise asyncio.CancelledError
 
 
 def test_dispatcher_claims_pending_delivery_and_marks_sent(
@@ -124,7 +169,9 @@ def test_dispatcher_schedules_retry_until_attempt_budget_is_exhausted() -> None:
         repository=repository,
         providers=(
             StaticProvider(
-                status="retry", error_code="rate_limited", retry_after_seconds=9
+                status="retry",
+                error_code="provider_rate_limited",
+                retry_after_seconds=9,
             ),
         ),
         clock=FixedClock(_now()),
@@ -138,11 +185,13 @@ def test_dispatcher_schedules_retry_until_attempt_budget_is_exhausted() -> None:
     assert updated.status == "retry"
     assert updated.attempt_count == 1
     assert updated.next_attempt_at == _now() + timedelta(seconds=9)
-    assert updated.last_error_code == "rate_limited"
+    assert updated.last_error_code == "provider_rate_limited"
 
     second_dispatcher = NotificationDispatcher(
         repository=repository,
-        providers=(StaticProvider(status="retry", error_code="rate_limited"),),
+        providers=(
+            StaticProvider(status="retry", error_code="provider_rate_limited"),
+        ),
         clock=FixedClock(_now() + timedelta(seconds=10)),
         config=NotificationDispatcherConfig(max_attempts=2),
     )
@@ -155,7 +204,7 @@ def test_dispatcher_schedules_retry_until_attempt_budget_is_exhausted() -> None:
     assert exhausted.attempt_count == 2
 
 
-def test_dispatcher_reclaims_expired_claim_without_double_sending_active_claim() -> None:
+def test_dispatcher_recovers_expired_claim_as_unknown_without_blind_resend() -> None:
     repository = InMemoryNotificationRepository()
     active = repository.record_delivery(
         delivery=_delivery(
@@ -177,11 +226,13 @@ def test_dispatcher_reclaims_expired_claim_without_double_sending_active_claim()
 
     result = dispatcher.drain_once()
 
-    assert result.scanned == 1
-    assert result.sent == 1
+    assert result.scanned == 0
+    assert result.sent == 0
+    assert result.unknown == 1
     assert repository.deliveries[active.delivery_id].status == "claimed"
-    assert repository.deliveries[expired.delivery_id].status == "sent"
-    assert repository.deliveries[expired.delivery_id].attempt_count == 1
+    assert repository.deliveries[expired.delivery_id].status == "unknown"
+    assert repository.deliveries[expired.delivery_id].last_error_code == "provider_shutdown"
+    assert repository.deliveries[expired.delivery_id].attempt_count == 0
 
 
 def test_dispatcher_marks_unknown_without_blind_retry() -> None:
@@ -190,7 +241,12 @@ def test_dispatcher_marks_unknown_without_blind_retry() -> None:
     metrics = CapturingMetrics()
     dispatcher = NotificationDispatcher(
         repository=repository,
-        providers=(StaticProvider(status="unknown", error_code="telegram_timeout"),),
+        providers=(
+            StaticProvider(
+                status="unknown",
+                error_code="provider_timeout_after_acceptance_possible",
+            ),
+        ),
         clock=FixedClock(_now()),
         metrics=metrics,
     )
@@ -202,8 +258,30 @@ def test_dispatcher_marks_unknown_without_blind_retry() -> None:
     assert result.unknown == 1
     assert repeated.scanned == 0
     assert updated.status == "unknown"
-    assert updated.last_error_code == "telegram_timeout"
+    assert (
+        updated.last_error_code
+        == "provider_timeout_after_acceptance_possible"
+    )
     assert metrics.unknown_count == 1
+
+
+def test_dispatcher_persists_unknown_before_propagating_cancellation() -> None:
+    repository = InMemoryNotificationRepository()
+    delivery = repository.record_delivery(delivery=_delivery(status="pending"))
+    dispatcher = NotificationDispatcher(
+        repository=repository,
+        providers=(CancellingProvider(status="unknown"),),
+        clock=FixedClock(_now()),
+    )
+
+    with pytest.raises(asyncio.CancelledError):
+        dispatcher.drain_once()
+
+    updated = repository.deliveries[delivery.delivery_id]
+    assert updated.status == "unknown"
+    assert updated.last_error_code == "provider_cancelled"
+    assert updated.lease_until is None
+    assert len(repository.attempts) == 1
 
 
 def test_dispatcher_dead_letters_missing_provider() -> None:
@@ -221,7 +299,7 @@ def test_dispatcher_dead_letters_missing_provider() -> None:
     assert result.provider_missing == 1
     assert result.dead_letter == 1
     assert updated.status == "dead_letter"
-    assert updated.last_error_code == "provider_missing"
+    assert updated.last_error_code == "provider_disabled"
     assert len(repository.attempts) == 1
 
 
@@ -234,6 +312,14 @@ def _delivery(
 ) -> NotificationDelivery:
     return NotificationDelivery(
         delivery_id=uuid4(),
+        organization_id=OrganizationId(
+            UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+        ),
+        provider_instance_id=(
+            UUID("00000000-0000-4000-8000-000000000002")
+            if provider_key == "fake"
+            else UUID("00000000-0000-4000-8000-000000000001")
+        ),
         event_id=UUID("22222222-2222-4222-8222-222222222222"),
         report_run_id=None,
         command_id=None,

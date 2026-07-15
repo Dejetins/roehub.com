@@ -6,7 +6,10 @@ from uuid import UUID, uuid4
 
 from trading.contexts.notifications.adapters import PostgresNotificationRepository
 from trading.contexts.notifications.domain import NotificationDelivery, NotificationRoute
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+_PROVIDER_INSTANCE_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 
 class _Gateway:
@@ -79,7 +82,9 @@ def test_postgres_notification_repository_maps_route_and_claims_delivery() -> No
     repository = PostgresNotificationRepository(gateway=gateway)
     now = datetime(2026, 6, 29, 16, 0, tzinfo=timezone.utc)
     route = repository.upsert_route(route=_route(now=now))
-    stored_route = repository.get_route(route_id=route.route_id)
+    stored_route = repository.get_route(
+        organization_id=_ORGANIZATION_ID, route_id=route.route_id
+    )
     delivery = repository.record_delivery(delivery=_delivery(route_id=route.route_id, now=now))
 
     claimed = repository.claim_delivery(
@@ -104,6 +109,7 @@ def test_postgres_notification_repository_lists_active_routes_with_typed_owner_f
     route = repository.upsert_route(route=_route(now=now))
 
     routes = repository.list_active_routes(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=route.owner_user_id,
         recipient_kind="user",
         category="strategy_signal",
@@ -120,6 +126,7 @@ def test_postgres_notification_repository_reads_owner_scoped_delivery_counters()
     now = datetime(2026, 6, 29, 16, 0, tzinfo=timezone.utc)
 
     counters = repository.get_delivery_counters(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=UserId(UUID("11111111-1111-4111-8111-111111111111")),
         now=now,
     )
@@ -132,6 +139,8 @@ def test_postgres_notification_repository_reads_owner_scoped_delivery_counters()
 def _route(*, now: datetime) -> NotificationRoute:
     return NotificationRoute(
         route_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
         recipient_kind="user",
         owner_user_id=UserId(UUID("11111111-1111-4111-8111-111111111111")),
         channel_key="telegram",
@@ -150,6 +159,8 @@ def _route(*, now: datetime) -> NotificationRoute:
 def _delivery(*, route_id: UUID, now: datetime) -> NotificationDelivery:
     return NotificationDelivery(
         delivery_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
         event_id=UUID("22222222-2222-4222-8222-222222222222"),
         report_run_id=None,
         command_id=None,

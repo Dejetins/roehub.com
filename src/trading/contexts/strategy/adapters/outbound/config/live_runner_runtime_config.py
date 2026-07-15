@@ -233,17 +233,17 @@ class StrategyLiveRunnerTelegramConfig:
         Returns:
             None.
         Assumptions:
-            `mode` is fixed to `notifications`, `log_only` or `telegram`.
+            `mode` is fixed to `notifications` or `log_only`.
         Raises:
             ValueError: If one of config values is invalid.
         Side Effects:
             None.
         """
         normalized_mode = self.mode.strip()
-        if normalized_mode not in {"notifications", "log_only", "telegram"}:
+        if normalized_mode not in {"notifications", "log_only"}:
             raise ValueError(
                 "strategy_live_runner.telegram.mode must be one of: "
-                "notifications, log_only, telegram"
+                "notifications, log_only"
             )
         if self.send_timeout_s <= 0:
             raise ValueError("strategy_live_runner.telegram.send_timeout_s must be > 0")
@@ -259,11 +259,6 @@ class StrategyLiveRunnerTelegramConfig:
         normalized_bot_token_env = None
         if self.bot_token_env is not None:
             normalized_bot_token_env = self.bot_token_env.strip() or None
-
-        if self.enabled and normalized_mode == "telegram" and normalized_bot_token_env is None:
-            raise ValueError(
-                "strategy_live_runner.telegram.bot_token_env is required for mode=telegram"
-            )
 
         object.__setattr__(self, "mode", normalized_mode)
         object.__setattr__(self, "api_base_url", normalized_api_base.rstrip("/"))
@@ -483,7 +478,7 @@ def load_strategy_live_runner_runtime_config(
             bot_token_env=_get_optional_str_with_default(
                 telegram_map,
                 "bot_token_env",
-                default="TELEGRAM_BOT_TOKEN",
+                default=None,
             ),
             api_base_url=_get_str_with_default(
                 telegram_map,

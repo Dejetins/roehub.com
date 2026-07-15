@@ -1,18 +1,31 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
 
+import pytest
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.testclient import TestClient
 
 from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_market_data_reference_router
+from trading.contexts.backtest.application.ports import (
+    ResearchOrganizationScope,
+    ResearchOrganizationScopeResolver,
+)
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.market_data.application.dto.reference_api import (
     BTCUSDTMarketReadinessReport,
     BTCUSDTMarketReadinessRow,
     EnabledMarketReference,
 )
-from trading.shared_kernel.primitives import InstrumentId, MarketId, PaidLevel, Symbol, UserId
+from trading.platform.errors import RoehubError
+from trading.shared_kernel.primitives import (
+    InstrumentId,
+    MarketId,
+    OrganizationId,
+    PaidLevel,
+    Symbol,
+    UserId,
+)
 
 # WEB-EPIC-07 mapping:
 # - Scope 1: unit tests for auth-only access, deterministic payload mapping,
@@ -62,6 +75,26 @@ class _HeaderCurrentUserDependency:
         return CurrentUserPrincipal(
             user_id=UserId.from_string(raw_user_id),
             paid_level=PaidLevel.free(),
+        )
+
+
+class _ScopeResolver:
+    def resolve(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        return ResearchOrganizationScope(
+            organization_id=OrganizationId.from_string(
+                "00000000-0000-0000-0000-000000000001"
+            ),
+            user_id=user_id,
+        )
+
+
+class _AmbiguousScopeResolver:
+    def resolve(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        _ = user_id
+        raise RoehubError(
+            code="research.organization_scope_ambiguous",
+            message="Research organization scope is ambiguous",
+            details={"reason": "multiple_active_memberships"},
         )
 
 
@@ -515,6 +548,7 @@ def _build_client(
     list_use_case: _FakeListEnabledMarketsUseCase,
     search_use_case: _FakeSearchEnabledTradableInstrumentsUseCase,
     btcusdt_readiness_use_case: _FakeBTCUSDTMarketReadinessUseCase | None = None,
+    organization_scope_resolver: ResearchOrganizationScopeResolver | None = _ScopeResolver(),
 ) -> tuple[TestClient, _FakeSearchEnabledTradableInstrumentsUseCase]:
     """
     Build FastAPI test client with market-data reference router and shared error handlers.
@@ -560,9 +594,43 @@ def _build_client(
                 )
             ),  # type: ignore[arg-type]
             current_user_dependency=_HeaderCurrentUserDependency(),  # type: ignore[arg-type]
+            organization_scope_resolver=organization_scope_resolver,
         )
     )
     return TestClient(app), search_use_case
+
+
+@pytest.mark.parametrize(
+    ("scope_resolver", "expected_status", "expected_code"),
+    [
+        (None, 503, "research.organization_scope_unavailable"),
+        (
+            _AmbiguousScopeResolver(),
+            409,
+            "research.organization_scope_ambiguous",
+        ),
+    ],
+)
+def test_market_data_reference_fails_closed_before_clickhouse_read(
+    scope_resolver: ResearchOrganizationScopeResolver | None,
+    expected_status: int,
+    expected_code: str,
+) -> None:
+    search_use_case = _FakeSearchEnabledTradableInstrumentsUseCase(rows_by_market={})
+    client, _ = _build_client(
+        list_use_case=_FakeListEnabledMarketsUseCase(rows=()),
+        search_use_case=search_use_case,
+        organization_scope_resolver=scope_resolver,
+    )
+
+    response = client.get(
+        "/market-data/instruments?market_id=1",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000001"},
+    )
+
+    assert response.status_code == expected_status
+    assert response.json()["error"]["code"] == expected_code
+    assert search_use_case.calls == []
 
 
 def _readiness_report(

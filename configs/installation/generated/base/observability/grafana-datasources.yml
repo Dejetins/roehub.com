@@ -1,0 +1,13 @@
+apiVersion: 1
+datasources:
+- access: proxy
+  isDefault: true
+  name: Roehub Prometheus
+  type: prometheus
+  uid: roehub-prometheus
+  url: http://prometheus:9090
+- access: proxy
+  name: Roehub Loki
+  type: loki
+  uid: roehub-loki
+  url: http://loki:3100

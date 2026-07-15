@@ -7,7 +7,9 @@ from trading.contexts.strategy.application import (
     StrategyTelegramNotificationEventV1,
     TelegramNotificationPolicy,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-4000-8000-000000005500")
 
 
 def test_telegram_notification_policy_filters_fixed_event_types_and_builds_plain_text() -> None:
@@ -148,6 +150,7 @@ def _event(
         None.
     """
     return StrategyTelegramNotificationEventV1(
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000005501"),
         ts=ts,
         strategy_id=strategy_id,

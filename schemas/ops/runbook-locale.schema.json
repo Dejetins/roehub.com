@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops.roehub.io/v1/runbook-locale.schema.json",
+  "title": "Roehub runbook locale",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "kind", "metadata", "translations"],
+  "properties": {
+    "apiVersion": {"const": "ops.roehub.io/v1"},
+    "kind": {"const": "RunbookLocale"},
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runbook_id", "locale"],
+      "properties": {
+        "runbook_id": {"type": "string", "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$"},
+        "locale": {"const": "ru"}
+      }
+    },
+    "translations": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "summary",
+        "prerequisites",
+        "symptoms",
+        "diagnostics",
+        "allowed_actions",
+        "rollback",
+        "evidence_collect",
+        "success_conditions",
+        "failure_conditions",
+        "redaction_rules",
+        "monitoring_gaps",
+        "warnings",
+        "stop_conditions"
+      ],
+      "properties": {
+        "title": {"type": "string", "minLength": 1},
+        "summary": {"type": "string", "minLength": 1},
+        "prerequisites": {"$ref": "#/$defs/stringMap"},
+        "symptoms": {"$ref": "#/$defs/stringMap"},
+        "diagnostics": {"$ref": "#/$defs/diagnosticMap"},
+        "allowed_actions": {"$ref": "#/$defs/stringMap"},
+        "rollback": {"$ref": "#/$defs/diagnosticMap"},
+        "evidence_collect": {"$ref": "#/$defs/stringMap"},
+        "success_conditions": {"$ref": "#/$defs/stringMap"},
+        "failure_conditions": {"$ref": "#/$defs/stringMap"},
+        "redaction_rules": {"$ref": "#/$defs/stringMap"},
+        "monitoring_gaps": {"$ref": "#/$defs/stringMap"},
+        "warnings": {"$ref": "#/$defs/stringMap"},
+        "stop_conditions": {"$ref": "#/$defs/stringMap"}
+      }
+    }
+  },
+  "$defs": {
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": {"type": "string", "minLength": 1}
+    },
+    "diagnosticMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["instruction", "expected_evidence"],
+        "properties": {
+          "instruction": {"type": "string", "minLength": 1},
+          "expected_evidence": {"type": "string", "minLength": 1}
+        }
+      }
+    }
+  }
+}

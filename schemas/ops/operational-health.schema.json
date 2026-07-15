@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ops.roehub.io/v1/operational-health.schema.json",
+  "title": "Roehub redacted operational health snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "profile", "generated_at", "overall_state", "services"],
+  "properties": {
+    "schema": {"const": "io.roehub.operational-health/v1alpha1"},
+    "profile": {"enum": ["base", "trading", "ml"]},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "overall_state": {"$ref": "#/$defs/state"},
+    "services": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/status"}
+    }
+  },
+  "$defs": {
+    "state": {"enum": ["ready", "degraded", "stopped", "unknown"]},
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service_id",
+        "capability",
+        "state",
+        "detail_code",
+        "runbook_id",
+        "action_ref",
+        "required",
+        "observed_at"
+      ],
+      "properties": {
+        "service_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{1,63}$"},
+        "capability": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{1,127}$"},
+        "state": {"$ref": "#/$defs/state"},
+        "detail_code": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{1,127}$"},
+        "runbook_id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{1,127}$"},
+        "action_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._-]{1,127}$"},
+        "required": {"type": "boolean"},
+        "observed_at": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

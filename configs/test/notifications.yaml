@@ -6,15 +6,15 @@ notifications:
     batch_size: 100
     lease_seconds: 30
     retry_backoff_seconds: 60
+    max_retry_backoff_seconds: 300
+    retry_jitter_ratio: 0.0
     max_attempts: 3
   providers:
+    healthcheck_interval_seconds: 30.0
     telegram:
-      enabled: false
       api_base_url: "https://api.telegram.org"
-      send_timeout_s: 2.0
-      healthcheck_enabled: false
-      healthcheck_interval_seconds: 30.0
-      healthcheck_timeout_s: 5.0
+      connect_timeout_seconds: 3.0
+      overall_timeout_seconds: 10.0
   telegram_bot:
     enabled: false
     poll_interval_seconds: 5

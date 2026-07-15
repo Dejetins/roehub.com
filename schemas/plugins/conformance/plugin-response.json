@@ -1,0 +1,5 @@
+{
+  "contract": "PluginResponse/v1alpha1",
+  "status": "ready",
+  "protocol": "roehub.plugin.rpc/v1alpha1"
+}

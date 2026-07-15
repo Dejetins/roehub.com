@@ -137,9 +137,7 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
                 key="slot_generation",
                 path=path,
             ),
-            asof_date=str(
-                self._required_yaml_field(payload=payload, key="asof_date", path=path)
-            ),
+            asof_date=str(self._required_yaml_field(payload=payload, key="asof_date", path=path)),
             manifest_sha256=str(
                 self._required_yaml_field(
                     payload=payload,
@@ -2182,11 +2180,7 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
             details.append(f"unexpected keys {extra_keys}")
         raise ValueError(
             f"{path} must contain required keys {required_keys}"
-            + (
-                f" and may contain optional keys {optional_keys}"
-                if len(optional_keys) > 0
-                else ""
-            )
+            + (f" and may contain optional keys {optional_keys}" if len(optional_keys) > 0 else "")
             + (f"; {'; '.join(details)}" if len(details) > 0 else "")
         )
 

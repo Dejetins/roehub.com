@@ -9,6 +9,7 @@ from .execution_dispatch import (
     ExecutionDispatchResult,
     ExecutionDispatchService,
 )
+from .execution_gateway import ExecutionGatewayPolicyService
 from .execution_ingress import (
     CreateExecutionIntentCommand,
     EmitExecutionNotificationCommand,
@@ -27,6 +28,7 @@ __all__ = [
     "CreateExecutionIntentCommand",
     "EmitExecutionNotificationCommand",
     "ExecutionIngressService",
+    "ExecutionGatewayPolicyService",
     "ExecutionDispatchConfig",
     "ExecutionDispatchResult",
     "ExecutionDispatchService",

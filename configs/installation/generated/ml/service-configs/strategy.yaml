@@ -1,0 +1,50 @@
+strategy:
+  api:
+    enabled: true
+  live_worker:
+    enabled: true
+    poll_interval_seconds: 3
+    redis_streams:
+      block_ms: 100
+      connect_timeout_s: 2.0
+      consumer_group: strategy.live_runner.v1
+      db: 0
+      enabled: true
+      host: redis
+      password_env: ROEHUB_REDIS_PASSWORD
+      pending_claim_min_idle_ms: 0
+      port: 6379
+      read_count: 500
+      socket_timeout_s: 2.0
+      stream_prefix: md.candles.1m
+    repair:
+      retry_attempts: 5
+      retry_backoff_seconds: 1.0
+  metrics:
+    port: 9207
+  producer:
+    allow_all: false
+    allowed_modes:
+    - paper
+    - testnet
+    allowed_strategy_ids: []
+    allowed_user_ids: []
+    enabled: false
+  realtime_output:
+    redis_streams:
+      connect_timeout_s: 2.0
+      db: 0
+      enabled: true
+      events_stream_prefix: strategy.events.v1.user
+      host: redis
+      metrics_stream_prefix: strategy.metrics.v1.user
+      password_env: ROEHUB_REDIS_PASSWORD
+      port: 6379
+      socket_timeout_s: 2.0
+  telegram:
+    api_base_url: https://api.telegram.org
+    debounce_failed_seconds: 600
+    enabled: false
+    mode: notifications
+    send_timeout_s: 2.0
+version: 1

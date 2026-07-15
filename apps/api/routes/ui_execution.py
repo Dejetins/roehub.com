@@ -13,6 +13,7 @@ from apps.api.dto.ui_execution import (
     ExecutionSourceEventRequest,
     ExecutionSourceEventResponse,
 )
+from trading.contexts.backtest.application.ports import ResearchOrganizationScopeResolver
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.live_execution.application import (
     CreateExecutionIntentCommand,
@@ -21,12 +22,16 @@ from trading.contexts.live_execution.application import (
     ExecutionIngressService,
     RecordExecutionSourceEventCommand,
 )
+from trading.contexts.live_execution.application.ports import (
+    ExecutionRiskContextQuery,
+    ExecutionRiskContextResolutionError,
+    ExecutionRiskContextResolver,
+)
 from trading.contexts.live_execution.domain import (
     ExecutionIntent,
     ExecutionNotificationOutboxEvent,
     ExecutionNotificationValidationError,
     ExecutionOrderModelRejectedError,
-    ExecutionRiskContext,
     ExecutionSourceEvent,
     ExecutionSourceValidationError,
 )
@@ -40,11 +45,17 @@ def build_ui_execution_router(
     ingress_service: ExecutionIngressService,
     dispatch_service: ExecutionDispatchService | None = None,
     current_user_dependency: CurrentUserPrincipalDependency,
+    organization_scope_resolver: ResearchOrganizationScopeResolver,
+    risk_context_resolver: ExecutionRiskContextResolver,
 ) -> APIRouter:
     if ingress_service is None:  # type: ignore[truthy-bool]
         raise ValueError("build_ui_execution_router requires ingress_service")
     if current_user_dependency is None:  # type: ignore[truthy-bool]
         raise ValueError("build_ui_execution_router requires current_user_dependency")
+    if organization_scope_resolver is None:  # type: ignore[truthy-bool]
+        raise ValueError("build_ui_execution_router requires organization_scope_resolver")
+    if risk_context_resolver is None:  # type: ignore[truthy-bool]
+        raise ValueError("build_ui_execution_router requires risk_context_resolver")
 
     router = APIRouter(tags=["ui-execution"])
 
@@ -61,6 +72,9 @@ def build_ui_execution_router(
         try:
             result = ingress_service.record_source_event(
                 command=RecordExecutionSourceEventCommand(
+                    organization_id=organization_scope_resolver.resolve(
+                        user_id=current_user.user_id
+                    ).organization_id,
                     owner_user_id=current_user.user_id,
                     source_type=payload.source_type,
                     source_event_ref=payload.source_event_ref,
@@ -86,8 +100,22 @@ def build_ui_execution_router(
         current_user: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> ExecutionIntentResponse:
         try:
+            organization_id = organization_scope_resolver.resolve(
+                user_id=current_user.user_id
+            ).organization_id
+            risk_context = risk_context_resolver.resolve(
+                query=ExecutionRiskContextQuery(
+                    organization_id=organization_id,
+                    owner_user_id=current_user.user_id,
+                    source_event_id=payload.source_event_id,
+                    exchange_connection_id=payload.exchange_connection_id,
+                    market_type=payload.market_type,
+                    instrument_key=payload.instrument_key,
+                )
+            )
             result = ingress_service.create_intent(
                 command=CreateExecutionIntentCommand(
+                    organization_id=organization_id,
                     owner_user_id=current_user.user_id,
                     source_event_id=payload.source_event_id,
                     idempotency_key=payload.idempotency_key,
@@ -107,12 +135,14 @@ def build_ui_execution_router(
                         "amend_replace": payload.order.amend_replace,
                         "legs": payload.order.legs,
                     },
-                    risk_context=_risk_context_from_payload(payload=payload),
+                    risk_context=risk_context,
                 )
             )
         except ExecutionOrderModelRejectedError as error:
             raise _unsupported_order_model_error(reason=error.reason) from error
         except ExecutionSourceValidationError as error:
+            raise _execution_request_error(reason=error.reason) from error
+        except ExecutionRiskContextResolutionError as error:
             raise _execution_request_error(reason=error.reason) from error
         if result.duplicate:
             response.status_code = 200
@@ -138,6 +168,9 @@ def build_ui_execution_router(
         try:
             result = ingress_service.emit_notification(
                 command=EmitExecutionNotificationCommand(
+                    organization_id=organization_scope_resolver.resolve(
+                        user_id=current_user.user_id
+                    ).organization_id,
                     owner_user_id=current_user.user_id,
                     source_type=payload.source_type,
                     event_type=payload.event_type,
@@ -171,6 +204,9 @@ def build_ui_execution_router(
             items=[
                 _to_notification_response(notification=notification, duplicate=False)
                 for notification in ingress_service.list_recent_notifications(
+                    organization_id=organization_scope_resolver.resolve(
+                        user_id=current_user.user_id
+                    ).organization_id,
                     owner_user_id=current_user.user_id,
                     limit=50,
                 )
@@ -252,14 +288,6 @@ def _to_notification_response(
         sent_at=notification.sent_at,
         duplicate=duplicate,
     )
-
-
-def _risk_context_from_payload(
-    *, payload: ExecutionIntentRequest
-) -> ExecutionRiskContext | None:
-    if payload.risk_context is None:
-        return None
-    return ExecutionRiskContext(**payload.risk_context.model_dump())
 
 
 def _source_event_error(*, reason: str) -> RoehubError:

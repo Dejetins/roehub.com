@@ -325,9 +325,9 @@ class StrategyTelegramRuntimeConfig:
             Normalizes mode/base URL/token-env values in place.
         """
         normalized_mode = self.mode.strip()
-        if normalized_mode not in {"notifications", "log_only", "telegram"}:
+        if normalized_mode not in {"notifications", "log_only"}:
             raise ValueError(
-                "strategy.telegram.mode must be one of: notifications, log_only, telegram"
+                "strategy.telegram.mode must be one of: notifications, log_only"
             )
         if self.send_timeout_s <= 0:
             raise ValueError("strategy.telegram.send_timeout_s must be > 0")
@@ -341,11 +341,6 @@ class StrategyTelegramRuntimeConfig:
         normalized_bot_token_env = None
         if self.bot_token_env is not None:
             normalized_bot_token_env = self.bot_token_env.strip() or None
-
-        if self.enabled and normalized_mode == "telegram" and normalized_bot_token_env is None:
-            raise ValueError(
-                "strategy.telegram.bot_token_env is required for mode=telegram"
-            )
 
         object.__setattr__(self, "mode", normalized_mode)
         object.__setattr__(self, "api_base_url", normalized_api_base.rstrip("/"))
@@ -703,7 +698,7 @@ def load_strategy_runtime_config(
             bot_token_env=_get_optional_str_with_default(
                 telegram_map,
                 "bot_token_env",
-                default="TELEGRAM_BOT_TOKEN",
+                default=None,
             ),
             api_base_url=_get_str_with_default(
                 telegram_map,

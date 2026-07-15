@@ -1,0 +1,89 @@
+apiVersion: ops.roehub.io/v1
+kind: Runbook
+metadata:
+  id: identity.oidc-provider-unavailable
+  revision: 1
+  source_legacy: docs/runbooks/keycloak-local-setup-and-ops.md
+spec:
+  title: Configured OIDC provider is unavailable
+  summary: Isolate a provider outage while preserving local login and existing Roehub sessions.
+  severity: high
+  component_ids: [app:api, app:web, context:identity]
+  prerequisites:
+    - id: confirm_provider_scope
+      text: Confirm the alert identifies the configured provider and not the local authentication boundary.
+    - id: preserve_local_access
+      text: Confirm local owner login and existing Roehub sessions remain available before any service action.
+  symptoms:
+    - id: provider_requests_failed
+      text: Discovery, signing-key, or token operations return sanitized unavailable outcomes.
+    - id: oidc_login_failed
+      text: New OIDC login or linking attempts fail while local login remains independent.
+  diagnostics:
+    - id: inspect_provider_metrics
+      capability: observe.metrics.query
+      instruction: Inspect bounded provider operation and outcome labels for the alert window.
+      expected_evidence: Provider identifier, operation, outcome class, count, and duration without request payloads.
+    - id: probe_discovery
+      capability: observe.network.probe
+      instruction: Probe the configured discovery endpoint through a bounded unauthenticated request.
+      expected_evidence: Timestamped status class, latency, and issuer match result without response body capture.
+    - id: verify_local_boundary
+      capability: observe.health.read
+      instruction: Verify local authentication status and one synthetic existing-session check independently of OIDC.
+      expected_evidence: Sanitized availability classes without cookies, credentials, or user attributes.
+  allowed_actions:
+    - id: restart_api
+      capability: control.service.restart
+      instruction: Restart only the Roehub API when evidence identifies a local client or cache fault.
+      approval: operator
+      effect: reversible
+    - id: rollback_release
+      capability: control.release.rollback
+      instruction: Roll back the current release when a verified OIDC client change caused the outage.
+      approval: installation_owner
+      effect: disruptive
+  rollback:
+    - id: restore_verified_release
+      action_ref: rollback_release
+      instruction: Restore the last verified release without changing provider identities or invitation data.
+      expected_evidence: Bounded discovery and OIDC canary checks succeed while local access remains available.
+  evidence:
+    collect:
+      - id: provider_outcome_timeline
+        text: Sanitized provider operation outcomes and latency classes across the alert window.
+      - id: local_access_state
+        text: Local authentication and existing-session availability classes during provider failure.
+    success_conditions:
+      - id: provider_recovered
+        text: A bounded OIDC canary succeeds and the prolonged-failure alert clears.
+      - id: local_access_preserved
+        text: Local login and existing sessions remain available throughout recovery.
+    failure_conditions:
+      - id: provider_still_unknown
+        text: The provider result remains unavailable or token exchange outcome is unknown.
+      - id: local_access_degraded
+        text: Local login or existing sessions are also unavailable, indicating a wider identity incident.
+  secret_redaction:
+    forbidden_evidence_keys: [authorization, client_secret, code, cookie, credential, id_token, nonce, session, state, token]
+    rules:
+      - id: no_protocol_material
+        text: Never record authorization codes, tokens, state, nonce, cookies, client credentials, or provider payloads.
+      - id: bounded_identity_labels
+        text: Record only the configured provider identifier and bounded outcome classes, never external subjects or email addresses.
+  owner:
+    team: platform.identity
+    escalation_role: installation_owner
+  related_alerts: [OidcProviderUnavailable]
+  monitoring_gaps: []
+  safety:
+    warnings:
+      - id: no_token_retry
+        text: Never retry a token request with an unknown result and never create a Roehub session from that attempt.
+      - id: no_local_disable
+        text: Do not disable local authentication while investigating an external provider outage.
+    stop_conditions:
+      - id: provider_change_requires_authority
+        text: Stop before changing provider configuration, client credentials, redirect addresses, or external identities without installation-owner authority.
+      - id: wider_identity_incident
+        text: Escalate and stop isolated provider recovery if local login or existing sessions are also degraded.

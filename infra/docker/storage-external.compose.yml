@@ -1,0 +1,23 @@
+name: roehub-storage-external
+
+services:
+  storage-readiness:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.storage-migrations
+    restart: "no"
+    environment:
+      ROEHUB_STORAGE_POSTGRES_DSN: ${ROEHUB_STORAGE_POSTGRES_DSN:?required}
+      ROEHUB_STORAGE_CLICKHOUSE_DSN: ${ROEHUB_STORAGE_CLICKHOUSE_DSN:?required}
+      ROEHUB_STORAGE_REDIS_URL: ${ROEHUB_STORAGE_REDIS_URL:?required}
+    command:
+      - readiness
+      - --service-config
+      - /etc/roehub/service-config.json
+    cap_drop: [ALL]
+    read_only: true
+    security_opt: [no-new-privileges:true]
+    tmpfs: ["/tmp:rw,noexec,nosuid,size=32m"]
+    user: "65534:65534"
+    volumes:
+      - ${ROEHUB_STORAGE_SERVICE_CONFIG:?required}:/etc/roehub/service-config.json:ro

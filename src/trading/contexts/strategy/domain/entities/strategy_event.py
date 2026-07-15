@@ -7,7 +7,7 @@ from typing import Any, Mapping
 from uuid import UUID, uuid4
 
 from trading.contexts.strategy.domain.errors import StrategySpecValidationError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +25,7 @@ class StrategyEvent:
     """
 
     event_id: UUID
+    organization_id: OrganizationId
     user_id: UserId
     strategy_id: UUID
     run_id: UUID | None
@@ -62,6 +63,7 @@ class StrategyEvent:
     def create(
         cls,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         strategy_id: UUID,
         run_id: UUID | None,
@@ -93,6 +95,7 @@ class StrategyEvent:
         effective_event_id = event_id if event_id is not None else uuid4()
         return cls(
             event_id=effective_event_id,
+            organization_id=organization_id,
             user_id=user_id,
             strategy_id=strategy_id,
             run_id=run_id,

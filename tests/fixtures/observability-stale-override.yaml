@@ -1,0 +1,18 @@
+services:
+  operational-health:
+    command:
+      - python
+      - -m
+      - apps.monitoring.operational_health
+      - --manifest
+      - /etc/roehub/operational-manifest.json
+      - --host
+      - 0.0.0.0
+      - --port
+      - "9300"
+      - --interval-seconds
+      - "20"
+      - --freshness-sla-seconds
+      - "5"
+      - --loki-url
+      - http://loki:3100

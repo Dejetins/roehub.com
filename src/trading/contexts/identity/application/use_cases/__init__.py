@@ -9,6 +9,20 @@ from .exchange_keys_errors import (
 )
 from .exchange_keys_models import ExchangeKeyView
 from .list_exchange_keys import ListExchangeKeysUseCase
+from .local_auth import (
+    LocalAuthError,
+    LocalAuthOptions,
+    LocalAuthResult,
+    LocalAuthService,
+    LocalAuthStatus,
+)
+from .oidc_auth import (
+    OidcAuthenticationError,
+    OidcAuthenticationResult,
+    OidcAuthenticationService,
+    OidcAuthorizationStart,
+)
+from .organizations import OrganizationAccessError, OrganizationAccessService
 
 __all__ = [
     "CreateExchangeKeyUseCase",
@@ -21,4 +35,15 @@ __all__ = [
     "ExchangeKeyValidationError",
     "ExchangeKeyView",
     "ListExchangeKeysUseCase",
+    "LocalAuthError",
+    "LocalAuthOptions",
+    "LocalAuthResult",
+    "LocalAuthService",
+    "LocalAuthStatus",
+    "OrganizationAccessError",
+    "OrganizationAccessService",
+    "OidcAuthenticationError",
+    "OidcAuthenticationResult",
+    "OidcAuthenticationService",
+    "OidcAuthorizationStart",
 ]

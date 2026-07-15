@@ -1,0 +1,5 @@
+receivers:
+- name: local-audit-only
+route:
+  group_wait: 0s
+  receiver: local-audit-only

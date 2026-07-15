@@ -12,7 +12,7 @@ from trading.contexts.strategy.application.ports.repositories import (
 )
 from trading.contexts.strategy.domain.entities import StrategyExchangeBinding
 from trading.contexts.strategy.domain.errors import StrategyStorageError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepository):
@@ -37,7 +37,8 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
             query=f"""
             SELECT binding_id
             FROM {self._table_name}
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND strategy_id = %(strategy_id)s
               AND exchange_connection_id = %(exchange_connection_id)s
               AND usage_mode = %(usage_mode)s
@@ -53,6 +54,7 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
             INSERT INTO {self._table_name}
             (
                 binding_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 exchange_connection_id,
@@ -66,6 +68,7 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
             VALUES
             (
                 %(binding_id)s,
+                %(organization_id)s,
                 %(owner_user_id)s,
                 %(strategy_id)s,
                 %(exchange_connection_id)s,
@@ -78,6 +81,7 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
             )
             RETURNING
                 binding_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 exchange_connection_id,
@@ -95,12 +99,18 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
         return _map_binding(row=row)
 
     def get(
-        self, *, owner_user_id: UserId, strategy_id: UUID, binding_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+        binding_id: UUID,
     ) -> StrategyExchangeBinding | None:
         row = self._gateway.fetch_one(
             query=f"""
             SELECT
                 binding_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 exchange_connection_id,
@@ -111,11 +121,13 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
                 disabled_at,
                 archived_at
             FROM {self._table_name}
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND strategy_id = %(strategy_id)s
               AND binding_id = %(binding_id)s
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_id": str(strategy_id),
                 "binding_id": str(binding_id),
@@ -124,12 +136,17 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
         return _map_binding(row=row) if row is not None else None
 
     def list_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_id: UUID,
     ) -> tuple[StrategyExchangeBinding, ...]:
         rows = self._gateway.fetch_all(
             query=f"""
             SELECT
                 binding_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 exchange_connection_id,
@@ -140,11 +157,13 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
                 disabled_at,
                 archived_at
             FROM {self._table_name}
-            WHERE owner_user_id = %(owner_user_id)s
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
               AND strategy_id = %(strategy_id)s
             ORDER BY created_at ASC, binding_id ASC
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_id": str(strategy_id),
             },
@@ -154,6 +173,7 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
     def disable(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         binding_id: UUID,
@@ -165,12 +185,14 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
                SET binding_status = 'disabled',
                    updated_at = %(disabled_at)s,
                    disabled_at = %(disabled_at)s
-             WHERE owner_user_id = %(owner_user_id)s
+             WHERE organization_id = %(organization_id)s
+               AND owner_user_id = %(owner_user_id)s
                AND strategy_id = %(strategy_id)s
                AND binding_id = %(binding_id)s
                AND binding_status = 'active'
             RETURNING
                 binding_id,
+                organization_id,
                 owner_user_id,
                 strategy_id,
                 exchange_connection_id,
@@ -182,6 +204,7 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
                 archived_at
             """,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_id": str(strategy_id),
                 "binding_id": str(binding_id),
@@ -191,6 +214,7 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
         if row is not None:
             return _map_binding(row=row)
         return self.get(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             binding_id=binding_id,
@@ -200,6 +224,7 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
 def _binding_parameters(*, binding: StrategyExchangeBinding) -> dict[str, object]:
     return {
         "binding_id": str(binding.binding_id),
+        "organization_id": str(binding.organization_id),
         "owner_user_id": str(binding.owner_user_id),
         "strategy_id": str(binding.strategy_id),
         "exchange_connection_id": str(binding.exchange_connection_id),
@@ -215,6 +240,7 @@ def _binding_parameters(*, binding: StrategyExchangeBinding) -> dict[str, object
 def _map_binding(*, row: Mapping[str, Any]) -> StrategyExchangeBinding:
     return StrategyExchangeBinding(
         binding_id=UUID(str(row["binding_id"])),
+        organization_id=OrganizationId.from_string(str(row["organization_id"])),
         owner_user_id=UserId.from_string(str(row["owner_user_id"])),
         strategy_id=UUID(str(row["strategy_id"])),
         exchange_connection_id=UUID(str(row["exchange_connection_id"])),

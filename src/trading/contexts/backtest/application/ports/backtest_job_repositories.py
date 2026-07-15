@@ -14,7 +14,7 @@ from trading.contexts.backtest.domain.entities import (
     BacktestJobTopVariant,
 )
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,6 +31,7 @@ class BacktestJobListQuery:
       - apps/api/routes/backtests.py
     """
 
+    organization_id: OrganizationId
     user_id: UserId
     limit: int = 50
     state: BacktestJobState | None = None
@@ -51,6 +52,8 @@ class BacktestJobListQuery:
         Side Effects:
             None.
         """
+        if self.organization_id is None:  # type: ignore[truthy-bool]
+            raise ValueError("BacktestJobListQuery.organization_id is required")
         if self.user_id is None:  # type: ignore[truthy-bool]
             raise ValueError("BacktestJobListQuery.user_id is required")
         if self.limit <= 0:
@@ -150,6 +153,7 @@ class BacktestJobRepository(Protocol):
     def find_by_idempotency_key(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         idempotency_key_hash: str,
         created_after: datetime,
@@ -177,6 +181,7 @@ class BacktestJobRepository(Protocol):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         now: datetime,
         locked_by: str,
@@ -206,6 +211,7 @@ class BacktestJobRepository(Protocol):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         now: datetime,
         locked_by: str,
@@ -238,12 +244,19 @@ class BacktestJobRepository(Protocol):
         """
         ...
 
-    def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
+    def get(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId | None = None,
+    ) -> BacktestJob | None:
         """
-        Load job snapshot by id with optional owner filter.
+        Load one organization-scoped job snapshot with an optional user filter.
 
         Args:
             job_id: Job identifier.
+            organization_id: Mandatory organization boundary.
             user_id: Optional owner filter for user-scoped read paths.
         Returns:
             BacktestJob | None: Job snapshot or `None` when not found.
@@ -260,6 +273,7 @@ class BacktestJobRepository(Protocol):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         limit: int | None = None,
     ) -> tuple[BacktestJobTopVariant, ...]:
         """
@@ -267,6 +281,7 @@ class BacktestJobRepository(Protocol):
 
         Args:
             job_id: Parent job identifier.
+            organization_id: Mandatory organization boundary.
             limit: Optional positive cap for preview reads.
         Returns:
             tuple[BacktestJobTopVariant, ...]: Rows sorted by `rank ASC`.
@@ -283,6 +298,7 @@ class BacktestJobRepository(Protocol):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         public_variant_key: str,
     ) -> BacktestJobTopVariant | None:
         """
@@ -290,6 +306,7 @@ class BacktestJobRepository(Protocol):
 
         Args:
             job_id: Parent job identifier.
+            organization_id: Mandatory organization boundary.
             public_variant_key: Public route key, not the raw storage SHA.
         Returns:
             BacktestJobTopVariant | None: Row or `None`.
@@ -323,6 +340,7 @@ class BacktestJobRepository(Protocol):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         cancel_requested_at: datetime,
     ) -> BacktestJob | None:
@@ -345,7 +363,13 @@ class BacktestJobRepository(Protocol):
         """
         ...
 
-    def delete_terminal(self, *, job_id: UUID, user_id: UserId) -> bool:
+    def delete_terminal(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId,
+    ) -> bool:
         """
         Hard-delete one owner terminal job row and let dependent rows cascade.
 
@@ -363,7 +387,12 @@ class BacktestJobRepository(Protocol):
         """
         ...
 
-    def count_active_for_user(self, *, user_id: UserId) -> int:
+    def count_active_for_user(
+        self,
+        *,
+        organization_id: OrganizationId,
+        user_id: UserId,
+    ) -> int:
         """
         Count owner active jobs (`queued + running`) for per-user quota checks.
 
@@ -383,6 +412,7 @@ class BacktestJobRepository(Protocol):
     def count_created_for_user_since(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         created_after: datetime,
     ) -> int:

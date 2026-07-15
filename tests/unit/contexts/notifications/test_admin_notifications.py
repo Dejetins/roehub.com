@@ -13,7 +13,10 @@ from trading.contexts.notifications.application import (
     NotificationDispatcher,
 )
 from trading.contexts.notifications.domain import NotificationRoute
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+_PROVIDER_INSTANCE_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 
 def _now() -> datetime:
@@ -52,7 +55,9 @@ def test_admin_drill_creates_admin_only_deliveries_and_log_attempts() -> None:
         metrics=metrics,
     )
 
-    drill = service.create_synthetic_admin_deliveries()
+    drill = service.create_synthetic_admin_deliveries(
+        organization_id=_ORGANIZATION_ID
+    )
     dispatch = NotificationDispatcher(
         repository=repository,
         providers=(LogOnlyNotificationProvider(),),
@@ -81,6 +86,8 @@ def test_admin_drill_creates_admin_only_deliveries_and_log_attempts() -> None:
 def _admin_route() -> NotificationRoute:
     return NotificationRoute(
         route_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
         recipient_kind="admin",
         owner_user_id=None,
         channel_key="telegram",
@@ -99,6 +106,8 @@ def _admin_route() -> NotificationRoute:
 def _user_route() -> NotificationRoute:
     return NotificationRoute(
         route_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
         recipient_kind="user",
         owner_user_id=UserId(UUID("11111111-1111-4111-8111-111111111111")),
         channel_key="telegram",

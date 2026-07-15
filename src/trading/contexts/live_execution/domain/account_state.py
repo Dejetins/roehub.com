@@ -6,7 +6,7 @@ from decimal import Decimal
 from typing import Any, Literal
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 AccountReadinessStatus = Literal["fresh", "stale", "degraded", "config_mismatch"]
 ConfigGuardStatus = Literal["verified", "mismatch", "degraded"]
@@ -55,6 +55,7 @@ class ExchangeInstrumentFilterSnapshot:
 @dataclass(frozen=True, slots=True)
 class ExchangeAccountProjection:
     account_snapshot_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     exchange_connection_id: UUID
     exchange_name: str
@@ -97,6 +98,7 @@ class ExpectedInstrumentConfig:
 class AccountConfigGuardResult:
     config_guard_result_id: UUID
     account_snapshot_id: UUID | None
+    organization_id: OrganizationId
     owner_user_id: UserId
     exchange_connection_id: UUID
     instrument_key: str

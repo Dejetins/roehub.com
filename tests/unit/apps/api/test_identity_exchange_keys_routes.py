@@ -624,13 +624,6 @@ def _build_test_client() -> tuple[
     app = FastAPI()
     app.include_router(
         build_identity_router(
-            keycloak_auth_url=_KEYCLOAK_AUTH_URL,
-            keycloak_token_url=_KEYCLOAK_TOKEN_URL,
-            keycloak_introspection_url=_KEYCLOAK_INTROSPECTION_URL,
-            keycloak_client_id=_KEYCLOAK_CLIENT_ID,
-            keycloak_client_secret=_KEYCLOAK_CLIENT_SECRET,
-            keycloak_redirect_uri=_KEYCLOAK_REDIRECT_URI,
-            keycloak_logout_redirect_uri=_KEYCLOAK_LOGOUT_REDIRECT_URI,
             current_user_dependency=current_user_dependency,
             audit_events_repository=account_repository,
             user_repository=user_repository,

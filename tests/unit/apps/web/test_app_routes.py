@@ -83,6 +83,27 @@ def test_same_origin_api_proxy_strips_prefix_and_forwards_cookie() -> None:
     assert captured["forwarded_proto"] == "http"
 
 
+def test_same_origin_api_proxy_preserves_versioned_api_namespace() -> None:
+    captured: dict[str, str] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["path"] = request.url.path
+        return httpx.Response(status_code=200, json=[])
+
+    app = create_app(
+        environ={
+            "WEB_API_BASE_URL": "http://web.local",
+            "WEB_API_UPSTREAM_URL": "http://api.local",
+        }
+    )
+    app.state.api_proxy_transport = httpx.MockTransport(handler)
+
+    response = TestClient(app).get("/api/v1/organizations")
+
+    assert response.status_code == 200
+    assert captured["path"] == "/api/v1/organizations"
+
+
 def test_public_root_renders_login_only_workbench_gateway_and_local_assets() -> None:
     client = _build_test_client()
 
@@ -114,12 +135,32 @@ def test_public_root_renders_login_only_workbench_gateway_and_local_assets() -> 
     assert 'data-auth-gateway' in response.text
     assert 'data-auth-modal' not in response.text
     assert 'data-cli-stream' not in main_html
-    assert 'href="/api/auth/login?next=%2Fdashboard"' in response.text
+    assert 'data-next-path="/dashboard"' in response.text
+    assert 'data-passkey-login' in response.text
+    assert 'name="ticket_file" type="file"' in response.text
+    assert 'name="ticket" type="password"' not in response.text
+    assert '/api/auth/login' not in response.text
     assert 'id="auth-theme-switcher-trigger"' in response.text
     assert "/assets/css/shell.css?v=" in response.text
     assert 'data-theme-value="graphite"' in response.text
     assert 'data-theme-value="paper"' in response.text
     assert "site.css" not in response.text
+
+
+def test_admin_operational_health_and_runbook_routes_are_protected_and_bounded() -> None:
+    client = _build_test_client()
+
+    admin = client.get("/admin")
+    runbook = client.get("/runbooks/web.api-health-degraded")
+    invalid = client.get("/runbooks/../../pyproject.toml")
+
+    assert admin.status_code == 200
+    assert 'data-admin-panel="health"' in admin.text
+    assert "data-admin-health-services" in admin.text
+    assert runbook.status_code == 200
+    assert "web.api-health-degraded" in runbook.text
+    assert "Состояние" in runbook.text
+    assert invalid.status_code == 404
 
 
 def test_public_landing_does_not_require_current_user_api_without_auth_cookie() -> None:
@@ -160,6 +201,7 @@ def test_public_landing_shows_current_user_when_auth_cookie_is_present() -> None
     [
         ("/dashboard", "/login?next=%2Fdashboard"),
         ("/settings", "/login?next=%2Fsettings"),
+        ("/admin", "/login?next=%2Fadmin"),
         ("/backtests", "/login?next=%2Fbacktests"),
         ("/backtests/new", "/login?next=%2Fbacktests%2Fnew"),
         ("/backtests/abc123", "/login?next=%2Fbacktests%2Fabc123"),
@@ -191,7 +233,7 @@ def test_login_route_sanitizes_external_next_and_renders_direct_gateway() -> Non
     response = client.get("/login?next=https://evil.example/path")
 
     assert response.status_code == 200
-    assert "/api/auth/login?next=%2F" in response.text
+    assert 'data-next-path="/"' in response.text
     assert 'data-auth-continue' in response.text
     assert "Sign in to Roehub" in response.text
     assert "https://evil.example/path" not in response.text
@@ -203,18 +245,19 @@ def test_login_route_sanitizes_external_next_and_renders_direct_gateway() -> Non
     assert 'data-cli-stream' not in main_html
     assert "/assets/css/pages/landing.css" in response.text
     assert "/assets/js/pages/landing.js" not in response.text
-    assert "Roehub uses a Keycloak-backed account flow" in main_html
+    assert "A local passkey is the primary sign-in method" in main_html
 
 
-def test_register_route_is_separate_keycloak_backed_entrypoint() -> None:
+def test_register_route_explains_closed_registration() -> None:
     client = _build_test_client()
 
     response = client.get("/register?next=/settings")
 
     assert response.status_code == 200
     assert 'data-page="register"' in response.text
-    assert 'data-register-entrypoint="/api/auth/login?next=%2Fsettings"' in response.text
-    assert "Create your Roehub account" in response.text
+    assert 'href="/login"' in response.text
+    assert "Public registration is closed" in response.text
+    assert "Registration is closed" in response.text
     assert "<input" not in response.text
     assert "<form" not in response.text
 
@@ -409,6 +452,47 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     )
     assert "128 ms" not in settings_js
     assert "needsAttention" not in settings_js
+
+
+def test_authorized_admin_route_renders_typed_fail_closed_console() -> None:
+    client = _build_test_client()
+
+    response = client.get("/admin")
+    main_html = response.text.split('<main id="main-content"', maxsplit=1)[1].split(
+        "</main>", maxsplit=1
+    )[0]
+
+    assert response.status_code == 200
+    assert 'data-page="admin"' in response.text
+    assert 'data-nav-key="admin"' in response.text
+    assert 'nav-tab--active is-active"' in response.text
+    assert "/assets/css/pages/admin.css" in response.text
+    assert "/assets/js/pages/admin.js" in response.text
+    assert 'data-organizations-endpoint="/api/v1/organizations"' in main_html
+    assert (
+        'data-snapshot-endpoint-template="/api/v1/admin/organizations/'
+        '{organization_id}/snapshot"' in main_html
+    )
+    assert 'data-admin-confirm aria-labelledby="admin-confirm-title"' in main_html
+    assert 'data-confirm-input autocomplete="off"' in main_html
+    assert 'data-admin-recent-auth-banner hidden' in main_html
+    assert 'data-admin-operation="restart"' in main_html
+    assert 'data-operation-reconcile hidden' in main_html
+    assert "Backup capability deferred" in main_html
+    assert "Backup actions unavailable" in main_html
+    assert "type=\"password\"" not in main_html
+    assert "<textarea" not in main_html
+    assert "docker compose" not in main_html.lower()
+    assert 'name="authorization"' not in main_html.lower()
+
+    admin_js = (_WEB_ROOT / "dist" / "js" / "pages" / "admin.js").read_text()
+    assert "textContent" in admin_js
+    assert "innerHTML" not in admin_js
+    assert 'method: "PATCH"' in admin_js
+    assert '"Idempotency-Key"' in admin_js
+    assert ':reconcile`' in admin_js
+    assert "data-admin-plugin-diff" in admin_js
+    assert "state.snapshot?.organization_name" in admin_js
 
 
 def test_authorized_strategy_routes_render_stage_6_workstation_and_aliases() -> None:
@@ -768,6 +852,42 @@ def test_authorized_dashboard_renders_stage_4_workstation_shell() -> None:
     assert "<select" not in response.text
 
 
+def test_plugin_panel_lab_is_disabled_by_default_and_host_owned_when_enabled() -> None:
+    assert _build_test_client().get("/__qa/plugin-panels").status_code == 404
+
+    app = create_app(
+        environ={
+            "WEB_API_BASE_URL": "http://web.local",
+            "WEB_API_UPSTREAM_URL": "http://api.local",
+            "ROEHUB_PLUGIN_PANEL_LAB": "true",
+            "ROEHUB_PLUGIN_PANEL_LAB_INSTANCE_ID": (
+                "00000000-0000-0000-0000-000000000713"
+            ),
+        }
+    )
+    app.state.current_user_api_client = SimpleNamespace(
+        fetch_current_user=lambda *, cookie_header: CurrentUserApiResult(
+            status_code=200,
+            user=WebCurrentUser(
+                user_id="00000000-0000-0000-0000-000000000321",
+                paid_level="free",
+            ),
+            error_message=None,
+        )
+    )
+    response = TestClient(app).get("/__qa/plugin-panels")
+
+    assert response.status_code == 200
+    assert "RoehubDataFrame/v1" in response.text
+    assert 'data-plugin-panel-lab' in response.text
+    assert 'data-panel-table-alternative' in response.text
+    assert "/assets/js/components/plugin-panel.js" not in response.text
+    assert "/assets/js/pages/plugin-panel-lab.js" in response.text
+    assert "https://plugin" not in response.text
+    assert "script_url" not in response.text
+    assert "data-panel-fixture-state=\"partial\"" in response.text
+
+
 def test_authorized_monitoring_uses_task_first_summary_surface() -> None:
     client = _build_test_client()
 
@@ -792,7 +912,8 @@ def test_locale_cookie_selects_russian_shell_without_localizing_routes() -> None
     assert '<html lang="ru" data-locale="ru" data-theme="graphite">' in response.text
     assert "Войти в Roehub" in response.text
     assert 'data-auth-gateway' in response.text
-    assert "/api/auth/login" in response.text
+    assert "Войти с ключом доступа" in response.text
+    assert "/api/auth/login" not in response.text
 
 
 def test_invalid_locale_cookie_falls_back_to_english() -> None:

@@ -120,6 +120,7 @@ class NotificationReportScheduler:
                     window=window,
                 )
                 existing = self._repository.get_report_run_by_dedupe_key(
+                    organization_id=route.organization_id,
                     dedupe_key=dedupe_key
                 )
                 if existing is not None:
@@ -139,6 +140,7 @@ class NotificationReportScheduler:
                 period_id = _period_id(report_type=report_type, window=window)
                 report_run = NotificationReportRun(
                     report_run_id=uuid4(),
+                    organization_id=route.organization_id,
                     owner_user_id=owner_user_id,
                     report_type=report_type,
                     period_start=window.period_start_utc,
@@ -164,6 +166,8 @@ class NotificationReportScheduler:
                 )
                 delivery = NotificationDelivery(
                     delivery_id=uuid4(),
+                    organization_id=route.organization_id,
+                    provider_instance_id=route.provider_instance_id,
                     event_id=None,
                     report_run_id=stored_report_run.report_run_id,
                     command_id=None,
@@ -303,6 +307,7 @@ def _report_dedupe_key(
         f"end={window.period_end_utc.isoformat()}:scope={scope_digest}"
     )
     return build_notification_dedupe_key(
+        organization_id=route.organization_id,
         source_context="notifications",
         source_event_type=report_type,
         source_id=source_id,

@@ -15,7 +15,7 @@ from trading.contexts.live_execution.domain import (
     ExchangeAccountProjection,
     ExpectedInstrumentConfig,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class ExchangeAccountProjectionService:
@@ -37,15 +37,19 @@ class ExchangeAccountProjectionService:
     def sync_connection(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         reader: ExchangeAccountStateReader,
         requirements: tuple[ExpectedInstrumentConfig, ...] = (),
     ) -> ExchangeAccountProjection:
         projection = reader.read_account_projection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_connection_id=exchange_connection_id,
         )
+        if projection.organization_id != organization_id:
+            raise ValueError("account projection organization does not match request")
         if projection.owner_user_id != owner_user_id:
             raise ValueError("account projection owner does not match request owner")
         if projection.exchange_connection_id != exchange_connection_id:
@@ -55,6 +59,7 @@ class ExchangeAccountProjectionService:
             for requirement in requirements:
                 self._repository.record_config_guard_result(
                     result=self.verify_config(
+                        organization_id=organization_id,
                         owner_user_id=owner_user_id,
                         exchange_connection_id=exchange_connection_id,
                         requirement=requirement,
@@ -66,6 +71,7 @@ class ExchangeAccountProjectionService:
     def verify_config(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         requirement: ExpectedInstrumentConfig,
@@ -74,6 +80,7 @@ class ExchangeAccountProjectionService:
         checked_at = _utc(self._clock.now())
         if projection is None and self._repository is not None:
             projection = self._repository.get_latest_projection(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 exchange_connection_id=exchange_connection_id,
             )
@@ -81,6 +88,7 @@ class ExchangeAccountProjectionService:
             return AccountConfigGuardResult(
                 config_guard_result_id=uuid4(),
                 account_snapshot_id=None,
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 exchange_connection_id=exchange_connection_id,
                 instrument_key=requirement.instrument_key,
@@ -94,6 +102,7 @@ class ExchangeAccountProjectionService:
         return AccountConfigGuardResult(
             config_guard_result_id=uuid4(),
             account_snapshot_id=projection.account_snapshot_id,
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_connection_id=exchange_connection_id,
             instrument_key=requirement.instrument_key,
@@ -107,6 +116,7 @@ class ExchangeAccountProjectionService:
     def get_readiness(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID | None,
         requirement: ExpectedInstrumentConfig | None,
@@ -137,6 +147,7 @@ class ExchangeAccountProjectionService:
                 exchange_connection_id=exchange_connection_id,
             )
         projection = self._repository.get_latest_projection(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_connection_id=exchange_connection_id,
         )
@@ -149,6 +160,7 @@ class ExchangeAccountProjectionService:
                 exchange_connection_id=exchange_connection_id,
             )
         guard = self._repository.get_latest_config_guard_result(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_connection_id=exchange_connection_id,
             instrument_key=requirement.instrument_key,
@@ -156,6 +168,7 @@ class ExchangeAccountProjectionService:
         )
         if guard is None:
             guard = self.verify_config(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 exchange_connection_id=exchange_connection_id,
                 requirement=requirement,

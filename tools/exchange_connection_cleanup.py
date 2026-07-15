@@ -7,6 +7,7 @@ import os
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Protocol, cast
 from uuid import UUID
 
@@ -26,6 +27,7 @@ from trading.contexts.identity.adapters.outbound import (
 from trading.contexts.identity.application.use_cases.account_settings import (
     AccountSettingsUseCase,
 )
+from trading.platform.secrets import SecureCredentialFile
 from trading.shared_kernel.primitives import UserId
 
 DEFAULT_LABEL_PREFIXES = ("stage08_", "e2e_", "smoke_")
@@ -33,7 +35,7 @@ DEFAULT_CLEANUP_SOURCE = "stage09d"
 DEFAULT_LIMIT = 100
 _DSN_ENV = "IDENTITY_PG_DSN"
 _BASE_URL_ENV = "ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL"
-_TOKEN_ENV = "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN"
+_TOKEN_FILE_ENV = "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE"
 _TIMEOUT_ENV = "ROEHUB_EXCHANGE_CONTROL_INTERNAL_TIMEOUT_SECONDS"
 
 
@@ -454,7 +456,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--dsn", default=os.environ.get(_DSN_ENV, ""))
     parser.add_argument("--exchange-control-url", default=os.environ.get(_BASE_URL_ENV, ""))
-    parser.add_argument("--exchange-control-token", default=os.environ.get(_TOKEN_ENV, ""))
+    parser.add_argument(
+        "--exchange-control-token-file",
+        default=os.environ.get(_TOKEN_FILE_ENV, ""),
+    )
     parser.add_argument(
         "--exchange-control-timeout",
         type=float,
@@ -512,13 +517,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
         )
         return 0
-    if not args.exchange_control_url.strip() or not args.exchange_control_token.strip():
+    if not args.exchange_control_url.strip() or not args.exchange_control_token_file.strip():
         raise SystemExit(
-            "Execution requires --exchange-control-url and --exchange-control-token."
+            "Execution requires --exchange-control-url and --exchange-control-token-file."
         )
     archive_client = HttpExchangeControlClient(
         base_url=args.exchange_control_url,
-        internal_api_token=args.exchange_control_token,
+        internal_api_credential=SecureCredentialFile(
+            Path(args.exchange_control_token_file).expanduser().resolve()
+        ),
         timeout_seconds=args.exchange_control_timeout,
     )
     audit_recorder = AccountSettingsUseCase(

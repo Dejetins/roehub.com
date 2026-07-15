@@ -8,7 +8,9 @@ from trading.contexts.strategy.adapters.outbound import (
     TelegramNotifierHooks,
 )
 from trading.contexts.strategy.application import StrategyTelegramNotificationV1
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-4000-8000-000000006100")
 
 
 class _ResolverStub:
@@ -211,6 +213,7 @@ def _notification() -> StrategyTelegramNotificationV1:
         None.
     """
     return StrategyTelegramNotificationV1(
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000006101"),
         ts=datetime(2026, 2, 17, 10, 0, tzinfo=timezone.utc),
         strategy_id=UUID("00000000-0000-0000-0000-00000000A610"),

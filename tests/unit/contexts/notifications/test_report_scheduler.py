@@ -23,7 +23,10 @@ from trading.contexts.notifications.application.stats_query import (
     NotificationStatsSourceRow,
 )
 from trading.contexts.notifications.domain import NotificationRoute
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+_PROVIDER_INSTANCE_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 
 def _now() -> datetime:
@@ -185,6 +188,8 @@ def test_report_scheduler_smoke_creates_log_delivery_attempts_through_dispatcher
 def _route(*, schedule_json: dict[str, object]) -> NotificationRoute:
     return NotificationRoute(
         route_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
         recipient_kind="user",
         owner_user_id=_user_id(),
         channel_key="telegram",

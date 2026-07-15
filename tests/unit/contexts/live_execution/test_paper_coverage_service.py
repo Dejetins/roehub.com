@@ -8,8 +8,9 @@ from trading.contexts.live_execution.adapters.outbound.persistence.in_memory imp
 )
 from trading.contexts.live_execution.application import PaperScenarioCoverageService
 from trading.contexts.live_execution.domain import PaperScenarioCoverageResult
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-4000-8000-000000070000")
 _USER_ID = UserId.from_string("00000000-0000-0000-0000-000000070001")
 _SCENARIO_KEY = "a" * 64
 _NOW = datetime(2026, 6, 17, 12, 0, tzinfo=UTC)
@@ -33,6 +34,7 @@ def test_paper_coverage_records_latest_result_by_scenario_key() -> None:
     service.record(result=first)
     recorded = service.record(result=second)
     loaded = service.get_latest_by_scenario_key(
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         scenario_key=_SCENARIO_KEY,
     )
@@ -53,6 +55,7 @@ def _coverage_result(
 ) -> PaperScenarioCoverageResult:
     return PaperScenarioCoverageResult(
         coverage_result_id=coverage_result_id,
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         scenario_matrix_row_id=UUID("00000000-0000-0000-0000-000000070201"),
         scenario_key=_SCENARIO_KEY,

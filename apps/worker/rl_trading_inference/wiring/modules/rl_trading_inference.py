@@ -83,6 +83,7 @@ class RlTradingInferenceInstrumentConfig:
 
 @dataclass(frozen=True, slots=True)
 class RlTradingInferenceOperatorContextConfig:
+    organization_id: str
     owner_user_id: str
     strategy_id: str
     strategy_run_id: str
@@ -675,6 +676,7 @@ def load_rl_trading_inference_runtime_config(path: str | Path) -> RlTradingInfer
         postgres_dsn_env=str(inference.get("postgres_dsn_env", "STRATEGY_PG_DSN")),
         state_path=Path(str(inference.get("state_path", ""))),
         operator_context=RlTradingInferenceOperatorContextConfig(
+            organization_id=str(operator_context.get("organization_id", "")),
             owner_user_id=str(operator_context.get("owner_user_id", "")),
             strategy_id=str(operator_context.get("strategy_id", "")),
             strategy_run_id=str(operator_context.get("strategy_run_id", "")),
@@ -802,7 +804,12 @@ def _validate_config(config: RlTradingInferenceRuntimeConfig) -> None:
         if instrument.instrument_key in seen:
             raise ValueError("Stage 08K monitor instrument duplicate")
         seen.add(instrument.instrument_key)
-    for field_name in ("owner_user_id", "strategy_id", "strategy_run_id"):
+    for field_name in (
+        "organization_id",
+        "owner_user_id",
+        "strategy_id",
+        "strategy_run_id",
+    ):
         value = str(getattr(config.operator_context, field_name)).strip()
         if not value:
             raise ValueError(f"inference.operator_context.{field_name} is required")

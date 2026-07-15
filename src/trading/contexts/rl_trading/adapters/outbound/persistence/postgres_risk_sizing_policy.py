@@ -15,7 +15,7 @@ from trading.contexts.rl_trading.domain.risk_sizing_policy import (
 from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway import (
     StrategyPostgresGateway,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresRlRiskSizingPolicyRepository:
@@ -37,7 +37,8 @@ class PostgresRlRiskSizingPolicyRepository:
             query=f"""
             SELECT *
               FROM {self._policy_table_name}
-             WHERE owner_user_id = %(owner_user_id)s
+             WHERE organization_id = %(organization_id)s
+               AND owner_user_id = %(owner_user_id)s
                AND strategy_id = %(strategy_id)s
                AND exchange_name = %(exchange_name)s
                AND market_type = %(market_type)s
@@ -66,6 +67,7 @@ class PostgresRlRiskSizingPolicyRepository:
                 INSERT INTO {self._policy_table_name}
                 (
                     policy_id,
+                    organization_id,
                     owner_user_id,
                     strategy_id,
                     exchange_name,
@@ -92,6 +94,7 @@ class PostgresRlRiskSizingPolicyRepository:
                 )
                 VALUES (
                     %(policy_id)s::uuid,
+                    %(organization_id)s::uuid,
                     %(owner_user_id)s::uuid,
                     %(strategy_id)s::uuid,
                     %(exchange_name)s,
@@ -117,6 +120,7 @@ class PostgresRlRiskSizingPolicyRepository:
                     %(observed_at)s
                 )
                 ON CONFLICT (
+                    organization_id,
                     owner_user_id,
                     strategy_id,
                     exchange_name,
@@ -148,6 +152,7 @@ class PostgresRlRiskSizingPolicyRepository:
                 (
                     event_id,
                     policy_id,
+                    organization_id,
                     owner_user_id,
                     strategy_id,
                     exchange_name,
@@ -162,6 +167,7 @@ class PostgresRlRiskSizingPolicyRepository:
                 SELECT
                     %(event_id)s::uuid,
                     policy_id,
+                    organization_id,
                     owner_user_id,
                     strategy_id,
                     exchange_name,
@@ -214,6 +220,7 @@ class PostgresRlRiskSizingPolicyRepository:
 
 def _row_to_record(*, row: Mapping[str, Any]) -> RlRiskSizingPolicyRecord:
     key = RlRiskSizingPolicyKey(
+        organization_id=OrganizationId.from_string(str(row["organization_id"])),
         owner_user_id=UserId.from_string(str(row["owner_user_id"])),
         strategy_id=UUID(str(row["strategy_id"])),
         exchange_name=str(row["exchange_name"]),
@@ -247,6 +254,7 @@ def _row_to_record(*, row: Mapping[str, Any]) -> RlRiskSizingPolicyRecord:
 
 def _key_parameters(*, key: RlRiskSizingPolicyKey) -> dict[str, str]:
     return {
+        "organization_id": str(key.organization_id),
         "owner_user_id": str(key.owner_user_id),
         "strategy_id": str(key.strategy_id),
         "exchange_name": key.exchange_name,

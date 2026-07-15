@@ -5,17 +5,20 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Protocol
 from uuid import UUID
 
 import httpx
+
+from trading.platform.secrets import SecureCredentialFile
 
 INTERNAL_SERVICE_HEADER = "X-Roehub-Internal-Service"
 REQUEST_ID_HEADER = "X-Request-Id"
 INTERNAL_SERVICE_NAME = "apps/api"
 
 _BASE_URL_ENV = "ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL"
-_TOKEN_ENV = "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN"
+_CREDENTIAL_PATH_ENV = "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE"
 _ROUTES_ENABLED_ENV = "ROEHUB_EXCHANGE_CONNECTIONS_PUBLIC_ROUTES_ENABLED"
 _TIMEOUT_ENV = "ROEHUB_EXCHANGE_CONTROL_INTERNAL_TIMEOUT_SECONDS"
 _DEFAULT_TIMEOUT_SECONDS = 2.0
@@ -234,7 +237,7 @@ class ExchangeControlClient(Protocol):
 @dataclass(frozen=True)
 class ExchangeControlClientConfig:
     base_url: str | None
-    internal_api_token: str | None
+    internal_api_credential: SecureCredentialFile | None
     timeout_seconds: float
     public_routes_enabled: bool
 
@@ -242,7 +245,11 @@ class ExchangeControlClientConfig:
     def from_environ(cls, environ: Mapping[str, str]) -> "ExchangeControlClientConfig":
         config = cls(
             base_url=_read_optional_str(environ.get(_BASE_URL_ENV)),
-            internal_api_token=_read_optional_str(environ.get(_TOKEN_ENV)),
+            internal_api_credential=(
+                SecureCredentialFile(Path(raw_path))
+                if (raw_path := _read_optional_str(environ.get(_CREDENTIAL_PATH_ENV)))
+                else None
+            ),
             timeout_seconds=_read_positive_float(
                 value=environ.get(_TIMEOUT_ENV),
                 default=_DEFAULT_TIMEOUT_SECONDS,
@@ -261,17 +268,18 @@ class ExchangeControlClientConfig:
                 "exchange connection routes require "
                 "ROEHUB_EXCHANGE_CONTROL_INTERNAL_BASE_URL"
             )
-        if not self.internal_api_token:
+        if self.internal_api_credential is None:
             raise ValueError(
-                "exchange connection routes require ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN"
+                "exchange connection routes require "
+                "ROEHUB_EXCHANGE_CONTROL_INTERNAL_API_TOKEN_FILE"
             )
 
     def build_client(self) -> ExchangeControlClient | None:
-        if not self.base_url or not self.internal_api_token:
+        if not self.base_url or self.internal_api_credential is None:
             return None
         return HttpExchangeControlClient(
             base_url=self.base_url,
-            internal_api_token=self.internal_api_token,
+            internal_api_credential=self.internal_api_credential,
             timeout_seconds=self.timeout_seconds,
         )
 
@@ -279,15 +287,14 @@ class ExchangeControlClientConfig:
 @dataclass(frozen=True)
 class HttpExchangeControlClient:
     base_url: str
-    internal_api_token: str
+    internal_api_credential: SecureCredentialFile
     timeout_seconds: float = _DEFAULT_TIMEOUT_SECONDS
     transport: httpx.BaseTransport | None = None
 
     def __post_init__(self) -> None:
         if not self.base_url.strip():
             raise ValueError("exchange-control internal base URL is required")
-        if not self.internal_api_token.strip():
-            raise ValueError("exchange-control internal API token is required")
+        self.internal_api_credential.read()
         if self.timeout_seconds <= 0:
             raise ValueError("exchange-control internal timeout must be positive")
 
@@ -504,7 +511,7 @@ class HttpExchangeControlClient:
                     params=params,
                     json=json,
                     headers={
-                        "Authorization": f"Bearer {self.internal_api_token}",
+                        "Authorization": f"Bearer {self.internal_api_credential.read()}",
                         INTERNAL_SERVICE_HEADER: INTERNAL_SERVICE_NAME,
                         REQUEST_ID_HEADER: effective_request_id,
                     },

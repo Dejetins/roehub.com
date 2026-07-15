@@ -5,7 +5,7 @@ from uuid import UUID
 from trading.contexts.strategy.application.ports.repositories import StrategyEventRepository
 from trading.contexts.strategy.domain.entities import StrategyEvent
 from trading.contexts.strategy.domain.errors import StrategyStorageError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class InMemoryStrategyEventRepository(StrategyEventRepository):
@@ -57,7 +57,9 @@ class InMemoryStrategyEventRepository(StrategyEventRepository):
         self._events_by_id[event.event_id] = event
         return event
 
-    def list_for_strategy(self, *, user_id: UserId, strategy_id: UUID) -> tuple[StrategyEvent, ...]:
+    def list_for_strategy(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> tuple[StrategyEvent, ...]:
         """
         List strategy-level events in deterministic ordering by timestamp and event_id.
 
@@ -76,11 +78,15 @@ class InMemoryStrategyEventRepository(StrategyEventRepository):
         events = [
             event
             for event in self._events_by_id.values()
-            if event.user_id == user_id and event.strategy_id == strategy_id
+            if event.organization_id == organization_id
+            and event.user_id == user_id
+            and event.strategy_id == strategy_id
         ]
         return tuple(sorted(events, key=lambda item: (item.ts, str(item.event_id))))
 
-    def list_for_run(self, *, user_id: UserId, run_id: UUID) -> tuple[StrategyEvent, ...]:
+    def list_for_run(
+        self, *, organization_id: OrganizationId, user_id: UserId, run_id: UUID
+    ) -> tuple[StrategyEvent, ...]:
         """
         List run-level events in deterministic ordering by timestamp and event_id.
 
@@ -99,6 +105,8 @@ class InMemoryStrategyEventRepository(StrategyEventRepository):
         events = [
             event
             for event in self._events_by_id.values()
-            if event.user_id == user_id and event.run_id == run_id
+            if event.organization_id == organization_id
+            and event.user_id == user_id
+            and event.run_id == run_id
         ]
         return tuple(sorted(events, key=lambda item: (item.ts, str(item.event_id))))

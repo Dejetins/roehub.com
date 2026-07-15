@@ -237,9 +237,7 @@ class StrategyLiveRunner:
             else NoOpStrategyRealtimeOutputPublisher()
         )
         self._telegram_notifier = (
-            telegram_notifier
-            if telegram_notifier is not None
-            else NoOpTelegramNotifier()
+            telegram_notifier if telegram_notifier is not None else NoOpTelegramNotifier()
         )
         self._telegram_notification_policy = (
             telegram_notification_policy
@@ -279,6 +277,7 @@ class StrategyLiveRunner:
 
         for run in active_runs:
             strategy = self._strategy_repository.find_by_strategy_id(
+                organization_id=run.organization_id,
                 user_id=run.user_id,
                 strategy_id=run.strategy_id,
             )
@@ -626,6 +625,7 @@ class StrategyLiveRunner:
         mode = profile.mode if profile is not None else "monitor_only"
         signal = StrategySignal(
             signal_id=_signal_id(run=run, candle=candle),
+            organization_id=run.organization_id,
             owner_user_id=run.user_id,
             strategy_id=run.strategy_id,
             strategy_run_id=run.run_id,
@@ -662,6 +662,7 @@ class StrategyLiveRunner:
         if self._live_profile_repository is None:
             return None
         return self._live_profile_repository.get_for_strategy(
+            organization_id=run.organization_id,
             owner_user_id=run.user_id,
             strategy_id=run.strategy_id,
         )
@@ -779,6 +780,7 @@ class StrategyLiveRunner:
         """
         snapshot = StrategyRun(
             run_id=run.run_id,
+            organization_id=run.organization_id,
             user_id=run.user_id,
             strategy_id=run.strategy_id,
             state=run.state,
@@ -820,6 +822,7 @@ class StrategyLiveRunner:
         )
         successor = StrategyRun.start(
             run_id=uuid4(),
+            organization_id=previous_run.organization_id,
             user_id=previous_run.user_id,
             strategy_id=previous_run.strategy_id,
             started_at=started_at,
@@ -884,6 +887,7 @@ class StrategyLiveRunner:
         if transitioned.metadata_json != metadata_json:
             transitioned = StrategyRun(
                 run_id=transitioned.run_id,
+                organization_id=transitioned.organization_id,
                 user_id=transitioned.user_id,
                 strategy_id=transitioned.strategy_id,
                 state=transitioned.state,
@@ -916,6 +920,7 @@ class StrategyLiveRunner:
         if profile is None or profile.exchange_connection_id is None:
             return
         self._position_ownership_coordinator.reserve_for_strategy_run(
+            organization_id=run.organization_id,
             owner_user_id=run.user_id,
             exchange_connection_id=profile.exchange_connection_id,
             strategy_id=run.strategy_id,
@@ -936,6 +941,7 @@ class StrategyLiveRunner:
             return
         if profile.mode == "paper":
             self._capital_reservation_coordinator.reserve_virtual_for_strategy_run(
+                organization_id=run.organization_id,
                 owner_user_id=run.user_id,
                 strategy_id=run.strategy_id,
                 live_profile_id=profile.profile_id,
@@ -947,6 +953,7 @@ class StrategyLiveRunner:
         if profile.exchange_connection_id is None or profile.mode not in {"live", "testnet"}:
             return
         self._capital_reservation_coordinator.reserve_for_strategy_run(
+            organization_id=run.organization_id,
             owner_user_id=run.user_id,
             exchange_connection_id=profile.exchange_connection_id,
             strategy_id=run.strategy_id,
@@ -960,6 +967,7 @@ class StrategyLiveRunner:
         if self._position_ownership_coordinator is None:
             return
         self._position_ownership_coordinator.activate_for_strategy_run(
+            organization_id=run.organization_id,
             owner_user_id=run.user_id,
             strategy_run_id=run.run_id,
             now=now,
@@ -969,6 +977,7 @@ class StrategyLiveRunner:
         if self._position_ownership_coordinator is None:
             return
         self._position_ownership_coordinator.release_for_strategy_run(
+            organization_id=run.organization_id,
             owner_user_id=run.user_id,
             strategy_run_id=run.run_id,
             now=run.updated_at,
@@ -979,6 +988,7 @@ class StrategyLiveRunner:
         if self._capital_reservation_coordinator is None:
             return
         self._capital_reservation_coordinator.release_for_strategy_run(
+            organization_id=run.organization_id,
             owner_user_id=run.user_id,
             strategy_run_id=run.run_id,
             now=run.updated_at,
@@ -1095,9 +1105,7 @@ class StrategyLiveRunner:
         return {
             "warmup_processed_bars": str(warmup_state.processed_bars),
             "checkpoint_ts_open": (
-                _isoformat_utc(run.checkpoint_ts_open)
-                if run.checkpoint_ts_open is not None
-                else ""
+                _isoformat_utc(run.checkpoint_ts_open) if run.checkpoint_ts_open is not None else ""
             ),
             "lag_seconds": str(
                 _lag_seconds(
@@ -1225,6 +1233,7 @@ class StrategyLiveRunner:
         if current.state == "failed":
             self._publish_telegram_notification_event(
                 event=StrategyTelegramNotificationEventV1(
+                    organization_id=current.organization_id,
                     user_id=current.user_id,
                     ts=current.updated_at,
                     strategy_id=current.strategy_id,
@@ -1262,10 +1271,7 @@ class StrategyLiveRunner:
             self._telegram_notifier.notify(notification=notification)
         except Exception:  # noqa: BLE001
             log.exception(
-                (
-                    "strategy telegram notification failed "
-                    "event_type=%s strategy_id=%s run_id=%s"
-                ),
+                ("strategy telegram notification failed " "event_type=%s strategy_id=%s run_id=%s"),
                 event.event_type,
                 event.strategy_id,
                 event.run_id,

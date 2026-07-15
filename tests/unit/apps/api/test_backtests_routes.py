@@ -26,6 +26,7 @@ from trading.contexts.backtest.application.ports import (
     BacktestJobListQuery,
     BacktestLazyTradesMaterializationRequest,
     BacktestLazyTradesMaterializationTask,
+    ResearchOrganizationScope,
 )
 from trading.contexts.backtest.application.services.v2 import (
     BACKTEST_SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
@@ -66,7 +67,28 @@ from trading.contexts.strategy.domain.entities import (
     StrategySpecV1,
 )
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import PaidLevel, UserId
+from trading.shared_kernel.primitives import OrganizationId, PaidLevel, UserId
+
+_ORGANIZATION_ID = OrganizationId.from_string("00000000-0000-0000-0000-000000000001")
+
+
+class _ScopeResolver:
+    def resolve(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        return ResearchOrganizationScope(
+            organization_id=_ORGANIZATION_ID,
+            user_id=user_id,
+        )
+
+
+@dataclass
+class _MappingScopeResolver:
+    organizations: dict[UserId, OrganizationId]
+
+    def resolve(self, *, user_id: UserId) -> ResearchOrganizationScope:
+        return ResearchOrganizationScope(
+            organization_id=self.organizations[user_id],
+            user_id=user_id,
+        )
 
 
 def test_get_backtest_runtime_defaults_returns_public_contract() -> None:
@@ -184,9 +206,7 @@ def test_post_backtest_preflight_route_smoke_for_futures_funding_statuses(
     client = _build_client(
         resolver=_FakeArtifactResolver(
             funding_coverage_status=status,
-            funding_coverage_policy=(
-                "degraded_with_warning" if status == "degraded" else status
-            ),
+            funding_coverage_policy=("degraded_with_warning" if status == "degraded" else status),
             funding_manifest_hash="c" * 64,
             funding_rows_count=rows_count,
             funding_expected_event_count=expected_event_count,
@@ -685,14 +705,10 @@ def test_backtest_results_routes_expose_funding_fields_without_top_trades() -> N
     assert top["funding"]["metrics"]["funding_pnl_quote"] == pytest.approx(75.0)
     assert top["funding"]["warning_codes"] == ["missing_leading_coverage"]
     variant = variant_response.json()
-    assert variant["funding"]["effective_ranking_metric"] == (
-        "total_return_pct_net_of_funding"
-    )
+    assert variant["funding"]["effective_ranking_metric"] == ("total_return_pct_net_of_funding")
     detail = detail_response.json()
     assert detail["funding_manifest_hash"] == "f" * 64
-    assert detail["funding"]["metrics"]["total_return_pct_net_of_funding"] == pytest.approx(
-        13.25
-    )
+    assert detail["funding"]["metrics"]["total_return_pct_net_of_funding"] == pytest.approx(13.25)
     assert detail["chart_overlay"]["funding_events"][0]["kind"] == "funding_event"
 
 
@@ -1474,6 +1490,45 @@ def test_get_backtest_job_foreign_owner_returns_forbidden_code() -> None:
     assert response.json()["error"]["code"] == "backtest.forbidden"
 
 
+def test_get_backtest_job_cross_organization_returns_not_found() -> None:
+    repository = _FakeJobRepository()
+    user_a = UserId.from_string("00000000-0000-0000-0000-000000000271")
+    user_b = UserId.from_string("00000000-0000-0000-0000-000000000272")
+    resolver = _MappingScopeResolver(
+        organizations={
+            user_a: OrganizationId.from_string("00000000-0000-0000-0000-000000000011"),
+            user_b: OrganizationId.from_string("00000000-0000-0000-0000-000000000012"),
+        }
+    )
+    client = _build_client(
+        jobs_use_case=_build_jobs_use_case(
+            repository=repository,
+            organization_scope_resolver=resolver,
+        )
+    )
+    created = client.post(
+        "/backtests/jobs",
+        headers={"x-user-id": str(user_a)},
+        json=_valid_request(),
+    )
+
+    cross_organization = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}",
+        headers={"x-user-id": str(user_b)},
+    )
+    foreign_list = client.get(
+        "/backtests/jobs",
+        headers={"x-user-id": str(user_b)},
+    )
+
+    assert created.status_code == 201
+    assert created.json()["organization_id"] == str(resolver.organizations[user_a])
+    assert cross_organization.status_code == 404
+    assert cross_organization.json()["error"]["code"] == "backtest.not_found"
+    assert foreign_list.status_code == 200
+    assert foreign_list.json()["items"] == []
+
+
 def test_post_backtest_job_cancel_terminal_job_is_idempotent() -> None:
     repository = _FakeJobRepository()
     client = _build_client(jobs_use_case=_build_jobs_use_case(repository=repository))
@@ -1503,7 +1558,10 @@ def test_delete_backtest_job_removes_terminal_owner_job_and_variants() -> None:
     )
     job_id = UUID(created.json()["job_id"])
     _complete_job(repository=repository, job_id=job_id)
-    assert repository.list_top_variants(job_id=job_id)
+    assert repository.list_top_variants(
+        job_id=job_id,
+        organization_id=_ORGANIZATION_ID,
+    )
 
     response = client.delete(
         f"/backtests/jobs/{job_id}",
@@ -1516,7 +1574,13 @@ def test_delete_backtest_job_removes_terminal_owner_job_and_variants() -> None:
 
     assert response.status_code == 204
     assert missing.status_code == 404
-    assert repository.list_top_variants(job_id=job_id) == ()
+    assert (
+        repository.list_top_variants(
+            job_id=job_id,
+            organization_id=_ORGANIZATION_ID,
+        )
+        == ()
+    )
 
 
 def test_delete_backtest_job_rejects_active_and_foreign_jobs() -> None:
@@ -1606,7 +1670,10 @@ class _RepoVariantLaunchReader:
         job_id: UUID,
         variant_key: str,
     ) -> BacktestVariantLaunchSnapshot:
-        job = self._repository.get(job_id=job_id)
+        job = self._repository.get(
+            job_id=job_id,
+            organization_id=_ORGANIZATION_ID,
+        )
         if job is None:
             raise RoehubError(
                 code="strategy_variant_launch.not_found",
@@ -1621,6 +1688,7 @@ class _RepoVariantLaunchReader:
             )
         row = self._repository.get_top_variant_by_public_key(
             job_id=job_id,
+            organization_id=_ORGANIZATION_ID,
             public_variant_key=variant_key,
         )
         if row is None:
@@ -1744,6 +1812,7 @@ def _build_client(
                 runtime_config=runtime_config,
             ),
             current_user_dependency=_HeaderCurrentUserDependency(),  # type: ignore[arg-type]
+            organization_scope_resolver=_ScopeResolver(),
             jobs_use_case=jobs_use_case,
             create_strategy_from_variant_use_case=create_strategy_from_variant_use_case,
             compatibility_readiness_service=compatibility_readiness_service,
@@ -1776,6 +1845,7 @@ class _FakeCreateStrategyFromVariantUseCase:
             )
         self.calls = (*self.calls, (variant_key, idempotency_key))
         strategy = Strategy.create(
+            organization_id=current_user.organization_id,
             user_id=current_user.user_id,
             spec=StrategySpecV1.from_json(payload=_strategy_spec_payload()),
             created_at=datetime(2026, 5, 30, 10, 0, tzinfo=UTC),
@@ -1783,6 +1853,7 @@ class _FakeCreateStrategyFromVariantUseCase:
         )
         provenance = StrategyBacktestVariantProvenance(
             strategy_id=strategy.strategy_id,
+            organization_id=current_user.organization_id,
             user_id=current_user.user_id,
             source_job_id=job_id,
             source_variant_key=variant_key,
@@ -1834,6 +1905,7 @@ def _build_jobs_use_case(
     lazy_trades_service: Any | None = None,
     materialization_repository: Any | None = None,
     admission_service: BacktestAdmissionService | None = None,
+    organization_scope_resolver: Any | None = None,
 ) -> BacktestJobsUseCase:
     defaults_provider = YamlBacktestGridDefaultsProvider.from_yaml(
         config_path="configs/prod/indicators.yaml"
@@ -1851,6 +1923,7 @@ def _build_jobs_use_case(
             runtime_config=runtime_config,
         ),
         runtime_config=runtime_config,
+        organization_scope_resolver=organization_scope_resolver or _ScopeResolver(),
         admission_service=admission_service or BacktestAdmissionService(),
         execution_trigger=execution_trigger,
         lazy_trades_service=lazy_trades_service,
@@ -1905,6 +1978,7 @@ def _complete_job(
     now = datetime.now(UTC)
     running = repository.claim_for_inline_execution(
         job_id=job_id,
+        organization_id=job.organization_id,
         user_id=job.user_id,
         now=now,
         locked_by=locked_by,
@@ -1929,6 +2003,7 @@ def _complete_job(
     )
     finished = repository.finish_with_top_variants(
         job_id=job_id,
+        organization_id=job.organization_id,
         user_id=job.user_id,
         now=now,
         locked_by=locked_by,
@@ -2314,7 +2389,7 @@ class _Probe:
 
 @dataclass
 class _FakeMaterializationRepository:
-    tasks: dict[tuple[str, UUID, str, str], BacktestLazyTradesMaterializationTask] = field(
+    tasks: dict[tuple[str, str, UUID, str, str], BacktestLazyTradesMaterializationTask] = field(
         default_factory=dict
     )
 
@@ -2324,6 +2399,7 @@ class _FakeMaterializationRepository:
         request: BacktestLazyTradesMaterializationRequest,
     ) -> BacktestLazyTradesMaterializationTask:
         key = (
+            str(request.organization_id),
             str(request.owner_user_id),
             request.job_id,
             request.public_variant_key,
@@ -2334,6 +2410,7 @@ class _FakeMaterializationRepository:
             return existing
         task = BacktestLazyTradesMaterializationTask(
             task_id=UUID(f"00000000-0000-0000-0000-{len(self.tasks) + 1:012d}"),
+            organization_id=request.organization_id,
             owner_user_id=request.owner_user_id,
             job_id=request.job_id,
             public_variant_key=request.public_variant_key,
@@ -2365,30 +2442,49 @@ class _FakeMaterializationRepository:
     def find_by_identity(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         job_id: UUID,
         public_variant_key: str,
         cache_key: str,
     ) -> BacktestLazyTradesMaterializationTask | None:
-        return self.tasks.get((str(owner_user_id), job_id, public_variant_key, cache_key))
+        return self.tasks.get(
+            (
+                str(organization_id),
+                str(owner_user_id),
+                job_id,
+                public_variant_key,
+                cache_key,
+            )
+        )
 
-    def count_active_for_user(self, *, owner_user_id: UserId) -> int:
+    def count_active_for_user(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+    ) -> int:
         return sum(
             1
             for task in self.tasks.values()
-            if task.owner_user_id == owner_user_id and task.status in {"queued", "running"}
+            if task.organization_id == organization_id
+            and task.owner_user_id == owner_user_id
+            and task.status in {"queued", "running"}
         )
 
     def count_created_for_user_since(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         created_after: datetime,
     ) -> int:
         return sum(
             1
             for task in self.tasks.values()
-            if task.owner_user_id == owner_user_id and task.created_at >= created_after
+            if task.organization_id == organization_id
+            and task.owner_user_id == owner_user_id
+            and task.created_at >= created_after
         )
 
     def count_active_global(self) -> int:
@@ -2428,8 +2524,15 @@ def _fake_trade(index: int, *, include_equity: bool = True) -> dict[str, Any]:
 class _FakeExecutionTrigger:
     calls: tuple[tuple[UUID, str], ...] = ()
 
-    def enqueue(self, *, job_id: UUID, user_id: UserId, request_hash: str) -> None:
-        _ = user_id
+    def enqueue(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        request_hash: str,
+    ) -> None:
+        _ = organization_id, user_id
         self.calls = (*self.calls, (job_id, request_hash))
 
 
@@ -2465,6 +2568,7 @@ class _FakeJobRepository:
     def find_by_idempotency_key(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         idempotency_key_hash: str,
         created_after: datetime,
@@ -2473,7 +2577,8 @@ class _FakeJobRepository:
         for job in sorted(self.jobs.values(), key=lambda item: item.created_at):
             idempotency = dict(job.request_json).get("idempotency")
             if (
-                job.user_id == user_id
+                job.organization_id == organization_id
+                and job.user_id == user_id
                 and job.created_at >= created_after
                 and isinstance(idempotency, dict)
                 and idempotency.get("key_hash") == idempotency_key_hash
@@ -2485,6 +2590,7 @@ class _FakeJobRepository:
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         now: datetime,
         locked_by: str,
@@ -2492,7 +2598,12 @@ class _FakeJobRepository:
     ) -> BacktestJob | None:
         assert self.jobs is not None
         job = self.jobs.get(job_id)
-        if job is None or job.user_id != user_id or job.state != "queued":
+        if (
+            job is None
+            or job.organization_id != organization_id
+            or job.user_id != user_id
+            or job.state != "queued"
+        ):
             return None
         claimed = job.claim(
             changed_at=now,
@@ -2506,6 +2617,7 @@ class _FakeJobRepository:
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         now: datetime,
         locked_by: str,
@@ -2518,7 +2630,12 @@ class _FakeJobRepository:
         assert self.jobs is not None
         assert self.top_rows is not None
         job = self.jobs.get(job_id)
-        if job is None or job.user_id != user_id or job.state != "running":
+        if (
+            job is None
+            or job.organization_id != organization_id
+            or job.user_id != user_id
+            or job.state != "running"
+        ):
             return None
         finished = job.finish(
             next_state=next_state,
@@ -2531,10 +2648,18 @@ class _FakeJobRepository:
             self.top_rows[job_id] = top_variants
         return finished
 
-    def get(self, *, job_id: UUID, user_id: UserId | None = None) -> BacktestJob | None:
+    def get(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId | None = None,
+    ) -> BacktestJob | None:
         assert self.jobs is not None
         job = self.jobs.get(job_id)
         if job is None:
+            return None
+        if job.organization_id != organization_id:
             return None
         if user_id is not None and job.user_id != user_id:
             return None
@@ -2545,7 +2670,9 @@ class _FakeJobRepository:
         items = [
             job
             for job in self.jobs.values()
-            if job.user_id == query.user_id and (query.state is None or job.state == query.state)
+            if job.organization_id == query.organization_id
+            and job.user_id == query.user_id
+            and (query.state is None or job.state == query.state)
         ]
         items.sort(key=lambda item: (item.created_at, str(item.job_id)), reverse=True)
         return BacktestJobListPage(items=tuple(items[: query.limit]), next_cursor=None)
@@ -2554,19 +2681,30 @@ class _FakeJobRepository:
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         limit: int | None = None,
     ) -> tuple[BacktestJobTopVariant, ...]:
+        assert self.jobs is not None
         assert self.top_rows is not None
-        rows = self.top_rows.get(job_id, ())
+        job = self.jobs.get(job_id)
+        rows = (
+            self.top_rows.get(job_id, ())
+            if job is not None and job.organization_id == organization_id
+            else ()
+        )
         return rows if limit is None else rows[:limit]
 
     def get_top_variant_by_public_key(
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         public_variant_key: str,
     ) -> BacktestJobTopVariant | None:
-        for row in self.list_top_variants(job_id=job_id):
+        for row in self.list_top_variants(
+            job_id=job_id,
+            organization_id=organization_id,
+        ):
             if row.payload_json.get("public_variant_key") == public_variant_key:
                 return row
         return None
@@ -2575,23 +2713,31 @@ class _FakeJobRepository:
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         cancel_requested_at: datetime,
     ) -> BacktestJob | None:
         assert self.jobs is not None
         job = self.jobs.get(job_id)
-        if job is None or job.user_id != user_id:
+        if job is None or job.organization_id != organization_id or job.user_id != user_id:
             return None
         cancelled = job.request_cancel(changed_at=cancel_requested_at)
         self.jobs[job_id] = cancelled
         return cancelled
 
-    def delete_terminal(self, *, job_id: UUID, user_id: UserId) -> bool:
+    def delete_terminal(
+        self,
+        *,
+        job_id: UUID,
+        organization_id: OrganizationId,
+        user_id: UserId,
+    ) -> bool:
         assert self.jobs is not None
         assert self.top_rows is not None
         job = self.jobs.get(job_id)
         if (
             job is None
+            or job.organization_id != organization_id
             or job.user_id != user_id
             or job.state
             not in {
@@ -2605,13 +2751,18 @@ class _FakeJobRepository:
         self.top_rows.pop(job_id, None)
         return True
 
-    def count_active_for_user(self, *, user_id: UserId) -> int:
+    def count_active_for_user(self, *, organization_id: OrganizationId, user_id: UserId) -> int:
         assert self.jobs is not None
-        return sum(1 for job in self.jobs.values() if job.user_id == user_id and job.is_active())
+        return sum(
+            1
+            for job in self.jobs.values()
+            if job.organization_id == organization_id and job.user_id == user_id and job.is_active()
+        )
 
     def count_created_for_user_since(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         created_after: datetime,
     ) -> int:
@@ -2619,7 +2770,9 @@ class _FakeJobRepository:
         return sum(
             1
             for job in self.jobs.values()
-            if job.user_id == user_id and job.created_at >= created_after
+            if job.organization_id == organization_id
+            and job.user_id == user_id
+            and job.created_at >= created_after
         )
 
     def count_active_global(self) -> int:

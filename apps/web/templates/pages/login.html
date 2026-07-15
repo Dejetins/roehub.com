@@ -17,19 +17,58 @@
       </div>
     </div>
 
-    <div class="auth-gateway__card">
+    <div class="auth-gateway__card" data-local-auth data-next-path="{{ auth_next_path }}">
       <div class="auth-gateway__mark" aria-hidden="true">R</div>
       <p class="auth-gateway__eyebrow">{{ t("auth.login_eyebrow") }}</p>
       <h2>{{ t("auth.login_title") }}</h2>
       <p>{{ t("auth.login_body") }}</p>
       <dl class="auth-gateway__session">
         <div><dt>{{ t("auth.next_label") }}</dt><dd>{{ auth_next_path }}</dd></div>
-        <div><dt>{{ t("auth.gateway.identity") }}</dt><dd>Keycloak / OIDC</dd></div>
+        <div><dt>{{ t("auth.gateway.identity") }}</dt><dd>{{ t("auth.local.identity") }}</dd></div>
         <div><dt>{{ t("auth.gateway.credentials") }}</dt><dd>{{ t("auth.gateway.credentials_value") }}</dd></div>
       </dl>
-      <a class="rh-button rh-button--primary auth-gateway__continue" href="{{ oidc_login_url }}" data-auth-continue>
-        {{ t("auth.continue") }}
-      </a>
+      <div data-local-login hidden>
+        <button class="rh-button rh-button--primary auth-gateway__continue" type="button" data-auth-continue data-passkey-login>
+          {{ t("auth.local.passkey_login") }}
+        </button>
+        <details class="local-auth__fallbacks">
+          <summary>{{ t("auth.local.fallbacks") }}</summary>
+          <form class="local-auth__form" data-password-login>
+            <label>{{ t("auth.local.username") }}<input name="username" autocomplete="username" required></label>
+            <label>{{ t("auth.local.password") }}<input name="password" type="password" autocomplete="current-password" required></label>
+            <button class="rh-button" type="submit">{{ t("auth.local.password_login") }}</button>
+          </form>
+          <form class="local-auth__form" data-recovery-login>
+            <label>{{ t("auth.local.username") }}<input name="username" autocomplete="username" required></label>
+            <label>{{ t("auth.local.recovery_code") }}<input name="recovery_code" autocomplete="off" required></label>
+            <button class="rh-button" type="submit">{{ t("auth.local.recovery_login") }}</button>
+          </form>
+        </details>
+      </div>
+      <div class="local-auth__federated" data-oidc-login hidden>
+        <p>{{ t("auth.oidc.invitation_note") }}</p>
+        <a class="rh-button auth-gateway__continue" href="{{ oidc_login_url }}" data-oidc-login-link>
+          {{ t("auth.oidc.login") }} <span data-oidc-provider-name></span>
+        </a>
+      </div>
+      <form class="local-auth__form" data-local-bootstrap hidden>
+        <p class="local-auth__notice">{{ t("auth.local.bootstrap_note") }}</p>
+        <label>{{ t("auth.local.ticket") }}<input name="ticket_file" type="file" accept="text/plain,.txt" required></label>
+        <label>{{ t("auth.local.username") }}<input name="username" autocomplete="username" value="owner" required></label>
+        <label>{{ t("auth.local.display_name") }}<input name="display_name" autocomplete="name" required></label>
+        <label>{{ t("auth.local.installation_name") }}<input name="installation_name" value="Roehub" required></label>
+        <label>{{ t("auth.local.organization_slug") }}<input name="organization_slug" value="default" required></label>
+        <label>{{ t("auth.local.organization_name") }}<input name="organization_name" value="Default" required></label>
+        <label>{{ t("auth.local.optional_password") }}<input name="password" type="password" minlength="14" autocomplete="new-password"></label>
+        <button class="rh-button rh-button--primary" type="submit">{{ t("auth.local.bootstrap") }}</button>
+      </form>
+      <section class="local-auth__recovery" data-recovery-codes hidden>
+        <h3>{{ t("auth.local.recovery_title") }}</h3>
+        <p>{{ t("auth.local.recovery_note") }}</p>
+        <ol data-recovery-code-list></ol>
+        <button class="rh-button rh-button--primary" type="button" data-recovery-ack>{{ t("auth.local.recovery_ack") }}</button>
+      </section>
+      <p class="local-auth__status" role="status" aria-live="polite" data-local-auth-status></p>
       <p class="auth-gateway__security">{{ t("auth.gateway.security_note") }}</p>
     </div>
   </section>

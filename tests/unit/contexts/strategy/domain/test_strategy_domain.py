@@ -16,7 +16,16 @@ from trading.contexts.strategy.domain import (
     ensure_single_active_run,
     generate_strategy_name,
 )
-from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, Timeframe, UserId
+from trading.shared_kernel.primitives import (
+    InstrumentId,
+    MarketId,
+    OrganizationId,
+    Symbol,
+    Timeframe,
+    UserId,
+)
+
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000000120"))
 
 
 def test_strategy_name_is_deterministic_for_same_user_and_spec() -> None:
@@ -67,6 +76,7 @@ def test_strategy_create_enforces_immutable_deterministic_name_contract() -> Non
     created_at = datetime(2026, 2, 15, 10, 0, tzinfo=timezone.utc)
 
     strategy = Strategy.create(
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         spec=spec,
         created_at=created_at,
@@ -77,6 +87,7 @@ def test_strategy_create_enforces_immutable_deterministic_name_contract() -> Non
     with pytest.raises(StrategySpecValidationError):
         Strategy(
             strategy_id=strategy.strategy_id,
+            organization_id=_ORGANIZATION_ID,
             user_id=user_id,
             name="manual mutable name",
             spec=spec,
@@ -129,6 +140,7 @@ def test_strategy_run_state_machine_allows_only_documented_transitions() -> None
     started_at = datetime(2026, 2, 15, 11, 0, tzinfo=timezone.utc)
     run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000B001"),
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         strategy_id=UUID("00000000-0000-0000-0000-00000000A001"),
         started_at=started_at,
@@ -167,6 +179,7 @@ def test_strategy_run_state_machine_allows_only_documented_transitions() -> None
     with pytest.raises(StrategyRunTransitionError):
         StrategyRun(
             run_id=UUID("00000000-0000-0000-0000-00000000B002"),
+            organization_id=_ORGANIZATION_ID,
             user_id=user_id,
             strategy_id=UUID("00000000-0000-0000-0000-00000000A001"),
             state="paused",  # type: ignore[arg-type]
@@ -198,12 +211,14 @@ def test_single_active_run_invariant_rejects_second_active_run() -> None:
 
     active_run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000B010"),
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         strategy_id=UUID("00000000-0000-0000-0000-00000000A010"),
         started_at=base_time,
     )
     another_active_run = StrategyRun.start(
         run_id=UUID("00000000-0000-0000-0000-00000000B011"),
+        organization_id=_ORGANIZATION_ID,
         user_id=user_id,
         strategy_id=UUID("00000000-0000-0000-0000-00000000A010"),
         started_at=datetime(2026, 2, 15, 12, 1, tzinfo=timezone.utc),
@@ -230,6 +245,7 @@ def test_strategy_events_allow_nullable_run_id_and_are_json_serializable() -> No
     """
     event = StrategyEvent.create(
         event_id=UUID("00000000-0000-0000-0000-00000000E001"),
+        organization_id=_ORGANIZATION_ID,
         user_id=UserId.from_string("00000000-0000-0000-0000-000000000129"),
         strategy_id=UUID("00000000-0000-0000-0000-00000000A020"),
         run_id=None,
@@ -240,7 +256,6 @@ def test_strategy_events_allow_nullable_run_id_and_are_json_serializable() -> No
 
     assert event.run_id is None
     assert event.payload_json["schema_version"] == 1
-
 
 
 def _build_spec() -> StrategySpecV1:

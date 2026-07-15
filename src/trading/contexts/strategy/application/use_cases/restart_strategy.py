@@ -82,6 +82,7 @@ class RestartStrategyUseCase:
 
         try:
             active_run = self._run_repository.find_active_for_strategy(
+                organization_id=current_user.organization_id,
                 user_id=current_user.user_id,
                 strategy_id=strategy.strategy_id,
             )
@@ -126,6 +127,7 @@ class RestartStrategyUseCase:
             )
             stopping = StrategyRun(
                 run_id=stopping.run_id,
+                organization_id=stopping.organization_id,
                 user_id=stopping.user_id,
                 strategy_id=stopping.strategy_id,
                 state=stopping.state,
@@ -139,6 +141,7 @@ class RestartStrategyUseCase:
             persisted_stopping = self._run_repository.update(run=stopping)
             if self._position_ownership_coordinator is not None:
                 self._position_ownership_coordinator.mark_releasing_for_strategy_run(
+                    organization_id=current_user.organization_id,
                     owner_user_id=current_user.user_id,
                     strategy_run_id=persisted_stopping.run_id,
                     now=requested_at,

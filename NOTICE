@@ -1,0 +1,14 @@
+Roehub
+Copyright 2026 Roehub contributors
+
+This product includes software developed by Roehub contributors and is
+licensed under the Apache License, Version 2.0.
+
+Third-party attribution notices required by redistributed components are
+generated in tools/release/THIRD_PARTY_NOTICES.md. The generated file is part
+of the source and binary distribution set. A third-party notice is copied into
+this file only when its upstream license requires inclusion in the top-level
+NOTICE; informational license lists do not modify the Apache License.
+
+This product includes TradingView Lightweight Charts™.
+Copyright (c) 2025 TradingView, Inc. https://www.tradingview.com/

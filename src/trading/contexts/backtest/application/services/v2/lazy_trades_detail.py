@@ -99,6 +99,7 @@ class BacktestLazyTradesDetailService:
         reference_now = (now or datetime.now(UTC)).astimezone(UTC)
         artifact_metadata = _artifact_metadata_from_job(job=job)
         cache_key = build_lazy_trades_cache_key(
+            organization_id=str(job.organization_id),
             job_id=str(job.job_id),
             variant_key=checked.public_variant_key,
             variant_hash=checked.variant_hash,
@@ -157,6 +158,7 @@ class BacktestLazyTradesDetailService:
         reference_now = (now or datetime.now(UTC)).astimezone(UTC)
         artifact_metadata = _artifact_metadata_from_job(job=job)
         cache_key = build_lazy_trades_cache_key(
+            organization_id=str(job.organization_id),
             job_id=str(job.job_id),
             variant_key=checked.public_variant_key,
             variant_hash=checked.variant_hash,

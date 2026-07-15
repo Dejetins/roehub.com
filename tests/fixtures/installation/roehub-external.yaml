@@ -1,0 +1,69 @@
+schema: io.roehub.installation/v1alpha1
+installation_id: roehub-external-test
+domain: localhost
+architecture: linux/arm64
+profiles:
+  - base
+  - trading
+paths:
+  data: /var/lib/roehub
+  config: /etc/roehub
+  artifacts: /var/lib/roehub/artifacts
+ports:
+  http: 8080
+  https: 8443
+  api: 8000
+  metrics: 9090
+stores:
+  postgresql:
+    mode: external
+    host: postgresql
+    port: 5432
+    database: roehub
+    credentials_ref: openbao://kv/roehub/storage/postgresql#credentials
+    tls: false
+  clickhouse:
+    mode: external
+    host: clickhouse
+    port: 8123
+    database: roehub
+    credentials_ref: openbao://kv/roehub/storage/clickhouse#credentials
+    tls: false
+  redis:
+    mode: external
+    host: redis
+    port: 6379
+    database: roehub
+    credentials_ref: openbao://kv/roehub/storage/redis#credentials
+    tls: false
+artifacts:
+  mode: local_cas
+  path: /var/lib/roehub/artifacts
+resources:
+  base:
+    cpus: 2
+    memory_mb: 2048
+  trading:
+    cpus: 4
+    memory_mb: 4096
+  ml:
+    cpus: 8
+    memory_mb: 8192
+tls:
+  mode: disabled
+proxy:
+  mode: embedded
+  trusted_proxies: []
+update_checks:
+  enabled: false
+oidc:
+  enabled: false
+openbao:
+  mode: embedded
+  address: http://openbao:8200
+  secret_root: kv/roehub
+notifications:
+  telegram:
+    enabled: false
+trading:
+  mode: paper

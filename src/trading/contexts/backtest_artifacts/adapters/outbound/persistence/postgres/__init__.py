@@ -8,3 +8,6 @@ __all__ = [
     "PostgresBacktestJobRepository",
     "PsycopgBacktestPostgresGateway",
 ]
+from .artifact_catalog_repository import PostgresArtifactCatalogRepository
+
+__all__ += ["PostgresArtifactCatalogRepository"]

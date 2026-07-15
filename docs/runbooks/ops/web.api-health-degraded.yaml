@@ -1,0 +1,84 @@
+apiVersion: ops.roehub.io/v1
+kind: Runbook
+metadata:
+  id: web.api-health-degraded
+  revision: 1
+  source_legacy: docs/runbooks/web-ui-gateway-same-origin.md
+spec:
+  title: Web gateway or API health is degraded
+  summary: Separate edge, same-origin gateway, API readiness, and dependency failure without exposing session data.
+  severity: high
+  component_ids: [app:web, app:api]
+  prerequisites:
+    - id: identify_route
+      text: Confirm the installation, public route, and failing health boundary.
+    - id: avoid_session_capture
+      text: Use a synthetic unauthenticated probe and do not capture user sessions.
+  symptoms:
+    - id: api_health_failed
+      text: The API health probe fails or returns a degraded dependency state.
+    - id: gateway_unavailable
+      text: The Web gateway cannot reach the same-origin API boundary.
+  diagnostics:
+    - id: probe_health
+      capability: observe.network.probe
+      instruction: Run a bounded synthetic probe against public health and same-origin gateway routes.
+      expected_evidence: Status class, latency, and sanitized route identifier without headers or cookies.
+    - id: inspect_readiness
+      capability: observe.health.read
+      instruction: Compare Web, API, and required dependency readiness classifications.
+      expected_evidence: Timestamped readiness classes with no environment values or credentials.
+  allowed_actions:
+    - id: diagnostics
+      capability: observe.health.read
+      instruction: Keep the boundary read-only until Web/API readiness and dependency state are known.
+      approval: none
+      effect: read_only
+    - id: restart_service
+      capability: control.service.restart
+      instruction: Restart the isolated failing service after dependency evidence identifies its boundary.
+      approval: operator
+      effect: reversible
+    - id: rollback_release
+      capability: control.release.rollback
+      instruction: Roll back the release when a verified Web or API change caused the failure.
+      approval: installation_owner
+      effect: disruptive
+  rollback:
+    - id: restore_previous_release
+      action_ref: rollback_release
+      instruction: Restore the last verified release and repeat synthetic health and same-origin probes.
+      expected_evidence: Public health, Web readiness, and same-origin API probes are stable.
+  evidence:
+    collect:
+      - id: route_matrix
+        text: Sanitized status and latency matrix for edge, Web, API, and dependencies.
+      - id: readiness_timeline
+        text: Timestamped readiness transitions for the affected services.
+    success_conditions:
+      - id: stable_same_origin
+        text: Synthetic public and same-origin probes remain healthy for the observation window.
+    failure_conditions:
+      - id: dependency_unknown
+        text: A required dependency remains unavailable or the failing boundary is ambiguous.
+  secret_redaction:
+    forbidden_evidence_keys: [authorization, cookie, csrf, password, session, token]
+    rules:
+      - id: no_browser_session
+        text: Never record browser cookies, CSRF values, session identifiers, or authorization headers.
+      - id: sanitize_routes
+        text: Record route templates and status classes, not user-specific URLs or payloads.
+  owner:
+    team: platform.delivery
+    escalation_role: installation_owner
+  related_alerts: [ApiHealthDown, ApiMetricsDown]
+  monitoring_gaps: []
+  safety:
+    warnings:
+      - id: no_sensitive_trace
+        text: Do not enable traces that capture headers, bodies, or session material.
+      - id: no_broad_restart
+        text: Do not restart all dependencies when the failing boundary is unknown.
+    stop_conditions:
+      - id: auth_boundary_unclear
+        text: Stop if the probe would require a real user session or secret-bearing request.

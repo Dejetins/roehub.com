@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from trading.contexts.backtest.application.ports import BacktestJobExecutionTrigger
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class DatabaseBacktestJobExecutionTrigger(BacktestJobExecutionTrigger):
@@ -19,10 +19,11 @@ class DatabaseBacktestJobExecutionTrigger(BacktestJobExecutionTrigger):
         self,
         *,
         job_id: UUID,
+        organization_id: OrganizationId,
         user_id: UserId,
         request_hash: str,
     ) -> None:
-        _ = job_id, user_id, request_hash
+        _ = job_id, organization_id, user_id, request_hash
 
 
 __all__ = ["DatabaseBacktestJobExecutionTrigger"]

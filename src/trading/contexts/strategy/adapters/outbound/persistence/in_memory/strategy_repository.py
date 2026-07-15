@@ -5,7 +5,7 @@ from uuid import UUID
 from trading.contexts.strategy.application.ports.repositories import StrategyRepository
 from trading.contexts.strategy.domain.entities import Strategy
 from trading.contexts.strategy.domain.errors import StrategyStorageError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class InMemoryStrategyRepository(StrategyRepository):
@@ -57,7 +57,13 @@ class InMemoryStrategyRepository(StrategyRepository):
         self._strategies_by_id[strategy.strategy_id] = strategy
         return strategy
 
-    def find_by_strategy_id(self, *, user_id: UserId, strategy_id: UUID) -> Strategy | None:
+    def find_by_strategy_id(
+        self,
+        *,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        strategy_id: UUID,
+    ) -> Strategy | None:
         """
         Load strategy snapshot by owner and identifier.
 
@@ -76,11 +82,16 @@ class InMemoryStrategyRepository(StrategyRepository):
         strategy = self._strategies_by_id.get(strategy_id)
         if strategy is None:
             return None
-        if strategy.user_id != user_id:
+        if strategy.organization_id != organization_id or strategy.user_id != user_id:
             return None
         return strategy
 
-    def find_any_by_strategy_id(self, *, strategy_id: UUID) -> Strategy | None:
+    def find_any_by_strategy_id(
+        self,
+        *,
+        organization_id: OrganizationId,
+        strategy_id: UUID,
+    ) -> Strategy | None:
         """
         Load strategy snapshot by identifier without owner filtering.
 
@@ -95,11 +106,15 @@ class InMemoryStrategyRepository(StrategyRepository):
         Side Effects:
             None.
         """
-        return self._strategies_by_id.get(strategy_id)
+        strategy = self._strategies_by_id.get(strategy_id)
+        if strategy is None or strategy.organization_id != organization_id:
+            return None
+        return strategy
 
     def list_for_user(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         include_deleted: bool = False,
     ) -> tuple[Strategy, ...]:
@@ -121,7 +136,9 @@ class InMemoryStrategyRepository(StrategyRepository):
         filtered = [
             strategy
             for strategy in self._strategies_by_id.values()
-            if strategy.user_id == user_id and (include_deleted or not strategy.is_deleted)
+            if strategy.organization_id == organization_id
+            and strategy.user_id == user_id
+            and (include_deleted or not strategy.is_deleted)
         ]
         return tuple(
             sorted(
@@ -130,7 +147,13 @@ class InMemoryStrategyRepository(StrategyRepository):
             )
         )
 
-    def soft_delete(self, *, user_id: UserId, strategy_id: UUID) -> bool:
+    def soft_delete(
+        self,
+        *,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        strategy_id: UUID,
+    ) -> bool:
         """
         Mark strategy snapshot as deleted (`is_deleted=True`) when owner matches.
 
@@ -149,7 +172,7 @@ class InMemoryStrategyRepository(StrategyRepository):
         strategy = self._strategies_by_id.get(strategy_id)
         if strategy is None:
             return False
-        if strategy.user_id != user_id:
+        if strategy.organization_id != organization_id or strategy.user_id != user_id:
             return False
         if strategy.is_deleted:
             return False

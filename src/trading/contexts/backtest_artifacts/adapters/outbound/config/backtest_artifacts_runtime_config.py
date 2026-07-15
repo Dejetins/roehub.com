@@ -97,9 +97,7 @@ def resolve_backtest_env_name(*, environ: Mapping[str, str]) -> str:
     """
     raw_value = environ.get(_ENV_NAME_KEY, "").strip().lower()
     if raw_value not in _ALLOWED_ENVS:
-        raise ValueError(
-            f"{_ENV_NAME_KEY} must be one of {_ALLOWED_ENVS}; got {raw_value!r}"
-        )
+        raise ValueError(f"{_ENV_NAME_KEY} must be one of {_ALLOWED_ENVS}; got {raw_value!r}")
     return raw_value
 
 
@@ -627,9 +625,7 @@ class BacktestArtifactExecutionPolicyRuntimeConfig:
         )
         _require_positive_int(
             value=self.signal_worker_memory_budget_bytes,
-            field_path=(
-                "backtest_artifacts.execution_policy.signal_worker_memory_budget_bytes"
-            ),
+            field_path=("backtest_artifacts.execution_policy.signal_worker_memory_budget_bytes"),
         )
         _require_positive_int(
             value=self.signal_chunk_rows_min,
@@ -833,9 +829,7 @@ class BacktestArtifactsRuntimeConfig:
             signal_artifacts=tuple(
                 item.to_validation_spec() for item in self.validation_plan.signal_artifacts
             ),
-            max_signal_rows_per_artifact=(
-                self.validation_budgets.max_signal_rows_per_artifact
-            ),
+            max_signal_rows_per_artifact=(self.validation_budgets.max_signal_rows_per_artifact),
             max_hit_times_cells=self.validation_budgets.max_hit_times_cells,
             max_hit_times_cells_full_rebuild=(
                 self.validation_budgets.max_hit_times_cells_full_rebuild
@@ -1090,9 +1084,7 @@ def load_backtest_artifacts_runtime_config(path: str | Path) -> BacktestArtifact
         execution_policy=BacktestArtifactExecutionPolicyRuntimeConfig(
             max_open_timeframe_sessions=_require_int(
                 value=execution_policy_map.get("max_open_timeframe_sessions"),
-                field_path=(
-                    "backtest_artifacts.execution_policy.max_open_timeframe_sessions"
-                ),
+                field_path=("backtest_artifacts.execution_policy.max_open_timeframe_sessions"),
             ),
             signal_worker_processes=_require_int(
                 value=execution_policy_map.get("signal_worker_processes"),

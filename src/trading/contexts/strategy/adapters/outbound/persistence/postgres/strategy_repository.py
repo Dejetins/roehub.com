@@ -11,7 +11,7 @@ from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway im
 from trading.contexts.strategy.application.ports.repositories import StrategyRepository
 from trading.contexts.strategy.domain.entities import Strategy, StrategySpecV1
 from trading.contexts.strategy.domain.errors import StrategyStorageError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresStrategyRepository(StrategyRepository):
@@ -74,6 +74,7 @@ class PostgresStrategyRepository(StrategyRepository):
         INSERT INTO {self._strategies_table}
         (
             strategy_id,
+            organization_id,
             user_id,
             name,
             instrument_id,
@@ -89,6 +90,7 @@ class PostgresStrategyRepository(StrategyRepository):
         VALUES
         (
             %(strategy_id)s,
+            %(organization_id)s,
             %(user_id)s,
             %(name)s,
             %(instrument_id)s::jsonb,
@@ -103,6 +105,7 @@ class PostgresStrategyRepository(StrategyRepository):
         )
         RETURNING
             strategy_id,
+            organization_id,
             user_id,
             name,
             instrument_id,
@@ -120,6 +123,7 @@ class PostgresStrategyRepository(StrategyRepository):
             query=query,
             parameters={
                 "strategy_id": str(strategy.strategy_id),
+                "organization_id": str(strategy.organization_id),
                 "user_id": str(strategy.user_id),
                 "name": strategy.name,
                 "instrument_id": _json_dumps(payload=strategy.spec.instrument_id.as_dict()),
@@ -137,7 +141,13 @@ class PostgresStrategyRepository(StrategyRepository):
             raise StrategyStorageError("PostgresStrategyRepository.create returned no row")
         return _map_strategy_row(row=row)
 
-    def find_by_strategy_id(self, *, user_id: UserId, strategy_id: UUID) -> Strategy | None:
+    def find_by_strategy_id(
+        self,
+        *,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        strategy_id: UUID,
+    ) -> Strategy | None:
         """
         Find strategy by owner and strategy id.
 
@@ -156,6 +166,7 @@ class PostgresStrategyRepository(StrategyRepository):
         query = f"""
         SELECT
             strategy_id,
+            organization_id,
             user_id,
             name,
             instrument_id,
@@ -168,12 +179,14 @@ class PostgresStrategyRepository(StrategyRepository):
             created_at,
             is_deleted
         FROM {self._strategies_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND strategy_id = %(strategy_id)s
         """
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "strategy_id": str(strategy_id),
             },
@@ -182,7 +195,12 @@ class PostgresStrategyRepository(StrategyRepository):
             return None
         return _map_strategy_row(row=row)
 
-    def find_any_by_strategy_id(self, *, strategy_id: UUID) -> Strategy | None:
+    def find_any_by_strategy_id(
+        self,
+        *,
+        organization_id: OrganizationId,
+        strategy_id: UUID,
+    ) -> Strategy | None:
         """
         Find strategy by identifier without owner filter for explicit ownership checks in use-cases.
 
@@ -200,6 +218,7 @@ class PostgresStrategyRepository(StrategyRepository):
         query = f"""
         SELECT
             strategy_id,
+            organization_id,
             user_id,
             name,
             instrument_id,
@@ -212,11 +231,13 @@ class PostgresStrategyRepository(StrategyRepository):
             created_at,
             is_deleted
         FROM {self._strategies_table}
-        WHERE strategy_id = %(strategy_id)s
+        WHERE organization_id = %(organization_id)s
+          AND strategy_id = %(strategy_id)s
         """
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "strategy_id": str(strategy_id),
             },
         )
@@ -227,6 +248,7 @@ class PostgresStrategyRepository(StrategyRepository):
     def list_for_user(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         include_deleted: bool = False,
     ) -> tuple[Strategy, ...]:
@@ -249,6 +271,7 @@ class PostgresStrategyRepository(StrategyRepository):
         query = f"""
         SELECT
             strategy_id,
+            organization_id,
             user_id,
             name,
             instrument_id,
@@ -261,14 +284,27 @@ class PostgresStrategyRepository(StrategyRepository):
             created_at,
             is_deleted
         FROM {self._strategies_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           {where_deleted}
         ORDER BY created_at ASC, strategy_id ASC
         """
-        rows = self._gateway.fetch_all(query=query, parameters={"user_id": str(user_id)})
+        rows = self._gateway.fetch_all(
+            query=query,
+            parameters={
+                "organization_id": str(organization_id),
+                "user_id": str(user_id),
+            },
+        )
         return tuple(_map_strategy_row(row=row) for row in rows)
 
-    def soft_delete(self, *, user_id: UserId, strategy_id: UUID) -> bool:
+    def soft_delete(
+        self,
+        *,
+        organization_id: OrganizationId,
+        user_id: UserId,
+        strategy_id: UUID,
+    ) -> bool:
         """
         Soft-delete strategy by updating only `is_deleted = TRUE`.
 
@@ -287,7 +323,8 @@ class PostgresStrategyRepository(StrategyRepository):
         query = f"""
         UPDATE {self._strategies_table}
         SET is_deleted = TRUE
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND strategy_id = %(strategy_id)s
           AND is_deleted = FALSE
         RETURNING strategy_id
@@ -295,6 +332,7 @@ class PostgresStrategyRepository(StrategyRepository):
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "strategy_id": str(strategy_id),
             },
@@ -354,6 +392,7 @@ def _map_strategy_row(*, row: Mapping[str, Any]) -> Strategy:
         spec = StrategySpecV1.from_json(payload=spec_payload)
         return Strategy(
             strategy_id=UUID(str(row["strategy_id"])),
+            organization_id=OrganizationId.from_string(str(row["organization_id"])),
             user_id=UserId.from_string(str(row["user_id"])),
             name=str(row["name"]),
             spec=spec,

@@ -13,7 +13,10 @@ from trading.contexts.notifications.application import (
 )
 from trading.contexts.notifications.domain import NotificationRoute, NotificationValidationError
 from trading.contexts.notifications.domain.notification import NotificationMode
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+_ORGANIZATION_ID = OrganizationId(UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"))
+_PROVIDER_INSTANCE_ID = UUID("00000000-0000-4000-8000-000000000001")
 
 
 def _now() -> datetime:
@@ -38,6 +41,8 @@ def _user_routes(owner_user_id: UserId) -> tuple[NotificationRoute, ...]:
 def _admin_route() -> NotificationRoute:
     return NotificationRoute(
         route_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
         recipient_kind="admin",
         owner_user_id=None,
         channel_key="telegram",
@@ -63,6 +68,8 @@ def _route(
     timestamp = now or _now()
     return NotificationRoute(
         route_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
+        provider_instance_id=_PROVIDER_INSTANCE_ID,
         recipient_kind="user",
         owner_user_id=owner_user_id,
         channel_key="telegram",
@@ -87,7 +94,7 @@ def test_synthetic_matrix_routes_every_type_to_fake_log_delivery_candidate() -> 
 
     for route in routes:
         repository.upsert_route(route=route)
-    for fact in synthetic_notification_matrix(owner_user_id=owner_user_id, now=_now()):
+    for fact in _matrix(owner_user_id):
         result = router.route(fact=fact, routes=routes, now=_now())
         repository.record_event(event=result.event)
         for delivery in result.deliveries:
@@ -118,7 +125,7 @@ def test_synthetic_matrix_routes_every_type_to_fake_log_delivery_candidate() -> 
     assert len(repository.attempts) == len(repository.deliveries)
     assert {
         fact.source_event_type
-        for fact in synthetic_notification_matrix(owner_user_id=owner_user_id, now=_now())
+        for fact in _matrix(owner_user_id)
     } >= {
         "producer_signal_rejected",
         "producer_order_rejected",
@@ -135,8 +142,8 @@ def test_synthetic_matrix_routes_every_type_to_fake_log_delivery_candidate() -> 
 def test_router_proves_user_admin_route_separation() -> None:
     owner_user_id = _user_id()
     router = NotificationSourceRouter()
-    user_fact = synthetic_notification_matrix(owner_user_id=owner_user_id, now=_now())[0]
-    admin_fact = synthetic_notification_matrix(owner_user_id=owner_user_id, now=_now())[-1]
+    user_fact = _matrix(owner_user_id)[0]
+    admin_fact = _matrix(owner_user_id)[-1]
     routes = (_route(owner_user_id=owner_user_id, mode="all", categories=()), _admin_route())
 
     user_result = router.route(fact=user_fact, routes=routes, now=_now())
@@ -171,7 +178,7 @@ def test_router_applies_user_preference_modes() -> None:
     )
     facts_by_category = {
         fact.category: fact
-        for fact in synthetic_notification_matrix(owner_user_id=owner_user_id, now=_now())
+        for fact in _matrix(owner_user_id)
         if fact.recipient_kind == "user"
     }
     router = NotificationSourceRouter()
@@ -195,7 +202,7 @@ def test_router_applies_user_preference_modes() -> None:
 
     critical_facts_by_category = {
         fact.category: fact
-        for fact in synthetic_notification_matrix(owner_user_id=owner_user_id, now=_now())
+        for fact in _matrix(owner_user_id)
         if fact.category in {"execution_unknown", "kill_switch"}
     }
     for category, fact in critical_facts_by_category.items():
@@ -210,6 +217,7 @@ def test_router_rejects_secret_like_synthetic_payloads() -> None:
     router = NotificationSourceRouter()
     fact = SyntheticNotificationSourceFact(
         fact_id="strategy:signal:secret",
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_user_id(),
         recipient_kind="user",
         source_context="strategy",
@@ -223,3 +231,11 @@ def test_router_rejects_secret_like_synthetic_payloads() -> None:
 
     with pytest.raises(NotificationValidationError, match="sensitive_notification_key_rejected"):
         router.event_from_fact(fact=fact, now=_now())
+
+
+def _matrix(owner_user_id: UserId) -> tuple[SyntheticNotificationSourceFact, ...]:
+    return synthetic_notification_matrix(
+        organization_id=_ORGANIZATION_ID,
+        owner_user_id=owner_user_id,
+        now=_now(),
+    )

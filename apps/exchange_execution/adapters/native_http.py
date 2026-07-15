@@ -10,6 +10,7 @@ import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 from time import perf_counter
 from typing import Any, Mapping
 from uuid import UUID
@@ -32,10 +33,19 @@ _BINANCE_FUTURES_TESTNET_URL = "https://demo-fapi.binance.com"
 _BYBIT_TESTNET_URL = "https://api-testnet.bybit.com"
 
 
+def _module_revision_hash(provider_id: str) -> str:
+    module_bytes = Path(__file__).read_bytes()
+    return hashlib.sha256(provider_id.encode("utf-8") + b"\0" + module_bytes).hexdigest()
+
+
 @dataclass(frozen=True, slots=True)
 class BinanceTestnetOrderAdapter:
     timeout_seconds: float = 5.0
     exchange_name: str = "binance"
+    provider_id: str = "core:binance-testnet"
+    provider_version: str = "v1"
+    provider_kind: str = "core"
+    revision_hash: str = _module_revision_hash("core:binance-testnet")
 
     def server_time_ms(self) -> int:
         payload = _get_json(
@@ -59,10 +69,17 @@ class BinanceTestnetOrderAdapter:
             params=params,
             credential=secret,
             timeout_seconds=self.timeout_seconds,
+            unknown_on_failure=True,
         )
         observed_at = datetime.now(tz=UTC)
+        exchange_order_id = payload.get("orderId")
+        if exchange_order_id is None:
+            raise ExchangeOrderAdapterError(
+                reason="exchange_submit_response_invalid",
+                unknown_state=True,
+            )
         return ExchangeOrderSubmitResult(
-            exchange_order_id=str(payload.get("orderId") or payload.get("clientOrderId")),
+            exchange_order_id=str(exchange_order_id),
             exchange_status=str(payload.get("status") or "submitted").lower(),
             submitted_at=observed_at,
             latency_ms=_elapsed_ms(started),
@@ -99,6 +116,71 @@ class BinanceTestnetOrderAdapter:
                 command=command,
                 exchange_order_id=exchange_order_id,
                 credential=secret,
+                timeout_seconds=self.timeout_seconds,
+            ),
+        )
+
+    def get_order_status_by_client_order_id(
+        self,
+        *,
+        command: ExchangeOrderCommand,
+        client_order_id: str,
+        credential: object,
+    ) -> ExchangeOrderStatusResult:
+        auth = _credential(credential)
+        base_url, path = _binance_base_and_order_path(command)
+        started = perf_counter()
+        try:
+            payload = _binance_signed_json(
+                method="GET",
+                base_url=base_url,
+                path=path,
+                params={"symbol": _symbol(command), "origClientOrderId": client_order_id},
+                credential=auth,
+                timeout_seconds=self.timeout_seconds,
+                unknown_on_failure=True,
+                confirmed_not_found=True,
+            )
+        except ExchangeOrderAdapterError as error:
+            if error.unknown_state:
+                return ExchangeOrderStatusResult(
+                    exchange_order_id="",
+                    exchange_status="unknown",
+                    checked_at=datetime.now(tz=UTC),
+                    latency_ms=_elapsed_ms(started),
+                    metadata={"provider": "binance", "lookup": "client_order_id"},
+                    lookup_outcome="unknown",
+                )
+            if error.reason != "exchange_order_not_found":
+                raise
+            return ExchangeOrderStatusResult(
+                exchange_order_id="",
+                exchange_status="not_found",
+                checked_at=datetime.now(tz=UTC),
+                latency_ms=_elapsed_ms(started),
+                metadata={"provider": "binance", "lookup": "client_order_id"},
+                lookup_outcome="confirmed_absent",
+            )
+        if payload.get("orderId") is None:
+            return ExchangeOrderStatusResult(
+                exchange_order_id="",
+                exchange_status="unknown",
+                checked_at=datetime.now(tz=UTC),
+                latency_ms=_elapsed_ms(started),
+                metadata={"provider": "binance", "lookup": "client_order_id"},
+                lookup_outcome="unknown",
+            )
+        exchange_order_id = str(payload["orderId"])
+        return ExchangeOrderStatusResult(
+            exchange_order_id=exchange_order_id,
+            exchange_status=str(payload.get("status") or "status_checked").lower(),
+            checked_at=datetime.now(tz=UTC),
+            latency_ms=_elapsed_ms(started),
+            metadata={"provider": "binance", "lookup": "client_order_id"},
+            fills=_binance_order_fills(
+                command=command,
+                exchange_order_id=exchange_order_id,
+                credential=auth,
                 timeout_seconds=self.timeout_seconds,
             ),
         )
@@ -143,6 +225,7 @@ class BinanceTestnetOrderAdapter:
                     "binance",
                     f"spot-rest-user-stream-deprecated:{connection.connection_id}",
                 ),
+                organization_id=connection.organization_id,
                 exchange_name="binance",
                 environment=connection.environment,
                 market_type=connection.market_type,
@@ -180,6 +263,7 @@ class BinanceTestnetOrderAdapter:
         now = datetime.now(tz=UTC)
         return ExchangePrivateStreamSession(
             session_id=_session_uuid("binance", listen_key),
+            organization_id=connection.organization_id,
             exchange_name="binance",
             environment=connection.environment,
             market_type=connection.market_type,
@@ -196,6 +280,10 @@ class BinanceTestnetOrderAdapter:
 class BybitTestnetOrderAdapter:
     timeout_seconds: float = 5.0
     exchange_name: str = "bybit"
+    provider_id: str = "core:bybit-testnet"
+    provider_version: str = "v1"
+    provider_kind: str = "core"
+    revision_hash: str = _module_revision_hash("core:bybit-testnet")
 
     def server_time_ms(self) -> int:
         payload = _get_json(
@@ -220,11 +308,18 @@ class BybitTestnetOrderAdapter:
             params=params,
             credential=secret,
             timeout_seconds=self.timeout_seconds,
+            unknown_on_failure=True,
         )
-        result = _bybit_result(payload)
+        result = _bybit_result(payload, unknown_on_invalid=True)
         observed_at = datetime.now(tz=UTC)
+        exchange_order_id = result.get("orderId")
+        if not exchange_order_id:
+            raise ExchangeOrderAdapterError(
+                reason="exchange_submit_response_invalid",
+                unknown_state=True,
+            )
         return ExchangeOrderSubmitResult(
-            exchange_order_id=str(result.get("orderId") or result.get("orderLinkId")),
+            exchange_order_id=str(exchange_order_id),
             exchange_status="submitted",
             submitted_at=observed_at,
             latency_ms=_elapsed_ms(started),
@@ -270,6 +365,66 @@ class BybitTestnetOrderAdapter:
             ),
         )
 
+    def get_order_status_by_client_order_id(
+        self,
+        *,
+        command: ExchangeOrderCommand,
+        client_order_id: str,
+        credential: object,
+    ) -> ExchangeOrderStatusResult:
+        auth = _credential(credential)
+        started = perf_counter()
+        try:
+            payload = _bybit_signed_json(
+                method="GET",
+                path="/v5/order/realtime",
+                params={
+                    "category": _bybit_category(command),
+                    "symbol": _symbol(command),
+                    "orderLinkId": client_order_id,
+                },
+                credential=auth,
+                timeout_seconds=self.timeout_seconds,
+                unknown_on_failure=True,
+            )
+            result = _bybit_result(payload, unknown_on_invalid=True)
+        except ExchangeOrderAdapterError as error:
+            if not error.unknown_state:
+                raise
+            return ExchangeOrderStatusResult(
+                exchange_order_id="",
+                exchange_status="unknown",
+                checked_at=datetime.now(tz=UTC),
+                latency_ms=_elapsed_ms(started),
+                metadata={"provider": "bybit", "lookup": "client_order_id"},
+                lookup_outcome="unknown",
+            )
+        rows = result.get("list") if isinstance(result, Mapping) else None
+        row = rows[0] if isinstance(rows, list) and rows else {}
+        if not row:
+            return ExchangeOrderStatusResult(
+                exchange_order_id="",
+                exchange_status="not_found",
+                checked_at=datetime.now(tz=UTC),
+                latency_ms=_elapsed_ms(started),
+                metadata={"provider": "bybit", "lookup": "client_order_id"},
+                lookup_outcome="confirmed_absent",
+            )
+        exchange_order_id = str(row.get("orderId") or client_order_id)
+        return ExchangeOrderStatusResult(
+            exchange_order_id=exchange_order_id,
+            exchange_status=str(row.get("orderStatus") or "status_checked").lower(),
+            checked_at=datetime.now(tz=UTC),
+            latency_ms=_elapsed_ms(started),
+            metadata={"provider": "bybit", "lookup": "client_order_id"},
+            fills=_bybit_order_fills(
+                command=command,
+                exchange_order_id=exchange_order_id,
+                credential=auth,
+                timeout_seconds=self.timeout_seconds,
+            ),
+        )
+
     def cancel_order(
         self,
         *,
@@ -310,6 +465,7 @@ class BybitTestnetOrderAdapter:
         now = datetime.now(tz=UTC)
         return ExchangePrivateStreamSession(
             session_id=_session_uuid("bybit", f"{connection.connection_id}:{server_time}"),
+            organization_id=connection.organization_id,
             exchange_name="bybit",
             environment=connection.environment,
             market_type=connection.market_type,
@@ -330,6 +486,8 @@ def _binance_signed_json(
     params: Mapping[str, object],
     credential: ExchangeExecutionCredential,
     timeout_seconds: float,
+    unknown_on_failure: bool = False,
+    confirmed_not_found: bool = False,
 ) -> dict[str, Any]:
     signed = {**params, "recvWindow": _RECV_WINDOW, "timestamp": str(int(time.time() * 1000))}
     query = urllib.parse.urlencode(signed)
@@ -344,6 +502,8 @@ def _binance_signed_json(
         url=url,
         headers={"X-MBX-APIKEY": credential.api_key},
         timeout_seconds=timeout_seconds,
+        unknown_on_failure=unknown_on_failure,
+        confirmed_not_found=confirmed_not_found,
     )
 
 
@@ -354,6 +514,7 @@ def _bybit_signed_json(
     params: Mapping[str, object],
     credential: ExchangeExecutionCredential,
     timeout_seconds: float,
+    unknown_on_failure: bool = False,
 ) -> dict[str, Any]:
     timestamp = str(int(time.time() * 1000))
     if method == "GET":
@@ -382,6 +543,7 @@ def _bybit_signed_json(
         },
         data=data,
         timeout_seconds=timeout_seconds,
+        unknown_on_failure=unknown_on_failure,
     )
 
 
@@ -418,30 +580,58 @@ def _request_json(
     timeout_seconds: float,
     data: bytes | None = None,
     allow_empty: bool = False,
+    unknown_on_failure: bool = False,
+    confirmed_not_found: bool = False,
 ) -> dict[str, Any]:
     request = urllib.request.Request(url=url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
             raw = response.read().decode("utf-8")
     except urllib.error.HTTPError as exc:
-        raise ExchangeOrderAdapterError(reason=f"exchange_http_{exc.code}") from exc
+        error_body = exc.read().decode("utf-8", errors="replace")
+        try:
+            error_payload = json.loads(error_body)
+        except json.JSONDecodeError:
+            error_payload = {}
+        if (
+            confirmed_not_found
+            and isinstance(error_payload, dict)
+            and error_payload.get("code") == -2013
+        ):
+            raise ExchangeOrderAdapterError(reason="exchange_order_not_found") from exc
+        raise ExchangeOrderAdapterError(
+            reason=f"exchange_http_{exc.code}",
+            unknown_state=unknown_on_failure,
+        ) from exc
     except TimeoutError as exc:
         raise ExchangeOrderAdapterError(
             reason="exchange_request_timeout",
             unknown_state=True,
         ) from exc
     except OSError as exc:
-        raise ExchangeOrderAdapterError(reason="exchange_request_failed") from exc
+        raise ExchangeOrderAdapterError(
+            reason="exchange_request_failed",
+            unknown_state=unknown_on_failure,
+        ) from exc
     if allow_empty and not raw.strip():
         return {}
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError as exc:
-        raise ExchangeOrderAdapterError(reason="exchange_response_invalid") from exc
+        raise ExchangeOrderAdapterError(
+            reason="exchange_response_invalid",
+            unknown_state=unknown_on_failure,
+        ) from exc
     if not isinstance(payload, dict):
-        raise ExchangeOrderAdapterError(reason="exchange_response_invalid")
+        raise ExchangeOrderAdapterError(
+            reason="exchange_response_invalid",
+            unknown_state=unknown_on_failure,
+        )
     if "retCode" in payload and int(payload.get("retCode", 0)) != 0:
-        raise ExchangeOrderAdapterError(reason=f"exchange_ret_code_{payload.get('retCode')}")
+        raise ExchangeOrderAdapterError(
+            reason=f"exchange_ret_code_{payload.get('retCode')}",
+            unknown_state=unknown_on_failure,
+        )
     return payload
 
 
@@ -526,7 +716,9 @@ def _binance_order_params(command: ExchangeOrderCommand) -> dict[str, object]:
         if command.limit_price is None:
             raise ExchangeOrderAdapterError(reason="limit_price_required")
         params["price"] = _decimal_api_value(command.limit_price)
-        params["timeInForce"] = "GTC"
+        params["timeInForce"] = command.constraints.get("time_in_force", "GTC")
+    if command.market_type == "futures" and command.constraints.get("reduce_only") == "true":
+        params["reduceOnly"] = "true"
     return params
 
 
@@ -549,7 +741,9 @@ def _bybit_order_params(command: ExchangeOrderCommand) -> dict[str, object]:
         if command.limit_price is None:
             raise ExchangeOrderAdapterError(reason="limit_price_required")
         params["price"] = _decimal_api_value(command.limit_price)
-        params["timeInForce"] = "GTC"
+        params["timeInForce"] = command.constraints.get("time_in_force", "GTC")
+    if command.market_type == "futures" and command.constraints.get("reduce_only") == "true":
+        params["reduceOnly"] = True
     return params
 
 
@@ -570,10 +764,15 @@ def _bybit_category(command: ExchangeOrderCommand) -> str:
     raise ExchangeOrderAdapterError(reason="unsupported_market_type")
 
 
-def _bybit_result(payload: Mapping[str, Any]) -> Mapping[str, Any]:
+def _bybit_result(
+    payload: Mapping[str, Any], *, unknown_on_invalid: bool = False
+) -> Mapping[str, Any]:
     result = payload.get("result")
     if not isinstance(result, Mapping):
-        raise ExchangeOrderAdapterError(reason="exchange_response_invalid")
+        raise ExchangeOrderAdapterError(
+            reason="exchange_response_invalid",
+            unknown_state=unknown_on_invalid,
+        )
     return result
 
 

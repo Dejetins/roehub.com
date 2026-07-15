@@ -1,0 +1,17 @@
+{
+  "address": "http://openbao:8200",
+  "authentication": {
+    "delivery": "file",
+    "reload": "per-request",
+    "token_file": "/run/secrets/roehub-openbao-token"
+  },
+  "mode": "embedded",
+  "profile": "ml",
+  "schema": "io.roehub.openbao-input/v1alpha1",
+  "secret_references": [
+    "openbao://kv/roehub/storage/clickhouse#credentials",
+    "openbao://kv/roehub/storage/postgresql#credentials",
+    "openbao://kv/roehub/storage/redis#credentials"
+  ],
+  "secret_root": "kv/roehub"
+}

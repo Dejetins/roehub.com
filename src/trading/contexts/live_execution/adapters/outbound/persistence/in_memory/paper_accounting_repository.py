@@ -11,7 +11,7 @@ from trading.contexts.live_execution.domain import (
     PaperOrder,
     StrategyPaperAccountingSnapshot,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class InMemoryPaperAccountingRepository(PaperAccountingRepository):
@@ -28,6 +28,7 @@ class InMemoryPaperAccountingRepository(PaperAccountingRepository):
     def release_reservation_for_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         changed_at: datetime,
@@ -35,12 +36,14 @@ class InMemoryPaperAccountingRepository(PaperAccountingRepository):
     ) -> CapitalReservation | None:
         for index, item in enumerate(self.reservations):
             if (
-                item.owner_user_id == owner_user_id
+                item.organization_id == organization_id
+                and item.owner_user_id == owner_user_id
                 and item.strategy_run_id == strategy_run_id
                 and item.state == "reserved"
             ):
                 updated = CapitalReservation(
                     reservation_id=item.reservation_id,
+                    organization_id=item.organization_id,
                     owner_user_id=item.owner_user_id,
                     exchange_connection_id=item.exchange_connection_id,
                     strategy_id=item.strategy_id,
@@ -63,25 +66,32 @@ class InMemoryPaperAccountingRepository(PaperAccountingRepository):
         return None
 
     def get_active_reservation_for_run(
-        self, *, owner_user_id: UserId, strategy_run_id: UUID
+        self, *, organization_id: OrganizationId, owner_user_id: UserId, strategy_run_id: UUID
     ) -> CapitalReservation | None:
         matches = [
             item
             for item in self.reservations
-            if item.owner_user_id == owner_user_id
+            if item.organization_id == organization_id
+            and item.owner_user_id == owner_user_id
             and item.strategy_run_id == strategy_run_id
             and item.state == "reserved"
         ]
         return matches[-1] if matches else None
 
     def sum_active_reserved(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID, asset: str
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
+        asset: str,
     ) -> Decimal:
         return sum(
             (
                 item.reserved_amount
                 for item in self.reservations
-                if item.owner_user_id == owner_user_id
+                if item.organization_id == organization_id
+                and item.owner_user_id == owner_user_id
                 and item.exchange_connection_id == exchange_connection_id
                 and item.asset == asset
                 and item.state == "reserved"
@@ -100,7 +110,8 @@ class InMemoryPaperAccountingRepository(PaperAccountingRepository):
             (
                 item
                 for item in self.accounting
-                if item.paper_fill_id == accounting.paper_fill_id
+                if item.organization_id == accounting.organization_id
+                and item.paper_fill_id == accounting.paper_fill_id
             ),
             None,
         )
@@ -110,7 +121,8 @@ class InMemoryPaperAccountingRepository(PaperAccountingRepository):
             (
                 item
                 for item in self.orders
-                if item.source_event_id is not None
+                if item.organization_id == order.organization_id
+                and item.source_event_id is not None
                 and item.source_event_id == order.source_event_id
             ),
             None,
@@ -120,7 +132,8 @@ class InMemoryPaperAccountingRepository(PaperAccountingRepository):
                 (
                     item
                     for item in self.accounting
-                    if item.paper_fill_id == accounting.paper_fill_id
+                    if item.organization_id == accounting.organization_id
+                    and item.paper_fill_id == accounting.paper_fill_id
                 ),
                 None,
             )
@@ -132,12 +145,14 @@ class InMemoryPaperAccountingRepository(PaperAccountingRepository):
         return accounting
 
     def get_latest_accounting_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID
+        self, *, organization_id: OrganizationId, owner_user_id: UserId, strategy_id: UUID
     ) -> StrategyPaperAccountingSnapshot | None:
         matches = [
             item
             for item in self.accounting
-            if item.owner_user_id == owner_user_id and item.strategy_id == strategy_id
+            if item.organization_id == organization_id
+            and item.owner_user_id == owner_user_id
+            and item.strategy_id == strategy_id
         ]
         if not matches:
             return None

@@ -8,7 +8,7 @@ from trading.contexts.strategy.domain.errors import (
     StrategyActiveRunConflictError,
     StrategyStorageError,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class InMemoryStrategyRunRepository(StrategyRunRepository):
@@ -60,6 +60,7 @@ class InMemoryStrategyRunRepository(StrategyRunRepository):
             raise StrategyStorageError("InMemoryStrategyRunRepository duplicate run_id")
 
         existing_active = self.find_active_for_strategy(
+            organization_id=run.organization_id,
             user_id=run.user_id,
             strategy_id=run.strategy_id,
         )
@@ -91,7 +92,9 @@ class InMemoryStrategyRunRepository(StrategyRunRepository):
         self._runs_by_id[run.run_id] = run
         return run
 
-    def find_by_run_id(self, *, user_id: UserId, run_id: UUID) -> StrategyRun | None:
+    def find_by_run_id(
+        self, *, organization_id: OrganizationId, user_id: UserId, run_id: UUID
+    ) -> StrategyRun | None:
         """
         Load run snapshot by owner and run identifier.
 
@@ -110,11 +113,13 @@ class InMemoryStrategyRunRepository(StrategyRunRepository):
         run = self._runs_by_id.get(run_id)
         if run is None:
             return None
-        if run.user_id != user_id:
+        if run.organization_id != organization_id or run.user_id != user_id:
             return None
         return run
 
-    def find_active_for_strategy(self, *, user_id: UserId, strategy_id: UUID) -> StrategyRun | None:
+    def find_active_for_strategy(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> StrategyRun | None:
         """
         Find active run for strategy in deterministic ordering.
 
@@ -133,7 +138,10 @@ class InMemoryStrategyRunRepository(StrategyRunRepository):
         active_runs = [
             run
             for run in self._runs_by_id.values()
-            if run.user_id == user_id and run.strategy_id == strategy_id and run.is_active()
+            if run.organization_id == organization_id
+            and run.user_id == user_id
+            and run.strategy_id == strategy_id
+            and run.is_active()
         ]
         if not active_runs:
             return None
@@ -144,7 +152,9 @@ class InMemoryStrategyRunRepository(StrategyRunRepository):
         )
         return sorted_runs[0]
 
-    def list_for_strategy(self, *, user_id: UserId, strategy_id: UUID) -> tuple[StrategyRun, ...]:
+    def list_for_strategy(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> tuple[StrategyRun, ...]:
         """
         List strategy runs in deterministic ordering by started_at and run_id.
 
@@ -163,7 +173,9 @@ class InMemoryStrategyRunRepository(StrategyRunRepository):
         filtered = [
             run
             for run in self._runs_by_id.values()
-            if run.user_id == user_id and run.strategy_id == strategy_id
+            if run.organization_id == organization_id
+            and run.user_id == user_id
+            and run.strategy_id == strategy_id
         ]
         return tuple(
             sorted(

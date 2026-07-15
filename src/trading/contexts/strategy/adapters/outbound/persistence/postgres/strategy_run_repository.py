@@ -14,7 +14,7 @@ from trading.contexts.strategy.domain.errors import (
     StrategyActiveRunConflictError,
     StrategyStorageError,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 _ACTIVE_STATES_SQL_LITERAL = "'starting','warming_up','running','stopping'"
 
@@ -78,6 +78,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
         """
         if run.is_active():
             active_run = self.find_active_for_strategy(
+                organization_id=run.organization_id,
                 user_id=run.user_id,
                 strategy_id=run.strategy_id,
             )
@@ -90,6 +91,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
         INSERT INTO {self._runs_table}
         (
             run_id,
+            organization_id,
             user_id,
             strategy_id,
             state,
@@ -103,6 +105,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
         VALUES
         (
             %(run_id)s,
+            %(organization_id)s,
             %(user_id)s,
             %(strategy_id)s,
             %(state)s,
@@ -115,6 +118,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
         )
         RETURNING
             run_id,
+            organization_id,
             user_id,
             strategy_id,
             state,
@@ -130,6 +134,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
                 query=query,
                 parameters={
                     "run_id": str(run.run_id),
+                    "organization_id": str(run.organization_id),
                     "user_id": str(run.user_id),
                     "strategy_id": str(run.strategy_id),
                     "state": run.state,
@@ -176,10 +181,12 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             last_error = %(last_error)s,
             updated_at = %(updated_at)s,
             metadata_json = %(metadata_json)s::jsonb
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND run_id = %(run_id)s
         RETURNING
             run_id,
+            organization_id,
             user_id,
             strategy_id,
             state,
@@ -194,6 +201,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             query=query,
             parameters={
                 "run_id": str(run.run_id),
+                "organization_id": str(run.organization_id),
                 "user_id": str(run.user_id),
                 "state": run.state,
                 "stopped_at": run.stopped_at,
@@ -207,7 +215,9 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             raise StrategyStorageError("PostgresStrategyRunRepository.update cannot find run row")
         return _map_run_row(row=row)
 
-    def find_by_run_id(self, *, user_id: UserId, run_id: UUID) -> StrategyRun | None:
+    def find_by_run_id(
+        self, *, organization_id: OrganizationId, user_id: UserId, run_id: UUID
+    ) -> StrategyRun | None:
         """
         Find run snapshot by owner and run identifier.
 
@@ -226,6 +236,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
         query = f"""
         SELECT
             run_id,
+            organization_id,
             user_id,
             strategy_id,
             state,
@@ -236,12 +247,14 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             updated_at,
             metadata_json
         FROM {self._runs_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND run_id = %(run_id)s
         """
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "run_id": str(run_id),
             },
@@ -250,7 +263,9 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             return None
         return _map_run_row(row=row)
 
-    def find_active_for_strategy(self, *, user_id: UserId, strategy_id: UUID) -> StrategyRun | None:
+    def find_active_for_strategy(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> StrategyRun | None:
         """
         Find current active run for strategy using deterministic ordering.
 
@@ -269,6 +284,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
         query = f"""
         SELECT
             run_id,
+            organization_id,
             user_id,
             strategy_id,
             state,
@@ -279,7 +295,8 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             updated_at,
             metadata_json
         FROM {self._runs_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND strategy_id = %(strategy_id)s
           AND state IN ({_ACTIVE_STATES_SQL_LITERAL})
         ORDER BY started_at DESC, run_id DESC
@@ -288,6 +305,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "strategy_id": str(strategy_id),
             },
@@ -296,7 +314,9 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             return None
         return _map_run_row(row=row)
 
-    def list_for_strategy(self, *, user_id: UserId, strategy_id: UUID) -> tuple[StrategyRun, ...]:
+    def list_for_strategy(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> tuple[StrategyRun, ...]:
         """
         List strategy runs ordered deterministically by start time and run id.
 
@@ -315,6 +335,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
         query = f"""
         SELECT
             run_id,
+            organization_id,
             user_id,
             strategy_id,
             state,
@@ -325,13 +346,15 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
             updated_at,
             metadata_json
         FROM {self._runs_table}
-        WHERE user_id = %(user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND user_id = %(user_id)s
           AND strategy_id = %(strategy_id)s
         ORDER BY started_at ASC, run_id ASC
         """
         rows = self._gateway.fetch_all(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "user_id": str(user_id),
                 "strategy_id": str(strategy_id),
             },
@@ -356,6 +379,7 @@ class PostgresStrategyRunRepository(StrategyRunRepository):
         query = f"""
         SELECT
             run_id,
+            organization_id,
             user_id,
             strategy_id,
             state,
@@ -396,6 +420,7 @@ def _map_run_row(*, row: Mapping[str, Any]) -> StrategyRun:
         state = _parse_run_state(value=row["state"])
         return StrategyRun(
             run_id=UUID(str(row["run_id"])),
+            organization_id=OrganizationId.from_string(str(row["organization_id"])),
             user_id=UserId.from_string(str(row["user_id"])),
             strategy_id=UUID(str(row["strategy_id"])),
             state=state,

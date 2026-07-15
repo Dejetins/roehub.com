@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 from trading.contexts.strategy.domain.entities.strategy_spec_v1 import StrategySpecV1
 from trading.contexts.strategy.domain.errors import StrategySpecValidationError
 from trading.contexts.strategy.domain.services.strategy_name import generate_strategy_name
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +24,7 @@ class Strategy:
     """
 
     strategy_id: UUID
+    organization_id: OrganizationId
     user_id: UserId
     name: str
     spec: StrategySpecV1
@@ -59,6 +60,7 @@ class Strategy:
     def create(
         cls,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         spec: StrategySpecV1,
         created_at: datetime,
@@ -85,6 +87,7 @@ class Strategy:
         generated_name = generate_strategy_name(user_id=user_id, spec=spec)
         return cls(
             strategy_id=effective_strategy_id,
+            organization_id=organization_id,
             user_id=user_id,
             name=generated_name,
             spec=spec,
@@ -109,6 +112,7 @@ class Strategy:
         """
         return Strategy(
             strategy_id=self.strategy_id,
+            organization_id=self.organization_id,
             user_id=self.user_id,
             name=self.name,
             spec=self.spec,

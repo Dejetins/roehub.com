@@ -1,0 +1,196 @@
+{
+  "profile": "ml",
+  "schema": "io.roehub.operational-manifest/v1alpha1",
+  "services": [
+    {
+      "action_ref": "restart_service",
+      "capability": "product.web_api",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "web.api-health-degraded",
+      "service_id": "api",
+      "target": "http://api:8000/health",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "research.backtests",
+      "kind": "http_reachability",
+      "required": false,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "backtest-artifact-publisher",
+      "target": "http://backtest-artifact-publisher:9203/metrics",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "research.backtests",
+      "kind": "http_reachability",
+      "required": false,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "backtest-job-runner",
+      "target": "http://backtest-job-runner:9204/metrics",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "storage.clickhouse",
+      "kind": "http_reachability",
+      "required": false,
+      "runbook_id": "database.clickhouse-degraded",
+      "service_id": "clickhouse",
+      "target": "http://clickhouse:8123/ping",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "runtime.service",
+      "kind": "http_reachability",
+      "required": false,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "clickhouse-exporter",
+      "target": "http://clickhouse-exporter:9116/metrics",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "trading.execution",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "exchange-control",
+      "target": "http://exchange-control:9205/health/ready",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "trading.execution",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "exchange-execution",
+      "target": "http://exchange-execution:9206/health/ready",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "market_data.ingestion",
+      "kind": "http_reachability",
+      "required": false,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "market-data-scheduler",
+      "target": "http://market-data-scheduler:9202/metrics",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "market_data.ingestion",
+      "kind": "http_reachability",
+      "required": false,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "market-data-ws",
+      "target": "http://market-data-ws:9201/metrics",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "notifications.delivery",
+      "kind": "http_reachability",
+      "required": false,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "notification-dispatcher",
+      "target": "http://notification-dispatcher:9210/metrics",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "notifications.delivery",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "notification-report-scheduler",
+      "target": "http://notification-report-scheduler:9211/health/ready",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "secrets.openbao",
+      "kind": "openbao",
+      "required": true,
+      "runbook_id": "auth.openbao-unavailable",
+      "service_id": "openbao",
+      "target": "http://openbao:8200/v1/sys/health?standbyok=true&sealedcode=200&uninitcode=200",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "extensions.plugins",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "plugin-gateway",
+      "target": "http://plugin-gateway:9209/health/ready",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "storage.postgresql",
+      "kind": "tcp_reachability",
+      "required": false,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "postgresql",
+      "target": "postgresql:5432",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "diagnostics",
+      "capability": "transport.redis",
+      "kind": "tcp_reachability",
+      "required": false,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "redis",
+      "target": "redis:6379",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "ml.inference",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "rl-inference",
+      "target": "http://rl-inference:9213/health/ready",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "trading.strategy",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "strategy-live-runner",
+      "target": "http://strategy-live-runner:9207/health/ready",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "notifications.delivery",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "runtime.service-degraded",
+      "service_id": "telegram-bot-worker",
+      "target": "http://telegram-bot-worker:9212/health/ready",
+      "timeout_seconds": 1.0
+    },
+    {
+      "action_ref": "restart_service",
+      "capability": "product.web_api",
+      "kind": "http_json",
+      "required": true,
+      "runbook_id": "web.api-health-degraded",
+      "service_id": "web",
+      "target": "http://web:8010/health/ready",
+      "timeout_seconds": 1.0
+    }
+  ]
+}

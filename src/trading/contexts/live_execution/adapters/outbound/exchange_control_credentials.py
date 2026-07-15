@@ -18,8 +18,10 @@ from trading.contexts.live_execution.application.ports import (
 from trading.contexts.live_execution.domain import (
     ExchangeExecutionConnection,
     ExchangeExecutionCredential,
+    execution_account_revision_hash,
+    execution_secret_reference_hash,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class ExchangeControlCredentialResolver(ExchangeExecutionCredentialResolver):
@@ -33,10 +35,18 @@ class ExchangeControlCredentialResolver(ExchangeExecutionCredentialResolver):
         self._secret_cipher = secret_cipher
 
     def resolve(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
     ) -> ExchangeExecutionConnection:
         connection = self._connection_repository.get(connection_id=exchange_connection_id)
-        if connection is None or connection.owner_user_id != owner_user_id:
+        if (
+            connection is None
+            or connection.organization_id != organization_id
+            or connection.owner_user_id != owner_user_id
+        ):
             raise ExchangeExecutionCredentialUnavailable(reason="exchange_connection_not_found")
         if connection.status != "active":
             raise ExchangeExecutionCredentialUnavailable(reason="exchange_connection_not_active")
@@ -74,12 +84,29 @@ class ExchangeControlCredentialResolver(ExchangeExecutionCredentialResolver):
         )
         return ExchangeExecutionConnection(
             connection_id=connection.connection_id,
+            organization_id=connection.organization_id,
             owner_user_id=connection.owner_user_id,
             exchange_name=connection.exchange_name,
             market_type=connection.market_type,
             environment=connection.environment,
             connection_readiness=str(capability_summary["connection_readiness"]),
             effective_capability=str(capability_summary["effective_capability"]),
+            secret_reference_hash=execution_secret_reference_hash(
+                connection_id=connection.connection_id,
+                credential_version_id=credential_version.credential_version_id,
+            ),
+            account_revision_hash=execution_account_revision_hash(
+                connection_id=connection.connection_id,
+                credential_version_id=credential_version.credential_version_id,
+                organization_id=connection.organization_id,
+                owner_user_id=connection.owner_user_id,
+                exchange_name=connection.exchange_name,
+                market_type=connection.market_type,
+                environment=connection.environment,
+                connection_readiness=str(capability_summary["connection_readiness"]),
+                effective_capability=str(capability_summary["effective_capability"]),
+                updated_at=connection.updated_at,
+            ),
             credential=ExchangeExecutionCredential(
                 api_key=api_key,
                 api_secret=api_secret,

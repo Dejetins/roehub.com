@@ -1,0 +1,81 @@
+apiVersion: ops.roehub.io/v1
+kind: Runbook
+metadata:
+  id: auth.openbao-unavailable
+  revision: 2
+  source_legacy: docs/runbooks/openbao-secrets-and-recovery.md
+spec:
+  title: OpenBao secret resolution or Transit operations are unavailable
+  summary: Preserve fail-closed secret handling while distinguishing uninitialized, sealed, connectivity, and policy failure.
+  severity: critical
+  component_ids: [app:exchange_control, context:exchange_control]
+  prerequisites:
+    - id: confirm_fail_closed
+      text: Confirm secret-dependent operations are blocked rather than falling back to plaintext.
+    - id: identify_scope
+      text: Confirm the installation and affected service identity without reading secret values.
+  symptoms:
+    - id: transit_unavailable
+      text: Encrypt, decrypt, or HMAC operations return a sanitized unavailable result.
+    - id: reference_unavailable
+      text: A typed KV v2 reference cannot be resolved inside its trusted service boundary.
+    - id: service_not_ready
+      text: Exchange-control readiness reports the secret backend as unavailable.
+  diagnostics:
+    - id: read_health
+      capability: observe.health.read
+      instruction: Read the OpenBao seal and health state through the approved health boundary.
+      expected_evidence: A timestamped status code and uninitialized, sealed, unsealed, or unavailable classification without credentials.
+    - id: read_audit
+      capability: observe.audit.read
+      instruction: Inspect bounded authorization outcome classes for the affected service identity.
+      expected_evidence: Redacted allow or deny classes with request identifiers, never policy tokens.
+  allowed_actions:
+    - id: diagnostics
+      capability: observe.health.read
+      instruction: Keep the boundary read-only while initialization, seal, policy, and connectivity state are classified.
+      approval: none
+      effect: read_only
+    - id: rollback_release
+      capability: control.release.rollback
+      instruction: Roll back the current release when a verified policy or wiring change caused the outage.
+      approval: installation_owner
+      effect: disruptive
+  rollback:
+    - id: rollback_verified_change
+      action_ref: rollback_release
+      instruction: Restore the last verified release without exporting or copying secret material.
+      expected_evidence: Health and one bounded transit canary succeed with sanitized evidence.
+  evidence:
+    collect:
+      - id: seal_health
+        text: Sanitized initialization, seal, readiness, and connectivity classifications.
+      - id: policy_outcome
+        text: Redacted service identity and authorization outcome class.
+    success_conditions:
+      - id: bounded_canary
+        text: A bounded transit canary succeeds and no plaintext fallback is observed.
+    failure_conditions:
+      - id: sealed_or_unknown
+        text: The service remains uninitialized, sealed, unauthorized, or in an unknown state.
+  secret_redaction:
+    forbidden_evidence_keys: [authorization, ciphertext, cookie, plaintext, token]
+    rules:
+      - id: no_transit_material
+        text: Never record plaintext, ciphertext, HMAC input, keys, or service tokens.
+      - id: sanitize_policy
+        text: Record policy decision classes without raw policy documents or identity credentials.
+  owner:
+    team: platform.security
+    escalation_role: security_owner
+  related_alerts: [RoehubOperationalServiceDegraded]
+  monitoring_gaps: []
+  safety:
+    warnings:
+      - id: no_unseal_material
+        text: Do not request or paste unseal material into chat, logs, or incident evidence.
+      - id: no_plaintext_fallback
+        text: Do not bypass transit encryption with local plaintext storage.
+    stop_conditions:
+      - id: authority_missing
+        text: Stop before production unseal, policy mutation, rotation, or force restore without explicit owner authority.

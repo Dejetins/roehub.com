@@ -1,0 +1,104 @@
+{
+  "contract": "io.roehub.admin-browser-proof/v1alpha1",
+  "stage": "19",
+  "generated_at": "2026-07-14T14:33:43+03:00",
+  "target": "synthetic local FastAPI/Jinja/typed-API fixture",
+  "production_mutation": false,
+  "sensitive_data_present": false,
+  "roles": {
+    "owner": {
+      "member_controls": 2,
+      "plugin_management": true,
+      "operation_controls": 6,
+      "installation_operation_controls": 4
+    },
+    "admin": {
+      "member_controls": 2,
+      "plugin_management": true,
+      "operation_controls": 2,
+      "installation_operation_controls": 0
+    },
+    "operator": {
+      "member_controls": 0,
+      "plugin_management": false,
+      "operation_controls": 2,
+      "installation_operation_controls": 0
+    },
+    "trader": {
+      "member_controls": 0,
+      "plugin_management": false,
+      "operation_controls": 0
+    },
+    "viewer": {
+      "member_controls": 0,
+      "plugin_management": false,
+      "operation_controls": 0
+    }
+  },
+  "checks": {
+    "recent_auth_success": "passed",
+    "recent_auth_failure_disables_mutations": "passed",
+    "last_owner_denial_http_409": "passed",
+    "plugin_permission_diff_before_confirmation": "passed",
+    "typed_confirmation_phrase": "passed",
+    "unknown_operation_visible": "passed",
+    "unknown_operation_reconciled_to_succeeded": "passed",
+    "operation_id_bound_to_organization_and_idempotency_key": "passed",
+    "same_idempotency_key_on_submit_poll_reconcile": "passed",
+    "release_and_recovery_controls_installation_owner_only": "passed",
+    "audit_hidden_without_audit_read": "passed",
+    "no_password_or_secret_named_inputs": "passed",
+    "no_inline_executable_script": "passed",
+    "keyboard_skip_link_and_main_focus": "passed",
+    "dark_theme": "passed",
+    "light_theme": "passed",
+    "russian_locale": "passed",
+    "reduced_motion": "passed",
+    "console_clean_for_non_denial_flows": "passed",
+    "expected_denial_only_failed_request": "HTTP 409 last_owner"
+  },
+  "responsive": {
+    "375": {"document_overflow": false},
+    "768": {"document_overflow": false},
+    "1024": {"document_overflow": false},
+    "1440": {"document_overflow": false}
+  },
+  "screenshots": [
+    {
+      "path": "output/playwright/stage19-admin/.playwright-cli/page-2026-07-14T10-57-57-553Z.png",
+      "viewport": "375x812",
+      "sha256": "3cfc49414d71059a81b824797192b9200fc1aa0cc39f6ef468a78c860fe22e59"
+    },
+    {
+      "path": "output/playwright/stage19-admin/.playwright-cli/page-2026-07-14T10-58-02-507Z.png",
+      "viewport": "768x900",
+      "sha256": "38df5dd8fb48841493599dc92e272c197676749d278c0e8421e8ca79650dbef1"
+    },
+    {
+      "path": "output/playwright/stage19-admin/.playwright-cli/page-2026-07-14T10-58-20-080Z.png",
+      "viewport": "1024x900",
+      "sha256": "eaa4fbe219af343ccc97a90255c2c0c41677cf56ba73490d3fde3cdf0d338ed1"
+    },
+    {
+      "path": "output/playwright/stage19-admin/.playwright-cli/page-2026-07-14T10-59-08-427Z.png",
+      "viewport": "1440x900 dark",
+      "sha256": "c8d68f47f66088cca40d4b88ddb987b984d4aa324856790d8c7663f227fc28c7"
+    },
+    {
+      "path": "output/playwright/stage19-admin/.playwright-cli/page-2026-07-14T10-59-42-229Z.png",
+      "viewport": "1440x900 light",
+      "sha256": "7cfd111eb1a8360993cd891782a243783f736734081c06cdfb2ab535012fd3aa"
+    },
+    {
+      "path": "output/playwright/stage19-admin/.playwright-cli/page-2026-07-14T10-53-31-732Z.png",
+      "viewport": "1440x900 plugin permission confirmation",
+      "sha256": "f0e8b7e824b9ed6c0f12bb5708d4c54685f66113b82d3de05b5e966945b0a749"
+    },
+    {
+      "path": "output/playwright/stage19-admin-followup/.playwright-cli/page-2026-07-14T11-33-12-227Z.png",
+      "viewport": "1280x720 post-review operation follow-up",
+      "sha256": "ba71523b2df87b2251e9da1e0323b3a61b0515c65a131fedd4bf5ec25f62b468"
+    }
+  ],
+  "proof_boundary": "N/A: local synthetic identities and typed API fixture only; no production admin mutation, provider effect, release operation, backup, deploy, or roehubctl replacement"
+}

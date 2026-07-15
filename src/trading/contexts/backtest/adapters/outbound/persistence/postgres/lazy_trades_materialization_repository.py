@@ -15,10 +15,11 @@ from trading.contexts.backtest.application.ports import (
     BacktestLazyTradesMaterializationTask,
 )
 from trading.contexts.backtest.domain.errors import BacktestStorageError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 _BACKTEST_LAZY_TRADES_MATERIALIZATION_SELECT_COLUMNS = """
     task_id,
+    organization_id,
     owner_user_id,
     job_id,
     public_variant_key,
@@ -70,6 +71,7 @@ class PostgresBacktestLazyTradesMaterializationRepository(
     def find_by_identity(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         job_id: UUID,
         public_variant_key: str,
@@ -79,7 +81,8 @@ class PostgresBacktestLazyTradesMaterializationRepository(
         SELECT
             {_BACKTEST_LAZY_TRADES_MATERIALIZATION_SELECT_COLUMNS}
         FROM {self._table}
-        WHERE owner_user_id = %(owner_user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND owner_user_id = %(owner_user_id)s
           AND job_id = %(job_id)s
           AND public_variant_key = %(public_variant_key)s
           AND cache_key = %(cache_key)s
@@ -88,6 +91,7 @@ class PostgresBacktestLazyTradesMaterializationRepository(
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "job_id": str(job_id),
                 "public_variant_key": public_variant_key,
@@ -108,6 +112,7 @@ class PostgresBacktestLazyTradesMaterializationRepository(
         INSERT INTO {self._table}
         (
             task_id,
+            organization_id,
             owner_user_id,
             job_id,
             public_variant_key,
@@ -136,6 +141,7 @@ class PostgresBacktestLazyTradesMaterializationRepository(
         VALUES
         (
             %(task_id)s,
+            %(organization_id)s,
             %(owner_user_id)s,
             %(job_id)s,
             %(public_variant_key)s,
@@ -161,7 +167,13 @@ class PostgresBacktestLazyTradesMaterializationRepository(
             NULL,
             %(ttl_seconds)s
         )
-        ON CONFLICT (owner_user_id, job_id, public_variant_key, cache_key)
+        ON CONFLICT (
+            organization_id,
+            owner_user_id,
+            job_id,
+            public_variant_key,
+            cache_key
+        )
         DO UPDATE SET
             status = CASE
                 WHEN {self._table}.status IN ('completed', 'failed', 'cancelled')
@@ -240,6 +252,7 @@ class PostgresBacktestLazyTradesMaterializationRepository(
             query=query,
             parameters={
                 "task_id": str(task_id),
+                "organization_id": str(request.organization_id),
                 "owner_user_id": str(request.owner_user_id),
                 "job_id": str(request.job_id),
                 "public_variant_key": request.public_variant_key,
@@ -260,23 +273,33 @@ class PostgresBacktestLazyTradesMaterializationRepository(
             )
         return _map_materialization_row(row=row)
 
-    def count_active_for_user(self, *, owner_user_id: UserId) -> int:
+    def count_active_for_user(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+    ) -> int:
         query = f"""
         SELECT
             COUNT(*) AS active_total
         FROM {self._table}
-        WHERE owner_user_id = %(owner_user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND owner_user_id = %(owner_user_id)s
           AND status IN ('queued', 'running')
         """
         row = self._gateway.fetch_one(
             query=query,
-            parameters={"owner_user_id": str(owner_user_id)},
+            parameters={
+                "organization_id": str(organization_id),
+                "owner_user_id": str(owner_user_id),
+            },
         )
         return _count_from_row(row=row, field_name="active_total")
 
     def count_created_for_user_since(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         created_after: datetime,
     ) -> int:
@@ -284,12 +307,14 @@ class PostgresBacktestLazyTradesMaterializationRepository(
         SELECT
             COUNT(*) AS created_total
         FROM {self._table}
-        WHERE owner_user_id = %(owner_user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND owner_user_id = %(owner_user_id)s
           AND created_at >= %(created_after)s
         """
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "created_after": created_after,
             },
@@ -521,6 +546,7 @@ def _map_materialization_row(
     try:
         return BacktestLazyTradesMaterializationTask(
             task_id=UUID(str(row["task_id"])),
+            organization_id=OrganizationId.from_string(str(row["organization_id"])),
             owner_user_id=UserId.from_string(str(row["owner_user_id"])),
             job_id=UUID(str(row["job_id"])),
             public_variant_key=str(row["public_variant_key"]),

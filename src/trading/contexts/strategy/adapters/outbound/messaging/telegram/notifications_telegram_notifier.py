@@ -65,6 +65,7 @@ class NotificationsTelegramNotifier(TelegramNotifier):
                 event=self._router.event_from_fact(fact=fact, now=now)
             )
             routes = self._repository.list_active_routes(
+                organization_id=notification.organization_id,
                 owner_user_id=notification.user_id,
                 recipient_kind="user",
                 category=event.category,
@@ -80,6 +81,8 @@ class NotificationsTelegramNotifier(TelegramNotifier):
                 self._repository.record_delivery(
                     delivery=NotificationDelivery(
                         delivery_id=uuid4(),
+                        organization_id=notification.organization_id,
+                        provider_instance_id=route.provider_instance_id,
                         event_id=event.event_id,
                         report_run_id=None,
                         command_id=None,
@@ -146,6 +149,7 @@ def _source_fact(
     category, severity = _category_and_severity(event_type=notification.event_type)
     return SyntheticNotificationSourceFact(
         fact_id=f"{notification.event_type}:{notification.strategy_id}:{notification.run_id}",
+        organization_id=notification.organization_id,
         owner_user_id=notification.user_id,
         recipient_kind="user",
         source_context="strategy",

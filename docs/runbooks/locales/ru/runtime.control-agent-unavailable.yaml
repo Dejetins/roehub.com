@@ -1,0 +1,51 @@
+apiVersion: ops.roehub.io/v1
+kind: RunbookLocale
+metadata:
+  runbook_id: runtime.control-agent-unavailable
+  locale: ru
+translations:
+  title: Control-agent недоступен или результат операции неизвестен
+  summary: Восстановить ограниченный контур управления хостом без обхода политики, повтора неоднозначного эффекта или раскрытия служебной идентичности.
+  prerequisites:
+    identify_installation: Подтвердите установку, сгенерированный профиль и локальный управляющий сокет без чтения значений идентичности.
+    preserve_journal: Сохраните локальный журнал операций и его lock-файл до любых действий по восстановлению сервиса.
+  symptoms:
+    socket_unavailable: Локальный управляющий сокет хоста недоступен, при этом основной API или PostgreSQL также могут быть остановлены.
+    journal_rejected: Control-agent отклоняет операции, потому что права, последовательность или целостность hash-chain журнала не подтверждены.
+    effect_unknown: Ограниченная операция перешла в состояние unknown после timeout или разрыва транспорта.
+  diagnostics:
+    inspect_health:
+      instruction: Проверьте host-service control-agent, сокет и готовность сгенерированной topology через разрешённую границу хоста.
+      expected_evidence: Классы состояния сервиса и сокета с отметкой времени, а также очищенные ожидаемое и фактическое состояния topology.
+    inspect_journal:
+      instruction: Проверьте права журнала, непрерывность sequence, целостность hash-chain и исходный operation id без чтения идентификационных данных.
+      expected_evidence: Очищенный результат проверки целостности и terminal либо unknown состояние исходной операции.
+    verify_policy:
+      instruction: Проверьте хеши сгенерированной политики и manifest перед восстановлением topology или rollback.
+      expected_evidence: Совпадение policy, Compose, generation manifest и release digest без значений environment.
+  allowed_actions:
+    restart_control_agent: Перезапустите только host-service control-agent после успешной проверки журнала и сгенерированной политики.
+    reconcile_original_operation: Сверьте исходную unknown-операцию с фактической topology до решения о безопасности следующей операции.
+    rollback_release: Откатите последний проверенный выпуск только через типизированную границу control-agent.
+  rollback:
+    restore_verified_release:
+      instruction: Восстановите последний проверенный выпуск и сохраните исходный журнал операций для последующей сверки аудита.
+      expected_evidence: Health control-agent, целостность журнала, хеши сгенерированной политики и ожидаемая topology успешно проверены.
+  evidence_collect:
+    control_health: Очищенные классы host-service, сокета, политики и topology с отметками времени.
+    journal_integrity: Последовательность журнала, результат hash-chain и состояние операции без credentials или command output.
+  success_conditions:
+    bounded_control_restored: Управляющий сокет доступен, журнал проверен, а ожидаемая topology сверена типизированным действием.
+  failure_conditions:
+    integrity_or_state_unknown: Целостность журнала, сгенерированной политики или эффект исходной операции остаются неизвестными.
+  redaction_rules:
+    no_identity_material: Никогда не сохраняйте содержимое host identity-файлов, assertions, HMAC-входы или signatures.
+    no_runtime_values: Сохраняйте только имена environment и классы состояния, но не значения environment, DSN или provider payloads.
+  monitoring_gaps:
+    missing_control_agent_alert: Канонический alert управляющего сокета и целостности журнала control-agent должен быть добавлен на Stage 20 и пока отсутствует.
+  warnings:
+    no_docker_bypass: Не монтируйте Docker socket в API, Web, worker или plugin и не запускайте произвольный shell как обходной путь.
+    no_blind_retry: Не повторяйте unknown-эффект с новым operation id до сверки исходной операции.
+  stop_conditions:
+    integrity_unknown: Остановитесь, если целостность журнала или сгенерированной политики нельзя доказать.
+    owner_authority_missing: Остановитесь перед rollback выпуска или разрушительным восстановлением состояния без явного разрешения installation owner.

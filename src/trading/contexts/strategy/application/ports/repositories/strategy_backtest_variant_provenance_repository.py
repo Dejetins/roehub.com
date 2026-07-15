@@ -7,7 +7,7 @@ from trading.contexts.strategy.domain.entities import (
     Strategy,
     StrategyBacktestVariantProvenance,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class StrategyBacktestVariantProvenanceRepository(Protocol):
@@ -18,6 +18,7 @@ class StrategyBacktestVariantProvenanceRepository(Protocol):
     def find_by_idempotency_key(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         idempotency_key_hash: str,
     ) -> StrategyBacktestVariantProvenance | None:
@@ -29,6 +30,7 @@ class StrategyBacktestVariantProvenanceRepository(Protocol):
     def find_by_source_variant(
         self,
         *,
+        organization_id: OrganizationId,
         user_id: UserId,
         source_job_id: UUID,
         source_variant_key: str,

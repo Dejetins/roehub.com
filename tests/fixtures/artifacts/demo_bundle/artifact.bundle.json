@@ -1,0 +1,36 @@
+{
+  "schema": "ArtifactManifest/v1",
+  "bundle_id": "roehub.demo.bundle",
+  "name": "Roehub Artifact Store Demo",
+  "version": "0.1.0",
+  "created_at": "2026-07-13T00:00:00Z",
+  "entries": [
+    {
+      "path": "demo/hello.json",
+      "blob": {
+        "digest": "sha256:11da6c2c2f8dafd34e3954e0db6764ef9beb4d5d25ab9b18fdb4c78e2661fe27",
+        "size_bytes": 90,
+        "media_type": "application/json"
+      },
+      "executable": false
+    },
+    {
+      "path": "demo/model-card.txt",
+      "blob": {
+        "digest": "sha256:2a5916d7d52bf2ae95b7e8862ec85def22a0e97eb2655d617e6e31d50794a028",
+        "size_bytes": 112,
+        "media_type": "text/plain"
+      },
+      "executable": false
+    }
+  ],
+  "metadata": {
+    "purpose": "self-hosted-demo",
+    "contains_production_data": false
+  },
+  "signature": {
+    "algorithm": "Ed25519",
+    "key_id": "roehub.demo.publisher",
+    "value_b64": "62Bys3054CRLTkWgihZRAmFyj45//jU/9akxjrk1vOE7BBMk8VYXDN4/2nT9E4GtB2DMH5+huTD4dyMTJBKNAA=="
+  }
+}

@@ -1,5 +1,17 @@
 # Keycloak Cutover Plan v1 (Legacy Auth Removal)
 
+> Статус: `superseded` как будущий план с 2026-07-13.
+> Его заменяет
+> `docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md`:
+> чистая установка использует local auth, внешний OIDC необязателен, а
+> существующая Keycloak-система не является migration source и не переносится.
+> Stages `06`–`07` приняты в новой greenfield-модели; канонические контракты —
+> `local-auth-sessions-recovery-v1.md` и
+> `oidc-authentication-provider-v1.md`. Оставшийся текст ниже является только
+> историческим описанием прежнего Keycloak-only направления.
+> Real-boundary validation этого superseded-плана больше не выполняется; её
+> заменяют browser/API/migration evidence, заданные новыми Stages `06`–`07`.
+
 ## 1) Scope And Fixed Decisions
 
 Этот план фиксирует полный отказ от legacy-auth модели и переход на Keycloak-only authentication/authorization.

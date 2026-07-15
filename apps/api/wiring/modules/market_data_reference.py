@@ -38,6 +38,8 @@ from trading.contexts.strategy.adapters.outbound import (
     resolve_strategy_config_path,
 )
 
+from .research_tenancy import build_research_organization_scope_resolver
+
 
 @dataclass(frozen=True, slots=True)
 class MarketDataReferenceUseCases:
@@ -114,6 +116,9 @@ def build_market_data_reference_router(
         search_enabled_tradable_instruments_use_case=use_cases.search_enabled_tradable_instruments,
         btcusdt_market_readiness_use_case=use_cases.btcusdt_market_readiness,
         current_user_dependency=current_user_dependency,
+        organization_scope_resolver=build_research_organization_scope_resolver(
+            environ=environ
+        ),
     )
 
 

@@ -32,6 +32,7 @@ from trading.shared_kernel.direction_policy import (
     SHORT_DIRECTION_REQUIRES_FUTURES_MARKET,
     short_direction_requires_futures_market,
 )
+from trading.shared_kernel.primitives import OrganizationId
 
 SCENARIO_MATRIX_SCHEMA_V1 = "strategy_variant_scenario_matrix_v1"
 SCENARIO_MATRIX_SYMBOL_SCOPE_V1 = "BTCUSDT"
@@ -46,6 +47,7 @@ ScenarioOrderCapability = Literal["paper_only", "real_order_capable", "unsupport
 @dataclass(frozen=True, slots=True)
 class StrategyVariantScenarioMatrixRow:
     scenario_matrix_row_id: UUID
+    organization_id: OrganizationId
     owner_user_id: Any
     source_job_id: UUID
     source_variant_key: str
@@ -85,6 +87,7 @@ class StrategyVariantScenarioMatrixRow:
 
 @dataclass(frozen=True, slots=True)
 class StrategyVariantScenarioMatrixReport:
+    organization_id: OrganizationId
     owner_user_id: Any
     source_job_id: UUID
     source_variant_key: str
@@ -139,6 +142,7 @@ class StrategyVariantScenarioMatrixService:
             backtest_risk_mode = _backtest_risk_mode(snapshot=snapshot)
             backtest_direction_mode = _backtest_direction_mode(snapshot=snapshot)
             report = StrategyVariantScenarioMatrixReport(
+                organization_id=current_user.organization_id,
                 owner_user_id=current_user.user_id,
                 source_job_id=snapshot.job_id,
                 source_variant_key=snapshot.variant_key,
@@ -227,6 +231,7 @@ def _scenario_row(
     )
     return StrategyVariantScenarioMatrixRow(
         scenario_matrix_row_id=uuid4(),
+        organization_id=current_user.organization_id,
         owner_user_id=current_user.user_id,
         source_job_id=snapshot.job_id,
         source_variant_key=snapshot.variant_key,

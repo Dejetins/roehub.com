@@ -866,9 +866,7 @@ class BacktestArtifactPrecomputeRunnerV2:
         existing_manifest = None
         existing_arrays = None
         reuse_source_slot = (
-            inactive_slot
-            if request.reuse_source_slot is None
-            else request.reuse_source_slot
+            inactive_slot if request.reuse_source_slot is None else request.reuse_source_slot
         )
         if not request.force_full_rebuild:
             existing_manifest = _load_existing_inactive_manifest_v2(
@@ -942,9 +940,7 @@ class BacktestArtifactPrecomputeRunnerV2:
                 force_full_rebuild=request.force_full_rebuild,
                 has_existing_slot_manifest=existing_manifest is not None,
             )
-            hit_times_timeline_bar_count = int(
-                hit_times_source_arrays.open_time.shape[0]
-            )
+            hit_times_timeline_bar_count = int(hit_times_source_arrays.open_time.shape[0])
             hit_times_tp_level_count = len(self.runtime_settings.hit_times_tp_levels_pct)
             hit_times_sl_level_count = len(self.runtime_settings.hit_times_sl_levels_pct)
             hit_times_build_result = coordinator.run_stage(
@@ -1037,9 +1033,7 @@ class BacktestArtifactPrecomputeRunnerV2:
                                 "mapping_tail_bars_1m": (
                                     self.runtime_settings.mapping_tail_bars_1m
                                 ),
-                                "signal_tail_bars_1m": (
-                                    self.runtime_settings.signal_tail_bars_1m
-                                ),
+                                "signal_tail_bars_1m": (self.runtime_settings.signal_tail_bars_1m),
                                 "signal_target_count": len(timeframe_signal_targets),
                                 "signal_worker_processes": (
                                     self.runtime_settings.execution_policy.signal_worker_processes
@@ -1058,7 +1052,8 @@ class BacktestArtifactPrecomputeRunnerV2:
                                 ),
                             },
                         ),
-                        execute=lambda timeframe=timeframe, timeframe_signal_targets=(
+                        execute=lambda timeframe=timeframe,
+                        timeframe_signal_targets=(
                             timeframe_signal_targets
                         ): _materialize_timeframe_session_v2(
                             artifact_loader=self.artifact_loader,
@@ -1110,15 +1105,11 @@ class BacktestArtifactPrecomputeRunnerV2:
                                     "signal_rewritten_tail_bars": (
                                         stage_result.rewritten_signal_tail_bars
                                     ),
-                                    "completed_chunks_total": (
-                                        stage_result.completed_chunks_total
-                                    ),
+                                    "completed_chunks_total": (stage_result.completed_chunks_total),
                                     "completed_indicators_total": (
                                         stage_result.completed_indicators_total
                                     ),
-                                    "signal_manifest_count": len(
-                                        stage_result.signal_manifests
-                                    ),
+                                    "signal_manifest_count": len(stage_result.signal_manifests),
                                 },
                             )
                         ),
@@ -1147,9 +1138,7 @@ class BacktestArtifactPrecomputeRunnerV2:
                             "completed_indicators_total": (
                                 completed_session_result.completed_indicators_total
                             ),
-                            "signal_manifest_count": len(
-                                completed_session_result.signal_manifests
-                            ),
+                            "signal_manifest_count": len(completed_session_result.signal_manifests),
                         }
                     )
                     timeframe_stage_result = completed_session_result
@@ -1233,9 +1222,7 @@ class BacktestArtifactPrecomputeRunnerV2:
                         if canonical_stage_result.tail_plan.prefix is None
                         else int(canonical_stage_result.tail_plan.prefix.open_time.shape[0])
                     ),
-                    rewritten_tail_bars=int(
-                        canonical_stage_result.tail_arrays.open_time.shape[0]
-                    ),
+                    rewritten_tail_bars=int(canonical_stage_result.tail_arrays.open_time.shape[0]),
                 ),
                 mappings=ArtifactStageRebuildStatsV2(
                     reused_prefix_bars=mapping_reused_prefix_bars,
@@ -1410,10 +1397,7 @@ def _group_signal_targets_by_timeframe_v2(
     grouped: dict[str, list[ArtifactSignalValidationSpecV2]] = {}
     for target in signal_targets:
         grouped.setdefault(target.timeframe, []).append(target)
-    return {
-        timeframe: tuple(targets)
-        for timeframe, targets in grouped.items()
-    }
+    return {timeframe: tuple(targets) for timeframe, targets in grouped.items()}
 
 
 def _materialize_timeframe_session_v2(
@@ -2180,9 +2164,7 @@ def _estimate_signal_chunk_bytes_per_row_v2(
       - src/trading/contexts/indicators/adapters/outbound/compute_numba/engine.py
     """
     if timeline_bar_count <= 0:
-        raise ValueError(
-            f"signal timeline_bar_count must be > 0; got {timeline_bar_count!r}"
-        )
+        raise ValueError(f"signal timeline_bar_count must be > 0; got {timeline_bar_count!r}")
     if compute_bar_count <= 0:
         raise ValueError(f"signal compute_bar_count must be > 0; got {compute_bar_count!r}")
     if dependency_count < 0:
@@ -2853,9 +2835,7 @@ def _execute_signal_chunk_job_v2(
                 indicator_id=rule_spec.indicator_id,
                 chunk_block=chunk_block,
             )
-            expected_variants = (
-                chunk_block.row_end_exclusive - chunk_block.row_start_inclusive
-            )
+            expected_variants = chunk_block.row_end_exclusive - chunk_block.row_start_inclusive
             primary_tensor = indicator_compute.compute(
                 ComputeRequest(
                     candles=candles,
@@ -3748,13 +3728,10 @@ def _signal_rebuild_context_bars_v2(
       - src/trading/contexts/backtest/adapters/outbound/defaults/
         indicators_yaml_defaults_provider.py
     """
-    return (
-        _signal_compute_context_bars_v2(materialized_grid=materialized_grid)
-        + _signal_param_context_bars_v2(
-            signal_param_specs=defaults_provider.signal_param_defaults(
-                indicator_id=indicator_id
-            )
-        )
+    return _signal_compute_context_bars_v2(
+        materialized_grid=materialized_grid
+    ) + _signal_param_context_bars_v2(
+        signal_param_specs=defaults_provider.signal_param_defaults(indicator_id=indicator_id)
     )
 
 
@@ -6013,10 +5990,7 @@ def _convert_one_minute_tail_bars_to_hit_times_bars_v2(*, hit_times_tail_bars_1m
         None.
     """
     if hit_times_tail_bars_1m <= 0:
-        raise ValueError(
-            "hit_times_tail_bars_1m must be > 0; "
-            f"got {hit_times_tail_bars_1m!r}"
-        )
+        raise ValueError("hit_times_tail_bars_1m must be > 0; " f"got {hit_times_tail_bars_1m!r}")
     if HIT_TIMES_TIMEFRAME_LITERAL_V2 == _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2:
         return hit_times_tail_bars_1m
     duration_millis = _timeframe_duration_millis_v2(Timeframe(HIT_TIMES_TIMEFRAME_LITERAL_V2))
@@ -6732,14 +6706,12 @@ def _validate_mapping_index_arrays_v2(
             f"{label} must have shape ({target_bar_count},); got "
             f"{arrays.bar_open_1m_idx.shape!r}"
         )
-    if (
-        arrays.bar_open_1m_idx.shape[0] > 1
-        and not np.all(arrays.bar_open_1m_idx[1:] >= arrays.bar_open_1m_idx[:-1])
+    if arrays.bar_open_1m_idx.shape[0] > 1 and not np.all(
+        arrays.bar_open_1m_idx[1:] >= arrays.bar_open_1m_idx[:-1]
     ):
         raise ValueError(f"{label}.bar_open_1m_idx must be non-decreasing")
-    if (
-        arrays.bar_close_1m_idx.shape[0] > 1
-        and not np.all(arrays.bar_close_1m_idx[1:] >= arrays.bar_close_1m_idx[:-1])
+    if arrays.bar_close_1m_idx.shape[0] > 1 and not np.all(
+        arrays.bar_close_1m_idx[1:] >= arrays.bar_close_1m_idx[:-1]
     ):
         raise ValueError(f"{label}.bar_close_1m_idx must be non-decreasing")
     if not np.all(arrays.bar_open_1m_idx <= arrays.bar_close_1m_idx):
@@ -7786,20 +7758,16 @@ def _merge_price_sections_v2(
     for section in price_manifests:
         if section.timeframe in merged_by_timeframe:
             raise ValueError(
-                "root manifest price sections contain duplicate timeframe "
-                f"{section.timeframe!r}"
+                "root manifest price sections contain duplicate timeframe " f"{section.timeframe!r}"
             )
         merged_by_timeframe[section.timeframe] = section
     for section in preserved_prices:
         if section.timeframe in merged_by_timeframe:
             raise ValueError(
-                "root manifest price sections contain duplicate timeframe "
-                f"{section.timeframe!r}"
+                "root manifest price sections contain duplicate timeframe " f"{section.timeframe!r}"
             )
         merged_by_timeframe[section.timeframe] = section
-    timeframe_order = {
-        literal: index for index, literal in enumerate(ARTIFACT_PRICE_TIMEFRAMES_V2)
-    }
+    timeframe_order = {literal: index for index, literal in enumerate(ARTIFACT_PRICE_TIMEFRAMES_V2)}
     ordered_sections = sorted(
         merged_by_timeframe.values(),
         key=lambda section: timeframe_order[section.timeframe],
@@ -7957,9 +7925,7 @@ def _serialize_signal_catalog_v2(catalog: ArtifactSignalCatalogV2) -> dict[str, 
     return {
         "supported_timeframes": [item for item in catalog.supported_timeframes],
         "supported_indicator_ids": [item for item in catalog.supported_indicator_ids],
-        "manifests": [
-            _serialize_signal_catalog_entry_v2(entry) for entry in catalog.manifests
-        ],
+        "manifests": [_serialize_signal_catalog_entry_v2(entry) for entry in catalog.manifests],
     }
 
 
@@ -8541,9 +8507,7 @@ def _load_validated_array_v2(
             f"expected {actual_shape!r}"
         )
     if expected_shape is not None and actual_shape != expected_shape:
-        raise ValueError(
-            f"{location} file shape must be {expected_shape!r}; got {actual_shape!r}"
-        )
+        raise ValueError(f"{location} file shape must be {expected_shape!r}; got {actual_shape!r}")
     if array.dtype.name != expected_dtype:
         raise ValueError(
             f"{location} file dtype must be {expected_dtype!r}; got {array.dtype.name!r}"

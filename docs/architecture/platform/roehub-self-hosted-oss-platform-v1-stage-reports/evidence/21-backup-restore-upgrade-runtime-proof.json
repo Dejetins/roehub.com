@@ -1,0 +1,162 @@
+{
+  "backup_progress": "completed",
+  "cleanup": {
+    "down_exit_status": {
+      "roehub-stage21-proof13-monitoring": 0,
+      "roehub-stage21-proof13-rollback": 0,
+      "roehub-stage21-proof13-source": 0,
+      "roehub-stage21-proof13-target": 0,
+      "roehub-stage21-proof13-update": 0
+    },
+    "residual_resources": {
+      "roehub-stage21-proof13-monitoring": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-stage21-proof13-rollback": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-stage21-proof13-source": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-stage21-proof13-target": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-stage21-proof13-update": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      }
+    },
+    "status": "completed"
+  },
+  "encrypted_entries": 8,
+  "external_provider_writes": false,
+  "manifest_signature": "verified",
+  "monitoring_during_recovery": {
+    "operational_health_ready": true,
+    "running": [
+      "alertmanager",
+      "blackbox",
+      "grafana",
+      "loki",
+      "operational-health",
+      "prometheus"
+    ],
+    "web_api_running": false
+  },
+  "monitoring_project": "roehub-stage21-proof13-monitoring",
+  "observed_rpo_seconds": 37.535141,
+  "observed_rto_seconds": 6.386634541209787,
+  "openbao": {
+    "cleanup": "passed",
+    "encrypted_raft_snapshot": true,
+    "forbidden_output_scan": "passed",
+    "fresh_storage_guard": "passed",
+    "fresh_volume_force_restore": "passed"
+  },
+  "production_mutation": false,
+  "proof_boundary": "N/A: disposable local Docker projects, generated fixture data, operator-generated temporary keys, no production restore",
+  "real_order_effects": false,
+  "release_lifecycle": {
+    "failed_update_detail": "upgrade.injected_failure_before_commit",
+    "failed_update_state": "failed",
+    "fixture": "versioned-unpublished-n-minus-one",
+    "from_release": "0.0.0",
+    "injected_failure": "failed_before_atomic_release_commit",
+    "irreversible_migration_guard": "upgrade.forward_recovery_plan_required",
+    "irreversible_update_state": "failed",
+    "observed_rollback_seconds": 6.552426332840696,
+    "observed_upgrade_seconds": 0.04112920816987753,
+    "preupgrade_backup_verified": true,
+    "resume_after_failure": "passed",
+    "resumed_update_state": "succeeded",
+    "rollback_release": "0.0.0",
+    "rollback_state": "succeeded",
+    "rollback_state_owner_count": 8,
+    "to_release": "0.1.0"
+  },
+  "restore_comparison": {
+    "all_plaintext_digests": 8,
+    "artifacts": {
+      "digest": "sha256:15078be2718eaaea75b0f3f4a377be221b6da93bcb049758d6d8453f807ed043",
+      "match": true
+    },
+    "clickhouse": {
+      "digest_match": true,
+      "rows": 3,
+      "time_range": [
+        "2026-07-14 09:00:00.000",
+        "2026-07-14 09:02:00.000"
+      ]
+    },
+    "observability_bounded_history": "matched",
+    "openbao_encrypted_snapshot": {
+      "ciphertext_sha256": "sha256:0b1b0dbc738a3245d8753c0e0b9eed082674c7b1f8fd80b6caa3ba0243e28d7f",
+      "decryptable_by_operator_key": true,
+      "same_snapshot_fresh_volume_restore": "passed"
+    },
+    "plugin_operation_audit": "matched",
+    "postgresql": {
+      "kinds": [
+        "audit",
+        "config",
+        "operation",
+        "plugin",
+        "user"
+      ],
+      "rows": 5,
+      "users_config_plugin_operation_audit": "matched"
+    },
+    "redis_checkpoint": {
+      "source_of_truth": false,
+      "value_match": true
+    },
+    "release_config": {
+      "exact_files": 3,
+      "match": true
+    }
+  },
+  "restore_progress": "completed",
+  "roehubctl_without_web_api": {
+    "backup": "succeeded",
+    "backup_cancellation": {
+      "request": "succeeded",
+      "resume": "succeeded",
+      "target": "failed"
+    },
+    "control_socket": "unix",
+    "restore": "succeeded",
+    "restore_cancellation": {
+      "request": "succeeded",
+      "resume": "succeeded",
+      "target": "failed"
+    },
+    "web_api_running": false
+  },
+  "schema": "io.roehub.installation-recovery-runtime-proof/v1alpha1",
+  "sensitive_data_present": false,
+  "sla_claimed": false,
+  "source_project": "roehub-stage21-proof13-source",
+  "source_target_separation": "passed",
+  "stage": "21",
+  "state_owner_coverage": [
+    "artifacts",
+    "clickhouse",
+    "observability",
+    "openbao",
+    "plugin_operation_audit",
+    "postgresql",
+    "redis_checkpoint",
+    "release_config"
+  ],
+  "status": "passed",
+  "target_project": "roehub-stage21-proof13-target"
+}

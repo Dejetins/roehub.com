@@ -1,0 +1,249 @@
+{
+  "$defs": {
+    "JobOutputDescriptor": {
+      "additionalProperties": false,
+      "properties": {
+        "digest": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "media_type": {
+          "maxLength": 127,
+          "minLength": 1,
+          "pattern": "^[a-z0-9.+-]+/[a-z0-9.+-]+$",
+          "title": "Media Type",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 240,
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*//)(?!.*\\\\)(?!.*(?:^|/)(?:\\.|\\.\\.)(?:/|$))(?!.*\\/$)[^\\u0000]+$",
+          "title": "Path",
+          "type": "string"
+        },
+        "size_bytes": {
+          "maximum": 67108864,
+          "minimum": 0,
+          "title": "Size Bytes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "digest",
+        "size_bytes",
+        "media_type"
+      ],
+      "title": "JobOutputDescriptor",
+      "type": "object"
+    },
+    "StrategyRuntimeDecision": {
+      "additionalProperties": false,
+      "description": "Strict host-owned output: a strategy cannot return an exchange order.",
+      "properties": {
+        "instrument_id": {
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$",
+          "title": "Instrument Id",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "signal",
+            "intent"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "reason_code": {
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$",
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "side": {
+          "enum": [
+            "buy",
+            "sell",
+            "flat"
+          ],
+          "title": "Side",
+          "type": "string"
+        },
+        "strength_decimal": {
+          "pattern": "^(0|1|0\\.[0-9]{1,8})$",
+          "title": "Strength Decimal",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "instrument_id",
+        "side",
+        "strength_decimal",
+        "observed_at",
+        "reason_code"
+      ],
+      "title": "StrategyRuntimeDecision",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.roehub.io/jobs/job-result-manifest-v1.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "else": {
+        "properties": {
+          "output_artifact_manifest_digest": {
+            "type": "null"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "succeeded"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "properties": {
+          "output_artifact_manifest_digest": {
+            "pattern": "^sha256:[0-9a-f]{64}$",
+            "type": "string"
+          }
+        },
+        "required": [
+          "output_artifact_manifest_digest"
+        ]
+      }
+    }
+  ],
+  "properties": {
+    "attempt_id": {
+      "format": "uuid",
+      "title": "Attempt Id",
+      "type": "string"
+    },
+    "completed_at": {
+      "format": "date-time",
+      "title": "Completed At",
+      "type": "string"
+    },
+    "envelope_digest": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Envelope Digest",
+      "type": "string"
+    },
+    "error_code": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z][a-z0-9._-]{2,127}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error Code"
+    },
+    "exit_code": {
+      "anyOf": [
+        {
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Exit Code"
+    },
+    "job_id": {
+      "format": "uuid",
+      "title": "Job Id",
+      "type": "string"
+    },
+    "organization_id": {
+      "format": "uuid",
+      "title": "Organization Id",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "succeeded",
+        "failed",
+        "crashed",
+        "canceled",
+        "timed_out",
+        "resource_exhausted"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "output_artifact_manifest_digest": {
+      "anyOf": [
+        {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output Artifact Manifest Digest"
+    },
+    "outputs": {
+      "items": {
+        "$ref": "#/$defs/JobOutputDescriptor"
+      },
+      "maxItems": 256,
+      "title": "Outputs",
+      "type": "array",
+      "x-roehub-max-aggregate-size-bytes": 67108864,
+      "x-roehub-unique-by": "path"
+    },
+    "schema": {
+      "const": "JobResultManifest/v1",
+      "enum": [
+        "JobResultManifest/v1"
+      ],
+      "title": "Schema",
+      "type": "string"
+    },
+    "strategy_decisions": {
+      "items": {
+        "$ref": "#/$defs/StrategyRuntimeDecision"
+      },
+      "maxItems": 4096,
+      "title": "Strategy Decisions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "job_id",
+    "attempt_id",
+    "organization_id",
+    "outcome",
+    "envelope_digest",
+    "outputs",
+    "strategy_decisions",
+    "completed_at"
+  ],
+  "title": "JobResultManifest",
+  "type": "object",
+  "x-roehub-enforcement-boundary": "trading.integration.JobResultManifest.model_validate"
+}

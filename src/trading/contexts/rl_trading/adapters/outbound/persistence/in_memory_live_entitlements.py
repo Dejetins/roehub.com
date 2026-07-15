@@ -10,7 +10,7 @@ from trading.contexts.rl_trading.domain.live_entitlements import (
     RlLiveTickerMode,
     evaluate_rl_live_ticker_entitlement,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,17 +24,24 @@ class _ActiveProfileTicker:
 
 class InMemoryRlLiveTickerEntitlementRepository:
     def __init__(self) -> None:
-        self._active_by_profile: dict[tuple[str, UUID], _ActiveProfileTicker] = {}
-        self._overrides: dict[str, int] = {}
+        self._active_by_profile: dict[tuple[str, str, UUID], _ActiveProfileTicker] = {}
+        self._overrides: dict[tuple[str, str], int] = {}
 
-    def set_override(self, *, owner_user_id: UserId, live_slots_allowed: int) -> None:
+    def set_override(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        live_slots_allowed: int,
+    ) -> None:
         if live_slots_allowed < 0:
             raise ValueError("live_slots_allowed must be >= 0")
-        self._overrides[str(owner_user_id)] = live_slots_allowed
+        self._overrides[(str(organization_id), str(owner_user_id))] = live_slots_allowed
 
     def snapshot(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         paid_level: str,
         mode: RlLiveTickerMode,
@@ -44,13 +51,19 @@ class InMemoryRlLiveTickerEntitlementRepository:
             paid_level=paid_level,
             mode=mode,
             requested_ticker=requested_ticker,
-            active_tickers=self._active_tickers(owner_user_id=owner_user_id),
-            override_live_slots_allowed=self._overrides.get(str(owner_user_id)),
+            active_tickers=self._active_tickers(
+                organization_id=organization_id,
+                owner_user_id=owner_user_id,
+            ),
+            override_live_slots_allowed=self._overrides.get(
+                (str(organization_id), str(owner_user_id))
+            ),
         )
 
     def sync_profile(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         paid_level: str,
         strategy_id: UUID,
@@ -60,10 +73,11 @@ class InMemoryRlLiveTickerEntitlementRepository:
         profile_ready: bool,
         observed_at: datetime,
     ) -> RlLiveTickerEntitlementSnapshot:
-        profile_key = (str(owner_user_id), strategy_id)
+        profile_key = (str(organization_id), str(owner_user_id), strategy_id)
         if mode != "live" or not profile_ready or requested_ticker is None:
             self._active_by_profile.pop(profile_key, None)
             return self.snapshot(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 paid_level=paid_level,
                 mode=mode,
@@ -72,6 +86,7 @@ class InMemoryRlLiveTickerEntitlementRepository:
 
         previous = self._active_by_profile.pop(profile_key, None)
         snapshot = self.snapshot(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             paid_level=paid_level,
             mode=mode,
@@ -91,16 +106,23 @@ class InMemoryRlLiveTickerEntitlementRepository:
             updated_at=observed_at,
         )
         return self.snapshot(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             paid_level=paid_level,
             mode=mode,
             requested_ticker=requested_ticker,
         )
 
-    def _active_tickers(self, *, owner_user_id: UserId) -> tuple[RlLiveTickerIdentity, ...]:
+    def _active_tickers(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+    ) -> tuple[RlLiveTickerIdentity, ...]:
+        organization = str(organization_id)
         owner = str(owner_user_id)
         return tuple(
             item.ticker
             for key, item in self._active_by_profile.items()
-            if key[0] == owner
+            if key[0] == organization and key[1] == owner
         )

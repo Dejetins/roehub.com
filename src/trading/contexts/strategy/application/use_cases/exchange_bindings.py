@@ -11,12 +11,13 @@ from trading.contexts.strategy.application.ports.repositories import (
 )
 from trading.contexts.strategy.domain.entities import StrategyExchangeBinding
 from trading.platform.errors import RoehubError
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 @dataclass(frozen=True, slots=True)
 class StrategyExchangeBindingView:
     binding_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     strategy_id: UUID
     exchange_connection_id: UUID
@@ -34,12 +35,21 @@ class StrategyExchangeBindingService:
     binding_repository: StrategyExchangeBindingRepository
 
     def list_bindings(
-        self, *, owner_user_id: UserId, strategy_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_id: UUID,
     ) -> tuple[StrategyExchangeBindingView, ...]:
-        self._require_strategy(owner_user_id=owner_user_id, strategy_id=strategy_id)
+        self._require_strategy(
+            organization_id=organization_id,
+            owner_user_id=owner_user_id,
+            strategy_id=strategy_id,
+        )
         return tuple(
             _to_view(binding=binding)
             for binding in self.binding_repository.list_for_strategy(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 strategy_id=strategy_id,
             )
@@ -48,13 +58,18 @@ class StrategyExchangeBindingService:
     def create_binding(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         exchange_connection_id: UUID,
         usage_mode: str,
         now: datetime,
     ) -> StrategyExchangeBindingView:
-        self._require_strategy(owner_user_id=owner_user_id, strategy_id=strategy_id)
+        self._require_strategy(
+            organization_id=organization_id,
+            owner_user_id=owner_user_id,
+            strategy_id=strategy_id,
+        )
         if usage_mode != "trading":
             raise RoehubError(
                 code="validation_error",
@@ -71,6 +86,7 @@ class StrategyExchangeBindingService:
             )
         binding = StrategyExchangeBinding(
             binding_id=uuid4(),
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             exchange_connection_id=exchange_connection_id,
@@ -95,13 +111,19 @@ class StrategyExchangeBindingService:
     def disable_binding(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         binding_id: UUID,
         now: datetime,
     ) -> StrategyExchangeBindingView:
-        self._require_strategy(owner_user_id=owner_user_id, strategy_id=strategy_id)
+        self._require_strategy(
+            organization_id=organization_id,
+            owner_user_id=owner_user_id,
+            strategy_id=strategy_id,
+        )
         existing = self.binding_repository.get(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             binding_id=binding_id,
@@ -111,6 +133,7 @@ class StrategyExchangeBindingService:
         if existing.binding_status != "active":
             return _to_view(binding=existing)
         disabled = self.binding_repository.disable(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             binding_id=binding_id,
@@ -120,8 +143,15 @@ class StrategyExchangeBindingService:
             raise _binding_not_found(binding_id=binding_id)
         return _to_view(binding=disabled)
 
-    def _require_strategy(self, *, owner_user_id: UserId, strategy_id: UUID) -> None:
+    def _require_strategy(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_id: UUID,
+    ) -> None:
         strategy = self.strategy_repository.find_by_strategy_id(
+            organization_id=organization_id,
             user_id=owner_user_id,
             strategy_id=strategy_id,
         )
@@ -136,6 +166,7 @@ class StrategyExchangeBindingService:
 def _to_view(*, binding: StrategyExchangeBinding) -> StrategyExchangeBindingView:
     return StrategyExchangeBindingView(
         binding_id=binding.binding_id,
+        organization_id=binding.organization_id,
         owner_user_id=binding.owner_user_id,
         strategy_id=binding.strategy_id,
         exchange_connection_id=binding.exchange_connection_id,

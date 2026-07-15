@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Literal, Mapping
 from uuid import UUID
 
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 from .execution_source import ExecutionIntent, ExecutionSourceType
 
@@ -14,6 +14,8 @@ RiskStatus = Literal["accepted", "rejected"]
 
 @dataclass(frozen=True, slots=True)
 class ExecutionRiskContext:
+    organization_ownership_verified: bool = False
+    account_ownership_verified: bool = False
     exchange_connection_active: bool = False
     secret_custody_ready: bool = False
     source_authorized: bool = False
@@ -53,6 +55,7 @@ class ExecutionRiskAuditEvent:
     event_id: UUID
     intent_id: UUID
     source_event_id: UUID
+    organization_id: OrganizationId
     owner_user_id: UserId
     source_type: ExecutionSourceType
     event_type: str
@@ -72,6 +75,16 @@ def evaluate_execution_risk(
         return _reject(check_name="risk_context", reason="risk_state_unavailable")
 
     common_checks: tuple[tuple[str, bool, str], ...] = (
+        (
+            "organization_ownership_verified",
+            context.organization_ownership_verified,
+            "organization_ownership_mismatch",
+        ),
+        (
+            "account_ownership_verified",
+            context.account_ownership_verified,
+            "account_ownership_mismatch",
+        ),
         (
             "exchange_connection_active",
             context.exchange_connection_active,

@@ -1,0 +1,81 @@
+apiVersion: ops.roehub.io/v1
+kind: Runbook
+metadata:
+  id: runtime.service-degraded
+  revision: 1
+  source_legacy: docs/runbooks/control-agent-emergency-recovery.md
+spec:
+  title: Generated runtime service is degraded or stopped
+  summary: Isolate a generated service failure and recover only the affected service through the typed control boundary.
+  severity: high
+  component_ids: [app:monitoring, context:operations]
+  prerequisites:
+    - id: identify_service
+      text: Confirm the generated profile, bounded service identifier, and observed state.
+    - id: preserve_evidence
+      text: Preserve sanitized health transitions and the original operation identifier before mutation.
+  symptoms:
+    - id: readiness_failed
+      text: The generated readiness or metrics endpoint is not ready.
+    - id: service_stopped
+      text: The service endpoint refuses connections while independent observability remains available.
+  diagnostics:
+    - id: inspect_health
+      capability: observe.health.read
+      instruction: Compare the generated service state with its direct synthetic probe.
+      expected_evidence: A timestamped state and bounded detail code without endpoint values or identity data.
+    - id: inspect_metrics
+      capability: observe.metrics.query
+      instruction: Inspect bounded readiness and error signals for the affected service and its declared dependencies.
+      expected_evidence: A low-cardinality metric snapshot without organization, account, or secret labels.
+  allowed_actions:
+    - id: diagnostics
+      capability: observe.health.read
+      instruction: Keep the boundary read-only until the affected service and dependency state are known.
+      approval: none
+      effect: read_only
+    - id: restart_service
+      capability: control.service.restart
+      instruction: Restart only the identified service after the failure boundary and dependency state are known.
+      approval: operator
+      effect: reversible
+  rollback:
+    - id: reconcile_restart
+      action_ref: restart_service
+      instruction: Reconcile the restart result and stop retrying if the effect remains unknown.
+      expected_evidence: A terminal operation state and stable readiness transition for the same service.
+  evidence:
+    collect:
+      - id: state_transition
+        text: Sanitized ready, degraded, stopped, or unknown transitions with timestamps.
+      - id: dependency_state
+        text: Bounded state of declared dependencies and the independent monitoring services.
+    success_conditions:
+      - id: service_stable
+        text: The service returns to ready and remains stable while monitoring and logs stay queryable.
+    failure_conditions:
+      - id: boundary_unknown
+        text: The failing boundary, dependency state, or restart effect remains unknown.
+  secret_redaction:
+    forbidden_evidence_keys: [account, authorization, cookie, organization, password, token]
+    rules:
+      - id: bounded_labels_only
+        text: Record only generated service, capability, state, runbook, action, and profile labels.
+      - id: no_raw_payloads
+        text: Never record response bodies, environment values, provider payloads, or user identifiers.
+  owner:
+    team: platform.operations
+    escalation_role: installation_owner
+  related_alerts: [RoehubOperationalServiceDegraded]
+  monitoring_gaps: []
+  safety:
+    warnings:
+      - id: no_broad_restart
+        text: Do not restart unrelated services or all dependencies as a diagnostic shortcut.
+      - id: no_blind_retry
+        text: Do not repeat a restart while the original operation effect is unknown.
+    stop_conditions:
+      - id: data_integrity_unknown
+        text: Stop if storage integrity, migration state, or an external effect is unknown.
+      - id: action_not_allowlisted
+        text: Stop if the required action is absent from the generated allowlist.

@@ -18,14 +18,25 @@ _IDENTITY_EXCHANGE_KEYS_V1_SQL_FILE = "0003_identity_exchange_keys_v1.sql"
 _IDENTITY_EXCHANGE_KEYS_V2_SQL_FILE = "0004_identity_exchange_keys_v2.sql"
 _IDENTITY_KEYCLOAK_CUTOVER_V1_SQL_FILE = "0005_identity_keycloak_cutover_v1.sql"
 _IDENTITY_ACCOUNT_SETTINGS_V1_SQL_FILE = "0006_identity_account_settings_v1.sql"
-_IDENTITY_EXCHANGE_AUDIT_EVENTS_V1_SQL_FILE = (
-    "0007_identity_exchange_audit_events_v1.sql"
-)
+_IDENTITY_EXCHANGE_AUDIT_EVENTS_V1_SQL_FILE = "0007_identity_exchange_audit_events_v1.sql"
 _EXCHANGE_CONNECTIONS_V1_SQL_FILE = "0008_exchange_connections_v1.sql"
 _IDENTITY_EXCHANGE_RECLASSIFICATION_AUDIT_V1_SQL_FILE = (
     "0009_identity_exchange_reclassification_audit_v1.sql"
 )
 _STRATEGY_EXCHANGE_BINDINGS_V1_SQL_FILE = "0010_strategy_exchange_bindings_v1.sql"
+_ORGANIZATIONS_RBAC_AUDIT_V1_SQL_FILE = "0011_identity_organizations_rbac_audit_v1.sql"
+_LOCAL_AUTH_V1_SQL_FILE = "0012_identity_local_auth_v1.sql"
+_OIDC_PROVIDER_V1_SQL_FILE = "0013_identity_oidc_provider_v1.sql"
+_RESEARCH_ORGANIZATION_ISOLATION_V1_SQL_FILE = "0014_research_organization_isolation_v1.sql"
+_TRADING_ORGANIZATION_ISOLATION_V1_SQL_FILE = "0015_trading_organization_isolation_v1.sql"
+_NOTIFICATION_PROVIDER_INSTANCES_V1_SQL_FILE = "0016_notification_provider_instances_v1.sql"
+_EXTENSIONS_PLUGIN_PLATFORM_V1ALPHA1_SQL_FILE = "0017_extensions_plugin_platform_v1alpha1.sql"
+_ARTIFACT_STORE_V1_SQL_FILE = "0018_artifact_store_v1.sql"
+_ISOLATED_JOB_RUNTIME_V1_SQL_FILE = "0019_isolated_job_runtime_v1.sql"
+_EXECUTION_GATEWAY_MAINNET_SAFETY_V1_SQL_FILE = (
+    "0020_execution_gateway_mainnet_safety_v1.sql"
+)
+_CONTROL_OPERATION_AUDIT_V1_SQL_FILE = "0021_control_operation_audit_v1.sql"
 
 
 @dataclass(frozen=True, slots=True)
@@ -116,9 +127,7 @@ def decide_identity_exchange_keys_v2_action(
                 "0004_identity_exchange_keys_v2.sql is unsafe: v1 schema with non-empty "
                 "identity_exchange_keys table"
             ),
-            hint=(
-                "Run explicit re-encryption migration for existing rows, then apply v2 schema."
-            ),
+            hint=("Run explicit re-encryption migration for existing rows, then apply v2 schema."),
         )
 
     return IdentityExchangeKeysV2Decision(
@@ -221,20 +230,41 @@ def run_dev_db_bootstrap(
     Side Effects:
         Connects to Postgres, executes SQL migrations, and mutates schema state.
     """
-    apply_identity_baseline_sql(identity_dsn=identity_dsn, migrations_dir=migrations_dir)
+    apply_identity_baseline_sql(
+        identity_dsn=identity_dsn,
+        migrations_dir=migrations_dir,
+        include_strategy_bindings=False,
+    )
     run_alembic_upgrade_head(
         postgres_dsn=postgres_dsn,
         alembic_upgrade_runner=alembic_upgrade_runner,
     )
+    apply_strategy_exchange_bindings_sql(
+        identity_dsn=identity_dsn,
+        migrations_dir=migrations_dir,
+    )
+    apply_organizations_rbac_audit_sql(
+        identity_dsn=identity_dsn,
+        migrations_dir=migrations_dir,
+    )
+    apply_local_auth_sql(identity_dsn=identity_dsn, migrations_dir=migrations_dir)
+    apply_oidc_provider_sql(identity_dsn=identity_dsn, migrations_dir=migrations_dir)
 
 
-def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+def apply_identity_baseline_sql(
+    *,
+    identity_dsn: str,
+    migrations_dir: Path,
+    include_strategy_bindings: bool = True,
+) -> None:
     """
     Apply identity baseline SQL with v2 pre-check and Keycloak cutover `0005`.
 
     Args:
         identity_dsn: DSN for identity Postgres schema.
         migrations_dir: Directory containing identity SQL files.
+        include_strategy_bindings: Whether to apply `0010`. Clean installs defer it
+            until Alembic has created `strategy_strategies`.
     Returns:
         None.
     Assumptions:
@@ -333,22 +363,185 @@ def apply_identity_baseline_sql(*, identity_dsn: str, migrations_dir: Path) -> N
         _execute_sql_script(connection=connection, sql_path=exchange_audit_events_v1_path)
         print(f"Applying identity baseline SQL: {exchange_connections_v1_path.name}")
         _execute_sql_script(connection=connection, sql_path=exchange_connections_v1_path)
-        print(
-            "Applying identity baseline SQL: "
-            f"{exchange_reclassification_audit_v1_path.name}"
-        )
+        print("Applying identity baseline SQL: " f"{exchange_reclassification_audit_v1_path.name}")
         _execute_sql_script(
             connection=connection,
             sql_path=exchange_reclassification_audit_v1_path,
         )
-        print(
-            "Applying identity baseline SQL: "
-            f"{strategy_exchange_bindings_v1_path.name}"
-        )
-        _execute_sql_script(
-            connection=connection,
-            sql_path=strategy_exchange_bindings_v1_path,
-        )
+        if include_strategy_bindings:
+            print("Applying identity baseline SQL: " f"{strategy_exchange_bindings_v1_path.name}")
+            _execute_sql_script(
+                connection=connection,
+                sql_path=strategy_exchange_bindings_v1_path,
+            )
+
+
+def apply_strategy_exchange_bindings_sql(
+    *,
+    identity_dsn: str,
+    migrations_dir: Path,
+) -> None:
+    """Apply `0010` after the Alembic strategy baseline on a clean installation."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_STRATEGY_EXCHANGE_BINDINGS_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_organizations_rbac_audit_sql(
+    *,
+    identity_dsn: str,
+    migrations_dir: Path,
+) -> None:
+    """Apply greenfield organization/RBAC schema after Alembic and binding tables exist."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_ORGANIZATIONS_RBAC_AUDIT_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_local_auth_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Apply local account, passkey, recovery, rate-limit, and auth-audit schema."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_LOCAL_AUTH_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_oidc_provider_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Apply provider-neutral OIDC attempts, external identities, and audit schema."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_OIDC_PROVIDER_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_research_organization_isolation_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Apply greenfield research ownership and composite organization constraints."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_RESEARCH_ORGANIZATION_ISOLATION_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_trading_organization_isolation_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Apply greenfield trading ownership and composite organization constraints."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_TRADING_ORGANIZATION_ISOLATION_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_notification_provider_instances_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Apply greenfield notification provider packages and scoped instances."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_NOTIFICATION_PROVIDER_INSTANCES_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_extensions_plugin_platform_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Apply signed package, organization instance, operation, and audit schema."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_EXTENSIONS_PLUGIN_PLATFORM_V1ALPHA1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_artifact_store_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Apply organization-scoped ArtifactStore/v1 catalog and lifecycle schema."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_ARTIFACT_STORE_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_isolated_job_runtime_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Apply durable JobEnvelope/v1 jobs and attempts."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_ISOLATED_JOB_RUNTIME_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_execution_gateway_mainnet_safety_sql(
+    *, identity_dsn: str, migrations_dir: Path
+) -> None:
+    """Apply persisted execution gateway and mainnet safety policy."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_EXECUTION_GATEWAY_MAINNET_SAFETY_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_control_operation_audit_sql(
+    *, identity_dsn: str, migrations_dir: Path
+) -> None:
+    """Apply durable control-agent audit events and reconciliation cursor."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_CONTROL_OPERATION_AUDIT_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
 def run_alembic_upgrade_head(

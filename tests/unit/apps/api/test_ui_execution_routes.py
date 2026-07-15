@@ -7,15 +7,22 @@ from starlette.requests import Request
 
 from apps.api.common import register_api_error_handlers
 from apps.api.routes import build_ui_execution_router
+from apps.api.wiring.modules.research_tenancy import DevelopmentOrganizationScopeResolver
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.live_execution.adapters.outbound.persistence.in_memory import (
     InMemoryExecutionIntentRepository,
 )
 from trading.contexts.live_execution.application import ExecutionIngressService
-from trading.contexts.live_execution.application.ports import ExecutionDispatchPublishResult
+from trading.contexts.live_execution.application.ports import (
+    ExecutionDispatchPublishResult,
+    ExecutionRiskContextQuery,
+    ExecutionRiskContextResolver,
+    FailClosedExecutionRiskContextResolver,
+)
 from trading.contexts.live_execution.application.use_cases.execution_dispatch import (
     ExecutionDispatchService,
 )
+from trading.contexts.live_execution.domain import ExecutionRiskContext
 from trading.shared_kernel.primitives import PaidLevel, UserId
 
 _USER_ID = "00000000-0000-0000-0000-000000010501"
@@ -74,7 +81,6 @@ def test_ui_execution_routes_create_and_dedupe_intent() -> None:
             "quantity": "0.01",
             "limit_price": "10000",
         },
-        "risk_context": _accepted_risk_context(),
     }
     intent_response = client.post(
         "/ui/execution/intents",
@@ -127,7 +133,6 @@ def test_ui_execution_route_dispatches_accepted_intent_when_dispatch_service_is_
                 "side": "buy",
                 "quote_notional": "25",
             },
-            "risk_context": _accepted_risk_context(),
         },
     )
 
@@ -139,8 +144,10 @@ def test_ui_execution_route_dispatches_accepted_intent_when_dispatch_service_is_
     assert repository.intents[0].status == "dispatched"
 
 
-def test_ui_execution_route_rejects_intent_when_risk_context_is_missing() -> None:
-    client = _build_client()
+def test_ui_execution_route_fails_closed_when_server_risk_state_is_unavailable() -> None:
+    client = _build_client(
+        risk_context_resolver=FailClosedExecutionRiskContextResolver()
+    )
 
     source_id = client.post(
         "/ui/execution/source-events",
@@ -170,9 +177,44 @@ def test_ui_execution_route_rejects_intent_when_risk_context_is_missing() -> Non
         },
     )
 
-    assert response.status_code == 201
-    assert response.json()["status"] == "rejected"
-    assert response.json()["risk_reason"] == "risk_state_unavailable"
+    assert response.status_code == 400
+    assert response.json()["error"]["details"]["reason"] == "risk_state_unavailable"
+
+
+def test_ui_execution_route_rejects_client_supplied_risk_authority() -> None:
+    repository = InMemoryExecutionIntentRepository()
+    client = _build_client(repository=repository)
+    source_id = client.post(
+        "/ui/execution/source-events",
+        headers={"x-user-id": _USER_ID},
+        json={
+            "source_type": "ops_test",
+            "source_event_ref": "client-risk-spoof",
+            "source_ref": {"ops_test_id": "client-risk-spoof"},
+            "idempotency_key": "client-risk-spoof-source",
+        },
+    ).json()["source_event_id"]
+
+    response = client.post(
+        "/ui/execution/intents",
+        headers={"x-user-id": _USER_ID},
+        json={
+            "source_event_id": source_id,
+            "idempotency_key": "client-risk-spoof-intent",
+            "exchange_connection_id": "00000000-0000-0000-0000-000000010601",
+            "market_type": "spot",
+            "instrument_key": "binance:spot:BTCUSDT",
+            "order": {
+                "order_type": "market",
+                "side": "buy",
+                "quote_notional": "25",
+            },
+            "risk_context": _accepted_risk_context(),
+        },
+    )
+
+    assert response.status_code == 422
+    assert repository.intents == []
 
 
 def test_ui_execution_route_rejects_unsupported_order_model() -> None:
@@ -341,6 +383,7 @@ def _build_client(
     *,
     repository: InMemoryExecutionIntentRepository | None = None,
     dispatch_transport: object | None = None,
+    risk_context_resolver: ExecutionRiskContextResolver | None = None,
 ) -> TestClient:
     intent_repository = repository or InMemoryExecutionIntentRepository()
     clock = _Clock()
@@ -361,6 +404,10 @@ def _build_client(
             ),
             dispatch_service=dispatch_service,
             current_user_dependency=_CurrentUserDependency(),
+            organization_scope_resolver=DevelopmentOrganizationScopeResolver(),
+            risk_context_resolver=(
+                risk_context_resolver or _TrustedRiskContextResolver()
+            ),
         )
     )
     return TestClient(app)
@@ -402,8 +449,16 @@ class _DispatchTransport:
         _ = stream_name, message_id
 
 
+class _TrustedRiskContextResolver:
+    def resolve(self, *, query: ExecutionRiskContextQuery) -> ExecutionRiskContext:
+        _ = query
+        return ExecutionRiskContext(**_accepted_risk_context())  # type: ignore[arg-type]
+
+
 def _accepted_risk_context() -> dict[str, object]:
     return {
+        "organization_ownership_verified": True,
+        "account_ownership_verified": True,
         "exchange_connection_active": True,
         "secret_custody_ready": True,
         "source_authorized": True,

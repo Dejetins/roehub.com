@@ -19,9 +19,10 @@ from trading.contexts.live_execution.domain import (
     StrategyPaperAccountingSnapshot,
 )
 from trading.contexts.strategy.domain.entities import StrategySignal
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 _QUOTE_ASSET = "USDT"
+_PAPER_EXECUTION_ID_NAMESPACE = "io.roehub.paper-execution/v1"
 _FEE_BPS = Decimal("10")
 _QUANTITY_QUANT = Decimal("0.00000001")
 _MONEY_QUANT = Decimal("0.00000001")
@@ -54,6 +55,7 @@ class CapitalReservationPaperAccountingService:
     def reserve_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         strategy_id: UUID,
@@ -65,6 +67,7 @@ class CapitalReservationPaperAccountingService:
         if requested_amount <= 0:
             return self._reject(
                 owner_user_id=owner_user_id,
+                organization_id=organization_id,
                 exchange_connection_id=exchange_connection_id,
                 strategy_id=strategy_id,
                 live_profile_id=live_profile_id,
@@ -77,6 +80,7 @@ class CapitalReservationPaperAccountingService:
         projection = (
             self._account_projection_repository.get_latest_projection(
                 owner_user_id=owner_user_id,
+                organization_id=organization_id,
                 exchange_connection_id=exchange_connection_id,
             )
             if self._account_projection_repository is not None
@@ -85,6 +89,7 @@ class CapitalReservationPaperAccountingService:
         if projection is None:
             return self._reject(
                 owner_user_id=owner_user_id,
+                organization_id=organization_id,
                 exchange_connection_id=exchange_connection_id,
                 strategy_id=strategy_id,
                 live_profile_id=live_profile_id,
@@ -97,6 +102,7 @@ class CapitalReservationPaperAccountingService:
         age_seconds = projection.age_seconds(now=now)
         if projection.sync_status == "degraded" or age_seconds > self._max_projection_age_seconds:
             return self._reject(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 exchange_connection_id=exchange_connection_id,
                 strategy_id=strategy_id,
@@ -114,12 +120,14 @@ class CapitalReservationPaperAccountingService:
         free_amount = quote_balance.free if quote_balance is not None else Decimal("0")
         already_reserved = self._repository.sum_active_reserved(
             owner_user_id=owner_user_id,
+            organization_id=organization_id,
             exchange_connection_id=exchange_connection_id,
             asset=_QUOTE_ASSET,
         )
         available = free_amount - already_reserved
         if available < requested_amount:
             return self._reject(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 exchange_connection_id=exchange_connection_id,
                 strategy_id=strategy_id,
@@ -132,6 +140,7 @@ class CapitalReservationPaperAccountingService:
             )
         reservation = CapitalReservation(
             reservation_id=uuid4(),
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_connection_id=exchange_connection_id,
             strategy_id=strategy_id,
@@ -156,6 +165,7 @@ class CapitalReservationPaperAccountingService:
     def reserve_virtual_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         live_profile_id: UUID | None,
@@ -166,6 +176,7 @@ class CapitalReservationPaperAccountingService:
         if requested_amount <= 0:
             return self._reject(
                 owner_user_id=owner_user_id,
+                organization_id=organization_id,
                 exchange_connection_id=PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID,
                 strategy_id=strategy_id,
                 live_profile_id=live_profile_id,
@@ -177,6 +188,7 @@ class CapitalReservationPaperAccountingService:
             )
         reservation = CapitalReservation(
             reservation_id=uuid4(),
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_connection_id=PAPER_VIRTUAL_EXCHANGE_CONNECTION_ID,
             strategy_id=strategy_id,
@@ -199,9 +211,16 @@ class CapitalReservationPaperAccountingService:
         return recorded
 
     def release_for_strategy_run(
-        self, *, owner_user_id: UserId, strategy_run_id: UUID, now: datetime, reason: str
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_run_id: UUID,
+        now: datetime,
+        reason: str,
     ) -> CapitalReservation | None:
         released = self._repository.release_reservation_for_run(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_run_id=strategy_run_id,
             changed_at=now,
@@ -219,6 +238,7 @@ class CapitalReservationPaperAccountingService:
         if signal.side is None:
             raise CapitalReservationBlockedError(reason="paper_signal_missing_side")
         reservation = self._repository.get_active_reservation_for_run(
+            organization_id=signal.organization_id,
             owner_user_id=signal.owner_user_id,
             strategy_run_id=signal.strategy_run_id,
         )
@@ -236,7 +256,10 @@ class CapitalReservationPaperAccountingService:
             side=signal.side,
         )
         order = PaperOrder(
-            paper_order_id=_stable_uuid("paper-order", signal.signal_id),
+            paper_order_id=_stable_uuid(
+                "paper-order", signal.signal_id, organization_id=signal.organization_id
+            ),
+            organization_id=signal.organization_id,
             owner_user_id=signal.owner_user_id,
             strategy_id=signal.strategy_id,
             strategy_run_id=signal.strategy_run_id,
@@ -254,8 +277,11 @@ class CapitalReservationPaperAccountingService:
             created_at=created_at,
         )
         fill = PaperFill(
-            paper_fill_id=_stable_uuid("paper-fill", signal.signal_id),
+            paper_fill_id=_stable_uuid(
+                "paper-fill", signal.signal_id, organization_id=signal.organization_id
+            ),
             paper_order_id=order.paper_order_id,
+            organization_id=signal.organization_id,
             owner_user_id=signal.owner_user_id,
             strategy_id=signal.strategy_id,
             strategy_run_id=signal.strategy_run_id,
@@ -278,7 +304,10 @@ class CapitalReservationPaperAccountingService:
         )
         mark_to_market_value = quote_notional if signal.side == "buy" else Decimal("0")
         accounting = StrategyPaperAccountingSnapshot(
-            accounting_id=_stable_uuid("paper-accounting", signal.signal_id),
+            accounting_id=_stable_uuid(
+                "paper-accounting", signal.signal_id, organization_id=signal.organization_id
+            ),
+            organization_id=signal.organization_id,
             owner_user_id=signal.owner_user_id,
             strategy_id=signal.strategy_id,
             strategy_run_id=signal.strategy_run_id,
@@ -312,6 +341,7 @@ class CapitalReservationPaperAccountingService:
     def record_manual_paper_execution(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         live_profile_id: UUID | None,
@@ -331,11 +361,13 @@ class CapitalReservationPaperAccountingService:
         if reference_price <= 0:
             raise CapitalReservationBlockedError(reason="paper_manual_invalid_reference_price")
         reservation = self._repository.get_active_reservation_for_run(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_run_id=strategy_run_id,
         )
         if reservation is None:
             reservation = self.reserve_virtual_for_strategy_run(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 strategy_id=strategy_id,
                 live_profile_id=live_profile_id,
@@ -356,7 +388,10 @@ class CapitalReservationPaperAccountingService:
             side=side,
         )
         order = PaperOrder(
-            paper_order_id=_stable_uuid("manual-paper-order", source_event_id),
+            paper_order_id=_stable_uuid(
+                "manual-paper-order", source_event_id, organization_id=organization_id
+            ),
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             strategy_run_id=strategy_run_id,
@@ -375,8 +410,11 @@ class CapitalReservationPaperAccountingService:
             created_at=now,
         )
         fill = PaperFill(
-            paper_fill_id=_stable_uuid("manual-paper-fill", source_event_id),
+            paper_fill_id=_stable_uuid(
+                "manual-paper-fill", source_event_id, organization_id=organization_id
+            ),
             paper_order_id=order.paper_order_id,
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             strategy_run_id=strategy_run_id,
@@ -399,7 +437,10 @@ class CapitalReservationPaperAccountingService:
         )
         mark_to_market_value = quote_amount if side == "buy" else Decimal("0")
         accounting = StrategyPaperAccountingSnapshot(
-            accounting_id=_stable_uuid("manual-paper-accounting", source_event_id),
+            accounting_id=_stable_uuid(
+                "manual-paper-accounting", source_event_id, organization_id=organization_id
+            ),
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             strategy_run_id=strategy_run_id,
@@ -433,6 +474,7 @@ class CapitalReservationPaperAccountingService:
     def record_rl_paper_execution(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         live_profile_id: UUID | None,
@@ -452,11 +494,13 @@ class CapitalReservationPaperAccountingService:
         if reference_price <= 0:
             raise CapitalReservationBlockedError(reason="paper_rl_invalid_reference_price")
         reservation = self._repository.get_active_reservation_for_run(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_run_id=strategy_run_id,
         )
         if reservation is None:
             reservation = self.reserve_virtual_for_strategy_run(
+                organization_id=organization_id,
                 owner_user_id=owner_user_id,
                 strategy_id=strategy_id,
                 live_profile_id=live_profile_id,
@@ -477,7 +521,10 @@ class CapitalReservationPaperAccountingService:
             side=side,
         )
         order = PaperOrder(
-            paper_order_id=_stable_uuid("rl-paper-order", source_event_id),
+            paper_order_id=_stable_uuid(
+                "rl-paper-order", source_event_id, organization_id=organization_id
+            ),
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             strategy_run_id=strategy_run_id,
@@ -496,8 +543,11 @@ class CapitalReservationPaperAccountingService:
             created_at=now,
         )
         fill = PaperFill(
-            paper_fill_id=_stable_uuid("rl-paper-fill", source_event_id),
+            paper_fill_id=_stable_uuid(
+                "rl-paper-fill", source_event_id, organization_id=organization_id
+            ),
             paper_order_id=order.paper_order_id,
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             strategy_run_id=strategy_run_id,
@@ -520,7 +570,10 @@ class CapitalReservationPaperAccountingService:
         )
         mark_to_market_value = quote_amount if side == "buy" else Decimal("0")
         accounting = StrategyPaperAccountingSnapshot(
-            accounting_id=_stable_uuid("rl-paper-accounting", source_event_id),
+            accounting_id=_stable_uuid(
+                "rl-paper-accounting", source_event_id, organization_id=organization_id
+            ),
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
             strategy_run_id=strategy_run_id,
@@ -552,9 +605,10 @@ class CapitalReservationPaperAccountingService:
         return recorded
 
     def get_latest_accounting_for_strategy(
-        self, *, owner_user_id: UserId, strategy_id: UUID
+        self, *, organization_id: OrganizationId, owner_user_id: UserId, strategy_id: UUID
     ) -> StrategyPaperAccountingSnapshot | None:
         return self._repository.get_latest_accounting_for_strategy(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
         )
@@ -562,6 +616,7 @@ class CapitalReservationPaperAccountingService:
     def _reject(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         strategy_id: UUID,
@@ -574,6 +629,7 @@ class CapitalReservationPaperAccountingService:
     ) -> CapitalReservation:
         reservation = CapitalReservation(
             reservation_id=uuid4(),
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_connection_id=exchange_connection_id,
             strategy_id=strategy_id,
@@ -604,13 +660,19 @@ class CapitalReservationPaperAccountingService:
             self._on_paper_accounting(result, reason)
 
 
-def _stable_uuid(prefix: str, source_id: UUID) -> UUID:
-    return uuid5(NAMESPACE_URL, f"roehub:{prefix}:{source_id}")
+def _stable_uuid(
+    prefix: str,
+    source_id: UUID,
+    *,
+    organization_id: OrganizationId,
+) -> UUID:
+    return uuid5(
+        NAMESPACE_URL,
+        f"{_PAPER_EXECUTION_ID_NAMESPACE}:{organization_id}:{prefix}:{source_id}",
+    )
 
 
-def _paper_completeness(
-    *, market_type: str, side: str
-) -> tuple[str, bool, str]:
+def _paper_completeness(*, market_type: str, side: str) -> tuple[str, bool, str]:
     normalized_market = market_type.strip().casefold()
     if normalized_market == "spot" and side == "sell":
         return (

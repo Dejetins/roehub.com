@@ -1,16 +1,35 @@
 .git
 .venv
-__pycache__
 .pytest_cache
-.mypy_cache
 .ruff_cache
-.dist
-.build
+.mypy_cache
+.pyright
+__pycache__
 *.pyc
 *.pyo
-*.pyd
-.DS_Store
 .env
 .env.*
-deploy/.env
-deploy/.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.jks
+id_rsa*
+.DS_Store
+local_artifacts
+artifacts
+docs
+prototypes
+tests
+
+# Release outputs bind the built image digest and must not become inputs to that
+# same image.  Keeping them outside the context prevents a self-referential
+# digest and makes repeated multi-architecture builds comparable.
+configs/installation/generated
+configs/installation/runtime-service-manifest.json
+schemas/release
+tools/release/*
+!tools/release/THIRD_PARTY_NOTICES.md

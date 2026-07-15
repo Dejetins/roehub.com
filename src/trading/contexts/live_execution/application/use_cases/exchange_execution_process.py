@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Callable, Mapping
 from uuid import UUID, uuid4
 
@@ -15,7 +15,9 @@ from trading.contexts.live_execution.application.ports import (
     ExchangeOrderAdapter,
     ExchangeOrderAdapterError,
     ExecutionDispatchUnavailableError,
+    ExecutionGatewayPolicyRepository,
     ExecutionIntentRepository,
+    FailClosedExecutionGatewayPolicyRepository,
     LiveExecutionClock,
 )
 from trading.contexts.live_execution.domain import (
@@ -28,12 +30,14 @@ from trading.contexts.live_execution.domain import (
     ExchangeExecutionRequestObservation,
     ExchangeOrderCommand,
     ExchangeOrderStatusResult,
+    ExecutionAdapterIdentity,
     ExecutionIntent,
     ExecutionNotificationOutboxEvent,
     ExecutionOrderEvent,
     ExecutionReconciliationRun,
+    ExecutionSubmitGuardQuery,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 _ORDER_LEDGER_EXCHANGES = frozenset({"binance", "bybit"})
 
@@ -59,12 +63,15 @@ class ExchangeExecutionProcessConfig:
     ledger_pitr_required: bool = False
     ledger_pitr_verified: bool = False
     fail_fast: bool = False
+    submit_claim_ttl_seconds: int = 30
 
     def __post_init__(self) -> None:
         if self.service_id.strip() == "":
             raise ValueError("ExchangeExecutionProcessConfig.service_id must be non-empty")
-        if self.adapter_mode not in {"disabled", "testnet"}:
-            raise ValueError("exchange-execution adapter_mode must be disabled or testnet")
+        if self.adapter_mode not in {"disabled", "testnet", "emulator"}:
+            raise ValueError(
+                "exchange-execution adapter_mode must be disabled, testnet or emulator"
+            )
         if self.consumer_name.strip() == "":
             raise ValueError("ExchangeExecutionProcessConfig.consumer_name must be non-empty")
         if self.read_count <= 0:
@@ -81,6 +88,8 @@ class ExchangeExecutionProcessConfig:
             raise ValueError("ExchangeExecutionProcessConfig.rate_limit_per_second must be > 0")
         if self.rate_limit_burst <= 0:
             raise ValueError("ExchangeExecutionProcessConfig.rate_limit_burst must be > 0")
+        if self.submit_claim_ttl_seconds <= 0:
+            raise ValueError("ExchangeExecutionProcessConfig.submit_claim_ttl_seconds must be > 0")
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +116,7 @@ class ExchangeExecutionProcessService:
         order_repository: ExchangeExecutionOrderRepository | None = None,
         credential_resolver: ExchangeExecutionCredentialResolver | None = None,
         order_adapters: tuple[ExchangeOrderAdapter, ...] = (),
+        gateway_policy_repository: ExecutionGatewayPolicyRepository | None = None,
         started_at: datetime | None = None,
         on_observation: Callable[[str, str], None] | None = None,
         on_dlq: Callable[[str], None] | None = None,
@@ -132,6 +142,9 @@ class ExchangeExecutionProcessService:
         self._order_repository = order_repository
         self._credential_resolver = credential_resolver
         self._order_adapters = {adapter.exchange_name: adapter for adapter in order_adapters}
+        self._gateway_policy_repository = (
+            gateway_policy_repository or FailClosedExecutionGatewayPolicyRepository()
+        )
         self._consumer = consumer
         self._clock = clock
         self._started_at = started_at or clock.now()
@@ -263,6 +276,7 @@ class ExchangeExecutionProcessService:
             observation = ExchangeExecutionRequestObservation(
                 observation_id=uuid4(),
                 service_id=self._config.service_id,
+                organization_id=intent.organization_id if intent is not None else None,
                 intent_id=intent_id,
                 stream_name=message.stream_name,
                 redis_message_id=message.message_id,
@@ -285,18 +299,28 @@ class ExchangeExecutionProcessService:
                 self._record_ack(reason=reason)
                 quarantined_count += 1
                 acked_count += 1
-            elif status in {"testnet_submitted", "guard_rejected", "adapter_error"}:
-                self._consumer.ack_after_durable_state_change(
-                    stream_name=message.stream_name,
-                    message_id=message.message_id,
+            elif status in {
+                "testnet_submitted",
+                "emulator_submitted",
+                "guard_rejected",
+                "adapter_error",
+                "reconciled",
+            }:
+                keep_pending = status == "adapter_error" and (
+                    "unknown_state" in reason or "claim_fence_lost" in reason
                 )
-                self._record_ack(reason=reason)
-                acked_count += 1
-                if status == "testnet_submitted":
+                if not keep_pending:
+                    self._consumer.ack_after_durable_state_change(
+                        stream_name=message.stream_name,
+                        message_id=message.message_id,
+                    )
+                    self._record_ack(reason=reason)
+                    acked_count += 1
+                if status in {"testnet_submitted", "emulator_submitted"}:
                     submitted_count += 1
                 elif status == "guard_rejected":
                     guard_rejected_count += 1
-                else:
+                elif status == "adapter_error":
                     adapter_error_count += 1
         return ExchangeExecutionProcessStepResult(
             read_count=len(messages),
@@ -309,7 +333,7 @@ class ExchangeExecutionProcessService:
             reason=(
                 "adapter_disabled_no_submit"
                 if self._config.adapter_mode == "disabled"
-                else "testnet_adapter_processed"
+                else f"{self._config.adapter_mode}_adapter_processed"
             ),
         )
 
@@ -485,10 +509,12 @@ class ExchangeExecutionProcessService:
     ) -> tuple[ExchangeExecutionObservationStatus, str, ExecutionIntent | None]:
         try:
             intent_id = UUID(payload["intent_id"])
+            organization_id = OrganizationId.from_string(payload["organization_id"])
             owner_user_id = UserId.from_string(payload["owner_user_id"])
         except (KeyError, ValueError):
             return "quarantined", "dispatch_payload_invalid_identity", None
         intent = self._intent_repository.get_intent_by_id(
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             intent_id=intent_id,
         )
@@ -498,13 +524,18 @@ class ExchangeExecutionProcessService:
             return "quarantined", "intent_not_dispatchable", intent
         if self._config.adapter_mode == "disabled":
             return "adapter_disabled", "adapter_disabled_stage13", intent
-        return "skipped", "testnet_execution_pending", intent
+        return "skipped", f"{self._config.adapter_mode}_execution_pending", intent
 
     def _execute_testnet_intent(
         self, *, intent: ExecutionIntent | None
     ) -> tuple[ExchangeExecutionObservationStatus, str]:
         if intent is None:
             return "quarantined", "intent_not_found"
+        success_status: ExchangeExecutionObservationStatus = (
+            "emulator_submitted"
+            if self._config.adapter_mode == "emulator"
+            else "testnet_submitted"
+        )
         if self._order_repository is None or self._credential_resolver is None:
             return "guard_rejected", "testnet_adapter_dependency_missing"
         exchange_name = _exchange_from_instrument_key(intent.instrument_key)
@@ -532,11 +563,20 @@ class ExchangeExecutionProcessService:
             )
             return "guard_rejected", "exchange_adapter_not_enabled"
         command = _command_from_intent(intent=intent, exchange_name=exchange_name)
-        existing = self._order_repository.get_by_intent(intent_id=intent.intent_id)
+        existing = self._order_repository.get_by_intent(
+            organization_id=intent.organization_id,
+            intent_id=intent.intent_id,
+        )
         if existing is not None and existing.exchange_order_id is not None:
-            return "testnet_submitted", "order_already_processed"
+            return "reconciled", "order_already_processed"
+        unknown_existing = existing is not None and (
+            existing.status in {"unknown", "submit_pending"}
+            or "unknown_state" in existing.status_reason
+            or "reconciliation_required" in existing.status_reason
+        )
         try:
             connection = self._credential_resolver.resolve(
+                organization_id=intent.organization_id,
                 owner_user_id=intent.owner_user_id,
                 exchange_connection_id=intent.exchange_connection_id,
             )
@@ -559,7 +599,12 @@ class ExchangeExecutionProcessService:
                 reason=error.reason,
             )
             return "guard_rejected", error.reason
-        guard_reason = _connection_guard_reason(intent=intent, connection=connection)
+        guard_reason = _connection_guard_reason(
+            intent=intent,
+            connection=connection,
+            adapter=adapter,
+            adapter_mode=self._config.adapter_mode,
+        )
         if guard_reason is not None:
             guarded_command = _command_from_intent(
                 intent=intent,
@@ -589,6 +634,7 @@ class ExchangeExecutionProcessService:
             exchange_name=connection.exchange_name,
             environment=connection.environment,
         )
+        adapter_identity = _adapter_identity(adapter=adapter)
         clock_reason = self._exchange_clock_guard_reason(
             adapter=adapter,
             exchange=connection.exchange_name,
@@ -612,7 +658,108 @@ class ExchangeExecutionProcessService:
                 reason=clock_reason,
             )
             return "guard_rejected", clock_reason
-        pending_order = self._order_repository.record_submit_pending(command=command)
+        if unknown_existing and existing is not None:
+            if (
+                existing.status == "submit_pending"
+                and existing.submit_claim_expires_at is not None
+                and existing.submit_claim_expires_at > self._clock.now()
+            ):
+                return "skipped", "submission_in_flight"
+            try:
+                self._acquire_rate_limit(
+                    exchange=connection.exchange_name,
+                    operation="status",
+                )
+                reconciled = adapter.get_order_status_by_client_order_id(
+                    command=command,
+                    client_order_id=existing.client_order_id,
+                    credential=connection.credential,
+                )
+            except ExchangeOrderAdapterError as error:
+                self._record_reconciliation(
+                    order=existing,
+                    status_result=None,
+                    reason=f"unknown_provider_reconciliation_failed:{error.reason}",
+                )
+                return "adapter_error", "unknown_state_reconciliation_required"
+            if reconciled.lookup_outcome == "unknown":
+                self._record_reconciliation(
+                    order=existing,
+                    status_result=reconciled,
+                    reason="unknown_provider_reconciliation_inconclusive",
+                )
+                return "adapter_error", "unknown_state_reconciliation_required"
+            reconciled_order = self._order_repository.record_status_result(
+                organization_id=intent.organization_id,
+                intent_id=intent.intent_id,
+                result=reconciled,
+            )
+            if reconciled_order is None:
+                return "adapter_error", "unknown_state_reconciliation_write_failed"
+            self._record_order_event(
+                order=reconciled_order,
+                event_type="status_checked",
+                status="reconciled",
+                reason=reconciled.exchange_status,
+                provider_event_id=reconciled.exchange_order_id or None,
+                metadata={"lookup": "client_order_id"},
+            )
+            provider_confirmed_absent = reconciled.lookup_outcome == "confirmed_absent"
+            self._record_reconciliation(
+                order=reconciled_order,
+                status_result=reconciled,
+                reason=(
+                    "unknown_provider_confirmed_absent"
+                    if provider_confirmed_absent
+                    else "unknown_provider_status_matched"
+                ),
+            )
+            if provider_confirmed_absent:
+                return "reconciled", "unknown_state_reconciled_absent_without_resubmit"
+            self._update_source_event_from_order(
+                order=reconciled_order,
+                outcome="submitted",
+                reason=reconciled.exchange_status,
+            )
+            return "reconciled", "unknown_state_reconciled_present_without_resubmit"
+        submission_attempt_id = uuid4()
+        preflight = self._gateway_policy_repository.evaluate_and_record(
+            query=ExecutionSubmitGuardQuery(
+                intent=intent,
+                connection=connection,
+                adapter=adapter_identity,
+                phase="preflight",
+                submission_attempt_id=submission_attempt_id,
+                evaluated_at=self._clock.now(),
+            )
+        )
+        if not preflight.accepted:
+            self._record_submit_guard_rejection(
+                command=command,
+                reason=preflight.reason,
+                phase="preflight",
+            )
+            return "guard_rejected", preflight.reason
+        if preflight.audit_event_id is None:
+            self._record_submit_guard_rejection(
+                command=command,
+                reason="execution_gateway_audit_unavailable",
+                phase="preflight",
+            )
+            return "guard_rejected", "execution_gateway_audit_unavailable"
+        claimed_at = self._clock.now()
+        claim = self._order_repository.claim_submit(
+            command=command,
+            claim_id=submission_attempt_id,
+            claimed_at=claimed_at,
+            expires_at=claimed_at
+            + timedelta(seconds=self._config.submit_claim_ttl_seconds),
+            submit_guard_audit_event_id=preflight.audit_event_id,
+            mainnet_approval_id=preflight.approval_id,
+        )
+        if not claim.acquired:
+            return "skipped", claim.reason
+        pending_order = claim.order
         self._record_order_event(
             order=pending_order,
             event_type="submit_pending",
@@ -627,6 +774,7 @@ class ExchangeExecutionProcessService:
             )
             session = adapter.ensure_private_stream_session(connection=connection)
             self._order_repository.record_private_stream_session(
+                organization_id=intent.organization_id,
                 connection_id=connection.connection_id,
                 session=session,
             )
@@ -646,28 +794,137 @@ class ExchangeExecutionProcessService:
                 exchange=connection.exchange_name,
                 operation="submit",
             )
+            try:
+                current_connection = self._credential_resolver.resolve(
+                    organization_id=intent.organization_id,
+                    owner_user_id=intent.owner_user_id,
+                    exchange_connection_id=intent.exchange_connection_id,
+                )
+            except ExchangeExecutionCredentialUnavailable as error:
+                renewed_at = self._clock.now()
+                if not self._order_repository.renew_submit_claim(
+                    organization_id=intent.organization_id,
+                    intent_id=intent.intent_id,
+                    claim_id=submission_attempt_id,
+                    renewed_at=renewed_at,
+                    expires_at=renewed_at
+                    + timedelta(seconds=self._config.submit_claim_ttl_seconds),
+                ):
+                    return "skipped", "submit_claim_fence_lost"
+                if not self._record_submit_guard_rejection(
+                    command=command,
+                    reason=error.reason,
+                    phase="pre_submit",
+                    claim_id=submission_attempt_id,
+                    rejected_at=renewed_at,
+                ):
+                    return "skipped", "submit_claim_fence_lost"
+                return "guard_rejected", error.reason
+            current_guard_reason = _connection_guard_reason(
+                intent=intent,
+                connection=current_connection,
+                adapter=adapter,
+                adapter_mode=self._config.adapter_mode,
+            )
+            if current_guard_reason is not None:
+                renewed_at = self._clock.now()
+                if not self._order_repository.renew_submit_claim(
+                    organization_id=intent.organization_id,
+                    intent_id=intent.intent_id,
+                    claim_id=submission_attempt_id,
+                    renewed_at=renewed_at,
+                    expires_at=renewed_at
+                    + timedelta(seconds=self._config.submit_claim_ttl_seconds),
+                ):
+                    return "skipped", "submit_claim_fence_lost"
+                if not self._record_submit_guard_rejection(
+                    command=command,
+                    reason=current_guard_reason,
+                    phase="pre_submit",
+                    claim_id=submission_attempt_id,
+                    rejected_at=renewed_at,
+                ):
+                    return "skipped", "submit_claim_fence_lost"
+                return "guard_rejected", current_guard_reason
+            pre_submit = self._gateway_policy_repository.evaluate_and_record(
+                query=ExecutionSubmitGuardQuery(
+                    intent=intent,
+                    connection=current_connection,
+                    adapter=adapter_identity,
+                    phase="pre_submit",
+                    submission_attempt_id=submission_attempt_id,
+                    evaluated_at=self._clock.now(),
+                )
+            )
+            renewed_at = self._clock.now()
+            if not self._order_repository.renew_submit_claim(
+                organization_id=intent.organization_id,
+                intent_id=intent.intent_id,
+                claim_id=submission_attempt_id,
+                renewed_at=renewed_at,
+                expires_at=renewed_at
+                + timedelta(seconds=self._config.submit_claim_ttl_seconds),
+            ):
+                return "skipped", "submit_claim_fence_lost"
+            if not pre_submit.accepted:
+                if not self._record_submit_guard_rejection(
+                    command=command,
+                    reason=pre_submit.reason,
+                    phase="pre_submit",
+                    claim_id=submission_attempt_id,
+                    rejected_at=renewed_at,
+                ):
+                    return "skipped", "submit_claim_fence_lost"
+                return "guard_rejected", pre_submit.reason
+            if pre_submit.audit_event_id is None:
+                if not self._record_submit_guard_rejection(
+                    command=command,
+                    reason="execution_gateway_audit_unavailable",
+                    phase="pre_submit",
+                    claim_id=submission_attempt_id,
+                    rejected_at=renewed_at,
+                ):
+                    return "skipped", "submit_claim_fence_lost"
+                return "guard_rejected", "execution_gateway_audit_unavailable"
+            if (
+                current_connection.environment == "mainnet"
+                and pre_submit.approval_id != preflight.approval_id
+            ):
+                if not self._record_submit_guard_rejection(
+                    command=command,
+                    reason="mainnet_approval_changed_during_submit",
+                    phase="pre_submit",
+                    claim_id=submission_attempt_id,
+                    rejected_at=renewed_at,
+                ):
+                    return "skipped", "submit_claim_fence_lost"
+                return "guard_rejected", "mainnet_approval_changed_during_submit"
             submitted = adapter.submit_order(
                 command=command,
-                credential=connection.credential,
+                credential=current_connection.credential,
             )
             submitted_order = self._order_repository.record_submit_result(
+                organization_id=intent.organization_id,
                 intent_id=intent.intent_id,
+                claim_id=submission_attempt_id,
+                finalized_at=self._clock.now(),
                 result=submitted,
             )
-            if submitted_order is not None:
-                self._record_order_event(
-                    order=submitted_order,
-                    event_type="submitted",
-                    status="submitted",
-                    reason=submitted.exchange_status,
-                    provider_event_id=submitted.exchange_order_id,
-                    metadata=submitted.metadata,
-                )
-                self._update_source_event_from_order(
-                    order=submitted_order,
-                    outcome="submitted",
-                    reason=submitted.exchange_status,
-                )
+            if submitted_order is None:
+                return "adapter_error", "submit_result_claim_fence_lost_unknown_state"
+            self._record_order_event(
+                order=submitted_order,
+                event_type="submitted",
+                status="submitted",
+                reason=submitted.exchange_status,
+                provider_event_id=submitted.exchange_order_id,
+                metadata=submitted.metadata,
+            )
+            self._update_source_event_from_order(
+                order=submitted_order,
+                outcome="submitted",
+                reason=submitted.exchange_status,
+            )
             self._record_order_submit(
                 exchange=connection.exchange_name,
                 reason=submitted.exchange_status,
@@ -683,9 +940,10 @@ class ExchangeExecutionProcessService:
             status = adapter.get_order_status(
                 command=command,
                 exchange_order_id=submitted.exchange_order_id,
-                credential=connection.credential,
+                credential=current_connection.credential,
             )
             status_order = self._order_repository.record_status_result(
+                organization_id=intent.organization_id,
                 intent_id=intent.intent_id,
                 result=status,
             )
@@ -712,9 +970,10 @@ class ExchangeExecutionProcessService:
                 cancelled = adapter.cancel_order(
                     command=command,
                     exchange_order_id=submitted.exchange_order_id,
-                    credential=connection.credential,
+                    credential=current_connection.credential,
                 )
                 cancelled_order = self._order_repository.record_cancel_result(
+                    organization_id=intent.organization_id,
                     intent_id=intent.intent_id,
                     result=cancelled,
                 )
@@ -749,7 +1008,10 @@ class ExchangeExecutionProcessService:
                 else error.reason
             )
             order = self._order_repository.record_adapter_error(
+                organization_id=intent.organization_id,
                 intent_id=intent.intent_id,
+                claim_id=submission_attempt_id,
+                occurred_at=self._clock.now(),
                 reason=reason,
             )
             if order is not None:
@@ -782,8 +1044,54 @@ class ExchangeExecutionProcessService:
                 )
             return "adapter_error", reason
         if self._config.cancel_after_submit and not status.fills:
-            return "testnet_submitted", "testnet_submit_status_cancel_recorded"
-        return "testnet_submitted", "testnet_submit_status_recorded"
+            return success_status, f"{self._config.adapter_mode}_submit_status_cancel_recorded"
+        return success_status, f"{self._config.adapter_mode}_submit_status_recorded"
+
+    def _record_submit_guard_rejection(
+        self,
+        *,
+        command: ExchangeOrderCommand,
+        reason: str,
+        phase: str,
+        claim_id: UUID | None = None,
+        rejected_at: datetime | None = None,
+    ) -> bool:
+        if self._order_repository is None:
+            return False
+        if claim_id is None:
+            order = self._order_repository.record_guard_rejection(
+                command=command,
+                reason=reason,
+            )
+        else:
+            if rejected_at is None:
+                raise ValueError("claim guard rejection requires rejected_at")
+            order = self._order_repository.record_claim_guard_rejection(
+                command=command,
+                claim_id=claim_id,
+                rejected_at=rejected_at,
+                reason=reason,
+            )
+            if order is None:
+                return False
+        self._record_order_event(
+            order=order,
+            event_type="guard_rejected",
+            status="guard_rejected",
+            reason=reason,
+            metadata={"guard": "execution_gateway", "phase": phase},
+        )
+        self._record_order_notification(
+            order=order,
+            event_type=(
+                "producer_kill_switch"
+                if reason == "execution_kill_switch_active"
+                else "producer_order_rejected"
+            ),
+            severity="critical" if reason == "execution_kill_switch_active" else "warning",
+            reason=reason,
+        )
+        return True
 
     def _record_order_event(
         self,
@@ -802,6 +1110,7 @@ class ExchangeExecutionProcessService:
                 event_id=uuid4(),
                 order_id=order.order_id,
                 intent_id=order.intent_id,
+                organization_id=order.organization_id,
                 owner_user_id=order.owner_user_id,
                 event_type=event_type,  # type: ignore[arg-type]
                 status=status,
@@ -847,6 +1156,7 @@ class ExchangeExecutionProcessService:
                 reconciliation_run_id=uuid4(),
                 order_id=order.order_id,
                 intent_id=order.intent_id,
+                organization_id=order.organization_id,
                 owner_user_id=order.owner_user_id,
                 exchange_name=order.exchange_name,
                 environment=order.environment,
@@ -891,12 +1201,14 @@ class ExchangeExecutionProcessService:
         self, *, order: ExchangeExecutionOrderRecord, outcome: str, reason: str
     ) -> None:
         intent = self._intent_repository.get_intent_by_id(
+            organization_id=order.organization_id,
             owner_user_id=order.owner_user_id,
             intent_id=order.intent_id,
         )
         if intent is None:
             return
         self._intent_repository.update_source_event_outcome(
+            organization_id=order.organization_id,
             owner_user_id=order.owner_user_id,
             source_event_id=intent.source_event_id,
             outcome=outcome,
@@ -913,6 +1225,7 @@ class ExchangeExecutionProcessService:
         reason: str,
     ) -> None:
         intent = self._intent_repository.get_intent_by_id(
+            organization_id=order.organization_id,
             owner_user_id=order.owner_user_id,
             intent_id=order.intent_id,
         )
@@ -921,6 +1234,7 @@ class ExchangeExecutionProcessService:
         recorded = self._intent_repository.record_notification_outbox(
             event=ExecutionNotificationOutboxEvent(
                 notification_id=uuid4(),
+                organization_id=order.organization_id,
                 owner_user_id=order.owner_user_id,
                 source_type=intent.source_type,
                 event_type=event_type,  # type: ignore[arg-type]
@@ -1047,7 +1361,7 @@ def _command_from_intent(
         intent=intent,
         exchange_name=exchange_name,
         environment=environment,
-        client_order_id=f"rh_{intent.idempotency_key_hash[:32]}",
+        client_order_id=f"rh1_{intent.idempotency_key_hash[:28]}",
     )
 
 
@@ -1055,15 +1369,25 @@ def _connection_guard_reason(
     *,
     intent: ExecutionIntent,
     connection: object,
+    adapter: ExchangeOrderAdapter,
+    adapter_mode: str,
 ) -> str | None:
     exchange_connection = connection
+    if getattr(exchange_connection, "organization_id") != intent.organization_id:
+        return "organization_ownership_mismatch"
+    if getattr(exchange_connection, "connection_id") != intent.exchange_connection_id:
+        return "account_ownership_mismatch"
     exchange_name = getattr(exchange_connection, "exchange_name")
     market_type = getattr(exchange_connection, "market_type")
     environment = getattr(exchange_connection, "environment")
     readiness = getattr(exchange_connection, "connection_readiness")
     capability = getattr(exchange_connection, "effective_capability")
-    if environment != "testnet":
+    if environment == "mainnet" and not (
+        adapter_mode == "emulator" and adapter.provider_id == "core:exchange-emulator"
+    ):
         return "mainnet_hard_block"
+    if environment not in {"testnet", "mainnet"}:
+        return "execution_mode_not_approved"
     if readiness != "ready_for_trading" or capability != "trading":
         return "exchange_connection_not_ready_for_trading"
     if exchange_name != _exchange_from_instrument_key(intent.instrument_key):
@@ -1071,6 +1395,19 @@ def _connection_guard_reason(
     if market_type != intent.market_type:
         return "exchange_config_mismatch"
     return None
+
+
+def _adapter_identity(*, adapter: ExchangeOrderAdapter) -> ExecutionAdapterIdentity:
+    provider_kind = adapter.provider_kind
+    if provider_kind not in {"core", "verified", "plugin"}:
+        provider_kind = "plugin"
+    return ExecutionAdapterIdentity(
+        provider_id=adapter.provider_id,
+        provider_version=adapter.provider_version,
+        provider_kind=provider_kind,  # type: ignore[arg-type]
+        exchange_name=adapter.exchange_name,
+        revision_hash=adapter.revision_hash,
+    )
 
 
 def _reconciliation_reason(

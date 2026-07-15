@@ -1,9 +1,24 @@
 from __future__ import annotations
 
-from typing import Any, Mapping, Protocol, cast
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any, ContextManager, Mapping, Protocol, cast
 
 import psycopg
 from psycopg.rows import dict_row
+
+
+class StrategyPostgresTransaction(Protocol):
+    """One PostgreSQL transaction with a stable MVCC snapshot."""
+
+    def fetch_one(self, *, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any] | None:
+        ...
+
+    def fetch_all(
+        self, *, query: str, parameters: Mapping[str, Any]
+    ) -> tuple[Mapping[str, Any], ...]: ...
+
+    def execute(self, *, query: str, parameters: Mapping[str, Any]) -> None: ...
 
 
 class StrategyPostgresGateway(Protocol):
@@ -79,8 +94,42 @@ class StrategyPostgresGateway(Protocol):
         """
         ...
 
+class _PsycopgStrategyPostgresTransaction(StrategyPostgresTransaction):
+    def __init__(self, *, connection: psycopg.Connection[Any]) -> None:
+        self._connection = connection
 
-class PsycopgStrategyPostgresGateway(StrategyPostgresGateway):
+    def fetch_one(self, *, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any] | None:
+        with self._connection.cursor() as cursor:
+            cursor.execute(cast(Any, query), parameters)
+            row = cursor.fetchone()
+        return dict(row) if row is not None else None
+
+    def fetch_all(
+        self, *, query: str, parameters: Mapping[str, Any]
+    ) -> tuple[Mapping[str, Any], ...]:
+        with self._connection.cursor() as cursor:
+            cursor.execute(cast(Any, query), parameters)
+            rows = cursor.fetchall()
+        return tuple(dict(row) for row in rows)
+
+    def execute(self, *, query: str, parameters: Mapping[str, Any]) -> None:
+        with self._connection.cursor() as cursor:
+            cursor.execute(cast(Any, query), parameters)
+
+
+class TransactionalStrategyPostgresGateway(StrategyPostgresGateway, Protocol):
+    def transaction(self) -> ContextManager[StrategyPostgresTransaction]:
+        """Open a repeatable-read transaction for atomic multi-statement decisions."""
+        ...
+
+    def serialized_transaction(
+        self, *, lock_key: str
+    ) -> ContextManager[StrategyPostgresTransaction]:
+        """Serialize one scope before opening its repeatable-read snapshot."""
+        ...
+
+
+class PsycopgStrategyPostgresGateway(TransactionalStrategyPostgresGateway):
     """
     PsycopgStrategyPostgresGateway — psycopg3 implementation for Strategy v1 SQL gateway.
 
@@ -182,3 +231,31 @@ class PsycopgStrategyPostgresGateway(StrategyPostgresGateway):
         with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, query), parameters)
+
+    @contextmanager
+    def transaction(self) -> Iterator[StrategyPostgresTransaction]:
+        """Yield one repeatable-read transaction and commit only on success."""
+        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+            yield _PsycopgStrategyPostgresTransaction(connection=connection)
+
+    @contextmanager
+    def serialized_transaction(
+        self, *, lock_key: str
+    ) -> Iterator[StrategyPostgresTransaction]:
+        """Acquire a session lock before creating the repeatable-read snapshot."""
+        normalized_key = lock_key.strip()
+        if not normalized_key:
+            raise ValueError("serialized transaction requires non-empty lock key")
+        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+            connection.autocommit = True
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT pg_advisory_lock(hashtextextended(%s, 0))",
+                    (normalized_key,),
+                )
+            connection.autocommit = False
+            with connection.cursor() as cursor:
+                cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
+            yield _PsycopgStrategyPostgresTransaction(connection=connection)

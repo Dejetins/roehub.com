@@ -1,0 +1,355 @@
+{
+  "$defs": {
+    "BackupManifestEntry": {
+      "additionalProperties": false,
+      "description": "One encrypted, digest-bound state-owner snapshot.",
+      "properties": {
+        "artifact_name": {
+          "pattern": "^[a-z0-9][a-z0-9._-]{0,127}\\.age$",
+          "title": "Artifact Name",
+          "type": "string"
+        },
+        "captured_at": {
+          "format": "date-time",
+          "title": "Captured At",
+          "type": "string"
+        },
+        "ciphertext_bytes": {
+          "maximum": 1074790400,
+          "minimum": 1,
+          "title": "Ciphertext Bytes",
+          "type": "integer"
+        },
+        "ciphertext_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Ciphertext Sha256",
+          "type": "string"
+        },
+        "consistency_mode": {
+          "enum": [
+            "application_quiesced",
+            "database_snapshot",
+            "durable_checkpoint",
+            "encrypted_raft_snapshot",
+            "content_addressed_snapshot",
+            "bounded_history_snapshot"
+          ],
+          "title": "Consistency Mode",
+          "type": "string"
+        },
+        "encrypted": {
+          "const": true,
+          "default": true,
+          "enum": [
+            true
+          ],
+          "title": "Encrypted",
+          "type": "boolean"
+        },
+        "limitations": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 16,
+          "title": "Limitations",
+          "type": "array"
+        },
+        "media_type": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Media Type",
+          "type": "string"
+        },
+        "owner": {
+          "$ref": "#/$defs/BackupStateOwner"
+        },
+        "plaintext_bytes": {
+          "maximum": 1073741824,
+          "minimum": 1,
+          "title": "Plaintext Bytes",
+          "type": "integer"
+        },
+        "plaintext_sha256": {
+          "pattern": "^sha256:[0-9a-f]{64}$",
+          "title": "Plaintext Sha256",
+          "type": "string"
+        },
+        "source_schema_version": {
+          "pattern": "^[a-z0-9][a-z0-9._+-]{0,63}$",
+          "title": "Source Schema Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "artifact_name",
+        "media_type",
+        "consistency_mode",
+        "source_schema_version",
+        "captured_at",
+        "plaintext_bytes",
+        "plaintext_sha256",
+        "ciphertext_bytes",
+        "ciphertext_sha256"
+      ],
+      "title": "BackupManifestEntry",
+      "type": "object"
+    },
+    "BackupStateOwner": {
+      "enum": [
+        "release_config",
+        "postgresql",
+        "clickhouse",
+        "redis_checkpoint",
+        "openbao",
+        "artifacts",
+        "plugin_operation_audit",
+        "observability"
+      ],
+      "title": "BackupStateOwner",
+      "type": "string"
+    }
+  },
+  "$id": "https://schemas.roehub.io/backup/installation-backup-manifest.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Signed installation-wide backup inventory without secret material.",
+  "properties": {
+    "backup_id": {
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$",
+      "title": "Backup Id",
+      "type": "string"
+    },
+    "compatibility": {
+      "const": "greenfield-self-hosted-v1",
+      "default": "greenfield-self-hosted-v1",
+      "enum": [
+        "greenfield-self-hosted-v1"
+      ],
+      "title": "Compatibility",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "entries": {
+      "allOf": [
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "application_quiesced"
+              },
+              "owner": {
+                "const": "release_config"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "database_snapshot"
+              },
+              "owner": {
+                "const": "postgresql"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "database_snapshot"
+              },
+              "owner": {
+                "const": "clickhouse"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "durable_checkpoint"
+              },
+              "owner": {
+                "const": "redis_checkpoint"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "encrypted_raft_snapshot"
+              },
+              "owner": {
+                "const": "openbao"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "content_addressed_snapshot"
+              },
+              "owner": {
+                "const": "artifacts"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "application_quiesced"
+              },
+              "owner": {
+                "const": "plugin_operation_audit"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        },
+        {
+          "contains": {
+            "properties": {
+              "consistency_mode": {
+                "const": "bounded_history_snapshot"
+              },
+              "owner": {
+                "const": "observability"
+              }
+            },
+            "required": [
+              "owner",
+              "consistency_mode"
+            ],
+            "type": "object"
+          },
+          "maxContains": 1,
+          "minContains": 1
+        }
+      ],
+      "items": {
+        "$ref": "#/$defs/BackupManifestEntry"
+      },
+      "maxItems": 8,
+      "minItems": 8,
+      "title": "Entries",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "installation_fingerprint": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Installation Fingerprint",
+      "type": "string"
+    },
+    "observed_rpo_seconds": {
+      "minimum": 0.0,
+      "title": "Observed Rpo Seconds",
+      "type": "number"
+    },
+    "quiesce_completed_at": {
+      "format": "date-time",
+      "title": "Quiesce Completed At",
+      "type": "string"
+    },
+    "quiesce_started_at": {
+      "format": "date-time",
+      "title": "Quiesce Started At",
+      "type": "string"
+    },
+    "schema": {
+      "const": "io.roehub.installation-backup/v1alpha1",
+      "default": "io.roehub.installation-backup/v1alpha1",
+      "enum": [
+        "io.roehub.installation-backup/v1alpha1"
+      ],
+      "title": "Schema",
+      "type": "string"
+    },
+    "signing_key_id": {
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "title": "Signing Key Id",
+      "type": "string"
+    },
+    "source_release_version": {
+      "pattern": "^[a-z0-9][a-z0-9._+-]{0,63}$",
+      "title": "Source Release Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "backup_id",
+    "installation_fingerprint",
+    "source_release_version",
+    "created_at",
+    "quiesce_started_at",
+    "quiesce_completed_at",
+    "observed_rpo_seconds",
+    "signing_key_id",
+    "entries"
+  ],
+  "title": "InstallationBackupManifest",
+  "type": "object"
+}

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.roehub.io/operations/control-policy.v1alpha1.schema.json",
+  "title": "Roehub generated control policy v1alpha1",
+  "type": "object",
+  "required": [
+    "schema",
+    "profile",
+    "release_version",
+    "allowed_services",
+    "default_services",
+    "services"
+  ],
+  "properties": {
+    "schema": {"const": "io.roehub.control-policy/v1alpha1"},
+    "profile": {"enum": ["base", "trading", "ml"]},
+    "release_version": {"type": "string", "minLength": 1},
+    "allowed_services": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"}
+    },
+    "default_services": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"}
+    },
+    "services": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {"$ref": "#/$defs/service"}
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "service": {
+      "type": "object",
+      "required": [
+        "image",
+        "release_reference",
+        "mounts",
+        "environment_names",
+        "resources",
+        "command_sha256",
+        "restart_allowed"
+      ],
+      "properties": {
+        "image": {"type": "string", "minLength": 1},
+        "release_reference": {
+          "type": "string",
+          "pattern": "^[^\\s@]+@sha256:[a-f0-9]{64}$"
+        },
+        "mounts": {"type": "array", "items": {"type": "string"}},
+        "environment_names": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]*$"}
+        },
+        "resources": {
+          "type": "object",
+          "required": ["cpus", "memory"],
+          "properties": {
+            "cpus": {"type": "string", "minLength": 1},
+            "memory": {"type": "string", "pattern": "^[1-9][0-9]*M$"}
+          },
+          "additionalProperties": false
+        },
+        "command_sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+        "restart_allowed": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    }
+  }
+}

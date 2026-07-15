@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Protocol
 
 from trading.contexts.live_execution.domain import PaperScenarioCoverageResult
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PaperScenarioCoverageRepository(Protocol):
@@ -12,5 +12,9 @@ class PaperScenarioCoverageRepository(Protocol):
     ) -> PaperScenarioCoverageResult: ...
 
     def get_latest_by_scenario_key(
-        self, *, owner_user_id: UserId, scenario_key: str
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        scenario_key: str,
     ) -> PaperScenarioCoverageResult | None: ...

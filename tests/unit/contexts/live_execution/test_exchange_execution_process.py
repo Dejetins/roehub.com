@@ -18,6 +18,7 @@ from trading.contexts.live_execution.application.ports import (
     ExchangeExecutionRedisMessage,
     ExchangeOrderAdapterError,
     ExecutionDispatchPublishResult,
+    FailClosedExecutionGatewayPolicyRepository,
 )
 from trading.contexts.live_execution.domain import (
     ExchangeExecutionConnection,
@@ -29,11 +30,28 @@ from trading.contexts.live_execution.domain import (
     ExchangePrivateStreamSession,
     ExecutionFillFact,
     ExecutionIntent,
+    ExecutionSubmitGuardDecision,
+    ExecutionSubmitGuardQuery,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
+_ORGANIZATION_ID = OrganizationId(UUID("00000000-0000-4000-8000-000000013000"))
 _USER_ID = UserId.from_string("00000000-0000-0000-0000-000000013001")
 _NOW = datetime(2026, 5, 31, 18, 0, tzinfo=UTC)
+
+
+class _AcceptedGatewayPolicy(FailClosedExecutionGatewayPolicyRepository):
+    def evaluate_and_record(
+        self, *, query: ExecutionSubmitGuardQuery
+    ) -> ExecutionSubmitGuardDecision:
+        return ExecutionSubmitGuardDecision(
+            status="accepted",
+            reason="execution_submit_guard_accepted",
+            check_name="all",
+            phase=query.phase,
+            evaluated_at=query.evaluated_at,
+            audit_event_id=uuid4(),
+        )
 
 
 class _Clock:
@@ -215,6 +233,7 @@ def test_run_once_recovers_pending_messages_before_reading_new_requests() -> Non
         stream_name="execution.requests.v1",
         message_id="2-0",
         payload={
+            "organization_id": str(_ORGANIZATION_ID),
             "intent_id": str(second_intent.intent_id),
             "owner_user_id": str(second_intent.owner_user_id),
         },
@@ -266,6 +285,7 @@ def test_testnet_adapter_records_submit_status_cancel_before_ack() -> None:
         order_repository=order_repository,
         credential_resolver=_Resolver(environment="testnet"),
         order_adapters=(adapter,),
+        gateway_policy_repository=_AcceptedGatewayPolicy(),
         consumer=consumer,
         clock=_Clock(),
     )
@@ -278,7 +298,12 @@ def test_testnet_adapter_records_submit_status_cancel_before_ack() -> None:
     assert order_repository.orders[intent.intent_id].status == "cancelled"
     assert order_repository.orders[intent.intent_id].exchange_order_id == "order-1"
     assert process_repository.observations[0].status == "testnet_submitted"
-    assert order_repository.private_stream_sessions[intent.exchange_connection_id].status == "ready"
+    assert (
+        order_repository.private_stream_sessions[
+            (intent.organization_id, intent.exchange_connection_id)
+        ].status
+        == "ready"
+    )
     assert len(order_repository.order_events) == 5
     assert len(order_repository.fills) == 0
     assert len(order_repository.reconciliation_runs) == 1
@@ -319,6 +344,7 @@ def test_testnet_adapter_respects_rate_limit_before_adapter_calls() -> None:
         order_repository=order_repository,
         credential_resolver=_Resolver(environment="testnet"),
         order_adapters=(_Adapter(exchange_name="bybit"),),
+        gateway_policy_repository=_AcceptedGatewayPolicy(),
         consumer=consumer,
         clock=_Clock(),
         on_rate_limit_wait=lambda exchange, operation, wait: waits.append(
@@ -369,6 +395,7 @@ def test_testnet_adapter_canary_can_record_fill_without_cancel() -> None:
         order_repository=order_repository,
         credential_resolver=_Resolver(environment="testnet"),
         order_adapters=(adapter,),
+        gateway_policy_repository=_AcceptedGatewayPolicy(),
         consumer=consumer,
         clock=_Clock(),
     )
@@ -422,6 +449,7 @@ def test_testnet_adapter_skips_cancel_when_market_order_already_filled() -> None
         order_repository=order_repository,
         credential_resolver=_Resolver(environment="testnet"),
         order_adapters=(adapter,),
+        gateway_policy_repository=_AcceptedGatewayPolicy(),
         consumer=consumer,
         clock=_Clock(),
     )
@@ -472,6 +500,7 @@ def test_testnet_futures_fill_without_funding_is_matched_order_reconciliation() 
         order_repository=order_repository,
         credential_resolver=_Resolver(environment="testnet", market_type="futures"),
         order_adapters=(_Adapter(exchange_name="bybit"),),
+        gateway_policy_repository=_AcceptedGatewayPolicy(),
         consumer=consumer,
         clock=_Clock(),
     )
@@ -485,8 +514,7 @@ def test_testnet_futures_fill_without_funding_is_matched_order_reconciliation() 
     assert len(order_repository.fills) == 1
     assert order_repository.reconciliation_runs[0].status == "matched"
     assert (
-        order_repository.reconciliation_runs[0].reason
-        == "futures_order_status_and_fills_matched"
+        order_repository.reconciliation_runs[0].reason == "futures_order_status_and_fills_matched"
     )
     assert order_repository.reconciliation_runs[0].funding_event_count == 0
 
@@ -520,6 +548,7 @@ def test_testnet_adapter_accepts_dispatching_intent_after_redis_publish_race() -
         order_repository=order_repository,
         credential_resolver=_Resolver(environment="testnet"),
         order_adapters=(adapter,),
+        gateway_policy_repository=_AcceptedGatewayPolicy(),
         consumer=consumer,
         clock=_Clock(),
     )
@@ -533,6 +562,129 @@ def test_testnet_adapter_accepts_dispatching_intent_after_redis_publish_race() -
     assert process_repository.observations[0].status == "testnet_submitted"
     assert order_repository.orders[intent.intent_id].status == "status_checked"
     assert adapter.submitted == 1
+
+
+def test_unknown_submit_http_error_stays_pending_without_redis_ack() -> None:
+    process_repository = InMemoryExchangeExecutionProcessRepository()
+    intent_repository = InMemoryExecutionIntentRepository()
+    order_repository = InMemoryExchangeExecutionOrderRepository()
+    intent = _intent(status="dispatched", risk_status="accepted")
+    intent_repository.record_intent(intent=intent)
+    consumer = _Consumer(
+        messages=(
+            _message(
+                payload={
+                    "intent_id": str(intent.intent_id),
+                    "owner_user_id": str(intent.owner_user_id),
+                }
+            ),
+        )
+    )
+    adapter = _Adapter(exchange_name="bybit", submit_unknown=True)
+    service = ExchangeExecutionProcessService(
+        config=ExchangeExecutionProcessConfig(
+            adapter_mode="testnet",
+            consumer_enabled=True,
+            cancel_after_submit=False,
+            max_clock_drift_ms=10_000,
+        ),
+        repository=process_repository,
+        intent_repository=intent_repository,
+        order_repository=order_repository,
+        credential_resolver=_Resolver(environment="testnet"),
+        order_adapters=(adapter,),
+        gateway_policy_repository=_AcceptedGatewayPolicy(),
+        consumer=consumer,
+        clock=_Clock(),
+    )
+
+    result = service.run_once()
+
+    assert result.adapter_error_count == 1
+    assert result.acked_count == 0
+    assert consumer.acked == []
+    assert order_repository.orders[intent.intent_id].status == "unknown"
+    assert "unknown_state" in order_repository.orders[intent.intent_id].status_reason
+    assert process_repository.observations[0].status_reason == (
+        "adapter_unknown_state_reconciliation_required"
+    )
+
+
+def test_unknown_submit_state_reconciles_by_client_order_id_without_resubmit() -> None:
+    process_repository = InMemoryExchangeExecutionProcessRepository()
+    intent_repository = InMemoryExecutionIntentRepository()
+    order_repository = InMemoryExchangeExecutionOrderRepository()
+    intent = _intent(status="dispatched", risk_status="accepted")
+    intent_repository.record_intent(intent=intent)
+    command = ExchangeOrderCommand.from_intent(
+        intent=intent,
+        exchange_name="bybit",
+        environment="testnet",
+        client_order_id=f"rh1_{intent.idempotency_key_hash[:28]}",
+    )
+    claim_id = uuid4()
+    order_repository.claim_submit(
+        command=command,
+        claim_id=claim_id,
+        claimed_at=_NOW,
+        expires_at=_NOW + timedelta(seconds=30),
+        submit_guard_audit_event_id=uuid4(),
+        mainnet_approval_id=None,
+    )
+    order_repository.record_adapter_error(
+        organization_id=intent.organization_id,
+        intent_id=intent.intent_id,
+        claim_id=claim_id,
+        occurred_at=_NOW + timedelta(seconds=1),
+        reason="adapter_unknown_state_reconciliation_required",
+    )
+    consumer = _Consumer(
+        messages=(
+            _message(
+                payload={
+                    "intent_id": str(intent.intent_id),
+                    "owner_user_id": str(intent.owner_user_id),
+                }
+            ),
+        )
+    )
+    adapter = _Adapter(exchange_name="bybit")
+    service = ExchangeExecutionProcessService(
+        config=ExchangeExecutionProcessConfig(
+            adapter_mode="testnet",
+            consumer_enabled=True,
+            cancel_after_submit=False,
+            max_clock_drift_ms=10_000,
+        ),
+        repository=process_repository,
+        intent_repository=intent_repository,
+        order_repository=order_repository,
+        credential_resolver=_Resolver(environment="testnet"),
+        order_adapters=(adapter,),
+        gateway_policy_repository=_AcceptedGatewayPolicy(),
+        consumer=consumer,
+        clock=_Clock(),
+    )
+
+    result = service.run_once()
+    order = order_repository.get_by_intent(
+        organization_id=intent.organization_id,
+        intent_id=intent.intent_id,
+    )
+
+    assert result.acked_count == 1
+    assert result.adapter_error_count == 0
+    assert result.submitted_count == 0
+    assert adapter.submitted == 0
+    assert order is not None
+    assert order.status == "status_checked"
+    assert order.exchange_order_id == f"reconciled-{command.client_order_id}"
+    assert process_repository.observations[0].status_reason == (
+        "unknown_state_reconciled_present_without_resubmit"
+    )
+    assert process_repository.observations[0].status == "reconciled"
+    assert order_repository.reconciliation_runs[-1].status == "matched"
+    assert order_repository.reconciliation_runs[-1].reason == "unknown_provider_status_matched"
 
 
 def test_testnet_adapter_hard_blocks_mainnet_connection_before_ack() -> None:
@@ -562,6 +714,7 @@ def test_testnet_adapter_hard_blocks_mainnet_connection_before_ack() -> None:
         order_repository=order_repository,
         credential_resolver=_Resolver(environment="mainnet"),
         order_adapters=(_Adapter(exchange_name="bybit"),),
+        gateway_policy_repository=_AcceptedGatewayPolicy(),
         consumer=consumer,
         clock=_Clock(),
     )
@@ -610,6 +763,7 @@ def test_testnet_adapter_rejects_unsupported_exchange_without_order_row() -> Non
         order_repository=order_repository,
         credential_resolver=_Resolver(environment="testnet"),
         order_adapters=(_Adapter(exchange_name="bybit"),),
+        gateway_policy_repository=_AcceptedGatewayPolicy(),
         consumer=consumer,
         clock=_Clock(),
     )
@@ -629,7 +783,7 @@ def _message(*, payload: dict[str, str]) -> ExchangeExecutionRedisMessage:
     return ExchangeExecutionRedisMessage(
         stream_name="execution.requests.v1",
         message_id="1-0",
-        payload=payload,
+        payload={"organization_id": str(_ORGANIZATION_ID), **payload},
     )
 
 
@@ -644,6 +798,7 @@ def _intent(
     return ExecutionIntent(
         intent_id=uuid4(),
         source_event_id=uuid4(),
+        organization_id=_ORGANIZATION_ID,
         owner_user_id=_USER_ID,
         source_type="ops_test",
         strategy_signal_id=None,
@@ -674,16 +829,23 @@ class _Resolver:
         self._market_type = market_type
 
     def resolve(
-        self, *, owner_user_id: UserId, exchange_connection_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
     ) -> ExchangeExecutionConnection:
         return ExchangeExecutionConnection(
             connection_id=exchange_connection_id,
+            organization_id=organization_id,
             owner_user_id=owner_user_id,
             exchange_name="bybit",
             market_type=self._market_type,  # type: ignore[arg-type]
             environment=self._environment,
             connection_readiness="ready_for_trading",
             effective_capability="trading",
+            secret_reference_hash="4" * 64,
+            account_revision_hash="3" * 64,
             credential=ExchangeExecutionCredential(
                 api_key="test-key",
                 api_secret="test-secret",
@@ -698,12 +860,18 @@ class _Adapter:
         exchange_name: str,
         cancel_reason: str | None = None,
         include_fills: bool = True,
+        submit_unknown: bool = False,
     ) -> None:
         self.exchange_name = exchange_name
+        self.provider_id = f"core:{exchange_name}-test-adapter"
+        self.provider_version = "v1"
+        self.provider_kind = "core"
+        self.revision_hash = "5" * 64
         self.submitted = 0
         self.cancelled = 0
         self._cancel_reason = cancel_reason
         self._include_fills = include_fills
+        self._submit_unknown = submit_unknown
 
     def server_time_ms(self) -> int:
         return int(_NOW.timestamp() * 1000)
@@ -715,6 +883,7 @@ class _Adapter:
     ) -> ExchangePrivateStreamSession:
         return ExchangePrivateStreamSession(
             session_id=UUID("00000000-0000-0000-0000-000000013901"),
+            organization_id=connection.organization_id,
             exchange_name=connection.exchange_name,
             environment=connection.environment,
             market_type=connection.market_type,
@@ -731,6 +900,11 @@ class _Adapter:
     ) -> ExchangeOrderSubmitResult:
         _ = command, credential
         self.submitted += 1
+        if self._submit_unknown:
+            raise ExchangeOrderAdapterError(
+                reason="exchange_http_400",
+                unknown_state=True,
+            )
         return ExchangeOrderSubmitResult(
             exchange_order_id="order-1",
             exchange_status="new",
@@ -769,6 +943,19 @@ class _Adapter:
                 if self._include_fills
                 else ()
             ),
+        )
+
+    def get_order_status_by_client_order_id(
+        self,
+        *,
+        command: ExchangeOrderCommand,
+        client_order_id: str,
+        credential: object,
+    ) -> ExchangeOrderStatusResult:
+        return self.get_order_status(
+            command=command,
+            exchange_order_id=f"reconciled-{client_order_id}",
+            credential=credential,
         )
 
     def cancel_order(

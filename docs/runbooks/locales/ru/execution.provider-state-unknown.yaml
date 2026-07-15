@@ -1,0 +1,45 @@
+apiVersion: ops.roehub.io/v1
+kind: RunbookLocale
+metadata:
+  runbook_id: execution.provider-state-unknown
+  locale: ru
+translations:
+  title: Исполнение перешло в неизвестное состояние провайдера
+  summary: Приостановить новые отправки и сверить факты провайдера до повтора или возобновления.
+  prerequisites:
+    identify_account: Подтвердите установку, организацию, ссылку на счёт и operation id без credentials.
+    preserve_ledger: Сохраните устойчивый журнал исполнения и сверки до любого действия.
+  symptoms:
+    submit_unknown: Отправка, отмена или запрос состояния имеет неоднозначный результат провайдера.
+    reconciliation_pending: Устойчивая запись ордера не сопоставлена с фактами провайдера.
+  diagnostics:
+    read_ledger:
+      instruction: Прочитайте ограниченные состояния операции, ордера, событий и сверки по стабильным идентификаторам.
+      expected_evidence: Очищенные переходы и отметки времени без credentials и необработанного payload провайдера.
+    read_metrics:
+      instruction: Сопоставьте метрики неизвестного состояния, сверки, stream и ошибок адаптера.
+      expected_evidence: Ограниченный снимок с разрешёнными низкокардинальными метками.
+  allowed_actions:
+    pause_submissions: Приостановите новые отправки для затронутого счёта.
+    trigger_reconciliation: Запустите ограниченную сверку по существующим operation и provider id.
+    resume_submissions: Возобновите отправки только после проверенного terminal или quarantined состояния всех операций.
+  rollback:
+    resume_after_reconciliation:
+      instruction: Восстановите отправки только после завершения и независимой проверки доказательств сверки.
+      expected_evidence: Неизвестных операций нет, состояние счёта совпадает с фактами провайдера.
+  evidence_collect:
+    operation_timeline: Очищенные переходы операции, события, ордера и сверки.
+    provider_identity: Хешированные или очищенные provider operation references, достаточные для корреляции.
+  success_conditions:
+    reconciled_terminal_state: Каждая неизвестная операция имеет подтверждённое провайдером terminal или quarantined состояние.
+  failure_conditions:
+    provider_facts_missing: Факты провайдера недоступны или противоречат устойчивому журналу.
+  redaction_rules:
+    redact_provider_payload: Сохраняйте из ответов провайдера только разрешённые идентификаторы и классы состояния.
+    redact_account_identity: Используйте внутренние ссылки на счёт, а не необработанные сведения exchange account.
+  monitoring_gaps: {}
+  warnings:
+    no_blind_retry: Никогда не повторяйте денежный запрос, пока результат провайдера неизвестен.
+    keep_kill_switch: Сохраняйте запрет отправок до завершения сверки.
+  stop_conditions:
+    ledger_conflict: Остановитесь и выполните эскалацию, если журнал и факты провайдера противоречат друг другу.

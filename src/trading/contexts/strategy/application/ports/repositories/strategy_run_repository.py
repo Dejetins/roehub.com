@@ -4,7 +4,7 @@ from typing import Protocol
 from uuid import UUID
 
 from trading.contexts.strategy.domain.entities import StrategyRun
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class StrategyRunRepository(Protocol):
@@ -54,7 +54,9 @@ class StrategyRunRepository(Protocol):
         """
         ...
 
-    def find_by_run_id(self, *, user_id: UserId, run_id: UUID) -> StrategyRun | None:
+    def find_by_run_id(
+        self, *, organization_id: OrganizationId, user_id: UserId, run_id: UUID
+    ) -> StrategyRun | None:
         """
         Load run by owner and run identifier.
 
@@ -72,7 +74,9 @@ class StrategyRunRepository(Protocol):
         """
         ...
 
-    def find_active_for_strategy(self, *, user_id: UserId, strategy_id: UUID) -> StrategyRun | None:
+    def find_active_for_strategy(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> StrategyRun | None:
         """
         Load active run for strategy, if any.
 
@@ -90,7 +94,9 @@ class StrategyRunRepository(Protocol):
         """
         ...
 
-    def list_for_strategy(self, *, user_id: UserId, strategy_id: UUID) -> tuple[StrategyRun, ...]:
+    def list_for_strategy(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID
+    ) -> tuple[StrategyRun, ...]:
         """
         List all runs for strategy in deterministic order.
 

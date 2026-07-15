@@ -63,13 +63,14 @@ class PostgresExchangeExecutionProcessRepository(ExchangeExecutionProcessReposit
             query="""
             INSERT INTO exchange_execution_request_observations
             (
-                observation_id, service_id, intent_id, stream_name,
+                observation_id, service_id, organization_id, intent_id, stream_name,
                 redis_message_id, status, status_reason, adapter_mode,
                 observed_at, metadata_json
             )
             VALUES
             (
-                %(observation_id)s, %(service_id)s, %(intent_id)s, %(stream_name)s,
+                %(observation_id)s, %(service_id)s, %(organization_id)s,
+                %(intent_id)s, %(stream_name)s,
                 %(redis_message_id)s, %(status)s, %(status_reason)s,
                 %(adapter_mode)s, %(observed_at)s, %(metadata_json)s::jsonb
             )
@@ -102,6 +103,11 @@ def _observation_params(observation: ExchangeExecutionRequestObservation) -> dic
     return {
         "observation_id": str(observation.observation_id),
         "service_id": observation.service_id,
+        "organization_id": (
+            str(observation.organization_id)
+            if observation.organization_id is not None
+            else None
+        ),
         "intent_id": str(observation.intent_id) if observation.intent_id is not None else None,
         "stream_name": observation.stream_name,
         "redis_message_id": observation.redis_message_id,

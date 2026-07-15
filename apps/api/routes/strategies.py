@@ -1227,6 +1227,7 @@ def _apply_rl_live_ticker_entitlement(
         strategy=strategy,
     )
     snapshot = entitlement_service.sync_profile(
+        organization_id=strategy.organization_id,
         owner_user_id=profile.owner_user_id,
         paid_level=str(principal.paid_level),
         strategy_id=profile.strategy_id,
@@ -1280,6 +1281,7 @@ def _rl_risk_policy_key(*, strategy: Strategy) -> RlRiskSizingPolicyKey:
         fallback_symbol=str(strategy.spec.instrument_id.symbol),
     )
     return RlRiskSizingPolicyKey(
+        organization_id=strategy.organization_id,
         owner_user_id=strategy.user_id,
         strategy_id=strategy.strategy_id,
         exchange_name=exchange_name,
@@ -1299,6 +1301,7 @@ def _rl_live_ticker_identity(
         fallback_symbol=str(strategy.spec.instrument_id.symbol),
     )
     return RlLiveTickerIdentity(
+        organization_id=strategy.organization_id,
         owner_user_id=owner_user_id,
         exchange_name=exchange_name,
         market_type=market_type,
@@ -1469,6 +1472,7 @@ def _execute_manual_strategy_action(
 ) -> ManualStrategyExecutionResponse:
     strategy = get_use_case.execute(strategy_id=strategy_id, current_user=current_user)
     active_run = run_repository.find_active_for_strategy(
+        organization_id=current_user.organization_id,
         user_id=current_user.user_id,
         strategy_id=strategy.strategy_id,
     )
@@ -1479,6 +1483,7 @@ def _execute_manual_strategy_action(
             details={"reason": "strategy_run_inactive"},
         )
     profile = profile_repository.get_for_strategy(
+        organization_id=current_user.organization_id,
         owner_user_id=current_user.user_id,
         strategy_id=strategy.strategy_id,
     )
@@ -1519,6 +1524,7 @@ def _execute_manual_strategy_action(
     try:
         source_result = ingress_service.record_source_event(
             command=RecordExecutionSourceEventCommand(
+                organization_id=current_user.organization_id,
                 owner_user_id=current_user.user_id,
                 source_type="manual_request",
                 source_event_ref=f"manual:{action}:{active_run.run_id}",
@@ -1535,6 +1541,7 @@ def _execute_manual_strategy_action(
         )
         intent_result = ingress_service.create_intent(
             command=CreateExecutionIntentCommand(
+                organization_id=current_user.organization_id,
                 owner_user_id=current_user.user_id,
                 source_event_id=source_result.event.source_event_id,
                 idempotency_key=f"{source_key}|intent",
@@ -1582,6 +1589,7 @@ def _execute_manual_strategy_action(
             )
         try:
             accounting = paper_accounting_service.record_manual_paper_execution(
+                organization_id=current_user.organization_id,
                 owner_user_id=current_user.user_id,
                 strategy_id=strategy.strategy_id,
                 live_profile_id=profile.profile_id,
@@ -1681,6 +1689,8 @@ def _manual_risk_context(
         variant_compatible = report.compatibility_state == "launchable"
     if mode == "paper":
         return ExecutionRiskContext(
+            organization_ownership_verified=True,
+            account_ownership_verified=True,
             exchange_connection_active=True,
             secret_custody_ready=True,
             source_authorized=True,
@@ -1700,27 +1710,10 @@ def _manual_risk_context(
             max_order_size_ok=True,
             daily_limit_ok=True,
         )
-    allows_testnet = mode == "testnet"
-    return ExecutionRiskContext(
-        exchange_connection_active=profile_ready and allows_testnet,
-        secret_custody_ready=profile_ready and allows_testnet,
-        source_authorized=True,
-        strategy_variant_compatible=variant_compatible,
-        market_data_state=market_data_state,
-        strategy_binding_active=profile_ready and allows_testnet,
-        strategy_live_profile_ready=profile_ready and allows_testnet,
-        strategy_run_active=True,
-        exchange_config_verified=profile_ready and allows_testnet,
-        account_state_fresh=profile_ready and allows_testnet,
-        position_ownership_active=profile_ready and allows_testnet,
-        capital_reservation_active=profile_ready and allows_testnet,
-        capital_reservation_sufficient=profile_ready and allows_testnet,
-        manual_recent_auth=recent_auth,
-        kill_switch_open=True,
-        environment_policy_allows=allows_testnet,
-        max_order_size_ok=True,
-        daily_limit_ok=True,
-    )
+    # Manual testnet execution is not wired to the trusted account-state,
+    # reservation, limit, and kill-switch authorities yet. Keep it fail-closed
+    # even when the profile itself is ready.
+    return ExecutionRiskContext()
 
 
 def _manual_response_status(

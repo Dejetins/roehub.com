@@ -1,0 +1,487 @@
+{
+  "alert_index": {
+    "ApiHealthDown": [
+      "web.api-health-degraded"
+    ],
+    "ApiMetricsDown": [
+      "web.api-health-degraded"
+    ],
+    "ClickHouseHttpPingDown": [
+      "database.clickhouse-degraded"
+    ],
+    "ClickHouseServiceDegraded": [
+      "database.clickhouse-degraded"
+    ],
+    "LiveExecutionReconciliationPending": [
+      "execution.provider-state-unknown"
+    ],
+    "LiveExecutionUnknownState": [
+      "execution.provider-state-unknown"
+    ],
+    "MarketDataClickHouseRepairCircuitOpenTooLong": [
+      "worker.market-data-live-tail-gap"
+    ],
+    "MarketDataLiveTailUnrepairedGapBeyondPolicy": [
+      "worker.market-data-live-tail-gap"
+    ],
+    "MarketDataRestTailRepairErrors": [
+      "worker.market-data-live-tail-gap"
+    ],
+    "OidcProviderUnavailable": [
+      "identity.oidc-provider-unavailable"
+    ],
+    "RoehubOperationalHealthUnavailable": [
+      "runtime.observability-unavailable"
+    ],
+    "RoehubOperationalLogPushFailed": [
+      "runtime.observability-unavailable"
+    ],
+    "RoehubOperationalServiceDegraded": [
+      "auth.openbao-unavailable",
+      "runtime.service-degraded"
+    ],
+    "RoehubOperationalSnapshotStale": [
+      "runtime.observability-unavailable"
+    ]
+  },
+  "apiVersion": "ops.roehub.io/v1",
+  "kind": "RunbookIndex",
+  "legacy_unmigrated": [
+    {
+      "path": "docs/runbooks/backtest-artifacts-rebuild.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/clickhouse-partition-dedup.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/exchange-secret-management.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/help_commands.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/indicators-numba-cache-and-threads.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/indicators-numba-warmup-jit.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/indicators-why-nan.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/installation-backup-restore-upgrade.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/live-execution-redis-dispatch.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/mac-studio-backend-operations.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/mac-studio-monitoring-plan.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/mac-studio-native-backend-operations.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/market-data-autonomous-docker.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/market-data-metrics-reference-ru.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/market-data-metrics.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/market-data-redis-streams.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/offline-release-installation.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/plugin-runtime-and-rollback.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/prod-dashboard-metrics-reference-ru.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/rl-trading-operations.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/roehub-ui-autostart-systemd.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/storage-bootstrap-and-migrations.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
+      "path": "docs/runbooks/strategy-live-worker.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    }
+  ],
+  "problem_index": {
+    "auth.openbao-unavailable/reference_unavailable": "auth.openbao-unavailable",
+    "auth.openbao-unavailable/service_not_ready": "auth.openbao-unavailable",
+    "auth.openbao-unavailable/transit_unavailable": "auth.openbao-unavailable",
+    "database.clickhouse-degraded/exporter_degraded": "database.clickhouse-degraded",
+    "database.clickhouse-degraded/health_probe_failed": "database.clickhouse-degraded",
+    "execution.provider-state-unknown/reconciliation_pending": "execution.provider-state-unknown",
+    "execution.provider-state-unknown/submit_unknown": "execution.provider-state-unknown",
+    "identity.oidc-provider-unavailable/oidc_login_failed": "identity.oidc-provider-unavailable",
+    "identity.oidc-provider-unavailable/provider_requests_failed": "identity.oidc-provider-unavailable",
+    "runtime.control-agent-unavailable/effect_unknown": "runtime.control-agent-unavailable",
+    "runtime.control-agent-unavailable/journal_rejected": "runtime.control-agent-unavailable",
+    "runtime.control-agent-unavailable/socket_unavailable": "runtime.control-agent-unavailable",
+    "runtime.observability-unavailable/health_scrape_down": "runtime.observability-unavailable",
+    "runtime.observability-unavailable/state_unknown": "runtime.observability-unavailable",
+    "runtime.service-degraded/readiness_failed": "runtime.service-degraded",
+    "runtime.service-degraded/service_stopped": "runtime.service-degraded",
+    "web.api-health-degraded/api_health_failed": "web.api-health-degraded",
+    "web.api-health-degraded/gateway_unavailable": "web.api-health-degraded",
+    "worker.market-data-live-tail-gap/repair_circuit_open": "worker.market-data-live-tail-gap",
+    "worker.market-data-live-tail-gap/unrepaired_gap": "worker.market-data-live-tail-gap"
+  },
+  "runbooks": [
+    {
+      "allowed_action_capabilities": [
+        "control.release.rollback",
+        "observe.health.read"
+      ],
+      "canonical_path": "docs/runbooks/ops/auth.openbao-unavailable.yaml",
+      "component_ids": [
+        "app:exchange_control",
+        "context:exchange_control"
+      ],
+      "generated_ru_path": "docs/runbooks/generated/ru/auth.openbao-unavailable.md",
+      "id": "auth.openbao-unavailable",
+      "monitoring_gap_ids": [],
+      "problems": [
+        "auth.openbao-unavailable/transit_unavailable",
+        "auth.openbao-unavailable/reference_unavailable",
+        "auth.openbao-unavailable/service_not_ready"
+      ],
+      "related_alerts": [
+        "RoehubOperationalServiceDegraded"
+      ],
+      "revision": 2,
+      "severity": "critical",
+      "source_legacy": "docs/runbooks/openbao-secrets-and-recovery.md",
+      "title": "OpenBao secret resolution or Transit operations are unavailable",
+      "title_ru": "Разрешение ссылок OpenBao или операции Transit недоступны"
+    },
+    {
+      "allowed_action_capabilities": [
+        "control.release.rollback",
+        "control.worker.pause",
+        "control.worker.resume",
+        "observe.health.read"
+      ],
+      "canonical_path": "docs/runbooks/ops/database.clickhouse-degraded.yaml",
+      "component_ids": [
+        "app:monitoring",
+        "context:market_data"
+      ],
+      "generated_ru_path": "docs/runbooks/generated/ru/database.clickhouse-degraded.md",
+      "id": "database.clickhouse-degraded",
+      "monitoring_gap_ids": [],
+      "problems": [
+        "database.clickhouse-degraded/health_probe_failed",
+        "database.clickhouse-degraded/exporter_degraded"
+      ],
+      "related_alerts": [
+        "ClickHouseHttpPingDown",
+        "ClickHouseServiceDegraded"
+      ],
+      "revision": 1,
+      "severity": "high",
+      "source_legacy": "docs/runbooks/clickhouse-memory-profiles.md",
+      "title": "ClickHouse service is unavailable or query capacity is degraded",
+      "title_ru": "ClickHouse недоступен или потерял расчётную ёмкость"
+    },
+    {
+      "allowed_action_capabilities": [
+        "control.execution.pause",
+        "control.execution.resume",
+        "control.reconciliation.trigger"
+      ],
+      "canonical_path": "docs/runbooks/ops/execution.provider-state-unknown.yaml",
+      "component_ids": [
+        "app:exchange_execution",
+        "context:live_execution"
+      ],
+      "generated_ru_path": "docs/runbooks/generated/ru/execution.provider-state-unknown.md",
+      "id": "execution.provider-state-unknown",
+      "monitoring_gap_ids": [],
+      "problems": [
+        "execution.provider-state-unknown/submit_unknown",
+        "execution.provider-state-unknown/reconciliation_pending"
+      ],
+      "related_alerts": [
+        "LiveExecutionReconciliationPending",
+        "LiveExecutionUnknownState"
+      ],
+      "revision": 1,
+      "severity": "critical",
+      "source_legacy": "docs/runbooks/exchange-execution.md",
+      "title": "Exchange execution entered an unknown provider state",
+      "title_ru": "Исполнение перешло в неизвестное состояние провайдера"
+    },
+    {
+      "allowed_action_capabilities": [
+        "control.release.rollback",
+        "control.service.restart"
+      ],
+      "canonical_path": "docs/runbooks/ops/identity.oidc-provider-unavailable.yaml",
+      "component_ids": [
+        "app:api",
+        "app:web",
+        "context:identity"
+      ],
+      "generated_ru_path": "docs/runbooks/generated/ru/identity.oidc-provider-unavailable.md",
+      "id": "identity.oidc-provider-unavailable",
+      "monitoring_gap_ids": [],
+      "problems": [
+        "identity.oidc-provider-unavailable/provider_requests_failed",
+        "identity.oidc-provider-unavailable/oidc_login_failed"
+      ],
+      "related_alerts": [
+        "OidcProviderUnavailable"
+      ],
+      "revision": 1,
+      "severity": "high",
+      "source_legacy": "docs/runbooks/keycloak-local-setup-and-ops.md",
+      "title": "Configured OIDC provider is unavailable",
+      "title_ru": "Настроенный OIDC-провайдер недоступен"
+    },
+    {
+      "allowed_action_capabilities": [
+        "control.reconciliation.trigger",
+        "control.release.rollback",
+        "control.service.restart"
+      ],
+      "canonical_path": "docs/runbooks/ops/runtime.control-agent-unavailable.yaml",
+      "component_ids": [
+        "app:control_agent",
+        "app:roehubctl",
+        "context:operations"
+      ],
+      "generated_ru_path": "docs/runbooks/generated/ru/runtime.control-agent-unavailable.md",
+      "id": "runtime.control-agent-unavailable",
+      "monitoring_gap_ids": [
+        "missing_control_agent_alert"
+      ],
+      "problems": [
+        "runtime.control-agent-unavailable/socket_unavailable",
+        "runtime.control-agent-unavailable/journal_rejected",
+        "runtime.control-agent-unavailable/effect_unknown"
+      ],
+      "related_alerts": [],
+      "revision": 1,
+      "severity": "critical",
+      "source_legacy": "docs/runbooks/control-agent-emergency-recovery.md",
+      "title": "Control agent is unavailable or an operation result is unknown",
+      "title_ru": "Control-agent недоступен или результат операции неизвестен"
+    },
+    {
+      "allowed_action_capabilities": [
+        "control.service.restart",
+        "observe.health.read"
+      ],
+      "canonical_path": "docs/runbooks/ops/runtime.observability-unavailable.yaml",
+      "component_ids": [
+        "app:monitoring",
+        "context:operations"
+      ],
+      "generated_ru_path": "docs/runbooks/generated/ru/runtime.observability-unavailable.md",
+      "id": "runtime.observability-unavailable",
+      "monitoring_gap_ids": [],
+      "problems": [
+        "runtime.observability-unavailable/health_scrape_down",
+        "runtime.observability-unavailable/state_unknown"
+      ],
+      "related_alerts": [
+        "RoehubOperationalHealthUnavailable",
+        "RoehubOperationalLogPushFailed",
+        "RoehubOperationalSnapshotStale"
+      ],
+      "revision": 1,
+      "severity": "critical",
+      "source_legacy": "docs/runbooks/notifications-admin-alerts.md",
+      "title": "Independent operational health service is unavailable",
+      "title_ru": "Независимый сервис операционного здоровья недоступен"
+    },
+    {
+      "allowed_action_capabilities": [
+        "control.service.restart",
+        "observe.health.read"
+      ],
+      "canonical_path": "docs/runbooks/ops/runtime.service-degraded.yaml",
+      "component_ids": [
+        "app:monitoring",
+        "context:operations"
+      ],
+      "generated_ru_path": "docs/runbooks/generated/ru/runtime.service-degraded.md",
+      "id": "runtime.service-degraded",
+      "monitoring_gap_ids": [],
+      "problems": [
+        "runtime.service-degraded/readiness_failed",
+        "runtime.service-degraded/service_stopped"
+      ],
+      "related_alerts": [
+        "RoehubOperationalServiceDegraded"
+      ],
+      "revision": 1,
+      "severity": "high",
+      "source_legacy": "docs/runbooks/control-agent-emergency-recovery.md",
+      "title": "Generated runtime service is degraded or stopped",
+      "title_ru": "Сгенерированный сервис среды исполнения работает с деградацией или остановлен"
+    },
+    {
+      "allowed_action_capabilities": [
+        "control.release.rollback",
+        "control.service.restart",
+        "observe.health.read"
+      ],
+      "canonical_path": "docs/runbooks/ops/web.api-health-degraded.yaml",
+      "component_ids": [
+        "app:web",
+        "app:api"
+      ],
+      "generated_ru_path": "docs/runbooks/generated/ru/web.api-health-degraded.md",
+      "id": "web.api-health-degraded",
+      "monitoring_gap_ids": [],
+      "problems": [
+        "web.api-health-degraded/api_health_failed",
+        "web.api-health-degraded/gateway_unavailable"
+      ],
+      "related_alerts": [
+        "ApiHealthDown",
+        "ApiMetricsDown"
+      ],
+      "revision": 1,
+      "severity": "high",
+      "source_legacy": "docs/runbooks/web-ui-gateway-same-origin.md",
+      "title": "Web gateway or API health is degraded",
+      "title_ru": "Web-шлюз или API работают с деградацией"
+    },
+    {
+      "allowed_action_capabilities": [
+        "control.service.restart",
+        "control.worker.pause",
+        "control.worker.resume"
+      ],
+      "canonical_path": "docs/runbooks/ops/worker.market-data-live-tail-gap.yaml",
+      "component_ids": [
+        "worker:market_data_ws",
+        "context:market_data"
+      ],
+      "generated_ru_path": "docs/runbooks/generated/ru/worker.market-data-live-tail-gap.md",
+      "id": "worker.market-data-live-tail-gap",
+      "monitoring_gap_ids": [],
+      "problems": [
+        "worker.market-data-live-tail-gap/unrepaired_gap",
+        "worker.market-data-live-tail-gap/repair_circuit_open"
+      ],
+      "related_alerts": [
+        "MarketDataClickHouseRepairCircuitOpenTooLong",
+        "MarketDataLiveTailUnrepairedGapBeyondPolicy",
+        "MarketDataRestTailRepairErrors"
+      ],
+      "revision": 1,
+      "severity": "high",
+      "source_legacy": "docs/runbooks/market-data-live-tail-repair.md",
+      "title": "Market-data live tail remains incomplete beyond policy",
+      "title_ru": "Оперативный хвост рыночных данных остаётся неполным"
+    }
+  ]
+}

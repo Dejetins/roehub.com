@@ -16,7 +16,7 @@ from trading.contexts.live_execution.domain import (
 from trading.contexts.strategy.adapters.outbound.persistence.postgres.gateway import (
     StrategyPostgresGateway,
 )
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepository):
@@ -39,6 +39,7 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         INSERT INTO {self._table_name}
         (
             ownership_id,
+            organization_id,
             owner_user_id,
             exchange_connection_id,
             strategy_id,
@@ -56,6 +57,7 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         VALUES
         (
             %(ownership_id)s,
+            %(organization_id)s,
             %(owner_user_id)s,
             %(exchange_connection_id)s,
             %(strategy_id)s,
@@ -72,6 +74,7 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         )
         RETURNING
             ownership_id,
+            organization_id,
             owner_user_id,
             exchange_connection_id,
             strategy_id,
@@ -94,6 +97,7 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         except Exception as error:  # noqa: BLE001
             if _is_unique_violation(error=error):
                 existing = self.get_blocking_for_scope(
+                    organization_id=ownership.organization_id,
                     owner_user_id=ownership.owner_user_id,
                     exchange_connection_id=ownership.exchange_connection_id,
                     market_type=ownership.market_type,
@@ -113,6 +117,7 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
     def update_state(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         state: str,
@@ -127,11 +132,13 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
             reason = %(reason)s,
             {released_at_sql}
             expires_at = expires_at
-        WHERE owner_user_id = %(owner_user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND owner_user_id = %(owner_user_id)s
           AND strategy_run_id = %(strategy_run_id)s
           AND state <> 'released'
         RETURNING
             ownership_id,
+            organization_id,
             owner_user_id,
             exchange_connection_id,
             strategy_id,
@@ -149,6 +156,7 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_run_id": str(strategy_run_id),
                 "state": state,
@@ -161,11 +169,16 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         return _map_ownership(row=row)
 
     def get_for_run(
-        self, *, owner_user_id: UserId, strategy_run_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_run_id: UUID,
     ) -> StrategyPositionOwnership | None:
         query = f"""
         SELECT
             ownership_id,
+            organization_id,
             owner_user_id,
             exchange_connection_id,
             strategy_id,
@@ -180,7 +193,8 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
             expires_at,
             reason
         FROM {self._table_name}
-        WHERE owner_user_id = %(owner_user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND owner_user_id = %(owner_user_id)s
           AND strategy_run_id = %(strategy_run_id)s
         ORDER BY acquired_at DESC, ownership_id DESC
         LIMIT 1
@@ -188,6 +202,7 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "strategy_run_id": str(strategy_run_id),
             },
@@ -197,6 +212,7 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
     def get_blocking_for_scope(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         market_type: str,
@@ -205,6 +221,7 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         query = f"""
         SELECT
             ownership_id,
+            organization_id,
             owner_user_id,
             exchange_connection_id,
             strategy_id,
@@ -219,7 +236,8 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
             expires_at,
             reason
         FROM {self._table_name}
-        WHERE owner_user_id = %(owner_user_id)s
+        WHERE organization_id = %(organization_id)s
+          AND owner_user_id = %(owner_user_id)s
           AND exchange_connection_id = %(exchange_connection_id)s
           AND market_type = %(market_type)s
           AND instrument_key = %(instrument_key)s
@@ -230,6 +248,7 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
         row = self._gateway.fetch_one(
             query=query,
             parameters={
+                "organization_id": str(organization_id),
                 "owner_user_id": str(owner_user_id),
                 "exchange_connection_id": str(exchange_connection_id),
                 "market_type": market_type,
@@ -242,6 +261,7 @@ class PostgresStrategyPositionOwnershipRepository(StrategyPositionOwnershipRepos
 def _ownership_parameters(*, ownership: StrategyPositionOwnership) -> dict[str, object]:
     return {
         "ownership_id": str(ownership.ownership_id),
+        "organization_id": str(ownership.organization_id),
         "owner_user_id": str(ownership.owner_user_id),
         "exchange_connection_id": str(ownership.exchange_connection_id),
         "strategy_id": str(ownership.strategy_id),
@@ -266,6 +286,7 @@ def _map_ownership(*, row: Mapping[str, Any]) -> StrategyPositionOwnership:
         live_profile_raw = row.get("live_profile_id")
         return StrategyPositionOwnership(
             ownership_id=UUID(str(row["ownership_id"])),
+            organization_id=OrganizationId.from_string(str(row["organization_id"])),
             owner_user_id=UserId.from_string(str(row["owner_user_id"])),
             exchange_connection_id=UUID(str(row["exchange_connection_id"])),
             strategy_id=UUID(str(row["strategy_id"])),

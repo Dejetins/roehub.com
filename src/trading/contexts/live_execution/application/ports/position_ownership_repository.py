@@ -5,7 +5,7 @@ from typing import Protocol
 from uuid import UUID
 
 from trading.contexts.live_execution.domain import StrategyPositionOwnership
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class StrategyPositionOwnershipRepository(Protocol):
@@ -14,6 +14,7 @@ class StrategyPositionOwnershipRepository(Protocol):
     def update_state(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         state: str,
@@ -22,12 +23,17 @@ class StrategyPositionOwnershipRepository(Protocol):
     ) -> StrategyPositionOwnership | None: ...
 
     def get_for_run(
-        self, *, owner_user_id: UserId, strategy_run_id: UUID
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        strategy_run_id: UUID,
     ) -> StrategyPositionOwnership | None: ...
 
     def get_blocking_for_scope(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         market_type: str,

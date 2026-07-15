@@ -6,13 +6,14 @@ from typing import Protocol
 from uuid import UUID
 
 from trading.contexts.strategy.domain.entities import StrategySignal
-from trading.shared_kernel.primitives import UserId
+from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
 class StrategyCapitalReservationCoordinator(Protocol):
     def reserve_virtual_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_id: UUID,
         live_profile_id: UUID | None,
@@ -24,6 +25,7 @@ class StrategyCapitalReservationCoordinator(Protocol):
     def reserve_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         exchange_connection_id: UUID,
         strategy_id: UUID,
@@ -36,6 +38,7 @@ class StrategyCapitalReservationCoordinator(Protocol):
     def release_for_strategy_run(
         self,
         *,
+        organization_id: OrganizationId,
         owner_user_id: UserId,
         strategy_run_id: UUID,
         now: datetime,

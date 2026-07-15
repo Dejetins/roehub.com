@@ -61,6 +61,7 @@ from trading.contexts.rl_trading.domain import (
     preload_stage13_policy_from_candidate_manifest_v1,
 )
 from trading.contexts.strategy.adapters.outbound import PsycopgStrategyPostgresGateway
+from trading.shared_kernel.primitives import OrganizationId
 
 log = logging.getLogger(__name__)
 
@@ -102,6 +103,7 @@ def _build_parser() -> argparse.ArgumentParser:
     canary = subparsers.add_parser("canary-once")
     canary.add_argument("--candidate-manifest", required=True)
     canary.add_argument("--feature-window-json", required=True)
+    canary.add_argument("--organization-id", required=True)
     canary.add_argument("--owner-user-id", required=True)
     canary.add_argument("--strategy-id", required=True)
     canary.add_argument("--strategy-run-id", required=True)
@@ -109,6 +111,7 @@ def _build_parser() -> argparse.ArgumentParser:
     paper = subparsers.add_parser("paper-once")
     paper.add_argument("--candidate-manifest", required=True)
     paper.add_argument("--feature-window-json", required=True)
+    paper.add_argument("--organization-id", required=True)
     paper.add_argument("--owner-user-id", required=True)
     paper.add_argument("--strategy-id", required=True)
     paper.add_argument("--strategy-run-id", required=True)
@@ -118,6 +121,7 @@ def _build_parser() -> argparse.ArgumentParser:
     testnet = subparsers.add_parser("testnet-once")
     testnet.add_argument("--candidate-manifest", required=True)
     testnet.add_argument("--feature-window-json", required=True)
+    testnet.add_argument("--organization-id", required=True)
     testnet.add_argument("--owner-user-id", required=True)
     testnet.add_argument("--strategy-id", required=True)
     testnet.add_argument("--strategy-run-id", required=True)
@@ -160,6 +164,7 @@ def main(argv: list[str] | None = None) -> int:
             return _run_canary_once(
                 candidate_manifest=args.candidate_manifest,
                 feature_window_json=args.feature_window_json,
+                organization_id=args.organization_id,
                 owner_user_id=args.owner_user_id,
                 strategy_id=args.strategy_id,
                 strategy_run_id=args.strategy_run_id,
@@ -168,6 +173,7 @@ def main(argv: list[str] | None = None) -> int:
             return _run_paper_once(
                 candidate_manifest=args.candidate_manifest,
                 feature_window_json=args.feature_window_json,
+                organization_id=args.organization_id,
                 owner_user_id=args.owner_user_id,
                 strategy_id=args.strategy_id,
                 strategy_run_id=args.strategy_run_id,
@@ -178,6 +184,7 @@ def main(argv: list[str] | None = None) -> int:
             return _run_testnet_once(
                 candidate_manifest=args.candidate_manifest,
                 feature_window_json=args.feature_window_json,
+                organization_id=args.organization_id,
                 owner_user_id=args.owner_user_id,
                 strategy_id=args.strategy_id,
                 strategy_run_id=args.strategy_run_id,
@@ -231,6 +238,7 @@ def _run_canary_once(
     *,
     candidate_manifest: str,
     feature_window_json: str,
+    organization_id: str,
     owner_user_id: str,
     strategy_id: str,
     strategy_run_id: str,
@@ -258,6 +266,7 @@ def _run_canary_once(
     ingress = ExecutionIngressService(repository=repository, clock=SystemLiveExecutionClock())
     producer = LiveExecutionRlInferenceProducer(ingress_service=ingress, repository=repository)
     event = producer.record_monitor_only_decision(
+        organization_id=OrganizationId.from_string(organization_id),
         context=Stage13DecisionContext(
             owner_user_id=owner_user_id,
             strategy_id=strategy_id,
@@ -295,6 +304,7 @@ def _run_paper_once(
     *,
     candidate_manifest: str,
     feature_window_json: str,
+    organization_id: str,
     owner_user_id: str,
     strategy_id: str,
     strategy_run_id: str,
@@ -344,6 +354,7 @@ def _run_paper_once(
     )
     risk_context = _paper_risk_context()
     first = producer.record_paper_decision(
+        organization_id=OrganizationId.from_string(organization_id),
         context=context,
         decision=decision,
         risk_context=risk_context,
@@ -352,6 +363,7 @@ def _run_paper_once(
         reference_price=Decimal(reference_price),
     )
     replay = producer.record_paper_decision(
+        organization_id=OrganizationId.from_string(organization_id),
         context=context,
         decision=decision,
         risk_context=risk_context,
@@ -397,6 +409,7 @@ def _run_testnet_once(
     *,
     candidate_manifest: str,
     feature_window_json: str,
+    organization_id: str,
     owner_user_id: str,
     strategy_id: str,
     strategy_run_id: str,
@@ -474,6 +487,7 @@ def _run_testnet_once(
         instrument_key=window.instrument_key,
     )
     first = producer.record_testnet_decision(
+        organization_id=OrganizationId.from_string(organization_id),
         context=context,
         decision=decision,
         risk_context=_testnet_risk_context(),
@@ -485,6 +499,7 @@ def _run_testnet_once(
     dispatch_result = dispatch.dispatch_intent(intent=first.intent) if first.intent else None
     dispatch_ready_at = time.perf_counter()
     replay = producer.record_testnet_decision(
+        organization_id=OrganizationId.from_string(organization_id),
         context=context,
         decision=decision,
         risk_context=_testnet_risk_context(),
@@ -733,6 +748,8 @@ def _memory_repository_counts(
 
 def _paper_risk_context() -> ExecutionRiskContext:
     return ExecutionRiskContext(
+        organization_ownership_verified=True,
+        account_ownership_verified=True,
         exchange_connection_active=True,
         secret_custody_ready=True,
         source_authorized=True,
@@ -753,26 +770,10 @@ def _paper_risk_context() -> ExecutionRiskContext:
 
 
 def _testnet_risk_context() -> ExecutionRiskContext:
-    return ExecutionRiskContext(
-        exchange_connection_active=True,
-        secret_custody_ready=True,
-        source_authorized=True,
-        strategy_variant_compatible=True,
-        market_data_state="ready",
-        strategy_binding_active=True,
-        strategy_live_profile_ready=True,
-        strategy_run_active=True,
-        exchange_config_verified=True,
-        account_state_fresh=True,
-        position_ownership_active=True,
-        capital_reservation_active=True,
-        capital_reservation_sufficient=True,
-        ml_agent_policy_active=True,
-        kill_switch_open=True,
-        environment_policy_allows=True,
-        max_order_size_ok=True,
-        daily_limit_ok=True,
-    )
+    # The standalone CLI has no trusted ownership, account-state, limit, or
+    # kill-switch resolver. Persist the source event, but fail closed before
+    # dispatch instead of promoting command-line input into risk authority.
+    return ExecutionRiskContext()
 
 
 class _MemoryExecutionDispatchTransport:

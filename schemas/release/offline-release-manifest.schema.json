@@ -1,0 +1,342 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.roehub.io/release/offline-release-manifest.v1alpha1.schema.json",
+  "title": "Roehub signed offline release bundle manifest v1alpha1",
+  "type": "object",
+  "required": [
+    "schema",
+    "product",
+    "release",
+    "compatibility",
+    "signing",
+    "network_policy",
+    "images",
+    "license_audit",
+    "corresponding_sources",
+    "assets"
+  ],
+  "properties": {
+    "schema": {
+      "const": "io.roehub.offline-release-bundle/v1alpha1"
+    },
+    "product": {
+      "const": "roehub"
+    },
+    "release": {
+      "type": "object",
+      "required": ["version", "manifest"],
+      "properties": {
+        "version": {
+          "type": "string",
+          "pattern": "^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        },
+        "manifest": {
+          "$ref": "#/$defs/path"
+        }
+      },
+      "additionalProperties": false
+    },
+    "compatibility": {
+      "type": "object",
+      "required": ["bundle_schema", "release_manifest_schema", "minimum_docker_api"],
+      "properties": {
+        "bundle_schema": {
+          "const": "io.roehub.offline-release-bundle/v1alpha1"
+        },
+        "release_manifest_schema": {
+          "const": "io.roehub.release/v1alpha1"
+        },
+        "minimum_docker_api": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "signing": {
+      "type": "object",
+      "required": ["algorithm", "key_id", "public_key"],
+      "properties": {
+        "algorithm": {
+          "const": "SSHSIG-Ed25519"
+        },
+        "key_id": {
+          "$ref": "#/$defs/digest"
+        },
+        "public_key": {
+          "$ref": "#/$defs/path"
+        }
+      },
+      "additionalProperties": false
+    },
+    "network_policy": {
+      "type": "object",
+      "required": ["default_egress", "telemetry", "update_checks", "catalog_requests"],
+      "properties": {
+        "default_egress": {
+          "const": "denied"
+        },
+        "telemetry": {
+          "const": "disabled"
+        },
+        "update_checks": {
+          "const": "explicit_opt_in"
+        },
+        "catalog_requests": {
+          "const": "disabled"
+        }
+      },
+      "additionalProperties": false
+    },
+    "images": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/image"
+      }
+    },
+    "license_audit": {
+      "type": "object",
+      "required": [
+        "path",
+        "policy",
+        "policy_sha256",
+        "raw_noassertion_count",
+        "schema",
+        "status",
+        "unresolved_count"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "policy": {
+          "$ref": "#/$defs/path"
+        },
+        "policy_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "raw_noassertion_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "schema": {
+          "const": "io.roehub.runtime-license-audit/v1alpha1"
+        },
+        "status": {
+          "const": "passed"
+        },
+        "unresolved_count": {
+          "const": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "corresponding_sources": {
+      "type": "object",
+      "required": ["grafana", "loki", "openbao"],
+      "properties": {
+        "grafana": {
+          "$ref": "#/$defs/source"
+        },
+        "loki": {
+          "$ref": "#/$defs/source"
+        },
+        "openbao": {
+          "$ref": "#/$defs/source"
+        }
+      },
+      "additionalProperties": false
+    },
+    "assets": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/asset"
+      }
+    }
+  },
+  "$defs": {
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/-]+$"
+    },
+    "digest": {
+      "type": "string",
+      "pattern": "^sha256:[a-f0-9]{64}$"
+    },
+    "platform": {
+      "enum": ["linux/amd64", "linux/arm64"]
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "archive_root",
+        "expected_sha256",
+        "image",
+        "image_index_digest",
+        "license_files",
+        "path",
+        "revision",
+        "sha256",
+        "size_bytes",
+        "tag",
+        "url"
+      ],
+      "properties": {
+        "archive_root": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "expected_sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "image": {
+          "enum": ["grafana", "loki", "openbao"]
+        },
+        "image_index_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "license_files": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._/-]+$"
+          }
+        },
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}(?:\\+roehub-licensed-qr\\.1)?$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "tag": {
+          "type": "string",
+          "pattern": "^v?[0-9]+\\.[0-9]+\\.[0-9]+(?:-roehub-licensed-qr\\.1)?$"
+        },
+        "url": {
+          "type": "string",
+          "pattern": "^https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/(?:archive/refs/tags/[A-Za-z0-9._-]+\\.tar\\.gz|releases/download/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\\.tar\\.gz)$"
+        }
+      },
+      "additionalProperties": false
+    },
+    "image": {
+      "type": "object",
+      "required": [
+        "online_reference",
+        "index_digest",
+        "media_type",
+        "platforms",
+        "child_digests",
+        "archive",
+        "sboms"
+      ],
+      "properties": {
+        "online_reference": {
+          "type": "string",
+          "pattern": "^[^\\s@]+@sha256:[a-f0-9]{64}$"
+        },
+        "index_digest": {
+          "$ref": "#/$defs/digest"
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "platforms": {
+          "type": "array",
+          "minItems": 2,
+          "uniqueItems": true,
+          "items": {
+            "type": "string"
+          },
+          "allOf": [
+            {
+              "contains": {
+                "const": "linux/amd64"
+              }
+            },
+            {
+              "contains": {
+                "const": "linux/arm64"
+              }
+            }
+          ]
+        },
+        "child_digests": {
+          "type": "object",
+          "required": ["linux/amd64", "linux/arm64"],
+          "properties": {
+            "linux/amd64": {
+              "$ref": "#/$defs/digest"
+            },
+            "linux/arm64": {
+              "$ref": "#/$defs/digest"
+            }
+          },
+          "additionalProperties": {
+            "$ref": "#/$defs/digest"
+          }
+        },
+        "archive": {
+          "$ref": "#/$defs/path"
+        },
+        "sboms": {
+          "type": "object",
+          "required": ["linux/amd64", "linux/arm64"],
+          "properties": {
+            "linux/amd64": {
+              "$ref": "#/$defs/path"
+            },
+            "linux/arm64": {
+              "$ref": "#/$defs/path"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "asset": {
+      "type": "object",
+      "required": ["path", "sha256", "size_bytes", "media_type", "executable"],
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "media_type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "executable": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
