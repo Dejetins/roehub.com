@@ -22,6 +22,7 @@ class SchedulerBackfillPlanner:
     """
 
     tail_lookback_minutes: int
+    bootstrap_history_lookback_minutes: int | None = None
 
     def __post_init__(self) -> None:
         """
@@ -44,6 +45,11 @@ class SchedulerBackfillPlanner:
         """
         if self.tail_lookback_minutes <= 0:
             raise ValueError("tail_lookback_minutes must be > 0")
+        if (
+            self.bootstrap_history_lookback_minutes is not None
+            and self.bootstrap_history_lookback_minutes <= 0
+        ):
+            raise ValueError("bootstrap_history_lookback_minutes must be > 0 when set")
 
     def plan_for_instrument(
         self,
@@ -92,25 +98,49 @@ class SchedulerBackfillPlanner:
 
         first_ts, last_ts = bounds_1m
         if first_ts is None or last_ts is None:
+            bootstrap_start = effective_start
+            if self.bootstrap_history_lookback_minutes is not None:
+                bounded_start = UtcTimestamp(
+                    now_minute.value
+                    - timedelta(minutes=self.bootstrap_history_lookback_minutes)
+                )
+                if bounded_start.value > bootstrap_start.value:
+                    bootstrap_start = bounded_start
             return [
                 RestFillTask(
                     instrument_id=instrument_id,
-                    time_range=TimeRange(start=effective_start, end=now_minute),
+                    time_range=TimeRange(start=bootstrap_start, end=now_minute),
                     reason="scheduler_bootstrap",
                 )
             ]
 
         tasks: list[RestFillTask] = []
 
-        historical_threshold = effective_start.value + timedelta(minutes=1)
-        if first_ts.value > historical_threshold and effective_start.value < first_ts.value:
-            tasks.append(
-                RestFillTask(
-                    instrument_id=instrument_id,
-                    time_range=TimeRange(start=effective_start, end=first_ts),
-                    reason="historical_backfill",
-                )
+        if self.bootstrap_history_lookback_minutes is not None:
+            bootstrap_start = UtcTimestamp(
+                now_minute.value
+                - timedelta(minutes=self.bootstrap_history_lookback_minutes)
             )
+            if bootstrap_start.value < effective_start.value:
+                bootstrap_start = effective_start
+            if bootstrap_start.value < first_ts.value:
+                tasks.append(
+                    RestFillTask(
+                        instrument_id=instrument_id,
+                        time_range=TimeRange(start=bootstrap_start, end=first_ts),
+                        reason="scheduler_bootstrap",
+                    )
+                )
+        else:
+            historical_threshold = effective_start.value + timedelta(minutes=1)
+            if first_ts.value > historical_threshold and effective_start.value < first_ts.value:
+                tasks.append(
+                    RestFillTask(
+                        instrument_id=instrument_id,
+                        time_range=TimeRange(start=effective_start, end=first_ts),
+                        reason="historical_backfill",
+                    )
+                )
 
         lookback_start = UtcTimestamp(
             now_minute.value - timedelta(minutes=self.tail_lookback_minutes)

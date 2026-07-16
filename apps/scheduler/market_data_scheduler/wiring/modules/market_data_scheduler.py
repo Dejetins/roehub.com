@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Mapping
 from uuid import uuid4
@@ -20,6 +21,7 @@ from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
     ClickHouseSettingsLoader,
     _clickhouse_client,
 )
+from trading.contexts.backtest.adapters.outbound import PsycopgBacktestPostgresGateway
 from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
 from trading.contexts.market_data.adapters.outbound.clients.funding_rate_history_source import (
     RestFundingRateHistorySource,
@@ -37,19 +39,18 @@ from trading.contexts.market_data.adapters.outbound.config.runtime_config import
     MarketDataRuntimeConfig,
     load_market_data_runtime_config,
 )
-from trading.contexts.market_data.adapters.outbound.config.whitelist import (
-    load_whitelist_rows_from_csv,
-)
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseCanonicalCandleIndexReader,
-    ClickHouseEnabledInstrumentReader,
     ClickHouseFundingRateStore,
     ClickHouseInstrumentRefWriter,
     ClickHouseMarketRefWriter,
     ClickHouseRawKlineWriter,
     ThreadLocalClickHouseConnectGateway,
 )
-from trading.contexts.market_data.application.dto import RestFillTask, WhitelistInstrumentRow
+from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
+    PostgresInstrumentSelectionRepository,
+)
+from trading.contexts.market_data.application.dto import RestFillTask
 from trading.contexts.market_data.application.ports.clock.clock import Clock
 from trading.contexts.market_data.application.ports.sources.instrument_history_start_source import (
     InstrumentHistoryStartSource,
@@ -68,11 +69,11 @@ from trading.contexts.market_data.application.services.minute_utils import floor
 from trading.contexts.market_data.application.use_cases import (
     BackfillFundingRatesUseCase,
     EnrichRefInstrumentsFromExchangeUseCase,
+    RefreshInstrumentCatalogFromExchangeUseCase,
     RestCatchUp1mUseCase,
     RestFillRange1mUseCase,
     SeedRefMarketUseCase,
     SyncFuturesFundingUniverseUseCase,
-    SyncWhitelistToRefInstrumentsUseCase,
 )
 from trading.platform.time.system_clock import SystemClock
 from trading.shared_kernel.primitives import InstrumentId, MarketId, UtcTimestamp
@@ -230,9 +231,8 @@ class MarketDataSchedulerApp:
 
     Parameters:
     - config: runtime market-data config.
-    - whitelist_path: path to whitelist CSV used by sync job.
     - seed_use_case: seed ref_market use-case.
-    - sync_use_case: whitelist sync use-case.
+    - catalog_refresh_use_case: exchange metadata refresh without selection side effects.
     - enrich_use_case: instrument enrichment use-case.
     - instrument_reader: enabled-instruments reader.
     - index_reader: canonical index reader.
@@ -248,9 +248,8 @@ class MarketDataSchedulerApp:
         self,
         *,
         config: MarketDataRuntimeConfig,
-        whitelist_path: str,
         seed_use_case: SeedRefMarketUseCase,
-        sync_use_case: SyncWhitelistToRefInstrumentsUseCase,
+        catalog_refresh_use_case: RefreshInstrumentCatalogFromExchangeUseCase,
         enrich_use_case: EnrichRefInstrumentsFromExchangeUseCase,
         instrument_reader: EnabledInstrumentReader,
         index_reader: CanonicalCandleIndexReader,
@@ -262,6 +261,7 @@ class MarketDataSchedulerApp:
         history_start_source: InstrumentHistoryStartSource | None = None,
         funding_sync_use_case: SyncFuturesFundingUniverseUseCase | None = None,
         funding_catchup_use_case: BackfillFundingRatesUseCase | None = None,
+        catalog_state_repository: PostgresInstrumentSelectionRepository | None = None,
     ) -> None:
         """
         Validate and store scheduler runtime dependencies.
@@ -284,9 +284,8 @@ class MarketDataSchedulerApp:
         if metrics_port <= 0:
             raise ValueError("metrics_port must be > 0")
         self._config = config
-        self._whitelist_path = whitelist_path
         self._seed_use_case = seed_use_case
-        self._sync_use_case = sync_use_case
+        self._catalog_refresh_use_case = catalog_refresh_use_case
         self._enrich_use_case = enrich_use_case
         self._instrument_reader = instrument_reader
         self._index_reader = index_reader
@@ -296,6 +295,7 @@ class MarketDataSchedulerApp:
         self._rest_catchup_use_case = rest_catchup_use_case
         self._funding_sync_use_case = funding_sync_use_case
         self._funding_catchup_use_case = funding_catchup_use_case
+        self._catalog_state_repository = catalog_state_repository
         self._metrics = metrics
         self._metrics_port = metrics_port
         self._clock: Clock = SystemClock()
@@ -331,18 +331,21 @@ class MarketDataSchedulerApp:
 
         jobs = [
             SchedulerJob(
-                name="sync_whitelist",
-                interval_seconds=self._config.scheduler.jobs.sync_whitelist.interval_seconds,
+                name="refresh_catalog",
+                interval_seconds=self._config.scheduler.jobs.refresh_catalog.interval_seconds,
             ),
             SchedulerJob(
                 name="enrich",
                 interval_seconds=self._config.scheduler.jobs.enrich.interval_seconds,
             ),
-            SchedulerJob(
-                name="rest_insurance_catchup",
-                interval_seconds=self._config.scheduler.jobs.rest_insurance_catchup.interval_seconds,
-            ),
         ]
+        if self._config.scheduler.jobs.rest_insurance_catchup.enabled:
+            jobs.append(
+                SchedulerJob(
+                    name="rest_insurance_catchup",
+                    interval_seconds=self._config.scheduler.jobs.rest_insurance_catchup.interval_seconds,
+                )
+            )
         if self._funding_job_enabled():
             jobs.append(
                 SchedulerJob(
@@ -365,8 +368,8 @@ class MarketDataSchedulerApp:
     def _startup_jobs(self) -> list[SchedulerJob]:
         jobs = [
             SchedulerJob(
-                name="sync_whitelist",
-                interval_seconds=self._config.scheduler.jobs.sync_whitelist.interval_seconds,
+                name="refresh_catalog",
+                interval_seconds=self._config.scheduler.jobs.refresh_catalog.interval_seconds,
             ),
             SchedulerJob(
                 name="enrich",
@@ -441,8 +444,8 @@ class MarketDataSchedulerApp:
         self._metrics.scheduler_job_runs_total.labels(job=job.name).inc()
 
         try:
-            if job.name == "sync_whitelist":
-                await self._run_sync_whitelist_job()
+            if job.name == "refresh_catalog":
+                await self._run_refresh_catalog_job()
             elif job.name == "enrich":
                 await self._run_enrich_job()
             elif job.name == "startup_scan":
@@ -460,9 +463,9 @@ class MarketDataSchedulerApp:
             duration = max(loop.time() - started, 0.0)
             self._metrics.scheduler_job_duration_seconds.labels(job=job.name).observe(duration)
 
-    async def _run_sync_whitelist_job(self) -> None:
+    async def _run_refresh_catalog_job(self) -> None:
         """
-        Run S1: seed markets and sync whitelist into `ref_instruments`.
+        Run S1: seed markets and refresh supported exchange metadata.
 
         Parameters:
         - None.
@@ -471,24 +474,39 @@ class MarketDataSchedulerApp:
         - None.
 
         Assumptions/Invariants:
-        - Whitelist CSV schema follows existing project contract.
+        - Refresh only writes global catalog metadata; it never creates selections.
 
         Errors/Exceptions:
-        - Propagates whitelist parsing and use-case errors.
+        - Propagates catalog refresh errors.
 
         Side effects:
-        - Writes into `ref_market` and `ref_instruments` tables.
+        - Writes into `ref_market` and `ref_instruments` tables without user intent.
         """
         await asyncio.to_thread(self._seed_use_case.run)
-        whitelist_rows = await asyncio.to_thread(
-            load_whitelist_rows_from_csv,
-            Path(self._whitelist_path),
+        market_ids = tuple(MarketId(value) for value in self._config.market_ids())
+        try:
+            report = await asyncio.to_thread(self._catalog_refresh_use_case.run)
+        except Exception:
+            if self._catalog_state_repository is not None:
+                await asyncio.to_thread(
+                    self._catalog_state_repository.mark_catalog_failed,
+                    market_ids=market_ids,
+                    now=datetime.now(UTC),
+                )
+            raise
+        if self._catalog_state_repository is not None:
+            await asyncio.to_thread(
+                self._catalog_state_repository.mark_catalog_fresh,
+                market_ids=market_ids,
+                now=datetime.now(UTC),
+            )
+        log.info(
+            "refresh_instrument_catalog completed: markets_total=%s "
+            "instruments_total=%s rows_upserted=%s",
+            report.markets_total,
+            report.instruments_total,
+            report.rows_upserted,
         )
-        dto_rows = [
-            WhitelistInstrumentRow(instrument_id=row.instrument_id, is_enabled=row.is_enabled)
-            for row in whitelist_rows
-        ]
-        await asyncio.to_thread(self._sync_use_case.run, dto_rows)
 
     async def _run_enrich_job(self) -> None:
         """
@@ -537,7 +555,10 @@ class MarketDataSchedulerApp:
         - Reads canonical bounds for enabled instruments.
         - Enqueues background REST fill tasks.
         """
-        await self._scan_and_enqueue(scan_reason="startup_scan")
+        await self._scan_and_enqueue(
+            scan_reason="startup_scan",
+            allowed_reasons={"scheduler_bootstrap", "scheduler_tail"},
+        )
 
     async def _run_rest_insurance_job(self) -> None:
         """
@@ -578,9 +599,10 @@ class MarketDataSchedulerApp:
             return
 
         await self._maybe_refresh_funding_universe()
+        effective_instruments = self._instrument_reader.list_enabled_tradable()
         report = await asyncio.to_thread(
-            self._funding_catchup_use_case.run_due_universe,
-            market_ids=(MarketId(2), MarketId(4)),
+            self._funding_catchup_use_case.run_due_instruments,
+            instrument_ids=effective_instruments,
             dry_run=False,
         )
         success_by_market: set[tuple[str, str]] = set()
@@ -880,6 +902,16 @@ class MarketDataSchedulerApp:
                         self._history_start_source.get_history_start,
                         instrument,
                     )
+                if (
+                    symbol_history_start is not None
+                    and self._catalog_state_repository is not None
+                ):
+                    await asyncio.to_thread(
+                        self._catalog_state_repository.record_history_bound,
+                        instrument_id=instrument,
+                        expected_start_at=symbol_history_start.value,
+                        confirmed_at=self._clock.now().value,
+                    )
                 return self._backfill_planner.plan_for_instrument(
                     instrument_id=instrument,
                     earliest_market_ts=earliest,
@@ -1005,7 +1037,6 @@ def _minutes_between(start: UtcTimestamp | None, end: UtcTimestamp | None) -> in
 def build_market_data_scheduler_app(
     *,
     config_path: str,
-    whitelist_path: str,
     environ: Mapping[str, str],
     metrics_port: int,
 ) -> MarketDataSchedulerApp:
@@ -1014,7 +1045,6 @@ def build_market_data_scheduler_app(
 
     Parameters:
     - config_path: path to `market_data.yaml`.
-    - whitelist_path: path to `whitelist.csv`.
     - environ: environment mapping with ClickHouse settings.
     - metrics_port: Prometheus HTTP port.
 
@@ -1045,20 +1075,12 @@ def build_market_data_scheduler_app(
         database=clickhouse_settings.database,
     )
     seed_use_case = SeedRefMarketUseCase(writer=market_writer, clock=SystemClock())
-    sync_use_case = SyncWhitelistToRefInstrumentsUseCase(
-        writer=instrument_writer,
-        clock=SystemClock(),
-        known_market_ids=set(config.market_ids()),
-    )
 
     index_reader = ClickHouseCanonicalCandleIndexReader(
         gateway=gateway,
         database=clickhouse_settings.database,
     )
-    instrument_reader = ClickHouseEnabledInstrumentReader(
-        gateway=gateway,
-        database=clickhouse_settings.database,
-    )
+    instrument_reader = _effective_instrument_reader(environ=environ)
     rest_source = RestCandleIngestSource(
         cfg=config,
         clock=SystemClock(),
@@ -1113,6 +1135,12 @@ def build_market_data_scheduler_app(
         settlement_lag_minutes=config.scheduler.jobs.funding_rate_catchup.settlement_lag_minutes,
     )
     metadata_source = RestInstrumentMetadataSource(cfg=config, http=RequestsHttpClient())
+    catalog_refresh_use_case = RefreshInstrumentCatalogFromExchangeUseCase(
+        market_ids=tuple(MarketId(value) for value in config.market_ids()),
+        metadata_source=metadata_source,
+        writer=instrument_writer,
+        clock=SystemClock(),
+    )
     history_start_source = RestInstrumentHistoryStartSource(
         cfg=config,
         http=RequestsHttpClient(),
@@ -1130,13 +1158,13 @@ def build_market_data_scheduler_app(
     )
     backfill_planner = SchedulerBackfillPlanner(
         tail_lookback_minutes=config.ingestion.tail_lookback_minutes,
+        bootstrap_history_lookback_minutes=config.ingestion.bootstrap_history_lookback_minutes,
     )
 
     return MarketDataSchedulerApp(
         config=config,
-        whitelist_path=whitelist_path,
         seed_use_case=seed_use_case,
-        sync_use_case=sync_use_case,
+        catalog_refresh_use_case=catalog_refresh_use_case,
         enrich_use_case=enrich_use_case,
         instrument_reader=instrument_reader,
         index_reader=index_reader,
@@ -1146,6 +1174,18 @@ def build_market_data_scheduler_app(
         rest_catchup_use_case=rest_catchup_use_case,
         funding_sync_use_case=funding_sync_use_case,
         funding_catchup_use_case=funding_catchup_use_case,
+        catalog_state_repository=instrument_reader,
         metrics=MarketDataSchedulerMetrics(),
         metrics_port=metrics_port,
+    )
+
+
+def _effective_instrument_reader(
+    *, environ: Mapping[str, str]
+) -> PostgresInstrumentSelectionRepository:
+    dsn = environ.get("STRATEGY_PG_DSN", "").strip()
+    if not dsn:
+        raise ValueError("STRATEGY_PG_DSN is required for effective instrument selections")
+    return PostgresInstrumentSelectionRepository(
+        gateway=PsycopgBacktestPostgresGateway(dsn=dsn)
     )

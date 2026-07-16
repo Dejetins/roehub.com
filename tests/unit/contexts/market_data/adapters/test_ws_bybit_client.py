@@ -5,9 +5,12 @@ import json
 from datetime import datetime, timezone
 from uuid import UUID
 
+import pytest
+
 from trading.contexts.market_data.adapters.outbound.clients.bybit.ws_client import (
     _chunk_symbols,
     _parse_subscribe_ack,
+    _recv_or_stop,
     _subscribe_topics,
     parse_bybit_closed_1m_message,
 )
@@ -70,6 +73,38 @@ class _FakeBybitSocket:
         if not self._recv_payloads:
             raise RuntimeError("recv called without canned payloads")
         return self._recv_payloads.pop(0)
+
+
+class _BlockingSocket:
+    """Socket fake that makes cancellation of the pending recv observable."""
+
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.cancelled = asyncio.Event()
+
+    async def recv(self) -> str:
+        self.started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.cancelled.set()
+            raise
+        raise AssertionError("blocking socket recv unexpectedly returned")
+
+
+def test_recv_or_stop_cancels_and_joins_pending_socket_recv() -> None:
+    """A subscription refresh must not leave a failed websocket task behind."""
+
+    async def run() -> None:
+        socket = _BlockingSocket()
+        worker = asyncio.create_task(_recv_or_stop(socket, asyncio.Event()))
+        await socket.started.wait()
+        worker.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await worker
+        assert socket.cancelled.is_set()
+
+    asyncio.run(run())
 
 
 def test_bybit_confirm_false_is_ignored() -> None:

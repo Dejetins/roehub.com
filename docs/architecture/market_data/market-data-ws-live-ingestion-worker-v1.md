@@ -1,5 +1,11 @@
 # Market Data — WS Live Ingestion Worker & Maintenance Scheduler (v1)
 
+> Исторический документ: worker больше не читает CSV whitelist. Его вход —
+> `GlobalEffectiveCollectorSet`: объединение пользовательских selections и pin
+> активных стратегий; список обновляется во время работы. Актуальная сеть
+> отделяет внутренний контур от `market-data-egress`, доступного только
+> `market-data-ws` и `market-data-scheduler`.
+
 Этот документ описывает **EPIC 3 — WS Live Ingestion Worker: close-only, <1s to raw** и сопутствующий **maintenance scheduler**.
 Формат и уровень детализации ориентированы на то, чтобы по документу можно было **однозначно реализовать код** (через Codex агент)
 и развернуть сервисы (docker-compose / k8s позже).

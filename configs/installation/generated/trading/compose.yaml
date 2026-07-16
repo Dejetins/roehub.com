@@ -1,10 +1,22 @@
 name: roehub-trading
 networks:
+  market-data-egress:
+    internal: false
+    labels:
+      io.roehub.egress-purpose: public-market-data-only
+      io.roehub.profile: trading
+      io.roehub.trust-boundary: market-data-egress
   roehub:
     internal: true
     labels:
       io.roehub.profile: trading
       io.roehub.trust-boundary: installation-internal
+  web-ingress:
+    internal: false
+    labels:
+      io.roehub.ingress-purpose: host-web-ui-only
+      io.roehub.profile: trading
+      io.roehub.trust-boundary: web-ingress
 services:
   alertmanager:
     cap_drop: &id001
@@ -913,8 +925,6 @@ services:
     - apps.scheduler.market_data_scheduler.main.main
     - --config
     - /etc/roehub/market-data.yaml
-    - --whitelist
-    - /etc/roehub/whitelist.csv
     - --metrics-port
     - '9202'
     depends_on:
@@ -991,6 +1001,7 @@ services:
       io.roehub.role: market-data-scheduler
     networks:
     - roehub
+    - market-data-egress
     read_only: true
     restart: unless-stopped
     security_opt:
@@ -1005,7 +1016,6 @@ services:
     - ./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro
     - runtime-secrets:/run/roehub-secrets:ro
     - ./service-configs/market-data.yaml:/etc/roehub/market-data.yaml:ro
-    - ./service-configs/whitelist.csv:/etc/roehub/whitelist.csv:ro
   market-data-ws:
     cap_drop:
     - ALL
@@ -1091,6 +1101,7 @@ services:
       io.roehub.role: market-data-ws
     networks:
     - roehub
+    - market-data-egress
     read_only: true
     restart: unless-stopped
     security_opt:
@@ -1956,6 +1967,7 @@ services:
       io.roehub.role: web
     networks:
     - roehub
+    - web-ingress
     ports:
     - 127.0.0.1:8080:8010
     read_only: true

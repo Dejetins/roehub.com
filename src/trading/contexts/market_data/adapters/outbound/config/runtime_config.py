@@ -147,6 +147,7 @@ class IngestionConfig:
     rest_concurrency_instruments: int
     tail_lookback_minutes: int
     rest_inter_instrument_delay_s: float
+    bootstrap_history_lookback_minutes: int | None = None
 
     def __post_init__(self) -> None:
         """
@@ -174,6 +175,11 @@ class IngestionConfig:
             self.rest_concurrency_instruments,
         )
         _require_positive_int("ingestion.tail_lookback_minutes", self.tail_lookback_minutes)
+        if self.bootstrap_history_lookback_minutes is not None:
+            _require_positive_int(
+                "ingestion.bootstrap_history_lookback_minutes",
+                self.bootstrap_history_lookback_minutes,
+            )
         _require_non_negative(
             "ingestion.rest_inter_instrument_delay_s",
             self.rest_inter_instrument_delay_s,
@@ -183,6 +189,7 @@ class IngestionConfig:
 @dataclass(frozen=True, slots=True)
 class SchedulerJobConfig:
     interval_seconds: int
+    enabled: bool = True
 
     def __post_init__(self) -> None:
         """
@@ -252,7 +259,7 @@ class FundingRateCatchupJobConfig:
 
 @dataclass(frozen=True, slots=True)
 class SchedulerJobsConfig:
-    sync_whitelist: SchedulerJobConfig
+    refresh_catalog: SchedulerJobConfig
     enrich: SchedulerJobConfig
     rest_insurance_catchup: SchedulerJobConfig
     funding_rate_catchup: FundingRateCatchupJobConfig
@@ -511,19 +518,30 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
             "rest_inter_instrument_delay_s",
             default=0.0,
         ),
+        bootstrap_history_lookback_minutes=_get_optional_positive_int_with_default(
+            ingestion,
+            "bootstrap_history_lookback_minutes",
+            default=None,
+        ),
     )
 
     scheduler_map = _get_mapping(md, "scheduler", required=False)
     scheduler_jobs = _get_mapping(scheduler_map, "jobs", required=False)
     scheduler_cfg = SchedulerConfig(
         jobs=SchedulerJobsConfig(
-            sync_whitelist=SchedulerJobConfig(
+            refresh_catalog=SchedulerJobConfig(
                 interval_seconds=_get_int_nested_with_default(
                     scheduler_jobs,
-                    section="sync_whitelist",
+                    section="refresh_catalog",
                     key="interval_seconds",
                     default=3600,
-                )
+                ),
+                enabled=_get_bool_nested_with_default(
+                    scheduler_jobs,
+                    section="refresh_catalog",
+                    key="enabled",
+                    default=True,
+                ),
             ),
             enrich=SchedulerJobConfig(
                 interval_seconds=_get_int_nested_with_default(
@@ -531,7 +549,13 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
                     section="enrich",
                     key="interval_seconds",
                     default=21600,
-                )
+                ),
+                enabled=_get_bool_nested_with_default(
+                    scheduler_jobs,
+                    section="enrich",
+                    key="enabled",
+                    default=True,
+                ),
             ),
             rest_insurance_catchup=SchedulerJobConfig(
                 interval_seconds=_get_int_nested_with_default(
@@ -539,7 +563,13 @@ def load_market_data_runtime_config(path: str | Path) -> MarketDataRuntimeConfig
                     section="rest_insurance_catchup",
                     key="interval_seconds",
                     default=3600,
-                )
+                ),
+                enabled=_get_bool_nested_with_default(
+                    scheduler_jobs,
+                    section="rest_insurance_catchup",
+                    key="enabled",
+                    default=True,
+                ),
             ),
             funding_rate_catchup=_parse_funding_rate_catchup_job_config(scheduler_jobs),
         )
@@ -854,6 +884,20 @@ def _get_int_with_default(d: Mapping[str, Any], key: str, *, default: int) -> in
     return _get_int(d, key, required=True)
 
 
+def _get_optional_positive_int_with_default(
+    d: Mapping[str, Any],
+    key: str,
+    *,
+    default: int | None,
+) -> int | None:
+    """Read an optional positive integer, retaining ``None`` when it is absent."""
+    if key not in d:
+        return default
+    value = _get_int(d, key, required=True)
+    _require_positive_int(key, value)
+    return value
+
+
 def _get_str_with_default(d: Mapping[str, Any], key: str, *, default: str) -> str:
     """
     Read optional string key from mapping with explicit default.
@@ -1029,6 +1073,18 @@ def _get_int_nested_with_default(
     """
     section_map = _get_mapping(d, section, required=False)
     return _get_int_with_default(section_map, key, default=default)
+
+
+def _get_bool_nested_with_default(
+    d: Mapping[str, Any],
+    *,
+    section: str,
+    key: str,
+    default: bool,
+) -> bool:
+    """Read an optional boolean from one optional nested configuration section."""
+    section_map = _get_mapping(d, section, required=False)
+    return _get_bool_with_default(section_map, key, default=default)
 
 
 def _require_non_empty(name: str, s: str) -> None:

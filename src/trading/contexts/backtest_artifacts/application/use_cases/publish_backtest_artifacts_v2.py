@@ -71,6 +71,7 @@ class PublishBacktestArtifactsV2Request:
 
     coordinates: ArtifactCoordinatesV2
     full_rebuild: bool = False
+    max_source_bars: int | None = None
 
     def __post_init__(self) -> None:
         """
@@ -94,6 +95,12 @@ class PublishBacktestArtifactsV2Request:
         """
         if self.coordinates is None:  # type: ignore[truthy-bool]
             raise ValueError("PublishBacktestArtifactsV2Request.coordinates is required")
+        if self.max_source_bars is not None and (
+            isinstance(self.max_source_bars, bool)
+            or not isinstance(self.max_source_bars, int)
+            or self.max_source_bars <= 0
+        ):
+            raise ValueError("PublishBacktestArtifactsV2Request.max_source_bars must be > 0")
 
 
 @dataclass(frozen=True, slots=True)
@@ -375,6 +382,10 @@ class PublishBacktestArtifactsV2UseCase:
             coordinates=request.coordinates,
             before=UtcTimestamp(started_at_utc),
         )
+        requested_time_range = _limit_requested_time_range_v2(
+            time_range=requested_time_range,
+            max_source_bars=request.max_source_bars,
+        )
         precheck = self.slot_publisher.precheck_publish(request.coordinates)
         _ensure_precheck_ready_v2(precheck=precheck)
         _ensure_bootstrap_slot_roots_v2(
@@ -496,6 +507,21 @@ def _resolve_requested_time_range_v2(
         start=first_ts_open,
         end=UtcTimestamp(last_ts_open.value + timedelta(minutes=1)),
     )
+
+
+def _limit_requested_time_range_v2(
+    *,
+    time_range: TimeRange,
+    max_source_bars: int | None,
+) -> TimeRange:
+    """Keep an explicit one-off publish within a newest-first 1m source window."""
+    if max_source_bars is None:
+        return time_range
+    bounded_start = max(
+        time_range.start.value,
+        time_range.end.value - timedelta(minutes=max_source_bars),
+    )
+    return TimeRange(start=UtcTimestamp(bounded_start), end=time_range.end)
 
 
 def _resolve_build_time_range_v2(

@@ -116,6 +116,42 @@ def test_runtime_topology_generation_is_deterministic_and_complete(tmp_path: Pat
         jsonschema.Draft202012Validator(control_schema).validate(control_policy)
         services = compose["services"]
         assert compose["networks"]["roehub"]["internal"] is True
+        assert compose["networks"]["web-ingress"] == {
+            "internal": False,
+            "labels": {
+                "io.roehub.profile": profile,
+                "io.roehub.trust-boundary": "web-ingress",
+                "io.roehub.ingress-purpose": "host-web-ui-only",
+            },
+        }
+        assert services["web"]["networks"] == ["roehub", "web-ingress"]
+        market_data_egress = compose["networks"].get("market-data-egress")
+        if profile == "base":
+            assert market_data_egress is None
+        else:
+            assert market_data_egress == {
+                "internal": False,
+                "labels": {
+                    "io.roehub.profile": profile,
+                    "io.roehub.trust-boundary": "market-data-egress",
+                    "io.roehub.egress-purpose": "public-market-data-only",
+                },
+            }
+            assert services["market-data-ws"]["networks"] == [
+                "roehub",
+                "market-data-egress",
+            ]
+            assert services["market-data-scheduler"]["networks"] == [
+                "roehub",
+                "market-data-egress",
+            ]
+            assert all(
+                service["networks"] == ["roehub"]
+                for name, service in services.items()
+                if name
+                not in {"market-data-ws", "market-data-scheduler", "web", "secret-init"}
+                and "networks" in service
+            )
         assert {
             name for name, row in services.items() if not row.get("profiles")
         } == default_services

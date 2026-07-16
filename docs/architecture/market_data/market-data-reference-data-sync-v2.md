@@ -1,5 +1,10 @@
 # Market Data — Reference Data Sync (Whitelist -> ClickHouse) (v2)
 
+> Исторический документ: `whitelist.csv` больше не является источником runtime
+> policy. Текущий metadata-only refresh заполняет глобальный каталог биржи, но
+> не создаёт selection или historical backfill; выбор организации хранится в
+> PostgreSQL. См. `roehub-market-data-activation-and-instrument-selection-v1`.
+
 Этот документ фиксирует правила и минимальные механизмы заполнения reference-таблиц ClickHouse
 для bounded context `market_data` на этапе v2.
 

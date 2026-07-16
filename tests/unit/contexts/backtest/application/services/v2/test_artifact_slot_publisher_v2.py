@@ -185,6 +185,7 @@ backtest_artifacts:
   slot_policy:
     slots: [slot_b, slot_a]
   publish_schedule:
+    enabled: false
     full_rebuild_hour_utc: 2
     full_rebuild_minute_utc: 0
   lookback_policy:

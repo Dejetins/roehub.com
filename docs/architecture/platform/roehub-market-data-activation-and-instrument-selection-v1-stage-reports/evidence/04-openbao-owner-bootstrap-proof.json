@@ -1,0 +1,41 @@
+{
+  "schema": "io.roehub.market-data-activation.openbao-owner-bootstrap-proof/v1",
+  "stage": "04",
+  "proof_boundary": "disposable_runtime_and_owner_handoff",
+  "runtime": {
+    "environment": "isolated Docker Desktop project",
+    "image_source": "local offline candidate override with pull_policy=never",
+    "compose_config": "passed",
+    "initialization_states": ["uninitialized", "sealed", "unsealed"],
+    "owner_pgp_recipients": 3,
+    "unseal_threshold": 2,
+    "initial_admin_pgp_encrypted": true,
+    "service_identities": 8,
+    "static_owner_provisioning_identities": 7,
+    "plugin_identity": "instance-scoped and intentionally not provisioned globally",
+    "approle_response_wrapping": "passed",
+    "approle_one_time_unwrap": "passed",
+    "wrapped_file_delivery": "passed",
+    "service_token_renewal": "passed",
+    "least_privilege": {
+      "api_value_access": "denied",
+      "api_transit_decrypt": "denied",
+      "shared_broad_tokens": false
+    },
+    "initial_admin_revocation": "passed",
+    "cleanup": "passed"
+  },
+  "owner_init_command": {
+    "separate_from_verifier": true,
+    "requires_exact_public_pgp_recipients": 3,
+    "requires_distinct_recipients": true,
+    "writes_only_encrypted_custody_files": true,
+    "idempotent_existing_delivery_check": true,
+    "service_delivery": "per-service RoleID plus response-wrapped one-time SecretID",
+    "no_private_pgp_or_unseal_or_token_output": true
+  },
+  "durable_owner_action_required": true,
+  "durable_owner_material_created": false,
+  "secrets_recorded": false,
+  "production_modified": false
+}

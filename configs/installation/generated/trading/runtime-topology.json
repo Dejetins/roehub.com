@@ -153,6 +153,7 @@
       "internal_port": 8010,
       "lifecycle": "service",
       "name": "web",
+      "network_access": "web_ingress",
       "profiles": [
         "base",
         "trading",
@@ -412,6 +413,7 @@
       "internal_port": 9201,
       "lifecycle": "service",
       "name": "market-data-ws",
+      "network_access": "market_data_egress",
       "profiles": [
         "trading",
         "ml"
@@ -428,8 +430,6 @@
         "apps.scheduler.market_data_scheduler.main.main",
         "--config",
         "/etc/roehub/market-data.yaml",
-        "--whitelist",
-        "/etc/roehub/whitelist.csv",
         "--metrics-port",
         "9202"
       ],
@@ -450,6 +450,7 @@
       "internal_port": 9202,
       "lifecycle": "service",
       "name": "market-data-scheduler",
+      "network_access": "market_data_egress",
       "profiles": [
         "trading",
         "ml"

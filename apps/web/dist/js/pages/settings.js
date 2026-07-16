@@ -25,7 +25,7 @@ const state = {
   notificationScoped: null,
 };
 
-const SETTINGS_TABS = new Set(["profile", "api", "integrations", "security"]);
+const SETTINGS_TABS = new Set(["profile", "api", "integrations", "security", "market_data"]);
 
 function endpoint(root, name) {
   return root.dataset[name] || "";

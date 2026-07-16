@@ -133,3 +133,39 @@ def test_missing_interval_is_degraded_and_skipped() -> None:
 
     assert report.instrument_reports[0].status == "skipped_missing_interval"
     assert source.calls == []
+
+
+def test_selected_catchup_does_not_fetch_unselected_funding_instruments() -> None:
+    selected = _instrument()
+    unselected = FundingInstrument(
+        instrument_id=InstrumentId(MarketId(2), Symbol("ETHUSDT")),
+        instrument_key="binance:futures:ETHUSDT",
+        exchange="binance",
+        market_type="futures",
+        status="TRADING",
+        is_tradable=1,
+        base_asset="ETH",
+        quote_asset="USDT",
+        funding_interval_minutes=480,
+        funding_interval_source="test_interval",
+        funding_cap=None,
+        funding_floor=None,
+        updated_at=UtcTimestamp(datetime(2026, 6, 22, 0, 0, tzinfo=timezone.utc)),
+    )
+    source = _Source()
+    writer = _Writer(None)
+    use_case = BackfillFundingRatesUseCase(
+        source=source,
+        writer=writer,
+        universe_store=_Universe([selected, unselected]),
+        clock=_Clock(),
+        tail_lookback_intervals=3,
+        settlement_lag_minutes=10,
+    )
+
+    report = use_case.run_due_instruments(
+        instrument_ids=(selected.instrument_id,),
+    )
+
+    assert report.instruments_total == 1
+    assert [call[0] for call in source.calls] == [selected.instrument_id]

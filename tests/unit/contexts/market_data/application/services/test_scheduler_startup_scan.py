@@ -5,7 +5,7 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from prometheus_client import REGISTRY, CollectorRegistry
 
@@ -28,7 +28,6 @@ from trading.contexts.market_data.application.use_cases import (
     RestCatchUp1mReport,
     RestCatchUp1mUseCase,
     SeedRefMarketUseCase,
-    SyncWhitelistToRefInstrumentsUseCase,
 )
 from trading.shared_kernel.primitives import (
     InstrumentId,
@@ -63,10 +62,14 @@ class _SyncUseCase:
         """Initialize sync invocation counter."""
         self.calls = 0
 
-    def run(self, rows):  # noqa: ANN001
-        """Increment invocation counter and ignore payload details."""
-        _ = rows
+    def run(self):  # noqa: ANN001
+        """Increment invocation counter and return a minimal catalog refresh report."""
         self.calls += 1
+        return type(
+            "_CatalogReport",
+            (),
+            {"markets_total": 1, "instruments_total": 1, "rows_upserted": 1},
+        )()
 
 
 class _EnrichUseCase:
@@ -317,7 +320,7 @@ market_data:
     rest_inter_instrument_delay_s: __REST_INTER_INSTRUMENT_DELAY_S__
   scheduler:
     jobs:
-      sync_whitelist: { interval_seconds: 3600 }
+      refresh_catalog: { interval_seconds: 3600 }
       enrich: { interval_seconds: 3600 }
       rest_insurance_catchup: { interval_seconds: 3600 }
   backfill:
@@ -359,15 +362,14 @@ def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(
         )
 
         seed = _SeedUseCase()
-        sync = _SyncUseCase()
+        catalog_refresh = _SyncUseCase()
         enrich = _EnrichUseCase()
         queue = _RestQueue()
         registry = CollectorRegistry()
         app = MarketDataSchedulerApp(
             config=_config(tmp_path),
-            whitelist_path=str(tmp_path / "missing.csv"),
             seed_use_case=cast(SeedRefMarketUseCase, seed),
-            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, sync),
+            catalog_refresh_use_case=cast(Any, catalog_refresh),
             enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, enrich),
             instrument_reader=_InstrumentReader(),
             index_reader=_IndexReader(),
@@ -379,29 +381,20 @@ def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(
         )
         app._clock = _FixedClock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc)))
 
-        whitelist = tmp_path / "missing.csv"
-        whitelist.write_text("market_id,symbol,is_enabled\n1,BTCUSDT,1\n", encoding="utf-8")
-
         stop_event = asyncio.Event()
         stop_event.set()
 
         await app.run(stop_event)
 
         assert seed.calls == 1
-        assert sync.calls == 1
+        assert catalog_refresh.calls == 1
         assert enrich.calls == 1
         assert queue.started == 1
         assert queue.closed == 1
-        assert len(queue.enqueued) == 2
+        assert len(queue.enqueued) == 1
         reasons = {task.reason for task in queue.enqueued}
-        assert reasons == {"historical_backfill", "scheduler_tail"}
+        assert reasons == {"scheduler_tail"}
         assert app._metrics.scheduler_startup_scan_instruments_total._value.get() == 1
-        assert app._metrics.scheduler_tasks_planned_total.labels(
-            reason="historical_backfill"
-        )._value.get() == 1
-        assert app._metrics.scheduler_tasks_enqueued_total.labels(
-            reason="historical_backfill"
-        )._value.get() == 1
         assert app._metrics.scheduler_tasks_planned_total.labels(reason="scheduler_tail")._value.get() == 1  # noqa: E501
         assert app._metrics.scheduler_tasks_enqueued_total.labels(reason="scheduler_tail")._value.get() == 1  # noqa: E501
         assert "startup_scan: instruments_scanned=1" in caplog.text
@@ -410,12 +403,12 @@ def test_scheduler_runs_startup_scan_once_and_enqueues_tasks(
     asyncio.run(_scenario())
 
 
-def test_scheduler_startup_scan_tail_only_canonical_still_enqueues_historical(
+def test_scheduler_startup_scan_tail_only_canonical_does_not_enqueue_historical(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
     """
-    Ensure startup scan enqueues historical task in tail-only canonical state.
+    Ensure startup scan does not enqueue an unapproved historical range.
 
     Parameters:
     - tmp_path: pytest temporary path fixture.
@@ -434,9 +427,8 @@ def test_scheduler_startup_scan_tail_only_canonical_still_enqueues_historical(
         queue = _RestQueue()
         app = MarketDataSchedulerApp(
             config=_config(tmp_path),
-            whitelist_path=str(tmp_path / "missing.csv"),
             seed_use_case=cast(SeedRefMarketUseCase, _SeedUseCase()),
-            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, _SyncUseCase()),
+            catalog_refresh_use_case=cast(Any, _SyncUseCase()),
             enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, _EnrichUseCase()),
             instrument_reader=_InstrumentReader(),
             index_reader=_TailOnlyIndexReader(),
@@ -448,19 +440,12 @@ def test_scheduler_startup_scan_tail_only_canonical_still_enqueues_historical(
         )
         app._clock = _FixedClock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc)))
 
-        whitelist = tmp_path / "missing.csv"
-        whitelist.write_text("market_id,symbol,is_enabled\n1,BTCUSDT,1\n", encoding="utf-8")
-
         stop_event = asyncio.Event()
         stop_event.set()
 
         await app.run(stop_event)
 
-        reasons = {task.reason for task in queue.enqueued}
-        assert "historical_backfill" in reasons
-        historical = next(task for task in queue.enqueued if task.reason == "historical_backfill")
-        assert str(historical.time_range.start) == "2017-01-01T00:00:00.000Z"
-        assert str(historical.time_range.end) == "2026-02-09T13:50:00.000Z"
+        assert queue.enqueued == []
 
     asyncio.run(_scenario())
 
@@ -489,9 +474,8 @@ def test_scheduler_startup_scan_skips_false_prefix_before_symbol_history_start(
         queue = _RestQueue()
         app = MarketDataSchedulerApp(
             config=_config(tmp_path),
-            whitelist_path=str(tmp_path / "missing.csv"),
             seed_use_case=cast(SeedRefMarketUseCase, _SeedUseCase()),
-            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, _SyncUseCase()),
+            catalog_refresh_use_case=cast(Any, _SyncUseCase()),
             enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, _EnrichUseCase()),
             instrument_reader=_InstrumentReader(),
             index_reader=_TailOnlyIndexReader(),
@@ -509,9 +493,6 @@ def test_scheduler_startup_scan_skips_false_prefix_before_symbol_history_start(
             ),
         )
         app._clock = _FixedClock(UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc)))
-
-        whitelist = tmp_path / "missing.csv"
-        whitelist.write_text("market_id,symbol,is_enabled\n1,BTCUSDT,1\n", encoding="utf-8")
 
         stop_event = asyncio.Event()
         stop_event.set()
@@ -548,9 +529,8 @@ def test_rest_insurance_catchup_runs_for_all_enabled_instruments(
         rest_catchup = _RestCatchUpUseCase()
         app = MarketDataSchedulerApp(
             config=_config(tmp_path),
-            whitelist_path=str(tmp_path / "missing.csv"),
             seed_use_case=cast(SeedRefMarketUseCase, _SeedUseCase()),
-            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, _SyncUseCase()),
+            catalog_refresh_use_case=cast(Any, _SyncUseCase()),
             enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, _EnrichUseCase()),
             instrument_reader=_MultiInstrumentReader(),
             index_reader=_IndexReader(),
@@ -617,9 +597,8 @@ def test_rest_insurance_catchup_applies_configured_inter_instrument_delay(
         rest_catchup = _RestCatchUpUseCase()
         app = MarketDataSchedulerApp(
             config=_config(tmp_path, rest_inter_instrument_delay_s=2.0),
-            whitelist_path=str(tmp_path / "missing.csv"),
             seed_use_case=cast(SeedRefMarketUseCase, _SeedUseCase()),
-            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, _SyncUseCase()),
+            catalog_refresh_use_case=cast(Any, _SyncUseCase()),
             enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, _EnrichUseCase()),
             instrument_reader=_MultiInstrumentReader(),
             index_reader=_IndexReader(),
@@ -663,9 +642,8 @@ def test_rest_insurance_catchup_tracks_skipped_no_seed(
         rest_catchup = _NoSeedRestCatchUpUseCase()
         app = MarketDataSchedulerApp(
             config=_config(tmp_path),
-            whitelist_path=str(tmp_path / "missing.csv"),
             seed_use_case=cast(SeedRefMarketUseCase, _SeedUseCase()),
-            sync_use_case=cast(SyncWhitelistToRefInstrumentsUseCase, _SyncUseCase()),
+            catalog_refresh_use_case=cast(Any, _SyncUseCase()),
             enrich_use_case=cast(EnrichRefInstrumentsFromExchangeUseCase, _EnrichUseCase()),
             instrument_reader=_InstrumentReader(),
             index_reader=_NoSeedIndexReader(),

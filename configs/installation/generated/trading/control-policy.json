@@ -656,7 +656,7 @@
       "restart_allowed": false
     },
     "market-data-scheduler": {
-      "command_sha256": "c8a8cc3d0b74dfe3798c7b3a1aa926ae56489cc796ce769f6e5af97f610fde1a",
+      "command_sha256": "82be987bd376b5aca5acb7e97a291f1088296ed1295b7bb2b957934fe927e4b1",
       "environment_names": [
         "CH_DATABASE",
         "CH_HOST",
@@ -708,8 +708,7 @@
         "./service-configs/indicators.yaml:/etc/roehub/indicators.yaml:ro",
         "./service-configs/market_data.yaml:/etc/roehub/market_data.yaml:ro",
         "runtime-secrets:/run/roehub-secrets:ro",
-        "./service-configs/market-data.yaml:/etc/roehub/market-data.yaml:ro",
-        "./service-configs/whitelist.csv:/etc/roehub/whitelist.csv:ro"
+        "./service-configs/market-data.yaml:/etc/roehub/market-data.yaml:ro"
       ],
       "release_reference": "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "resources": {

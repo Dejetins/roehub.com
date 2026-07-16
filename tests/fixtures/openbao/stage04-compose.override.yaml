@@ -1,0 +1,4 @@
+services:
+  openbao:
+    image: roehub-offline/openbao:0.1.0-8492e2c1a523aac5
+    pull_policy: never

@@ -12,6 +12,9 @@ from trading.contexts.backtest.application.ports import (
     ResearchOrganizationScopeResolver,
 )
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
+from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
+    InstrumentSelectionRecord,
+)
 from trading.contexts.market_data.application.dto.reference_api import (
     BTCUSDTMarketReadinessReport,
     BTCUSDTMarketReadinessRow,
@@ -213,6 +216,44 @@ class _FakeBTCUSDTMarketReadinessUseCase:
     def execute(self) -> BTCUSDTMarketReadinessReport:
         self.calls += 1
         return self._report
+
+
+class _FakeInstrumentSelectionRepository:
+    def __init__(self) -> None:
+        self.selected: set[tuple[int, str]] = set()
+        self.unselect_calls: list[tuple[int, str]] = []
+
+    def list_for_organization(self, *, organization_id: OrganizationId):
+        now = datetime(2027, 1, 15, 8, 0, tzinfo=UTC)
+        return tuple(
+            InstrumentSelectionRecord(
+                organization_id=organization_id,
+                instrument_id=_instrument(market_id, symbol),
+                selected_by_user_id=UserId.from_string(
+                    "00000000-0000-0000-0000-000000000101"
+                ),
+                created_at=now,
+                updated_at=now,
+            )
+            for market_id, symbol in sorted(self.selected)
+        )
+
+    def select(self, *, instrument_id: InstrumentId, **_kwargs) -> None:
+        self.selected.add((instrument_id.market_id.value, str(instrument_id.symbol)))
+
+    def unselect(self, *, instrument_id: InstrumentId, **_kwargs) -> None:
+        key = (instrument_id.market_id.value, str(instrument_id.symbol))
+        self.selected.discard(key)
+        self.unselect_calls.append(key)
+
+    def is_strategy_pinned(self, *, instrument_id: InstrumentId, **_kwargs) -> bool:
+        return str(instrument_id.symbol) == "BTCUSDT"
+
+    def catalog_state(self, **_kwargs) -> str:
+        return "stale"
+
+    def list_history_bounds(self, **_kwargs):
+        return {}
 
 
 def test_get_market_data_markets_returns_enabled_items() -> None:
@@ -489,6 +530,41 @@ def test_get_btcusdt_market_readiness_returns_reference_and_stream_matrix() -> N
     assert payload["items"][0]["stream_name"] == "md.candles.1m.binance:spot:BTCUSDT"
 
 
+def test_catalog_selection_is_scoped_and_unselect_remains_allowed_when_pinned() -> None:
+    selections = _FakeInstrumentSelectionRepository()
+    client, _ = _build_client(
+        list_use_case=_FakeListEnabledMarketsUseCase(rows=()),
+        search_use_case=_FakeSearchEnabledTradableInstrumentsUseCase(
+            rows_by_market={1: (_instrument(1, "BTCUSDT"), _instrument(1, "ETHUSDT"))}
+        ),
+        selection_repository=selections,
+    )
+    headers = {"x-user-id": "00000000-0000-0000-0000-000000000101"}
+
+    selected = client.put("/market-data/selections/1/BTCUSDT", headers=headers)
+    catalog = client.get("/market-data/catalog?market_id=1", headers=headers)
+    unselected = client.delete("/market-data/selections/1/BTCUSDT", headers=headers)
+
+    assert selected.status_code == 200
+    assert catalog.status_code == 200
+    assert catalog.json()["catalog_state"] == "stale"
+    assert catalog.json()["items"][0] == {
+        "market_id": 1,
+        "symbol": "BTCUSDT",
+        "selected": True,
+        "strategy_pinned": True,
+        "effective": True,
+        "coverage_state": "unknown",
+        "coverage_percent": None,
+        "artifact_state": "unavailable",
+        "artifact_bytes": 0,
+    }
+    assert unselected.status_code == 200
+    assert unselected.json()["strategy_pinned"] is True
+    assert unselected.json()["effective"] is True
+    assert selections.unselect_calls == [(1, "BTCUSDT")]
+
+
 def test_market_data_reference_routes_require_authentication() -> None:
     """
     Verify both reference endpoints are auth-protected and return deterministic 401.
@@ -549,6 +625,7 @@ def _build_client(
     search_use_case: _FakeSearchEnabledTradableInstrumentsUseCase,
     btcusdt_readiness_use_case: _FakeBTCUSDTMarketReadinessUseCase | None = None,
     organization_scope_resolver: ResearchOrganizationScopeResolver | None = _ScopeResolver(),
+    selection_repository: _FakeInstrumentSelectionRepository | None = None,
 ) -> tuple[TestClient, _FakeSearchEnabledTradableInstrumentsUseCase]:
     """
     Build FastAPI test client with market-data reference router and shared error handlers.
@@ -595,6 +672,7 @@ def _build_client(
             ),  # type: ignore[arg-type]
             current_user_dependency=_HeaderCurrentUserDependency(),  # type: ignore[arg-type]
             organization_scope_resolver=organization_scope_resolver,
+            instrument_selection_repository=selection_repository,  # type: ignore[arg-type]
         )
     )
     return TestClient(app), search_use_case

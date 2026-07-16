@@ -49,6 +49,7 @@ ASSET_SUFFIXES = {
     ".woff",
     ".woff2",
 }
+_NON_DISTRIBUTION_CONTAINER_SOURCE_PREFIXES = ("tests/fixtures/",)
 
 
 class PolicyError(RuntimeError):
@@ -206,6 +207,8 @@ def _prototype_components(policy: dict[str, Any]) -> list[Component]:
 def _discover_container_images(tracked: list[str]) -> set[str]:
     images: set[str] = set()
     for relative in tracked:
+        if relative.startswith(_NON_DISTRIBUTION_CONTAINER_SOURCE_PREFIXES):
+            continue
         path = Path(relative)
         name = path.name.lower()
         is_dockerfile = name.startswith("dockerfile")

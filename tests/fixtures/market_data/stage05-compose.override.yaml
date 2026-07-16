@@ -1,0 +1,57 @@
+services:
+  api:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  backtest-artifact-publisher:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  backtest-job-runner:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  clickhouse-exporter:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  domain-cli:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  exchange-control:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  exchange-execution:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  job-runtime:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  market-data-scheduler:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  market-data-ws:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  notification-dispatcher:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  notification-report-scheduler:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  operational-health:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  plugin-gateway:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  storage-migrations:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  strategy-live-runner:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  telegram-bot-worker:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+  web:
+    image: roehub-dev/runtime:market-data-stage05
+    pull_policy: never
+    ports: !override
+      - 127.0.0.1:8080:8010

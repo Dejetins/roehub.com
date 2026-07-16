@@ -14,6 +14,10 @@ from .enrich_ref_instruments_from_exchange import (
     EnrichRefInstrumentsReport,
 )
 from .list_enabled_markets import ListEnabledMarketsUseCase
+from .refresh_instrument_catalog_from_exchange import (
+    CatalogRefreshReport,
+    RefreshInstrumentCatalogFromExchangeUseCase,
+)
 from .rest_catchup_1m import RestCatchUp1mReport, RestCatchUp1mUseCase
 from .rest_fill_range_1m import RestFillRange1mUseCase
 from .search_enabled_tradable_instruments import (
@@ -47,6 +51,8 @@ __all__ = [
     "RestCatchUp1mUseCase",
     "RestCatchUp1mReport",
     "RestFillRange1mUseCase",
+    "CatalogRefreshReport",
+    "RefreshInstrumentCatalogFromExchangeUseCase",
     "SearchEnabledTradableInstrumentsUseCase",
     "DEFAULT_INSTRUMENT_SEARCH_LIMIT",
     "MAX_INSTRUMENT_SEARCH_LIMIT",

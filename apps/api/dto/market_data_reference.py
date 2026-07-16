@@ -85,6 +85,34 @@ class MarketDataInstrumentsResponse(BaseModel):
     items: list[MarketDataInstrumentItemResponse]
 
 
+class MarketDataCatalogItemResponse(BaseModel):
+    market_id: int
+    symbol: str
+    selected: bool
+    strategy_pinned: bool
+    effective: bool
+    coverage_state: str
+    coverage_percent: float | None
+    artifact_state: str
+    artifact_bytes: int
+
+
+class MarketDataCatalogResponse(BaseModel):
+    catalog_state: str
+    items: list[MarketDataCatalogItemResponse]
+
+
+class MarketDataSelectionItemResponse(BaseModel):
+    market_id: int
+    symbol: str
+    strategy_pinned: bool
+    effective: bool
+
+
+class MarketDataSelectionsResponse(BaseModel):
+    items: list[MarketDataSelectionItemResponse]
+
+
 class BTCUSDTMarketReadinessItemResponse(BaseModel):
     market_id: int | None
     exchange_name: str

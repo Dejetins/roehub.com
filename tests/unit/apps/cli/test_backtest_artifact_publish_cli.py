@@ -129,6 +129,8 @@ def test_backtest_artifact_publish_cli_forwards_request_and_renders_json(capsys)
             "--symbol",
             "BTCUSDT",
             "--full-rebuild",
+            "--max-source-bars",
+            "20000",
         ]
     )
     stdout = capsys.readouterr().out.strip()
@@ -145,6 +147,7 @@ def test_backtest_artifact_publish_cli_forwards_request_and_renders_json(capsys)
         symbol="BTCUSDT",
     )
     assert fake_use_case.requests[0].full_rebuild is True
+    assert fake_use_case.requests[0].max_source_bars == 20000
     assert payload["publish_mode"] == "full_rebuild"
     assert payload["coordinates"] == {
         "exchange": "binance",

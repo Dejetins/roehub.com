@@ -154,6 +154,14 @@ class RestInstrumentMetadataSource(InstrumentMetadataSource):
                     price_step=price_step,
                     qty_step=qty_step,
                     min_notional=min_notional,
+                    status=(
+                        "ENABLED"
+                        if str(item.get("status", "")).upper() == "TRADING"
+                        else "DISABLED"
+                    ),
+                    is_tradable=(
+                        1 if str(item.get("status", "")).upper() == "TRADING" else 0
+                    ),
                 )
             )
         return out
@@ -240,6 +248,16 @@ class RestInstrumentMetadataSource(InstrumentMetadataSource):
                             lot_filter.get("qtyStep") or lot_filter.get("basePrecision")
                         ),
                         min_notional=min_notional,
+                        status=(
+                            "ENABLED"
+                            if str(item.get("status", "")).strip().lower() == "trading"
+                            else "DISABLED"
+                        ),
+                        is_tradable=(
+                            1
+                            if str(item.get("status", "")).strip().lower() == "trading"
+                            else 0
+                        ),
                     )
                 )
 

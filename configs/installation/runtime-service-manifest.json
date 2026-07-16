@@ -56,6 +56,7 @@
       "internal_port": 8010,
       "health_path": "/health/ready",
       "depends_on": ["api"],
+      "network_access": "web_ingress",
       "resources": {"cpus": 0.5, "memory_mb": 384}
     },
     {
@@ -158,6 +159,7 @@
       "health_path": "/metrics",
       "depends_on": ["clickhouse", "redis", "storage-migrations"],
       "config_mount": "market-data.yaml",
+      "network_access": "market_data_egress",
       "resources": {"cpus": 1.0, "memory_mb": 768}
     },
     {
@@ -167,11 +169,12 @@
       "entrypoints": ["apps/scheduler/market_data_scheduler/main/main.py"],
       "profiles": ["trading", "ml"],
       "image": "runtime",
-      "command": ["python", "-m", "apps.scheduler.market_data_scheduler.main.main", "--config", "/etc/roehub/market-data.yaml", "--whitelist", "/etc/roehub/whitelist.csv", "--metrics-port", "9202"],
+      "command": ["python", "-m", "apps.scheduler.market_data_scheduler.main.main", "--config", "/etc/roehub/market-data.yaml", "--metrics-port", "9202"],
       "internal_port": 9202,
       "health_path": "/metrics",
       "depends_on": ["clickhouse", "redis", "storage-migrations"],
       "config_mount": "market-data.yaml",
+      "network_access": "market_data_egress",
       "resources": {"cpus": 0.75, "memory_mb": 512}
     },
     {

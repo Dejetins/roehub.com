@@ -1,0 +1,63 @@
+{
+  "schema": "io.roehub.market-data-activation.local-runtime-proof/v1",
+  "stage": "05",
+  "proof_boundary": "local_macos_docker_desktop_arm64",
+  "runtime": {
+    "project": "roehub-stage05",
+    "platform": "linux/arm64",
+    "image": "roehub-dev/runtime:market-data-stage05",
+    "image_id": "sha256:c07c059a923f8905887cc0d8534b2ba1d3b74d814f39030356bfb650d263ed90",
+    "compose_config": "passed",
+    "sequential_recreate": "passed",
+    "normal_ingress": "127.0.0.1:8080:8010",
+    "manual_bridge_workaround": false,
+    "permanent_services_running": 24,
+    "secrets_recorded": false,
+    "production_modified": false
+  },
+  "network": {
+    "internal_network_preserved": true,
+    "egress_services": ["market-data-scheduler", "market-data-ws"],
+    "other_workload_egress": false
+  },
+  "readiness": {
+    "evidence": "05-local-runtime-readiness-proof.json",
+    "ready": true,
+    "ws_connected": 1,
+    "ws_messages_total": 390,
+    "insert_rows_total": 2,
+    "ws_errors_total": 0,
+    "insert_errors_total": 0,
+    "rest_fill_errors_total": 0,
+    "scheduler_job_runs_total": 6,
+    "scheduler_job_errors_total": 0,
+    "candle_age_seconds": 55.47897696495056
+  },
+  "artifact": {
+    "coordinates": "binance:futures:BTCUSDT",
+    "max_source_bars": 10080,
+    "current_pointer_sha256": "d9e83f4bc65c44faa9f5cf6b637f086a8705f958a91fb4630398129ac2d40165",
+    "artifact_file_count": 1667,
+    "artifact_bytes": 31367168,
+    "publisher_memory_current_bytes": 336969728,
+    "publisher_memory_peak_bytes": 705806336,
+    "publisher_internal_budget_bytes": 805306368,
+    "publisher_container_limit_bytes": 1073741824,
+    "oom": 0,
+    "oom_kill": 0
+  },
+  "browser": {
+    "route": "http://127.0.0.1:8080/",
+    "onboarding_form_observed": true,
+    "console_errors": 0,
+    "console_warnings": 0,
+    "authenticated_selection_replayed": false,
+    "selection_proof": "Stage 02 browser evidence; selection surface unchanged in Stage 05"
+  },
+  "release_handoff": {
+    "signed_stage22_candidate_rebuilt": false,
+    "original_stage22_stage23_evidence_recertification_required": true,
+    "native_linux_amd64_proven": false,
+    "durable_openbao_owner_custody_completed": false
+  }
+}

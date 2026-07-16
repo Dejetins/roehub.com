@@ -346,7 +346,6 @@ def _render_service_configs(
         "plugin-publisher-keys.json": json_bytes(
             {"contract": "PluginPublisherKeys/v1alpha1", "keys": {}}
         ),
-        "whitelist.csv": templates["whitelist.csv"],
     }
 
 
@@ -390,18 +389,37 @@ def _render_compose(
     if profile == "ml":
         volumes["ml-state"] = {"labels": {"io.roehub.state-owner": "ml-runtime"}}
     volumes.update(observability_volumes())
+    networks: dict[str, Any] = {
+        "roehub": {
+            "internal": True,
+            "labels": {
+                "io.roehub.profile": profile,
+                "io.roehub.trust-boundary": "installation-internal",
+            },
+        }
+    }
+    if any(role.get("network_access") == "market_data_egress" for role in roles):
+        networks["market-data-egress"] = {
+            "internal": False,
+            "labels": {
+                "io.roehub.profile": profile,
+                "io.roehub.trust-boundary": "market-data-egress",
+                "io.roehub.egress-purpose": "public-market-data-only",
+            },
+        }
+    if any(role.get("network_access") == "web_ingress" for role in roles):
+        networks["web-ingress"] = {
+            "internal": False,
+            "labels": {
+                "io.roehub.profile": profile,
+                "io.roehub.trust-boundary": "web-ingress",
+                "io.roehub.ingress-purpose": "host-web-ui-only",
+            },
+        }
     return {
         "name": f"roehub-{profile}",
         "services": services,
-        "networks": {
-            "roehub": {
-                "internal": True,
-                "labels": {
-                    "io.roehub.profile": profile,
-                    "io.roehub.trust-boundary": "installation-internal",
-                }
-            }
-        },
+        "networks": networks,
         "volumes": volumes,
         "x-roehub": {
             "generated": True,
@@ -699,7 +717,7 @@ def _runtime_role_service(
         "cap_drop": ["ALL"],
         "security_opt": ["no-new-privileges:true"],
         "tmpfs": ["/tmp:rw,noexec,nosuid,size=64m", "/run:rw,noexec,nosuid,size=16m"],
-        "networks": ["roehub"],
+        "networks": _role_networks(role),
         "environment": _runtime_environment(profile=profile, config=config),
         "volumes": [
             "./service-config.json:/etc/roehub/service-config.json:ro",
@@ -725,10 +743,6 @@ def _runtime_role_service(
         service["volumes"].append(
             f"./service-configs/{role['config_mount']}:/etc/roehub/{role['config_mount']}:ro"
         )
-        if role["name"] == "market-data-scheduler":
-            service["volumes"].append(
-                "./service-configs/whitelist.csv:/etc/roehub/whitelist.csv:ro"
-            )
     if role["name"] == "api":
         service["volumes"].extend(
             [
@@ -814,6 +828,21 @@ def _runtime_role_service(
     if role["name"] == "web":
         service["ports"] = [f"127.0.0.1:{config['ports']['http']}:8010"]
     return service
+
+
+def _role_networks(role: Mapping[str, Any]) -> list[str]:
+    """Return the exact declared networks for one runtime role."""
+
+    access = str(role.get("network_access", "internal_only"))
+    if access == "internal_only":
+        return ["roehub"]
+    if access == "market_data_egress":
+        return ["roehub", "market-data-egress"]
+    if access == "web_ingress":
+        return ["roehub", "web-ingress"]
+    raise InstallationConfigError(
+        f"runtime role {role['name']} has unsupported network_access: {access}"
+    )
 
 
 def _runtime_environment(*, profile: str, config: dict[str, Any]) -> dict[str, str]:

@@ -153,6 +153,8 @@ same strict sequence:
 
 Default manual mode stays incremental-ready for one explicit symbol root:
 
+Validation boundary: unit checks do not accept this operation alone; execute a local Docker runtime smoke for the selected symbol and verify the active-slot pointer before treating a publish as successful.
+
 ```bash
 uv run python -m apps.cli.main.main backtest-artifact-publish \
   --config configs/prod/backtest_artifacts.yaml \
@@ -178,6 +180,22 @@ uv run python -m apps.cli.main.main backtest-artifact-publish \
   --symbol BTCUSDT \
   --full-rebuild
 ```
+
+Bounded first-publish proof for one explicit target:
+
+```bash
+uv run python -m apps.cli.main.main backtest-artifact-publish \
+  --config configs/prod/backtest_artifacts.yaml \
+  --exchange binance \
+  --market-type futures \
+  --symbol BTCUSDT \
+  --max-source-bars 20000
+```
+
+`--max-source-bars` limits only that manual invocation to the most recent one-minute source
+window. It is not a scheduler default and must not be used to hide a full-catalog rebuild.
+For the standard futures artifact set, use at least `10080` bars: its longest `3d` rollup needs
+a full UTC bucket, while shorter windows may correctly fail before the pointer switch.
 
 CLI result contract returns deterministic diagnostics with:
 

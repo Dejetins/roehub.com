@@ -78,8 +78,9 @@ market_data:
     flush_interval_ms: 250
     max_buffer_rows: 2000
     rest_concurrency_instruments: 2
-    tail_lookback_minutes: 120
+    tail_lookback_minutes: 10080
     rest_inter_instrument_delay_s: 1.0
+    bootstrap_history_lookback_minutes: 10080
 
   live_feed:
     redis_streams:
@@ -96,11 +97,12 @@ market_data:
 
   scheduler:
     jobs:
-      sync_whitelist:
+      refresh_catalog:
         interval_seconds: 60
       enrich:
         interval_seconds: 21600
       rest_insurance_catchup:
+        enabled: false
         interval_seconds: 1800
       funding_rate_catchup:
         enabled: true

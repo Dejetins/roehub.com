@@ -52,6 +52,66 @@ PGP-ключами владельцев и записываются в owner-con
    token `15m` с максимумом `30m`, без `default` policy, и проверяет `renew-self`;
 6. отзывает initial administrative credential.
 
+## Команда владельца для новой установки
+
+Для новой пустой установки используется отдельная идемпотентная команда
+`openbao-owner-init`; она не является verifier и не заменяет историческую
+временную схему `1/1`. Команда принимает ровно три различных **публичных**
+PGP-ключа, проверяет их через GnuPG в одноразовом keyring и передаёт в OpenBao
+параметры `3` shares / threshold `2`.
+
+До запуска владелец создаёт private parent-directory с mode `0700`; сами
+public-key files и output-directory не передаются в чат, Git или CI. Пример
+формы запуска без значений:
+
+```bash
+python -m apps.cli.main.main openbao-owner-init initialize \
+  --address http://127.0.0.1:8200 \
+  --pgp-recipient /secure/openbao/owner-1-public.asc \
+  --pgp-recipient /secure/openbao/owner-2-public.asc \
+  --pgp-recipient /secure/openbao/owner-3-public.asc \
+  --delivery-dir /secure/openbao/owner-custody
+```
+
+Команда выполняется только когда OpenBao возвращает состояние
+`uninitialized`. Она записывает в новый каталог с mode `0700` четыре
+зашифрованных файла mode `0600`: три `unseal-share-*.pgp` и
+`initial-admin.pgp`. Содержимое не печатается. Повторный запуск с тем же
+безопасным delivery-каталогом и состоянием initialized выполняет только
+проверку и возвращает `already_initialized`; если состояние и каталог не
+согласованы, команда останавливается без нового `init`.
+
+Далее владелец расшифровывает material исключительно в своей локальной trusted
+среде, передаёт два разных unseal share непосредственно OpenBao и только после
+успешного unseal запускает выдачу service bootstrap. Initial administrator
+credential передаётся только через regular file mode `0600`:
+
+```bash
+python -m apps.cli.main.main openbao-owner-init provision-services \
+  --address http://127.0.0.1:8200 \
+  --administrator-token-file /secure/openbao/decrypted-initial-admin-token \
+  --delivery-dir /run/roehub-openbao-owner/service-bootstrap
+```
+
+Второй delivery-каталог должен быть isolated tmpfs. В нём лежит отдельная
+пара `role-id` и `wrapped-secret-id` для каждой service identity. Каждый
+`wrapped-secret-id` имеет TTL не более `5m`, одноразово разворачивается только
+в credential bootstrap соответствующего сервиса и монтируется в этот сервис
+отдельно от остальных. Нельзя использовать общий token-файл или общий mount
+для нескольких сервисов. После успешной выдачи команда отзывает initial
+administrator credential.
+
+Команда выдаёт семь статических service identities. `plugin-runtime` намеренно
+не получает общий AppRole: его policy и credential создаются при установке
+конкретного plugin instance для точного
+`organization_id/instance_id` path. Универсальный plugin token нарушил бы
+изоляцию организаций и запрещён.
+
+Если команда после `init` сообщает ошибку доставки, нельзя повторять `init`:
+владелец должен проверить private delivery-parent и состояние OpenBao по
+безопасной локальной процедуре. Ни один из этих файлов не является evidence и
+не прикладывается к тикетам, отчётам или сообщениям.
+
 Одноразовый verifier Stage `08` создаёт три независимых временных PGP keyring,
 получает `3` PGP-зашифрованных shares с threshold `2`, расшифровывает только два
 share в памяти, PGP-расшифровывает начальный administrative credential и

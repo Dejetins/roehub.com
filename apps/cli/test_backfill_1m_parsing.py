@@ -69,3 +69,19 @@ def test_clickhouse_env_loader_parses_values() -> None:
     assert s.password == "p"
     assert s.secure is True
     assert s.verify is False
+
+
+def test_clickhouse_env_loader_reads_file_backed_credential(tmp_path) -> None:
+    credential_path = tmp_path / "clickhouse-credential"
+    marker = "fixture-value"
+    credential_path.write_text(f"{marker}\n", encoding="utf-8")
+
+    settings = ClickHouseSettingsLoader(
+        {
+            "CH_HOST": "ch",
+            "CH_DATABASE": "roehub",
+            "ROEHUB_CLICKHOUSE_PASSWORD_FILE": str(credential_path),
+        }
+    ).load()
+
+    assert settings.password == marker

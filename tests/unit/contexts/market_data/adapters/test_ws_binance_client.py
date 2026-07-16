@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import datetime, timezone
 from uuid import UUID
 
+import pytest
+
 from trading.contexts.market_data.adapters.outbound.clients.binance.ws_client import (
+    _recv_or_stop,
     parse_binance_closed_1m_message,
 )
 from trading.shared_kernel.primitives import MarketId, UtcTimestamp
@@ -20,6 +24,38 @@ class _FixedClock:
     def now(self) -> UtcTimestamp:
         """Return preconfigured fixed timestamp."""
         return self._now_value
+
+
+class _BlockingSocket:
+    """Socket fake that makes cancellation of the pending recv observable."""
+
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+        self.cancelled = asyncio.Event()
+
+    async def recv(self) -> str:
+        self.started.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            self.cancelled.set()
+            raise
+        raise AssertionError("blocking socket recv unexpectedly returned")
+
+
+def test_recv_or_stop_cancels_and_joins_pending_socket_recv() -> None:
+    """A subscription refresh must not leave a failed websocket task behind."""
+
+    async def run() -> None:
+        socket = _BlockingSocket()
+        worker = asyncio.create_task(_recv_or_stop(socket, asyncio.Event()))
+        await socket.started.wait()
+        worker.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await worker
+        assert socket.cancelled.is_set()
+
+    asyncio.run(run())
 
 
 def test_binance_non_closed_update_is_ignored() -> None:
@@ -82,4 +118,3 @@ def test_binance_closed_update_yields_normalized_1m_candle() -> None:
     assert row.candle.ts_open.value.microsecond == 0
     assert row.candle.instrument_id.market_id.value == 1
     assert str(row.candle.instrument_id.symbol) == "BTCUSDT"
-

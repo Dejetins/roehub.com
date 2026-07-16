@@ -130,7 +130,7 @@
   ],
   "areas": [
     {
-      "file_count": 667,
+      "file_count": 671,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -152,7 +152,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 289,
+      "file_count": 291,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -161,7 +161,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 291,
+      "file_count": 293,
       "id": "operations",
       "paths": [
         "infra/",
@@ -174,7 +174,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 127,
+      "file_count": 128,
       "id": "automation",
       "paths": [
         "tools/",
@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 418,
+      "file_count": 426,
       "id": "quality",
       "paths": [
         "tests/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1104,
+      "file_count": 1124,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -306,7 +306,7 @@
       "entrypoints": [
         "apps/cli/main/main.py"
       ],
-      "file_count": 22,
+      "file_count": 23,
       "id": "app:cli",
       "kind": "app",
       "name": "cli",
@@ -519,6 +519,7 @@
       "depends_on": [
         "app:api",
         "app:cli",
+        "context:backtest",
         "context:backtest_artifacts",
         "context:indicators",
         "context:market_data",
@@ -557,7 +558,7 @@
         "apps/web/main/app.py",
         "apps/web/main/main.py"
       ],
-      "file_count": 96,
+      "file_count": 97,
       "id": "app:web",
       "kind": "app",
       "name": "web",
@@ -635,8 +636,11 @@
       "used_by": [
         "app:api",
         "app:migrations",
+        "app:scheduler",
         "context:backtest_artifacts",
-        "worker:backtest_job_runner"
+        "context:market_data",
+        "worker:backtest_job_runner",
+        "worker:market_data_ws"
       ]
     },
     {
@@ -674,6 +678,7 @@
         "app:cli",
         "app:scheduler",
         "context:backtest",
+        "context:market_data",
         "worker:backtest_job_runner",
         "worker:job_runtime"
       ]
@@ -915,6 +920,8 @@
     },
     {
       "depends_on": [
+        "context:backtest",
+        "context:backtest_artifacts",
         "core:shared_kernel"
       ],
       "description": "Получение, нормализация и хранение рыночных данных.",
@@ -939,7 +946,7 @@
         "docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md"
       ],
       "entrypoints": [],
-      "file_count": 95,
+      "file_count": 99,
       "id": "context:market_data",
       "kind": "context",
       "name": "market_data",
@@ -953,9 +960,9 @@
         "src/trading/contexts/market_data/adapters/outbound/config",
         "src/trading/contexts/market_data/adapters/outbound/messaging",
         "src/trading/contexts/market_data/adapters/outbound/messaging/redis",
+        "src/trading/contexts/market_data/adapters/outbound/persistence",
         "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse",
-        "src/trading/contexts/market_data/adapters/outbound/persistence/postgres",
-        "src/trading/contexts/market_data/application/dto"
+        "src/trading/contexts/market_data/adapters/outbound/persistence/postgres"
       ],
       "used_by": [
         "app:api",
@@ -1235,6 +1242,14 @@
         "docs/architecture/platform/data-sources-panels-and-design-system-v1.md",
         "docs/architecture/platform/isolated-job-runtime-v1.md",
         "docs/architecture/platform/plugin-api-v1alpha1.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/00-contract-baseline-and-repair-route.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/01-controlled-egress-and-market-readiness.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/02-user-instrument-selection-and-onboarding.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/03-artifact-capacity-and-first-publish.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/04-openbao-owner-bootstrap-and-credential-isolation.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/05-release-rebuild-local-lifecycle-and-handoff.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/roehub-market-data-activation-and-instrument-selection-v1-stage-ledger.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/00-freeze-current-state-and-contracts.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/01-open-source-license-and-release-governance.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/02-machine-readable-runbooks.md",
@@ -1247,15 +1262,7 @@
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/09-research-context-organization-isolation.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/10-trading-context-organization-isolation.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/11-notification-and-telegram-provider-plugins.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/12-plugin-platform-api-and-sdk.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/13-data-sources-panels-and-design-system.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/14-artifact-store-and-default-bundles.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/15-isolated-job-and-strategy-runtimes.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/16-execution-gateway-and-mainnet-safety.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/17-containerize-all-services-and-profiles.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/18-control-agent-and-roehubctl.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/19-administration-web-ui.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/20-observability-and-operational-actions.md"
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/12-plugin-platform-api-and-sdk.md"
       ],
       "entrypoints": [],
       "file_count": 13,
@@ -1376,6 +1383,7 @@
     {
       "depends_on": [
         "app:cli",
+        "context:backtest",
         "context:market_data",
         "core:platform",
         "core:shared_kernel"
@@ -1786,6 +1794,11 @@
     {
       "kind": "python-import",
       "source": "app:scheduler",
+      "target": "context:backtest"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:scheduler",
       "target": "context:backtest_artifacts"
     },
     {
@@ -1941,6 +1954,16 @@
     {
       "kind": "python-import",
       "source": "context:market_data",
+      "target": "context:backtest"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:market_data",
+      "target": "context:backtest_artifacts"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:market_data",
       "target": "core:shared_kernel"
     },
     {
@@ -2062,6 +2085,11 @@
       "kind": "python-import",
       "source": "worker:market_data_ws",
       "target": "app:cli"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:market_data_ws",
+      "target": "context:backtest"
     },
     {
       "kind": "python-import",
@@ -2996,6 +3024,36 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/agents/generated/rl-trading-agent-platform-v1/22-final-docs-prompt-closure.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/00-contract-baseline-and-repair-route.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/01-controlled-egress-and-market-readiness.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/02-user-instrument-selection-and-onboarding.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/03-artifact-capacity-and-first-publish.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/04-openbao-owner-bootstrap-and-credential-isolation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/05-release-rebuild-local-lifecycle-and-handoff.md"
     },
     {
       "area": "knowledge",
@@ -4418,6 +4476,16 @@
       "path": ".opencode/openai-codex-auth-config.json"
     },
     {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": ".playwright-mcp/page-2026-07-15T21-27-57-496Z.yml"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": ".playwright-mcp/page-2026-07-15T21-29-02-989Z.yml"
+    },
+    {
       "area": "repository-meta",
       "kind": "other",
       "path": ".python-version"
@@ -4966,6 +5034,11 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/cli/commands/local_auth_bootstrap.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/cli/commands/openbao_owner_init.py"
     },
     {
       "area": "delivery",
@@ -5686,6 +5759,11 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/web/templates/fragments/account/limits.html"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/web/templates/fragments/account/market_data.html"
     },
     {
       "area": "delivery",
@@ -9475,6 +9553,76 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/00-contract-baseline-and-repair-route.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/01-controlled-egress-and-market-readiness.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/02-user-instrument-selection-and-onboarding.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/03-artifact-capacity-and-first-publish.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/04-openbao-owner-bootstrap-and-credential-isolation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/05-release-rebuild-local-lifecycle-and-handoff.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/01-market-readiness-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/02-market-data-selection-runtime-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/03-artifact-capacity-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/04-openbao-owner-bootstrap-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/05-local-runtime-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/05-local-runtime-readiness-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/roehub-market-data-activation-and-instrument-selection-v1-stage-ledger.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/00-freeze-current-state-and-contracts.md"
     },
     {
@@ -10434,6 +10582,11 @@
     },
     {
       "area": "operations",
+      "kind": "python",
+      "path": "infra/openbao/owner_init.py"
+    },
+    {
+      "area": "operations",
       "kind": "other",
       "path": "infra/openbao/policies/roehub-api.hcl"
     },
@@ -10651,6 +10804,11 @@
       "area": "operations",
       "kind": "migration",
       "path": "migrations/postgres/0021_control_operation_audit_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0022_market_data_instrument_selections_v1.sql"
     },
     {
       "area": "operations",
@@ -13435,6 +13593,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/artifact_inventory_reader.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/__init__.py"
     },
     {
@@ -13480,6 +13643,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/instrument_coverage_reader.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py"
     },
     {
@@ -13506,6 +13674,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/gateway.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/instrument_selection_repository.py"
     },
     {
       "area": "domain",
@@ -13751,6 +13924,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/market_data/application/use_cases/list_enabled_markets.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/use_cases/refresh_instrument_catalog_from_exchange.py"
     },
     {
       "area": "domain",
@@ -15085,12 +15263,27 @@
     {
       "area": "quality",
       "kind": "configuration",
+      "path": "tests/fixtures/market_data/stage02-compose.override.yaml"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/market_data/stage05-compose.override.yaml"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
       "path": "tests/fixtures/observability-runtime-override.yaml"
     },
     {
       "area": "quality",
       "kind": "configuration",
       "path": "tests/fixtures/observability-stale-override.yaml"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/openbao/stage04-compose.override.yaml"
     },
     {
       "area": "quality",
@@ -15391,6 +15584,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/cli/test_openbao_owner_init_cli.py"
     },
     {
       "area": "quality",
@@ -16315,6 +16513,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_instrument_coverage_reader.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_raw_kline_writer.py"
     },
     {
@@ -16346,6 +16549,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/contexts/market_data/adapters/test_postgres_candle_repair_audit_repository.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/market_data/adapters/test_postgres_instrument_selection_repository.py"
     },
     {
       "area": "quality",
@@ -16790,6 +16998,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/infra/test_openbao_owner_init.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/infra/test_prod_compose_files.py"
     },
     {
@@ -17066,6 +17279,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/tools/test_runtime_license_audit.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_verify_market_data_readiness.py"
     },
     {
       "area": "automation",
@@ -17350,6 +17568,11 @@
     {
       "area": "automation",
       "kind": "python",
+      "path": "tools/release/verify_market_data_readiness.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
       "path": "tools/release/verify_observability_runtime.py"
     },
     {
@@ -17373,7 +17596,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3040,
+  "inventory_file_count": 3079,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17590,5 +17813,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "6f73c7e8e1648f912bbb682b72b77455f5b5caf2ab12e24e38952a26ebf4a6a9"
+  "structural_digest": "c7bb8ceacee6f7d81012f55677129c01c8dfb19b7c570e35206d99847aa44ec0"
 }

@@ -34,6 +34,7 @@ from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_en
 from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2Request,
     PublishBacktestArtifactsV2UseCase,
+    publish_backtest_artifacts_v2,
 )
 from trading.contexts.market_data.application.ports.stores import DailyTsOpenCount
 from trading.contexts.market_data.application.ports.stores.funding_rate_coverage_reader import (
@@ -44,6 +45,32 @@ from trading.contexts.market_data.application.ports.stores.funding_rate_coverage
 from trading.shared_kernel.primitives import InstrumentId, TimeRange, UtcTimestamp
 
 _PUBLISH_NOW_UTC_V2 = datetime(2026, 3, 29, 12, 0, tzinfo=timezone.utc)
+
+
+def test_manual_source_window_limits_the_oldest_one_minute_bar() -> None:
+    bounded = publish_backtest_artifacts_v2._limit_requested_time_range_v2(
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime(2026, 3, 1, 0, 0, tzinfo=timezone.utc)),
+            end=UtcTimestamp(datetime(2026, 3, 2, 0, 0, tzinfo=timezone.utc)),
+        ),
+        max_source_bars=60,
+    )
+
+    assert bounded.start.value == datetime(2026, 3, 1, 23, 0, tzinfo=timezone.utc)
+    assert bounded.end.value == datetime(2026, 3, 2, 0, 0, tzinfo=timezone.utc)
+
+
+def test_manual_source_window_rejects_non_integer_limit() -> None:
+    """Ensure the memory guard cannot be bypassed by a non-integer DTO value."""
+    with pytest.raises(ValueError, match="max_source_bars must be > 0"):
+        PublishBacktestArtifactsV2Request(
+            coordinates=ArtifactCoordinatesV2(
+                exchange="binance",
+                market_type="futures",
+                symbol="BTCUSDT",
+            ),
+            max_source_bars=cast(int, "100"),
+        )
 
 
 @dataclass(slots=True)

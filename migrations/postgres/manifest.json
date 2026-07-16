@@ -99,6 +99,13 @@
       "files": [
         {"path": "0021_control_operation_audit_v1.sql", "sha256": "71178ba2b6c8f5aeba1dc522111ccb016fa4d7b4d6e28c67453092398e7dd988"}
       ]
+    },
+    {
+      "version": "market-data-selections-0022",
+      "sha256": "3aa63cf619a518e26559f12b5b4ee3b37e560b275c12851b4107a9de74e26814",
+      "files": [
+        {"path": "0022_market_data_instrument_selections_v1.sql", "sha256": "82a9d30383e73e2ad44da7cfddbb75eb9b84537b9c4c19cadcd725f464a38495"}
+      ]
     }
   ]
 }

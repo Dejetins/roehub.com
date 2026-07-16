@@ -70,6 +70,7 @@ class BacktestArtifactPublishCliArgs:
     market_type: str
     symbol: str
     full_rebuild: bool
+    max_source_bars: int | None
     report_format: str
 
     def to_request(self) -> PublishBacktestArtifactsV2Request:
@@ -99,6 +100,7 @@ class BacktestArtifactPublishCliArgs:
                 symbol=self.symbol,
             ),
             full_rebuild=self.full_rebuild,
+            max_source_bars=self.max_source_bars,
         )
 
 
@@ -237,12 +239,16 @@ class BacktestArtifactPublishCli:
             raise ValueError("--market-type must be non-empty")
         if not symbol:
             raise ValueError("--symbol must be non-empty")
+        max_source_bars = ns.max_source_bars
+        if max_source_bars is not None and max_source_bars <= 0:
+            raise ValueError("--max-source-bars must be > 0")
         return BacktestArtifactPublishCliArgs(
             config=config,
             exchange=exchange,
             market_type=market_type,
             symbol=symbol,
             full_rebuild=bool(ns.full_rebuild),
+            max_source_bars=max_source_bars,
             report_format=str(ns.report_format),
         )
 
@@ -283,6 +289,15 @@ def _build_parser() -> argparse.ArgumentParser:
         "--full-rebuild",
         action="store_true",
         help="Disable inactive-slot reuse and force a full rebuild before publish",
+    )
+    parser.add_argument(
+        "--max-source-bars",
+        type=int,
+        default=None,
+        help=(
+            "Limit this explicit manual publish to the newest N one-minute source bars; "
+            "scheduled publishes remain unbounded"
+        ),
     )
     parser.add_argument(
         "--report-format",

@@ -4,8 +4,8 @@ backtest_artifacts:
     max_open_timeframe_sessions: 1
     signal_chunk_rows_max: 256
     signal_chunk_rows_min: 32
-    signal_worker_memory_budget_bytes: 2147483648
-    signal_worker_processes: 4
+    signal_worker_memory_budget_bytes: 805306368
+    signal_worker_processes: 1
   hit_times_grid:
     sl_levels_pct:
     - 0.5
@@ -165,6 +165,7 @@ backtest_artifacts:
     price_tail_bars_1m: 20000
     signal_tail_bars_1m: 20000
   publish_schedule:
+    enabled: false
     full_rebuild_hour_utc: 2
     full_rebuild_minute_utc: 0
   slot_policy:

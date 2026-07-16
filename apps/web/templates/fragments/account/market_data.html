@@ -1,0 +1,47 @@
+<section
+  class="terminal-panel settings-panel market-data-settings"
+  data-market-data-settings
+  data-markets-endpoint="/api/market-data/markets"
+  data-catalog-endpoint="/api/market-data/catalog"
+  data-selections-endpoint="/api/market-data/selections"
+>
+  <header class="panel-heading market-data-settings__heading">
+    <div>
+      <h2>{{ t("market_data.settings.title") }}</h2>
+      <p>{{ t("market_data.settings.description") }}</p>
+    </div>
+    <output class="settings-pill" data-market-data-catalog-state aria-live="polite">{{ t("settings.loading") }}</output>
+  </header>
+
+  <form class="market-data-settings__controls" data-market-data-search-form>
+    <label>
+      <span>{{ t("market_data.settings.market") }}</span>
+      <select data-market-data-market aria-label="{{ t('market_data.settings.market') }}"></select>
+    </label>
+    <label>
+      <span>{{ t("market_data.settings.search") }}</span>
+      <input type="search" maxlength="64" autocomplete="off" data-market-data-search>
+    </label>
+    <button class="rh-button rh-button--primary rh-button--compact" type="submit">{{ t("market_data.settings.search_action") }}</button>
+  </form>
+
+  <p class="market-data-settings__hint">{{ t("market_data.settings.hint") }}</p>
+  <p class="market-data-settings__status" data-market-data-status role="status" aria-live="polite"></p>
+
+  <div class="settings-table-wrap market-data-settings__table-wrap">
+    <table class="settings-table market-data-settings__table">
+      <thead>
+        <tr>
+          <th>{{ t("market_data.settings.symbol") }}</th>
+          <th>{{ t("market_data.settings.collection") }}</th>
+          <th>{{ t("market_data.settings.coverage") }}</th>
+          <th>{{ t("market_data.settings.artifact_size") }}</th>
+          <th><span class="visually-hidden">{{ t("market_data.settings.action") }}</span></th>
+        </tr>
+      </thead>
+      <tbody data-market-data-catalog>
+        <tr><td colspan="5">{{ t("settings.loading") }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>

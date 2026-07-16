@@ -116,6 +116,8 @@ class ExchangeInstrumentMetadata:
     price_step: float | None
     qty_step: float | None
     min_notional: float | None
+    status: str = "ENABLED"
+    is_tradable: int = 1
 
     def __post_init__(self) -> None:
         """
@@ -147,6 +149,10 @@ class ExchangeInstrumentMetadata:
             raise ValueError("ExchangeInstrumentMetadata.qty_step must be > 0")
         if self.min_notional is not None and self.min_notional <= 0:
             raise ValueError("ExchangeInstrumentMetadata.min_notional must be > 0")
+        if self.status not in {"ENABLED", "DISABLED"}:
+            raise ValueError("ExchangeInstrumentMetadata.status must be ENABLED or DISABLED")
+        if self.is_tradable not in {0, 1}:
+            raise ValueError("ExchangeInstrumentMetadata.is_tradable must be 0 or 1")
 
 
 @dataclass(frozen=True, slots=True)

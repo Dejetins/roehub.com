@@ -13,6 +13,7 @@ from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
     ClickHouseSettingsLoader,
     _clickhouse_client,
 )
+from trading.contexts.backtest.adapters.outbound import PsycopgBacktestPostgresGateway
 from trading.contexts.market_data.adapters.outbound.clients.binance import (
     BinanceWsClosedCandleStream,
     BinanceWsHooks,
@@ -41,12 +42,17 @@ from trading.contexts.market_data.adapters.outbound.messaging.redis import (
 )
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseCanonicalCandleIndexReader,
-    ClickHouseEnabledInstrumentReader,
     ClickHouseRawKlineWriter,
     ThreadLocalClickHouseConnectGateway,
 )
+from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
+    PostgresInstrumentSelectionRepository,
+)
 from trading.contexts.market_data.application.dto import CandleWithMeta, RestFillTask
 from trading.contexts.market_data.application.ports.feeds import LiveCandlePublisher
+from trading.contexts.market_data.application.ports.stores.enabled_instrument_reader import (
+    EnabledInstrumentReader,
+)
 from trading.contexts.market_data.application.services import (
     AsyncRawInsertBuffer,
     AsyncRestFillQueue,
@@ -389,7 +395,7 @@ class MarketDataWsApp:
         self,
         *,
         config: MarketDataRuntimeConfig,
-        instrument_reader: ClickHouseEnabledInstrumentReader,
+        instrument_reader: EnabledInstrumentReader,
         index_reader: ClickHouseCanonicalCandleIndexReader,
         insert_buffer: AsyncRawInsertBuffer,
         rest_fill_queue: AsyncRestFillQueue,
@@ -399,6 +405,7 @@ class MarketDataWsApp:
         ingest_id: UUID,
         metrics: MarketDataWsMetrics,
         metrics_port: int,
+        subscription_refresh_seconds: float = 15.0,
     ) -> None:
         """
         Validate and store worker runtime dependencies.
@@ -420,6 +427,8 @@ class MarketDataWsApp:
         """
         if metrics_port <= 0:
             raise ValueError("metrics_port must be > 0")
+        if subscription_refresh_seconds <= 0:
+            raise ValueError("subscription_refresh_seconds must be > 0")
         if live_candle_publisher is None:  # type: ignore[truthy-bool]
             raise ValueError("live_candle_publisher must be provided")
         self._config = config
@@ -433,6 +442,7 @@ class MarketDataWsApp:
         self._ingest_id = ingest_id
         self._metrics = metrics
         self._metrics_port = metrics_port
+        self._subscription_refresh_seconds = subscription_refresh_seconds
 
     async def run(self, stop_event: asyncio.Event) -> None:
         """
@@ -461,24 +471,72 @@ class MarketDataWsApp:
         await self._insert_buffer.start()
         await self._rest_fill_queue.start()
 
-        plans = self._build_connection_plans(self._instrument_reader.list_enabled_tradable())
-        ws_tasks = [
-            asyncio.create_task(
-                self._run_plan(plan, stop_event),
-                name=f"ws-{plan.market.market_id.value}",
+        ws_tasks: dict[tuple[int, tuple[str, ...]], asyncio.Task[None]] = {}
+        try:
+            while not stop_event.is_set():
+                plans = self._build_connection_plans(
+                    self._instrument_reader.list_enabled_tradable()
+                )
+                desired = {
+                    self._plan_key(plan): plan
+                    for plan in plans
+                }
+                needs_refresh = set(ws_tasks) != set(desired) or any(
+                    task.done() for task in ws_tasks.values()
+                )
+                if needs_refresh:
+                    await self._replace_subscription_tasks(
+                        ws_tasks=ws_tasks,
+                        plans=desired,
+                        stop_event=stop_event,
+                    )
+                    ws_tasks = {
+                        key: asyncio.create_task(
+                            self._run_plan(plan, stop_event),
+                            name=f"ws-{plan.market.market_id.value}-{'-'.join(plan.symbols)}",
+                        )
+                        for key, plan in desired.items()
+                    }
+                    if not ws_tasks:
+                        log.info("no enabled instruments yet; waiting for subscription refresh")
+                try:
+                    await asyncio.wait_for(
+                        stop_event.wait(), timeout=self._subscription_refresh_seconds
+                    )
+                except TimeoutError:
+                    continue
+        finally:
+            log.info("worker shutdown requested")
+            await self._replace_subscription_tasks(
+                ws_tasks=ws_tasks,
+                plans={},
+                stop_event=stop_event,
             )
-            for plan in plans
-        ]
+            await self._insert_buffer.close()
+            await self._rest_fill_queue.close()
 
-        if not ws_tasks:
-            log.warning("no enabled instruments found; worker will stay idle until shutdown")
+    @staticmethod
+    def _plan_key(plan: WorkerConnectionPlan) -> tuple[int, tuple[str, ...]]:
+        """Return the stable identity of one websocket subscription plan."""
 
-        await stop_event.wait()
-        log.info("worker shutdown requested")
+        return (plan.market.market_id.value, plan.symbols)
 
-        await asyncio.gather(*ws_tasks, return_exceptions=True)
-        await self._insert_buffer.close()
-        await self._rest_fill_queue.close()
+    async def _replace_subscription_tasks(
+        self,
+        *,
+        ws_tasks: Mapping[tuple[int, tuple[str, ...]], asyncio.Task[None]],
+        plans: Mapping[tuple[int, tuple[str, ...]], WorkerConnectionPlan],
+        stop_event: asyncio.Event,
+    ) -> None:
+        """Cancel obsolete stream tasks before a refreshed subscription set starts."""
+
+        _ = plans
+        _ = stop_event
+        for task in ws_tasks.values():
+            if not task.done():
+                task.cancel()
+        if ws_tasks:
+            await asyncio.gather(*ws_tasks.values(), return_exceptions=True)
 
     def _build_connection_plans(
         self,
@@ -691,10 +749,7 @@ def build_market_data_ws_app(
         gateway=gateway,
         database=clickhouse_settings.database,
     )
-    instrument_reader = ClickHouseEnabledInstrumentReader(
-        gateway=gateway,
-        database=clickhouse_settings.database,
-    )
+    instrument_reader = _effective_instrument_reader(environ=environ)
     metrics = MarketDataWsMetrics()
     clock = SystemClock()
     ingest_id = uuid4()
@@ -804,6 +859,17 @@ def build_market_data_ws_app(
         ingest_id=ingest_id,
         metrics=metrics,
         metrics_port=metrics_port,
+    )
+
+
+def _effective_instrument_reader(
+    *, environ: Mapping[str, str]
+) -> PostgresInstrumentSelectionRepository:
+    dsn = environ.get("STRATEGY_PG_DSN", "").strip()
+    if not dsn:
+        raise ValueError("STRATEGY_PG_DSN is required for effective instrument selections")
+    return PostgresInstrumentSelectionRepository(
+        gateway=PsycopgBacktestPostgresGateway(dsn=dsn)
     )
 
 

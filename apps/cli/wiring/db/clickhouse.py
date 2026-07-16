@@ -77,7 +77,17 @@ class ClickHouseSettingsLoader:
 
         # алиасы: CH_* приоритетнее, потом CLICKHOUSE_*
         user = pick("CH_USER", "CLICKHOUSE_USER", default="default")
-        password = pick("CH_PASSWORD", "CLICKHOUSE_PASSWORD", default="")
+        password = (
+            pick("CH_PASSWORD", "CLICKHOUSE_PASSWORD", default="")
+            or _read_optional_credential_file(
+                pick(
+                    "ROEHUB_CLICKHOUSE_PASSWORD_FILE",
+                    "CH_PASSWORD_FILE",
+                    "CLICKHOUSE_PASSWORD_FILE",
+                    default="",
+                )
+            )
+        )
 
         # ВАЖНО: по умолчанию используем market_data (ваш DDL),
         # не берём CLICKHOUSE_DB автоматически, чтобы не уехать в 'roehub'.
@@ -165,3 +175,17 @@ def _read_env_file(path: Path) -> dict[str, str]:
         if key:
             out[key] = val
     return out
+
+
+def _read_optional_credential_file(path_value: str) -> str:
+    """Read a configured credential file without copying it into the environment."""
+    if not path_value:
+        return ""
+    path = Path(path_value)
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except OSError as error:
+        raise ValueError(f"ClickHouse credential file is unreadable: {path}") from error
+    if not value:
+        raise ValueError(f"ClickHouse credential file is empty: {path}")
+    return value
