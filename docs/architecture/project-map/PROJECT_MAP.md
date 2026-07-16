@@ -2,7 +2,7 @@
 
 Этот документ — человекочитаемое представление единой карты проекта. Машиночитаемый источник для агентов — [`project-map.json`](project-map.json), семантический каталог — [`project-map.toml`](project-map.toml), правила использования — [`AGENT_GUIDE.md`](AGENT_GUIDE.md).
 
-Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `c7bb8ceacee6f7d81012f55677129c01c8dfb19b7c570e35206d99847aa44ec0`; учтено файлов: **3079**.
+Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `479226cca136fb25b5a584d4b6ce9e5b60d623e664878d0c5c2a302ee10c930f`; учтено файлов: **3074**.
 
 ## Визуальная runtime-карта
 
@@ -295,7 +295,7 @@ flowchart TB
 | `domain` | Доменные контексты | Бизнес-правила и use cases по bounded contexts. | 671 | `src/trading/contexts/` |
 | `shared-core` | Shared kernel и платформа | Общие типы, конфигурация, ошибки, интеграционные и производительные примитивы. | 36 | `src/trading/__init__.py`, `src/trading/shared_kernel/`, `src/trading/platform/`, `src/trading/integration/`, `src/trading/fastpath/` |
 | `delivery` | Приложения и delivery | HTTP, HTML, CLI, workers, schedulers, migrations и composition roots. | 291 | `apps/` |
-| `operations` | Инфраструктура и эксплуатация | Docker, macOS runtime, edge, monitoring, конфигурация и миграции данных. | 293 | `infra/`, `configs/`, `migrations/`, `alembic/`, `.github/workflows/` |
+| `operations` | Инфраструктура и эксплуатация | Docker, macOS runtime, edge, monitoring, конфигурация и миграции данных. | 290 | `infra/`, `configs/`, `migrations/`, `alembic/`, `.github/workflows/` |
 | `automation` | Инструменты и автоматизация | Операторские скрипты, генераторы, CI helpers, загрузчики и notebooks. | 128 | `tools/`, `scripts/`, `data_load/`, `notebooks/` |
 | `quality` | Проверки и тестовые данные | Unit, integration, notebook и performance-smoke проверки, fixtures и typings. | 426 | `tests/`, `fixtures/`, `typings/` |
 | `knowledge` | Документация и агентные контракты | Архитектура, runbooks, планы, правила агентов и индекс проекта. | 1124 | `docs/`, `.codex/`, `AGENTS.md`, `README.md` |

@@ -161,7 +161,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 293,
+      "file_count": 290,
       "id": "operations",
       "paths": [
         "infra/",
@@ -4476,16 +4476,6 @@
       "path": ".opencode/openai-codex-auth-config.json"
     },
     {
-      "area": "repository-root",
-      "kind": "configuration",
-      "path": ".playwright-mcp/page-2026-07-15T21-27-57-496Z.yml"
-    },
-    {
-      "area": "repository-root",
-      "kind": "configuration",
-      "path": ".playwright-mcp/page-2026-07-15T21-29-02-989Z.yml"
-    },
-    {
       "area": "repository-meta",
       "kind": "other",
       "path": ".python-version"
@@ -6397,11 +6387,6 @@
     },
     {
       "area": "operations",
-      "kind": "other",
-      "path": "configs/installation/generated/base/service-configs/whitelist.csv"
-    },
-    {
-      "area": "operations",
       "kind": "configuration",
       "path": "configs/installation/generated/ml/compose.yaml"
     },
@@ -6532,11 +6517,6 @@
     },
     {
       "area": "operations",
-      "kind": "other",
-      "path": "configs/installation/generated/ml/service-configs/whitelist.csv"
-    },
-    {
-      "area": "operations",
       "kind": "configuration",
       "path": "configs/installation/generated/trading/compose.yaml"
     },
@@ -6664,11 +6644,6 @@
       "area": "operations",
       "kind": "configuration",
       "path": "configs/installation/generated/trading/service-configs/strategy.yaml"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "configs/installation/generated/trading/service-configs/whitelist.csv"
     },
     {
       "area": "operations",
@@ -17596,7 +17571,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3079,
+  "inventory_file_count": 3074,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17813,5 +17788,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "c7bb8ceacee6f7d81012f55677129c01c8dfb19b7c570e35206d99847aa44ec0"
+  "structural_digest": "479226cca136fb25b5a584d4b6ce9e5b60d623e664878d0c5c2a302ee10c930f"
 }
