@@ -161,7 +161,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 291,
+      "file_count": 288,
       "id": "operations",
       "paths": [
         "infra/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1148,
+      "file_count": 1057,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -2217,11 +2217,6 @@
     },
     {
       "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/agents/architect.toml"
-    },
-    {
-      "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/agents/generated/README.md"
     },
@@ -3538,26 +3533,6 @@
     {
       "area": "knowledge",
       "kind": "configuration",
-      "path": ".codex/agents/promt_manager.toml"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/promt_temlate.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/agents/software_engineer.toml"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/stage_execution_ledger_template.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
       "path": ".codex/hooks.json"
     },
     {
@@ -3568,367 +3543,7 @@
     {
       "area": "knowledge",
       "kind": "python",
-      "path": ".codex/hooks/hook_observe_report.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
       "path": ".codex/hooks/roehub_hook_router.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/01_pretool_secret_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/02_pretool_macstudio_runtime_git_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/03_pretool_macstudio_checkout_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/04_pretool_playwright_floating_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/05_pretool_playwright_pinned_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/06_posttool_prompt_pack_missing_anchors.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/07_stop_cold_head_first_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/08_stop_cold_head_repeated_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/09_posttool_skill_frontmatter_warning.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/10_pretool_destructive_root_rm_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/11_pretool_tmp_rm_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/12_posttool_architecture_doc_warning.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/13_posttool_validation_depth_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/14_pretool_secret_env_placeholder_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/15_posttool_browser_tests_only_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/16_pretool_apply_patch_negative_examples_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/17_pretool_execpolicy_negative_dry_run_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/18_pretool_pnpm_playwright_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/19_posttool_prompt_browser_auth_missing_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/20_posttool_prompt_browser_auth_present_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/21_stop_cold_head_structured_receipt_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/22_stop_cold_head_unstructured_mention_blocks.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/23_stop_architecture_discussion_no_artifact_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/24_pretool_ssh_clickhouse_inline_query_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/25_pretool_ssh_clickhouse_stdin_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/26_pretool_ssh_inline_json_curl_warn.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/27_posttool_secret_assignment_tool_response_warn.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/28_posttool_raw_jwt_tool_response_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/29_posttool_docs_index_warning.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/30_posttool_performance_claim_missing_evidence_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/31_posttool_performance_claim_with_evidence_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/32_pretool_stage_branch_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/33_pretool_branch_create_without_approval_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/34_pretool_branch_create_with_approval_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/35_posttool_prompt_stage_branch_policy_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/36_posttool_prompt_pack_multiple_branch_names_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/37_posttool_prompt_pack_single_branch_policy_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/38_pretool_git_branch_show_current_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/39_posttool_prompt_codex_path_no_branch_policy_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/40_pretool_worktree_without_approval_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/41_pretool_worktree_with_approval_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/42_pretool_stage_branch_worktree_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/43_posttool_runtime_proof_boundary_missing_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/44_posttool_runtime_proof_boundary_split_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/45_posttool_runtime_readonly_smoke_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/46_stop_cold_head_russian_human_receipt_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/47_stop_russian_language_mixed_stage_report_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/48_stop_russian_language_stage_report_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/49_stop_russian_language_memory_citation_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/50_pretool_git_add_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/51_pretool_git_add_explicit_path_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/52_pretool_git_commit_all_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/53_pretool_git_diff_cached_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/54_pretool_git_add_root_pathspec_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/55_pretool_git_add_dashdash_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/56_pretool_git_add_update_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/57_pretool_git_commit_amend_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/58_pretool_grep_forbidden_git_text_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/59_pretool_bash_lc_git_add_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/60_pretool_git_commit_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/61_pretool_git_restore_staged_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/62_pretool_git_commit_without_review_marker_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/63_pretool_git_commit_with_review_marker_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/64_pretool_git_push_without_review_marker_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/65_pretool_git_push_with_review_marker_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/66_pretool_sudo_git_add_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/67_pretool_env_i_git_add_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/68_pretool_git_restore_staged_path_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/69_pretool_xargs_git_add_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/70_posttool_prompt_pack_execution_missing_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/71_posttool_prompt_pack_execution_stage_ledger_missing_block.json"
     },
     {
       "area": "knowledge",
@@ -3939,16 +3554,6 @@
       "area": "knowledge",
       "kind": "python",
       "path": ".codex/hooks/validators/__init__.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/architecture_doc_linter.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/branch_workflow_guard.py"
     },
     {
       "area": "knowledge",
@@ -3968,46 +3573,6 @@
     {
       "area": "knowledge",
       "kind": "python",
-      "path": ".codex/hooks/validators/docs_index_drift_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/macstudio_path_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/performance_evidence_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/playwright_wrapper_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/prompt_pack_branch_policy_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/prompt_pack_stage_ledger_linter.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/remote_payload_quoting_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/runtime_proof_boundary_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
       "path": ".codex/hooks/validators/russian_final_answer_guard.py"
     },
     {
@@ -4019,26 +3584,6 @@
       "area": "knowledge",
       "kind": "python",
       "path": ".codex/hooks/validators/secret_redaction_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/skill_lint_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/validation_depth_linter.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/promt_template.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/rules/roehub.rules"
     },
     {
       "area": "knowledge",
@@ -4474,21 +4019,6 @@
       "area": "operations",
       "kind": "configuration",
       "path": ".github/workflows/ci.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": ".github/workflows/deploy-backend.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": ".github/workflows/deploy-web.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": ".github/workflows/exchange-connection-cleanup-ops.yml"
     },
     {
       "area": "operations",
@@ -17696,7 +17226,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3099,
+  "inventory_file_count": 3005,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17913,5 +17443,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "3230e28de0a6aaf04564082a2925f6d490d682e484d9647aaa1bf06a3498e308"
+  "structural_digest": "583f57964bd63bce832d4038bab5ab774e37f99f31abb78426973d20dab17761"
 }
