@@ -1,18 +1,20 @@
 # Skill/Plugin Auto-Improve Benchmark v1
 
-Статус: `draft execution plan`.
+Статус: `historical benchmark; execution retired`.
 
 Дата: 2026-07-07.
 
-Пакет исполнения:
+Исторический пакет исполнения:
 
 - `plan_doc`: `docs/architecture/agents/skill-plugin-auto-improve-benchmark-v1.md`
 - `prompt_pack_dir`: `.codex/agents/generated/skill-plugin-auto-improve-benchmark-v1/`
 - `stage_ledger`: `docs/architecture/agents/skill-plugin-auto-improve-benchmark-v1-stage-reports/skill-plugin-auto-improve-benchmark-v1-stage-ledger.md`
-- `execution_mode`: `goal_driven`
+- `execution_mode`: `superseded`
 - intended_agent_model: `gpt-5.5`
 - reasoning_effort: `xhigh`
-- Codex Goal mode: разрешен как режим поверх трех артефактов выше. Отдельный `GOAL.md` не нужен.
+- Этот пакет не выбирает текущую работу и не разрешает Goal. Используйте
+  глобальный delivery contract и current ticket; ссылки ниже сохранены только
+  как benchmark evidence.
 
 ## Цель
 
@@ -90,7 +92,7 @@ snapshot, но Stage `01` должен пометить это как residual r
 
 - изменение production runtime Roehub;
 - изменение public API, persistence, ClickHouse/Postgres schema, browser UI,
-  deploy pipeline или Mac Studio runtime;
+  deploy pipeline или retired-host runtime;
 - установка внешних сервисов или отправка секретов наружу;
 - автоматический `git commit`, `push`, branch, worktree или stash;
 - массовое переписывание всех skills/plugins без target manifest;
@@ -237,7 +239,7 @@ Raw local state under `.codex/tmp/` must not be committed.
 
 | Surface | Решение |
 |---|---|
-| Roehub runtime / deploy | `N/A`: план не меняет production services, Mac Studio runtime, API, UI, workers или deploy workflow. |
+| Roehub runtime / deploy | `N/A`: план не меняет production services, retired-host runtime, API, UI, workers или deploy workflow. |
 | Service calls | `N/A` для Roehub продукта. Clean-context Codex subagents используются как evaluator boundary, но Python harness не вызывает external LLM APIs по умолчанию. |
 | Auth/secrets | `N/A` для product auth. Секреты, tokens, cookies, raw provider payloads и env dumps запрещены в prompts, ledgers, reports, subagent packets и local run artifacts. |
 | Retry/idempotency | `N/A` для side effects. Повтор evaluator call допускается только как новый local event с новым `evaluation_id`; keep/discard не перезаписывается без trace. |
@@ -288,7 +290,7 @@ Stage `03`:
 |---|---|---|
 | Roehub public API | `none` | Plan targets local Codex skills/plugins and local harness only. |
 | Roehub persistence/schema | `none` | No DB schema or persisted app contract changes. |
-| Runtime/deploy | `none` | No Mac Studio deploy or production smoke in scope. |
+| Runtime/deploy | `none` | No retired-host deploy or production smoke in scope. |
 | Local Codex workflow | `compatible-change` | Adds optional local benchmark and reports. |
 | Skill/plugin files | `unknown` until Stage `03` | Stage `02` proposes versions; Stage `03` must classify actual edited files. |
 | Secrets/redaction | `compatible-change` | Strengthens redaction and local-only requirements. |

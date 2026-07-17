@@ -53,6 +53,24 @@ def test_resolve_deprecated_id_returns_canonical() -> None:
     assert resolve_skill(catalog, "S005")["skill_id"] == "S020"
 
 
+def test_resolve_skill_rejects_a_not_exposed_audit_record() -> None:
+    catalog = {
+        "skills": [
+            {
+                "skill_id": "S001",
+                "logical_name": "cache-only",
+                "canonical_name": "cache-only",
+                "aliases": [],
+                "implementation_channel": "supplemental",
+                "session_exposed": "not_exposed",
+            }
+        ]
+    }
+
+    with pytest.raises(BenchmarkError, match="not session-exposed"):
+        resolve_skill(catalog, "cache-only")
+
+
 def test_write_catalog_pair_has_identical_hashes(tmp_path: Path) -> None:
     catalog = {"spec": "fixture"}
     repo = tmp_path / "repo.json"

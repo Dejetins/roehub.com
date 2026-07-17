@@ -1,0 +1,61 @@
+# Historical configuration only. Do not deploy.
+# The Mac Studio upstream and host-specific production topology are retired.
+
+http://roehub.com {
+	route {
+		handle /__edge_id {
+			respond "vps-edge\n" 200
+		}
+
+		redir https://roehub.com{uri} 308
+	}
+}
+
+http://www.roehub.com {
+	redir https://roehub.com{uri} 301
+}
+
+roehub.com {
+	encode zstd gzip
+
+	handle /__edge_id {
+		respond "vps-edge\n" 200
+	}
+
+	handle_path /api/* {
+		reverse_proxy https://macstudio-daniil.tail0ebbbc.ts.net {
+			header_up Host macstudio-daniil.tail0ebbbc.ts.net
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Proto {scheme}
+			header_up X-Roehub-Forwarded-Host {host}
+			header_up X-Roehub-Forwarded-Proto {scheme}
+			transport http {
+				tls_server_name macstudio-daniil.tail0ebbbc.ts.net
+			}
+		}
+	}
+
+	handle /realms/* {
+		reverse_proxy https://macstudio-daniil.tail0ebbbc.ts.net:18443 {
+			header_up Host macstudio-daniil.tail0ebbbc.ts.net
+			transport http {
+				tls_server_name macstudio-daniil.tail0ebbbc.ts.net
+			}
+		}
+	}
+
+	handle /resources/* {
+		reverse_proxy https://macstudio-daniil.tail0ebbbc.ts.net:18443 {
+			header_up Host macstudio-daniil.tail0ebbbc.ts.net
+			transport http {
+				tls_server_name macstudio-daniil.tail0ebbbc.ts.net
+			}
+		}
+	}
+
+	reverse_proxy 127.0.0.1:8010
+}
+
+www.roehub.com {
+	redir https://roehub.com{uri} 301
+}

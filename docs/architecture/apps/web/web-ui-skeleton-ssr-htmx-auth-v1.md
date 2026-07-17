@@ -1,5 +1,10 @@
 # Web UI v1 -- SSR + HTMX skeleton + Auth UX (WEB-EPIC-01)
 
+**Статус:** историческое свидетельство реализации. SSR/Jinja/HTMX больше не
+является будущим целевым стеком; базовые требования следующей трансформации
+зафиксированы в
+[`roehub-product-transformation-requirements-v1.md`](../../platform/roehub-product-transformation-requirements-v1.md).
+
 Документ фиксирует архитектуру WEB-EPIC-01: `apps/web` как отдельный web upstream (Python SSR + Jinja2 + HTMX), который рендерит HTML, использует JSON API через `/api/...` и обеспечивает обязательный login gate.
 
 > Статус 2026-05-05: базовая SSR/auth идея остается актуальной, но целевой UX авторизации уточнен в `docs/architecture/apps/web/web-ui-backend-implementation-plan-v1.md` и `docs/architecture/apps/web/web-ui-design-manifest-v1.md`. Login больше не является отдельной полноэкранной страницей основного сценария: основной вход открывается как branded modal поверх shell/landing, а registration остается отдельной страницей `/register`.

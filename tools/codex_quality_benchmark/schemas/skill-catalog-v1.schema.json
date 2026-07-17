@@ -36,7 +36,7 @@
           "installed_enabled", "session_exposed", "activation_policy",
           "role", "visibility", "owner", "mutability", "side_effect_class",
           "primary_output", "aliases", "companions", "conflicts", "supersedes",
-          "stage", "recommended_action", "implementation_status",
+          "recommended_action", "implementation_status",
           "verification_status", "result_contract_provider",
           "result_contract_evidence", "evidence_refs"
         ],
@@ -65,7 +65,8 @@
           "companions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
           "conflicts": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
           "supersedes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
-          "stage": {"type": "string", "pattern": "^(00|01|02|03|04|05|06|07|08|supplemental)$"},
+          "stage": {"type": "string", "description": "Legacy field; retained for historical audit snapshots only."},
+          "audit_wave": {"type": "string", "description": "Historical audit provenance; never runtime routing or execution state."},
           "recommended_action": {"type": "string", "minLength": 1},
           "implementation_status": {"enum": ["pending", "implemented", "canonicalized", "deprecated", "accepted_no_change", "classified", "blocked"]},
           "verification_status": {"enum": ["pending", "structural_pass", "family_pass", "forward_pass", "inventory_only", "blocked"]},

@@ -10,7 +10,6 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -21,7 +20,6 @@ sys.path.insert(0, str(HOOK_DIR))
 from validators.common import (  # noqa: E402
     CONTINUE_BEFORE_FINAL,
     FATAL_BLOCK,
-    OBSERVE,
     WARN_WITH_CONTEXT,
     Finding,
     assistant_text,
@@ -32,21 +30,9 @@ from validators.common import (  # noqa: E402
 VALIDATOR_MODULES = [
     "validators.secret_redaction_guard",
     "validators.command_safety_guard",
-    "validators.branch_workflow_guard",
     "validators.scoped_git_staging_guard",
-    "validators.macstudio_path_guard",
-    "validators.remote_payload_quoting_guard",
-    "validators.playwright_wrapper_guard",
-    "validators.prompt_pack_stage_ledger_linter",
-    "validators.prompt_pack_branch_policy_guard",
-    "validators.docs_index_drift_guard",
-    "validators.architecture_doc_linter",
-    "validators.validation_depth_linter",
-    "validators.runtime_proof_boundary_guard",
-    "validators.performance_evidence_guard",
     "validators.russian_final_answer_guard",
     "validators.cold_head_gate",
-    "validators.skill_lint_guard",
 ]
 
 
@@ -76,7 +62,6 @@ def finding_groups(findings: list[Finding]) -> dict[str, list[Finding]]:
         FATAL_BLOCK: [f for f in findings if f.severity == FATAL_BLOCK],
         CONTINUE_BEFORE_FINAL: [f for f in findings if f.severity == CONTINUE_BEFORE_FINAL],
         WARN_WITH_CONTEXT: [f for f in findings if f.severity == WARN_WITH_CONTEXT],
-        OBSERVE: [f for f in findings if f.severity == OBSERVE],
     }
 
 
@@ -295,34 +280,9 @@ def emit_for_event(event: str, groups: dict[str, list[Finding]], payload: dict[s
             return
 
 
-def maybe_observe(payload: dict[str, Any], findings: list[Finding]) -> None:
-    log_path = os.environ.get("ROEHUB_HOOK_OBSERVE_LOG")
-    if not log_path:
-        return
-    safe = {
-        "event": hook_event(payload),
-        "cwd": payload.get("cwd"),
-        "finding_count": len(findings),
-        "findings": [
-            {
-                "severity": finding.severity,
-                "validator": finding.validator,
-                "title": finding.title,
-                "target": finding.target,
-            }
-            for finding in findings
-        ],
-    }
-    path = Path(log_path).expanduser()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(safe, ensure_ascii=False, sort_keys=True) + "\n")
-
-
 def main() -> int:
     payload = load_payload()
     findings = run_validators(payload)
-    maybe_observe(payload, findings)
     emit_for_event(hook_event(payload), finding_groups(findings), payload)
     return 0
 

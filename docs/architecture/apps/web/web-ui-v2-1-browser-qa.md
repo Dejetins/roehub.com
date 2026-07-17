@@ -80,7 +80,10 @@
 - Режим: независимый агент.
 - Первичный вердикт: `Block`.
 - Найденные блокеры: неверная web deploy boundary, несуществующая новая RBAC-модель, необоснованная идемпотентность exchange mutations, drift оболочки и маршрутов, темы вне server enum, неполная accessibility/performance matrix.
-- Исправлено: целевой deploy закреплён за GHCR/VPS workflow; Mac Studio оставлен backend upstream; backend остаётся единственным источником полномочий; неизвестный mutation result требует authoritative refetch без слепого повтора; темы сохраняются только в browser-local preference с legacy mapping; маршруты, владельцы и проверочная матрица зафиксированы явно.
+- Исправлено исторически: backend оставался единственным источником
+  полномочий; неизвестный mutation result требовал authoritative refetch без
+  слепого повтора; темы сохранялись только в browser-local preference с legacy
+  mapping; маршруты, владельцы и проверочная матрица были зафиксированы явно.
 - Локальная повторная проверка: противоречия устранены; production readiness остаётся закрыт до delivery proof.
 
 ## Production delivery и повторная проверка

@@ -1,18 +1,20 @@
 # Skill Library Classic Audit v1
 
-Статус: `draft execution plan`.
+Статус: `historical audit; execution retired`.
 
 Дата: 2026-07-07.
 
-Пакет исполнения:
+Исторический пакет исполнения:
 
 - `plan_doc`: `docs/architecture/agents/skill-library-classic-audit-v1.md`
 - `prompt_pack_dir`: `.codex/agents/generated/skill-library-classic-audit-v1/`
 - `stage_ledger`: `docs/architecture/agents/skill-library-classic-audit-v1-stage-reports/skill-library-classic-audit-v1-stage-ledger.md`
-- `execution_mode`: `goal_driven`
+- `execution_mode`: `superseded`
 - intended_agent_model: `gpt-5.5`
 - reasoning_effort: `xhigh`
-- Codex Goal mode: режим исполнения поверх трех артефактов выше. Отдельный `GOAL.md` не нужен.
+- Этот пакет не выбирает текущую работу и не разрешает Goal. Используйте
+  глобальный delivery contract и current ticket; ссылки ниже сохранены только
+  как audit evidence.
 
 ## Цель
 
@@ -149,7 +151,7 @@ changed file version.
 |---|---|---|
 | Roehub public API | `none` | Audit-only docs/prompt pack. |
 | Roehub persistence/schema | `none` | No DB changes. |
-| Runtime/deploy | `none` | No production runtime or Mac Studio deploy. |
+| Runtime/deploy | `none` | No production runtime or retired-host deploy. |
 | Local skill/plugin files | `none` in this plan | Source skill files are read-only. Improvements are proposals only. |
 | Local Codex workflow | `compatible-change` | Adds a repeatable audit process and reports. |
 

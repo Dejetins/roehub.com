@@ -1,13 +1,8 @@
-# Mac Studio Backend Operations
+# Mac Studio backend operations
 
-Статус: архивный документ.
+Status: retired procedure. Historical evidence is retained in
+[`legacy/README.md`](./legacy/README.md).
 
-Этот ранбук описывает Docker/Colima runtime path и сохранен только как историческая справка.
-
-Актуальный production runbook для текущей topology:
-
-- `docs/runbooks/mac-studio-native-backend-operations.md`
-
-Дополнительно:
-
-- migration plan: `docs/runbooks/mac-studio-native-backend-operations.md`
+No current runtime target is configured. Do not execute host-specific
+operations from historical evidence; select a current ticket with an approved
+installation and proof boundary.

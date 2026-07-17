@@ -56,7 +56,11 @@
 
 ### Validation Status
 
-Текущий документ описывает runtime migration contract, но локальные unit/integration tests не являются acceptance для Stage `10`. Stage `10` может быть только `completed-local` до post-main production runtime proof: target revision на `main`, green CI/deploy, синхронизация Mac Studio checkout/runtime, `smoke_prod.sh`, и bounded Strategy notifications-mode smoke без реальной Telegram отправки. До этого прямой `telegram` mode считается rollback-only, а не основным production-доказательством.
+Текущий документ описывает runtime migration contract, но локальные
+unit/integration tests не являются acceptance для будущего runtime. До выбора
+отдельного runtime ticket допустим только `completed-local`: target revision,
+green CI и bounded Strategy notifications-mode smoke без реальной Telegram
+отправки. Прямой `telegram` mode остаётся rollback-only, а не production proof.
 
 ### 1) Точка интеграции: Strategy live-runner
 

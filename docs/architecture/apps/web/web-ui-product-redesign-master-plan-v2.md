@@ -1,5 +1,14 @@
 # Roehub Web App Redesign Master Plan v2
 
+**Статус:** `historical implementation and UX evidence`. Базовые требования
+следующей трансформации зафиксированы в
+[`roehub-product-transformation-requirements-v1.md`](../../platform/roehub-product-transformation-requirements-v1.md),
+но этот документ не является её исполнительным планом.
+Этот файл сохраняется как доказательство реализованного SSR Web UI v2.1,
+принятых UX-наблюдений и production browser verification. Запрет React,
+сохранение SSR/Jinja/HTMX как целевого движка, auth-only роль `/` и прежняя
+deploy topology больше не применяются к будущей реализации.
+
 Документ фиксирует целевую продуктовую и визуальную систему Roehub как модульной, адаптивной и нативно ощущающейся web-программы без изменения доменных контрактов по умолчанию.
 
 ## Статус документа
@@ -1066,7 +1075,7 @@ Gate:
 Authenticated browser QA contract:
 
 - default smoke username: `smoke_e2e_keycloak`;
-- password source of truth on `macstudio`: `/Users/daniildegtyarev/.config/roehub/roehub.env`, key `ROEHUB_SMOKE_E2E_PASSWORD`;
+- historical password source: host-local secret storage, key `ROEHUB_SMOKE_E2E_PASSWORD`;
 - password никогда не записывается в repo files, prompts, screenshots, traces, logs, reports или stage ledger;
 - если безопасный password source недоступен, authenticated visual audit фиксируется как `blocked`, а static code inference не выдается за runtime observation.
 
@@ -1183,8 +1192,8 @@ Delivery proof boundary:
 - `read_only_existing_runtime_smoke` — наблюдение текущего production behavior без sync/reload/migration;
 - `post_main_production_runtime_proof` — changed revision уже в `main`, CI/deploy green, runtime обновлен, затем выполнен browser/API/service smoke;
 - Web UI разворачивается workflow `Deploy Web` на production VPS в `/opt/roehub-web` из опубликованного GHCR image;
-- Mac Studio остаётся API/backend upstream и не считается средой размещения `apps/web`;
-- `/Users/daniildegtyarev/Projects/roehub.com` и `/opt/roehub/app` на Mac Studio проверяются только как граница backend/runtime, а не как доказательство web deploy.
+- Historical API/backend upstream не считается средой размещения `apps/web`;
+- historical source/runtime trees проверялись только как граница backend/runtime, а не как доказательство web deploy.
 
 Gate:
 

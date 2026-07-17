@@ -1,5 +1,13 @@
 # Roehub — активация рыночных данных и выбор инструментов v1
 
+**Уточнение целевой архитектуры от 2026-07-16:** реализованные egress,
+organizational selection, coverage и ingestion evidence сохраняются. Будущий
+пользовательский каталог, snapshot/cursor API, экран выбора и resource review
+входят в базовые требования
+[`roehub-product-transformation-requirements-v1.md`](roehub-product-transformation-requirements-v1.md).
+Этот документ остаётся историческим доказательством текущей реализации и не
+задаёт будущую исполнительную задачу.
+
 Этот план устраняет разрыв между автономной установкой и контролируемым получением публичных рыночных данных, а также заменяет файловый whitelist выбором инструментов пользователем.
 
 ## Цель и границы
@@ -68,7 +76,7 @@
 - Publisher читает только `GlobalEffectiveCollectorSet`; он не имеет legacy default для всех enabled reference rows и остаётся выключенным по расписанию до отдельного capacity decision после успешного ручного `BTCUSDT` publish.
 - Stage `04` принимается после подтверждённого disposable 3-recipient, `2-of-3` owner-init path, per-service credential isolation и документированного owner-custody handoff. Реальная durable initialization локальной/удалённой установки — последующее действие владельца, а не ложный blocker локального candidate lifecycle.
 - После изменения release-config/OCI пересобрать кандидат Stage `22`, повторить нужные части `23` и локальный `24`; исходный `24` остаётся `blocked` до native `linux/amd64`.
-- Удалённая синхронизация означает scoped commit/push только этой ветки после доказательств; production/Mac Studio не трогать.
+- Удалённая синхронизация означает scoped commit/push только этой ветки после доказательств; текущий runtime не трогать.
 
 ## Критерий завершения
 

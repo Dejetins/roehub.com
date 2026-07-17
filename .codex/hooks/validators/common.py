@@ -9,13 +9,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
-REPO_CHECKOUT = "/Users/daniildegtyarev/Projects/roehub.com"
-RUNTIME_TREE = "/opt/roehub/app"
-
 FATAL_BLOCK = "FATAL_BLOCK"
 CONTINUE_BEFORE_FINAL = "CONTINUE_BEFORE_FINAL"
 WARN_WITH_CONTEXT = "WARN_WITH_CONTEXT"
-OBSERVE = "OBSERVE"
 
 
 @dataclass(frozen=True)

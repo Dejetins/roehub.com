@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fixture tests for Roehub Codex hook router."""
+"""Focused regression tests for the active Roehub hook invariants."""
 
 from __future__ import annotations
 
@@ -8,54 +8,173 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 TEST_DIR = Path(__file__).resolve().parent
 HOOK_DIR = TEST_DIR.parent
-ROUTER = HOOK_DIR / "roehub_hook_router.py"
-FIXTURES = TEST_DIR / "fixtures"
-SYNTHETIC_SMOKE_SECRET = "Smoke" + "E2E!" + "9999"
-SYNTHETIC_SECRET_ASSIGNMENT = "service " + "password: " + "abcdefgh1234"
+SYNTHETIC_SECRET = "Smoke" + "E2E!" + "9999"
 SYNTHETIC_JWT = "eyJ" + ("a" * 16) + "." + "eyJ" + ("b" * 16) + "." + "eyJ" + ("c" * 16)
-
-
-def load_fixture(path: Path) -> dict[str, Any]:
-    return json.loads(path.read_text(encoding="utf-8"))
-
-
-def materialize_fixture(fixture: dict[str, Any], tmpdir: Path) -> dict[str, Any]:
-    payload = fixture["payload"]
-    payload_text = json.dumps(payload)
-    payload_text = payload_text.replace("{tmp}", str(tmpdir))
-    payload_text = payload_text.replace(
-        "__ROEHUB_SYNTHETIC_SMOKE_SECRET__",
-        SYNTHETIC_SMOKE_SECRET,
+RUSSIAN_FINAL_RECEIPT = "\n".join(
+    (
+        "Изменения завершены.",
+        "",
+        "**Проверка перед финалом**",
+        "- Статус проверки: выполнена",
+        "- Режим: холодная самопроверка",
+        "- Что проверено: итоговый текст и измененные инструкции.",
+        "- Итог: можно продолжать",
+        "- Что исправлено/добавлено: убраны устаревшие правила.",
+        "- Остаточные риски: новая среда поставки еще не выбрана.",
+        "- Что это значит для следующего шага: выбрать отдельный runtime ticket.",
     )
-    payload_text = payload_text.replace(
-        "__ROEHUB_SYNTHETIC_SECRET_ASSIGNMENT__",
-        SYNTHETIC_SECRET_ASSIGNMENT,
-    )
-    payload_text = payload_text.replace(
-        "__ROEHUB_SYNTHETIC_JWT__",
-        SYNTHETIC_JWT,
-    )
-    rendered = json.loads(payload_text)
-    rendered["cwd"] = str(tmpdir)
-
-    for relative, content in fixture.get("setup_files", {}).items():
-        path = tmpdir / relative
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(content, encoding="utf-8")
-    return rendered
+)
 
 
-def run_fixture(path: Path) -> tuple[bool, str]:
-    fixture = load_fixture(path)
+@dataclass(frozen=True)
+class Case:
+    name: str
+    payload: dict[str, Any]
+    expected_empty: bool = False
+    expected_path: str | None = None
+    expected_value: str | None = None
+    expected_text: str | None = None
+
+
+CASES = (
+    Case(
+        "raw secret is denied before Bash",
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": f"printf '{SYNTHETIC_SECRET}'"},
+        },
+        expected_path="hookSpecificOutput.permissionDecision",
+        expected_value="deny",
+        expected_text="password-like literal",
+    ),
+    Case(
+        "destructive root removal is denied",
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "rm -rf /"},
+        },
+        expected_path="hookSpecificOutput.permissionDecision",
+        expected_value="deny",
+        expected_text="Recursive root removal",
+    ),
+    Case(
+        "environment secret reference is allowed",
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "printf '%s' \"$ROEHUB_SMOKE_E2E_PASSWORD\""},
+        },
+        expected_empty=True,
+    ),
+    Case(
+        "broad git staging is denied",
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "git add ."},
+        },
+        expected_path="hookSpecificOutput.permissionDecision",
+        expected_value="deny",
+        expected_text="Broad git add pathspec",
+    ),
+    Case(
+        "explicit git staging is allowed",
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {
+                "command": "git add .codex/AGENTS.md && git diff --cached --name-status"
+            },
+        },
+        expected_empty=True,
+    ),
+    Case(
+        "commit does not need a magic review marker",
+        {
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "git commit -m scoped"},
+        },
+        expected_empty=True,
+    ),
+    Case(
+        "raw jwt in tool output blocks continuation",
+        {
+            "hook_event_name": "PostToolUse",
+            "tool_name": "Bash",
+            "tool_input": {"command": "printf token"},
+            "tool_response": {"stdout": f"provider returned {SYNTHETIC_JWT}"},
+        },
+        expected_path="decision",
+        expected_value="block",
+        expected_text="JWT",
+    ),
+    Case(
+        "mixed-language final report is continued",
+        {
+            "hook_event_name": "Stop",
+            "stop_hook_active": False,
+            "last_assistant_message": "Изменения готовы. Verification: passed.",
+        },
+        expected_path="decision",
+        expected_value="block",
+        expected_text="Качественно переведи",
+    ),
+    Case(
+        "policy completion requires a review receipt",
+        {
+            "hook_event_name": "Stop",
+            "stop_hook_active": False,
+            "last_assistant_message": "Обновил `.codex/AGENTS.md` и завершил документ.",
+        },
+        expected_path="decision",
+        expected_value="block",
+        expected_text="Проверка перед финалом",
+    ),
+    Case(
+        "russian final with a review receipt is allowed",
+        {
+            "hook_event_name": "Stop",
+            "stop_hook_active": False,
+            "last_assistant_message": RUSSIAN_FINAL_RECEIPT,
+        },
+        expected_empty=True,
+    ),
+    Case(
+        "technical Mac Studio name is allowed in russian final",
+        {
+            "hook_event_name": "Stop",
+            "stop_hook_active": False,
+            "last_assistant_message": RUSSIAN_FINAL_RECEIPT.replace(
+                "новая среда поставки еще не выбрана",
+                "Mac Studio выведен из эксплуатации",
+            ),
+        },
+        expected_empty=True,
+    ),
+)
+
+
+def _lookup(data: dict[str, Any], path: str) -> Any:
+    current: Any = data
+    for part in path.split("."):
+        current = current[part]
+    return current
+
+
+def run_case(case: Case) -> tuple[bool, str]:
     with tempfile.TemporaryDirectory(prefix="roehub-hook-test-") as raw_tmp:
         tmpdir = Path(raw_tmp)
         shutil.copytree(HOOK_DIR, tmpdir / ".codex" / "hooks")
-        payload = materialize_fixture(fixture, tmpdir)
+        payload = {**case.payload, "cwd": str(tmpdir)}
         proc = subprocess.run(
             [sys.executable, str(tmpdir / ".codex" / "hooks" / "roehub_hook_router.py")],
             input=json.dumps(payload, ensure_ascii=False),
@@ -65,54 +184,36 @@ def run_fixture(path: Path) -> tuple[bool, str]:
             stderr=subprocess.PIPE,
             check=False,
         )
-    expected = fixture["expect"]
-    if proc.returncode != expected.get("returncode", 0):
-        expected_returncode = expected.get("returncode", 0)
-        return (
-            False,
-            f"{path.name}: returncode {proc.returncode}, "
-            f"expected {expected_returncode}; stderr={proc.stderr!r}",
-        )
     stdout = proc.stdout.strip()
-    if expected.get("stdout_empty"):
+    if proc.returncode:
+        return False, f"{case.name}: router returned {proc.returncode}: {proc.stderr!r}"
+    if case.expected_empty:
         if stdout:
-            return False, f"{path.name}: expected empty stdout, got {stdout!r}"
-        return True, path.name
-    if "stdout_contains" in expected and expected["stdout_contains"] not in stdout:
-        return (
-            False,
-            f"{path.name}: stdout missing {expected['stdout_contains']!r}; " f"got {stdout!r}",
-        )
-    if "json_path" in expected:
+            return False, f"{case.name}: expected empty stdout, got {stdout!r}"
+        return True, case.name
+    if case.expected_text and case.expected_text not in stdout:
+        return False, f"{case.name}: missing {case.expected_text!r}: {stdout!r}"
+    if case.expected_path:
         try:
-            data = json.loads(stdout)
-        except json.JSONDecodeError as exc:
-            return False, f"{path.name}: stdout is not JSON: {exc}: {stdout!r}"
-        current: Any = data
-        for part in expected["json_path"].split("."):
-            current = current[part]
-        if current != expected["json_value"]:
-            return (
-                False,
-                f"{path.name}: {expected['json_path']}={current!r}, "
-                f"expected {expected['json_value']!r}",
-            )
-    return True, path.name
+            value = _lookup(json.loads(stdout), case.expected_path)
+        except (json.JSONDecodeError, KeyError, TypeError) as exc:
+            return False, f"{case.name}: invalid hook output: {exc}: {stdout!r}"
+        if value != case.expected_value:
+            return False, f"{case.name}: {case.expected_path}={value!r}"
+    return True, case.name
 
 
 def main() -> int:
     failures: list[str] = []
-    for path in sorted(FIXTURES.glob("*.json")):
-        ok, message = run_fixture(path)
-        if ok:
-            print(f"ok {message}")
-        else:
-            print(f"not ok {message}")
+    for case in CASES:
+        ok, message = run_case(case)
+        print(("ok " if ok else "not ok ") + message)
+        if not ok:
             failures.append(message)
     if failures:
-        print(f"\n{len(failures)} fixture(s) failed")
+        print(f"\n{len(failures)} active hook regression(s) failed")
         return 1
-    print("\nall hook fixtures passed")
+    print("\nall active hook regressions passed")
     return 0
 
 

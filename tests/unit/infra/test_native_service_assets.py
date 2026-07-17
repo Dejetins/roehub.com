@@ -34,23 +34,22 @@ def test_exchange_execution_native_service_assets_are_installed_and_reloaded() -
     assert "com.roehub.test.exchange-execution.plist" in reload_services
 
 
-def test_backend_deploy_reloads_monit_for_monit_asset_changes() -> None:
-    workflow = _read(".github/workflows/deploy-backend.yml")
+def test_retired_native_deployment_workflows_are_absent() -> None:
+    root = _repo_root()
 
-    assert "infra/scripts/monit/" in workflow
-    assert "brew services restart monit" in workflow
+    assert not (root / ".github/workflows/deploy-backend.yml").exists()
+    assert not (root / ".github/workflows/deploy-web.yml").exists()
+    assert not (root / ".github/workflows/exchange-connection-cleanup-ops.yml").exists()
 
 
 def test_rl_monitor_smoke_checks_ready_loaded_and_safety_metrics() -> None:
     smoke = _read("scripts/macos/smoke_prod.sh")
-    deploy_workflow = _read(".github/workflows/deploy-backend.yml")
 
     assert "127.0.0.1:9213/health/ready" in smoke
     assert "for _attempt in {1..60}" in smoke
     assert "did not become ready within 60 seconds" in smoke
     assert "rl_trading_inference_model_loaded 1.0" in smoke
     assert "rl_trading_inference_safety_breaches_total" in smoke
-    assert "bash scripts/macos/smoke_prod.sh" in deploy_workflow
 
 
 def test_telegram_egress_tunnel_is_installed_and_scoped_to_notifications() -> None:

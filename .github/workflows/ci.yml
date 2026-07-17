@@ -104,6 +104,11 @@ jobs:
         run: |
           uv run ruff check .
 
+      - name: Roehub hook regressions
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          python .codex/hooks/tests/run_tests.py
+
       - name: Type check
         if: needs.changes.outputs.code == 'true'
         run: |

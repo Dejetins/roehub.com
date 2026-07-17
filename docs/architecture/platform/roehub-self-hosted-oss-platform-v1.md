@@ -1,18 +1,30 @@
 # Roehub Self-Hosted OSS Platform v1 — итоговый архитектурный и этапный план
 
+**Уточнение статуса от 2026-07-17:** документ сохраняется как историческое
+свидетельство реализации и приёмки
+этапов self-hosted платформы. Базовые требования следующей продуктовой
+трансформации, включая новый Web UI, режимы данных бектеста, progress/ETA,
+первый запуск, документацию и отказ от host-specific target, зафиксированы в
+[`roehub-product-transformation-requirements-v1.md`](roehub-product-transformation-requirements-v1.md).
+Они не возобновляют этот план и не превращают его исторические этапы в будущую
+исполнительную власть.
+
 ## Статус и источники исполнения
 
-- Статус целевой архитектуры: `accepted`.
-- Статус реализации: `not_started`.
-- Режим исполнения: `goal_driven`.
+- Статус документа: `historical implementation evidence`.
+- Статус исторических этапов `00`–`23`: `accepted evidence`.
+- Статус оставшихся этапов `24`–`25`: `superseded` с `2026-07-16`.
+- Режим будущего исполнения этого пакета: `superseded`.
 - `plan_doc`: `docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md`.
 - `prompt_pack_dir`: `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/`.
 - `stage_ledger`: `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/roehub-self-hosted-oss-platform-v1-stage-ledger.md`.
-- Ветка исполнения по умолчанию: `main`.
-- Отдельный `GOAL.md` не создаётся. Режим цели работает поверх трёх источников выше.
+- Эти три пути сохраняются как историческое evidence и не разрешают
+  возобновлять Stage `24` или `25`.
+- Новая работа начинается только из отдельно выбранного текущего ticket по
+  действующему delivery contract.
 
 Этот документ фиксирует согласованную целевую архитектуру и заменяет прежнее
-направление «подписочная платформа на специально настроенном Mac Studio» на
+направление «подписочная платформа на специально настроенном private host» на
 полностью открытый самостоятельно разворачиваемый программный комплекс.
 Текущая production-система в native-модели остаётся эксплуатационным фактом и
 источником сведений о существующем коде, но не является ни целевой архитектурой,
@@ -425,9 +437,10 @@ Roehub владеет сеткой, типографикой, цветовыми
 декларацию, а не собственный несогласованный дизайн.
 
 Целевое направление — плотный институциональный интерфейс с постепенным
-раскрытием деталей. Торговые временные ряды могут использовать Lightweight
-Charts, общая аналитика — Apache ECharts, декларативные исследования —
-Vega-Lite. Публичный контракт не зависит от конкретной библиотеки.
+раскрытием деталей. Все производственные графики отрисовываются через Apache
+ECharts и общий `RoehubChartSpec/v1`. Публичный plugin/data contract остаётся
+renderer-neutral: плагин не получает raw ECharts options и не определяет
+собственный renderer.
 
 ### Администрирование и аварийный контур
 
@@ -538,11 +551,11 @@ flowchart TB
 | `22` | Мультиархитектурные образы, подписанный комплект релиза, автономная установка и отсутствие скрытых исходящих обращений | `01`,`03`,`17`,`21` | Установка без Git и без сети из автономного комплекта |
 | `23` | Репетиция greenfield-установки и жизненного цикла из автономного комплекта | `21`,`22` | Чистая установка, bootstrap, свежие representative fixtures, backup/restore, повторяемость и release-to-release rollback |
 | `24` | Кандидат релиза на Linux amd64/arm64 и macOS M3 Pro | `22`,`23` | Матрица чистой установки, браузера/API/БД, среды исполнения, безопасности, резервного копирования и обновления |
-| `25` | Отдельно разрешённый greenfield production launch | `24` + новое подтверждение пользователя | Только `post_main_production_runtime_proof`; текущая native-система и её данные не мигрируют |
+| `25` | Отдельно разрешённое развертывание релиза в конкретной self-hosted установке | `24` + явное указание установки владельцем | Только `authorized_installation_runtime_proof` после backup/rollback; центральный Roehub production-host отсутствует |
 
 Stage `25` всегда является ручным барьером подтверждения. Автономная цель обязана
 остановиться перед ним, если в текущем пользовательском запросе нет отдельного
-явного разрешения на production-cutover.
+явного разрешения на изменение конкретной self-hosted установки.
 
 ## Охват компонентов текущей карты
 
@@ -658,10 +671,9 @@ bundle. Money-moving и provider side effects всегда сверяются п
 Завершённые stage ledgers старых планов не переписываются: они остаются
 историческим доказательством. Новый план ссылается на них как на входные факты.
 
-Обязательные входные документы этапов:
+Исторические входные документы и действующая база требований:
 
-- `docs/architecture/apps/web/web-ui-product-redesign-master-plan-v2.md`;
-- `docs/architecture/apps/web/web-ui-design-manifest-v1.md`;
+- `docs/architecture/platform/roehub-product-transformation-requirements-v1.md`;
 - `docs/architecture/notifications/web-execution-telegram-notifications-v1.md`;
 - `docs/architecture/live_execution/live-execution-universal-order-gateway-v1.md`;
 - `docs/architecture/live_execution/mainnet-real-money-trading-v1.md`;
@@ -686,15 +698,20 @@ bundle. Money-moving и provider side effects всегда сверяются п
 - Нельзя подразумевать commit, push, release, deploy или production mutation.
 - Если обязательная граница недоступна, статус — `blocked`, а не принятие по
   статическому выводу.
-- Перед production delivery допустимы только
-  `target_host_readiness_pre_main` и `read_only_existing_runtime_smoke`.
-  Доказательство изменённого production-кода — только
-  `post_main_production_runtime_proof` после `main`, зелёного CI/deploy и sync.
+- До релиза используются `local_source_development_proof` и
+  `local_installation_runtime_proof`.
+- Кандидат релиза требует `cross_platform_release_candidate_proof`: локальный
+  `linux/arm64`, CI `linux/amd64`, подписанный multi-arch bundle и чистая
+  установка.
+- Изменение конкретной установки требует отдельного
+  `authorized_installation_runtime_proof`; право изменить код, опубликовать
+  релиз или пройти CI не даёт такого разрешения автоматически.
 
 ## Критерий завершения цели
 
 Автономная цель считается выполненной, когда Stage `24` имеет `accepted`, все
 предыдущие этапы приняты, получен проверенный автономный комплект релиза,
 доказаны clean install и greenfield lifecycle rehearsal, а журнал содержит
-полный handoff. Перенос текущей production-базы и Stage `25` не входят в
-автоматическое завершение; Stage `25` требует отдельного решения владельца.
+полный handoff. Изменение любой существующей self-hosted установки и Stage
+`25` не входят в автоматическое завершение; Stage `25` требует отдельного
+решения владельца и указания конкретной цели.

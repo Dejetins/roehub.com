@@ -161,7 +161,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 290,
+      "file_count": 291,
       "id": "operations",
       "paths": [
         "infra/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1124,
+      "file_count": 1148,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -1250,6 +1250,7 @@
         "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/05-release-rebuild-local-lifecycle-and-handoff.md",
         "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/roehub-market-data-activation-and-instrument-selection-v1-stage-ledger.md",
         "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md",
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/00-freeze-current-state-and-contracts.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/01-open-source-license-and-release-governance.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/02-machine-readable-runbooks.md",
@@ -1261,8 +1262,7 @@
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/08-openbao-secrets-and-recovery.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/09-research-context-organization-isolation.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/10-trading-context-organization-isolation.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/11-notification-and-telegram-provider-plugins.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/12-plugin-platform-api-and-sdk.md"
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/11-notification-and-telegram-provider-plugins.md"
       ],
       "entrypoints": [],
       "file_count": 13,
@@ -2212,8 +2212,18 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/README.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "configuration",
       "path": ".codex/agents/architect.toml"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/README.md"
     },
     {
       "area": "knowledge",
@@ -3512,6 +3522,21 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/legacy/promt_temlate.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/legacy/promt_template.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/legacy/stage_execution_ledger_template.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "configuration",
       "path": ".codex/agents/promt_manager.toml"
     },
@@ -4263,6 +4288,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/skill-system/rollback/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/skill-system/rollback/blobs/0003e9adfe5581b9e8062e03251e64a21539a87518ac083a2fc5c2fdef9c0c09.md"
     },
     {
@@ -4424,6 +4454,11 @@
       "area": "knowledge",
       "kind": "configuration",
       "path": ".codex/skill-system/rollback/manifest-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-17-roehub-transformation-reset.md"
     },
     {
       "area": "repository-meta",
@@ -9598,6 +9633,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-product-transformation-requirements-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/00-freeze-current-state-and-contracts.md"
     },
     {
@@ -9968,6 +10008,86 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/runbooks/legacy/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/backtest-artifacts-rebuild.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/clickhouse-memory-profiles.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/clickhouse-partition-dedup.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/exchange-execution.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/exchange-secret-management.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/keycloak-local-setup-and-ops.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/market-data-autonomous-docker.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/market-data-metrics-reference-ru.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/market-data-metrics.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/notifications-admin-alerts.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/prod-dashboard-metrics-reference-ru.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/rl-trading-operations.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/roehub-ui-autostart-systemd.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/strategy-live-worker.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/web-ui-gateway-same-origin.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/runbooks/live-execution-redis-dispatch.md"
     },
     {
@@ -10169,6 +10289,11 @@
       "area": "operations",
       "kind": "other",
       "path": "infra/caddy/Caddyfile.vps"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/caddy/legacy/Caddyfile.vps.macstudio"
     },
     {
       "area": "operations",
@@ -17571,7 +17696,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3074,
+  "inventory_file_count": 3099,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17788,5 +17913,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "479226cca136fb25b5a584d4b6ce9e5b60d623e664878d0c5c2a302ee10c930f"
+  "structural_digest": "3230e28de0a6aaf04564082a2925f6d490d682e484d9647aaa1bf06a3498e308"
 }

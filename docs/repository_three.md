@@ -7,8 +7,6 @@
 |-- .github/
 |   `-- workflows/
 |       |-- ci.yml
-|       |-- deploy-backend.yml
-|       |-- deploy-web.yml
 |       `-- publish-app-image.yml
 |-- .gitignore
 |-- .opencode/
@@ -326,9 +324,6 @@
 |       |-- indicators-numba-warmup-jit.md
 |       |-- indicators-why-nan.md
 |       |-- keycloak-local-setup-and-ops.md
-|       |-- mac-studio-backend-operations.md
-|       |-- mac-studio-monitoring-plan.md
-|       |-- mac-studio-native-backend-operations.md
 |       |-- market-data-autonomous-docker.md
 |       |-- market-data-metrics-reference-ru.md
 |       |-- market-data-metrics.md

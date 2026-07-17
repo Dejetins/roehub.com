@@ -1,31 +1,30 @@
-# Roehub Project Execution Plan
+# Roehub Historical Project Coordination Map
 
-This document is the **project-level execution map** for long-horizon work in Roehub.
+This document preserves a **historical project-level coordination map** for
+long-horizon Roehub work.
 
 It is **not** a replacement for:
 - `.codex/AGENTS.md` — repository rules and durable behavior guidance
 - task prompts — per-task delivery contracts
 - architecture docs — domain-specific technical source of truth
 
-Its purpose is to keep multi-iteration work stable across:
+It does not select current delivery artifacts or execution authority. The
+global delivery contract and `.codex/AGENTS.md` do that now. The material below
+is retained only to explain prior decisions across:
 - architecture documentation,
 - roadmap execution,
 - milestone-driven refactors,
 - large feature series,
 - cross-context changes.
 
-This file is a **living document**.
-It should stay:
-- concise,
-- current,
-- checkpoint-oriented,
-- useful after interruptions.
+This file is **frozen historical evidence**. Do not update it for new work,
+reopen a milestone from it, or treat its prompt/ledger references as current.
 
 ---
 
 ## 1) How to use this file
 
-Use `PLANS.md` when work is any of:
+Do not use `PLANS.md` to route current work, even when it resembles:
 
 - multi-iteration architecture documentation,
 - roadmap work spanning multiple prompts,
@@ -42,15 +41,8 @@ Do **not** use this file as the main control surface for:
 - one-off backend changes,
 - small test-only updates.
 
-For ordinary tasks:
-- rely on `.codex/AGENTS.md`,
-- task prompt,
-- local code/docs/tests.
-
-For long-horizon tasks:
-- use this file as the stable project map,
-- use task prompts as milestone or checkpoint contracts,
-- keep this file updated when milestone status or decisions materially change.
+For all current tasks, rely on `.codex/AGENTS.md`, the global delivery
+contract, selected current ticket, and local code/docs/tests.
 
 ---
 
@@ -58,8 +50,8 @@ For long-horizon tasks:
 
 This file must remain readable and compact.
 
-### 2.1 Keep only active planning state
-Keep here only:
+### 2.1 Historical maintenance policy
+The following was the former maintenance policy:
 
 - active workstreams,
 - milestone map,
@@ -71,14 +63,14 @@ Keep here only:
 
 Do **not** turn this file into a full historical log.
 
-### 2.2 Rotation policy
+### 2.2 Former rotation policy
 When a section grows too large:
 
 - keep only the current active summary here,
 - move detailed history to an archive doc under `docs/` or `.codex/archive/`,
 - leave a short note that points to the archive.
 
-### 2.3 Maximum local history
+### 2.3 Former local-history limit
 Keep at most:
 
 - 5 recent decisions
@@ -87,7 +79,7 @@ Keep at most:
 
 Older resolved items should be summarized or archived.
 
-### 2.4 Update threshold
+### 2.4 Former update threshold
 Update this file when one of the following happens:
 
 - current milestone changes,
@@ -175,13 +167,14 @@ Static code reasoning alone is not sufficient evidence for browser-visible corre
 
 ---
 
-## 5) Active workstreams
+## 5) Historical workstream snapshot
 
-This section tracks the major project streams at a strategic level.
+This frozen table records the former strategic snapshot. It is not current
+status or execution authority.
 
 | Workstream | Goal | Current phase | Status | Current checkpoint |
 |---|---|---|---|---|
-| Market Data | reliable raw → canonical 1m ingestion across exchanges/markets | stabilizing / extending | active | maintain deterministic ingestion and operational reliability |
+| Market Data | reliable raw → canonical 1m ingestion across exchanges/markets | stabilizing / extending | active | будущий маршрут, реализация не начата: простой первый запуск и полный постраничный каталог поддерживаемых сегментов бирж |
 | Indicators | deterministic tensor computation and registry-driven extensibility | core established, extension ongoing | active | controlled indicator and engine evolution |
 | Strategy / Live | immutable strategy specs, live runner, realtime visibility | operational foundation | active | preserve reliable live orchestration and monitoring |
 | Backtest | scalable artifact-backed backtesting with staged runtime evolution | active major stream | active | optimize runtime while preserving exact scorer and rollout safety |
@@ -189,7 +182,7 @@ This section tracks the major project streams at a strategic level.
 | ML | future feature registry and inference path | planned | planned | no active checkpoint |
 | Live Execution | future order routing and execution gateway | planned | planned | no active checkpoint |
 | Notifications | provider-neutral user/admin notifications, Telegram bot, stats and reports | staged pack closed | active | Stages `00`-`11` closed on `main`; next step is a separate user-approved real Telegram canary/rollout beyond test/smoke recipients |
-| Self-Hosted OSS Platform | one release bundle, local-first auth, multi-org RBAC, plugins, admin/control plane, container runtime and migration | accepted architecture / staged execution not started | active | Stage `00` current; use `docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md` and its linked ledger/prompt pack |
+| Self-Hosted OSS Platform | one release bundle, local-first auth, multi-org RBAC, plugins, admin/control plane, container runtime and migration | historical accepted evidence | superseded | no current checkpoint; future work starts from a separately selected current ticket |
 | Cross-cutting Architecture / Docs | roadmap integrity, design docs, milestone coordination | always-on | active | keep architecture docs aligned with delivery |
 
 ---
@@ -292,24 +285,27 @@ Always-on responsibilities:
 
 ### 6.10 Self-Hosted OSS Platform
 
-Canonical execution sources:
+Historical execution sources (superseded):
 
 - `plan_doc`: `docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md`;
 - `prompt_pack_dir`: `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/`;
 - `stage_ledger`: `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/roehub-self-hosted-oss-platform-v1-stage-ledger.md`;
-- `execution_mode`: `goal_driven`.
+- `execution_mode`: `superseded`.
 
-The autonomous goal covers Stages `00`–`24`. Stage `25` production cutover is
-manual-only and requires a new explicit user approval.
+This pack has no autonomous Goal. Its stages are historical evidence and never
+authorize an execution, publication, or runtime action.
 
 ---
 
 ## 7) Current focus
 
-This section is operational and should stay current.
+This section is a historical snapshot and is not operational.
 
-### Primary active project focus
-- Self-Hosted OSS Platform Stage `00`: current-state/component/contract freeze before implementation
+### Former primary project focus
+- Требования следующей продуктовой трансформации зафиксированы в
+  `docs/architecture/platform/roehub-product-transformation-requirements-v1.md`;
+  документ не является исполнительным планом, а каждая следующая работа
+  выбирается отдельным текущим ticket по действующему delivery contract
 - Backtest runtime evolution under staged, rollout-safe architecture
 - Notifications final rollout boundary: staged pack closed; real Telegram canary requires user-approved recipient scope
 - Web/runtime contract consistency for browser-visible flows
@@ -321,22 +317,22 @@ This section is operational and should stay current.
 - Market data reliability and maintenance operations
 - Strategy/live operational hardening
 
-### Currently deferred
-- Self-Hosted OSS Platform production cutover Stage `25` until Stage `24` acceptance and new user approval
+### Historically deferred
+- Self-Hosted OSS Platform production cutover Stages `24`–`25`; the old stages
+  are superseded and cannot be resumed
 - Kubernetes, Podman, Colima and multi-node HA for the self-hosted release
 - broad cross-repo cleanup
 - unmeasured macOS MPS/GPU support claims
 
 ---
 
-## 8) Active checkpoint
+## 8) Historical checkpoint
 
 This section should describe the single most important current planning checkpoint.
 
 ### Current checkpoint
-Execute Self-Hosted OSS Platform Stage `00` from the linked plan/ledger/prompt
-pack before any implementation stage, while other accepted workstreams keep
-their own ledgers and scope.
+There is no current checkpoint in this frozen file. New work starts only from a
+separately selected current ticket under the active delivery contract.
 
 ### What “good” looks like right now
 - each major change belongs to a named workstream and checkpoint
@@ -416,9 +412,9 @@ Keep this list short and current.
 - Notifications real Telegram provider expansion remains deferred until an approved recipient/canary scope and active route readiness are available.
 - A single global `PLANS.md` can become noisy unless old decisions and outcomes are rotated aggressively.
 - Future ML and live execution work can distort current architecture if introduced too early into active planning.
-- The self-hosted migration is a repository-wide breaking change; Stage `00`
-  must keep component coverage, current runtime facts and contract migrations
-  explicit before code changes begin.
+- The self-hosted migration remains a repository-wide risk; each selected
+  current ticket must keep component coverage, runtime facts and contract
+  migrations explicit before code changes begin.
 
 ---
 
@@ -430,7 +426,13 @@ Keep only the most recent, still-relevant decisions here.
 2. Keep the control plane as a modular monolith; isolate workers, heavy jobs, exchange execution, plugins and host operations at real failure/trust boundaries.
 3. Clean install uses local passkey-first auth; generic OIDC is optional and current Keycloak migrates through hybrid mode without changing internal `user_id`.
 4. Roehub DB owns organizations/RBAC; `admin` manages roles and plugins while owner/recovery/mainnet invariants remain separately protected.
-5. Execute the new goal only from its linked plan, 26-prompt pack and single ledger; autonomous completion stops at Stage `24` before production cutover.
+5. Нормальный путь новой self-hosted-установки не использует файл ticket,
+   пользовательские recovery codes или ручной `OpenBao` handoff; полный
+   каталог требует snapshot/cursor contract и явно разделяет `bybit:linear` и
+   пока неподдерживаемые сегменты. Это будущий маршрут: исторические accepted
+   reports и ledger прежнего self-hosted плана остаются источником фактов, а
+   реализация начнётся только из отдельно выбранного текущего ticket по
+   действующему delivery contract.
 
 ---
 
@@ -441,7 +443,7 @@ Keep this list current and short.
 1. The self-hosted target architecture was accepted after iterative decisions on packaging, boundaries, auth, plugins, administration and observability.
 2. A Russian plan, one execution ledger and an English goal-driven prompt pack for Stages `00`–`25` were created and linked.
 3. All 33 current project-map components are mapped to implementation stages; four target components are planned: `context:extensions`, `context:operations`, `app:control_agent`, `app:roehubctl`.
-4. Native/Monit and Keycloak-only target documents were marked superseded while current runtime facts remain valid until migration evidence exists.
+4. Host-specific service-manager and Keycloak-only target documents were marked superseded while current runtime facts remain valid as historical evidence.
 5. Notifications Stages `00`-`11` remain closed historical evidence; their provider semantics feed the new plugin migration stage.
 
 ---

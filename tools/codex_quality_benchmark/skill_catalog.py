@@ -46,7 +46,9 @@ DEPRECATED_TO = {
     "S060": "S077",
     "S061": "S077",
 }
-STAGE_IDS = {
+# Historical implementation-wave provenance for the classic skill audit. This
+# is never a delivery workflow, routing state, or execution gate.
+LEGACY_AUDIT_WAVES = {
     "00": {"S065", "S066"},
     "01": {"S067", "S075", "S078", "S081", "S085"},
     "02": {
@@ -140,9 +142,8 @@ SUPPLEMENTAL_ORDER = [
 SPLIT_REFERENCES = {
     "S065": ["references/skill-system-contract-v1.md"],
     "S066": ["references/skill-system-contract-v1.md"],
-    "S068": ["references/roehub-profile.md"],
     "S075": ["references/execution.md", "references/synthesis.md", "references/security.md"],
-    "S080": ["references/prompt-contract.md", "references/roehub-profile.md"],
+    "S080": ["references/prompt-contract.md"],
     "S085": ["references/web.md", "references/mobile.md", "references/acceptance.md"],
 }
 SECRET_VALUE_RE = re.compile(
@@ -297,6 +298,15 @@ def build_catalog(
 
 
 def write_catalog_pair(catalog: dict[str, Any], repo_path: Path, global_path: Path) -> str:
+    """Write synchronized audit snapshots, never a runtime routing catalog."""
+    runtime_catalog = (
+        Path.home() / ".codex" / "skill-system" / "catalog-v1.json"
+    ).resolve()
+    if runtime_catalog in {repo_path.resolve(), global_path.resolve()}:
+        raise BenchmarkError(
+            "audit catalog must not be written to the runtime catalog path; "
+            "choose an audit-specific destination"
+        )
     payload = json.dumps(catalog, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
     repo_path.parent.mkdir(parents=True, exist_ok=True)
     global_path.parent.mkdir(parents=True, exist_ok=True)
@@ -321,16 +331,26 @@ def resolve_skill(catalog: dict[str, Any], query: str) -> dict[str, Any]:
         if normalized in values or normalized.lower() in {str(value).lower() for value in values}:
             candidates.append(record)
     canonical_candidates = [
-        row for row in candidates if row["implementation_channel"] != "deprecated"
+        row
+        for row in candidates
+        if row["implementation_channel"] != "deprecated"
+        and row.get("session_exposed", "public") in {"public", "internal"}
     ]
     if len(canonical_candidates) == 1:
         return canonical_candidates[0]
     if not canonical_candidates and len(candidates) == 1:
         target = DEPRECATED_TO.get(candidates[0]["skill_id"])
         if target:
-            return next(row for row in catalog["skills"] if row["skill_id"] == target)
+            replacement = next(row for row in catalog["skills"] if row["skill_id"] == target)
+            if replacement.get("session_exposed", "public") in {"public", "internal"}:
+                return replacement
+            raise BenchmarkError(
+                f"audit catalog target is not session-exposed: {query} -> {target}"
+            )
     if not candidates:
         raise BenchmarkError(f"skill not found: {query}")
+    if candidates and not canonical_candidates:
+        raise BenchmarkError(f"audit catalog skill is not session-exposed: {query}")
     raise BenchmarkError(
         f"ambiguous skill query {query}: {[row['skill_id'] for row in canonical_candidates]}"
     )
@@ -440,7 +460,7 @@ def _baseline_record(
 ) -> dict[str, Any]:
     skill_id = source["skill_id"]
     source_kind = source["source_kind"]
-    stage = _stage_for(skill_id)
+    audit_wave = _audit_wave_for(skill_id)
     deprecated = skill_id in DEPRECATED_TO
     direct = source_kind in {"user_skill", "system_skill"}
     if deprecated:
@@ -497,7 +517,7 @@ def _baseline_record(
         "companions": companions,
         "conflicts": [],
         "supersedes": supersedes,
-        "stage": stage,
+        "audit_wave": audit_wave,
         "priority": finding["priority"],
         "recommended_action": finding["recommended_action"],
         "improvement_proposal": finding["improvement_proposal"],
@@ -505,7 +525,7 @@ def _baseline_record(
         "verification_status": "pending",
         "result_contract_provider": provider,
         "result_contract_evidence": (
-            f"Stage {stage} must provide emitted-result or adapter evidence"
+            f"Legacy audit wave {audit_wave} records emitted-result or adapter evidence"
         ),
         "evidence_refs": [finding["audit_evidence"]],
     }
@@ -539,7 +559,7 @@ def _supplemental_record(skill_id: str, name: str, path: Path) -> dict[str, Any]
         "companions": [],
         "conflicts": [],
         "supersedes": [],
-        "stage": "supplemental",
+        "audit_wave": "supplemental",
         "priority": "unreviewed-supplemental",
         "recommended_action": "classify_only",
         "improvement_proposal": "preserve dormant until a separate installed-plugin audit",
@@ -560,6 +580,20 @@ def _apply_effective_metadata(records: list[dict[str, Any]]) -> None:
         if not effective_path.is_file():
             continue
         frontmatter = parse_skill_frontmatter(effective_path)
+        name = frontmatter.get("name")
+        description = frontmatter.get("description")
+        if (
+            not isinstance(name, str)
+            or not name
+            or not isinstance(description, str)
+            or not description
+        ):
+            raise BenchmarkError(
+                f"effective skill lacks standard name/description frontmatter: "
+                f"{record['skill_id']}"
+            )
+        record["canonical_name"] = name
+        record["effective_sha256"] = sha256_file(effective_path)
         metadata = frontmatter.get("metadata")
         if not isinstance(metadata, dict) or metadata.get("skill-spec") != "v1":
             continue
@@ -569,8 +603,6 @@ def _apply_effective_metadata(records: list[dict[str, Any]]) -> None:
                 f"invalid effective skill metadata for {record['skill_id']}: "
                 + "; ".join(validation.errors)
             )
-        record["canonical_name"] = str(frontmatter["name"])
-        record["effective_sha256"] = sha256_file(effective_path)
         for catalog_field, metadata_field in (
             ("role", "role"),
             ("visibility", "visibility"),
@@ -646,7 +678,7 @@ def _ownership_record(record: dict[str, Any], before_hash: str) -> dict[str, Any
     }[record["implementation_channel"]]
     return {
         "skill_id": record["skill_id"],
-        "stage": record["stage"],
+        "audit_wave": record.get("audit_wave", record.get("stage", "legacy")),
         "operation": operation,
         "source_path": record["canonical_path"],
         "effective_path": record["effective_path"],
@@ -661,10 +693,12 @@ def _ownership_record(record: dict[str, Any], before_hash: str) -> dict[str, Any
     }
 
 
-def _stage_for(skill_id: str) -> str:
-    matches = [stage for stage, ids in STAGE_IDS.items() if skill_id in ids]
+def _audit_wave_for(skill_id: str) -> str:
+    matches = [wave for wave, ids in LEGACY_AUDIT_WAVES.items() if skill_id in ids]
     if len(matches) != 1:
-        raise BenchmarkError(f"skill must be owned by exactly one implementation stage: {skill_id}")
+        raise BenchmarkError(
+            f"skill must be owned by exactly one legacy audit wave: {skill_id}"
+        )
     return matches[0]
 
 
@@ -801,18 +835,18 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         default=Path.home() / "plugins" / "codex-skill-system-overrides",
     )
-    build.add_argument("--repo-catalog", type=Path, required=True)
-    build.add_argument("--global-catalog", type=Path, required=True)
+    build.add_argument("--repo-audit-catalog", type=Path, required=True)
+    build.add_argument("--global-audit-catalog", type=Path, required=True)
     build.add_argument("--ownership", type=Path, required=True)
     build.add_argument("--allow-changed", action="append", default=[])
-    resolve = sub.add_parser("resolve-skill")
+    resolve = sub.add_parser("resolve-audit-skill", aliases=["resolve-skill"])
     resolve.add_argument(
-        "--catalog", type=Path, default=Path.home() / ".codex" / "skill-system" / "catalog-v1.json"
+        "--audit-catalog", "--catalog", dest="audit_catalog", type=Path, required=True
     )
     resolve.add_argument("query")
     mark = sub.add_parser("mark")
-    mark.add_argument("--repo-catalog", type=Path, required=True)
-    mark.add_argument("--global-catalog", type=Path, required=True)
+    mark.add_argument("--repo-audit-catalog", type=Path, required=True)
+    mark.add_argument("--global-audit-catalog", type=Path, required=True)
     mark.add_argument("--id", action="append", required=True)
     mark.add_argument(
         "--implementation-status",
@@ -858,7 +892,9 @@ def main(argv: list[str] | None = None) -> int:
                 allowed_changed=set(args.allow_changed),
             )
             digest = write_catalog_pair(
-                catalog, args.repo_catalog, args.global_catalog.expanduser()
+                catalog,
+                args.repo_audit_catalog,
+                args.global_audit_catalog.expanduser(),
             )
             args.ownership.parent.mkdir(parents=True, exist_ok=True)
             args.ownership.write_text(
@@ -867,10 +903,12 @@ def main(argv: list[str] | None = None) -> int:
             )
             print(f"OK: catalog={len(catalog['skills'])} sha256={digest}")
             return 0
-        if args.command == "resolve-skill":
+        if args.command in {"resolve-audit-skill", "resolve-skill"}:
             print(
                 json.dumps(
-                    resolve_skill(_load_catalog(args.catalog.expanduser()), args.query),
+                    resolve_skill(
+                        _load_catalog(args.audit_catalog.expanduser()), args.query
+                    ),
                     indent=2,
                     ensure_ascii=False,
                     sort_keys=True,
@@ -879,14 +917,16 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "mark":
             catalog = mark_catalog_records(
-                _load_catalog(args.repo_catalog),
+                _load_catalog(args.repo_audit_catalog),
                 set(args.id),
                 implementation_status=args.implementation_status,
                 verification_status=args.verification_status,
                 evidence_ref=args.evidence_ref,
             )
             digest = write_catalog_pair(
-                catalog, args.repo_catalog, args.global_catalog.expanduser()
+                catalog,
+                args.repo_audit_catalog,
+                args.global_audit_catalog.expanduser(),
             )
             print(f"OK: marked={len(set(args.id))} sha256={digest}")
             return 0
