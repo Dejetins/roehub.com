@@ -467,16 +467,18 @@ async def _recv_or_stop(socket, stop_event: asyncio.Event) -> str | None:
     """
     recv_task = asyncio.create_task(socket.recv())
     stop_task = asyncio.create_task(stop_event.wait())
-    done, pending = await asyncio.wait(
-        {recv_task, stop_task},
-        return_when=asyncio.FIRST_COMPLETED,
-    )
-    for task in pending:
-        task.cancel()
-    await asyncio.gather(*pending, return_exceptions=True)
-
-    if stop_task in done and stop_event.is_set():
-        recv_task.cancel()
-        await asyncio.gather(recv_task, return_exceptions=True)
-        return None
-    return str(recv_task.result())
+    try:
+        done, _ = await asyncio.wait(
+            {recv_task, stop_task},
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if stop_task in done and stop_event.is_set():
+            return None
+        return str(recv_task.result())
+    finally:
+        # Subscription refresh can cancel this parent while the receive is pending.
+        # Join both children so a normal socket close is never left unobserved.
+        for task in (recv_task, stop_task):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(recv_task, stop_task, return_exceptions=True)

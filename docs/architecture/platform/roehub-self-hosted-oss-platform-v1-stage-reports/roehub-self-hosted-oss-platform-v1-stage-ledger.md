@@ -5,25 +5,36 @@
 - `plan_doc`: `docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md`.
 - `prompt_pack_dir`: `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/`.
 - `stage_ledger`: `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/roehub-self-hosted-oss-platform-v1-stage-ledger.md`.
-- `execution_mode`: `goal_driven`.
-- `ledger_status`: `blocked`.
-- `current_stage`: `24`.
-- `updated_at`: `2026-07-15`.
+- `execution_mode`: `superseded`.
+- `ledger_status`: `superseded`.
+- `current_stage`: `none`.
+- `updated_at`: `2026-07-16`.
 - `owner`: `installation_owner Roehub / делегированный исполнитель Codex`.
 
-Этот документ одновременно является журналом архитектурных итераций и
-единственным журналом будущего этапного выполнения. Отдельный четвёртый
-координационный документ и `GOAL.md` не создаются.
+Этот документ сохраняет принятые доказательства Stages `00`–`23` и частичные
+исторические доказательства Stage `24`. Он больше не является журналом будущего
+выполнения. Stages `24`–`25` не возобновляются.
 
 ## Режим исполнения
 
-В режиме `goal_driven` исполнитель может продолжать этап за этапом только пока
-этот журнал явно разрешает следующий этап. Остановка обязательна при `blocked`,
-`completed`, отсутствии доказательства, нарушенной связи трёх источников
-исполнения или необходимости пользовательского разрешения.
+Исполнение этого пакета остановлено. Базовые требования следующей продуктовой
+трансформации зафиксированы в
+[`roehub-product-transformation-requirements-v1.md`](../roehub-product-transformation-requirements-v1.md),
+но не являются разрешением на возобновление этого пакета.
+Следующий исполнитель не должен запускать prompts `24` или `25`, исправлять их
+старые blockers либо интерпретировать historical evidence как release gate.
+Возобновление возможно только через новый current ticket, выбранный глобальным
+delivery contract; plan, ledger или prompt pack создаются лишь при явной
+необходимости.
 
-Stage `25` никогда не запускается автоматически. Он требует нового явного
-разрешения пользователя на production-cutover после принятия Stage `24`.
+## Пользовательское значение supersession
+
+Пользователь больше не должен предоставлять выведенный из эксплуатации хост,
+отдельную native-среду или доступ к центральному production runtime ради
+продолжения продукта.
+Заморозка не меняет уже реализованный код и не удаляет historical evidence; она
+только предотвращает запуск несовместимых старых этапов. Новая работа начинается
+с отдельного текущего ticket по действующему delivery contract.
 
 ## Правила обновления
 
@@ -41,19 +52,20 @@ Stage `25` никогда не запускается автоматически
 | Общий `main` | Сохранять чужие изменения; владеть только явно перечисленными файлами или hunks; не создавать branch/worktree/stash. |
 | Git | Не использовать broad staging. Commit, push, deploy и production mutation требуют отдельной authority. |
 | Документация | После Markdown-изменений запускать генерацию и проверку индекса документации. |
-| Runtime proof | Использовать только `target_host_readiness_pre_main`, `read_only_existing_runtime_smoke`, `post_main_production_runtime_proof` или `N/A`. |
+| Runtime proof | Исторические строки сохраняют прежние labels только как evidence; новое исполнение использует `local_source_development_proof`, `local_installation_runtime_proof`, `cross_platform_release_candidate_proof`, `authorized_installation_runtime_proof` или `N/A`. |
 
 ## Журнал согласованных архитектурных итераций
 
 | Дата | Итерация | Зафиксированное решение | Последствие для выполнения |
 |---|---|---|---|
-| 2026-07-12 | `A01` | Roehub становится полностью открытым самостоятельно разворачиваемым продуктом: одна команда и несколько контейнеров. | Решение о продукте и комплекте `vX.Y.Z` сохраняется; часть о native Mac Studio как migration source заменена `A07`. |
+| 2026-07-12 | `A01` | Roehub становится полностью открытым самостоятельно разворачиваемым продуктом: одна команда и несколько контейнеров. | Решение о продукте и комплекте `vX.Y.Z` сохраняется; часть о retired native host как migration source заменена `A07`. |
 | 2026-07-12 | `A02` | Управляющее ядро — модульный монолит; рабочие процессы, тяжёлые задания, шлюз исполнения и операционная граница изолируются по реальным причинам. | Каждый из 33 компонентов должен быть проверен, но не каждый становится отдельным сервисом. |
 | 2026-07-12 | `A03` | Keycloak исключается из обязательного `base`: локальная аутентификация для чистой установки и универсальный OIDC. Первоначальные `hybrid`/migration clauses заменены `A07`. | Local auth и provider-neutral OIDC сохраняются; перенос identity, сохранение current `user_id` и Keycloak retirement не входят в v1. |
 | 2026-07-12 | `A04` | Система плагинов становится продуктовым контрактом: package/instance, подписанные контейнеры, декларативные панели и публичный API/SDK. | Stages `11`–`15` переводят существующие ports/adapters на единый расширяемый контракт без открытия критических границ. |
 | 2026-07-13 | `A05` | `admin` управляет ролями и плагинами; зарезервированные инварианты владельца, восстановления и `mainnet` сохраняются. | Матрица RBAC и административный Web UI обязаны доказать управление ролями/плагинами и запрет удаления последнего владельца или обхода `recent-auth`. |
 | 2026-07-13 | `A06` | Созданы итоговый план, этот журнал и пакет промтов для режима цели. | Этап `00` является единственным разрешённым следующим этапом; реализация ещё не начата. |
 | 2026-07-13 | `A07` | Владелец выбрал greenfield-запуск: текущие production-базы, users/identity links, checkpoints, secrets и artifacts не копируются, не backfill-ятся и не исправляются для v1. | Аудит текущего кода остаётся evidence; расхождения текущих строк не блокируют Stage `00`. Stages `03`–`25` проверяют чистую инициализацию и жизненный цикл новой установки без legacy import/cutover. |
+| 2026-07-16 | `A08` | Принят новый пользовательский master, React/ECharts/Penpot маршрут, direct DB backtests и независимая self-hosted release boundary без retired host. | Stages `24`–`25` и их prompts получают `superseded`; accepted evidence Stages `00`–`23` сохраняется; новое выполнение выбирается глобальным delivery contract. |
 
 ## Независимая проверка перед исполнением
 
@@ -116,10 +128,10 @@ Stage `25` никогда не запускается автоматически
 | `19` | `accepted` | `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/19-administration-web-ui.md` | `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/19-administration-web-ui.md` | настоящий Chromium/FastAPI/typed HTTP; role/recent-auth/audit/operation binding; `1948 passed`, ruff/pyright/node | `N/A` | Отдельный admin UI, typed API, role/plugin/operation state, installation-owner actions и organization-bound reconcile доказаны | none; единственная independent проверка `Block` исправлена, local follow-up `Release after fixes`; backup остаётся deferred до `21` | `20` |
 | `20` | `accepted` | `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/20-observability-and-operational-actions.md` | `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/20-observability-and-operational-actions.md` | `real-boundary runtime/browser`: Docker Compose, 8 отказов, timeout/stale, alert persistence, Chromium Web→API→operational-health→Docker; `67 passed`, `1966 passed` | `N/A` | Типизированные `ready/degraded/stopped/unknown`, независимые metrics/logs, server-side safe actions, freshness и admin drill-down доказаны | none; единственный independent `Block` исправлен, local follow-up `Release after fixes`; external notifications/corresponding-source publish переданы release stages | `21` |
 | `21` | `accepted` | `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/21-backup-restore-upgrade-and-rollback.md` | `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/21-backup-restore-upgrade-and-rollback.md` | `real-boundary runtime`: PostgreSQL/ClickHouse/Redis/OpenBao/monitoring, authenticated Unix socket, concurrent cancel/resume, full restore/update/rollback; `44 passed`, `1985 passed` | `N/A` | Signed/encrypted eight-owner backup, measured capture-to-ready RPO/RTO, fresh restore, trusted release transitions и crash reconciliation доказаны | none; единственный independent `Block` из 6 `Blocker`/3 `High` исправлен, local follow-up `Release after fixes`; `0.0.0` остаётся unpublished fixture | `22` |
-| `22` | `accepted` | `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/22-signed-offline-release-bundle.md` | `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/22-signed-offline-release-bundle.md` | полный multi-arch OCI/SPDX/license/source/signature/reproducibility audit; реальная offline install, Compose health и packet capture | `N/A` | custom OpenBao с лицензированной QR-библиотекой; `250` raw `NOASSERTION`, `0` unresolved; подписанный воспроизводимый кандидат, tamper rejection и workload egress `0` доказаны | none; единственный independent `Block` и последующие runtime дефекты исправлены, local follow-up `Release after fixes` | `23` |
-| `23` | `accepted` | `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/23-greenfield-installation-lifecycle-rehearsal.md` | `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/23-greenfield-installation-lifecycle-rehearsal.md` | подписанный offline bundle; три чистые установки; Chromium/API/PostgreSQL/ClickHouse/Redis/OpenBao/artifact reconciliation; Stage `21`; `66 passed` | `N/A` | Полный greenfield install/bootstrap/backup/restore/passkey/repeat/update/rollback прошёл за `415.539 s`; production/current state не читался; cleanup полный | none; оба найденных runtime-дефекта и proof-harness drift исправлены, холодная перепроверка `Release after fixes` | `24` |
-| `24` | `blocked` | `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/24-platform-matrix-release-candidate.md` | `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/24-platform-matrix-release-candidate.md` | полный Stage `22` multi-arch candidate proof и локальный Docker Desktop `linux/arm64` greenfield lifecycle; real Chromium/API/DB/backup/restore/update/rollback; интерактивный `trading` launch | `N/A` | retained candidate manifest `569f24ee...`, tree `a9ca3b3c...`; Docker Desktop lifecycle `passed` за `471.74 s`; интерактивно работают `24` сервиса, Web `200`, console errors `0`, bootstrap secret не раскрыт | обязательный нативный Linux `amd64` отсутствует; штатный Docker Desktop web ingress требует исправления вместо ручного `bridge` workaround; затем остаются benchmarks, component/service reconciliation и responsive/accessibility matrix | нет |
-| `25` | `pending` | `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/25-greenfield-production-launch.md` | `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/25-greenfield-production-launch.md` | greenfield-поставка в production | `post_main_production_runtime_proof` | Подтверждённый запуск пустой новой установки без импорта current state | ожидает `24` и подтверждение пользователя | нет |
+| `22` | `accepted` | `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/22-signed-offline-release-bundle.md` | `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/22-signed-offline-release-bundle.md` | полный multi-arch OCI/SPDX/license/source/signature/reproducibility audit; реальная offline install, Compose health и packet capture | `N/A` | historical signed candidate доказан для исходных исходников | subsequent market-data/OpenBao runtime changes invalidated its applicability; new signed multi-arch Stage `22` recertification is required before any release claim | `23` only after recertification |
+| `23` | `accepted` | `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/23-greenfield-installation-lifecycle-rehearsal.md` | `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/23-greenfield-installation-lifecycle-rehearsal.md` | подписанный offline bundle; три чистые установки; Chromium/API/PostgreSQL/ClickHouse/Redis/OpenBao/artifact reconciliation; Stage `21`; `66 passed` | `N/A` | historical greenfield lifecycle доказан для исторического Stage `22` candidate | requires repeat against the new signed Stage `22` candidate; it cannot validate the current branch | `24` only after recertification |
+| `24` | `superseded` | `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/24-platform-matrix-release-candidate.md` | `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/24-platform-matrix-release-candidate.md` | Историческое частичное Docker Desktop evidence сохранено; продолжение по старой native-host матрице запрещено | `N/A` | Retained candidate и прошлые результаты остаются evidence только для прежнего кода | Новый master требует другой UI/runtime/release recertification и отдельный executable plan | нет |
+| `25` | `superseded` | `.codex/agents/generated/roehub-self-hosted-oss-platform-v1/25-greenfield-production-launch.md` | `docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/25-greenfield-production-launch.md` | Не выполняется из этого пакета | `N/A` | Нет | Центральный production launch больше не является продуктовой моделью | нет |
 
 ## Что обязательно знать следующему этапу
 
@@ -149,8 +161,8 @@ Stage `25` никогда не запускается автоматически
 | `21` | Backup manifest, restore/upgrade/rollback evidence и measured RPO/RTO | Stage `21` report |
 | `22` | Custom OpenBao QR replacement, `250/250` classified raw `NOASSERTION`, signed reproducible bundle, exact sources, autonomous install и workload no-egress | Stage `22` report; passed runtime evidence; retained candidate |
 | `23` | Подписанный кандидат установлен в source/target/repeat empty stores; owner bootstrap, two-org isolation, browser admin, exact backup/restore, restored passkey, Stage `21` update/rollback и cleanup доказаны; runtime/ML digests перевыпущены после bootstrap и Web BFF fixes | Stage `23` report; `io.roehub.greenfield-installation-lifecycle-proof/v1alpha1`; PNG SHA-256 `04bb8ff4efee0c20da5eb9356231c7f4000bd9addf7e19ae63a6a7036f5f7dc8`; current/production state не читался |
-| `24` | Stage `22` candidate воспроизведён и retained; Docker Desktop `4.82.0`/`linux/arm64` прошёл полный greenfield lifecycle, браузер, восстановление, повторную установку и вложенный Stage `21`; proof harness теперь использует локальные image ID во всех `--pull never` границах | Stage `24` blocked report; `io.roehub.platform-matrix-readiness-proof/v1alpha1`; `24-macos-docker-desktop-greenfield-lifecycle-proof.json`; для возобновления дать непроизводственный native amd64 Docker context/SSH executor без секретов в чате и повторить тот же candidate без эмуляции |
-| `25` | Greenfield production revision, CI/deploy/bootstrap/runtime proof and rollback decision внутри нового контура | Stage `25` report |
+| `24` | Частичное historical evidence сохранено, но старый platform-matrix stage не возобновляется | Stage `24` blocked report; новый release contract будет определён отдельным executable plan |
+| `25` | `superseded`; из этого пакета не выполняется | Новый master и будущий отдельный executable plan |
 
 ## Контракты, миграции и совместимость
 
@@ -177,8 +189,8 @@ Stage `25` никогда не запускается автоматически
 | `09`–`16` | context tests + type/lint + benchmarks where triggered | Two-org DB/API, plugin container, provider fake/safe canary, emulator/testnet | нет |
 | `17`–`22` | compose/config/package checks | Real containers, failure/restart, restore, offline install | нет |
 | `23` | clean-install/lifecycle tools | Offline bundle on empty stores; representative fresh fixtures; no current-state access | нет |
-| `24` | full focused and broad gates | Linux amd64/arm64, macOS M3 Pro, browser/API/DB/runtime/security matrix | нет |
-| `25` | delivery gates | `post_main_production_runtime_proof` | нет |
+| `24` | `superseded` | Historical evidence only; будущая матрица задаётся новым планом | N/A |
+| `25` | `superseded` | Не выполняется из этого пакета | N/A |
 
 ## Файловый манифест
 
@@ -212,20 +224,19 @@ Stage `25` никогда не запускается автоматически
 | `21` | не выполнялся | не выполнялся | ничего не планируется | ничего не планируется | `N/A` | обязательно | не выполнялся |
 | `22` | release/OpenBao build tools; license policy/auditor; bundle/installer/runtime verifier; release schema/metadata; Stage `22` tests/report/evidence | runtime Dockerfile/topology/generated configs; OSS metadata/notices; Stage `08`,`17` reports; docs/project-map outputs; этот ledger | none | signed candidate outside Git; generated release/runtime/docs/project-map outputs | exact source/license and digest bindings, signed `openbao.hcl`, internal network and workload packet boundary are mandatory release inputs | production/current state, credentials, provider effects, registry writes, publish/deploy and unrelated dirty files preserved | mixed accepted-stage/generated files changed only for final digest/license/runtime closure; staging/publish not performed |
 | `23` | lifecycle verifier; backup runtime monitoring proof; bootstrap/FK and Web BFF config fixes; focused tests; report/JSON/PNG evidence | migration manifest/generated topology; Stage `17`,`21`,`22` reports; OSS metadata; docs/project-map outputs; этот ledger | none | signed candidate Stage `22`; Stage `21` state-owner lifecycle; Stage `06` passkey bootstrap; Stage `17` topology | empty disposable source/target/repeat state, public/API/use-case boundaries, exact signed hashes and sequential memory-bounded execution | production databases, Keycloak, OpenBao, Redis checkpoints, artifacts, credentials, provider writes and real orders untouched | `accepted`; `415.539 s`, `66 passed`, Ruff/Pyright/generators, cold self-review `Release after fixes`, residual Docker resources `0` |
-| `24` | platform report/readiness/lifecycle evidence; offline image handoff in Stage `21`/OpenBao proof; focused regression tests | Stage `22` candidate provenance and digest pins; Stage `21` runtime proof; Docker Desktop runtime; browser screenshot | none | Linux amd64/arm64 and macOS M3 Pro Docker Desktop are mandatory; emulation is supplemental only | retained exact candidate and non-production native amd64 executor required | production/current state, credentials, provider effects, publish/deploy and Stage `25` remain forbidden | `blocked`; Docker Desktop `linux/arm64` matrix passed and cleaned, candidate retained; native amd64 executor absent |
-| `25` | не выполнялся | не выполнялся | ничего не планируется | ничего не планируется | `N/A` | обязательно | не выполнялся |
+| `24` | historical report/evidence only | none | none | Новый executable plan определит `cross_platform_release_candidate_proof` | none | любые новые изменения запрещены из этого пакета | `superseded` |
+| `25` | historical placeholder only | none | none | Не выполняется из этого пакета | none | любые deploy/installation mutations запрещены | `superseded` |
 
 ## Publish / deploy handoff
 
-- Создание этого плана не даёт authority на commit, push, release, deploy или
-  production mutation.
-- Реализационные этапы по умолчанию выполняются в общем checkout `main`, но
-  публикуются только после отдельного пользовательского запроса через
-  `publish-ci-deploy`.
-- Stage `23` использует только изолированную greenfield-установку и не читает
-  current production state.
-- Stage `25` требует отдельной authority и
-  `post_main_production_runtime_proof`.
+- Этот superseded пакет не даёт authority на новые изменения, commit, push,
+  release, deploy или mutation установки.
+- Stage `23` evidence сохраняется как историческая изолированная
+  greenfield-проверка прежнего кода.
+- Будущий release/publish lifecycle определяется только новым executable plan
+  и нормативными self-hosted proof labels из `.codex/AGENTS.md`.
+- Изменение конкретной установки всегда требует отдельного явного разрешения и
+  `authorized_installation_runtime_proof`.
 
 ## Blockers
 
@@ -234,7 +245,7 @@ Stage `25` никогда не запускается автоматически
 | `00` | Aggregate-only production ownership graph: 49 declared-FK edges clean; среди 51 semantic edges без FK — 218 orphan references и 10 cross-owner mismatches. | resolved by scope decision | `installation_owner` зафиксировал greenfield boundary `A07`: current rows не импортируются и не repair-ятся; Stage `05`,`09`,`10` создают fresh-schema constraints/tests | Пользовательское решение `A07`; Stage `00` report; independent review `Release after fixes`; local follow-up passed | yes: `01` |
 | `03` | Required real-boundary checks were unavailable: no `docker` executable, Docker Desktop path, Colima or Podman on the original host state. | resolved by environment change | Пользователь явно разрешил установку; установлены `colima 0.10.3`, Docker client `29.6.1`, Docker Engine `29.5.2`, Docker Compose `5.3.1` и Buildx `0.35.0`; Stage `03` выполнен заново | `docker version`; `docker compose version`; `colima status --json`; `verify_installation_runtime.py`; `config-consumer-ok` для трёх профилей | yes: `04` |
 | `22` | Exact OpenBao image included `github.com/yeqown/reedsolomon@v1.0.0`; the exact tagged source archive had no license grant. | resolved by owner decision and implementation | Владелец разрешил option `1`; собран custom OpenBao с MIT `skip2/go-qrcode`, сохранён JWT QR и повторены Stages `08`,`17`,`22` | Custom image `sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a`; exact source archive; module/ELF/QR tests; Stage `22` passed evidence | yes: `23` |
-| `24` | Обязательный native Linux `amd64` executor отсутствует; Rosetta/QEMU не являются acceptance evidence. Дополнительно Docker Desktop не активирует declared web host binding при единственной сети `internal: true`; ручное подключение web к `bridge` годится только для просмотра. | blocking | Исправить канонический ingress/network contract и выпустить новый подписанный кандидат; предоставить непроизводственный native `linux/amd64` Docker context или SSH executor без секретов в чате; затем повторить полную матрицу | Stage `22` full proof `passed`; Docker Desktop lifecycle `passed`; интерактивный `trading` launch: `24` running, Web `200` после bounded workaround, console errors `0`, container memory `2788.6 MiB` | no |
+| `24` | Старый native Linux `amd64`/Docker Desktop blocker сохранён только как historical evidence. | superseded | Не исправлять из этого пакета; новый план заново определит CI `linux/amd64`, local `linux/arm64`, ingress и browser gates | Решение `A08`; новый master; `24=25=superseded` | no |
 
 ## Change log
 
@@ -302,3 +313,5 @@ Stage `25` никогда не запускается автоматически
 | 2026-07-15 | Stage `24` resume / Stage `22` candidate repair | Владелец явно возобновил цель и разрешил самостоятельно воспроизвести exact signed candidate Stage `22`, загрузить его в Docker Desktop и начать локальную проверку. Environment gate пройден; `24=in_progress`, Stage `25` по-прежнему запрещён. | Docker Desktop `4.82.0`; client/server `29.6.1`; API `1.55`; context `desktop-linux`; server `linux/arm64`; Colima absent; initial images/containers `0`; disk free `187 GiB`; memory free `74%` |
 | 2026-07-15 | Stage `24` Docker Desktop local matrix | Stage `22` полностью воспроизведён после очистки cache: новый signed candidate retained, signatures/tamper/no-egress/license/source/OCI proofs повторно прошли. Docker Desktop `linux/arm64` greenfield lifecycle прошёл после исправления двух offline proof-harness путей, которые во вложенных Stage `21` и OpenBao backup/restore использовали upstream image references вместо локально импортированных image ID. `24=blocked` на текущем stop gate отсутствующего native Linux `amd64`; после возобновления также обязательны cross-platform benchmarks, финальная component/service reconciliation и responsive/accessibility browser matrix. Stage `25` не запускался. | Candidate manifest `569f24ee203bc7e27a7cdef6fa4cdc0fa58cbb072fb840d86687b4005c968add`; tree `a9ca3b3cbefc7ea6329b97f60e39f9d186256186569a7cf02f6dd4b24c4d3e0d`; lifecycle `471.74 s`; console errors `0`; cross-org `404`; restored passkey `true`; nested Stage `21` attempt `1`; residual Docker resources `0`; memory free after cleanup `52%` |
 | 2026-07-15 | Stage `24` interactive Docker Desktop launch | По явному запросу владельца retained candidate повторно проверен и импортирован, профиль `trading` оставлен работающим для просмотра. Обнаружено, что internal-only Compose network не активирует declared host binding в Docker Desktop; подключение только web к локальному `bridge` подтвердило root cause и временно открыло UI, но не считается acceptance fix. `24` остаётся `blocked`, `25` не запускался. | `24` running services + `2` completed one-shots; `http://127.0.0.1:8080/`=`200`; real browser RU bootstrap form; console errors `0`; ticket mode `0600`, value not exposed; container memory `2788.6 MiB`; system free `45%`; disk free `162 GiB` |
+| 2026-07-15 | Market-data activation Stage `05` handoff | В отдельной ветке добавлены controlled egress, user-selected instrument catalog, bounded artifact capacity, owner OpenBao bootstrap и file-backed publisher credential repair. Локальный Docker Desktop `linux/arm64` runtime доказан, но он не является signed multi-arch candidate. Historical Stage `22`/`23` остаются фактами для прежнего кода и должны быть полностью повторены до release claim; original Stage `24` blocker native `linux/amd64` не снят. | `roehub-market-data-activation-and-instrument-selection-v1` Stage `05` report and evidence; no production mutation |
+| 2026-07-16 | Stages `24`–`25` supersession | Новый пользовательский master и self-hosted proof boundary замещают оставшиеся этапы прежнего пакета. `ledger_status=superseded`, `current_stage=none`; оба prompts лишены authority и execution gate. | Новый master; `.codex/AGENTS.md` v1.12; решение `A08`; historical evidence Stages `00`–`23` и частичного `24` сохранено без повторной интерпретации |

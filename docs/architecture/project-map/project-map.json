@@ -130,7 +130,7 @@
   ],
   "areas": [
     {
-      "file_count": 667,
+      "file_count": 671,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -152,7 +152,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 289,
+      "file_count": 291,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -161,7 +161,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 291,
+      "file_count": 288,
       "id": "operations",
       "paths": [
         "infra/",
@@ -174,7 +174,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 127,
+      "file_count": 128,
       "id": "automation",
       "paths": [
         "tools/",
@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 418,
+      "file_count": 426,
       "id": "quality",
       "paths": [
         "tests/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1104,
+      "file_count": 1057,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -306,7 +306,7 @@
       "entrypoints": [
         "apps/cli/main/main.py"
       ],
-      "file_count": 22,
+      "file_count": 23,
       "id": "app:cli",
       "kind": "app",
       "name": "cli",
@@ -519,6 +519,7 @@
       "depends_on": [
         "app:api",
         "app:cli",
+        "context:backtest",
         "context:backtest_artifacts",
         "context:indicators",
         "context:market_data",
@@ -557,7 +558,7 @@
         "apps/web/main/app.py",
         "apps/web/main/main.py"
       ],
-      "file_count": 96,
+      "file_count": 97,
       "id": "app:web",
       "kind": "app",
       "name": "web",
@@ -635,8 +636,11 @@
       "used_by": [
         "app:api",
         "app:migrations",
+        "app:scheduler",
         "context:backtest_artifacts",
-        "worker:backtest_job_runner"
+        "context:market_data",
+        "worker:backtest_job_runner",
+        "worker:market_data_ws"
       ]
     },
     {
@@ -674,6 +678,7 @@
         "app:cli",
         "app:scheduler",
         "context:backtest",
+        "context:market_data",
         "worker:backtest_job_runner",
         "worker:job_runtime"
       ]
@@ -915,6 +920,8 @@
     },
     {
       "depends_on": [
+        "context:backtest",
+        "context:backtest_artifacts",
         "core:shared_kernel"
       ],
       "description": "Получение, нормализация и хранение рыночных данных.",
@@ -939,7 +946,7 @@
         "docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md"
       ],
       "entrypoints": [],
-      "file_count": 95,
+      "file_count": 99,
       "id": "context:market_data",
       "kind": "context",
       "name": "market_data",
@@ -953,9 +960,9 @@
         "src/trading/contexts/market_data/adapters/outbound/config",
         "src/trading/contexts/market_data/adapters/outbound/messaging",
         "src/trading/contexts/market_data/adapters/outbound/messaging/redis",
+        "src/trading/contexts/market_data/adapters/outbound/persistence",
         "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse",
-        "src/trading/contexts/market_data/adapters/outbound/persistence/postgres",
-        "src/trading/contexts/market_data/application/dto"
+        "src/trading/contexts/market_data/adapters/outbound/persistence/postgres"
       ],
       "used_by": [
         "app:api",
@@ -1235,6 +1242,15 @@
         "docs/architecture/platform/data-sources-panels-and-design-system-v1.md",
         "docs/architecture/platform/isolated-job-runtime-v1.md",
         "docs/architecture/platform/plugin-api-v1alpha1.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/00-contract-baseline-and-repair-route.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/01-controlled-egress-and-market-readiness.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/02-user-instrument-selection-and-onboarding.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/03-artifact-capacity-and-first-publish.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/04-openbao-owner-bootstrap-and-credential-isolation.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/05-release-rebuild-local-lifecycle-and-handoff.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/roehub-market-data-activation-and-instrument-selection-v1-stage-ledger.md",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md",
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/00-freeze-current-state-and-contracts.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/01-open-source-license-and-release-governance.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/02-machine-readable-runbooks.md",
@@ -1246,16 +1262,7 @@
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/08-openbao-secrets-and-recovery.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/09-research-context-organization-isolation.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/10-trading-context-organization-isolation.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/11-notification-and-telegram-provider-plugins.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/12-plugin-platform-api-and-sdk.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/13-data-sources-panels-and-design-system.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/14-artifact-store-and-default-bundles.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/15-isolated-job-and-strategy-runtimes.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/16-execution-gateway-and-mainnet-safety.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/17-containerize-all-services-and-profiles.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/18-control-agent-and-roehubctl.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/19-administration-web-ui.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/20-observability-and-operational-actions.md"
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/11-notification-and-telegram-provider-plugins.md"
       ],
       "entrypoints": [],
       "file_count": 13,
@@ -1376,6 +1383,7 @@
     {
       "depends_on": [
         "app:cli",
+        "context:backtest",
         "context:market_data",
         "core:platform",
         "core:shared_kernel"
@@ -1786,6 +1794,11 @@
     {
       "kind": "python-import",
       "source": "app:scheduler",
+      "target": "context:backtest"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:scheduler",
       "target": "context:backtest_artifacts"
     },
     {
@@ -1941,6 +1954,16 @@
     {
       "kind": "python-import",
       "source": "context:market_data",
+      "target": "context:backtest"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:market_data",
+      "target": "context:backtest_artifacts"
+    },
+    {
+      "kind": "python-import",
+      "source": "context:market_data",
       "target": "core:shared_kernel"
     },
     {
@@ -2066,6 +2089,11 @@
     {
       "kind": "python-import",
       "source": "worker:market_data_ws",
+      "target": "context:backtest"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:market_data_ws",
       "target": "context:market_data"
     },
     {
@@ -2184,8 +2212,13 @@
     },
     {
       "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/agents/architect.toml"
+      "kind": "documentation",
+      "path": ".codex/agents/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/README.md"
     },
     {
       "area": "knowledge",
@@ -3000,6 +3033,36 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/00-contract-baseline-and-repair-route.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/01-controlled-egress-and-market-readiness.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/02-user-instrument-selection-and-onboarding.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/03-artifact-capacity-and-first-publish.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/04-openbao-owner-bootstrap-and-credential-isolation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/05-release-rebuild-local-lifecycle-and-handoff.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/agents/generated/roehub-self-hosted-oss-platform-v1/00-freeze-current-state-and-contracts.md"
     },
     {
@@ -3454,23 +3517,18 @@
     },
     {
       "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/agents/promt_manager.toml"
+      "kind": "documentation",
+      "path": ".codex/agents/legacy/promt_temlate.md"
     },
     {
       "area": "knowledge",
       "kind": "documentation",
-      "path": ".codex/agents/promt_temlate.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/agents/software_engineer.toml"
+      "path": ".codex/agents/legacy/promt_template.md"
     },
     {
       "area": "knowledge",
       "kind": "documentation",
-      "path": ".codex/agents/stage_execution_ledger_template.md"
+      "path": ".codex/agents/legacy/stage_execution_ledger_template.md"
     },
     {
       "area": "knowledge",
@@ -3485,367 +3543,7 @@
     {
       "area": "knowledge",
       "kind": "python",
-      "path": ".codex/hooks/hook_observe_report.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
       "path": ".codex/hooks/roehub_hook_router.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/01_pretool_secret_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/02_pretool_macstudio_runtime_git_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/03_pretool_macstudio_checkout_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/04_pretool_playwright_floating_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/05_pretool_playwright_pinned_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/06_posttool_prompt_pack_missing_anchors.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/07_stop_cold_head_first_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/08_stop_cold_head_repeated_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/09_posttool_skill_frontmatter_warning.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/10_pretool_destructive_root_rm_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/11_pretool_tmp_rm_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/12_posttool_architecture_doc_warning.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/13_posttool_validation_depth_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/14_pretool_secret_env_placeholder_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/15_posttool_browser_tests_only_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/16_pretool_apply_patch_negative_examples_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/17_pretool_execpolicy_negative_dry_run_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/18_pretool_pnpm_playwright_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/19_posttool_prompt_browser_auth_missing_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/20_posttool_prompt_browser_auth_present_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/21_stop_cold_head_structured_receipt_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/22_stop_cold_head_unstructured_mention_blocks.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/23_stop_architecture_discussion_no_artifact_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/24_pretool_ssh_clickhouse_inline_query_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/25_pretool_ssh_clickhouse_stdin_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/26_pretool_ssh_inline_json_curl_warn.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/27_posttool_secret_assignment_tool_response_warn.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/28_posttool_raw_jwt_tool_response_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/29_posttool_docs_index_warning.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/30_posttool_performance_claim_missing_evidence_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/31_posttool_performance_claim_with_evidence_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/32_pretool_stage_branch_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/33_pretool_branch_create_without_approval_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/34_pretool_branch_create_with_approval_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/35_posttool_prompt_stage_branch_policy_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/36_posttool_prompt_pack_multiple_branch_names_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/37_posttool_prompt_pack_single_branch_policy_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/38_pretool_git_branch_show_current_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/39_posttool_prompt_codex_path_no_branch_policy_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/40_pretool_worktree_without_approval_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/41_pretool_worktree_with_approval_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/42_pretool_stage_branch_worktree_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/43_posttool_runtime_proof_boundary_missing_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/44_posttool_runtime_proof_boundary_split_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/45_posttool_runtime_readonly_smoke_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/46_stop_cold_head_russian_human_receipt_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/47_stop_russian_language_mixed_stage_report_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/48_stop_russian_language_stage_report_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/49_stop_russian_language_memory_citation_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/50_pretool_git_add_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/51_pretool_git_add_explicit_path_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/52_pretool_git_commit_all_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/53_pretool_git_diff_cached_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/54_pretool_git_add_root_pathspec_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/55_pretool_git_add_dashdash_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/56_pretool_git_add_update_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/57_pretool_git_commit_amend_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/58_pretool_grep_forbidden_git_text_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/59_pretool_bash_lc_git_add_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/60_pretool_git_commit_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/61_pretool_git_restore_staged_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/62_pretool_git_commit_without_review_marker_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/63_pretool_git_commit_with_review_marker_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/64_pretool_git_push_without_review_marker_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/65_pretool_git_push_with_review_marker_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/66_pretool_sudo_git_add_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/67_pretool_env_i_git_add_dot_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/68_pretool_git_restore_staged_path_allow.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/69_pretool_xargs_git_add_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/70_posttool_prompt_pack_execution_missing_block.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/hooks/tests/fixtures/71_posttool_prompt_pack_execution_stage_ledger_missing_block.json"
     },
     {
       "area": "knowledge",
@@ -3856,16 +3554,6 @@
       "area": "knowledge",
       "kind": "python",
       "path": ".codex/hooks/validators/__init__.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/architecture_doc_linter.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/branch_workflow_guard.py"
     },
     {
       "area": "knowledge",
@@ -3885,46 +3573,6 @@
     {
       "area": "knowledge",
       "kind": "python",
-      "path": ".codex/hooks/validators/docs_index_drift_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/macstudio_path_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/performance_evidence_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/playwright_wrapper_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/prompt_pack_branch_policy_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/prompt_pack_stage_ledger_linter.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/remote_payload_quoting_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/runtime_proof_boundary_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
       "path": ".codex/hooks/validators/russian_final_answer_guard.py"
     },
     {
@@ -3936,26 +3584,6 @@
       "area": "knowledge",
       "kind": "python",
       "path": ".codex/hooks/validators/secret_redaction_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/skill_lint_guard.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/validation_depth_linter.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/promt_template.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/rules/roehub.rules"
     },
     {
       "area": "knowledge",
@@ -4205,6 +3833,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/skill-system/rollback/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/skill-system/rollback/blobs/0003e9adfe5581b9e8062e03251e64a21539a87518ac083a2fc5c2fdef9c0c09.md"
     },
     {
@@ -4368,6 +4001,11 @@
       "path": ".codex/skill-system/rollback/manifest-v1.json"
     },
     {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-17-roehub-transformation-reset.md"
+    },
+    {
       "area": "repository-meta",
       "kind": "other",
       "path": ".dockerignore"
@@ -4381,21 +4019,6 @@
       "area": "operations",
       "kind": "configuration",
       "path": ".github/workflows/ci.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": ".github/workflows/deploy-backend.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": ".github/workflows/deploy-web.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": ".github/workflows/exchange-connection-cleanup-ops.yml"
     },
     {
       "area": "operations",
@@ -4966,6 +4589,11 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/cli/commands/local_auth_bootstrap.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/cli/commands/openbao_owner_init.py"
     },
     {
       "area": "delivery",
@@ -5690,6 +5318,11 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/web/templates/fragments/account/market_data.html"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/web/templates/fragments/account/notifications.html"
     },
     {
@@ -6319,11 +5952,6 @@
     },
     {
       "area": "operations",
-      "kind": "other",
-      "path": "configs/installation/generated/base/service-configs/whitelist.csv"
-    },
-    {
-      "area": "operations",
       "kind": "configuration",
       "path": "configs/installation/generated/ml/compose.yaml"
     },
@@ -6454,11 +6082,6 @@
     },
     {
       "area": "operations",
-      "kind": "other",
-      "path": "configs/installation/generated/ml/service-configs/whitelist.csv"
-    },
-    {
-      "area": "operations",
       "kind": "configuration",
       "path": "configs/installation/generated/trading/compose.yaml"
     },
@@ -6586,11 +6209,6 @@
       "area": "operations",
       "kind": "configuration",
       "path": "configs/installation/generated/trading/service-configs/strategy.yaml"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "configs/installation/generated/trading/service-configs/whitelist.csv"
     },
     {
       "area": "operations",
@@ -9475,6 +9093,81 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/00-contract-baseline-and-repair-route.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/01-controlled-egress-and-market-readiness.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/02-user-instrument-selection-and-onboarding.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/03-artifact-capacity-and-first-publish.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/04-openbao-owner-bootstrap-and-credential-isolation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/05-release-rebuild-local-lifecycle-and-handoff.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/01-market-readiness-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/02-market-data-selection-runtime-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/03-artifact-capacity-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/04-openbao-owner-bootstrap-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/05-local-runtime-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/evidence/05-local-runtime-readiness-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/roehub-market-data-activation-and-instrument-selection-v1-stage-ledger.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-product-transformation-requirements-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/00-freeze-current-state-and-contracts.md"
     },
     {
@@ -9845,6 +9538,86 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/runbooks/legacy/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/backtest-artifacts-rebuild.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/clickhouse-memory-profiles.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/clickhouse-partition-dedup.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/exchange-execution.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/exchange-secret-management.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/keycloak-local-setup-and-ops.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/market-data-autonomous-docker.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/market-data-metrics-reference-ru.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/market-data-metrics.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/notifications-admin-alerts.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/prod-dashboard-metrics-reference-ru.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/rl-trading-operations.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/roehub-ui-autostart-systemd.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/strategy-live-worker.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/runbooks/legacy/web-ui-gateway-same-origin.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/runbooks/live-execution-redis-dispatch.md"
     },
     {
@@ -10046,6 +9819,11 @@
       "area": "operations",
       "kind": "other",
       "path": "infra/caddy/Caddyfile.vps"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/caddy/legacy/Caddyfile.vps.macstudio"
     },
     {
       "area": "operations",
@@ -10434,6 +10212,11 @@
     },
     {
       "area": "operations",
+      "kind": "python",
+      "path": "infra/openbao/owner_init.py"
+    },
+    {
+      "area": "operations",
       "kind": "other",
       "path": "infra/openbao/policies/roehub-api.hcl"
     },
@@ -10651,6 +10434,11 @@
       "area": "operations",
       "kind": "migration",
       "path": "migrations/postgres/0021_control_operation_audit_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0022_market_data_instrument_selections_v1.sql"
     },
     {
       "area": "operations",
@@ -13435,6 +13223,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/artifact_inventory_reader.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/__init__.py"
     },
     {
@@ -13480,6 +13273,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/instrument_coverage_reader.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py"
     },
     {
@@ -13506,6 +13304,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/gateway.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/instrument_selection_repository.py"
     },
     {
       "area": "domain",
@@ -13751,6 +13554,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/market_data/application/use_cases/list_enabled_markets.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/use_cases/refresh_instrument_catalog_from_exchange.py"
     },
     {
       "area": "domain",
@@ -15085,12 +14893,27 @@
     {
       "area": "quality",
       "kind": "configuration",
+      "path": "tests/fixtures/market_data/stage02-compose.override.yaml"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/market_data/stage05-compose.override.yaml"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
       "path": "tests/fixtures/observability-runtime-override.yaml"
     },
     {
       "area": "quality",
       "kind": "configuration",
       "path": "tests/fixtures/observability-stale-override.yaml"
+    },
+    {
+      "area": "quality",
+      "kind": "configuration",
+      "path": "tests/fixtures/openbao/stage04-compose.override.yaml"
     },
     {
       "area": "quality",
@@ -15391,6 +15214,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/cli/test_openbao_owner_init_cli.py"
     },
     {
       "area": "quality",
@@ -16315,6 +16143,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_instrument_coverage_reader.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_raw_kline_writer.py"
     },
     {
@@ -16346,6 +16179,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/contexts/market_data/adapters/test_postgres_candle_repair_audit_repository.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/market_data/adapters/test_postgres_instrument_selection_repository.py"
     },
     {
       "area": "quality",
@@ -16790,6 +16628,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/infra/test_openbao_owner_init.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/infra/test_prod_compose_files.py"
     },
     {
@@ -17066,6 +16909,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/tools/test_runtime_license_audit.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_verify_market_data_readiness.py"
     },
     {
       "area": "automation",
@@ -17350,6 +17198,11 @@
     {
       "area": "automation",
       "kind": "python",
+      "path": "tools/release/verify_market_data_readiness.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
       "path": "tools/release/verify_observability_runtime.py"
     },
     {
@@ -17373,7 +17226,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3040,
+  "inventory_file_count": 3005,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17590,5 +17443,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "6f73c7e8e1648f912bbb682b72b77455f5b5caf2ab12e24e38952a26ebf4a6a9"
+  "structural_digest": "583f57964bd63bce832d4038bab5ab774e37f99f31abb78426973d20dab17761"
 }

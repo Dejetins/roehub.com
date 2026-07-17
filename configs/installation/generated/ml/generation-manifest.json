@@ -2,14 +2,14 @@
   "inputs": {
     "release_manifest_sha256": "706afe5a368eea2ab6b72cea4e7a700ec60622904e55c4f8630237ac32bca6a3",
     "roehub_yaml_sha256": "a8eb8d0a622e16997de60bba23f06b42477b7fb4d41f8289d77e40fce8d26383",
-    "runtime_service_manifest_sha256": "4cfafef968a666caf3471d36cee496ab3b132d4beec7e1a809b7028712fe2666"
+    "runtime_service_manifest_sha256": "a32acc1889f755af92896be5ea089e6d8914b4553eceea44be35270be0f35f3e"
   },
   "outputs": {
     "compose.yaml": {
-      "sha256": "aed9c4c4978946706acdb363e63920f9c8e79219a6aac3e11b1fde0d8e00341f"
+      "sha256": "82ae138c0096906b7ccd455e646312f0a6ced6838ac868230d4705c57339a28a"
     },
     "control-policy.json": {
-      "sha256": "c1f235e66936fb701fc38717a9205cc7bb77e78038885d81a46184d57823d630"
+      "sha256": "72c4df653c7a18f8b6aaad2f0b7c4c3a3ef8ef896955c8443ab1e95cda767e45"
     },
     "effective-config.redacted.json": {
       "sha256": "6586db3d13c1088efd8f49ac657b8bd63eb17322daa8f6157d83ad3930ed8c74"
@@ -48,13 +48,13 @@
       "sha256": "aa766bb57d280d6f6fa67febed729b46747381db79cf9b2fff96fae9cc0cc15a"
     },
     "runtime-topology.json": {
-      "sha256": "be6e71a35b76c8cf8a99372ad4df60ea486c2e6d4642f8d678e0ef90ac3724fc"
+      "sha256": "b46c2f4a71fea21f5391b2583ee3afba4033cb431f5216ddd565987def805bec"
     },
     "service-config.json": {
       "sha256": "e7d2ee7df720e02818c2ebbadf8406146584140d0b9c79dd41a25f0032015de2"
     },
     "service-configs/backtest-artifacts.yaml": {
-      "sha256": "0118b4ea49767cf25958140ec572a5daa41beadbc8347eb2e6f6e77dad600609"
+      "sha256": "8712bcf254384ccf14dfe39c98fd195fcacac936592654fad25ee1a0b090e82a"
     },
     "service-configs/exchange-execution.yaml": {
       "sha256": "02b7941207f181129aa1b1d77070091eac54a7259e3d545a0fe841f137f1067a"
@@ -63,10 +63,10 @@
       "sha256": "c9b127e8710a3f158d251a084ea2ee42c5a7660d45ae9673f16eef9a6c5a775c"
     },
     "service-configs/market-data.yaml": {
-      "sha256": "5e169213dc2ad946db9a5113f24f9525e6ba7253c7a54740948acc3bcb60c312"
+      "sha256": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4"
     },
     "service-configs/market_data.yaml": {
-      "sha256": "5e169213dc2ad946db9a5113f24f9525e6ba7253c7a54740948acc3bcb60c312"
+      "sha256": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4"
     },
     "service-configs/notifications.yaml": {
       "sha256": "c268241754499249ccb045012a578e166f07abe5193b2b9b897e51086d7bebf8"
@@ -79,9 +79,6 @@
     },
     "service-configs/strategy.yaml": {
       "sha256": "e5c19f65eeb30251b01ca6f84e52f5f8e41c86229f1b310b036db6056091e0bc"
-    },
-    "service-configs/whitelist.csv": {
-      "sha256": "f503bc4a72993a9a729266f9c19efab99c86236db2641bd488ac5176a440f7d7"
     }
   },
   "profile": "ml",

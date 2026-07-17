@@ -60,11 +60,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to market_data.yaml",
     )
     parser.add_argument(
-        "--whitelist",
-        default="configs/dev/whitelist.csv",
-        help="Path to whitelist.csv",
-    )
-    parser.add_argument(
         "--metrics-port",
         type=int,
         default=9202,
@@ -104,13 +99,12 @@ def _install_signal_handlers(stop_event: asyncio.Event) -> None:
             signal.signal(sig, lambda *_args: _mark_stop())
 
 
-async def _run_async(config_path: str, whitelist_path: str, metrics_port: int) -> int:
+async def _run_async(config_path: str, metrics_port: int) -> int:
     """
     Build and run scheduler runtime until termination signal.
 
     Parameters:
     - config_path: runtime config path.
-    - whitelist_path: whitelist csv path.
     - metrics_port: metrics endpoint port.
 
     Returns:
@@ -129,7 +123,6 @@ async def _run_async(config_path: str, whitelist_path: str, metrics_port: int) -
     _install_signal_handlers(stop_event)
     app = build_market_data_scheduler_app(
         config_path=config_path,
-        whitelist_path=whitelist_path,
         environ=os.environ,
         metrics_port=metrics_port,
     )
@@ -162,7 +155,6 @@ def main(argv: list[str] | None = None) -> int:
         return asyncio.run(
             _run_async(
                 config_path=args.config,
-                whitelist_path=args.whitelist,
                 metrics_port=args.metrics_port,
             )
         )
@@ -173,4 +165,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

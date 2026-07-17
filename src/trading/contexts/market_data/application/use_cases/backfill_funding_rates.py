@@ -127,6 +127,33 @@ class BackfillFundingRatesUseCase:
         )
         return _build_report(reports, dry_run=dry_run)
 
+    def run_due_instruments(
+        self,
+        *,
+        instrument_ids: Sequence[InstrumentId],
+        dry_run: bool = False,
+    ) -> BackfillFundingRatesReport:
+        """Fetch due funding only for the current effective collector set."""
+        selected = tuple(dict.fromkeys(instrument_ids))
+        if not selected:
+            return _build_report((), dry_run=dry_run)
+        market_ids = tuple(
+            MarketId(value)
+            for value in sorted({instrument_id.market_id.value for instrument_id in selected})
+        )
+        candidates = {
+            instrument.instrument_id: instrument
+            for instrument in self._universe_store.list_tradable_funding_instruments(
+                market_ids=market_ids
+            )
+        }
+        reports = tuple(
+            self._run_one(instrument=candidate, time_range=None, dry_run=dry_run)
+            for instrument_id in selected
+            if (candidate := candidates.get(instrument_id)) is not None
+        )
+        return _build_report(reports, dry_run=dry_run)
+
     def _run_one(
         self,
         *,

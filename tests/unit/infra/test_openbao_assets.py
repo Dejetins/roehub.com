@@ -13,6 +13,16 @@ from infra.openbao import verify_runtime
 ROOT = Path(__file__).resolve().parents[3]
 
 
+def test_runtime_image_includes_the_owner_bootstrap_module_and_policies() -> None:
+    dockerfile = (ROOT / "infra" / "docker" / "Dockerfile.runtime").read_text(encoding="utf-8")
+
+    assert "COPY infra/openbao infra/openbao" in dockerfile
+    assert (
+        "COPY --from=builder --chown=65532:65532 /build/infra/openbao infra/openbao"
+        in dockerfile
+    )
+
+
 def test_embedded_openbao_is_digest_pinned_hardened_and_persistent() -> None:
     compose_path = ROOT / "infra" / "docker" / "openbao-embedded.compose.yml"
     payload = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
@@ -156,3 +166,20 @@ def test_runtime_verifier_applies_offline_image_override_after_base_compose(
         "config",
         "--quiet",
     ]
+
+
+def test_runtime_verifier_cli_passes_compose_override(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    override = tmp_path / "override.yaml"
+    override.write_text("services: {}\n", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    def fake_verify(**kwargs: object) -> dict[str, object]:
+        captured.update(kwargs)
+        return {"schema": "fixture", "status": "passed"}
+
+    monkeypatch.setattr(verify_runtime, "verify", fake_verify)
+
+    assert verify_runtime.main(["--compose-override", str(override)]) == 0
+    assert captured["compose_override"] == override

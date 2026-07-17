@@ -1295,9 +1295,13 @@ def verify(
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--export-encrypted-backup", type=Path)
+    parser.add_argument("--compose-override", type=Path)
     args = parser.parse_args(argv)
     try:
-        result = verify(export_encrypted_backup=args.export_encrypted_backup)
+        result = verify(
+            export_encrypted_backup=args.export_encrypted_backup,
+            compose_override=args.compose_override,
+        )
     except RuntimeProofError as error:
         print(
             json.dumps(

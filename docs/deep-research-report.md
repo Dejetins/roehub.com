@@ -1,10 +1,16 @@
 # Техническое исследование Roehub web UI и план реализации новых интерфейсов
 
+> Статус: historical research. Не является текущим архитектурным или runtime
+> контрактом; применяйте глобальный delivery contract и current architecture.
+
 ## Executive summary
 
 По результатам анализа кода в репозитории на entity["company","GitHub","code hosting"] и приложенных прототипов оптимальная архитектура для Roehub на текущем этапе — **сохранить thin web UI на FastAPI SSR + Jinja2 + custom CSS + page-scoped JS islands**, а **HTMX использовать целенаправленно** для HTML-fragments, форм, модалок, фильтров и простых действий. Переход на React / Next / полноценный SPA сейчас не даёт архитектурного выигрыша, зато добавляет новый runtime- и build-слой, Node/JS toolchain, React-state complexity и риск расползания frontend-логики в проекте, который уже эффективно решает login gate, SSR delivery и same-origin API через Python web-процесс. fileciteturn63file0L1-L1 fileciteturn64file0L1-L1 fileciteturn50file0L1-L1 fileciteturn44file0L1-L1 citeturn6search1turn7search1
 
-Главная архитектурная поправка к исходной гипотезе: **в репозитории фактический edge уже не Nginx, а Caddy**, и production-схема уже разведена как *public edge/VPS + private backend on Mac Studio*. Поэтому сейчас не стоит планировать миграцию reverse proxy ради самой миграции; нужно сохранить роли слоёв, а не менять зрелый edge-компонент без необходимости. Если у команды есть корпоративный стандарт на Nginx, его можно применить позже без смены остальной архитектуры, но **операционной пользы именно сейчас это почти не даст**. fileciteturn55file0L1-L1 fileciteturn45file0L1-L1 fileciteturn44file0L1-L1
+Главная архитектурная поправка к исходной гипотезе: **в историческом
+репозитории edge уже был не Nginx, а Caddy**, и использовалась раздельная
+public/private topology. Эта прежняя схема не является текущим runtime
+контрактом. fileciteturn55file0L1-L1 fileciteturn45file0L1-L1 fileciteturn44file0L1-L1
 
 Самый важный технический риск находится не во frontend-слое, а в backend backtest flow: **текущие backtest jobs в коде исполняются `sync_inline` внутри API-процесса**, при этом UI уже построен так, будто работает с асинхронными jobs и polling. Для будущего backtest configurator / optimization / results это несоответствие нужно устранить в первую очередь: API должен стать enqueue-only, а выполнение должно уйти в отдельный worker loop на backend-стороне, лучше всего сначала через уже существующий Postgres-backed job repository и lease-claim модель, без немедленного введения тяжёлого брокера. Это критично и для отзывчивости UI, и для стабильности backend, и особенно для режима слабого VPS, где web-слой должен оставаться почти чисто I/O-bound. fileciteturn30file0L1-L1 fileciteturn32file0L1-L1 fileciteturn62file0L1-L1
 

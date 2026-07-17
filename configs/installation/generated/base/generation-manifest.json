@@ -2,11 +2,11 @@
   "inputs": {
     "release_manifest_sha256": "706afe5a368eea2ab6b72cea4e7a700ec60622904e55c4f8630237ac32bca6a3",
     "roehub_yaml_sha256": "a8eb8d0a622e16997de60bba23f06b42477b7fb4d41f8289d77e40fce8d26383",
-    "runtime_service_manifest_sha256": "4cfafef968a666caf3471d36cee496ab3b132d4beec7e1a809b7028712fe2666"
+    "runtime_service_manifest_sha256": "a32acc1889f755af92896be5ea089e6d8914b4553eceea44be35270be0f35f3e"
   },
   "outputs": {
     "compose.yaml": {
-      "sha256": "d89d4e4f6a2444bc5ff74381e94f887d470974af217b2a390c278d4a44e60fb4"
+      "sha256": "50c357e9e753bd5a51518f4a54d8a2e4cf0b2df9c950c054661f05318d83e7cc"
     },
     "control-policy.json": {
       "sha256": "5f13451de68071289ef0ff2840e262e57b5db31c26147adaa2556346d611ad16"
@@ -48,13 +48,13 @@
       "sha256": "e69c01484832d567d6ef69d18fb7199a27776217126965e12f41994217587c47"
     },
     "runtime-topology.json": {
-      "sha256": "3a1c96978765c504fd52616de1b5d2e107487e4a2c5b88a4dc6520ff0e31cf0d"
+      "sha256": "e2db779946975ff6b4cc766fe6f53525cbe97b262a53620315fee2560c3dda6b"
     },
     "service-config.json": {
       "sha256": "6dbddc7b04f7548f33ce55898f080ee119dd97ab388a1639421993197abba77b"
     },
     "service-configs/backtest-artifacts.yaml": {
-      "sha256": "0118b4ea49767cf25958140ec572a5daa41beadbc8347eb2e6f6e77dad600609"
+      "sha256": "8712bcf254384ccf14dfe39c98fd195fcacac936592654fad25ee1a0b090e82a"
     },
     "service-configs/exchange-execution.yaml": {
       "sha256": "02b7941207f181129aa1b1d77070091eac54a7259e3d545a0fe841f137f1067a"
@@ -63,10 +63,10 @@
       "sha256": "c9b127e8710a3f158d251a084ea2ee42c5a7660d45ae9673f16eef9a6c5a775c"
     },
     "service-configs/market-data.yaml": {
-      "sha256": "5e169213dc2ad946db9a5113f24f9525e6ba7253c7a54740948acc3bcb60c312"
+      "sha256": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4"
     },
     "service-configs/market_data.yaml": {
-      "sha256": "5e169213dc2ad946db9a5113f24f9525e6ba7253c7a54740948acc3bcb60c312"
+      "sha256": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4"
     },
     "service-configs/notifications.yaml": {
       "sha256": "c268241754499249ccb045012a578e166f07abe5193b2b9b897e51086d7bebf8"
@@ -79,9 +79,6 @@
     },
     "service-configs/strategy.yaml": {
       "sha256": "e5c19f65eeb30251b01ca6f84e52f5f8e41c86229f1b310b036db6056091e0bc"
-    },
-    "service-configs/whitelist.csv": {
-      "sha256": "f503bc4a72993a9a729266f9c19efab99c86236db2641bd488ac5176a440f7d7"
     }
   },
   "profile": "base",

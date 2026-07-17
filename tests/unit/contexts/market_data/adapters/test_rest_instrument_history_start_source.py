@@ -134,7 +134,7 @@ market_data:
     rest_inter_instrument_delay_s: 0.0
   scheduler:
     jobs:
-      sync_whitelist: { interval_seconds: 3600 }
+      refresh_catalog: { interval_seconds: 3600 }
       enrich: { interval_seconds: 3600 }
       rest_insurance_catchup: { interval_seconds: 3600 }
   backfill:

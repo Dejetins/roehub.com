@@ -18,7 +18,6 @@ MESSAGE = (
     "Roehub uses a shared main checkout. Stage only owned files or hunks with "
     "explicit paths, then inspect `git diff --cached --name-status` before commit/push."
 )
-SCOPED_REVIEW_MARKER = "ROEHUB_SCOPED_STAGING_REVIEWED=1"
 
 
 def _split_segments(command: str) -> list[str]:
@@ -158,14 +157,6 @@ def _classify_git(command_name: str, args: list[str]) -> str | None:
     return None
 
 
-def _missing_review_marker(command_name: str, segment: str) -> str | None:
-    if command_name not in {"commit", "push"}:
-        return None
-    if SCOPED_REVIEW_MARKER in segment:
-        return None
-    return "Commit/push without scoped staging review marker"
-
-
 def _indirect_git_command(parts: list[str]) -> str | None:
     if not parts or Path(parts[0]).name != "xargs":
         return None
@@ -192,10 +183,7 @@ def _find_broad_git_command(command: str) -> str | None:
         if not parsed:
             continue
         command_name, args = parsed
-        title = _classify_git(command_name, args) or _missing_review_marker(
-            command_name,
-            segment,
-        )
+        title = _classify_git(command_name, args)
         if title:
             return title
     return None

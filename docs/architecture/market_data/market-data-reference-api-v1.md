@@ -1,5 +1,15 @@
 # Market Data -- Reference API v1 (markets + instruments)
 
+Validation boundary: a local Docker `runtime smoke` and real browser proof are
+required in addition to `pytest`, `ruff`, and `pyright` for browser-visible or
+persistence-affecting changes to this contract.
+
+> Статус: дополнен в `roehub-market-data-activation-and-instrument-selection-v1`.
+> CSV whitelist больше не является runtime-политикой. Каталог остаётся глобальным
+> справочником, а пользовательский выбор хранится и проверяется в PostgreSQL по
+> организации. Браузер обращается к этим маршрутам через `/api/market-data/*`;
+> пути API-router ниже приведены без proxy-префикса.
+
 This document fixes WEB-EPIC-03 architecture: auth-only JSON API endpoints for UI dropdown/search,
 backed by ClickHouse reference tables `market_data.ref_market` and `market_data.ref_instruments`.
 
@@ -73,6 +83,19 @@ Add a new router `market-data reference` with endpoints:
   - deterministic ordering: `symbol ASC`
   - response shape:
     - `{"items": [{"market_id": 1, "symbol": "BTCUSDT"}, ...]}`
+
+- `GET /market-data/catalog?market_id=&q=&limit=`
+  - auth-only and organization-scoped for `selected`, `strategy_pinned` and `effective`
+  - returns public catalog rows plus `catalog_state`, `coverage_state`,
+    `coverage_percent`, `artifact_state` and actual `artifact_bytes`
+  - `coverage_state=unknown` remains explicit until a symbol-specific exchange
+    history lower bound is confirmed; the API must never infer `100%`
+
+- `PUT|DELETE /market-data/selections/{market_id}/{symbol}`
+  - auth-only, idempotent organization-owned intent with an audit event
+  - deletion remains allowed while the instrument is pinned by an active strategy;
+    the response reports `strategy_pinned=true` and `effective=true` rather than
+    stopping the strategy or deleting market data
 
 ### 4) Unit tests
 
@@ -154,6 +177,12 @@ uv run pytest -q
 python -m tools.docs.generate_docs_index
 python -m tools.docs.generate_docs_index --check
 ```
+
+For every runtime-visible change, run a local Docker `runtime smoke` and real
+browser proof: apply the PostgreSQL migration in a clean Compose environment,
+open `/settings#market_data`, find `BTCUSDT`, make both mutations through the
+UI, and confirm `/api/market-data/*` returns `200`. This does not replace the
+future `linux/amd64` matrix.
 
 ## Risks / open questions
 

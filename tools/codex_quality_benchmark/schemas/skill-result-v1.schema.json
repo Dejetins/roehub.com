@@ -55,35 +55,7 @@
         "residual_risks": {"type": "array"},
         "next_action": {"type": "string"}
       },
-      "additionalProperties": false,
-      "allOf": [{
-        "if": {
-          "properties": {
-            "proof_boundary": {
-              "properties": {
-                "profile": {"const": "roehub"},
-                "surface": {"enum": ["runtime", "deploy"]}
-              },
-              "required": ["profile", "surface"]
-            }
-          }
-        },
-        "then": {
-          "properties": {
-            "proof_boundary": {
-              "properties": {
-                "label": {
-                  "enum": [
-                    "target_host_readiness_pre_main",
-                    "read_only_existing_runtime_smoke",
-                    "post_main_production_runtime_proof"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }]
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

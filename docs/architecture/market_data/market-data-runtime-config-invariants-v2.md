@@ -1,5 +1,12 @@
 # Market Data — Runtime Config & Invariants (v2)
 
+> Исторический документ: с `roehub-market-data-activation-and-instrument-selection-v1`
+> CSV whitelist не определяет runtime-набор подписок, REST-догонки или публикации.
+> Набор collector строится из organization-owned selections и pin активных
+> стратегий; исходный документ сохранён для старого CLI-импорта и исторического
+> контекста. Актуальная модель описана в
+> `docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md`.
+
 Этот документ фиксирует runtime-конфигурацию и инварианты исполнения для bounded context `market_data`
 в рамках этапа v2 (REST + WS + автоматическая догонка хвоста).
 

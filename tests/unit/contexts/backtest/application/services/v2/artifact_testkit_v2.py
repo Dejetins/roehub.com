@@ -363,6 +363,7 @@ def build_artifact_precompute_fixture_v2(
                     },
                     "slot_policy": {"slots": ["slot_a", "slot_b"]},
                     "publish_schedule": {
+                        "enabled": False,
                         "full_rebuild_hour_utc": 2,
                         "full_rebuild_minute_utc": 0,
                     },

@@ -92,6 +92,25 @@
   align-items: stretch;
 }
 
+.dashboard-market-data-onboarding {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+}
+
+.dashboard-market-data-onboarding h2,
+.dashboard-market-data-onboarding p {
+  margin: 0;
+}
+
+.dashboard-market-data-onboarding p {
+  margin-top: 4px;
+  color: var(--rh-muted);
+}
+
 .dashboard-top-row {
   grid-column: 1 / -1;
   grid-template-columns: minmax(0, 1fr) minmax(340px, 0.42fr);

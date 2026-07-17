@@ -1,5 +1,10 @@
 # Web UI v1 -- Tests + Docs Index (WEB-EPIC-07)
 
+**Статус:** исторический реестр регрессионных проверок SSR. Будущие проверки
+выбираются в границах конкретных задач; базовые продуктовые требования
+зафиксированы в
+[`roehub-product-transformation-requirements-v1.md`](../../platform/roehub-product-transformation-requirements-v1.md).
+
 Документ фиксирует контракт WEB-EPIC-07: минимальный набор unit/smoke тестов для Milestone 6
 (Web UI + same-origin API proxy + market-data reference API) и правила поддержки docs index.
 

@@ -151,6 +151,7 @@
       "internal_port": 8010,
       "lifecycle": "service",
       "name": "web",
+      "network_access": "web_ingress",
       "profiles": [
         "base",
         "trading",

@@ -3,11 +3,12 @@ market_data:
     chunk_align: utc_day
     max_days_per_insert: 7
   ingestion:
+    bootstrap_history_lookback_minutes: 10080
     flush_interval_ms: 250
     max_buffer_rows: 3000
     rest_concurrency_instruments: 4
     rest_inter_instrument_delay_s: 2.0
-    tail_lookback_minutes: 720
+    tail_lookback_minutes: 10080
   live_feed:
     redis_hot_cache:
       enabled: true
@@ -150,8 +151,9 @@ market_data:
         startup_bootstrap: true
         tail_lookback_intervals: 3
         universe_refresh_interval_seconds: 21600
-      rest_insurance_catchup:
-        interval_seconds: 3600
-      sync_whitelist:
+      refresh_catalog:
         interval_seconds: 60
+      rest_insurance_catchup:
+        enabled: false
+        interval_seconds: 3600
 version: 1

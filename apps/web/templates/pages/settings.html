@@ -2,6 +2,7 @@
 
 {% block page_assets %}
   <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/settings.css') }}">
+  <link rel="stylesheet" href="{{ asset_url('/assets/css/pages/market-data-settings.css') }}">
 {% endblock %}
 
 {% block content %}
@@ -25,7 +26,8 @@
         ("profile", "settings.tabs.profile"),
         ("api", "settings.tabs.api"),
         ("integrations", "settings.tabs.integrations"),
-        ("security", "settings.tabs.security")
+        ("security", "settings.tabs.security"),
+        ("market_data", "settings.tabs.market_data")
       ] %}
         <button
           class="settings-modebar__button{{ ' is-active' if loop.first else '' }}"
@@ -86,10 +88,22 @@
         {% include "fragments/account/security.html" %}
         {% include "fragments/account/sessions.html" %}
       </section>
+
+      <section
+        class="settings-tab-panel settings-tab-panel--market-data"
+        id="settings-tab-market-data"
+        role="tabpanel"
+        aria-labelledby="settings-tab-button-market_data"
+        data-settings-tab-panel="market_data"
+        hidden
+      >
+        {% include "fragments/account/market_data.html" %}
+      </section>
     </div>
   </section>
 {% endblock %}
 
 {% block scripts %}
   <script type="module" src="{{ asset_url('/assets/js/pages/settings.js') }}"></script>
+  <script type="module" src="{{ asset_url('/assets/js/pages/market-data-settings.js') }}"></script>
 {% endblock %}

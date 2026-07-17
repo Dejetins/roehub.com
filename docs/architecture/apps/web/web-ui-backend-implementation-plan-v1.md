@@ -1,5 +1,12 @@
 # План реализации Roehub Web UI + Backend v1
 
+**Статус:** `historical implementation evidence`. Документ сохраняется как
+инвентаризация текущего SSR runtime, маршрутов и обнаруженных backend/read-model
+разрывов, но не задаёт будущую реализацию. Базовые продуктовые требования
+зафиксированы в
+[`roehub-product-transformation-requirements-v1.md`](../../platform/roehub-product-transformation-requirements-v1.md);
+исполнительная задача выбирается отдельно по действующему delivery contract.
+
 Документ фиксирует пошаговый план реализации новой версии Roehub Web UI и связанных backend read-model/API-расширений так, чтобы работу можно было безопасно распараллелить между агентами.
 
 ## Статус
@@ -45,7 +52,7 @@
 | 06 | `06-implement-strategy-library-detail.md` | Реализовано как current baseline: `/strategies`, `/strategies/new`, `/strategies/{strategy_id}` используют `pages/strategies.html`; есть bounded `GET /api/ui/strategies/dashboard`, DTO/wiring/tests, old `strategy_ui.js` не подключается. Текущая компоновка - пять рабочих блоков: слева Statistics Workspace над более широким Visual Workspace, справа Strategy Control над Saved Strategies той же ширины, снизу Trades History на всю ширину. Create UI и ручная `Load statistics` кнопка исключены из workstation: статистика подгружается сразу для выбранной строки стратегии. | Следующие этапы должны добавлять реальные read-model/projections для unavailable panels, не возвращая generic card grid. |
 | 07 | `07-implement-strategy-monitoring.md` | Не реализовано как отдельный live bridge: `/monitoring` сейчас compatibility placeholder, stream/read-model UI endpoints для strategy dashboard отсутствуют. `/strategies` и `/dashboard` используют bounded polling/read-models, но не полноценный strategy live SSE bridge. | Выполнять как backend/live bridge для текущего UI, не переписывая текущие `/strategies` и `/dashboard`. |
 | 08 | `08-implement-backtests-history-configurator.md` | Реализовано как current baseline: `/backtests`, `/backtests/new`, `/backtests/{job_id}` рендерят `pages/backtests.html`; есть reference-shaped workstation, branded dropdowns, config/preflight/create/history/job filters, delete/cancel markers, `GET /api/ui/backtests/workstation`, route/API/web tests, old `backtest_ui.js` не подключается. | Дальше только bugfix/read-model hardening; не возвращать generic history cards или native selects. |
-| 08.5 | `08-5-implement-backtest-runtime-hardening.md` | Частично реализовано на уровне API boundary: create path возвращает queued/background semantics и использует execution trigger/worker use-case seam. Production `backtest-job-runner` service на Mac Studio и lazy trades materialization queue еще не реализованы; это вынесено в `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`. | Выполнить отдельный runner prompt pack до публичной нагрузки `/backtests` create/results и до UI, который активно вызывает heavy result/stat endpoints. |
+| 08.5 | `08-5-implement-backtest-runtime-hardening.md` | Частично реализовано на уровне API boundary: create path возвращает queued/background semantics и использует execution trigger/worker use-case seam. Production `backtest-job-runner` service и lazy trades materialization queue еще не реализованы; это вынесено в `docs/architecture/backtest/backtest-job-runner-production-plan-v1.md`. | Выполнить отдельный runner prompt pack до публичной нагрузки `/backtests` create/results и до UI, который активно вызывает heavy result/stat endpoints. |
 | 09 | `09-implement-backtests-results.md` | Частично реализовано: backend endpoints `summary`, `equity`, `drawdown`, `monthly-stats`, `symbol-stats`, paginated `GET /trades` и `trades.csv` уже есть и покрыты API tests. Текущий Web UI подключает selected variant detail: charts, monthly stats, compatibility readiness и trades list через bounded endpoints; trades list собирает все paginated pages выбранного variant в один scrollable список. | Следующий шаг - не повторная реализация endpoints, а hardening этих методов под async materialization/cache-status и runner readiness для public/high-load сценариев. |
 | 10 | `10-implement-security-performance-delivery-hardening.md` | Не выполнено как финальный sweep; отдельные CSRF/origin checks уже есть в account routes, но это не заменяет Stage 10. | Выполнять после завершения всех browser-visible страниц. |
 | 11 | `11-implement-capacity-load-validation.md` | Не выполнено. | Выполнять после Stage 10 или перед публичным запуском live/autorefresh-heavy surfaces. |
@@ -191,7 +198,7 @@ Canonical page map:
 Rollback/baseline:
 
 - baseline commit для пересборки UI pack: `bae8bd88229ceec4736deee5d61ad178e1ab9060`;
-- если требуется физически откатить уже реализованный UI-код, использовать отдельный безопасный revert/publish workflow с проверками и Mac Studio sync;
+- если требуется физически откатить уже реализованный UI-код, использовать отдельный безопасный revert/publish workflow с проверками и утвержденным runtime contract;
 - этот план и prompt pack должны считать post-baseline generic UI реализацией, которую можно заменять, но не должны выполнять destructive reset без отдельного явного задания.
 
 ## Целевая архитектура
@@ -1875,7 +1882,7 @@ Backend/API:
 - проверить/изменить `src/trading/contexts/backtest/application/use_cases/backtest_jobs.py`;
 - добавить/изменить worker trigger/port/adapters в `src/trading/contexts/backtest/**` или существующем worker package;
 - для production runner prompt pack ожидаемые новые surfaces: `apps/worker/backtest_job_runner/**`,
-  storage/ports для `backtest_lazy_trades_materializations`, Mac Studio launchd
+  storage/ports для `backtest_lazy_trades_materializations`, service-manager
   plist, Prometheus target `127.0.0.1:9204/metrics` и dedicated runner smoke;
 - обновить `apps/api/routes/backtests.py` только если меняется external behavior/status;
 - добавить tests:
@@ -1896,7 +1903,7 @@ Backend/API:
 - current job states не меняются на persisted `created`/`completed`;
 - no full result/trades payload stored in job top rows;
 - local focused tests pass;
-- если compute path затронут, Mac Studio/backtest benchmark policy применяется отдельно и не подменяется UI smoke.
+- если compute path затронут, отдельная backtest benchmark policy применяется отдельно и не подменяется UI smoke.
 
 Нагрузочная проверка:
 
@@ -2212,7 +2219,7 @@ uv run python tools/load/web_capacity_smoke.py \
 | Branded controls | `breaking-change` для browser UX | Visible native select/dropdown заменяется shared Roehub controls; hidden fallback допустим. |
 | Refresh/autorefresh | `compatible-change` | Добавляются manual refresh/autorefresh DTO fields, limits и preference defaults; exchange-bound refresh не обходит backend limiter. |
 | Runtime workflow | `compatible-change` | Backtest create остается bounded async path; full compute переходит через parent/child `backtest-job-runner` workflow без изменения public DTO vocabulary. |
-| Benchmark / rollout gates | `compatible-change` | Backtest performance gates остаются; UI-работа не должна заявлять benchmark acceptance без Mac Studio evidence, если меняются compute paths. |
+| Benchmark / rollout gates | `compatible-change` | Backtest performance gates остаются; UI-работа не должна заявлять benchmark acceptance без сравнимого runtime evidence, если меняются compute paths. |
 | Performance risk | `unknown` до измерений | Dashboard/strategies/backtests/result-state/create flows могут создать fan-out или CPU pressure; требуются bounded DTOs, Playwright/network evidence и capacity/load report. |
 
 ## Открытые вопросы реализации

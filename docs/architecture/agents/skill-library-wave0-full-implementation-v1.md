@@ -83,7 +83,7 @@ Figma cache skills содержит `96` canonical paths. Baseline аудита 
 global/repo catalog policy, exact ownership manifest, rollback snapshot store,
 schemas, resolver, fixtures, tests, AGENTS routing, reports и docs continuity.
 
-Не входят Roehub application/runtime/deploy, Mac Studio mutation, Git
+Не входят Roehub application/runtime/deploy, retired-host mutation, Git
 commit/push, branch/worktree/stash, managed cache mutation, secrets/cookies/raw
 browser state/provider payloads и автоматическая установка dormant plugins.
 

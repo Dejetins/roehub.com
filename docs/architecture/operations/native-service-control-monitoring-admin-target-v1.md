@@ -8,14 +8,17 @@
 > разрешает будущим этапам возвращать обязательные `launchd`, Monit, Keycloak
 > или billing в self-hosted OSS target.
 
-Документ фиксирует целевую production-картину управления, контроля и мониторинга сервисов Roehub на `Mac Studio` в native-модели (без обязательного Docker runtime).
+Документ фиксирует историческую production-картину управления, контроля и
+мониторинга сервисов Roehub на retired host в native-модели (без обязательного
+Docker runtime).
 
 ## Статус и границы
 
 - Статус: historical superseded target; часть текста всё ещё описывает текущий
   runtime до выполнения нового миграционного плана.
-- Хост backend: `Mac Studio`.
-- Публичный edge остается на VPS (`roehub.com`), backend на `Mac Studio` остается private.
+- Хост backend: retired host.
+- Публичный edge и private backend topology сохранены только как historical
+  evidence.
 - Собственный billing-модуль не разрабатывается.
 - `Backtest artifact publisher` управляется через `Monit` поверх `launchd`.
 - Backtest artifact publisher входит в обязательный Prometheus monitoring baseline.
@@ -282,8 +285,7 @@
 
 ## Связанные документы
 
-- `docs/runbooks/mac-studio-native-backend-operations.md`
-- `docs/runbooks/mac-studio-monitoring-plan.md`
+- Historical operating procedures are archived under `docs/runbooks/legacy/`.
 - `docs/runbooks/backtest-artifacts-rebuild.md`
 - `docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md`
 - `docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md`

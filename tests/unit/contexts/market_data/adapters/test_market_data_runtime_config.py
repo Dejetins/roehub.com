@@ -42,7 +42,7 @@ market_data:
     rest_inter_instrument_delay_s: 2.0
   scheduler:
     jobs:
-      sync_whitelist: { interval_seconds: 900 }
+      refresh_catalog: { interval_seconds: 900 }
       enrich: { interval_seconds: 7200 }
       rest_insurance_catchup: { interval_seconds: 3600 }
       funding_rate_catchup:
@@ -69,7 +69,7 @@ market_data:
     assert cfg.ingestion.rest_concurrency_instruments == 7
     assert cfg.ingestion.tail_lookback_minutes == 240
     assert cfg.ingestion.rest_inter_instrument_delay_s == 2.0
-    assert cfg.scheduler.jobs.sync_whitelist.interval_seconds == 900
+    assert cfg.scheduler.jobs.refresh_catalog.interval_seconds == 900
     assert cfg.scheduler.jobs.funding_rate_catchup.interval_seconds == 1800
     assert cfg.scheduler.jobs.funding_rate_catchup.settlement_lag_minutes == 15
     assert cfg.scheduler.jobs.funding_rate_catchup.due_mode == "due_only"
@@ -127,7 +127,7 @@ market_data:
     )
 
     cfg = load_market_data_runtime_config(p)
-    assert cfg.scheduler.jobs.sync_whitelist.interval_seconds == 3600
+    assert cfg.scheduler.jobs.refresh_catalog.interval_seconds == 3600
     assert cfg.scheduler.jobs.enrich.interval_seconds == 21600
     assert cfg.scheduler.jobs.rest_insurance_catchup.interval_seconds == 3600
     assert cfg.scheduler.jobs.funding_rate_catchup.interval_seconds == 1800

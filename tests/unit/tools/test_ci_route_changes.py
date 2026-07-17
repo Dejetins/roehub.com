@@ -3,9 +3,7 @@ from __future__ import annotations
 import json
 
 from tools.ci.route_changes import (
-    classify_backend_deploy,
     classify_ci,
-    classify_web_deploy_config,
     classify_web_image,
 )
 
@@ -14,7 +12,7 @@ def _matrix_names(outputs: dict[str, str]) -> set[str]:
     return {item["name"] for item in json.loads(outputs["test_matrix"])["include"]}
 
 
-def test_web_only_change_runs_web_tests_without_backtest_or_backend_deploy() -> None:
+def test_web_only_change_runs_web_tests_without_backtest_or_migrations() -> None:
     paths = [
         "apps/web/dist/css/pages/backtests.css",
         "tests/unit/apps/web/test_app_routes.py",
@@ -25,7 +23,6 @@ def test_web_only_change_runs_web_tests_without_backtest_or_backend_deploy() -> 
     assert outputs["code"] == "true"
     assert outputs["run_migrations"] == "false"
     assert _matrix_names(outputs) == {"web-api"}
-    assert not classify_backend_deploy(paths)
     assert classify_web_image(paths)
 
 
@@ -73,8 +70,12 @@ def test_workflow_or_lockfile_change_runs_full_ci() -> None:
     }
 
 
-def test_deploy_routing_separates_backend_and_web_surfaces() -> None:
-    assert classify_backend_deploy(["apps/api/routes/backtests.py"])
-    assert not classify_backend_deploy(["apps/web/main/app.py"])
+def test_web_image_routing_is_explicit() -> None:
     assert classify_web_image(["apps/web/main/app.py"])
-    assert classify_web_deploy_config(["infra/caddy/Caddyfile.vps"])
+
+
+def test_codex_hook_change_runs_code_gates() -> None:
+    outputs = classify_ci([".codex/hooks/validators/common.py"])
+
+    assert outputs["code"] == "true"
+    assert outputs["has_tests"] == "true"

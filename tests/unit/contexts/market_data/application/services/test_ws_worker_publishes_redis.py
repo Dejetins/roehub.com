@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import asyncio
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 from uuid import UUID
 
+import apps.worker.market_data_ws.wiring.modules.market_data_ws as worker_module
 from apps.worker.market_data_ws.wiring.modules.market_data_ws import MarketDataWsApp
 from trading.contexts.market_data.application.dto import CandleWithMeta
 from trading.shared_kernel.primitives import (
@@ -166,6 +168,42 @@ class _NoopReconnectPlanner:
         return []
 
 
+class _LifecycleStub:
+    """Minimal async lifecycle dependency for subscription refresh tests."""
+
+    async def start(self) -> None:
+        return None
+
+    async def close(self) -> None:
+        return None
+
+
+class _RefreshingInstrumentReader:
+    """Return an instrument only after the initial empty startup read."""
+
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def list_enabled_tradable(self):
+        self.calls += 1
+        if self.calls == 1:
+            return ()
+        return (InstrumentId(market_id=MarketId(2), symbol=Symbol("BTCUSDT")),)
+
+
+class _RefreshProbeApp(MarketDataWsApp):
+    """Record a refreshed plan without opening an external websocket."""
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+        self.plan_seen = asyncio.Event()
+
+    async def _run_plan(self, plan, stop_event):
+        _ = plan
+        self.plan_seen.set()
+        await stop_event.wait()
+
+
 def _row() -> CandleWithMeta:
     """
     Build deterministic WS closed candle for worker tests.
@@ -279,3 +317,39 @@ def test_ws_worker_keeps_processing_when_live_publish_fails() -> None:
     assert len(publisher.calls) == 1
     assert len(rest_queue.tasks) == 1
     assert rest_queue.tasks[0] is gap_task
+
+
+def test_ws_worker_refreshes_subscriptions_after_empty_startup(monkeypatch) -> None:
+    """The worker must subscribe after scheduler data arrives, without restart."""
+
+    monkeypatch.setattr(worker_module, "start_http_server", lambda _port: None)
+    reader = _RefreshingInstrumentReader()
+    market = SimpleNamespace(
+        market_id=MarketId(2),
+        ws=SimpleNamespace(max_symbols_per_connection=200),
+    )
+    app = _RefreshProbeApp(
+        config=SimpleNamespace(market_by_id=lambda _market_id: market),
+        instrument_reader=reader,
+        index_reader=object(),
+        insert_buffer=_LifecycleStub(),
+        rest_fill_queue=_LifecycleStub(),
+        live_candle_publisher=object(),
+        gap_tracker=object(),
+        reconnect_planner=object(),
+        ingest_id=UUID("00000000-0000-0000-0000-000000000999"),
+        metrics=object(),
+        metrics_port=9201,
+        subscription_refresh_seconds=0.01,
+    )
+
+    async def scenario() -> None:
+        stop_event = asyncio.Event()
+        task = asyncio.create_task(app.run(stop_event))
+        await asyncio.wait_for(app.plan_seen.wait(), timeout=0.5)
+        stop_event.set()
+        await asyncio.wait_for(task, timeout=0.5)
+
+    asyncio.run(scenario())
+
+    assert reader.calls >= 2

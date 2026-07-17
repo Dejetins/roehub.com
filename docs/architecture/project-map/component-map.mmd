@@ -135,6 +135,7 @@ flowchart TB
   n_app_roehubctl --> n_context_operations
   n_app_scheduler --> n_app_api
   n_app_scheduler --> n_app_cli
+  n_app_scheduler --> n_context_backtest
   n_app_scheduler --> n_context_backtest_artifacts
   n_app_scheduler --> n_context_indicators
   n_app_scheduler --> n_context_market_data
@@ -166,6 +167,8 @@ flowchart TB
   n_context_live_execution --> n_context_exchange_control
   n_context_live_execution --> n_context_strategy
   n_context_live_execution --> n_core_shared_kernel
+  n_context_market_data --> n_context_backtest
+  n_context_market_data --> n_context_backtest_artifacts
   n_context_market_data --> n_core_shared_kernel
   n_context_notifications --> n_core_platform
   n_context_notifications --> n_core_shared_kernel
@@ -191,6 +194,7 @@ flowchart TB
   n_worker_job_runtime --> n_core_integration
   n_worker_job_runtime --> n_core_shared_kernel
   n_worker_market_data_ws --> n_app_cli
+  n_worker_market_data_ws --> n_context_backtest
   n_worker_market_data_ws --> n_context_market_data
   n_worker_market_data_ws --> n_core_platform
   n_worker_market_data_ws --> n_core_shared_kernel

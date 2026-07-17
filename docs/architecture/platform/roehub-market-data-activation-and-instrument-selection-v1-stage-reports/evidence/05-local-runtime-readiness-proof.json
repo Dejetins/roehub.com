@@ -1,0 +1,29 @@
+{
+  "candle_age_seconds": 55.47897696495056,
+  "checked_at": "2026-07-15T23:53:56.141640+00:00",
+  "checks": {
+    "fresh_candle": true,
+    "insert_errors": true,
+    "raw_insert": true,
+    "rest_fill_errors": true,
+    "scheduler_errors": true,
+    "scheduler_sync_and_enrichment": true,
+    "ws_connection": true,
+    "ws_errors": true,
+    "ws_messages": true
+  },
+  "newest_candle_timestamp": 1784159580.0,
+  "ready": true,
+  "scheduler": {
+    "scheduler_job_errors_total": 0.0,
+    "scheduler_job_runs_total": 6.0
+  },
+  "ws": {
+    "insert_errors_total": 0.0,
+    "insert_rows_total": 2.0,
+    "rest_fill_errors_total": 0.0,
+    "ws_connected": 1.0,
+    "ws_errors_total": 0.0,
+    "ws_messages_total": 390.0
+  }
+}

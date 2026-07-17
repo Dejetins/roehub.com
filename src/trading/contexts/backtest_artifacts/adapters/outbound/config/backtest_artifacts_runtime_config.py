@@ -51,7 +51,11 @@ _SIGNAL_ARTIFACT_REQUIRED_KEYS = ("timeframe", "indicator_id")
 _SIGNAL_ARTIFACTS_ALL_SUPPORTED_LITERAL = "all_supported_v1"
 _HIT_TIMES_GRID_REQUIRED_KEYS = ("tp_levels_pct", "sl_levels_pct")
 _SLOT_POLICY_REQUIRED_KEYS = ("slots",)
-_PUBLISH_SCHEDULE_REQUIRED_KEYS = ("full_rebuild_hour_utc", "full_rebuild_minute_utc")
+_PUBLISH_SCHEDULE_REQUIRED_KEYS = (
+    "enabled",
+    "full_rebuild_hour_utc",
+    "full_rebuild_minute_utc",
+)
 _LOOKBACK_POLICY_REQUIRED_KEYS = (
     "price_tail_bars_1m",
     "mapping_tail_bars_1m",
@@ -437,6 +441,7 @@ class BacktestArtifactPublishScheduleRuntimeConfig:
       - docs/architecture/backtest/README.md
     """
 
+    enabled: bool
     full_rebuild_hour_utc: int
     full_rebuild_minute_utc: int
 
@@ -455,6 +460,10 @@ class BacktestArtifactPublishScheduleRuntimeConfig:
         Side Effects:
             None.
         """
+        _require_bool(
+            value=self.enabled,
+            field_path="backtest_artifacts.publish_schedule.enabled",
+        )
         _require_int_range(
             value=self.full_rebuild_hour_utc,
             field_path="backtest_artifacts.publish_schedule.full_rebuild_hour_utc",
@@ -1030,6 +1039,10 @@ def load_backtest_artifacts_runtime_config(path: str | Path) -> BacktestArtifact
             )
         ),
         publish_schedule=BacktestArtifactPublishScheduleRuntimeConfig(
+            enabled=_require_bool(
+                value=publish_schedule_map.get("enabled"),
+                field_path="backtest_artifacts.publish_schedule.enabled",
+            ),
             full_rebuild_hour_utc=_require_int(
                 value=publish_schedule_map.get("full_rebuild_hour_utc"),
                 field_path="backtest_artifacts.publish_schedule.full_rebuild_hour_utc",
@@ -1156,6 +1169,7 @@ def build_backtest_artifacts_runtime_config_hash(
                 "slots": config.slot_policy.slots,
             },
             "publish_schedule": {
+                "enabled": config.publish_schedule.enabled,
                 "full_rebuild_hour_utc": config.publish_schedule.full_rebuild_hour_utc,
                 "full_rebuild_minute_utc": config.publish_schedule.full_rebuild_minute_utc,
             },

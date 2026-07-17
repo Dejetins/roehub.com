@@ -61,6 +61,53 @@ def test_planner_bootstrap_uses_symbol_history_start_when_present() -> None:
     assert str(tasks[0].time_range.end) == str(now_floor)
 
 
+def test_planner_bootstrap_can_limit_first_history_window() -> None:
+    """Ensure first user-selected ingestion cannot silently request all exchange history."""
+    planner = SchedulerBackfillPlanner(
+        tail_lookback_minutes=180,
+        bootstrap_history_lookback_minutes=1440,
+    )
+    earliest = UtcTimestamp(datetime(2017, 1, 1, 0, 0, tzinfo=timezone.utc))
+    now_floor = UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc))
+
+    tasks = planner.plan_for_instrument(
+        instrument_id=_instrument(),
+        earliest_market_ts=earliest,
+        bounds_1m=(None, None),
+        now_floor=now_floor,
+    )
+
+    assert len(tasks) == 1
+    assert tasks[0].reason == "scheduler_bootstrap"
+    assert str(tasks[0].time_range.start) == str(
+        UtcTimestamp(datetime(2026, 2, 8, 14, 0, tzinfo=timezone.utc))
+    )
+    assert str(tasks[0].time_range.end) == str(now_floor)
+
+
+def test_planner_bootstrap_window_repairs_live_only_seed_without_full_history() -> None:
+    """Ensure an early WebSocket candle cannot turn first ingestion into a 2017 backfill."""
+    planner = SchedulerBackfillPlanner(
+        tail_lookback_minutes=1440,
+        bootstrap_history_lookback_minutes=1440,
+    )
+    earliest = UtcTimestamp(datetime(2017, 1, 1, 0, 0, tzinfo=timezone.utc))
+    now_floor = UtcTimestamp(datetime(2026, 2, 9, 14, 0, tzinfo=timezone.utc))
+    live_first = UtcTimestamp(datetime(2026, 2, 9, 13, 58, tzinfo=timezone.utc))
+
+    tasks = planner.plan_for_instrument(
+        instrument_id=_instrument(),
+        earliest_market_ts=earliest,
+        bounds_1m=(live_first, live_first),
+        now_floor=now_floor,
+    )
+
+    assert [task.reason for task in tasks] == ["scheduler_bootstrap", "scheduler_tail"]
+    assert str(tasks[0].time_range.start) == "2026-02-08T14:00:00.000Z"
+    assert str(tasks[0].time_range.end) == str(live_first)
+    assert str(tasks[1].time_range.start) == "2026-02-09T13:59:00.000Z"
+
+
 def test_planner_creates_historical_range_from_earliest_to_canonical_min() -> None:
     """Ensure historical gap before canonical min is planned as half-open range."""
     planner = SchedulerBackfillPlanner(tail_lookback_minutes=180)

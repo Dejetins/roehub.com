@@ -328,17 +328,24 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "WEB SSR:" not in settings_response.text
     assert "Account:" not in settings_response.text
     assert "/assets/css/pages/settings.css" in settings_response.text
+    assert "/assets/css/pages/market-data-settings.css" in settings_response.text
     assert "/assets/js/pages/settings.js" in settings_response.text
+    assert "/assets/js/pages/market-data-settings.js" in settings_response.text
     assert 'href="/dashboard"' in settings_response.text
     assert 'class="settings-modebar"' in settings_response.text
     assert 'data-settings-tab-button="profile"' in settings_response.text
     assert 'data-settings-tab-button="api"' in settings_response.text
     assert 'data-settings-tab-button="integrations"' in settings_response.text
     assert 'data-settings-tab-button="security"' in settings_response.text
+    assert 'data-settings-tab-button="market_data"' in settings_response.text
     assert 'data-settings-tab-panel="profile"' in settings_response.text
     assert 'data-settings-tab-panel="api"' in settings_response.text
     assert 'data-settings-tab-panel="integrations"' in settings_response.text
     assert 'data-settings-tab-panel="security"' in settings_response.text
+    assert 'data-settings-tab-panel="market_data"' in settings_response.text
+    assert 'data-markets-endpoint="/api/market-data/markets"' in settings_response.text
+    assert 'data-catalog-endpoint="/api/market-data/catalog"' in settings_response.text
+    assert 'data-selections-endpoint="/api/market-data/selections"' in settings_response.text
     for panel in [
         "profile",
         "profile_actions",
@@ -404,7 +411,8 @@ def test_authorized_settings_route_renders_stage_5_workstation() -> None:
     assert "Latency" not in main_html
     assert "5 / 10" not in main_html
     assert "7 / 10" not in main_html
-    assert '<select' not in settings_response.text
+    assert settings_response.text.count("<select") == 1
+    assert '<select data-market-data-market aria-label="Market"></select>' in settings_response.text
     assert '<meter' not in settings_response.text
     assert "settings-cli-meter" in settings_response.text
     assert 'data-security-focus' not in settings_response.text

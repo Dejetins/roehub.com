@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "stage": "03",
+  "proof_boundary": "isolated_local_runtime",
+  "runtime_project": "roehub-stage02",
+  "target": {
+    "instrument_id": "2:BTCUSDT",
+    "coordinates": "binance:futures:BTCUSDT",
+    "source_candle_count": 10080,
+    "source_range_utc": [
+      "2026-07-08T22:51:00Z",
+      "2026-07-15T22:51:00Z"
+    ]
+  },
+  "collector_scope": {
+    "worker_source": "GlobalEffectiveCollectorSet",
+    "selected_instruments": ["2:BTCUSDT"],
+    "full_catalog_work_started": false,
+    "historical_backfill_enqueued": false
+  },
+  "publisher": {
+    "image_id": "sha256:0a03a358871c9a8748bba10dd178b2d370b349c585dce0d13c5d8cafe5793e07",
+    "container_memory_limit_bytes": 1073741824,
+    "signal_worker_processes": 1,
+    "signal_worker_memory_budget_bytes": 805306368,
+    "periodic_schedule_enabled": false,
+    "periodic_schedule_reason": "capacity_gate",
+    "cgroup_memory_peak_bytes": 715964416,
+    "oom": 0,
+    "oom_kill": 0
+  },
+  "artifact": {
+    "publish_status": "succeeded",
+    "active_slot": "slot_a",
+    "slot_generation": 1,
+    "manifest_sha256": "933973047920870ef45c958c658fa1d4e8b106b22cc68def0e36846e7b1a0154",
+    "artifact_bytes": 26764848,
+    "artifact_file_count": 1667,
+    "funding_coverage_status": "ready",
+    "funding_rows_count": 21,
+    "funding_expected_event_count": 21,
+    "funding_missing_event_count": 0,
+    "validation_diagnostics_count": 0
+  },
+  "non_production": true,
+  "secrets_recorded": false
+}

@@ -1,0 +1,5 @@
+{
+  "checked_at": "2026-07-15T20:33:20.403094+00:00",
+  "error": "command failed (81): docker compose -p roehub-stage01 -f configs/installation/generated/trading/compose.yaml -f /Users/daniildegtyarev/.local/share/roehub/demo-0.1.0/compose.trading.offline.yaml -f tests/fixtures/market_data/stage01-compose.override.yaml exec -T clickhouse sh -ec clickhouse-client --user default --password \"$(cat /run/roehub-secrets/clickhouse-password)\" --query \"SELECT toUnixTimestamp(max(ts_close)) FROM market_data.canonical_candles_1m\"; stderr='Received exception from server (version 24.8.14):\\nCode: 81. DB::Exception: Received from localhost:9000. DB::Exception: Database market_data does not exist. (UNKNOWN_DATABASE)\\n(query: SELECT toUnixTimestamp(max(ts_close)) FROM market_data.canonical_candles_1m)'",
+  "ready": false
+}

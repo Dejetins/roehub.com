@@ -6,6 +6,7 @@ import logging
 import os
 import time
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Sequence
 from uuid import uuid4
@@ -30,12 +31,16 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gatew
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (
     ClickHouseRawKlineWriter,
 )
+from trading.contexts.market_data.application.dto import RestFillTask
 from trading.contexts.market_data.application.use_cases.rest_catchup_1m import (
     RestCatchUp1mReport,
     RestCatchUp1mUseCase,
 )
+from trading.contexts.market_data.application.use_cases.rest_fill_range_1m import (
+    RestFillRange1mUseCase,
+)
 from trading.platform.time.system_clock import SystemClock
-from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol
+from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, TimeRange, UtcTimestamp
 
 log = logging.getLogger(__name__)
 
@@ -97,6 +102,34 @@ class RestCatchUp1mCli:
             batch_size=int(ns.batch_size),
             ingest_id=ingest_id,
         )
+
+        bounded_range = _parse_optional_time_range(start=ns.start, end=ns.end)
+        if bounded_range is not None:
+            if ns.all_from_ref_instruments:
+                raise SystemExit("--start/--end cannot be combined with --all-from-ref-instruments")
+            if ns.market_id is None or ns.symbol is None:
+                raise SystemExit("--start/--end requires --market-id and --symbol")
+            instrument_id = InstrumentId(MarketId(int(ns.market_id)), Symbol(str(ns.symbol)))
+            report = RestFillRange1mUseCase(
+                source=source,
+                writer=writer,
+                clock=clock,
+                max_days_per_insert=cfg.backfill.max_days_per_insert,
+                batch_size=int(ns.batch_size),
+                index_reader=index,
+            ).run(
+                RestFillTask(
+                    instrument_id=instrument_id,
+                    time_range=bounded_range,
+                    reason="operator_bounded",
+                )
+            )
+            _print_bounded_report(
+                report=report,
+                fmt=ns.report_format,
+                instrument_id=instrument_id,
+            )
+            return 0
 
         if ns.all_from_ref_instruments:
             instruments = _load_enabled_instruments(gw, settings.database)
@@ -227,6 +260,45 @@ def _print_report(rep: RestCatchUp1mReport, *, fmt: str, instrument_id: Instrume
     )
 
 
+def _print_bounded_report(*, report, fmt: str, instrument_id: InstrumentId) -> None:
+    payload = {
+        "mode": "bounded_fill",
+        "instrument_id": str(instrument_id),
+        "start": report.task.time_range.start.value.isoformat().replace("+00:00", "Z"),
+        "end": report.task.time_range.end.value.isoformat().replace("+00:00", "Z"),
+        "rows_read": report.rows_read,
+        "rows_written": report.rows_written,
+        "batches_written": report.batches_written,
+    }
+    if fmt == "json":
+        print(json.dumps(payload, ensure_ascii=False))
+        return
+    print(
+        "rest-catchup bounded report:\n"
+        f"- instrument_id: {payload['instrument_id']}\n"
+        f"- range: [{payload['start']}, {payload['end']})\n"
+        f"- rows_read: {payload['rows_read']}\n"
+        f"- rows_written: {payload['rows_written']}\n"
+        f"- batches_written: {payload['batches_written']}\n"
+    )
+
+
+def _parse_optional_time_range(*, start: str | None, end: str | None) -> TimeRange | None:
+    if start is None and end is None:
+        return None
+    if start is None or end is None:
+        raise SystemExit("--start and --end must be provided together")
+    return TimeRange(start=UtcTimestamp(_parse_utc(start)), end=UtcTimestamp(_parse_utc(end)))
+
+
+def _parse_utc(raw: str) -> datetime:
+    normalized = raw[:-1] + "+00:00" if raw.endswith("Z") else raw
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise SystemExit(f"timestamp must include timezone: {raw}")
+    return parsed.astimezone(timezone.utc)
+
+
 def _build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="rest-catchup")
     p.add_argument(
@@ -236,6 +308,8 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--market-id", type=int, default=None, help="MarketId (when running single instrument)")  # noqa: E501
     p.add_argument("--symbol", type=str, default=None, help="Symbol (when running single instrument)")  # noqa: E501
+    p.add_argument("--start", type=str, default=None, help="UTC ISO start for one bounded fill")
+    p.add_argument("--end", type=str, default=None, help="UTC ISO end for one bounded fill")
     p.add_argument(
         "--all-from-ref-instruments",
         action="store_true",

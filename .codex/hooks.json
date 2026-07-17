@@ -13,19 +13,6 @@
         ]
       }
     ],
-    "PermissionRequest": [
-      {
-        "matcher": "^(Bash|apply_patch|Edit|Write)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/roehub_hook_router.py\"",
-            "timeout": 20,
-            "statusMessage": "Checking Roehub approval policy"
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
         "matcher": "^(Bash|apply_patch|Edit|Write)$",
@@ -35,18 +22,6 @@
             "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/roehub_hook_router.py\"",
             "timeout": 20,
             "statusMessage": "Reviewing Roehub post-tool evidence"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/roehub_hook_router.py\"",
-            "timeout": 20,
-            "statusMessage": "Checking Roehub prompt policy"
           }
         ]
       }

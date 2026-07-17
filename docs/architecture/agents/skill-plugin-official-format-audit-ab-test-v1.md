@@ -19,7 +19,7 @@
 
 | Поверхность | Классификация | Обоснование |
 |---|---|---|
-| Вызовы `product/runtime services` | `N/A` | Roehub API, UI, workers, persistence, deploy и Mac Studio runtime не затронуты. |
+| Вызовы `product/runtime services` | `N/A` | Roehub API, UI, workers, persistence, deploy и retired-host runtime не затронуты. |
 | Покрытие service calls | `N/A` | Новых caller/callee contracts, auth models, timeout/retry/error behavior или side-effecting service calls нет; меняется только текст локального skill и локальный benchmark harness. |
 | Вызовы внешних providers | `N/A` для repo runtime; `compatible-change` для поведения skill | Инструкции skill больше не просят настраивать credentials в chat; уже настроенные локальные env vars по-прежнему могут использоваться engine через обычный lookup окружения. |
 | Logging/redaction | `compatible-change` | Правка явно запрещает secrets, browser cookies, raw provider payloads и private account access в chat/artifacts. |

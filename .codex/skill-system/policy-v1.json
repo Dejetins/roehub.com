@@ -1,10 +1,11 @@
 {
   "spec": "skill-policy/v1",
-  "catalog_authority": "/Users/daniildegtyarev/.codex/skill-system/catalog-v1.json",
-  "repo_snapshot": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/catalog-v1.json",
+  "audit_catalog": "/Users/daniildegtyarev/.codex/skill-system/catalog-v1.json",
+  "repo_audit_snapshot": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/catalog-v1.json",
   "resolver": "uv run python -m tools.codex_quality_benchmark.skill_catalog resolve-skill",
-  "catalog_scope": "deterministic-selection-not-loader-filter",
-  "effective_contract_required": true,
+  "catalog_scope": "historical-audit-and-alias-diagnostics-not-runtime-router",
+  "runtime_availability_source": "platform skill list",
+  "effective_contract_required": false,
   "resolution_required_when": [
     "alias",
     "deprecated-name",

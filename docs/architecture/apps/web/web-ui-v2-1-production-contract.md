@@ -1,5 +1,12 @@
 # Roehub Web UI v2.1 — промышленный контракт переноса
 
+**Статус:** историческое доказательство совместимости развёрнутого контура до
+будущей смены маршрутов. Базовые требования к следующему Web UI зафиксированы в
+[`roehub-product-transformation-requirements-v1.md`](../../platform/roehub-product-transformation-requirements-v1.md),
+но не выбирают исполнительную задачу автоматически.
+Same-origin, backend authority, защита секретов, unknown-result reconciliation,
+доступность и безопасный rollback остаются обязательными входными контрактами.
+
 ## Статус и цель
 
 - Статус: `deployed; production browser verified`.
@@ -156,11 +163,17 @@ Compatibility routes сохраняются. Deep links используют р�
 2. Core pages: Auth, Overview, Strategies, Backtests, contextual inspector.
 3. Operational pages: Monitoring, Models, Connections, Settings.
 4. Hardening: states, backend capabilities, i18n, accessibility, performance, browser evidence.
-5. Delivery: scoped commit to `main`, green CI, публикация app image, deploy Web UI на production VPS workflow `Deploy Web` и browser proof на `https://roehub.com`.
+5. Historical delivery: scoped commit to `main`, publication evidence and
+   browser proof on `https://roehub.com`.
 
-Каждый этап обратим через narrow file revert. Runtime rollout использует `.github/workflows/deploy-web.yml`: образ публикуется в GHCR, Web UI разворачивается на VPS в `/opt/roehub-web`, а API upstream остаётся на Mac Studio. До green `main` production deploy запрещён. Mac Studio не является целевой средой размещения `apps/web` и проверяется только как upstream/backend boundary. Откат Web UI выполняется повторным `workflow_dispatch` с последним исправным `image_tag`, затем повторяется public edge smoke.
+Каждый этап обратим через narrow file revert. Описанный здесь runtime rollout
+является historical evidence: его workflow и host-specific upstream выведены из
+эксплуатации. До появления отдельного утвержденного runtime ticket публикация
+не дает production claim и не выполняет rollback workflow.
 
-Это не staged prompt-pack execution: пользователь запустил активный Codex Goal напрямую. Runtime goal plan является источником текущего прогресса, а устойчивые решения, owned-file manifest, проверки и ревизия фиксируются в этом контракте и Git history. Если работа будет преобразована в prompt pack, до его запуска отдельно потребуются `plan_doc`, `prompt_pack_dir` и `stage_ledger`.
+Этот раздел сохраняется как историческое описание прежней поставки и не
+разрешает её возобновление. Любая будущая работа начинается из отдельно
+выбранного текущего ticket по действующему delivery contract.
 
 ## Contract impact
 
@@ -182,6 +195,10 @@ Compatibility routes сохраняются. Deep links используют р�
 - desktop/tablet/mobile, dark/light, keyboard/focus, reduced motion и `200%` zoom;
 - отсутствие console errors и unexpected failed network requests;
 - scoped Git manifest и green CI;
-- успешный workflow `Deploy Web`, production browser/API proof на `https://roehub.com` и отдельная проверка доступности Mac Studio upstream без представления её как web deploy.
+- historical browser/API proof на `https://roehub.com`; он не является текущим
+  runtime acceptance.
 
-Последний пункт выполнен для runtime revision `c07befd119062b067d6df9e35287a839fe69d1e4`: CI, публикация SHA-tagged GHCR image, `Deploy Web`, public edge smoke и authenticated production browser smoke завершены успешно.
+Исторический факт относится к runtime revision
+`c07befd119062b067d6df9e35287a839fe69d1e4`: CI, публикация SHA-tagged GHCR
+image, public edge smoke и authenticated production browser smoke завершились
+успешно.

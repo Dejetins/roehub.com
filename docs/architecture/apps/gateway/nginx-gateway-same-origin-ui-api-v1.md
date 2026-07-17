@@ -4,15 +4,8 @@
 
 `nginx gateway` удален из репозитория и больше не используется ни в prod, ни в local/dev.
 
-Актуальная схема same-origin:
-
-- production: `Caddy` на `VPS` проксирует `/api/*` на private API `Mac Studio`;
-- local/dev: `apps/web` сам проксирует `/api/*` в `WEB_API_UPSTREAM_URL`.
-
-Актуальные документы:
-
-- `docs/runbooks/mac-studio-native-backend-operations.md`
-- `docs/runbooks/web-ui-gateway-same-origin.md`
-- `docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md`
+Текущий remote same-origin runtime не настроен. Локальный `apps/web` может
+проксировать `/api/*` в `WEB_API_UPSTREAM_URL` только для явно выбранного
+development ticket.
 
 Этот файл сохранен только для historical reference и не описывает текущий runtime path.

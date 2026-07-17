@@ -66,7 +66,6 @@ def _templates() -> dict[str, bytes]:
             ROOT / "configs/prod/backtest_artifacts.yaml"
         ).read_bytes(),
         "indicators.yaml": (ROOT / "configs/prod/indicators.yaml").read_bytes(),
-        "whitelist.csv": (ROOT / "configs/prod/whitelist.csv").read_bytes(),
     }
 
 

@@ -328,6 +328,37 @@ def test_schedule_does_not_trigger_twice_after_restart_within_same_minute() -> N
     assert same_day_already_processed == datetime(2026, 3, 31, 0, 5, tzinfo=timezone.utc)
 
 
+def test_disabled_schedule_waits_for_shutdown_without_loading_or_publishing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The capacity gate must keep the scheduler alive without starting a catalog-wide run."""
+    metrics_started: list[int] = []
+    monkeypatch.setattr(
+        publisher_module,
+        "start_http_server",
+        lambda port, registry: metrics_started.append(port),
+    )
+    fake_use_case = _FakePublishUseCase(results=[])
+    app = BacktestArtifactPublisherApp(
+        publish_use_case=cast(PublishBacktestArtifactsV2UseCase, fake_use_case),
+        instrument_reader=_FakeInstrumentReader(
+            instruments=(InstrumentId(market_id=MarketId(2), symbol=Symbol("BTCUSDT")),)
+        ),
+        metrics=BacktestArtifactPublisherMetrics(registry=CollectorRegistry()),
+        host_lock=_FakeHostLock(acquired=True),
+        metrics_port=9203,
+        schedule=BacktestArtifactPublisherSchedule(enabled=False),
+        now_provider=lambda: (_ for _ in ()).throw(AssertionError("clock must not be read")),
+    )
+    stop_event = asyncio.Event()
+    stop_event.set()
+
+    asyncio.run(app.run(stop_event))
+
+    assert metrics_started == [9203]
+    assert fake_use_case.requests == []
+
+
 def test_scheduler_wiring_uses_explicit_artifact_config_for_indicators_resolution(
     monkeypatch,
 ) -> None:
@@ -375,6 +406,8 @@ def test_scheduler_wiring_uses_explicit_artifact_config_for_indicators_resolutio
                 None.
             """
             return Path("/tmp/artifacts")
+
+        publish_schedule = type("PublishSchedule", (), {"enabled": False})()
 
         def to_precompute_runtime_settings(self, *, config_sha256: str) -> object:
             """
@@ -606,7 +639,7 @@ def test_scheduler_wiring_uses_explicit_artifact_config_for_indicators_resolutio
     )
     monkeypatch.setattr(
         publisher_module,
-        "ClickHouseEnabledInstrumentReader",
+        "PostgresInstrumentSelectionRepository",
         lambda **kwargs: object(),
     )
     monkeypatch.setattr(

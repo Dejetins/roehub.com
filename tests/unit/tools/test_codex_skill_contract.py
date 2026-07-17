@@ -47,24 +47,21 @@ metadata:
     assert validate_skill_spec(path).valid
 
 
-def test_skill_result_requires_roehub_runtime_proof_label() -> None:
+def test_skill_spec_accepts_standard_minimal_frontmatter(tmp_path: Path) -> None:
+    path = tmp_path / "SKILL.md"
+    path.write_text(
+        "---\nname: example-skill\ndescription: Use when inspecting an example.\n---\n",
+        encoding="utf-8",
+    )
+    assert validate_skill_spec(path).valid
+
+
+def test_skill_result_accepts_generic_runtime_proof_label() -> None:
     result = _result()
     result["skill_run"]["proof_boundary"] = {
         "surface": "runtime",
-        "profile": "roehub",
+        "profile": "example-project",
         "label": "generic-runtime",
-    }
-    validation = validate_skill_result(result)
-    assert not validation.valid
-    assert any("target_host_readiness_pre_main" in error for error in validation.errors)
-
-
-def test_skill_result_accepts_profile_aware_label() -> None:
-    result = _result()
-    result["skill_run"]["proof_boundary"] = {
-        "surface": "runtime",
-        "profile": "roehub",
-        "label": "read_only_existing_runtime_smoke",
     }
     assert validate_skill_result(result).valid
 

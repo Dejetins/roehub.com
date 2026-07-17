@@ -23,6 +23,7 @@ COPY migrations migrations
 COPY schemas schemas
 COPY scripts scripts
 COPY tools tools
+COPY infra/openbao infra/openbao
 # Release manifests and generated deployment files contain this image's digest.
 # They are distributed by the signed offline bundle and mounted from the
 # installation profile; retaining them inside the image would create an
@@ -74,6 +75,7 @@ COPY --from=builder --chown=65532:65532 /build/alembic alembic
 COPY --from=builder --chown=65532:65532 /build/schemas schemas
 COPY --from=builder --chown=65532:65532 /build/scripts scripts
 COPY --from=builder --chown=65532:65532 /build/tools tools
+COPY --from=builder --chown=65532:65532 /build/infra/openbao infra/openbao
 COPY --from=builder --chown=65532:65532 /build/pyproject.toml /build/uv.lock ./
 COPY --from=builder --chown=65532:65532 /build/alembic.ini ./
 RUN mkdir -p /var/lib/roehub/artifacts /var/lib/roehub/ml && chown -R 65532:65532 /var/lib/roehub

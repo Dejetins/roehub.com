@@ -51,8 +51,10 @@ from trading.contexts.indicators.application.services import GridBuilder
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseCanonicalCandleIndexReader,
     ClickHouseCanonicalCandleReader,
-    ClickHouseEnabledInstrumentReader,
     ThreadLocalClickHouseConnectGateway,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
+    PostgresInstrumentSelectionRepository,
 )
 from trading.contexts.market_data.application.ports.stores import EnabledInstrumentReader
 from trading.platform.time.system_clock import SystemClock  # noqa: F401
@@ -142,6 +144,7 @@ class BacktestArtifactPublisherSchedule:
     timezone_name: str = "Europe/Moscow"
     hour: int = 3
     minute: int = 5
+    enabled: bool = True
 
     def __post_init__(self) -> None:
         """
@@ -164,6 +167,8 @@ class BacktestArtifactPublisherSchedule:
           - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
         """
         ZoneInfo(self.timezone_name)
+        if not isinstance(self.enabled, bool):
+            raise ValueError("BacktestArtifactPublisherSchedule.enabled must be a bool")
         if not 0 <= self.hour <= 23:
             raise ValueError("BacktestArtifactPublisherSchedule.hour must be in [0, 23]")
         if not 0 <= self.minute <= 59:
@@ -527,6 +532,13 @@ class BacktestArtifactPublisherApp:
             self.metrics_port,
             self.schedule.timezone_name,
         )
+        if not self.schedule.enabled:
+            log.info(
+                "event=schedule_disabled component=backtest-artifact-publisher "
+                "reason=capacity_gate"
+            )
+            await stop_event.wait()
+            return
         last_run_local_date: date | None = None
 
         while not stop_event.is_set():
@@ -652,26 +664,27 @@ class BacktestArtifactPublisherApp:
 
     def _load_publish_universe(self) -> tuple[ArtifactCoordinatesV2, ...]:
         """
-        Load and deterministically order the enabled+tradable publish universe.
+        Load and deterministically order the effective collector publish universe.
 
         Args:
             None.
         Returns:
             tuple[ArtifactCoordinatesV2, ...]: Ordered artifact coordinates for the daily run.
         Assumptions:
-            Universe source-of-truth is `market_data.ref_instruments`
-            with enabled+tradable rows only.
+            Universe source-of-truth is the global effective collector set: explicit
+            organization choices plus active strategy pins. It must never be inferred
+            from every legacy reference row.
         Raises:
             ValueError: If one market id cannot be bridged into artifact coordinates.
             Exception: Propagates storage reader errors from the enabled instrument reader.
         Side Effects:
-            Reads the latest enabled tradable instrument snapshot from ClickHouse.
+            Reads the global effective collector set from PostgreSQL.
         Docs:
           - docs/architecture/roadmap/backtest-refactor-final-plan-v2.md
           - docs/runbooks/backtest-artifacts-rebuild.md
         Related:
-          - src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/
-            enabled_instrument_reader.py
+          - src/trading/contexts/market_data/adapters/outbound/persistence/postgres/
+            instrument_selection_repository.py
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
         instruments = tuple(self.instrument_reader.list_enabled_tradable())
@@ -921,13 +934,15 @@ def build_backtest_artifact_publisher_app(
     )
     return BacktestArtifactPublisherApp(
         publish_use_case=publish_use_case,
-        instrument_reader=ClickHouseEnabledInstrumentReader(
-            gateway=clickhouse_gateway,
-            database=clickhouse_settings.database,
+        instrument_reader=PostgresInstrumentSelectionRepository(
+            gateway=PsycopgBacktestPostgresGateway(dsn=strategy_postgres_dsn),
         ),
         metrics=BacktestArtifactPublisherMetrics(),
         host_lock=FileBacktestArtifactPublisherHostLock(path=resolved_lock_path),
         metrics_port=metrics_port,
+        schedule=BacktestArtifactPublisherSchedule(
+            enabled=artifact_runtime_config.publish_schedule.enabled,
+        ),
     )
 
 

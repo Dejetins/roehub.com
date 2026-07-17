@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "skill-spec/v1",
   "type": "object",
-  "required": ["name", "description", "metadata"],
+  "required": ["name", "description"],
   "properties": {
     "name": {
       "type": "string",

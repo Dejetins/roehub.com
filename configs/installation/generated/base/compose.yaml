@@ -5,6 +5,12 @@ networks:
     labels:
       io.roehub.profile: base
       io.roehub.trust-boundary: installation-internal
+  web-ingress:
+    internal: false
+    labels:
+      io.roehub.ingress-purpose: host-web-ui-only
+      io.roehub.profile: base
+      io.roehub.trust-boundary: web-ingress
 services:
   alertmanager:
     cap_drop: &id001
@@ -1064,6 +1070,7 @@ services:
       io.roehub.role: web
     networks:
     - roehub
+    - web-ingress
     ports:
     - 127.0.0.1:8080:8010
     read_only: true

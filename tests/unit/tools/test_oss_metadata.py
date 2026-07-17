@@ -32,6 +32,17 @@ def test_container_inventory_ignores_multistage_aliases(
     }
 
 
+def test_container_inventory_excludes_test_fixtures(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = tmp_path / "tests" / "fixtures" / "runtime" / "compose.yaml"
+    fixture.parent.mkdir(parents=True)
+    fixture.write_text("services:\n  probe:\n    image: fixture-only:1\n", encoding="utf-8")
+    monkeypatch.setattr(oss_metadata, "ROOT", tmp_path)
+
+    assert _discover_container_images(["tests/fixtures/runtime/compose.yaml"]) == set()
+
+
 def test_committed_release_metadata_matches_policy() -> None:
     outputs = _expected_outputs()
 

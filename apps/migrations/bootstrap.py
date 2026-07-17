@@ -37,6 +37,9 @@ _EXECUTION_GATEWAY_MAINNET_SAFETY_V1_SQL_FILE = (
     "0020_execution_gateway_mainnet_safety_v1.sql"
 )
 _CONTROL_OPERATION_AUDIT_V1_SQL_FILE = "0021_control_operation_audit_v1.sql"
+_MARKET_DATA_INSTRUMENT_SELECTIONS_V1_SQL_FILE = (
+    "0022_market_data_instrument_selections_v1.sql"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -538,6 +541,21 @@ def apply_control_operation_audit_sql(
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir,
         filenames=(_CONTROL_OPERATION_AUDIT_V1_SQL_FILE,),
+    )[0]
+    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+        print(f"Applying post-Alembic identity SQL: {sql_path.name}")
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_market_data_instrument_selections_sql(
+    *, identity_dsn: str, migrations_dir: Path
+) -> None:
+    """Apply organization-scoped market-data selection and catalog-state schema."""
+
+    normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir,
+        filenames=(_MARKET_DATA_INSTRUMENT_SELECTIONS_V1_SQL_FILE,),
     )[0]
     with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")

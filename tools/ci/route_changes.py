@@ -179,7 +179,6 @@ def _is_docs_path(path: str) -> bool:
         "README.md",
         "AGENTS.md",
         ".codex/AGENTS.md",
-        ".codex/promt_template.md",
     } or path.startswith("docs/")
 
 
@@ -200,6 +199,7 @@ def _is_code_path(path: str) -> bool:
         path,
         (
             ".github/workflows/",
+            ".codex/hooks/",
             "apps/",
             "src/",
             "tests/",
@@ -295,13 +295,12 @@ def _is_market_identity_strategy_path(path: str) -> bool:
     )
 
 
-def _is_backend_deploy_path(path: str) -> bool:
+def _needs_migration_check(path: str) -> bool:
     if path in {
         ".python-version",
         "pyproject.toml",
         "uv.lock",
         "alembic.ini",
-        ".github/workflows/deploy-backend.yml",
     }:
         return True
     return _has_prefix(
@@ -337,14 +336,6 @@ def _is_web_image_path(path: str) -> bool:
             ".github/workflows/publish-app-image.yml",
         }
     )
-
-
-def _is_web_deploy_config_path(path: str) -> bool:
-    return path in {
-        "infra/docker/docker-compose.web.prod.yml",
-        "infra/caddy/Caddyfile.vps",
-        ".github/workflows/deploy-web.yml",
-    }
 
 
 def _matrix(shard_names: Iterable[str]) -> str:
@@ -397,7 +388,7 @@ def classify_ci(paths: Iterable[str], *, all_changes: bool = False) -> dict[str,
         if _is_market_identity_strategy_path(path):
             shards.add("market-identity-strategy")
 
-        if _is_backend_deploy_path(path):
+        if _needs_migration_check(path):
             run_migrations = True
 
         if (
@@ -439,16 +430,8 @@ def classify_ci(paths: Iterable[str], *, all_changes: bool = False) -> dict[str,
     }
 
 
-def classify_backend_deploy(paths: Iterable[str], *, all_changes: bool = False) -> bool:
-    return all_changes or any(_is_backend_deploy_path(path) for path in paths if path)
-
-
 def classify_web_image(paths: Iterable[str], *, all_changes: bool = False) -> bool:
     return all_changes or any(_is_web_image_path(path) for path in paths if path)
-
-
-def classify_web_deploy_config(paths: Iterable[str], *, all_changes: bool = False) -> bool:
-    return all_changes or any(_is_web_deploy_config_path(path) for path in paths if path)
 
 
 def _read_paths(path: Path) -> list[str]:
@@ -466,7 +449,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Classify changed paths for GitHub Actions.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    for command in ("ci", "backend-deploy", "web-image", "web-deploy-config"):
+    for command in ("ci", "web-image"):
         subparser = subparsers.add_parser(command)
         subparser.add_argument("--changed-files", type=Path, required=True)
         subparser.add_argument("--all", action="store_true", dest="all_changes")
@@ -476,29 +459,11 @@ def main() -> None:
 
     if args.command == "ci":
         _print_outputs(classify_ci(paths, all_changes=args.all_changes))
-    elif args.command == "backend-deploy":
-        _print_outputs(
-            {
-                "backend_changed": "true"
-                if classify_backend_deploy(paths, all_changes=args.all_changes)
-                else "false"
-            }
-        )
     elif args.command == "web-image":
         _print_outputs(
             {
                 "web_image_changed": (
                     "true" if classify_web_image(paths, all_changes=args.all_changes) else "false"
-                )
-            }
-        )
-    elif args.command == "web-deploy-config":
-        _print_outputs(
-            {
-                "web_deploy_config_changed": (
-                    "true"
-                    if classify_web_deploy_config(paths, all_changes=args.all_changes)
-                    else "false"
                 )
             }
         )

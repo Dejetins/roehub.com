@@ -26,6 +26,7 @@ from apps.migrations.bootstrap import (
     apply_identity_baseline_sql,
     apply_isolated_job_runtime_sql,
     apply_local_auth_sql,
+    apply_market_data_instrument_selections_sql,
     apply_notification_provider_instances_sql,
     apply_oidc_provider_sql,
     apply_organizations_rbac_audit_sql,
@@ -415,8 +416,8 @@ def _load_postgres_phases(manifest_path: Path) -> dict[str, tuple[str, tuple[Pat
     if payload.get("schema") != POSTGRES_MANIFEST_SCHEMA:
         raise StorageLifecycleError("unsupported PostgreSQL migration manifest schema")
     raw_phases = payload.get("phases")
-    if not isinstance(raw_phases, list) or len(raw_phases) != 13:
-        raise StorageLifecycleError("PostgreSQL migration manifest must define thirteen phases")
+    if not isinstance(raw_phases, list) or len(raw_phases) != 14:
+        raise StorageLifecycleError("PostgreSQL migration manifest must define fourteen phases")
     phases: dict[str, tuple[str, tuple[Path, ...]]] = {}
     for raw_phase in raw_phases:
         if not isinstance(raw_phase, dict):
@@ -466,6 +467,7 @@ def _load_postgres_phases(manifest_path: Path) -> dict[str, tuple[str, tuple[Pat
         "isolated-job-runtime-0019",
         "execution-gateway-safety-0020",
         "control-operation-audit-0021",
+        "market-data-selections-0022",
     }:
         raise StorageLifecycleError("PostgreSQL migration phases are incomplete")
     return phases
@@ -803,6 +805,27 @@ def apply_postgres_migrations(
             store="postgres-sql",
             version=control_audit_version,
             checksum=control_audit_checksum,
+        )
+
+    market_data_selections_version = "market-data-selections-0022"
+    market_data_selections_checksum, _market_data_selections_paths = phases[
+        market_data_selections_version
+    ]
+    if ("postgres-sql", market_data_selections_version) not in markers:
+        try:
+            apply_market_data_instrument_selections_sql(
+                identity_dsn=dsn,
+                migrations_dir=manifest_path.parent,
+            )
+        except Exception as error:  # noqa: BLE001
+            raise StorageLifecycleError(
+                "market-data instrument selections migration phase failed"
+            ) from error
+        _record_postgres_marker(
+            dsn,
+            store="postgres-sql",
+            version=market_data_selections_version,
+            checksum=market_data_selections_checksum,
         )
 
 

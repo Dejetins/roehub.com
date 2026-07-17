@@ -87,6 +87,9 @@
           "items": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"}
         },
         "config_mount": {"type": "string", "pattern": "^[a-z0-9_-]+\\.yaml$"},
+        "network_access": {
+          "enum": ["internal_only", "market_data_egress", "web_ingress"]
+        },
         "persistent_paths": {
           "type": "array",
           "uniqueItems": true,

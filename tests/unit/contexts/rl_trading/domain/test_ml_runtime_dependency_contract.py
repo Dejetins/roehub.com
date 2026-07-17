@@ -85,11 +85,3 @@ def test_rl_ml_runtime_configs_are_fail_closed_and_host_local() -> None:
         assert config["retraining"]["max_concurrent_candidate_jobs"] == 1
         assert config["disk"]["cleanup_may_delete_accepted_artifacts"] is False
         assert config["disk"]["block_training_below_free_gb"] >= config["disk"]["min_free_gb"]
-
-
-def test_production_deploy_installs_rl_ml_runtime_extra() -> None:
-    workflow = (REPO_ROOT / ".github/workflows/deploy-backend.yml").read_text(
-        encoding="utf-8"
-    )
-
-    assert "uv sync --locked --extra rl-ml" in workflow

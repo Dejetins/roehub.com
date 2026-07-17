@@ -8,6 +8,7 @@ Docs:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Mapping
 
 from fastapi import APIRouter
@@ -16,12 +17,23 @@ from apps.api.routes import (
     build_market_data_reference_router as build_market_data_reference_api_router,
 )
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+from trading.contexts.backtest.adapters.outbound import (
+    PsycopgBacktestPostgresGateway,
+    load_backtest_artifacts_runtime_config,
+)
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
+from trading.contexts.market_data.adapters.outbound.persistence.artifact_inventory_reader import (
+    FileSystemActiveArtifactInventoryReader,
+)
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseBTCUSDTMarketReadinessReader,
     ClickHouseEnabledMarketReader,
     ClickHouseEnabledTradableInstrumentSearchReader,
+    ClickHouseInstrumentCoverageReader,
     ThreadLocalClickHouseConnectGateway,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
+    PostgresInstrumentSelectionRepository,
 )
 from trading.contexts.market_data.application.dto.reference_api import (
     BTCUSDTStreamReadinessSnapshot,
@@ -46,6 +58,7 @@ class MarketDataReferenceUseCases:
     list_enabled_markets: ListEnabledMarketsUseCase
     search_enabled_tradable_instruments: SearchEnabledTradableInstrumentsUseCase
     btcusdt_market_readiness: BTCUSDTMarketReadinessUseCase
+    coverage_reader: ClickHouseInstrumentCoverageReader
 
 
 def build_market_data_reference_use_cases(
@@ -75,6 +88,10 @@ def build_market_data_reference_use_cases(
                 database=clickhouse_settings.database,
             ),
             stream_reader=_build_btcusdt_stream_readiness_reader(environ=environ),
+        ),
+        coverage_reader=ClickHouseInstrumentCoverageReader(
+            gateway=clickhouse_gateway,
+            database=clickhouse_settings.database,
         ),
     )
 
@@ -119,6 +136,33 @@ def build_market_data_reference_router(
         organization_scope_resolver=build_research_organization_scope_resolver(
             environ=environ
         ),
+        instrument_selection_repository=_build_instrument_selection_repository(environ=environ),
+        coverage_reader=use_cases.coverage_reader,
+        artifact_inventory_reader=_build_artifact_inventory_reader(environ=environ),
+    )
+
+
+def _build_instrument_selection_repository(
+    *, environ: Mapping[str, str]
+) -> PostgresInstrumentSelectionRepository | None:
+    dsn = environ.get("STRATEGY_PG_DSN", "").strip()
+    if not dsn:
+        return None
+    return PostgresInstrumentSelectionRepository(
+        gateway=PsycopgBacktestPostgresGateway(dsn=dsn)
+    )
+
+
+def _build_artifact_inventory_reader(
+    *, environ: Mapping[str, str]
+) -> FileSystemActiveArtifactInventoryReader | None:
+    configured = environ.get("ROEHUB_BACKTEST_ARTIFACTS_CONFIG", "").strip()
+    path = Path(configured) if configured else Path("/etc/roehub/backtest-artifacts.yaml")
+    if not path.is_file():
+        return None
+    config = load_backtest_artifacts_runtime_config(path)
+    return FileSystemActiveArtifactInventoryReader(
+        artifact_root=config.artifact_root_path()
     )
 
 

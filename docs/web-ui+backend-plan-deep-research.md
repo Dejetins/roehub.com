@@ -1,5 +1,8 @@
 # Roehub UI-first implementation brief
 
+> Статус: historical research. Не является текущим архитектурным или runtime
+> контрактом; применяйте глобальный delivery contract и current architecture.
+
 Ключевые пути и артефакты, которые были проанализированы:
 
 - `apps/web/main/app.py` — текущий FastAPI SSR web, protected pages, встроенный `/api/*` proxy для local/dev, `/_partial/user_badge` и `StaticFiles("/assets")`. fileciteturn85file0L1-L1
@@ -11,7 +14,8 @@
 - `apps/api/dto/backtests.py`, `market_data_reference.py` — текущие response shapes и read-model API contracts. fileciteturn53file0L1-L1 fileciteturn76file0L1-L1
 - `apps/api/wiring/modules/backtest.py`, `src/trading/contexts/backtest/application/use_cases/backtest_jobs.py`, `src/trading/contexts/backtest/domain/entities/backtest_job.py` — текущая job-модель, inline execution wiring, lazy trades cache. fileciteturn92file0L1-L1 fileciteturn84file0L1-L1 fileciteturn60file0L1-L1
 - `src/trading/contexts/strategy/.../redis_streams_realtime_output_publisher.py`, `apps/worker/strategy_live_runner/...`, `docs/architecture/strategy/strategy-realtime-output-redis-streams-v1.md` — уже существующий realtime substrate для strategy monitoring через Redis Streams. fileciteturn102file0L1-L1 fileciteturn103file0L1-L1 fileciteturn73file0L1-L1
-- `.github/workflows/deploy-web.yml`, `infra/docker/docker-compose.web.prod.yml`, `infra/caddy/Caddyfile.vps`, `docs/runbooks/web-ui-gateway-same-origin.md`, `docs/architecture/apps/gateway/nginx-gateway-same-origin-ui-api-v1.md` — текущая production topology и факт, что архивный Nginx path больше не активен, а production edge сейчас делает Caddy. fileciteturn64file0L1-L1 fileciteturn65file0L1-L1 fileciteturn66file0L1-L1 fileciteturn49file0L1-L1 fileciteturn86file0L1-L1
+- Historical evidence covered the former production topology and archived Nginx
+  path. Those files are no longer current runtime instructions. fileciteturn64file0L1-L1 fileciteturn65file0L1-L1 fileciteturn66file0L1-L1 fileciteturn49file0L1-L1 fileciteturn86file0L1-L1
 - `docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md`, `web-strategy-ui-crud-builder-delete-v1.md`, `backtest-service-artifact-runtime-v1.ru.md`, `identity-exchange-keys-storage-2fa-gate-policy-v2.md` — repo-level архитектурные намерения для web/auth, strategies, backtests и exchange secrets. fileciteturn48file0L1-L1 fileciteturn50file0L1-L1 fileciteturn51file0L1-L1 fileciteturn88file0L1-L1
 
 ## Executive summary

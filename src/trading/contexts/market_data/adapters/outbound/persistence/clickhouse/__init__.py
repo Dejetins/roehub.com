@@ -12,6 +12,10 @@ from .gateway import (
     ClickHouseGateway,
     ThreadLocalClickHouseConnectGateway,
 )
+from .instrument_coverage_reader import (
+    ClickHouseInstrumentCoverageReader,
+    InstrumentCoverageSnapshot,
+)
 from .raw_kline_writer import ClickHouseRawKlineWriter
 from .ref_instruments_writer import ClickHouseInstrumentRefWriter
 from .ref_market_writer import ClickHouseMarketRefWriter
@@ -24,6 +28,8 @@ __all__ = [
     "ClickHouseEnabledMarketReader",
     "ClickHouseEnabledTradableInstrumentSearchReader",
     "ClickHouseFundingRateStore",
+    "ClickHouseInstrumentCoverageReader",
+    "InstrumentCoverageSnapshot",
     "ClickHouseGateway",
     "ClickHouseConnectGateway",
     "ThreadLocalClickHouseConnectGateway",

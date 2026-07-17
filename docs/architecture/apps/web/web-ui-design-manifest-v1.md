@@ -1,5 +1,11 @@
 # Дизайн-манифест Roehub Web UI v1
 
+**Статус:** `historical implementation and visual evidence`. Документ
+сохраняется как baseline реализованного интерфейса и источник уже найденных
+accessibility/data-state требований, но не задаёт будущий дизайн. Базовые
+требования следующей трансформации зафиксированы в
+[`roehub-product-transformation-requirements-v1.md`](../../platform/roehub-product-transformation-requirements-v1.md).
+
 Документ фиксирует визуальный источник правды для новой версии Roehub Web UI: терминальный продуктовый интерфейс поверх `apps/web`, без сохранения текущей светлой реализации как наследуемого режима.
 
 ## Статус

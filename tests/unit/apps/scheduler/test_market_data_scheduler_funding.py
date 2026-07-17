@@ -42,9 +42,8 @@ def test_funding_metrics_do_not_use_symbol_label() -> None:
 def test_funding_startup_bootstrap_runs_before_heavy_startup_scan(tmp_path: Path) -> None:
     app = MarketDataSchedulerApp(
         config=_config(tmp_path),
-        whitelist_path=str(tmp_path / "whitelist.csv"),
         seed_use_case=cast(Any, object()),
-        sync_use_case=cast(Any, object()),
+        catalog_refresh_use_case=cast(Any, object()),
         enrich_use_case=cast(Any, object()),
         instrument_reader=cast(Any, object()),
         index_reader=cast(Any, object()),
@@ -58,7 +57,7 @@ def test_funding_startup_bootstrap_runs_before_heavy_startup_scan(tmp_path: Path
     )
 
     assert [job.name for job in app._startup_jobs()] == [
-        "sync_whitelist",
+        "refresh_catalog",
         "enrich",
         "funding_rate_catchup",
         "startup_scan",
@@ -92,9 +91,11 @@ def test_funding_job_does_not_refresh_full_universe_every_wake(tmp_path: Path) -
         def __init__(self):
             self.calls = 0
 
-        def run_due_universe(self, *, market_ids, dry_run):
+        def run_due_instruments(self, *, instrument_ids, dry_run):
             self.calls += 1
-            assert tuple(int(m.value) for m in market_ids) == (2, 4)
+            assert tuple(str(instrument_id.symbol) for instrument_id in instrument_ids) == (
+                "BTCUSDT",
+            )
             assert dry_run is False
             return BackfillFundingRatesReport(
                 instruments_total=1,
@@ -126,11 +127,21 @@ def test_funding_job_does_not_refresh_full_universe_every_wake(tmp_path: Path) -
         catchup = _FundingCatchup()
         app = MarketDataSchedulerApp(
             config=_config(tmp_path),
-            whitelist_path=str(tmp_path / "whitelist.csv"),
             seed_use_case=cast(Any, object()),
-            sync_use_case=cast(Any, object()),
+            catalog_refresh_use_case=cast(Any, object()),
             enrich_use_case=cast(Any, object()),
-            instrument_reader=cast(Any, object()),
+            instrument_reader=cast(
+                Any,
+                type(
+                    "_Selections",
+                    (),
+                    {
+                        "list_enabled_tradable": lambda self: (
+                            InstrumentId(MarketId(2), Symbol("BTCUSDT")),
+                        )
+                    },
+                )(),
+            ),
             index_reader=cast(Any, object()),
             rest_fill_queue=cast(Any, object()),
             backfill_planner=cast(Any, object()),
