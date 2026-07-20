@@ -1,0 +1,805 @@
+{
+  "schema_id": "io.roehub.local-platform-access-and-route-contract/v1",
+  "contract_id": "roehub-local-platform-access-and-route-contract-v1",
+  "status": "accepted_target_architecture",
+  "scope": "self_hosted_local_platform_only",
+  "enforcement_authority": "server",
+  "default_decision": "deny",
+  "organization_roles": ["owner", "admin", "operator", "trader", "viewer"],
+  "role_labels": {
+    "owner": "Owner",
+    "admin": "Administrator",
+    "operator": "Operator",
+    "trader": "Researcher / trader",
+    "viewer": "Read only"
+  },
+  "authority_overlays": [
+    {
+      "authority_id": "installation_owner",
+      "kind": "installation_authority_not_organization_role",
+      "grants": ["setup.bootstrap", "installation.trust.manage", "installation.resources.manage", "installation.recovery.execute"],
+      "does_not_imply": ["organization_membership", "organization_data_access", "trading_access", "secret_reveal"]
+    }
+  ],
+  "policy_values": {
+    "organization": "All resources in the selected organization, subject to server filtering and installation ceilings.",
+    "delegated_organization": "Organization scope only when an explicit server capability has been delegated.",
+    "operational_safe_subset": "Only allowlisted non-secret, reversible or safely stoppable operational actions.",
+    "own": "Only resources owned by the authenticated user inside the selected organization.",
+    "server_filtered_read": "Read-only projection selected by the server; hidden data is never fetched and hidden only in the client.",
+    "personal": "Only the authenticated user's personal profile, preferences, sessions, and audit data.",
+    "visibility_scoped": "Only documents whose server-side visibility policy includes the role or capability."
+  },
+  "delegation_contract": {
+    "status": "target_not_implemented",
+    "grantor_roles": ["owner"],
+    "grantee_roles": ["admin", "trader"],
+    "scope": "single_organization_and_exact_capability",
+    "delegable_capability_ids": [
+      "data.selection.manage",
+      "strategies.manage",
+      "strategies.run",
+      "strategies.safe_stop",
+      "strategies.manual_trade",
+      "models.manage",
+      "models.promote_or_rollback",
+      "backtests.manage_own",
+      "backtests.queue_operate",
+      "backtests.promote_own",
+      "live.reconcile",
+      "monitoring.safe_action",
+      "connections.bind_own"
+    ],
+    "non_delegable_authorities": [
+      "installation_owner",
+      "setup.bootstrap",
+      "installation.trust.manage",
+      "installation.resources.manage",
+      "installation.recovery.execute",
+      "connections.secret.reveal",
+      "mainnet.approve",
+      "roles.manage"
+    ],
+    "grant_record_fields": [
+      "organization_id",
+      "grantee_user_id",
+      "capability_id",
+      "resource_scope",
+      "granted_by_owner_user_id",
+      "granted_at",
+      "expires_at",
+      "revoked_at"
+    ],
+    "rules": [
+      "owner_recent_auth_required",
+      "owner_cannot_self_grant",
+      "grantee_must_have_active_membership",
+      "grant_cannot_exceed_grantor_authority",
+      "missing_expired_or_revoked_grant_denies",
+      "revocation_is_immediate",
+      "grant_and_revoke_are_audited",
+      "grantee_cannot_redelegate"
+    ],
+    "current_static_role_permissions_are_not_delegation_records": true
+  },
+  "operator_safe_action_policy": {
+    "status": "target_not_implemented",
+    "default_decision": "deny",
+    "allowed_actions": [
+      {"action_id": "strategy.stop", "conditions": ["organization_scope", "strategy_running", "stop_only", "idempotent", "audit_event"]},
+      {"action_id": "backtest.cancel", "conditions": ["organization_scope", "job_queued_or_running", "cancel_only", "idempotent", "audit_event"]},
+      {"action_id": "backtest.retry", "conditions": ["organization_scope", "job_failed_or_cancelled", "immutable_source_job", "same_input_snapshot", "resource_admission", "idempotency_key", "audit_event"]},
+      {"action_id": "execution.reconcile", "conditions": ["organization_scope", "non_escalating", "no_new_order", "idempotent", "audit_event"]},
+      {"action_id": "connection.recheck", "conditions": ["organization_scope", "no_secret_access", "audit_event"]},
+      {"action_id": "connection.disconnect", "conditions": ["organization_scope", "no_secret_access", "confirmation", "idempotent", "audit_event"]},
+      {"action_id": "service.diagnostics", "conditions": ["organization_scope", "read_only_diagnostics", "no_runtime_override", "audit_event"]},
+      {"action_id": "service.restart_stopped", "conditions": ["organization_owned_service", "shared_installation_service_forbidden", "service_allowlist", "observed_state_stopped", "action_ref_restart_service", "no_profile_release_or_subject_override", "idempotency_key", "audit_event"]}
+    ],
+    "explicitly_denied_actions": [
+      "strategy.run",
+      "strategy.restart",
+      "strategy.manual_entry",
+      "strategy.manual_exit",
+      "backtest.create",
+      "backtest.delete",
+      "backtest.promote",
+      "model.train",
+      "model.promote",
+      "model.rollback",
+      "connection.create",
+      "connection.rotate",
+      "connection.archive",
+      "connection.secret.read",
+      "service.start_arbitrary",
+      "service.stop_arbitrary",
+      "installation.install",
+      "installation.update",
+      "installation.rollback",
+      "installation.backup",
+      "installation.restore",
+      "plugin.install",
+      "plugin.update",
+      "plugin.rollback",
+      "role.grant",
+      "resource.ceiling.change"
+    ],
+    "current_operations_execute_permission_is_insufficient": true
+  },
+  "browser_mutation_envelope": {
+    "status": "target_not_implemented_where_absent",
+    "applies_to": "all_cookie_authenticated_browser_mutations",
+    "failure_decision": "deny",
+    "capability_ids": [
+      "auth.session.manage",
+      "setup.bootstrap",
+      "preferences.manage_personal",
+      "data.selection.manage",
+      "strategies.manage",
+      "strategies.run",
+      "strategies.safe_stop",
+      "strategies.manual_trade",
+      "models.manage",
+      "models.promote_or_rollback",
+      "backtests.manage_own",
+      "backtests.queue_operate",
+      "backtests.promote_own",
+      "live.reconcile",
+      "monitoring.safe_action",
+      "connections.bind_own",
+      "connections.manage",
+      "connections.safe_operate",
+      "settings.personal.manage",
+      "settings.organization.manage",
+      "installation.trust.manage",
+      "installation.resources.manage",
+      "admin.members.manage",
+      "admin.plugins.manage",
+      "admin.operations.execute",
+      "installation.recovery.execute",
+      "qa.plugin.query"
+    ],
+    "required_checks": [
+      "authenticated_principal",
+      "fail_closed_same_origin_or_csrf",
+      "selected_organization_and_object_scope",
+      "server_role_capability_or_authority",
+      "validated_request_contract",
+      "idempotency_for_retriable_commands",
+      "recent_auth_for_sensitive_actions",
+      "audit_for_security_or_operational_changes"
+    ],
+    "idempotency_rules": [
+      "same_key_same_actor_same_scope_same_payload",
+      "same_key_different_payload_rejected",
+      "terminal_result_replay_safe",
+      "unknown_result_requires_reconciliation_not_duplicate_submission"
+    ],
+    "sensitive_action_ids": [
+      "role.grant_or_revoke",
+      "connection.create_or_rotate",
+      "strategy.manual_mainnet_trade",
+      "model.promote_or_rollback",
+      "installation.trust_change",
+      "installation.resource_change",
+      "installation.recovery_or_update"
+    ],
+    "known_current_gaps": [
+      "strategy_mutations_missing_uniform_same_origin_or_csrf",
+      "backtest_mutations_missing_uniform_same_origin_or_csrf",
+      "market_data_selection_mutations_missing_uniform_same_origin_or_csrf"
+    ]
+  },
+  "capabilities": [
+    {
+      "capability_id": "auth.session.manage",
+      "action": "Complete sign-in, end the current session, and use approved recovery.",
+      "grants": [{"roles": ["owner", "admin", "operator", "trader", "viewer"], "scope": "personal"}],
+      "denied_roles": [],
+      "requirements": ["browser_mutation_envelope", "sanitized_next"],
+      "current_enforcement": "partially_implemented",
+      "source_refs": ["apps/web/main/app.py", "apps/web/dist/js/pages/auth.js"]
+    },
+    {
+      "capability_id": "setup.bootstrap",
+      "action": "Create the first local installation owner and initial organization.",
+      "grants": [],
+      "denied_roles": ["owner", "admin", "operator", "trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "installation_uninitialized", "local_only", "one_time_authority", "server_enforced"],
+      "authority_required": "installation_owner_bootstrap",
+      "current_enforcement": "partially_implemented",
+      "source_refs": ["apps/web/dist/js/pages/auth.js", "docs/architecture/platform/roehub-product-transformation-requirements-v1.md#6-first-launch-and-data"]
+    },
+    {
+      "capability_id": "preferences.manage_personal",
+      "action": "Manage personal theme, locale, density, and refresh preferences.",
+      "grants": [{"roles": ["owner", "admin", "operator", "trader", "viewer"], "scope": "personal"}],
+      "denied_roles": [],
+      "requirements": ["browser_mutation_envelope", "server_validated_preferences"],
+      "current_enforcement": "implemented_for_authenticated_user",
+      "source_refs": ["apps/api/routes/ui_account.py"]
+    },
+    {
+      "capability_id": "dashboard.read",
+      "action": "Read dashboard data.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin", "operator", "trader", "viewer"], "scope": "server_filtered_read"}
+      ],
+      "denied_roles": [],
+      "requirements": ["selected_organization", "source_freshness_projection"],
+      "current_enforcement": "authenticated_read_model_without_target_role_projection",
+      "source_refs": ["apps/api/routes/ui_dashboard.py"]
+    },
+    {
+      "capability_id": "data.catalog.read",
+      "action": "Read the supported market-data catalog and current selection.",
+      "grants": [{"roles": ["owner", "admin", "operator", "trader", "viewer"], "scope": "server_filtered_read"}],
+      "denied_roles": [],
+      "requirements": ["selected_organization", "snapshot_identity", "source_freshness_projection"],
+      "current_enforcement": "organization_scoped_without_target_role_projection",
+      "source_refs": ["apps/api/routes/market_data_reference.py"]
+    },
+    {
+      "capability_id": "data.selection.manage",
+      "action": "Select or remove organization instruments.",
+      "grants": [
+        {"roles": ["owner", "admin"], "scope": "organization"},
+        {"roles": ["trader"], "scope": "delegated_organization", "condition": "delegation:data.selection.manage"}
+      ],
+      "denied_roles": ["operator", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "installation_resource_ceiling", "strategy_pin_guard", "audit_event"],
+      "current_enforcement": "organization_scoped_but_target_role_policy_not_implemented",
+      "source_refs": ["apps/api/routes/market_data_reference.py"]
+    },
+    {
+      "capability_id": "strategies.read",
+      "action": "Read strategies and runtime state.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin", "operator"], "scope": "server_filtered_read"},
+        {"roles": ["trader"], "scope": "own"},
+        {"roles": ["viewer"], "scope": "server_filtered_read"}
+      ],
+      "denied_roles": [],
+      "requirements": ["selected_organization"],
+      "current_enforcement": "primarily_user_ownership_not_target_role_projection",
+      "source_refs": ["apps/api/routes/strategies.py"]
+    },
+    {
+      "capability_id": "strategies.manage",
+      "action": "Create, clone, update, or delete strategies.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:strategies.manage"},
+        {"roles": ["trader"], "scope": "own"}
+      ],
+      "denied_roles": ["operator", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "ownership_or_delegation", "destructive_confirmation_for_delete", "audit_event"],
+      "current_enforcement": "user_ownership_without_target_role_policy",
+      "source_refs": ["apps/api/routes/strategies.py"]
+    },
+    {
+      "capability_id": "strategies.run",
+      "action": "Start or restart an eligible strategy.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:strategies.run"},
+        {"roles": ["trader"], "scope": "own"}
+      ],
+      "denied_roles": ["operator", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "risk_admission", "connection_readiness", "audit_event"],
+      "current_enforcement": "user_ownership_and_runtime_guards_without_target_role_policy",
+      "source_refs": ["apps/api/routes/strategies.py"]
+    },
+    {
+      "capability_id": "strategies.safe_stop",
+      "action": "Stop an eligible running strategy without expanding trading authority.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:strategies.safe_stop"},
+        {"roles": ["operator"], "scope": "operational_safe_subset"},
+        {"roles": ["trader"], "scope": "own"}
+      ],
+      "denied_roles": ["viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "allowlisted_stop_only", "idempotency", "audit_event"],
+      "current_enforcement": "user_ownership_without_operator_safe_stop_policy",
+      "source_refs": ["apps/api/routes/strategies.py"]
+    },
+    {
+      "capability_id": "strategies.manual_trade",
+      "action": "Submit manual entry or exit for an eligible strategy.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:strategies.manual_trade"},
+        {"roles": ["trader"], "scope": "own"}
+      ],
+      "denied_roles": ["operator", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "recent_auth_when_required", "risk_admission", "mainnet_approval_when_required", "audit_event"],
+      "current_enforcement": "runtime_and_risk_guards_without_complete_target_role_policy",
+      "source_refs": ["apps/api/routes/strategies.py"]
+    },
+    {
+      "capability_id": "models.read",
+      "action": "Read models, experiments, readiness, promotion history, and rollback state.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin", "operator", "viewer"], "scope": "server_filtered_read"},
+        {"roles": ["trader"], "scope": "own"}
+      ],
+      "denied_roles": [],
+      "requirements": ["selected_organization"],
+      "current_enforcement": "target_workspace_not_implemented",
+      "source_refs": ["apps/web/main/app.py:get_models_page"]
+    },
+    {
+      "capability_id": "models.manage",
+      "action": "Create experiments and request model training.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:models.manage"},
+        {"roles": ["trader"], "scope": "own"}
+      ],
+      "denied_roles": ["operator", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "resource_admission", "audit_event"],
+      "current_enforcement": "target_not_implemented",
+      "source_refs": ["docs/architecture/platform/roehub-product-transformation-requirements-v1.md#11-roles-and-routes"]
+    },
+    {
+      "capability_id": "models.promote_or_rollback",
+      "action": "Promote or roll back a model after readiness checks.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:models.promote_or_rollback"},
+        {"roles": ["trader"], "scope": "own"}
+      ],
+      "denied_roles": ["operator", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "readiness_gate", "recent_auth_when_required", "audit_event"],
+      "current_enforcement": "target_not_implemented",
+      "source_refs": ["docs/architecture/platform/roehub-product-transformation-requirements-v1.md#11-roles-and-routes"]
+    },
+    {
+      "capability_id": "backtests.read",
+      "action": "Read backtest jobs and results.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin", "operator"], "scope": "server_filtered_read"},
+        {"roles": ["trader"], "scope": "own"},
+        {"roles": ["viewer"], "scope": "server_filtered_read", "condition": "completed_results_only"}
+      ],
+      "denied_roles": [],
+      "requirements": ["selected_organization", "result_visibility_policy"],
+      "current_enforcement": "user_ownership_without_target_role_projection",
+      "source_refs": ["apps/api/routes/backtests.py"]
+    },
+    {
+      "capability_id": "backtests.manage_own",
+      "action": "Create, cancel, or delete the actor's backtest jobs.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:backtests.manage_own"},
+        {"roles": ["trader"], "scope": "own"}
+      ],
+      "denied_roles": ["operator", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "resource_admission", "destructive_confirmation_for_delete", "audit_event"],
+      "current_enforcement": "user_ownership_and_paid_level_without_target_role_policy",
+      "source_refs": ["apps/api/routes/backtests.py"]
+    },
+    {
+      "capability_id": "backtests.queue_operate",
+      "action": "Cancel or retry an allowlisted job in the operational queue.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:backtests.queue_operate"},
+        {"roles": ["operator"], "scope": "operational_safe_subset"}
+      ],
+      "denied_roles": ["trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "allowlisted_cancel_or_retry", "no_result_mutation", "audit_event"],
+      "current_enforcement": "target_not_implemented",
+      "source_refs": ["docs/architecture/platform/roehub-product-transformation-requirements-v1.md#11-roles-and-routes"]
+    },
+    {
+      "capability_id": "backtests.promote_own",
+      "action": "Create or launch a strategy from an eligible backtest result.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:backtests.promote_own"},
+        {"roles": ["trader"], "scope": "own"}
+      ],
+      "denied_roles": ["operator", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "variant_compatibility", "risk_admission", "confirmation", "audit_event"],
+      "current_enforcement": "user_ownership_and_compatibility_guards_without_target_role_policy",
+      "source_refs": ["apps/api/routes/backtests.py", "apps/api/routes/strategies.py"]
+    },
+    {
+      "capability_id": "live.read",
+      "action": "Read live and paper execution state.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin", "operator", "viewer"], "scope": "server_filtered_read"},
+        {"roles": ["trader"], "scope": "own"}
+      ],
+      "denied_roles": [],
+      "requirements": ["selected_organization", "freshness_projection"],
+      "current_enforcement": "distributed_read_models_without_dedicated_target_workspace",
+      "source_refs": ["apps/api/routes/ui_strategies_dashboard.py", "apps/api/routes/ui_execution.py"]
+    },
+    {
+      "capability_id": "live.reconcile",
+      "action": "Reconcile execution state or perform an allowlisted safe stop.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:live.reconcile"},
+        {"roles": ["operator"], "scope": "operational_safe_subset"},
+        {"roles": ["trader"], "scope": "own", "condition": "non_escalating_reconciliation"}
+      ],
+      "denied_roles": ["viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "idempotency", "no_secret_access", "audit_event"],
+      "current_enforcement": "target_not_implemented_as_unified_capability",
+      "source_refs": ["apps/api/routes/ui_execution.py", "apps/api/routes/strategies.py"]
+    },
+    {
+      "capability_id": "monitoring.read",
+      "action": "Read grouped service health, freshness, dependencies, and user impact.",
+      "grants": [{"roles": ["owner", "admin", "operator", "trader", "viewer"], "scope": "server_filtered_read"}],
+      "denied_roles": [],
+      "requirements": ["secret_redaction", "source_freshness_projection"],
+      "current_enforcement": "authenticated_read_model_without_complete_target_grouping",
+      "source_refs": ["apps/api/routes/ui_dashboard.py", "apps/api/routes/admin.py"]
+    },
+    {
+      "capability_id": "monitoring.safe_action",
+      "action": "Perform an allowlisted safe operational action from monitoring.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:monitoring.safe_action"},
+        {"roles": ["operator"], "scope": "operational_safe_subset"}
+      ],
+      "denied_roles": ["trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_action_allowlist", "idempotency", "confirmation_when_destructive", "audit_event"],
+      "current_enforcement": "operations_execute_is_broader_than_target_safe_subset",
+      "source_refs": ["src/trading/contexts/identity/domain/entities/organization.py", "apps/api/routes/admin.py"]
+    },
+    {
+      "capability_id": "connections.status.read",
+      "action": "Read redacted connection readiness and validation state.",
+      "grants": [{"roles": ["owner", "admin", "operator", "trader", "viewer"], "scope": "server_filtered_read"}],
+      "denied_roles": [],
+      "requirements": ["no_secret_material", "selected_organization"],
+      "current_enforcement": "user_owned_projection_without_target_role_projection",
+      "source_refs": ["apps/api/routes/ui_account.py"]
+    },
+    {
+      "capability_id": "connections.bind_own",
+      "action": "Bind an allowed ready connection to an owned strategy.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "delegated_organization", "condition": "delegation:connections.bind_own"},
+        {"roles": ["trader"], "scope": "own"}
+      ],
+      "denied_roles": ["operator", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "strategy_ownership", "connection_readiness", "audit_event"],
+      "current_enforcement": "partially_implemented_without_target_role_policy",
+      "source_refs": ["apps/api/routes/ui_account.py", "apps/api/routes/strategies.py"]
+    },
+    {
+      "capability_id": "connections.manage",
+      "action": "Create, rotate, disconnect, or archive exchange connections.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "organization"}
+      ],
+      "denied_roles": ["operator", "trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "recent_auth", "no_secret_echo", "destructive_confirmation", "audit_event"],
+      "current_enforcement": "user_ownership_recent_auth_and_same_origin_without_target_role_policy",
+      "source_refs": ["apps/api/routes/ui_account.py"]
+    },
+    {
+      "capability_id": "connections.safe_operate",
+      "action": "Recheck or disconnect a connection without reading or rotating its secret.",
+      "grants": [
+        {"roles": ["owner", "admin"], "scope": "organization"},
+        {"roles": ["operator"], "scope": "operational_safe_subset"}
+      ],
+      "denied_roles": ["trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "no_secret_access", "allowlisted_recheck_or_disconnect", "audit_event"],
+      "current_enforcement": "target_operator_policy_not_implemented",
+      "source_refs": ["apps/api/routes/ui_account.py"]
+    },
+    {
+      "capability_id": "connections.secret.reveal",
+      "action": "Reveal stored connection secret material.",
+      "grants": [],
+      "denied_roles": ["owner", "admin", "operator", "trader", "viewer"],
+      "requirements": ["never_return_stored_secret"],
+      "current_enforcement": "security_invariant",
+      "source_refs": ["docs/architecture/platform/roehub-product-transformation-requirements-v1.md#11-roles-and-routes"]
+    },
+    {
+      "capability_id": "settings.personal.manage",
+      "action": "Manage personal profile, notification preferences, integrations, and sessions.",
+      "grants": [{"roles": ["owner", "admin", "operator", "trader", "viewer"], "scope": "personal"}],
+      "denied_roles": [],
+      "requirements": ["browser_mutation_envelope", "owner_user_id_scope", "recent_auth_for_security_actions"],
+      "current_enforcement": "implemented_for_owner_user_id",
+      "source_refs": ["apps/api/routes/ui_account.py"]
+    },
+    {
+      "capability_id": "settings.organization.manage",
+      "action": "Manage organization settings and resource quotas within installation ceilings.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "organization"}
+      ],
+      "denied_roles": ["operator", "trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "server_enforced_role", "installation_ceiling", "audit_event"],
+      "current_enforcement": "partially_implemented_in_organization_domain",
+      "source_refs": ["src/trading/contexts/identity/application/use_cases/organizations.py"]
+    },
+    {
+      "capability_id": "installation.trust.manage",
+      "action": "Manage installation-wide trust policy and trusted integration boundaries.",
+      "grants": [],
+      "denied_roles": ["owner", "admin", "operator", "trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "installation_owner", "recent_auth", "explicit_confirmation", "trust_policy_validation", "no_secret_echo", "audit_event"],
+      "authority_required": "installation_owner",
+      "current_enforcement": "target_not_implemented",
+      "source_refs": ["docs/architecture/platform/roehub-product-transformation-requirements-v1.md#2-product-boundary"]
+    },
+    {
+      "capability_id": "installation.resources.manage",
+      "action": "Set physical installation ceilings and separate backtest/artifact budgets.",
+      "grants": [],
+      "denied_roles": ["owner", "admin", "operator", "trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "installation_owner", "recent_auth", "safe_defaults", "audit_event"],
+      "authority_required": "installation_owner",
+      "current_enforcement": "target_not_implemented",
+      "source_refs": ["docs/architecture/platform/roehub-product-transformation-requirements-v1.md#9-resource-governance"]
+    },
+    {
+      "capability_id": "admin.overview.read",
+      "action": "Read the server-filtered administration overview, members, resources, extensions, maintenance state, and audit availability.",
+      "grants": [
+        {"roles": ["owner", "admin"], "scope": "organization"},
+        {"roles": ["operator"], "scope": "server_filtered_read"}
+      ],
+      "denied_roles": ["trader", "viewer"],
+      "requirements": ["selected_organization", "secret_redaction", "server_capability_projection"],
+      "current_enforcement": "partially_implemented_in_admin_snapshot",
+      "source_refs": ["apps/api/routes/admin.py"]
+    },
+    {
+      "capability_id": "admin.members.manage",
+      "action": "Invite members and change organization roles.",
+      "grants": [
+        {"roles": ["owner"], "scope": "organization"},
+        {"roles": ["admin"], "scope": "organization", "condition": "cannot_grant_or_remove_owner"}
+      ],
+      "denied_roles": ["operator", "trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "roles.manage", "recent_auth", "last_owner_guard", "audit_event"],
+      "current_enforcement": "implemented_in_organization_domain",
+      "source_refs": ["src/trading/contexts/identity/application/use_cases/organizations.py"]
+    },
+    {
+      "capability_id": "admin.plugins.manage",
+      "action": "Validate, install, update, or roll back extensions.",
+      "grants": [{"roles": ["owner", "admin"], "scope": "organization"}],
+      "denied_roles": ["operator", "trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "plugins.manage", "permission_review", "confirmation", "audit_event"],
+      "current_enforcement": "implemented_in_extension_authorization",
+      "source_refs": ["src/trading/contexts/extensions/adapters/identity_authorization.py", "apps/api/routes/extensions.py"]
+    },
+    {
+      "capability_id": "admin.operations.execute",
+      "action": "Execute allowlisted organization operations.",
+      "grants": [
+        {"roles": ["owner", "admin"], "scope": "organization"},
+        {"roles": ["operator"], "scope": "operational_safe_subset"}
+      ],
+      "denied_roles": ["trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "operations.execute", "server_action_allowlist", "idempotency", "audit_event"],
+      "current_enforcement": "partially_implemented_but_operator_safe_subset_needs_refinement",
+      "source_refs": ["src/trading/contexts/identity/domain/entities/organization.py", "apps/api/routes/admin.py"]
+    },
+    {
+      "capability_id": "installation.recovery.execute",
+      "action": "Manage backup recovery, update rollback, and physical installation recovery.",
+      "grants": [],
+      "denied_roles": ["owner", "admin", "operator", "trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "installation_owner", "recent_auth", "explicit_confirmation", "recovery_evidence", "audit_event"],
+      "authority_required": "installation_owner",
+      "current_enforcement": "partially_implemented_for_allowlisted_installation_actions",
+      "source_refs": ["apps/api/routes/admin.py", "src/trading/contexts/identity/application/use_cases/organizations.py"]
+    },
+    {
+      "capability_id": "audit.organization.read",
+      "action": "Read organization-level administrative audit events.",
+      "grants": [
+        {"roles": ["owner", "admin"], "scope": "organization"},
+        {"roles": ["operator"], "scope": "server_filtered_read"}
+      ],
+      "denied_roles": ["trader", "viewer"],
+      "requirements": ["audit.read", "secret_redaction"],
+      "current_enforcement": "implemented_in_admin_snapshot",
+      "source_refs": ["apps/api/routes/admin.py"]
+    },
+    {
+      "capability_id": "docs.read",
+      "action": "Read version-matched local user documentation.",
+      "grants": [{"roles": ["owner", "admin", "operator", "trader", "viewer"], "scope": "server_filtered_read"}],
+      "denied_roles": [],
+      "requirements": ["installed_version", "local_availability"],
+      "current_enforcement": "target_documentation_surface_not_implemented",
+      "source_refs": ["docs/architecture/platform/roehub-product-transformation-requirements-v1.md#12-documentation-and-roehubcom"]
+    },
+    {
+      "capability_id": "docs.operator.read",
+      "action": "Read an operator runbook.",
+      "grants": [
+        {"roles": ["owner", "admin", "operator"], "scope": "visibility_scoped"},
+        {"roles": ["trader", "viewer"], "scope": "visibility_scoped", "condition": "runbook_explicitly_allows_role"}
+      ],
+      "denied_roles": [],
+      "requirements": ["server_visibility_policy", "unknown_id_404", "forbidden_403", "no_publication_by_default"],
+      "current_enforcement": "authenticated_file_lookup_without_target_visibility_matrix",
+      "source_refs": ["apps/web/main/app.py:get_runbook_page"]
+    },
+    {
+      "capability_id": "qa.plugin.query",
+      "action": "Query a plugin data source in the QA-only laboratory.",
+      "grants": [{"roles": ["owner", "admin"], "scope": "organization"}],
+      "denied_roles": ["operator", "trader", "viewer"],
+      "requirements": ["browser_mutation_envelope", "feature_flag", "data.read", "qa_only", "no_product_navigation"],
+      "current_enforcement": "authenticated_and_feature_flag_without_target_role_policy",
+      "source_refs": ["apps/api/routes/extensions.py", "apps/web/main/app.py:get_plugin_panel_lab_page"]
+    }
+  ],
+  "surface_policies": [
+    {"surface_id": "platform.auth.lifecycle", "classification": "server_authorized", "capability_ids": ["auth.session.manage", "setup.bootstrap"]},
+    {"surface_id": "platform.shell.preferences", "classification": "server_authorized", "capability_ids": ["preferences.manage_personal"]},
+    {"surface_id": "platform.dashboard.data_onboarding", "classification": "client_navigation_non_authorizing", "capability_ids": ["data.catalog.read"]},
+    {"surface_id": "platform.strategies.library", "classification": "server_authorized", "capability_ids": ["strategies.read", "strategies.manage"]},
+    {"surface_id": "platform.strategies.runtime_control", "classification": "server_authorized", "capability_ids": ["strategies.read", "strategies.run", "strategies.safe_stop", "strategies.manual_trade"]},
+    {"surface_id": "platform.strategies.rl_ml_compatibility", "classification": "compatibility_surface_non_authorizing", "capability_ids": ["models.read", "models.manage", "models.promote_or_rollback"]},
+    {"surface_id": "platform.models.workspace", "classification": "server_authorized", "capability_ids": ["models.read", "models.manage", "models.promote_or_rollback"]},
+    {"surface_id": "platform.backtests.workstation", "classification": "server_authorized", "capability_ids": ["backtests.read", "backtests.manage_own", "backtests.queue_operate"]},
+    {"surface_id": "platform.backtests.variant_detail", "classification": "read_and_export_server_authorized", "capability_ids": ["backtests.read"]},
+    {"surface_id": "platform.backtests.strategy_promotion", "classification": "server_authorized", "capability_ids": ["backtests.promote_own"]},
+    {"surface_id": "platform.backtests.target_data_modes", "classification": "server_authorized_target_not_implemented", "capability_ids": ["backtests.manage_own"]},
+    {"surface_id": "platform.monitoring.workspace", "classification": "read_or_safe_action_server_authorized", "capability_ids": ["monitoring.read", "monitoring.safe_action"]},
+    {"surface_id": "platform.connections.workspace", "classification": "server_authorized", "capability_ids": ["connections.status.read", "connections.bind_own", "connections.manage", "connections.safe_operate", "connections.secret.reveal"]},
+    {"surface_id": "platform.settings.profile_limits", "classification": "server_authorized", "capability_ids": ["settings.personal.manage"]},
+    {"surface_id": "platform.settings.integrations_notifications", "classification": "server_authorized", "capability_ids": ["settings.personal.manage"]},
+    {"surface_id": "platform.settings.preferences", "classification": "server_authorized", "capability_ids": ["preferences.manage_personal"]},
+    {"surface_id": "platform.settings.market_data_catalog", "classification": "server_authorized", "capability_ids": ["data.catalog.read", "data.selection.manage"]},
+    {"surface_id": "platform.admin.console", "classification": "server_authorized", "capability_ids": ["admin.overview.read", "settings.organization.manage", "installation.trust.manage", "installation.resources.manage", "admin.members.manage", "admin.plugins.manage", "admin.operations.execute", "installation.recovery.execute", "audit.organization.read"]},
+    {"surface_id": "platform.qa.plugin_panel_lab", "classification": "qa_only_server_authorized", "capability_ids": ["qa.plugin.query"]},
+    {"surface_id": "platform.integration.api_proxy", "classification": "transport_non_authorizing", "capability_ids": []},
+    {"surface_id": "platform.system.error_and_recovery_states", "classification": "client_recovery_non_authorizing", "capability_ids": ["auth.session.manage"]},
+    {"surface_id": "platform.first_launch.full_setup", "classification": "one_time_server_authorized", "capability_ids": ["setup.bootstrap", "data.selection.manage"]},
+    {"surface_id": "platform.target.role_matrix", "classification": "policy_contract_non_authorizing", "capability_ids": []},
+    {"surface_id": "platform.historical.react_prototype", "classification": "historical_fixture_excluded", "capability_ids": []}
+  ],
+  "canonical_routes": [
+    {"route_id": "target.auth.login", "pattern": "/login", "screen_id": "screen.auth.login", "access": "anonymous_or_authenticated_redirect", "status": "target_not_implemented"},
+    {"route_id": "target.setup", "pattern": "/setup/{step}", "screen_id": "screen.setup.first_launch", "access": "installation_uninitialized_only", "status": "target_not_implemented"},
+    {"route_id": "target.dashboard", "pattern": "/dashboard", "screen_id": "screen.dashboard.overview", "access": "authenticated_server_filtered", "status": "target_not_implemented"},
+    {"route_id": "target.data", "pattern": "/data", "screen_id": "screen.data.catalog", "access": "authenticated_server_filtered", "status": "target_not_implemented"},
+    {"route_id": "target.strategies", "pattern": "/strategies", "screen_id": "screen.strategies.library", "access": "authenticated_server_filtered", "status": "target_not_implemented"},
+    {"route_id": "target.strategy_new", "pattern": "/strategies/new", "screen_id": "screen.strategies.editor", "access": "capability:strategies.manage", "status": "target_not_implemented"},
+    {"route_id": "target.strategy_detail", "pattern": "/strategies/{strategy_id}", "screen_id": "screen.strategies.detail", "access": "capability:strategies.read", "status": "target_not_implemented"},
+    {"route_id": "target.models", "pattern": "/models", "screen_id": "screen.models.registry", "access": "capability:models.read", "status": "target_not_implemented"},
+    {"route_id": "target.model_detail", "pattern": "/models/{model_id}", "screen_id": "screen.models.detail", "access": "capability:models.read", "status": "target_not_implemented"},
+    {"route_id": "target.backtests", "pattern": "/backtests", "screen_id": "screen.backtests.library", "access": "capability:backtests.read", "status": "target_not_implemented"},
+    {"route_id": "target.backtest_new", "pattern": "/backtests/new", "screen_id": "screen.backtests.builder", "access": "capability:backtests.manage_own", "status": "target_not_implemented"},
+    {"route_id": "target.backtest_detail", "pattern": "/backtests/{job_id}", "screen_id": "screen.backtests.detail", "access": "capability:backtests.read", "status": "target_not_implemented"},
+    {"route_id": "target.live", "pattern": "/live", "screen_id": "screen.live.workspace", "access": "capability:live.read", "status": "target_not_implemented"},
+    {"route_id": "target.monitoring", "pattern": "/monitoring", "screen_id": "screen.monitoring.workspace", "access": "capability:monitoring.read", "status": "target_not_implemented"},
+    {"route_id": "target.connections", "pattern": "/connections", "screen_id": "screen.connections.workspace", "access": "capability:connections.status.read", "status": "target_not_implemented"},
+    {"route_id": "target.settings_profile", "pattern": "/settings/profile", "screen_id": "screen.settings.profile", "access": "capability:settings.personal.manage", "status": "target_not_implemented"},
+    {"route_id": "target.settings_preferences", "pattern": "/settings/preferences", "screen_id": "screen.settings.preferences", "access": "capability:preferences.manage_personal", "status": "target_not_implemented"},
+    {"route_id": "target.settings_notifications", "pattern": "/settings/notifications", "screen_id": "screen.settings.notifications", "access": "capability:settings.personal.manage", "status": "target_not_implemented"},
+    {"route_id": "target.settings_security", "pattern": "/settings/security", "screen_id": "screen.settings.security", "access": "capability:settings.personal.manage", "status": "target_not_implemented"},
+    {"route_id": "target.admin", "pattern": "/admin", "screen_id": "screen.admin.overview", "access": "capability:admin.overview.read", "status": "target_not_implemented"},
+    {"route_id": "target.admin_members", "pattern": "/admin/members", "screen_id": "screen.admin.members", "access": "capability:admin.overview.read", "status": "target_not_implemented"},
+    {"route_id": "target.admin_resources", "pattern": "/admin/resources", "screen_id": "screen.admin.resources", "access": "capability:admin.overview.read", "status": "target_not_implemented"},
+    {"route_id": "target.admin_extensions", "pattern": "/admin/extensions", "screen_id": "screen.admin.extensions", "access": "capability:admin.overview.read", "status": "target_not_implemented"},
+    {"route_id": "target.admin_maintenance", "pattern": "/admin/maintenance", "screen_id": "screen.admin.maintenance", "access": "capability:admin.overview.read", "status": "target_not_implemented"},
+    {"route_id": "target.docs", "pattern": "/docs", "screen_id": "screen.docs.index", "access": "capability:docs.read", "status": "target_not_implemented"},
+    {"route_id": "target.docs_runbook", "pattern": "/docs/operator/runbooks/{runbook_id}/", "screen_id": "screen.docs.runbook", "access": "capability:docs.operator.read", "status": "target_not_implemented"},
+    {"route_id": "target.qa_plugin_panels", "pattern": "/__qa/plugin-panels", "screen_id": "screen.qa.plugin_panel_lab", "access": "capability:qa.plugin.query", "status": "compatibility_only"},
+    {"route_id": "target.internal_web_api_docs", "pattern": "/_internal/web-api/docs", "screen_id": "contract.framework.api_docs", "access": "disabled_by_default_or_authenticated_development", "status": "target_not_implemented"},
+    {"route_id": "target.internal_core_api_docs", "pattern": "/_internal/core-api/docs", "screen_id": "contract.framework.api_docs", "access": "disabled_by_default_or_authenticated_development", "status": "target_not_implemented"}
+  ],
+  "route_migrations": [
+    {
+      "migration_id": "route.root_state_gateway",
+      "from": "/",
+      "to": ["/setup/owner", "/login", "/dashboard"],
+      "behavior": "302_state_dependent",
+      "rule": "Uninitialized installation goes to setup; an authenticated user goes to dashboard; otherwise login.",
+      "compatibility": "compatible-change",
+      "implementation_status": "target_not_implemented"
+    },
+    {
+      "migration_id": "route.legacy_register",
+      "from": "/register",
+      "to": ["/setup/owner", "/login"],
+      "behavior": "302_state_dependent",
+      "rule": "Arbitrary self-registration is not a canonical local-platform route. Preserve the URL only as a state-aware compatibility gateway.",
+      "compatibility": "compatible-change",
+      "implementation_status": "target_not_implemented"
+    },
+    {
+      "migration_id": "route.settings_market_data",
+      "from": "/settings?tab=market-data",
+      "to": "/data",
+      "behavior": "308_after_target_route_available",
+      "rule": "Preserve recognized filters and selection context; do not expose credentials in the redirect URL.",
+      "compatibility": "compatible-change",
+      "implementation_status": "target_not_implemented"
+    },
+    {
+      "migration_id": "route.settings_default",
+      "from": "/settings",
+      "to": "/settings/profile",
+      "behavior": "308_after_nested_settings_available",
+      "rule": "Map recognized legacy tabs to their canonical nested route before applying the default profile route.",
+      "compatibility": "compatible-change",
+      "implementation_status": "target_not_implemented"
+    },
+    {
+      "migration_id": "route.models_rl_ml_alias",
+      "from": "/strategies?mode=rl_ml",
+      "to": "/models",
+      "behavior": "308_after_models_workspace_available",
+      "rule": "Keep `/models` canonical; preserve recognized model selection context and discard unrelated strategy-only query parameters.",
+      "compatibility": "compatible-change",
+      "implementation_status": "target_not_implemented"
+    },
+    {
+      "migration_id": "route.legacy_runbook",
+      "from": "/runbooks/{runbook_id}",
+      "to": "/docs/operator/runbooks/{runbook_id}/",
+      "behavior": "308_after_versioned_local_docs_available",
+      "rule": "Unknown IDs return 404, unauthenticated access preserves the canonical target in a sanitized `next`, and insufficient visibility returns 403.",
+      "compatibility": "compatible-change",
+      "implementation_status": "target_not_implemented"
+    },
+    {
+      "migration_id": "route.fastapi_docs_collision",
+      "from": ["/docs", "/docs/oauth2-redirect", "/redoc", "/openapi.json", "/api/docs", "/api/docs/oauth2-redirect", "/api/redoc", "/api/openapi.json"],
+      "to": ["/_internal/web-api/docs", "/_internal/web-api/docs/oauth2-redirect", "/_internal/web-api/redoc", "/_internal/web-api/openapi.json", "/_internal/core-api/docs", "/_internal/core-api/docs/oauth2-redirect", "/_internal/core-api/redoc", "/_internal/core-api/openapi.json"],
+      "behavior": "disable_by_default_and_move_for_development",
+      "rule": "Reserve `/docs` for versioned user documentation. Disable framework documentation on both Web and core API applications by default; when explicitly enabled for development, expose each application under its own authenticated `/_internal/*` namespace and do not proxy an anonymous `/api/docs` alias.",
+      "compatibility": "breaking-change",
+      "implementation_status": "target_not_implemented"
+    }
+  ],
+  "current_enforcement_findings": [
+    {
+      "finding_id": "auth.current_web_binary_gate",
+      "classification": "current_observed",
+      "finding": "The SSR Web gate primarily distinguishes anonymous from authenticated users and does not carry the target organization role matrix."
+    },
+    {
+      "finding_id": "identity.current_role_permissions",
+      "classification": "current_observed",
+      "finding": "The identity domain implements owner/admin/operator/trader/viewer and a permission map, while installation_owner is stored as separate authority."
+    },
+    {
+      "finding_id": "strategy.current_owner_scope",
+      "classification": "current_observed",
+      "finding": "Strategy and backtest routes primarily enforce authenticated user ownership and runtime checks, not the complete target role matrix."
+    },
+    {
+      "finding_id": "admin.current_permissions",
+      "classification": "current_observed",
+      "finding": "Administrative routes enforce organization permissions and installation_owner for installation actions, but operator `operations.execute` requires a narrower target safe-action allowlist."
+    },
+    {
+      "finding_id": "connections.current_recent_auth",
+      "classification": "current_observed",
+      "finding": "Connection credential mutations have same-origin and recent-auth guards, but target organization-role differentiation is not fully implemented."
+    }
+  ]
+}
