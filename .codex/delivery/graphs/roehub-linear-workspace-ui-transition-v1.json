@@ -1,0 +1,35 @@
+{
+  "schema_id": "io.roehub.delivery.ticket-graph/v1",
+  "graph_id": "ROEHUB-LINEAR-WORKSPACE-UI-TRANSITION-V1",
+  "title": "Roehub authenticated Linear-workspace UI transition",
+  "scope": "authenticated_self_hosted_platform_ui_only",
+  "status_authority": "ticket_front_matter_only",
+  "source_contracts": [
+    ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md",
+    "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md",
+    "docs/architecture/ui/roehub-linear-ui-migration-registry-v1.json",
+    "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v1.json"
+  ],
+  "tickets": [
+    {"ticket_id": "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md", "depends_on": [], "initial_status": "ready"},
+    {"ticket_id": "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md", "depends_on": ["ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20"], "initial_status": "draft"},
+    {"ticket_id": "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md", "depends_on": ["ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20", "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20"], "initial_status": "draft"},
+    {"ticket_id": "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md", "depends_on": ["ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20", "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20"], "initial_status": "draft"},
+    {"ticket_id": "ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md", "depends_on": ["ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20", "ROEHUB-AUTHZ-BACKTESTS-2026-07-20"], "initial_status": "draft"}
+  ],
+  "path_ownership_contract": {
+    "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20": ["docs/architecture/ui/linear-workspace-reference-manifest-v1.json", "docs/architecture/ui/linear-workspace-reference-measurements-v1.md"],
+    "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20": ["apps/platform-web/**", "packages/tokens/**", "packages/ui/**", "packages/localization/**", "packages/web-contracts/**"],
+    "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20": ["external:penpot/roehub-authenticated-linear-vnext", "docs/architecture/ui/roehub-linear-ui-migration-registry-v1.json"],
+    "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20": ["apps/platform-web/**", "apps/web/minimum-route-mount-adapter", "packages/tokens/**", "packages/ui/**", "packages/localization/**", "packages/web-contracts/**"],
+    "ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20": ["apps/platform-web/backtests/**", "ticket-owned-browser-and-performance-tests"]
+  },
+  "coordination_rules": [
+    "One ready ticket is one execution unit and ticket front matter is the only status source.",
+    "A draft ticket becomes ready only after every dependency is accepted with terminal evidence in the common base branch.",
+    "This UI stream may run beside the server authorization graph only in separate branches or worktrees with disjoint active paths.",
+    "The Backtests golden slice waits for both the accepted React shell and accepted server-authorized Backtests projection.",
+    "No ticket changes backend behavior, public roehub.com, release, or deployment authority."
+  ],
+  "initial_ready_ticket_id": "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20"
+}

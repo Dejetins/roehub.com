@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0.0",
+  "registry_id": "ROEHUB-LINEAR-UI-MIGRATION-V1",
+  "status": "accepted_preparation",
+  "shared_standard": "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md",
+  "reference_manifest": "docs/architecture/ui/linear-workspace-reference-manifest-v1.json",
+  "project_spec": ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md",
+  "existing_authority": {
+    "information_architecture": "docs/architecture/apps/web/roehub-local-platform-information-architecture-v1.md",
+    "screen_registry": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json",
+    "access_route_contract": "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v1.json",
+    "runtime_ui": "apps/web",
+    "historical_prototype": "prototypes/roehub-v2"
+  },
+  "target": {
+    "scope": "authenticated_self_hosted_platform_only",
+    "frontend": ["react", "typescript", "vite", "mobx", "tanstack_query", "styled_components", "css_custom_properties"],
+    "themes": ["abyss", "graphite", "frost", "paper"],
+    "backend_change": "none",
+    "transport": ["rest", "sse"],
+    "chart_engine": "apache_echarts_via_roehub_chart_contract",
+    "migration_mode": "route_bounded_ssr_to_react_strangler"
+  },
+  "clusters": [
+    {"cluster_id": "reference", "order": 1, "ticket": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md", "state": "ready"},
+    {"cluster_id": "architecture_spike", "order": 2, "ticket": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md", "state": "draft"},
+    {"cluster_id": "penpot_vnext", "order": 3, "ticket": ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md", "state": "draft"},
+    {"cluster_id": "application_shell", "order": 4, "ticket": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md", "state": "draft"},
+    {"cluster_id": "backtests_golden_slice", "order": 5, "ticket": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md", "state": "draft"}
+  ],
+  "legacy": {
+    "superseded_design_target": "ROEHUB-LOCAL-UI-DESIGN-SYSTEM-CONTRACT-2026-07-20",
+    "accepted_evidence_policy": "retain",
+    "server_authorization_stream_policy": "unchanged_and_parallel_when_paths_are_disjoint"
+  }
+}

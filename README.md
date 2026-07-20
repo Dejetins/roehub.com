@@ -33,6 +33,10 @@ source checkout.
   обязательная среда разработки, доказательства или поставки.
 - Базовые требования следующей продуктовой трансформации:
   `docs/architecture/platform/roehub-product-transformation-requirements-v1.md`.
+- Принятый переход authenticated UI к Linear-workspace baseline:
+  `.codex/delivery/specs/roehub-linear-workspace-ui-transition.md`; он меняет
+  только Web UI, сохраняет backend/REST/SSE и использует обратимый SSR→React
+  route boundary.
 - Отдельный Compose-контур `market_data`
   (`infra/docker/docker-compose.market_data.yml`) остаётся только историческим
   локальным контуром разработки.

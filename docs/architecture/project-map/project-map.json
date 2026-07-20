@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 429,
+      "file_count": 430,
       "id": "quality",
       "paths": [
         "tests/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1081,
+      "file_count": 1095,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -3538,12 +3538,27 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-LOCAL-UI-DESIGN-SYSTEM-CONTRACT-2026-07-20.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-LOCAL-UI-IA-2026-07-20.md"
     },
     {
       "area": "knowledge",
       "kind": "configuration",
+      "path": ".codex/delivery/graphs/roehub-linear-workspace-ui-transition-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
       "path": ".codex/delivery/graphs/roehub-server-authorization-stream-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md"
     },
     {
       "area": "knowledge",
@@ -4073,12 +4088,37 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/tickets/2026-07-20-roehub-local-ui-design-system-contract.md"
     },
     {
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/tickets/2026-07-20-roehub-local-ui-information-architecture.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md"
     },
     {
       "area": "knowledge",
@@ -6574,6 +6614,21 @@
       "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/apps/web/roehub-local-platform-component-registry-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/roehub-local-platform-design-system-contract-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/apps/web/roehub-local-platform-design-token-contract-v1.json"
     },
     {
       "area": "knowledge",
@@ -9539,6 +9594,21 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/strategy/strategy-telegram-notifier-best-effort-policy-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/ui/linear-workspace-reference-manifest-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/ui/roehub-linear-ui-migration-registry-v1.json"
     },
     {
       "area": "knowledge",
@@ -16753,6 +16823,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/docs/test_roehub_local_platform_design_system_contract.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/docs/test_roehub_local_platform_information_architecture.py"
     },
     {
@@ -17381,7 +17456,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3036,
+  "inventory_file_count": 3051,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17598,5 +17673,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "ddc13cca21b3bca2690912414115d2e40fd4290e1175e14843b10579efb6c560"
+  "structural_digest": "f49765780fc8034cf00504f9339a58289b1c70b3c3a0bbf36a48348ed30583e6"
 }

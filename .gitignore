@@ -68,6 +68,9 @@ target/
 .codex/*.local.*
 .opencode/
 .playwright-cli/
+**/auth-state*.json
+**/storage-state*.json
+.private/
 .local_artifacts/
 local_artifacts/
 .data_load/*

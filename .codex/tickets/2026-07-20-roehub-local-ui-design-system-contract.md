@@ -1,14 +1,20 @@
 ---
 ticket_id: ROEHUB-LOCAL-UI-DESIGN-SYSTEM-CONTRACT-2026-07-20
-status: ready
+status: accepted
 owner: unassigned
 depends_on:
   - ROEHUB-LOCAL-UI-IA-2026-07-20
 evidence:
   - .codex/delivery/evidence/ROEHUB-LOCAL-UI-DESIGN-SYSTEM-CONTRACT-2026-07-20.md
+future_implementation_authority: superseded_by_roehub_linear_workspace_ui_transition_spec
 ---
 
 # Define the local-platform design-system contract
+
+> Historical accepted evidence. Its future six-theme implementation target is
+> superseded by `.codex/delivery/specs/roehub-linear-workspace-ui-transition.md`.
+> This ticket remains accepted because its bounded contract audit was completed;
+> it is not an executable UI migration ticket.
 
 ## Outcome
 
