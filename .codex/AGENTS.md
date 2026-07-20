@@ -39,6 +39,14 @@ Read the smallest current source set needed for the task:
 - the selected ticket, plan, or ledger only when it is current and relevant;
 - affected code, tests, CI configuration, and nearby documentation.
 
+For authenticated Web transition work, also load
+`docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md`, the
+accepted Roehub transition specification under `.codex/delivery/specs/`, and
+the applicable node in `roehub-linear-workspace-ui-transition-v1.json`. The
+accepted 2026-07-20 local design-system artifacts remain historical contract
+evidence; their six-theme future implementation target is superseded. Backend
+and server-authorization tickets remain independently authoritative.
+
 `.codex/PLANS.md` is historical project coordination, not default task context
 or execution authority. Existing prompt packs and ledgers are historical unless
 their own current state and the selected work both make them authoritative.

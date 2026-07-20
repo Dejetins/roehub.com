@@ -1,0 +1,48 @@
+{
+  "schema_version": "1.0.0",
+  "reference_id": "LINEAR-WORKSPACE-REFERENCE-2026-07-20",
+  "status": "partial_accepted_input",
+  "source": {
+    "kind": "user_supplied_local_archive",
+    "archive_name": "reference.zip",
+    "archive_sha256": "eb7b0ab070f64d553baafacefa90fdb2e87e51bc174c63db9af73bc77f8e41c2",
+    "observed_at": "2026-07-20",
+    "distributable": false,
+    "commit_policy": "commit_sanitized_measurements_and_hashes_only"
+  },
+  "viewport": {"width": 2560, "height": 1440, "browser_chrome_included": true},
+  "captures": [
+    {"file": "SCR-20260720-uiqd.png", "sha256": "e8e65a7de2fcc86c6241ba26f6c95b47b025132df7daaf785da76a1fd01f5d59", "tags": ["inbox", "expanded_sidebar", "secondary_list", "empty_detail"]},
+    {"file": "SCR-20260720-uitn.png", "sha256": "6aad94fcecb3c4e16dede4d6983285350ec97564578f6b67aeb556285255a52a", "tags": ["collapsed_sidebar", "icon_rail", "empty_detail"]},
+    {"file": "SCR-20260720-uiud.png", "sha256": "3605756200c05658f39227e3855f719d16c6e722e1dcd30e439653e472695bc1", "tags": ["navigation_hover", "keyboard_hint"]},
+    {"file": "SCR-20260720-uivc.png", "sha256": "952d575eb23bb5a7239751b0e015e2cf6965e4e401691ad221ee1f7e8f168a32", "tags": ["navigation_group_hover", "expanded_sidebar"]},
+    {"file": "SCR-20260720-uiwe.png", "sha256": "3ba982a052ba696a6852bf30e86d23c8fbe16183069dd33584915867294507b8", "tags": ["navigation_more_menu", "popover"]},
+    {"file": "SCR-20260720-uiyo.png", "sha256": "cd75a10b281ebe9198f9684b0a150a4e2908fbf5d533f399efea356e9abd56b6", "tags": ["members_table", "customize_sidebar_modal"]},
+    {"file": "SCR-20260720-ujak.png", "sha256": "f7b078874798925a6e5b2dfe0f5de1cbd65bef4cf582080fa01fb641ad6f1b10", "tags": ["members_table", "navigation_more_menu"]},
+    {"file": "SCR-20260720-ujbo.png", "sha256": "4f739b4c770a91be9d5ab6e0ee185952569a710859060e04f97016f2e68618d9", "tags": ["modal", "customize_sidebar"]},
+    {"file": "SCR-20260720-ujcd.png", "sha256": "4c2740506a464ec82974aab1a03013e120ccf02b6da5737f0db318aeeab32d50", "tags": ["modal_combobox", "menu_selected"]},
+    {"file": "SCR-20260720-ujdr.png", "sha256": "cb698fd7c21b56595680210745c3498b7ec7d62209589dea8045caac5d10ae94", "tags": ["modal_combobox", "menu_hover"]},
+    {"file": "SCR-20260720-ujff.png", "sha256": "56a0a76175f6f0f4877bed6481c261b9e61c43cee2299d38941c52eda265a229", "tags": ["settings_navigation", "settings_sections", "dense_cards"]},
+    {"file": "SCR-20260720-ujlc.png", "sha256": "d5844983cc78ea9fad883f7b771d6e5b4b063204dc6fc0047bfb1e3936f74129", "tags": ["team_overview", "tabs", "context_actions"]},
+    {"file": "SCR-20260720-ujmx.png", "sha256": "1376b93d4315e681db8cca0da7ed1c5e770e5b9d843594553c94ecb963f55dea", "tags": ["projects_table", "right_detail_pane", "filters"]},
+    {"file": "SCR-20260720-ujod.png", "sha256": "776a4b712db25201cabee4ecac586a8efc05e1e2b9d254e33d5e955a63136cbe", "tags": ["inline_edit", "icon_picker", "right_detail_pane"]},
+    {"file": "SCR-20260720-ujqr.png", "sha256": "208ecb2c9f6fc1f07a83848fc678a030c5d3ed797b87fe221354da77596a6c06", "tags": ["right_detail_pane", "combobox", "nested_overlay"]},
+    {"file": "SCR-20260720-ujyx.png", "sha256": "7d7c5e2740b981e124daf24f9b4925f3ac30858f78d4670493a68aadbb4cb55b", "tags": ["preferences", "theme_control", "settings_form"]}
+  ],
+  "observed_intent": {
+    "sidebar_pointer_resizable": true,
+    "authenticated_desktop_first": true,
+    "dark_reference_available": true,
+    "project_brand_and_domain_content_are_not_shared": true
+  },
+  "missing_required_evidence": [
+    "abyss_graphite_frost_paper_representative_matrix",
+    "command_palette_interaction",
+    "keyboard_focus_sequence",
+    "sidebar_pointer_resize_recording_and_geometry",
+    "route_drawer_modal_popover_motion_recordings",
+    "loading_empty_error_stale_forbidden_session_expired_states",
+    "sanitized_accessibility_snapshots",
+    "measured_motion_and_component_geometry"
+  ]
+}
