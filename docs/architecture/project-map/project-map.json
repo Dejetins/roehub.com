@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1068,
+      "file_count": 1080,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -3538,6 +3538,11 @@
     {
       "area": "knowledge",
       "kind": "configuration",
+      "path": ".codex/delivery/graphs/roehub-server-authorization-stream-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
       "path": ".codex/hooks.json"
     },
     {
@@ -4009,6 +4014,61 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/tickets/2026-07-17-roehub-transformation-reset.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-authz-backtests.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-authz-browser-mutation-envelope.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-authz-capability-kernel.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-authz-connections.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-authz-dashboard-data.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-authz-delegation-core.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-authz-integration-proof.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-authz-operations-installation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-authz-settings-admin.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-authz-strategies.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-local-ui-design-system-contract.md"
     },
     {
       "area": "knowledge",
@@ -17291,7 +17351,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3018,
+  "inventory_file_count": 3030,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17508,5 +17568,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "8080484b52f5d827b2033d5fa8f2540d934d909d8a50dcd27ce06a4a8373393c"
+  "structural_digest": "ceeefdd5614e611fdb404a0960cc8e81819274bb4644f82f6fbb8bed72ce89bb"
 }
