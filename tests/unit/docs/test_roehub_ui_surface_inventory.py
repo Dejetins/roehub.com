@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import re
 from pathlib import Path
+from typing import Any
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 _LOCAL_REGISTRY_PATH = _REPO_ROOT / "docs/architecture/apps/web/roehub-ui-surface-registry-v1.json"
@@ -12,7 +13,7 @@ _PUBLIC_REGISTRY_PATH = (
 _SURFACE_ID = re.compile(r"^[a-z][a-z0-9]*(?:[._][a-z0-9]+)+$")
 
 
-def _read_registry(path: Path) -> dict[str, object]:
+def _read_registry(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
