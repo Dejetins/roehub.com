@@ -1,6 +1,6 @@
 ---
 ticket_id: ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20
-status: ready
+status: accepted
 owner: unassigned
 ticket_graph: .codex/delivery/graphs/roehub-server-authorization-stream-v1.json
 depends_on: []
