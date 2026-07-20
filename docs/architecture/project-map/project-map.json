@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 426,
+      "file_count": 427,
       "id": "quality",
       "paths": [
         "tests/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1057,
+      "file_count": 1063,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -1251,6 +1251,7 @@
         "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1-stage-reports/roehub-market-data-activation-and-instrument-selection-v1-stage-ledger.md",
         "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md",
         "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/platform/roehub-public-site-identity-release-and-measurement-v1.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/00-freeze-current-state-and-contracts.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/01-open-source-license-and-release-governance.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/02-machine-readable-runbooks.md",
@@ -1261,8 +1262,7 @@
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/07-oidc-provider-integration.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/08-openbao-secrets-and-recovery.md",
         "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/09-research-context-organization-isolation.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/10-trading-context-organization-isolation.md",
-        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/11-notification-and-telegram-provider-plugins.md"
+        "docs/architecture/platform/roehub-self-hosted-oss-platform-v1-stage-reports/10-trading-context-organization-isolation.md"
       ],
       "entrypoints": [],
       "file_count": 13,
@@ -4006,6 +4006,11 @@
       "path": ".codex/tickets/2026-07-17-roehub-transformation-reset.md"
     },
     {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-ui-surface-inventory.md"
+    },
+    {
       "area": "repository-meta",
       "kind": "other",
       "path": ".dockerignore"
@@ -6489,6 +6494,26 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/apps/gateway/nginx-gateway-same-origin-ui-api-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/apps/web/roehub-public-site-surface-registry-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/roehub-ui-design-and-delivery-architecture-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/roehub-ui-surface-inventory-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/apps/web/roehub-ui-surface-registry-v1.json"
     },
     {
       "area": "knowledge",
@@ -9164,6 +9189,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/platform/roehub-product-transformation-requirements-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/platform/roehub-public-site-identity-release-and-measurement-v1.md"
     },
     {
       "area": "knowledge",
@@ -16613,6 +16643,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/docs/test_roehub_ui_surface_inventory.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/infra/test_monitoring_assets.py"
     },
     {
@@ -17226,7 +17261,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3005,
+  "inventory_file_count": 3012,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17443,5 +17478,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "583f57964bd63bce832d4038bab5ab774e37f99f31abb78426973d20dab17761"
+  "structural_digest": "16cdaad094a7b7ca6417e1ea619d3fb7ad79f7b25038981385db5819fc8f0a2d"
 }
