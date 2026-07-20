@@ -130,7 +130,7 @@
   ],
   "areas": [
     {
-      "file_count": 671,
+      "file_count": 675,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 428,
+      "file_count": 429,
       "id": "quality",
       "paths": [
         "tests/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1080,
+      "file_count": 1081,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -774,7 +774,7 @@
         "docs/architecture/identity/identity-2fa-totp-policy-v1.md"
       ],
       "entrypoints": [],
-      "file_count": 71,
+      "file_count": 75,
       "id": "context:identity",
       "kind": "context",
       "name": "identity",
@@ -3529,6 +3529,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/agents/legacy/stage_execution_ledger_template.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20.md"
     },
     {
       "area": "knowledge",
@@ -12378,6 +12383,26 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/identity/application/authorization/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/authorization/models.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/authorization/policy.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/authorization/service.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/identity/application/ports/__init__.py"
     },
     {
@@ -16738,6 +16763,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/identity/authorization/test_capability_authorization.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/infra/test_monitoring_assets.py"
     },
     {
@@ -17351,7 +17381,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3030,
+  "inventory_file_count": 3036,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17568,5 +17598,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "ceeefdd5614e611fdb404a0960cc8e81819274bb4644f82f6fbb8bed72ce89bb"
+  "structural_digest": "ddc13cca21b3bca2690912414115d2e40fd4290e1175e14843b10579efb6c560"
 }
