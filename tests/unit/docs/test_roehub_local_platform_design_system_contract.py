@@ -32,7 +32,10 @@ def _relative_luminance(hex_color: str) -> float:
 
 
 def _contrast_ratio(foreground: str, background: str) -> float:
-    lightest, darkest = sorted((_relative_luminance(foreground), _relative_luminance(background)), reverse=True)
+    lightest, darkest = sorted(
+        (_relative_luminance(foreground), _relative_luminance(background)),
+        reverse=True,
+    )
     return (lightest + 0.05) / (darkest + 0.05)
 
 
@@ -112,7 +115,10 @@ def test_component_registry_covers_every_visual_screen_and_exact_state_set() -> 
         assert composition["component_ids"]
         assert set(composition["component_ids"]).issubset(family_ids)
 
-    excluded = {row["screen_id"] for row in registry["excluded_non_visual_or_historical_registry_entries"]}
+    excluded = {
+        row["screen_id"]
+        for row in registry["excluded_non_visual_or_historical_registry_entries"]
+    }
     expected_excluded = {
         row["screen_id"]
         for row in source["screens"]
@@ -138,7 +144,13 @@ def test_chart_progress_accessibility_and_future_package_boundaries_are_safe() -
         "arbitrary_renderer",
         "arbitrary_dataset_transform",
     }.issubset(chart["prohibited"])
-    assert {"units", "timezone", "source", "freshness", "table_alternative"}.issubset(chart["required_metadata"])
+    assert {
+        "units",
+        "timezone",
+        "source",
+        "freshness",
+        "table_alternative",
+    }.issubset(chart["required_metadata"])
 
     progress = registry["progress_contract"]
     assert progress["queue_and_execution_eta_are_distinct"] is True
@@ -151,7 +163,11 @@ def test_chart_progress_accessibility_and_future_package_boundaries_are_safe() -
     }
     assert set(progress["terminal_states"]) == {"completed", "failed", "cancelled"}
     assert progress["active_bar_hidden_after_terminal"] is True
-    assert {"decorative_timer", "false_100_percent", "success_without_terminal_server_result"}.issubset(progress["prohibited"])
+    assert {
+        "decorative_timer",
+        "false_100_percent",
+        "success_without_terminal_server_result",
+    }.issubset(progress["prohibited"])
 
     packages = {row["package"]: row["owns"] for row in registry["future_package_bindings"]}
     assert set(packages) == {
@@ -188,7 +204,10 @@ def test_design_document_links_index_and_project_map_are_current() -> None:
     for link in links:
         assert (DESIGN_SYSTEM_DOCUMENT.parent / link).resolve().exists(), link
 
-    assert "roehub-local-platform-design-system-contract-v1.md" in ARCHITECTURE_INDEX.read_text(encoding="utf-8")
+    assert (
+        "roehub-local-platform-design-system-contract-v1.md"
+        in ARCHITECTURE_INDEX.read_text(encoding="utf-8")
+    )
     project_map = _load_json(PROJECT_MAP)
     inventory_paths = {row["path"] for row in project_map["inventory"]}
     assert str(DESIGN_SYSTEM_DOCUMENT.relative_to(REPO_ROOT)) in inventory_paths
