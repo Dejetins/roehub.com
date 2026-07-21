@@ -130,7 +130,7 @@
   ],
   "areas": [
     {
-      "file_count": 675,
+      "file_count": 681,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -161,7 +161,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 288,
+      "file_count": 289,
       "id": "operations",
       "paths": [
         "infra/",
@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 430,
+      "file_count": 433,
       "id": "quality",
       "paths": [
         "tests/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1095,
+      "file_count": 1096,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -774,7 +774,7 @@
         "docs/architecture/identity/identity-2fa-totp-policy-v1.md"
       ],
       "entrypoints": [],
-      "file_count": 75,
+      "file_count": 81,
       "id": "context:identity",
       "kind": "context",
       "name": "identity",
@@ -3538,6 +3538,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-LOCAL-UI-DESIGN-SYSTEM-CONTRACT-2026-07-20.md"
     },
     {
@@ -4434,6 +4439,11 @@
       "area": "operations",
       "kind": "python",
       "path": "alembic/versions/20260711_0043_notification_delivery_counters_v1.py"
+    },
+    {
+      "area": "operations",
+      "kind": "python",
+      "path": "alembic/versions/20260720_0044_identity_delegated_capabilities_v1.py"
     },
     {
       "area": "delivery",
@@ -12323,6 +12333,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/outbound/persistence/in_memory/delegation_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/identity/adapters/outbound/persistence/in_memory/exchange_keys_repository.py"
     },
     {
@@ -12359,6 +12374,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/identity/adapters/outbound/persistence/postgres/account_settings_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/outbound/persistence/postgres/delegation_repository.py"
     },
     {
       "area": "domain",
@@ -12473,6 +12493,21 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/identity/application/delegation/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/delegation/models.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/delegation/service.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/identity/application/ports/__init__.py"
     },
     {
@@ -12494,6 +12529,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/identity/application/ports/current_user.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/ports/delegation_repository.py"
     },
     {
       "area": "domain",
@@ -16843,6 +16883,21 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/identity/delegation/test_delegated_capability_service.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/identity/delegation/test_delegation_migration_contract.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/identity/delegation/test_postgres_delegation_repository.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/infra/test_monitoring_assets.py"
     },
     {
@@ -17456,7 +17511,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3051,
+  "inventory_file_count": 3062,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17673,5 +17728,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "f49765780fc8034cf00504f9339a58289b1c70b3c3a0bbf36a48348ed30583e6"
+  "structural_digest": "6993c6a91dbe322593b38b7261c792ffaa784105663da7ed83f65a485a8aa7f2"
 }
