@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1105,
+      "file_count": 1104,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -4134,11 +4134,6 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/tickets/2026-07-20-roehub-local-ui-information-architecture.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md"
     },
     {
       "area": "knowledge",
@@ -17606,7 +17601,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3081,
+  "inventory_file_count": 3080,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17823,5 +17818,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "db30151175b52e3f0cda0bc7cb882b966fbcaa87ac4af34dab99bf5168697c67"
+  "structural_digest": "ae521a2858d1f3c98885874105093cf6ae8477796aeea4c521a293c625f4390c"
 }
