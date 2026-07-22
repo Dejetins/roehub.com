@@ -159,28 +159,41 @@ def _seed_delegation_database(
             """
         )
         cursor.executemany(
-            "INSERT INTO identity_users (user_id) VALUES (%s)",
-            [(str(owner_user_id),), (str(grantee_user_id),)],
-        )
-        cursor.execute(
-            "INSERT INTO identity_installations (installation_id) VALUES (%s)",
-            (str(installation_id),),
+            "INSERT INTO identity_users (user_id, created_at) VALUES (%s, %s)",
+            [(str(owner_user_id), NOW), (str(grantee_user_id), NOW)],
         )
         cursor.execute(
             """
-            INSERT INTO identity_organizations (organization_id, installation_id)
-            VALUES (%s, %s)
+            INSERT INTO identity_installations (installation_id, display_name, created_at)
+            VALUES (%s, %s, %s)
             """,
-            (str(organization_id), str(installation_id)),
+            (str(installation_id), "Delegation Test Installation", NOW),
+        )
+        cursor.execute(
+            """
+            INSERT INTO identity_organizations (
+                organization_id, installation_id, slug, display_name, created_at
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            """,
+            (
+                str(organization_id),
+                str(installation_id),
+                "delegation-test",
+                "Delegation Test Organization",
+                NOW,
+            ),
         )
         cursor.executemany(
             """
-            INSERT INTO identity_memberships (organization_id, user_id, role, status)
-            VALUES (%s, %s, %s, 'active')
+            INSERT INTO identity_memberships (
+                organization_id, user_id, role, status, created_at, updated_at
+            )
+            VALUES (%s, %s, %s, 'active', %s, %s)
             """,
             [
-                (str(organization_id), str(owner_user_id), "owner"),
-                (str(organization_id), str(grantee_user_id), "admin"),
+                (str(organization_id), str(owner_user_id), "owner", NOW, NOW),
+                (str(organization_id), str(grantee_user_id), "admin", NOW, NOW),
             ],
         )
 

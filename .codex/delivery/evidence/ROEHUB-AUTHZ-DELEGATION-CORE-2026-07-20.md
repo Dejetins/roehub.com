@@ -194,3 +194,72 @@ the real downgrade/re-upgrade cycle, CI parity with `bootstrap_main`, and
 absence of duplicate table ownership. It independently reproduced the optional
 delegation fixture failure before delegation logic at its seed insert without
 `created_at`, confirming that it is outside this repair.
+
+## 2026-07-22 — delegation PostgreSQL seed parity and mandatory CI check
+
+### Preconditions and root cause
+
+- `git ls-remote origin refs/heads/main` and `origin/main` were both
+  `b159bc0e7ac3ac14f53cd6f603574dcbaa08bf52`; local `main`/`HEAD` was the one
+  commit ahead `b3e8ce92785ebaeeea6f535bf7be7bd216592968`.
+- The index and working tree were clean, `git worktree list --porcelain`
+  registered only `/Users/daniildegtyarev/Projects/roehub.com`, and `outputs/`
+  remained ignored. `20260720_0044_identity_delegated_capabilities_v1.py` had
+  no diff from `b159bc0e7ac3ac14f53cd6f603574dcbaa08bf52`.
+- A disposable PostgreSQL 16 container bound only to `127.0.0.1:55447` was
+  bootstrapped with
+  `uv run python -m apps.migrations.bootstrap_main --identity-dsn "$POSTGRES_DSN" --postgres-dsn "$POSTGRES_DSN"`.
+  The command passed and applied the complete ordered bootstrap through SQL
+  `0022` and Alembic `head`.
+- Before this repair,
+  `ROEHUB_TEST_DELEGATION_PG_DSN="$POSTGRES_DSN" uv run pytest -q tests/unit/identity/delegation/test_postgres_delegation_repository.py`
+  failed as expected (`1 failed`) before repository logic with
+  `psycopg.errors.NotNullViolation`: `identity_users.created_at` was null.
+
+### Changed boundary
+
+- `_seed_delegation_database` now provides the current required schema fields:
+  `identity_users.created_at`; `identity_installations.display_name` and
+  `created_at`; `identity_organizations.slug`, `display_name`, and
+  `created_at`; and `identity_memberships.created_at` and `updated_at`.
+  It uses the fixed non-personal names `Delegation Test Installation`,
+  `Delegation Test Organization`, slug `delegation-test`, and the existing
+  deterministic UTC `NOW` value. No production defaults, constraints, SQL, or
+  Alembic revision changed.
+- The `migrations` GitHub Actions job now has one required
+  `Delegation PostgreSQL parity (fail-fast)` step directly after successful
+  `apps.migrations.bootstrap_main`:
+
+  ```bash
+  ROEHUB_TEST_DELEGATION_PG_DSN="$POSTGRES_DSN" uv run pytest -q tests/unit/identity/delegation/test_postgres_delegation_repository.py
+  ```
+
+  It reuses the job's existing one-time PostgreSQL service. No test shard or
+  other test suite was expanded.
+
+### Local command record
+
+| Command | Result |
+|---|---|
+| `ROEHUB_TEST_DELEGATION_PG_DSN="$POSTGRES_DSN" uv run pytest -q tests/unit/identity/delegation/test_postgres_delegation_repository.py` after bootstrap and seed repair | `1 passed` |
+| `ROEHUB_TEST_DELEGATION_PG_DSN="$POSTGRES_DSN" uv run pytest tests/unit/apps/migrations tests/unit/identity/delegation -q` | `86 passed`; no PostgreSQL skip remained. |
+| `uv run ruff check tests/unit/identity/delegation/test_postgres_delegation_repository.py` | passed. |
+| `uv run ruff format --check tests/unit/identity/delegation/test_postgres_delegation_repository.py` | passed (`1 file already formatted`). |
+| `uv run pyright tests/unit/identity/delegation/test_postgres_delegation_repository.py` | `0 errors, 0 warnings, 0 informations`. |
+| `uv run python -m tools.docs.generate_docs_index --check` | passed; index up to date. |
+| `uv run python -m tools.docs.generate_project_map --check` | passed; five artifacts up to date. |
+| `git diff --check` | passed. |
+| `docker rm -f roehub-delegation-pg-parity-20260722` | passed; the only disposable local PostgreSQL container was removed. |
+
+`ci.yml` parsed successfully with the repository Python environment. The CI
+parity command occurs exactly once and after `bootstrap_main`.
+
+### Independent review
+
+An independent separate-agent review performed no filesystem or database
+writes and found no `P0`–`P3` findings. It confirmed that the seed values meet
+the live SQL constraints, production schema and `0044` remain unchanged, the
+CI command receives `ROEHUB_TEST_DELEGATION_PG_DSN` after bootstrap so its skip
+branch is unreachable, and no unrelated test suite was broadened. It did not
+rerun tests by design; the command results above are the primary execution
+evidence.

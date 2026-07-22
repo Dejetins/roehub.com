@@ -195,6 +195,10 @@ jobs:
             --identity-dsn "$POSTGRES_DSN" \
             --postgres-dsn "$POSTGRES_DSN"
 
+      - name: Delegation PostgreSQL parity (fail-fast)
+        run: |
+          ROEHUB_TEST_DELEGATION_PG_DSN="$POSTGRES_DSN" uv run pytest -q tests/unit/identity/delegation/test_postgres_delegation_repository.py
+
   test_shards:
     name: test-shard (${{ matrix.name }})
     needs: changes
