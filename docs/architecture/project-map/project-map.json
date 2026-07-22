@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1103,
+      "file_count": 1101,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -3569,16 +3569,6 @@
       "area": "knowledge",
       "kind": "configuration",
       "path": ".codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/graphs/roehub-linear-workspace-ui-transition-v1.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/graphs/roehub-server-authorization-stream-v1.json"
     },
     {
       "area": "knowledge",
@@ -17596,7 +17586,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3079,
+  "inventory_file_count": 3077,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17813,5 +17803,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "c583aff47308ac84f5a43c7cf15c631f431e0b0b645e6a09c10bcc5eee78f82c"
+  "structural_digest": "db6221962734f4e9d3b6fd1d41a3ccbd791e477e5e2b3d6b194972de40d170de"
 }
