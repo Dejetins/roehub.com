@@ -58,6 +58,14 @@ or proof surface, create or select a new ticket instead.
 - Preserve foreign changes in the shared checkout. Own exact paths or safely
   separable hunks; never use broad staging, implicit staging, destructive Git,
   speculative branches, worktrees, or stashes as a workaround.
+- `docs/architecture/README.md` is a derived companion when this task changes
+  an architecture source in `docs/architecture/**`. It may be refreshed
+  without amending the ticket's owned-path list, but only for entries caused by
+  this task's source document. Acquire the global architecture-index lock,
+  repeat the status/diff inspection, then run
+  `python -m tools.docs.generate_docs_index` and its `--check` form before
+  releasing the same lock. Preserve the manual header and stop on unrelated
+  stale or non-separable foreign index hunks.
 - Use focused repository checks first. Tests are a gate, not universal
   acceptance: collect API, persistence, browser, runtime, performance, CI, or
   recovery evidence only when the changed behavior requires it.
