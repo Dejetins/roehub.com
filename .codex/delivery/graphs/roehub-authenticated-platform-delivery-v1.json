@@ -23,6 +23,7 @@
   "source_contracts": [
     ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md",
     "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md",
+    "docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md",
     "docs/architecture/ui/roehub-linear-ui-migration-registry-v1.json",
     "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v1.json",
     "docs/architecture/apps/web/roehub-local-platform-information-architecture-v1.md"
@@ -33,8 +34,8 @@
     {"ticket_id": "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-browser-mutation-envelope.md", "depends_on": ["ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20"]},
     {"ticket_id": "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md", "depends_on": []},
     {"ticket_id": "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md", "depends_on": ["ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20"]},
-    {"ticket_id": "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md", "depends_on": ["ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20", "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20"]},
-    {"ticket_id": "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md", "depends_on": ["ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20", "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20"]},
+    {"ticket_id": "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-figma-linear-vnext-foundations.md", "depends_on": ["ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20", "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20"]},
+    {"ticket_id": "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md", "depends_on": ["ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20", "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20"]},
     {"ticket_id": "ROEHUB-AUTHZ-BACKTESTS-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-backtests.md", "depends_on": ["ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20", "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20"]},
     {"ticket_id": "ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md", "depends_on": ["ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20", "ROEHUB-AUTHZ-BACKTESTS-2026-07-20"]},
     {"ticket_id": "ROEHUB-AUTHZ-DASHBOARD-DATA-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-dashboard-data.md", "depends_on": ["ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20", "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20"]},
@@ -46,7 +47,7 @@
   ],
   "priority_queue": [
     "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20",
-    "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20",
+    "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20",
     "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20",
     "ROEHUB-AUTHZ-BACKTESTS-2026-07-20",
     "ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20",

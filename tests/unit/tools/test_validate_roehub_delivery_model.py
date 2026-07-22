@@ -7,6 +7,7 @@ from pathlib import Path
 from tools.delivery.validate_roehub_delivery_model import (
     ACTIVE_REFERENCE_PATHS,
     GRAPH_PATH,
+    LEGACY_PENPOT_TICKET_PATH,
     _read_ticket_front_matter,
     validate_delivery_model,
 )
@@ -73,4 +74,43 @@ def test_registry_status_is_rejected(tmp_path: Path) -> None:
 
     assert "UI migration registry must not duplicate ticket status" in validate_delivery_model(
         fixture_root
+    )
+
+
+def test_unfinished_ticket_with_penpot_instruction_is_rejected(tmp_path: Path) -> None:
+    fixture_root = _fixture_repo(tmp_path)
+    ticket_path = (
+        fixture_root / ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md"
+    )
+    ticket_path.write_text(
+        ticket_path.read_text(encoding="utf-8") + "\nUse Penpot for the next design step.\n",
+        encoding="utf-8",
+    )
+
+    assert any(
+        error.startswith("unfinished ticket retains active Penpot instruction")
+        for error in validate_delivery_model(fixture_root)
+    )
+
+
+def test_canonical_figma_identity_drift_is_rejected(tmp_path: Path) -> None:
+    fixture_root = _fixture_repo(tmp_path)
+    registry_path = fixture_root / ACTIVE_REFERENCE_PATHS[-1]
+    registry = json.loads(registry_path.read_text(encoding="utf-8"))
+    registry["design_workspace"]["project_id"] = "wrong-project"
+    registry_path.write_text(json.dumps(registry), encoding="utf-8")
+
+    assert "UI migration registry has invalid canonical Figma identity" in validate_delivery_model(
+        fixture_root
+    )
+
+
+def test_replaced_penpot_ticket_is_rejected(tmp_path: Path) -> None:
+    fixture_root = _fixture_repo(tmp_path)
+    legacy_ticket = fixture_root / LEGACY_PENPOT_TICKET_PATH
+    legacy_ticket.parent.mkdir(parents=True, exist_ok=True)
+    legacy_ticket.write_text("historical duplicate", encoding="utf-8")
+
+    assert f"replaced Penpot ticket still exists: {LEGACY_PENPOT_TICKET_PATH}" in (
+        validate_delivery_model(fixture_root)
     )

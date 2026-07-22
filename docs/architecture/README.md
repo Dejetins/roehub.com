@@ -372,6 +372,7 @@
 - [Strategy Telegram notifier v1: notifications migration + rollback policy](docs/architecture/strategy/strategy-telegram-notifier-best-effort-policy-v1.md) — `docs/architecture/strategy/strategy-telegram-notifier-best-effort-policy-v1.md` — Документ фиксирует контракт STR-EPIC-05 после Notifications v1 Stage `10`: Strategy live-runner больше не должен использовать прямую Telegram delivery как основной путь. Основной режим `strategy.telegram.mode=notifications` ставит события в bounded context `notifications`; старые `log_only` и `telegram` адаптеры сохранены только как rollback.
 - [Linear workspace sanitized reference measurements v1](docs/architecture/ui/linear-workspace-reference-measurements-v1.md) — `docs/architecture/ui/linear-workspace-reference-measurements-v1.md` — This document records sanitized derived measurements and explicit waivers for
 - [Linear workspace UI transition standard v1](docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md) — `docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md` — This repository-neutral contract defines the shared UI replatforming method for
+- [Roehub Figma design-delivery standard v1](docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md) — `docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md` — - Status: `accepted architecture`.
 
 ### Ранбуки
 

@@ -5,6 +5,11 @@
 ## Статус
 
 - Статус: `accepted architecture`.
+- Инструментальная поправка от `2026-07-22`: все будущие инструкции Penpot в
+  этом документе заменены для Roehub контрактом
+  [`roehub-figma-design-delivery-standard-v1.md`](../../ui/roehub-figma-design-delivery-standard-v1.md).
+  Penpot-разделы ниже сохранены только как историческое описание прежнего
+  процесса и не разрешают новые записи. Custometry эта поправка не затрагивает.
 - Для authenticated local-platform UI последовательность design-system → full
   Penpot → implementation заменена принятым route-bounded Linear-workspace
   переходом в

@@ -30,7 +30,7 @@ ever returning stored secret material.
 
 ## Non-goals
 
-- No exchange-order submission, strategy UI, new credential provider, Penpot,
+- No exchange-order submission, strategy UI, new credential provider, Figma artifact,
   release, or deploy.
 
 ## Proof boundary

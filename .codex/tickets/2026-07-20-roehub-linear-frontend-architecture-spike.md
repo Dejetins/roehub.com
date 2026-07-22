@@ -46,7 +46,7 @@ and a repeatable client performance harness.
 
 ## Non-goals
 
-- No production shell, route cluster, Penpot, backend, trading, authorization,
+- No production shell, route cluster, Figma design, backend, trading, authorization,
   persistence, public-site, release, or deployment change.
 
 ## Proof boundary
@@ -66,4 +66,4 @@ may prove client overhead but not API latency. Focused Python/Node tests and
 
 Terminal evidence records dependency versions, route rollback, state-boundary
 tests, browser traces, measurement method/results, residual risk, and a clear
-proceed/change/stop decision for Penpot vNext and the production shell.
+proceed/change/stop decision for Figma vNext and the production shell.

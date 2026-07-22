@@ -41,12 +41,30 @@ Read the smallest current source set needed for the task:
 
 For authenticated Web transition work, also load
 `docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md`, the
+Roehub-specific Figma delivery standard at
+`docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md`, the
 accepted Roehub transition specification under `.codex/delivery/specs/`, and
 the applicable node in
 `.codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json`. The
 accepted 2026-07-20 local design-system artifacts remain historical contract
 evidence; their six-theme future implementation target is superseded. Backend
 and server-authorization tickets remain independently authoritative.
+
+All future Roehub design prototyping and design-to-code handoff use the Figma
+project `roehub.com` (`projectId` `629113387`). Authenticated-platform design
+uses the existing file `Roehub Authenticated Platform UI` (`fileKey`
+`GBzmB9evtzqnAYNjp9W1sr`); do not create a replacement or second canonical
+file. Before any Figma mutation, use `figma-use`, verify the authenticated plan,
+project and file identity, and inspect the exact owned pages/nodes. Add
+`figma-generate-library` for variables, tokens and components, and
+`figma-generate-design` for application pages or multi-section layouts. Penpot
+is not an active Roehub design surface. Preserve truthful historical Penpot
+evidence and do not change Custometry's design routing.
+
+Figma proves design structure and intent only. Record exact file/page/node
+identity, variable modes, component inventories, screenshots, functional-block
+mapping and explicit product-owner review. Runtime behavior, authorization,
+accessibility and performance still require code and real-browser evidence.
 
 Linear references are functional-structure inputs, not literal screen
 templates. Every selected Roehub surface must map analogous navigation, page

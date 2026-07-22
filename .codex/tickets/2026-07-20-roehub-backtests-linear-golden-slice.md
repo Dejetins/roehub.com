@@ -20,7 +20,7 @@ keyboard, four themes, and measured end-to-end browser behavior.
 
 ## Context and ownership
 
-Read the accepted shell, Penpot, server-authorization Backtests ticket/evidence,
+Read the accepted shell, Figma design, server-authorization Backtests ticket/evidence,
 local route/access contract, and real API DTOs. Own only this ticket/evidence,
 Backtest presentation/adapters in `apps/platform-web/**`, shared UI packages
 when safely separable, and ticket-owned browser/performance tests. Server and
@@ -43,7 +43,7 @@ domain code remain read-only.
 ## Proof boundary
 
 Use a real local API, server-authorized persona, deterministic Backtest data,
-real browser, and declared hardware. A mock, screenshot, Penpot frame, or unit
+real browser, and declared hardware. A mock, screenshot, Figma frame, or unit
 test cannot accept the golden slice.
 
 ## Acceptance

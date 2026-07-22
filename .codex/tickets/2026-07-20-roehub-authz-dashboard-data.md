@@ -31,7 +31,7 @@ cross-organization data.
 ## Non-goals
 
 - No personal settings, administration, strategies, backtests, connections,
-  monitoring, Web UI, or Penpot.
+  monitoring, Web UI, or Figma artifact.
 
 ## Proof boundary
 

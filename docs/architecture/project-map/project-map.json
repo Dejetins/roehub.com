@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1101,
+      "file_count": 1105,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -3553,6 +3553,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-FIGMA-DESIGN-DELIVERY-MIGRATION-2026-07-22.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20.md"
     },
     {
@@ -4108,6 +4113,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/tickets/2026-07-20-roehub-figma-linear-vnext-foundations.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md"
     },
     {
@@ -4144,6 +4154,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/tickets/2026-07-22-roehub-delivery-model-consolidation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-22-roehub-figma-design-delivery-migration.md"
     },
     {
       "area": "repository-meta",
@@ -9639,6 +9654,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md"
     },
     {
       "area": "knowledge",
@@ -17586,7 +17606,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3077,
+  "inventory_file_count": 3081,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17803,5 +17823,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "db6221962734f4e9d3b6fd1d41a3ccbd791e477e5e2b3d6b194972de40d170de"
+  "structural_digest": "db30151175b52e3f0cda0bc7cb882b966fbcaa87ac4af34dab99bf5168697c67"
 }

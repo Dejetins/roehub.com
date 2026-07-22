@@ -4,6 +4,10 @@
 
 - Status: `accepted target architecture`.
 - Product-owner decision: accepted on `2026-07-20`.
+- Design-tool amendment: future Roehub design handoff uses the registered Figma
+  workspace from
+  [`roehub-figma-design-delivery-standard-v1.md`](../../ui/roehub-figma-design-delivery-standard-v1.md).
+  Penpot wording below is retained as `2026-07-20` historical scope evidence.
 - Delivery ticket: `ROEHUB-LOCAL-UI-IA-2026-07-20`.
 - Scope: the self-hosted local platform only.
 - This document converts the accepted surface inventory into a target screen,

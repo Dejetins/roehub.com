@@ -1,9 +1,20 @@
 {
-  "schema_version": "1.2.0",
+  "schema_version": "1.3.0",
   "registry_id": "ROEHUB-LINEAR-UI-MIGRATION-V1",
   "shared_standard": "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md",
   "reference_manifest": "docs/architecture/ui/linear-workspace-reference-manifest-v1.json",
   "project_spec": ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md",
+  "design_standard": "docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md",
+  "design_workspace": {
+    "provider": "figma",
+    "project_name": "roehub.com",
+    "project_id": "629113387",
+    "plan_key": "team::831604964356268687",
+    "authenticated_platform_file_name": "Roehub Authenticated Platform UI",
+    "authenticated_platform_file_key": "GBzmB9evtzqnAYNjp9W1sr",
+    "authenticated_platform_file_url": "https://www.figma.com/design/GBzmB9evtzqnAYNjp9W1sr",
+    "penpot_role": "historical_evidence_only"
+  },
   "delivery_model": {
     "graph": ".codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json",
     "status_authority": "ticket_front_matter_only",
@@ -38,13 +49,14 @@
   "clusters": [
     {"cluster_id": "reference", "ticket": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md"},
     {"cluster_id": "architecture_spike", "ticket": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md"},
-    {"cluster_id": "penpot_vnext", "ticket": ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md"},
+    {"cluster_id": "figma_vnext", "ticket": ".codex/tickets/2026-07-20-roehub-figma-linear-vnext-foundations.md"},
     {"cluster_id": "application_shell", "ticket": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md"},
     {"cluster_id": "backtests_golden_slice", "ticket": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md"}
   ],
   "legacy": {
     "superseded_design_target": "ROEHUB-LOCAL-UI-DESIGN-SYSTEM-CONTRACT-2026-07-20",
     "accepted_evidence_policy": "retain",
+    "penpot_policy": "historical_evidence_only",
     "server_authorization_stream_policy": "consolidated_into_repository_delivery_queue"
   }
 }

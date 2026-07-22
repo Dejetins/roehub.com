@@ -5,6 +5,11 @@
 ## Статус и граница полномочий
 
 - Статус: `ready_for_product_review`.
+- Design-tool amendment: future Roehub library work uses the registered Figma
+  workspace from
+  [`roehub-figma-design-delivery-standard-v1.md`](../../ui/roehub-figma-design-delivery-standard-v1.md).
+  Penpot wording below remains truthful `2026-07-20` historical evidence and
+  is not active tool routing.
 - Historical contract evidence: future implementation authority, including the
   six-theme target, is superseded by
   [the Linear-workspace UI transition specification](../../../../.codex/delivery/specs/roehub-linear-workspace-ui-transition.md).

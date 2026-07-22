@@ -41,7 +41,7 @@ before a new Web UI relies on it.
 
 ## Non-goals
 
-- No Web UI, browser-visible acceptance, Penpot, model API creation, public site,
+- No Web UI, browser-visible acceptance, Figma artifact, model API creation, public site,
   release, or deploy.
 
 ## Proof boundary

@@ -2,7 +2,7 @@
 artifact_kind: delivery_spec
 delivery_contract: global/v1
 delivery_schema_version: 1
-spec_version: 1.1.0
+spec_version: 1.2.0
 status: accepted
 ---
 
@@ -46,6 +46,10 @@ useful block roles and relationships without cloning Linear screens.
   equivalence. Roehub preserves analogous interaction roles and information
   hierarchy while owning domain meaning, data, routes, permissions, copy,
   visual tokens, and composition.
+- All future Roehub design prototyping and handoff use the Figma project
+  `roehub.com` (`projectId` `629113387`). The authenticated-platform source is
+  `Roehub Authenticated Platform UI` (`fileKey` `GBzmB9evtzqnAYNjp9W1sr`).
+  Penpot remains historical evidence only and is not an active design surface.
 
 ## Current authority and supersession
 
@@ -57,6 +61,12 @@ The accepted `ROEHUB-LOCAL-UI-DESIGN-SYSTEM-CONTRACT-2026-07-20` evidence is
 retained. Its six-theme and implementation-independent target is superseded for
 future UI implementation by this specification and the shared standard. It is
 not relabelled as browser or Penpot proof.
+
+The shared standard remains unchanged because it is also used outside Roehub.
+For Roehub, its Penpot-specific clauses are superseded by
+`docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md`; all other
+transition, proof, browser, accessibility, performance, and rollback rules
+continue to apply.
 
 Historical SSR UI and `prototypes/roehub-v2/` remain migration observations, not
 the new visual source of truth. No accepted server ticket is superseded.
@@ -85,7 +95,7 @@ access, and authoritative data ownership.
 Literal replication is prohibited. Do not copy Linear branding, text, product
 taxonomy, proprietary assets, exact pixel coordinates, or unsupported concepts.
 Do not add labels, assignees, milestones, progress, activity, or collaboration
-objects merely because they appear in the reference. Each Penpot or runtime
+objects merely because they appear in the reference. Each Figma or runtime
 surface must include a mapping table with `reference block`, `Roehub function`,
 `authoritative source`, `required states`, and `evidence or justified omission`.
 
@@ -98,7 +108,8 @@ surface must include a mapping table with `reference block`, `Roehub function`,
 | Theme IDs | `breaking-change before new design implementation` | `slate` and `sand` are removed from the future target. |
 | Routes/capabilities | `compatible-change` | Existing canonical route and capability identities are preserved. |
 | Public site | `none` | Excluded from this transition. |
-| Penpot | `new target required` | Future vNext design is accepted separately. |
+| Figma | `new canonical target` | Future vNext design is accepted separately in the registered project and file. |
+| Historical Penpot evidence | `none` | Retained as factual history and not used for future writes. |
 
 ## Repository delivery queue
 
@@ -117,7 +128,7 @@ statuses, dependencies, or priority.
    four-theme evidence.
 2. Prove React coexistence with the FastAPI/Jinja gateway, MobX/Query state
    boundaries, typed REST/SSE adapters, route fallback, and performance harness.
-3. Create and accept Penpot vNext foundations and representative compositions.
+3. Create and accept Figma vNext foundations and representative compositions.
 4. Implement the React application shell behind the reversible route boundary.
 5. Implement the real read-only Backtest list/detail golden slice.
 
@@ -132,7 +143,7 @@ states and are sufficient for dark shell and functional-block reference, not
 for complete visual or motion acceptance. The reference ticket must close or
 explicitly waive every missing manifest item.
 
-Penpot proves design intent only. Source tests do not prove browser performance.
+Figma proves design intent only. Source tests do not prove browser performance.
 The shell and golden slice require real-browser traces on declared local
 hardware with client overhead, REST/SSE latency, and render time separated.
 

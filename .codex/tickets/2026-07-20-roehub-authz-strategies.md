@@ -30,7 +30,7 @@ risk, connection-readiness, and safe-operator rules for read and mutation paths.
 
 ## Non-goals
 
-- No new strategy UI, model workspace, backtest policy, Penpot, release, or
+- No new strategy UI, model workspace, backtest policy, Figma artifact, release, or
   deploy.
 
 ## Proof boundary

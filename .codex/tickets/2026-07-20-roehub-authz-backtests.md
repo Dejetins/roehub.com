@@ -31,7 +31,7 @@ only permitted results and a closed operator queue-action subset.
 
 ## Non-goals
 
-- No new data modes, compute engine, ETA algorithm, Web UI, Penpot, release, or
+- No new data modes, compute engine, ETA algorithm, Web UI, Figma artifact, release, or
   deploy.
 
 ## Proof boundary

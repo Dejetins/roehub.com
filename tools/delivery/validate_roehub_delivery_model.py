@@ -10,6 +10,12 @@ from typing import Any
 
 GRAPH_PATH = Path(".codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json")
 GRAPH_ID = "ROEHUB-AUTHENTICATED-PLATFORM-DELIVERY-V1"
+ROEHUB_FIGMA_STANDARD_PATH = Path(
+    "docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md"
+)
+LEGACY_PENPOT_TICKET_PATH = Path(
+    ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md"
+)
 VALID_STATUSES = {"draft", "ready", "active", "blocked", "accepted", "superseded"}
 LEGACY_GRAPH_PATHS = (
     Path(".codex/delivery/graphs/roehub-server-authorization-stream-v1.json"),
@@ -19,6 +25,7 @@ ACTIVE_REFERENCE_PATHS = (
     Path(".codex/AGENTS.md"),
     Path(".codex/PLANS.md"),
     Path(".codex/delivery/specs/roehub-linear-workspace-ui-transition.md"),
+    ROEHUB_FIGMA_STANDARD_PATH,
     Path("docs/architecture/ui/roehub-linear-ui-migration-registry-v1.json"),
 )
 RETIREMENT_POLICY_PATHS = ACTIVE_REFERENCE_PATHS[1:]
@@ -28,7 +35,7 @@ EXPECTED_TICKETS = {
     "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20",
     "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20",
     "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20",
-    "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20",
+    "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20",
     "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20",
     "ROEHUB-AUTHZ-BACKTESTS-2026-07-20",
     "ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20",
@@ -49,13 +56,13 @@ EXPECTED_DEPENDS_ON = {
     "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20": [
         "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20"
     ],
-    "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20": [
+    "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20": [
         "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20",
         "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20",
     ],
     "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20": [
         "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20",
-        "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20",
+        "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20",
     ],
     "ROEHUB-AUTHZ-BACKTESTS-2026-07-20": [
         "ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20",
@@ -116,6 +123,16 @@ EXPECTED_QUEUE_POLICY = {
     "max_selected_ready_tickets": 1,
     "blocked_selection": "first_priority_ticket_with_accepted_dependencies",
     "external_tracker_for_status_or_order": "not_used",
+}
+EXPECTED_FIGMA_DESIGN_WORKSPACE = {
+    "provider": "figma",
+    "project_name": "roehub.com",
+    "project_id": "629113387",
+    "plan_key": "team::831604964356268687",
+    "authenticated_platform_file_name": "Roehub Authenticated Platform UI",
+    "authenticated_platform_file_key": "GBzmB9evtzqnAYNjp9W1sr",
+    "authenticated_platform_file_url": "https://www.figma.com/design/GBzmB9evtzqnAYNjp9W1sr",
+    "penpot_role": "historical_evidence_only",
 }
 
 
@@ -193,6 +210,12 @@ def validate_delivery_model(repo_root: Path) -> list[str]:
         errors.append("delivery_authority does not define the repository-owned model")
     if graph.get("queue_policy") != EXPECTED_QUEUE_POLICY:
         errors.append("queue_policy does not define the required single-ticket selection")
+    source_contracts = graph.get("source_contracts")
+    if (
+        not isinstance(source_contracts, list)
+        or str(ROEHUB_FIGMA_STANDARD_PATH) not in source_contracts
+    ):
+        errors.append("unified graph must select the Roehub Figma delivery standard")
     for field in ("parallel_waves", "initial_ready_ticket_id"):
         if field in graph:
             errors.append(f"unified graph must not contain legacy field: {field}")
@@ -266,6 +289,8 @@ def validate_delivery_model(repo_root: Path) -> list[str]:
                 errors.append(f"accepted ticket has no evidence: {ticket_id}")
             elif any(not (root / item).is_file() for item in evidence):
                 errors.append(f"accepted ticket has missing evidence: {ticket_id}")
+        elif "penpot" in ticket_path.read_text(encoding="utf-8").lower():
+            errors.append(f"unfinished ticket retains active Penpot instruction: {ticket_id}")
 
     for ticket_id in REQUIRED_ACCEPTED_TICKETS:
         if tickets.get(ticket_id, {}).get("status") != "accepted":
@@ -318,6 +343,8 @@ def validate_delivery_model(repo_root: Path) -> list[str]:
     for path in LEGACY_GRAPH_PATHS:
         if (root / path).exists():
             errors.append(f"replaced graph still exists: {path}")
+    if (root / LEGACY_PENPOT_TICKET_PATH).exists():
+        errors.append(f"replaced Penpot ticket still exists: {LEGACY_PENPOT_TICKET_PATH}")
     active_paths = [*ACTIVE_REFERENCE_PATHS, *(Path(entry["path"]) for entry in entries.values())]
     for path in active_paths:
         candidate = root / path
@@ -348,6 +375,8 @@ def validate_delivery_model(repo_root: Path) -> list[str]:
             errors.append(
                 "UI migration registry clusters must not duplicate ticket status or priority"
             )
+        if registry.get("design_workspace") != EXPECTED_FIGMA_DESIGN_WORKSPACE:
+            errors.append("UI migration registry has invalid canonical Figma identity")
     return errors
 
 

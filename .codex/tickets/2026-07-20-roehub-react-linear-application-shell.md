@@ -5,7 +5,7 @@ owner: unassigned
 ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json
 depends_on:
   - ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20
-  - ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20
+  - ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20
 evidence: []
 ---
 
@@ -20,8 +20,9 @@ browser behavior.
 
 ## Start probe
 
-Confirm accepted predecessor evidence and the exact Penpot vNext file/revision
-before implementation. Stop on identity, source fingerprint, or revision drift.
+Confirm accepted predecessor evidence and the exact canonical Figma file,
+approved page/node inventory, and recorded design state before implementation.
+Stop on identity, source fingerprint, node inventory, or design-state drift.
 
 ## Owned paths
 
@@ -50,7 +51,7 @@ before implementation. Stop on identity, source fingerprint, or revision drift.
 ## Proof boundary
 
 Use `browser-qa-evidence`, measured performance evidence, Playwright, and the
-accepted Penpot source. Source tests alone cannot accept this ticket.
+accepted Figma source. Source tests alone cannot accept this ticket.
 
 ## Acceptance
 

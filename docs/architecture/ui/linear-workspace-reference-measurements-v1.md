@@ -4,7 +4,7 @@
 
 This document records sanitized derived measurements and explicit waivers for
 `LINEAR-WORKSPACE-REFERENCE-2026-07-20`. It is reference evidence only. It does
-not prove Roehub runtime behavior, product readiness, Penpot readiness, or
+not prove Roehub runtime behavior, product readiness, Figma readiness, or
 implementation acceptance.
 
 No screenshot, recording, trace, cookie, token, browser profile, storage state,
@@ -69,7 +69,7 @@ The analogue may use different geometry, grouping, interaction mechanics, or
 visual tokens. It must not copy Linear wording, icons, product entities,
 branding, account content, or exact pixel positions. It must not invent labels,
 assignees, milestones, progress, or collaboration concepts that Roehub does not
-own. Downstream Penpot and runtime evidence must map each selected reference
+own. Downstream Figma and runtime evidence must map each selected reference
 block to a Roehub function, authoritative source, required states, and evidence
 or justified omission.
 

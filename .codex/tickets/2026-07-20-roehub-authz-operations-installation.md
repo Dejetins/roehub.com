@@ -41,7 +41,7 @@ and shared-service actions, enforcing the accepted closed action set.
 
 ## Non-goals
 
-- No deployment target, host SSH, Mac Studio, UI, Penpot, plugin lifecycle,
+- No deployment target, host SSH, Mac Studio, UI, Figma artifact, plugin lifecycle,
   release, or deploy.
 
 ## Proof boundary

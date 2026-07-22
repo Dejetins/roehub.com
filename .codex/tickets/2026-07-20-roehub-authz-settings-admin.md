@@ -34,7 +34,7 @@ with server-filtered projections.
 ## Non-goals
 
 - No installation trust/resources/recovery or operational actions; no Dashboard,
-  Strategies, Backtests, Connections, Web UI, or Penpot.
+  Strategies, Backtests, Connections, Web UI, or Figma artifact.
 
 ## Proof boundary
 
