@@ -40,6 +40,8 @@ and design-review expectations before visual prototyping proceeds in Figma.
   `docs/architecture/ui/`;
 - `.codex/AGENTS.md`, the accepted UI transition specification, Roehub Figma
   standard, and UI migration registry only for approved resulting rules;
+- the unified delivery graph and Figma-foundations ticket only for the final
+  accepted-to-ready queue handoff after explicit product-owner approval;
 - deterministic architecture-index and project-map companions.
 
 Current application templates, scripts, route contracts, screen registries,
