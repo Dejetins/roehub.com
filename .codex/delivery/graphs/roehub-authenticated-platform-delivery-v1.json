@@ -1,0 +1,69 @@
+{
+  "schema_id": "io.roehub.delivery.ticket-graph/v1",
+  "graph_id": "ROEHUB-AUTHENTICATED-PLATFORM-DELIVERY-V1",
+  "title": "Roehub authenticated platform delivery queue",
+  "scope": "authenticated_self_hosted_platform_delivery",
+  "status_authority": "ticket_front_matter_only",
+  "delivery_authority": {
+    "ticket_status": "ticket_front_matter_only",
+    "dependency_and_priority": "this_graph",
+    "evidence": "ticket_evidence_files",
+    "accepted_base": "main",
+    "published_verification": "github_automated_checks",
+    "external_tracker": "not_used",
+    "linear_reference_role": "functional_structure_only"
+  },
+  "queue_policy": {
+    "execution_unit": "one_ready_ticket",
+    "max_active_tickets": 1,
+    "max_selected_ready_tickets": 1,
+    "blocked_selection": "first_priority_ticket_with_accepted_dependencies",
+    "external_tracker_for_status_or_order": "not_used"
+  },
+  "source_contracts": [
+    ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md",
+    "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md",
+    "docs/architecture/ui/roehub-linear-ui-migration-registry-v1.json",
+    "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v1.json",
+    "docs/architecture/apps/web/roehub-local-platform-information-architecture-v1.md"
+  ],
+  "tickets": [
+    {"ticket_id": "ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-capability-kernel.md", "depends_on": []},
+    {"ticket_id": "ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-delegation-core.md", "depends_on": ["ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20"]},
+    {"ticket_id": "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-browser-mutation-envelope.md", "depends_on": ["ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20"]},
+    {"ticket_id": "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md", "depends_on": []},
+    {"ticket_id": "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md", "depends_on": ["ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20"]},
+    {"ticket_id": "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md", "depends_on": ["ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20", "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20"]},
+    {"ticket_id": "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md", "depends_on": ["ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20", "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20"]},
+    {"ticket_id": "ROEHUB-AUTHZ-BACKTESTS-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-backtests.md", "depends_on": ["ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20", "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20"]},
+    {"ticket_id": "ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md", "depends_on": ["ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20", "ROEHUB-AUTHZ-BACKTESTS-2026-07-20"]},
+    {"ticket_id": "ROEHUB-AUTHZ-DASHBOARD-DATA-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-dashboard-data.md", "depends_on": ["ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20", "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20"]},
+    {"ticket_id": "ROEHUB-AUTHZ-STRATEGIES-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-strategies.md", "depends_on": ["ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20", "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20"]},
+    {"ticket_id": "ROEHUB-AUTHZ-CONNECTIONS-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-connections.md", "depends_on": ["ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20", "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20"]},
+    {"ticket_id": "ROEHUB-AUTHZ-SETTINGS-ADMIN-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-settings-admin.md", "depends_on": ["ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20", "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20"]},
+    {"ticket_id": "ROEHUB-AUTHZ-OPERATIONS-INSTALLATION-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-operations-installation.md", "depends_on": ["ROEHUB-AUTHZ-SETTINGS-ADMIN-2026-07-20", "ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20", "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20"]},
+    {"ticket_id": "ROEHUB-AUTHZ-INTEGRATION-PROOF-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-integration-proof.md", "depends_on": ["ROEHUB-AUTHZ-DASHBOARD-DATA-2026-07-20", "ROEHUB-AUTHZ-SETTINGS-ADMIN-2026-07-20", "ROEHUB-AUTHZ-STRATEGIES-2026-07-20", "ROEHUB-AUTHZ-BACKTESTS-2026-07-20", "ROEHUB-AUTHZ-CONNECTIONS-2026-07-20", "ROEHUB-AUTHZ-OPERATIONS-INSTALLATION-2026-07-20"]}
+  ],
+  "priority_queue": [
+    "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20",
+    "ROEHUB-PENPOT-LINEAR-VNEXT-FOUNDATIONS-2026-07-20",
+    "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20",
+    "ROEHUB-AUTHZ-BACKTESTS-2026-07-20",
+    "ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20",
+    "ROEHUB-AUTHZ-DASHBOARD-DATA-2026-07-20",
+    "ROEHUB-AUTHZ-STRATEGIES-2026-07-20",
+    "ROEHUB-AUTHZ-CONNECTIONS-2026-07-20",
+    "ROEHUB-AUTHZ-SETTINGS-ADMIN-2026-07-20",
+    "ROEHUB-AUTHZ-OPERATIONS-INSTALLATION-2026-07-20",
+    "ROEHUB-AUTHZ-INTEGRATION-PROOF-2026-07-20"
+  ],
+  "coordination_rules": [
+    "Ticket front matter is the only status source.",
+    "One ready ticket is one execution unit.",
+    "At most one ticket may be active.",
+    "At most one selected ticket may be ready.",
+    "When the selected ticket is blocked, select the first priority ticket whose dependencies are accepted.",
+    "No external tracker determines ticket status or queue order.",
+    "Ticket evidence files confirm completed work; main is the shared accepted base."
+  ]
+}

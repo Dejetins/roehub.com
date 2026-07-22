@@ -109,6 +109,11 @@ jobs:
         run: |
           python .codex/hooks/tests/run_tests.py
 
+      - name: Roehub delivery model
+        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
+        run: |
+          python -m tools.delivery.validate_roehub_delivery_model
+
       - name: Type check
         if: needs.changes.outputs.code == 'true'
         run: |

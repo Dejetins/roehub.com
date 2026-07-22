@@ -174,7 +174,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 128,
+      "file_count": 129,
       "id": "automation",
       "paths": [
         "tools/",
@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 435,
+      "file_count": 436,
       "id": "quality",
       "paths": [
         "tests/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1100,
+      "file_count": 1103,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -3548,6 +3548,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-DELIVERY-MODEL-CONSOLIDATION-2026-07-22.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20.md"
     },
     {
@@ -3559,6 +3564,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-LOCAL-UI-IA-2026-07-20.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json"
     },
     {
       "area": "knowledge",
@@ -4139,6 +4149,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/tickets/2026-07-20-roehub-ui-surface-inventory.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-22-roehub-delivery-model-consolidation.md"
     },
     {
       "area": "repository-meta",
@@ -17258,6 +17273,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/tools/test_validate_roehub_delivery_model.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/tools/test_verify_market_data_readiness.py"
     },
     {
@@ -17384,6 +17404,11 @@
       "area": "automation",
       "kind": "python",
       "path": "tools/codex_quality_benchmark/skill_discovery.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/delivery/validate_roehub_delivery_model.py"
     },
     {
       "area": "automation",
@@ -17571,7 +17596,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3074,
+  "inventory_file_count": 3079,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17788,5 +17813,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "b539894e15c64f3ca582eef4985c9f2040fe10b45da2684f5ef8e0ee0ff8149d"
+  "structural_digest": "c583aff47308ac84f5a43c7cf15c631f431e0b0b645e6a09c10bcc5eee78f82c"
 }

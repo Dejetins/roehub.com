@@ -2,7 +2,7 @@
 ticket_id: ROEHUB-AUTHZ-STRATEGIES-2026-07-20
 status: draft
 owner: unassigned
-ticket_graph: .codex/delivery/graphs/roehub-server-authorization-stream-v1.json
+ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json
 depends_on:
   - ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20
   - ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20

@@ -42,7 +42,8 @@ Read the smallest current source set needed for the task:
 For authenticated Web transition work, also load
 `docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md`, the
 accepted Roehub transition specification under `.codex/delivery/specs/`, and
-the applicable node in `roehub-linear-workspace-ui-transition-v1.json`. The
+the applicable node in
+`.codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json`. The
 accepted 2026-07-20 local design-system artifacts remain historical contract
 evidence; their six-theme future implementation target is superseded. Backend
 and server-authorization tickets remain independently authoritative.
@@ -52,6 +53,14 @@ templates. Every selected Roehub surface must map analogous navigation, page
 context, primary-work, and contextual status/progress/activity/resource blocks
 to Roehub-owned semantics, or record an explicit justified omission. Never copy
 Linear pixel geometry, product taxonomy, copy, assets, or unsupported concepts.
+
+For the authenticated-platform delivery queue, ticket front matter is the only
+status authority, `.codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json`
+defines dependencies and priority, ticket evidence files confirm completion,
+`main` is the shared accepted base, and GitHub Actions verifies publication.
+Linear references remain functional-structure inputs only: Linear is not a
+tracker, external projection, or source of ticket status, priority, or order.
+Do not rename historical ticket identifiers that contain `LINEAR`.
 
 `.codex/PLANS.md` is historical project coordination, not default task context
 or execution authority. Existing prompt packs and ledgers are historical unless

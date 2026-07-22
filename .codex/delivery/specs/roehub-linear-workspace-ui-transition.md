@@ -100,11 +100,18 @@ surface must include a mapping table with `reference block`, `Roehub function`,
 | Public site | `none` | Excluded from this transition. |
 | Penpot | `new target required` | Future vNext design is accepted separately. |
 
-## Delivery graph
+## Repository delivery queue
 
-The executable graph is
-`.codex/delivery/graphs/roehub-linear-workspace-ui-transition-v1.json`.
-One ready ticket is one execution unit.
+The executable queue is
+`.codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json`.
+Ticket front matter is the only source of status; the graph holds dependencies
+and priority; ticket evidence confirms completion; `main` is the shared
+accepted base; and GitHub Actions verifies the published result. One ready
+ticket is one execution unit.
+
+Linear references remain functional-structure inputs for this UI transition.
+Linear is not a delivery tracker, external projection, or authority for ticket
+statuses, dependencies, or priority.
 
 1. Complete reference, motion, geometry, keyboard, accessibility, and
    four-theme evidence.
@@ -115,8 +122,7 @@ One ready ticket is one execution unit.
 5. Implement the real read-only Backtest list/detail golden slice.
 
 Further route-cluster tickets are derived after the golden slice establishes
-measured architecture and browser behavior. Server authorization tickets may
-run in parallel on disjoint paths.
+measured architecture and browser behavior.
 
 ## Reference and proof boundary
 

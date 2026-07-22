@@ -1,10 +1,17 @@
 {
-  "schema_version": "1.1.0",
+  "schema_version": "1.2.0",
   "registry_id": "ROEHUB-LINEAR-UI-MIGRATION-V1",
-  "status": "accepted_preparation",
   "shared_standard": "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md",
   "reference_manifest": "docs/architecture/ui/linear-workspace-reference-manifest-v1.json",
   "project_spec": ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md",
+  "delivery_model": {
+    "graph": ".codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json",
+    "status_authority": "ticket_front_matter_only",
+    "priority_authority": "delivery_graph_only",
+    "linear_reference_role": "functional_structure_only",
+    "linear_tracker_role": "not_used",
+    "registry_role": "migration_context_only"
+  },
   "existing_authority": {
     "information_architecture": "docs/architecture/apps/web/roehub-local-platform-information-architecture-v1.md",
     "screen_registry": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json",
@@ -29,15 +36,15 @@
     "required_mapping_fields": ["reference_block", "roehub_function", "authoritative_source", "required_states", "evidence_or_justified_omission"]
   },
   "clusters": [
-    {"cluster_id": "reference", "order": 1, "ticket": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md", "state": "accepted"},
-    {"cluster_id": "architecture_spike", "order": 2, "ticket": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md", "state": "draft"},
-    {"cluster_id": "penpot_vnext", "order": 3, "ticket": ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md", "state": "draft"},
-    {"cluster_id": "application_shell", "order": 4, "ticket": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md", "state": "draft"},
-    {"cluster_id": "backtests_golden_slice", "order": 5, "ticket": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md", "state": "draft"}
+    {"cluster_id": "reference", "ticket": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md"},
+    {"cluster_id": "architecture_spike", "ticket": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md"},
+    {"cluster_id": "penpot_vnext", "ticket": ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md"},
+    {"cluster_id": "application_shell", "ticket": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md"},
+    {"cluster_id": "backtests_golden_slice", "ticket": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md"}
   ],
   "legacy": {
     "superseded_design_target": "ROEHUB-LOCAL-UI-DESIGN-SYSTEM-CONTRACT-2026-07-20",
     "accepted_evidence_policy": "retain",
-    "server_authorization_stream_policy": "unchanged_and_parallel_when_paths_are_disjoint"
+    "server_authorization_stream_policy": "consolidated_into_repository_delivery_queue"
   }
 }

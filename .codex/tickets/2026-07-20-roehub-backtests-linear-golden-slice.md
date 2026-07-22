@@ -2,6 +2,7 @@
 ticket_id: ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20
 status: draft
 owner: unassigned
+ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json
 depends_on:
   - ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20
   - ROEHUB-AUTHZ-BACKTESTS-2026-07-20

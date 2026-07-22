@@ -2,7 +2,7 @@
 
 Этот документ — человекочитаемое представление единой карты проекта. Машиночитаемый источник для агентов — `docs/architecture/project-map/project-map.json`, семантический каталог — `docs/architecture/project-map/project-map.toml`, правила использования — `docs/architecture/project-map/AGENT_GUIDE.md`.
 
-Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `b539894e15c64f3ca582eef4985c9f2040fe10b45da2684f5ef8e0ee0ff8149d`; учтено файлов: **3074**.
+Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `c583aff47308ac84f5a43c7cf15c631f431e0b0b645e6a09c10bcc5eee78f82c`; учтено файлов: **3079**.
 
 ## Визуальная runtime-карта
 
@@ -296,9 +296,9 @@ flowchart TB
 | `shared-core` | Shared kernel и платформа | Общие типы, конфигурация, ошибки, интеграционные и производительные примитивы. | 36 | `src/trading/__init__.py`, `src/trading/shared_kernel/`, `src/trading/platform/`, `src/trading/integration/`, `src/trading/fastpath/` |
 | `delivery` | Приложения и delivery | HTTP, HTML, CLI, workers, schedulers, migrations и composition roots. | 291 | `apps/` |
 | `operations` | Инфраструктура и эксплуатация | Docker, macOS runtime, edge, monitoring, конфигурация и миграции данных. | 289 | `infra/`, `configs/`, `migrations/`, `alembic/`, `.github/workflows/` |
-| `automation` | Инструменты и автоматизация | Операторские скрипты, генераторы, CI helpers, загрузчики и notebooks. | 128 | `tools/`, `scripts/`, `data_load/`, `notebooks/` |
-| `quality` | Проверки и тестовые данные | Unit, integration, notebook и performance-smoke проверки, fixtures и typings. | 435 | `tests/`, `fixtures/`, `typings/` |
-| `knowledge` | Документация и агентные контракты | Архитектура, runbooks, планы, правила агентов и индекс проекта. | 1100 | `docs/`, `.codex/`, `AGENTS.md`, `README.md` |
+| `automation` | Инструменты и автоматизация | Операторские скрипты, генераторы, CI helpers, загрузчики и notebooks. | 129 | `tools/`, `scripts/`, `data_load/`, `notebooks/` |
+| `quality` | Проверки и тестовые данные | Unit, integration, notebook и performance-smoke проверки, fixtures и typings. | 436 | `tests/`, `fixtures/`, `typings/` |
+| `knowledge` | Документация и агентные контракты | Архитектура, runbooks, планы, правила агентов и индекс проекта. | 1103 | `docs/`, `.codex/`, `AGENTS.md`, `README.md` |
 | `experiments` | Прототипы и локальные результаты | Изолированные прототипы и каталоги воспроизводимых результатов. | 52 | `prototypes/`, `output/`, `local_artifacts/` |
 | `repository-meta` | Корневые контракты репозитория | Build metadata, dependency locks, root configuration and compatibility indexes. | 12 | `.dockerignore`, `.gitignore`, `.opencode/`, `.python-version`, `.vscode/`, `Dockerfile.api`, `LICENSE`, `alembic.ini`, `pyproject.toml`, `pyrightconfig.json`, `repo_tree.md`, `uv.lock` |
 

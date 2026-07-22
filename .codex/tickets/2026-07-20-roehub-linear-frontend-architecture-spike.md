@@ -1,7 +1,8 @@
 ---
 ticket_id: ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20
-status: draft
+status: ready
 owner: unassigned
+ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json
 depends_on:
   - ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20
 evidence: []
