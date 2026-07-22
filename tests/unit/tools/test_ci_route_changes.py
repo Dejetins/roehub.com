@@ -12,6 +12,10 @@ def _matrix_names(outputs: dict[str, str]) -> set[str]:
     return {item["name"] for item in json.loads(outputs["test_matrix"])["include"]}
 
 
+def _matrix_targets(outputs: dict[str, str]) -> dict[str, str]:
+    return {item["name"]: item["target"] for item in json.loads(outputs["test_matrix"])["include"]}
+
+
 def test_web_only_change_runs_web_tests_without_backtest_or_migrations() -> None:
     paths = [
         "apps/web/dist/css/pages/backtests.css",
@@ -50,6 +54,22 @@ def test_backtest_api_change_runs_backtest_and_web_api_tests() -> None:
         "backtest-use-cases",
         "backtest-domain",
     }
+
+
+def test_identity_unit_change_runs_only_market_identity_strategy_shard() -> None:
+    outputs = classify_ci(
+        ["tests/unit/identity/mutation_security/test_browser_mutation_envelope.py"]
+    )
+
+    assert _matrix_names(outputs) == {"market-identity-strategy"}
+
+
+def test_market_identity_strategy_shard_runs_identity_unit_tests() -> None:
+    outputs = classify_ci(
+        ["src/trading/contexts/identity/application/mutation_security/service.py"]
+    )
+
+    assert "tests/unit/identity" in _matrix_targets(outputs)["market-identity-strategy"].split()
 
 
 def test_workflow_or_lockfile_change_runs_full_ci() -> None:

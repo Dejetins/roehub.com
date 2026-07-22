@@ -145,6 +145,7 @@ TEST_SHARDS: dict[str, TestShard] = {
             "tests/unit/contexts/identity",
             "tests/unit/contexts/market_data",
             "tests/unit/contexts/strategy",
+            "tests/unit/identity",
         ),
     ),
 }
@@ -267,9 +268,7 @@ def _is_backtest_path(path: str) -> bool:
 
 
 def _is_backtest_config_path(path: str) -> bool:
-    return path.startswith("configs/") and (
-        "backtest" in path or path.endswith("/indicators.yaml")
-    )
+    return path.startswith("configs/") and ("backtest" in path or path.endswith("/indicators.yaml"))
 
 
 def _is_indicator_path(path: str) -> bool:
@@ -291,6 +290,7 @@ def _is_market_identity_strategy_path(path: str) -> bool:
             "tests/unit/contexts/identity/",
             "tests/unit/contexts/market_data/",
             "tests/unit/contexts/strategy/",
+            "tests/unit/identity/",
         ),
     )
 
@@ -325,17 +325,13 @@ def _needs_migration_check(path: str) -> bool:
 
 
 def _is_web_image_path(path: str) -> bool:
-    return (
-        path.startswith("apps/web/")
-        or path
-        in {
-            ".python-version",
-            "pyproject.toml",
-            "uv.lock",
-            "infra/docker/Dockerfile.market_data",
-            ".github/workflows/publish-app-image.yml",
-        }
-    )
+    return path.startswith("apps/web/") or path in {
+        ".python-version",
+        "pyproject.toml",
+        "uv.lock",
+        "infra/docker/Dockerfile.market_data",
+        ".github/workflows/publish-app-image.yml",
+    }
 
 
 def _matrix(shard_names: Iterable[str]) -> str:
@@ -392,16 +388,20 @@ def classify_ci(paths: Iterable[str], *, all_changes: bool = False) -> dict[str,
             run_migrations = True
 
         if (
-            path.startswith("apps/")
-            or path.startswith("tests/unit/apps/")
-            or path.startswith("tests/unit/infra/")
-            or path.startswith("tests/unit/platform/")
-            or path.startswith("tests/unit/shared_kernel/")
-            or path.startswith("tests/unit/tools/")
-            or path.startswith("tools/")
-            or path.startswith("infra/")
-            or path.startswith("scripts/macos/")
-        ) and not _is_web_path(path) and not _is_backtest_path(path):
+            (
+                path.startswith("apps/")
+                or path.startswith("tests/unit/apps/")
+                or path.startswith("tests/unit/infra/")
+                or path.startswith("tests/unit/platform/")
+                or path.startswith("tests/unit/shared_kernel/")
+                or path.startswith("tests/unit/tools/")
+                or path.startswith("tools/")
+                or path.startswith("infra/")
+                or path.startswith("scripts/macos/")
+            )
+            and not _is_web_path(path)
+            and not _is_backtest_path(path)
+        ):
             shards.add("apps-platform")
 
         if path.startswith("src/trading/shared_kernel/") or path.startswith(

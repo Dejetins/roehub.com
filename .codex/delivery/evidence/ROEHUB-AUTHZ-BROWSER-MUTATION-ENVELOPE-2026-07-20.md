@@ -97,6 +97,27 @@ access, ownership, stale recent authentication, unknown capability, immutable
 validated payload, missing mandatory context, audit redaction, and audit-failure
 reconciliation.
 
+## CI routing publication-blocker repair
+
+- Before this repair, the command
+  `printf '%s\\n' 'tests/unit/identity/mutation_security/test_browser_mutation_envelope.py' | python -m tools.ci.route_changes ci --changed-files /dev/stdin`
+  fell through to the full matrix: `tests/unit/identity/` was not classified as
+  identity-context work, and the `market-identity-strategy` target did not run
+  that test tree.
+- The same command now returns only `market-identity-strategy` with target
+  `tests/unit/contexts/identity tests/unit/contexts/market_data tests/unit/contexts/strategy tests/unit/identity`.
+- `uv run pytest -q tests/unit/tools/test_ci_route_changes.py` — `8 passed in
+  0.03s`.
+- `uv run pytest -q -ra tests/unit/identity/mutation_security tests/unit/identity/authorization tests/unit/identity/delegation`
+  — `38 passed, 1 skipped in 0.68s`; the unchanged PostgreSQL delegation test
+  remains skipped because `ROEHUB_TEST_DELEGATION_PG_DSN` is not configured.
+- `uv run ruff check tools/ci/route_changes.py tests/unit/tools/test_ci_route_changes.py`
+  — `All checks passed!`.
+- `uv run ruff format --check tools/ci/route_changes.py tests/unit/tools/test_ci_route_changes.py`
+  — `2 files already formatted`.
+- `uv run pyright tools/ci/route_changes.py tests/unit/tools/test_ci_route_changes.py`
+  — `0 errors, 0 warnings, 0 informations`.
+
 ## Security review
 
 - Current cold self-review found no write outside the ticket paths and no route,
