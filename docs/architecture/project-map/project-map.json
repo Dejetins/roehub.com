@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1098,
+      "file_count": 1100,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -3544,6 +3544,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20.md"
     },
     {
       "area": "knowledge",
@@ -9619,6 +9624,11 @@
       "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/ui/linear-workspace-reference-manifest-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/ui/linear-workspace-reference-measurements-v1.md"
     },
     {
       "area": "knowledge",
@@ -17561,7 +17571,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3072,
+  "inventory_file_count": 3074,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17778,5 +17788,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "962cd0f2a53ae3c52e9fb64db863704c005bc7c61b6ea80cb114494d774c67bc"
+  "structural_digest": "b539894e15c64f3ca582eef4985c9f2040fe10b45da2684f5ef8e0ee0ff8149d"
 }

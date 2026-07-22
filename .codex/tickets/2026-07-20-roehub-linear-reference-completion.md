@@ -1,9 +1,10 @@
 ---
 ticket_id: ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20
-status: ready
+status: accepted
 owner: unassigned
 depends_on: []
-evidence: []
+evidence:
+  - .codex/delivery/evidence/ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20.md
 ---
 
 # Complete the Linear-workspace reference evidence

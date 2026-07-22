@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "reference_id": "LINEAR-WORKSPACE-REFERENCE-2026-07-20",
-  "status": "partial_accepted_input",
+  "status": "accepted_sanitized_reference_input",
   "source": {
     "kind": "user_supplied_local_archive",
     "archive_name": "reference.zip",
@@ -10,7 +10,25 @@
     "distributable": false,
     "commit_policy": "commit_sanitized_measurements_and_hashes_only"
   },
-  "viewport": {"width": 2560, "height": 1440, "browser_chrome_included": true},
+  "verification": {
+    "verified_at": "2026-07-20T23:10:40Z",
+    "historical_observations_preserved": true,
+    "archive_reverified_at": "2026-07-22T11:45:56Z",
+    "archive_sha256_match": true,
+    "capture_count": 16,
+    "all_capture_sha256_match": true
+  },
+  "viewport": {
+    "width": 2560,
+    "height": 1440,
+    "browser_chrome_included": true,
+    "measurement_kind": "captured_image_pixels_not_css_viewport",
+    "png_density_metadata": null,
+    "density_status": "absent_no_png_pHYs_or_exif_xy_resolution_tags",
+    "css_viewport": null,
+    "device_pixel_ratio": null,
+    "scale_status": "unknown_not_recoverable_from_png"
+  },
   "captures": [
     {"file": "SCR-20260720-uiqd.png", "sha256": "e8e65a7de2fcc86c6241ba26f6c95b47b025132df7daaf785da76a1fd01f5d59", "tags": ["inbox", "expanded_sidebar", "secondary_list", "empty_detail"]},
     {"file": "SCR-20260720-uitn.png", "sha256": "6aad94fcecb3c4e16dede4d6983285350ec97564578f6b67aeb556285255a52a", "tags": ["collapsed_sidebar", "icon_rail", "empty_detail"]},
@@ -35,14 +53,26 @@
     "dark_reference_available": true,
     "project_brand_and_domain_content_are_not_shared": true
   },
-  "missing_required_evidence": [
-    "abyss_graphite_frost_paper_representative_matrix",
-    "command_palette_interaction",
-    "keyboard_focus_sequence",
-    "sidebar_pointer_resize_recording_and_geometry",
-    "route_drawer_modal_popover_motion_recordings",
-    "loading_empty_error_stale_forbidden_session_expired_states",
-    "sanitized_accessibility_snapshots",
-    "measured_motion_and_component_geometry"
-  ]
+  "live_browser_observation": {
+    "observed_at": "2026-07-20T23:10:40Z",
+    "historical": true,
+    "browser": "Google Chrome 150.0.7871.129",
+    "css_viewport": {"width": 1512, "height": 790},
+    "device_pixel_ratio": 2,
+    "prefers_reduced_motion": false,
+    "auth_boundary": "existing_authenticated_session_separate_agent_tab",
+    "capture_policy": "no_live_screenshot_trace_recording_or_storage_state_retained",
+    "measurements": "docs/architecture/ui/linear-workspace-reference-measurements-v1.md"
+  },
+  "gap_dispositions": {
+    "abyss_graphite_frost_paper_representative_matrix": "waived_project_owned_theme_semantics_not_derivable_from_dark_linear_reference",
+    "command_palette_interaction": "observed_open_search_escape_execute_waived_to_avoid_external_side_effect",
+    "keyboard_focus_sequence": "observed_command_and_popover_focus_escape_return_broader_sequence_waived",
+    "sidebar_pointer_resize_recording_and_geometry": "geometry_observed_recording_and_preference_mutation_waived",
+    "route_drawer_modal_popover_motion_recordings": "route_and_popover_observed_static_modal_present_recordings_waived",
+    "loading_empty_error_stale_forbidden_session_expired_states": "loading_and_empty_observed_remaining_states_waived_as_unsafe_or_unavailable",
+    "sanitized_accessibility_snapshots": "observed_and_committed_as_role_counts_only",
+    "measured_motion_and_component_geometry": "geometry_observed_motion_timing_waived_no_animation_timeline_exposed"
+  },
+  "missing_required_evidence": []
 }
