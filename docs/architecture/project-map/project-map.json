@@ -152,7 +152,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 291,
+      "file_count": 312,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1104,
+      "file_count": 1105,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -460,6 +460,28 @@
     },
     {
       "depends_on": [
+        "app:web"
+      ],
+      "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
+      "docs": [],
+      "entrypoints": [],
+      "file_count": 21,
+      "id": "app:platform-web",
+      "kind": "app",
+      "name": "platform-web",
+      "roots": [
+        "apps/platform-web",
+        "apps/platform-web/scripts",
+        "apps/platform-web/src",
+        "apps/platform-web/src/data",
+        "apps/platform-web/src/state",
+        "apps/platform-web/tests",
+        "apps/platform-web/tests/browser"
+      ],
+      "used_by": []
+    },
+    {
+      "depends_on": [
         "core:integration"
       ],
       "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
@@ -576,7 +598,9 @@
         "apps/web/main",
         "apps/web/templates"
       ],
-      "used_by": []
+      "used_by": [
+        "app:platform-web"
+      ]
     },
     {
       "depends_on": [
@@ -1760,6 +1784,11 @@
       "kind": "python-import",
       "source": "app:migrations",
       "target": "core:shared_kernel"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:platform-web",
+      "target": "app:web"
     },
     {
       "kind": "python-import",
@@ -3558,6 +3587,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20.md"
     },
     {
@@ -5029,6 +5063,111 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/monitoring/operational_health.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "documentation",
+      "path": "apps/platform-web/README.md"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/index.html"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/platform-web/prototype_gateway.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/scripts/report-sizes.mjs"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/App.integration.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/App.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/data/api.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/data/api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/data/sse.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/data/sse.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/main.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/metrics.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/state/uiStore.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/state/uiStore.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/styles.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/tests/browser/architecture.spec.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/tests/browser/performance.spec.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/tests/browser/playwright.config.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/tests/setup.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "configuration",
+      "path": "apps/platform-web/tsconfig.json"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/vite.config.ts"
     },
     {
       "area": "delivery",
@@ -10709,6 +10848,16 @@
       "area": "automation",
       "kind": "documentation",
       "path": "notebooks/README.md"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "package-lock.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "package.json"
     },
     {
       "area": "experiments",
@@ -17601,7 +17750,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3080,
+  "inventory_file_count": 3104,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17818,5 +17967,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "ae521a2858d1f3c98885874105093cf6ae8477796aeea4c521a293c625f4390c"
+  "structural_digest": "1e58f08b1e1e5a44ba9d78b29a8abda17433edd4b9ea13406ba42515f93f18ed"
 }
