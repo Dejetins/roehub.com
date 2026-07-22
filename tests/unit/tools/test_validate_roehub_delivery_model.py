@@ -79,9 +79,12 @@ def test_registry_status_is_rejected(tmp_path: Path) -> None:
 
 def test_unfinished_ticket_with_penpot_instruction_is_rejected(tmp_path: Path) -> None:
     fixture_root = _fixture_repo(tmp_path)
-    ticket_path = (
-        fixture_root / ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md"
+    graph = json.loads((fixture_root / GRAPH_PATH).read_text(encoding="utf-8"))
+    unfinished_ticket_id = graph["priority_queue"][0]
+    unfinished_ticket_path = next(
+        entry["path"] for entry in graph["tickets"] if entry["ticket_id"] == unfinished_ticket_id
     )
+    ticket_path = fixture_root / unfinished_ticket_path
     ticket_path.write_text(
         ticket_path.read_text(encoding="utf-8") + "\nUse Penpot for the next design step.\n",
         encoding="utf-8",
