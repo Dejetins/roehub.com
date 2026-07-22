@@ -67,16 +67,26 @@
   owned-path type check above is green; foreign artifacts were not changed.
 - `git diff --check` passed. Each untracked task file was additionally checked
   with `git diff --no-index --check /dev/null <file>`; all passed.
-- `python -m tools.docs.generate_project_map --check` reported only
+- On 2026-07-22, the publication-blocker refresh ran
+  `python -m tools.docs.generate_project_map` — `OK: project map generated (5 artifacts)` —
+  followed by `python -m tools.docs.generate_project_map --check` —
+  `OK: project map up-to-date (5 artifacts)`. Only
   `docs/architecture/project-map/PROJECT_MAP.md` and
-  `docs/architecture/project-map/project-map.json` out of date. They were not
-  changed. The exact generated delta is: inventory `3062 -> 3075`, structural
-  digest `6993c6a91dbe322593b38b7261c792ffaa784105663da7ed83f65a485a8aa7f2 ->
-  f1cb7c9155d6e7f9aad574c0c50ab8733e9af7a5fe5c85a299cf673041171a21`,
+  `docs/architecture/project-map/project-map.json` changed: inventory
+  `3062 -> 3071`, structural digest
+  `6993c6a91dbe322593b38b7261c792ffaa784105663da7ed83f65a485a8aa7f2 ->
+  10fa1c91af71616846d05550dc937fccfd5545bd08eceb5bafc9f0622aeabe7d`,
   domain `681 -> 687`, quality `433 -> 435`, knowledge `1096 -> 1097`, and
-  `context:identity` `81 -> 87`. The JSON inventory adds the nine task files
-  plus four foreign `outputs/code-rot-cleaner/*` files; no other generated hunk
-  is required.
+  `context:identity` `81 -> 87`.
+- The same architecture-index lock covered
+  `python -m tools.docs.generate_docs_index` — unchanged — and
+  `python -m tools.docs.generate_docs_index --check` —
+  `OK: .../docs/architecture/README.md is up-to-date.` The final generated
+  diff passed `git diff --check`.
+- Before generation, the exact local-only `/outputs/` pattern was added to
+  `.git/info/exclude`; it is not a tracked or staged file. The resulting map
+  includes the nine new Browser Mutation Envelope files and no
+  `outputs/code-rot-cleaner/*` inventory entries.
 
 Focused tests cover direct authority through the delegation composition,
 active delegation, revoked delegation, expired delegation, authorizer
@@ -113,4 +123,5 @@ reconciliation.
   route-level TOCTOU concern requiring integration-specific transaction or
   re-check semantics.
 - No push, merge, PR, release, deploy, runtime, or browser-route acceptance was
-  performed. `outputs/` was excluded from the task and from Git staging.
+  performed. `outputs/` remains untouched and is excluded only locally through
+  `.git/info/exclude`; that local Git configuration is not staged.

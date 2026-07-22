@@ -130,7 +130,7 @@
   ],
   "areas": [
     {
-      "file_count": 681,
+      "file_count": 687,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 433,
+      "file_count": 435,
       "id": "quality",
       "paths": [
         "tests/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1096,
+      "file_count": 1097,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -774,7 +774,7 @@
         "docs/architecture/identity/identity-2fa-totp-policy-v1.md"
       ],
       "entrypoints": [],
-      "file_count": 81,
+      "file_count": 87,
       "id": "context:identity",
       "kind": "context",
       "name": "identity",
@@ -3529,6 +3529,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/agents/legacy/stage_execution_ledger_template.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20.md"
     },
     {
       "area": "knowledge",
@@ -12283,6 +12288,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/inbound/api/mutation_guard.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/identity/adapters/inbound/api/routes/__init__.py"
     },
     {
@@ -12504,6 +12514,31 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/identity/application/delegation/service.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/mutation_security/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/mutation_security/effective_authorizer.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/mutation_security/idempotency.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/mutation_security/models.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/application/mutation_security/service.py"
     },
     {
       "area": "domain",
@@ -16898,6 +16933,16 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/identity/mutation_security/test_mutation_guard.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/identity/mutation_security/test_mutation_security.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/infra/test_monitoring_assets.py"
     },
     {
@@ -17511,7 +17556,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3062,
+  "inventory_file_count": 3071,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17728,5 +17773,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "6993c6a91dbe322593b38b7261c792ffaa784105663da7ed83f65a485a8aa7f2"
+  "structural_digest": "10fa1c91af71616846d05550dc937fccfd5545bd08eceb5bafc9f0622aeabe7d"
 }
