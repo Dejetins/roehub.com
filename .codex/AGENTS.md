@@ -47,6 +47,12 @@ accepted 2026-07-20 local design-system artifacts remain historical contract
 evidence; their six-theme future implementation target is superseded. Backend
 and server-authorization tickets remain independently authoritative.
 
+Linear references are functional-structure inputs, not literal screen
+templates. Every selected Roehub surface must map analogous navigation, page
+context, primary-work, and contextual status/progress/activity/resource blocks
+to Roehub-owned semantics, or record an explicit justified omission. Never copy
+Linear pixel geometry, product taxonomy, copy, assets, or unsupported concepts.
+
 `.codex/PLANS.md` is historical project coordination, not default task context
 or execution authority. Existing prompt packs and ledgers are historical unless
 their own current state and the selected work both make them authoritative.

@@ -6,6 +6,7 @@ verdict: pass_with_explicit_waivers
 observed_at: 2026-07-20T23:10:40Z
 historical_observations_preserved: true
 archive_reverified_at: 2026-07-22T11:45:56Z
+supplemental_captures_verified_at: 2026-07-22T12:24:32Z
 ---
 
 # Linear reference completion evidence
@@ -19,6 +20,10 @@ All live-browser observations in this document were made on `2026-07-20` and are
 This evidence accepts the reference pack as sufficient input for the next
 repository ticket. It does not prove Roehub runtime, product, Penpot, release,
 or deployment readiness.
+
+The `2026-07-22` amendment records three additional user-supplied project
+overview states and formalizes functional-structure equivalence. It does not
+turn Linear screenshots into Roehub designs or authorize literal replication.
 
 ## Historical 2026-07-20 pre-write gates
 
@@ -56,6 +61,14 @@ its active changes were disjoint. No Custometry W19 result was read or reused.
 - Sanitized accessibility evidence is retained as role counts only.
 - Every prior manifest gap is either observed or explicitly waived with impact
   in `docs/architecture/ui/linear-workspace-reference-measurements-v1.md`.
+- Three supplemental PNGs were copied to the local reference folder outside
+  Git. Their hashes, pixel dimensions, and sanitized functional-state tags are
+  recorded in the manifest: project properties, milestones/progress, labels,
+  activity, tabs, resources, and contextual side-panel states.
+- The Roehub transition specification now requires an analogous functional
+  block or an explicit justified omission for each selected reference block;
+  literal geometry, taxonomy, copy, assets, and unsupported concepts are out of
+  scope.
 
 ## Redaction and prohibited-capture check
 
@@ -94,12 +107,41 @@ acceptance; none is treated as proven product behavior.
 | Required server/UI states | loading and empty observed; unsafe or unavailable states waived |
 | Accessibility | sanitized role counts and focus transitions recorded |
 | Component geometry/motion | geometry measured; motion timing waived to the shared standard |
+| Functional interpretation | analogous Roehub blocks or explicit omissions are required; literal replication is prohibited |
 | Prohibited captures absent | pass |
 | `git diff --check` | recorded by terminal verification before commit |
 
 ## Proof boundary
 
-The accepted result is a sanitized reference description. Its 2026-07-20 live observations remain historical; the archive and 16 PNG hashes were reverified on 2026-07-22 without a Linear session. It may unblock the
-next repository ticket only after this commit reaches the common `main`
-baseline. It does not make ROE-13 or ROE-15 ready and does not authorize their
-execution or status changes.
+The accepted result is a sanitized reference description. Its 2026-07-20 live
+observations remain historical; the archive and 16 PNG hashes were reverified
+on 2026-07-22 without a Linear session. Three additional user-supplied PNGs are
+identified by hash and retained only in the local reference folder, bringing
+the described set to 19 captures without tracking third-party images. It may
+unblock the next repository ticket only after this amendment reaches the common
+`main` baseline. It does not make ROE-13 or ROE-15 ready and does not authorize
+their execution or status changes.
+
+## 2026-07-22 amendment verification
+
+- `jq` semantic assertions pass for `19` manifest captures, exactly `3`
+  supplemental captures, the accepted reference cluster, and the formal
+  functional-equivalence contract.
+- The three local supplemental PNGs match the recorded SHA-256 values and are
+  available under
+  `/Users/daniildegtyarev/.codex/visualizations/2026/07/22/019f872a-e059-7ba3-a7dd-66302c23da27/linear-reference/`.
+- `git ls-files` confirms that none of the supplemental PNGs is tracked.
+- `python .codex/hooks/tests/run_tests.py` passes all `11` active hook
+  regressions.
+- `python -m tools.docs.generate_docs_index --check` reports the architecture
+  index up to date.
+- `python -m tools.docs.generate_project_map --check` reports all `5`
+  project-map artifacts up to date.
+- `python tools/release/oss_metadata.py --check` passes.
+- `python -m tools.ci.route_changes ci --changed-files <(...)` classifies the
+  amendment as documentation-only: `code=false`, `docs=true`,
+  `run_migrations=false`, and an empty test matrix.
+- `git diff --check` passes.
+- Compatibility classification: `compatible-change` for the reference and
+  planning contract; runtime, API, persistence, authorization, and deployment
+  behavior are unchanged.

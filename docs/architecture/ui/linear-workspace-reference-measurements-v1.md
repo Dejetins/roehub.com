@@ -32,6 +32,47 @@ No `72 dpi` field is present in the PNGs. A renderer may display a default
 density, but that value is not source metadata and is not treated as browser
 zoom, operating-system scale, CSS viewport, or device pixel ratio.
 
+## 2026-07-22 supplemental project-overview captures
+
+Three additional user-supplied PNGs extend the static reference with expanded
+project-overview side-panel states. They are copied into the local reference
+folder outside Git; the repository retains only hashes, pixel dimensions, and
+sanitized functional descriptions.
+
+| Local reference file | SHA-256 | Pixel dimensions | Functional state |
+|---|---|---:|---|
+| `SCR-20260722-project-overview-progress-expanded.png` | `60c0547a9b170534aa45c972d0a9994267ae9d8d0b4a60099bb1cb2eae07ff7e` | `3002 x 1572` | Project overview with tabs, summary metadata, resources, description, expanded milestones/progress, and assignee/label switcher. |
+| `SCR-20260722-project-overview-properties-expanded.png` | `6adf8c216f64978fb1005bc78346210de230b3d434f5c6cb0ee51a75ccd15873` | `3002 x 1552` | Project overview with expanded contextual properties and collapsed milestones/progress/activity sections. |
+| `SCR-20260722-project-overview-progress-activity.png` | `978274b6242b382af5831007414bd225e80454762d6a1b38b92966d3d5e5de93` | `3000 x 1556` | Project overview with expanded progress by classification and expanded activity history. |
+
+These captures contain third-party and account-specific presentation and are
+not distributable project assets. Their CSS viewport, DPR, density, and motion
+timing are not inferred from the image bytes.
+
+## Formal functional-structure interpretation
+
+The reference is transferred by function and relationship, not by literal
+appearance. A selected Roehub surface must provide an analogous block or an
+explicit justified omission for each applicable role:
+
+- global workspace navigation and permission-filtered destinations;
+- page identity, route context, view tabs, and contextual actions;
+- a primary domain work surface;
+- authoritative summary properties and state;
+- related resources or artifacts;
+- a contextual side panel that preserves the main task;
+- real progress, lifecycle, or health when the domain supports it;
+- authoritative activity, audit, event, or reconciliation history;
+- truthful loading, empty, error, degraded, forbidden, and expired states.
+
+The analogue may use different geometry, grouping, interaction mechanics, or
+visual tokens. It must not copy Linear wording, icons, product entities,
+branding, account content, or exact pixel positions. It must not invent labels,
+assignees, milestones, progress, or collaboration concepts that Roehub does not
+own. Downstream Penpot and runtime evidence must map each selected reference
+block to a Roehub function, authoritative source, required states, and evidence
+or justified omission.
+
 ## Historical live observation environment
 
 Observed at `2026-07-20T23:10:40Z` against the authenticated Linear Roehub
@@ -152,8 +193,8 @@ Linear-derived duration token.
 
 ## Roehub interpretation
 
-Reuse only density, hierarchy, geometry relationships, focus behavior, and
-state-continuity intent. Do not copy Linear branding, text, product entities,
-assets, source code, authorization behavior, or account content. All product
-semantics, routes, permissions, themes, copy, and runtime acceptance remain
-Roehub-owned.
+Reuse density, hierarchy, block relationships, focus behavior, and
+state-continuity intent through the formal mapping above. Similarity is judged
+by whether equivalent Roehub user tasks and state relationships are supported,
+not by screenshot resemblance. All product semantics, routes, permissions,
+themes, copy, composition, data, and runtime acceptance remain Roehub-owned.

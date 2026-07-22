@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "reference_id": "LINEAR-WORKSPACE-REFERENCE-2026-07-20",
   "status": "accepted_sanitized_reference_input",
   "source": {
@@ -10,13 +10,27 @@
     "distributable": false,
     "commit_policy": "commit_sanitized_measurements_and_hashes_only"
   },
+  "supplemental_sources": [
+    {
+      "source_id": "user_supplied_project_overview_2026_07_22",
+      "kind": "user_supplied_local_captures",
+      "received_at": "2026-07-22",
+      "capture_count": 3,
+      "distributable": false,
+      "commit_policy": "retain_images_outside_git_commit_hashes_dimensions_tags_only"
+    }
+  ],
   "verification": {
     "verified_at": "2026-07-20T23:10:40Z",
     "historical_observations_preserved": true,
     "archive_reverified_at": "2026-07-22T11:45:56Z",
     "archive_sha256_match": true,
     "capture_count": 16,
-    "all_capture_sha256_match": true
+    "all_capture_sha256_match": true,
+    "supplemental_verified_at": "2026-07-22T12:24:32Z",
+    "supplemental_capture_count": 3,
+    "all_supplemental_sha256_recorded": true,
+    "total_reference_capture_count": 19
   },
   "viewport": {
     "width": 2560,
@@ -45,8 +59,19 @@
     {"file": "SCR-20260720-ujmx.png", "sha256": "1376b93d4315e681db8cca0da7ed1c5e770e5b9d843594553c94ecb963f55dea", "tags": ["projects_table", "right_detail_pane", "filters"]},
     {"file": "SCR-20260720-ujod.png", "sha256": "776a4b712db25201cabee4ecac586a8efc05e1e2b9d254e33d5e955a63136cbe", "tags": ["inline_edit", "icon_picker", "right_detail_pane"]},
     {"file": "SCR-20260720-ujqr.png", "sha256": "208ecb2c9f6fc1f07a83848fc678a030c5d3ed797b87fe221354da77596a6c06", "tags": ["right_detail_pane", "combobox", "nested_overlay"]},
-    {"file": "SCR-20260720-ujyx.png", "sha256": "7d7c5e2740b981e124daf24f9b4925f3ac30858f78d4670493a68aadbb4cb55b", "tags": ["preferences", "theme_control", "settings_form"]}
+    {"file": "SCR-20260720-ujyx.png", "sha256": "7d7c5e2740b981e124daf24f9b4925f3ac30858f78d4670493a68aadbb4cb55b", "tags": ["preferences", "theme_control", "settings_form"]},
+    {"file": "SCR-20260722-project-overview-progress-expanded.png", "sha256": "60c0547a9b170534aa45c972d0a9994267ae9d8d0b4a60099bb1cb2eae07ff7e", "source_id": "user_supplied_project_overview_2026_07_22", "width": 3002, "height": 1572, "tags": ["project_overview", "view_tabs", "summary_properties", "resources", "description", "milestones", "progress", "contextual_side_panel"]},
+    {"file": "SCR-20260722-project-overview-properties-expanded.png", "sha256": "6adf8c216f64978fb1005bc78346210de230b3d434f5c6cb0ee51a75ccd15873", "source_id": "user_supplied_project_overview_2026_07_22", "width": 3002, "height": 1552, "tags": ["project_overview", "view_tabs", "summary_properties", "resources", "description", "properties_panel", "collapsed_context_sections"]},
+    {"file": "SCR-20260722-project-overview-progress-activity.png", "sha256": "978274b6242b382af5831007414bd225e80454762d6a1b38b92966d3d5e5de93", "source_id": "user_supplied_project_overview_2026_07_22", "width": 3000, "height": 1556, "tags": ["project_overview", "view_tabs", "summary_properties", "resources", "description", "progress_by_classification", "activity_history", "contextual_side_panel"]}
   ],
+  "reference_translation_contract": {
+    "mode": "functional_structural_equivalence_not_literal_replication",
+    "required_rule": "each_selected_reference_block_requires_an_analogous_roehub_function_or_explicit_justified_omission",
+    "required_mapping_fields": ["reference_block", "roehub_function", "authoritative_source", "required_states", "evidence_or_justified_omission"],
+    "core_block_roles": ["global_workspace_navigation", "page_identity_and_view_tabs", "primary_work_surface", "summary_properties", "related_resources", "contextual_side_panel", "progress_lifecycle_or_health", "activity_or_audit_history", "truthful_system_states"],
+    "roehub_owned": ["domain_semantics", "routes", "permissions", "copy", "themes", "visual_tokens", "composition", "authoritative_data", "runtime_acceptance"],
+    "prohibited": ["literal_screen_cloning", "linear_branding_or_copy", "private_assets", "exact_pixel_replication", "unsupported_roehub_concepts_added_for_visual_similarity"]
+  },
   "observed_intent": {
     "sidebar_pointer_resizable": true,
     "authenticated_desktop_first": true,

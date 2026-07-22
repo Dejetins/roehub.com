@@ -13,7 +13,8 @@ evidence:
 
 Roehub has a sanitized, reproducible reference pack sufficient to measure the
 selected Linear shell, panel, keyboard, motion, state, and perceived-performance
-behavior before Penpot or Web implementation begins.
+behavior before Penpot or Web implementation begins. The pack also defines
+formal functional-block equivalence without requiring literal screen copying.
 
 ## Context
 
@@ -22,6 +23,8 @@ behavior before Penpot or Web implementation begins.
 - `docs/architecture/ui/linear-workspace-reference-manifest-v1.json`
 - `docs/architecture/ui/roehub-linear-ui-migration-registry-v1.json`
 - user-supplied archive `/Users/daniildegtyarev/Downloads/reference.zip`
+- three user-supplied supplemental project-overview captures received on
+  `2026-07-22`, identified by hash in the manifest and retained outside Git
 
 ## Start probe
 
@@ -33,12 +36,15 @@ Stop on absence or identity drift.
 
 - this ticket;
 - `.codex/delivery/evidence/ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20.md`;
+- `.codex/delivery/specs/roehub-linear-workspace-ui-transition.md`;
 - `docs/architecture/ui/linear-workspace-reference-manifest-v1.json`;
-- `docs/architecture/ui/linear-workspace-reference-measurements-v1.md`.
+- `docs/architecture/ui/linear-workspace-reference-measurements-v1.md`;
+- `docs/architecture/ui/roehub-linear-ui-migration-registry-v1.json`.
 
 ## Scope
 
-- Verify all supplied screenshot hashes and record viewport/scale metadata.
+- Verify all archive and supplemental screenshot hashes and record available
+  pixel metadata without inferring unavailable CSS scale.
 - Close or explicitly waive command-palette, keyboard focus, sidebar resize,
   route/pane/modal/popover motion, loading/error/stale/forbidden/session,
   accessibility snapshot, component geometry, and motion timing gaps.
@@ -47,11 +53,16 @@ Stop on absence or identity drift.
 - Keep screenshots, recordings, auth storage, cookies, tokens, and browser
   profiles outside Git; commit only hashes, measurements, descriptions, and
   redacted evidence.
+- Define formal reference translation: selected Roehub screens preserve
+  analogous functional blocks and state relationships, while Roehub owns their
+  domain semantics, composition, copy, styling, data sources, and permissions.
 
 ## Non-goals
 
 - No product code, Penpot, routes, backend contracts, or product requirements.
 - No copied Linear branding, text, assets, source code, or authorization rules.
+- No one-to-one page cloning, mandatory pixel positions, or fabricated Roehub
+  concepts added only to resemble Linear.
 
 ## Proof boundary
 
@@ -70,4 +81,5 @@ waivers, redaction, and `git diff --check`. It does not prove Roehub runtime.
 
 All manifest gaps are closed or explicitly waived with impact, terminal
 evidence exists, no prohibited capture is tracked, and the ticket becomes
-`accepted` only after the recorded checks pass.
+`accepted` only after the recorded checks pass. Downstream UI tickets must map
+each selected reference block to a Roehub function or justify its omission.

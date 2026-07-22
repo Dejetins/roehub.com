@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "1.1.0",
   "registry_id": "ROEHUB-LINEAR-UI-MIGRATION-V1",
   "status": "accepted_preparation",
   "shared_standard": "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md",
@@ -21,8 +21,15 @@
     "chart_engine": "apache_echarts_via_roehub_chart_contract",
     "migration_mode": "route_bounded_ssr_to_react_strangler"
   },
+  "reference_interpretation": {
+    "mode": "functional_structural_equivalence_not_literal_replication",
+    "contract": ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md",
+    "measurements": "docs/architecture/ui/linear-workspace-reference-measurements-v1.md",
+    "rule": "each selected reference block maps to an analogous Roehub function or an explicit justified omission",
+    "required_mapping_fields": ["reference_block", "roehub_function", "authoritative_source", "required_states", "evidence_or_justified_omission"]
+  },
   "clusters": [
-    {"cluster_id": "reference", "order": 1, "ticket": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md", "state": "ready"},
+    {"cluster_id": "reference", "order": 1, "ticket": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md", "state": "accepted"},
     {"cluster_id": "architecture_spike", "order": 2, "ticket": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md", "state": "draft"},
     {"cluster_id": "penpot_vnext", "order": 3, "ticket": ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md", "state": "draft"},
     {"cluster_id": "application_shell", "order": 4, "ticket": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md", "state": "draft"},
