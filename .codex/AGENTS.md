@@ -66,6 +66,22 @@ identity, variable modes, component inventories, screenshots, functional-block
 mapping and explicit product-owner review. Runtime behavior, authorization,
 accessibility and performance still require code and real-browser evidence.
 
+An architecture or browser spike may prove technical feasibility, but its
+visible output is never a design source unless a design ticket and the product
+owner explicitly approve named Figma nodes. The visual layer of
+`ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20` is
+`rejected_by_product_owner` and `not_a_design_source`; downstream work may reuse
+only its route, state, transport, rollback, test, measurement and dependency
+seams. Do not inherit its layout, styling, component anatomy, copy, theme
+values, fixture presentation or screenshots.
+
+Before Roehub Figma foundations begin, the selected UI instructions-and-copy
+review ticket must be accepted by the product owner. Figma work must pause at
+the ticket's named review checkpoints. Agents may prepare alternatives and
+evidence, but may not select a product direction, infer approval from silence,
+or mark UI instructions, copy, or visual design `accepted` without an explicit
+product-owner decision identifying the reviewed artifact state.
+
 Linear references are functional-structure inputs, not literal screen
 templates. Every selected Roehub surface must map analogous navigation, page
 context, primary-work, and contextual status/progress/activity/resource blocks

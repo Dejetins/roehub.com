@@ -2,7 +2,7 @@
 artifact_kind: delivery_spec
 delivery_contract: global/v1
 delivery_schema_version: 1
-spec_version: 1.2.0
+spec_version: 1.3.0
 status: accepted
 ---
 
@@ -50,6 +50,14 @@ useful block roles and relationships without cloning Linear screens.
   `roehub.com` (`projectId` `629113387`). The authenticated-platform source is
   `Roehub Authenticated Platform UI` (`fileKey` `GBzmB9evtzqnAYNjp9W1sr`).
   Penpot remains historical evidence only and is not an active design surface.
+- The React coexistence spike is technical evidence only. Its visible
+  composition, styling, component anatomy, copy and screenshots were rejected
+  by the product owner and are not a design or implementation source.
+- UI instructions, terminology and interface copy are reviewed in a separate
+  product-owner-approved ticket before Figma foundations begin.
+- Agents cannot approve UI instructions, copy or visual design on behalf of the
+  product owner. Figma work pauses at explicit structure, direction,
+  foundations, interactive-flow and final-approval checkpoints.
 
 ## Current authority and supersession
 
@@ -128,9 +136,15 @@ statuses, dependencies, or priority.
    four-theme evidence.
 2. Prove React coexistence with the FastAPI/Jinja gateway, MobX/Query state
    boundaries, typed REST/SSE adapters, route fallback, and performance harness.
-3. Create and accept Figma vNext foundations and representative compositions.
-4. Implement the React application shell behind the reversible route boundary.
-5. Implement the real read-only Backtest list/detail golden slice.
+   Treat its visible layer as rejected and non-authoritative.
+3. Repair the design-acceptance boundary and separately review UI instructions,
+   terminology and interface copy with explicit product-owner approval.
+4. Create Figma structure and alternative directions, obtain product-owner
+   selection, then complete foundations and the interactive representative
+   Backtest flow. Accept only the explicitly approved named Figma state.
+5. Implement the React application shell behind the reversible route boundary,
+   replacing the spike visual layer from the accepted Figma source.
+6. Implement the real read-only Backtest list/detail golden slice.
 
 Further route-cluster tickets are derived after the golden slice establishes
 measured architecture and browser behavior.

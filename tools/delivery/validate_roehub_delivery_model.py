@@ -13,6 +13,11 @@ GRAPH_ID = "ROEHUB-AUTHENTICATED-PLATFORM-DELIVERY-V1"
 ROEHUB_FIGMA_STANDARD_PATH = Path(
     "docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md"
 )
+ARCHITECTURE_SPIKE_TICKET_ID = "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20"
+DESIGN_BOUNDARY_TICKET_ID = "ROEHUB-UI-DESIGN-ACCEPTANCE-BOUNDARY-REPAIR-2026-07-22"
+UI_INSTRUCTIONS_COPY_TICKET_ID = "ROEHUB-UI-INSTRUCTIONS-AND-COPY-REVIEW-2026-07-22"
+FIGMA_FOUNDATIONS_TICKET_ID = "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20"
+PROTOTYPE_README_PATH = Path("apps/platform-web/README.md")
 LEGACY_PENPOT_TICKET_PATH = Path(
     ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md"
 )
@@ -34,8 +39,10 @@ EXPECTED_TICKETS = {
     "ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20",
     "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20",
     "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20",
-    "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20",
-    "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20",
+    ARCHITECTURE_SPIKE_TICKET_ID,
+    DESIGN_BOUNDARY_TICKET_ID,
+    UI_INSTRUCTIONS_COPY_TICKET_ID,
+    FIGMA_FOUNDATIONS_TICKET_ID,
     "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20",
     "ROEHUB-AUTHZ-BACKTESTS-2026-07-20",
     "ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20",
@@ -53,16 +60,17 @@ EXPECTED_DEPENDS_ON = {
         "ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20"
     ],
     "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20": [],
-    "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20": [
-        "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20"
-    ],
-    "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20": [
+    ARCHITECTURE_SPIKE_TICKET_ID: ["ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20"],
+    DESIGN_BOUNDARY_TICKET_ID: [ARCHITECTURE_SPIKE_TICKET_ID],
+    UI_INSTRUCTIONS_COPY_TICKET_ID: [DESIGN_BOUNDARY_TICKET_ID],
+    FIGMA_FOUNDATIONS_TICKET_ID: [
         "ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20",
-        "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20",
+        ARCHITECTURE_SPIKE_TICKET_ID,
+        UI_INSTRUCTIONS_COPY_TICKET_ID,
     ],
     "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20": [
-        "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20",
-        "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20",
+        ARCHITECTURE_SPIKE_TICKET_ID,
+        FIGMA_FOUNDATIONS_TICKET_ID,
     ],
     "ROEHUB-AUTHZ-BACKTESTS-2026-07-20": [
         "ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20",
@@ -133,6 +141,21 @@ EXPECTED_FIGMA_DESIGN_WORKSPACE = {
     "authenticated_platform_file_key": "GBzmB9evtzqnAYNjp9W1sr",
     "authenticated_platform_file_url": "https://www.figma.com/design/GBzmB9evtzqnAYNjp9W1sr",
     "penpot_role": "historical_evidence_only",
+}
+EXPECTED_VISUAL_ACCEPTANCE = {
+    "technical_spike_role": "architecture_harness_only",
+    "technical_spike_visual_status": "rejected_by_product_owner",
+    "technical_spike_visual_source_role": "prohibited",
+    "design_source": "product_owner_approved_figma_nodes_only",
+    "instructions_and_copy_ticket": UI_INSTRUCTIONS_COPY_TICKET_ID,
+    "agent_self_acceptance": "prohibited",
+    "review_checkpoints": [
+        "structure_review",
+        "direction_selection",
+        "foundation_review",
+        "interactive_flow_review",
+        "final_design_approval",
+    ],
 }
 
 
@@ -242,7 +265,7 @@ def validate_delivery_model(repo_root: Path) -> list[str]:
             errors.append(f"ticket entry must not duplicate status: {ticket_id}")
         entries[ticket_id] = {**entry, "depends_on": depends_on}
     if set(entries) != EXPECTED_TICKETS or len(entries) != len(EXPECTED_TICKETS):
-        errors.append("unified graph must contain each of the 15 expected tickets exactly once")
+        errors.append("unified graph must contain each of the 17 expected tickets exactly once")
 
     for ticket_id, expected_dependencies in EXPECTED_DEPENDS_ON.items():
         entry = entries.get(ticket_id)
@@ -295,6 +318,29 @@ def validate_delivery_model(repo_root: Path) -> list[str]:
     for ticket_id in REQUIRED_ACCEPTED_TICKETS:
         if tickets.get(ticket_id, {}).get("status") != "accepted":
             errors.append(f"historical accepted status changed: {ticket_id}")
+
+    architecture_spike = tickets.get(ARCHITECTURE_SPIKE_TICKET_ID, {})
+    if architecture_spike.get("visual_design_status") != "rejected_by_product_owner":
+        errors.append("architecture spike must record the product-owner visual rejection")
+    if architecture_spike.get("visual_source_role") != "prohibited":
+        errors.append("architecture spike visual layer must be prohibited as a design source")
+
+    for ticket_id in (UI_INSTRUCTIONS_COPY_TICKET_ID, FIGMA_FOUNDATIONS_TICKET_ID):
+        ticket = tickets.get(ticket_id, {})
+        if ticket.get("acceptance_authority") != "product_owner":
+            errors.append(f"product-owner acceptance authority is missing: {ticket_id}")
+        if ticket.get("agent_self_acceptance") != "prohibited":
+            errors.append(f"agent self-acceptance must be prohibited: {ticket_id}")
+
+    prototype_readme = root / PROTOTYPE_README_PATH
+    if not prototype_readme.is_file():
+        errors.append(f"missing architecture prototype boundary: {PROTOTYPE_README_PATH}")
+    else:
+        prototype_text = prototype_readme.read_text(encoding="utf-8")
+        if "rejected_by_product_owner" not in prototype_text:
+            errors.append("prototype README must record the product-owner visual rejection")
+        if "not_a_design_source" not in prototype_text:
+            errors.append("prototype README must prohibit use as a design source")
 
     priority_queue = graph.get("priority_queue")
     if not isinstance(priority_queue, list) or not all(
@@ -377,6 +423,8 @@ def validate_delivery_model(repo_root: Path) -> list[str]:
             )
         if registry.get("design_workspace") != EXPECTED_FIGMA_DESIGN_WORKSPACE:
             errors.append("UI migration registry has invalid canonical Figma identity")
+        if registry.get("visual_acceptance") != EXPECTED_VISUAL_ACCEPTANCE:
+            errors.append("UI migration registry has invalid visual acceptance boundary")
     return errors
 
 

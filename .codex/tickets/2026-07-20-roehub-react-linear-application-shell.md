@@ -23,6 +23,9 @@ browser behavior.
 Confirm accepted predecessor evidence and the exact canonical Figma file,
 approved page/node inventory, and recorded design state before implementation.
 Stop on identity, source fingerprint, node inventory, or design-state drift.
+Confirm explicit product-owner approval of the recorded Figma state. The
+architecture spike supplies technical seams only; its visible layer is
+`not_a_design_source` and must be replaced rather than refined.
 
 ## Owned paths
 
@@ -47,6 +50,8 @@ Stop on identity, source fingerprint, node inventory, or design-state drift.
 
 - No domain content, trading mutation, backend authorization, persistence,
   public site, release, deployment, or fallback removal.
+- No inheritance of the architecture spike's layout, styling, component
+  anatomy, copy, theme values, fixture presentation, or screenshots.
 
 ## Proof boundary
 

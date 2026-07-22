@@ -1,5 +1,5 @@
 {
-  "schema_version": "1.3.0",
+  "schema_version": "1.4.0",
   "registry_id": "ROEHUB-LINEAR-UI-MIGRATION-V1",
   "shared_standard": "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md",
   "reference_manifest": "docs/architecture/ui/linear-workspace-reference-manifest-v1.json",
@@ -46,9 +46,20 @@
     "rule": "each selected reference block maps to an analogous Roehub function or an explicit justified omission",
     "required_mapping_fields": ["reference_block", "roehub_function", "authoritative_source", "required_states", "evidence_or_justified_omission"]
   },
+  "visual_acceptance": {
+    "technical_spike_role": "architecture_harness_only",
+    "technical_spike_visual_status": "rejected_by_product_owner",
+    "technical_spike_visual_source_role": "prohibited",
+    "design_source": "product_owner_approved_figma_nodes_only",
+    "instructions_and_copy_ticket": "ROEHUB-UI-INSTRUCTIONS-AND-COPY-REVIEW-2026-07-22",
+    "agent_self_acceptance": "prohibited",
+    "review_checkpoints": ["structure_review", "direction_selection", "foundation_review", "interactive_flow_review", "final_design_approval"]
+  },
   "clusters": [
     {"cluster_id": "reference", "ticket": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md"},
     {"cluster_id": "architecture_spike", "ticket": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md"},
+    {"cluster_id": "design_acceptance_boundary", "ticket": ".codex/tickets/2026-07-22-roehub-ui-design-acceptance-boundary-repair.md"},
+    {"cluster_id": "ui_instructions_and_copy", "ticket": ".codex/tickets/2026-07-22-roehub-ui-instructions-and-copy-review.md"},
     {"cluster_id": "figma_vnext", "ticket": ".codex/tickets/2026-07-20-roehub-figma-linear-vnext-foundations.md"},
     {"cluster_id": "application_shell", "ticket": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md"},
     {"cluster_id": "backtests_golden_slice", "ticket": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md"}

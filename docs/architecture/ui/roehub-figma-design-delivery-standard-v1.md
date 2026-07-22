@@ -104,6 +104,35 @@ milestones, progress, activity, or collaboration objects for visual similarity.
 Roehub owns its composition, themes, permissions, routes, data, terminology,
 financial semantics, and interaction priorities.
 
+## Product review checkpoints
+
+Technical browser spikes are not visual inputs. In particular, the visible
+layer of `ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20` is
+`rejected_by_product_owner` and `not_a_design_source`. Figma work may reuse its
+proven route, state, transport, rollback, test, measurement and dependency
+seams, but not its layout, styling, component anatomy, copy, theme values,
+fixture presentation or screenshots.
+
+The UI instructions-and-copy review must be accepted before application-layout
+work begins. A Figma foundations ticket then pauses at these named checkpoints:
+
+1. `structure_review`: functional-block mapping and low-fidelity shell
+   structure, with authoritative sources and justified omissions.
+2. `direction_selection`: two or three materially different `graphite` shell
+   directions using approved Roehub terminology and representative data.
+3. `foundation_review`: selected direction expressed through semantic
+   variables, components, patterns and representative four-theme coverage.
+4. `interactive_flow_review`: interactive read-only Backtest list/detail flow,
+   including required system states and keyboard/focus intent.
+5. `final_design_approval`: repeated inventory read plus explicit product-owner
+   approval of the named file, pages, nodes, variables and components.
+
+An agent may not choose among product directions or pass a checkpoint on the
+product owner's behalf. Silence, connector success, structural validation,
+screenshots, browser checks and CI are not product approval. While a required
+decision is pending, the design ticket remains `active` and records the exact
+checkpoint and artifact identity; it does not become `accepted`.
+
 ## Review, evidence, and handoff
 
 A Figma design ticket records:
@@ -120,6 +149,11 @@ A Figma design ticket records:
 The product owner approves the named Figma state before a design ticket becomes
 `accepted`. Figma approval does not authorize implementation automatically; the
 delivery graph and the implementation ticket remain the execution authority.
+
+If the product owner rejects a direction, record that decision and revise or
+archive the rejected nodes inside the same design ticket. Do not relabel the
+rejected state as accepted technical evidence and do not use it as an
+implementation source.
 
 ## Proof boundary
 

@@ -6,7 +6,10 @@ ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.j
 depends_on:
   - ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20
   - ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20
+  - ROEHUB-UI-INSTRUCTIONS-AND-COPY-REVIEW-2026-07-22
 evidence: []
+acceptance_authority: product_owner
+agent_self_acceptance: prohibited
 ---
 
 # Create Roehub Figma Linear-workspace vNext
@@ -26,6 +29,9 @@ Confirm the authenticated account, professional plan, project `roehub.com`
 (`fileKey` `GBzmB9evtzqnAYNjp9W1sr`) before broad reads or any mutation. Do not
 create a second design file. Inspect the owned pages/nodes immediately before
 writing and stop on identity, access, source-contract, or concurrent-edit drift.
+Confirm that `ROEHUB-UI-INSTRUCTIONS-AND-COPY-REVIEW-2026-07-22` is accepted
+with explicit product-owner evidence. Treat the architecture spike's visual
+layer as `not_a_design_source`.
 
 ## Owned paths
 
@@ -41,11 +47,20 @@ writing and stop on identity, access, source-contract, or concurrent-edit drift.
   detail pane, command palette, overlays, system states, accessibility/motion
   variants, and the representative Backtest list/detail flow.
 - Preserve Roehub screen, route, capability, trading, and brand semantics.
+- Stop for product-owner review at `structure_review`, `direction_selection`,
+  `foundation_review`, `interactive_flow_review`, and
+  `final_design_approval` as defined by the Figma delivery standard.
+- Present two or three materially different shell directions in `graphite`
+  before expanding the selected direction into the complete component and
+  four-theme system.
 
 ## Non-goals
 
 - No Web/backend code, public site, route/capability change, trading mutation,
   or rewrite of accepted historical evidence.
+- No reuse of the architecture spike's layout, styling, component anatomy,
+  interface copy, theme values, fixture presentation, or screenshots.
+- No agent selection of a product direction and no agent self-acceptance.
 
 ## Proof boundary
 
@@ -60,3 +75,7 @@ All design targets pass structural and visual checks without orphan or duplicate
 nodes, terminal evidence exists, and the product owner explicitly approves the
 named Figma state. The ticket becomes `accepted` only after that review and a
 repeated read confirms the recorded file, pages, nodes, variables, and components.
+
+Intermediate checkpoints require explicit product-owner decisions on the named
+nodes. Until the current checkpoint is approved, the ticket remains `active`;
+connector success, tests, screenshots, or silence cannot advance it.

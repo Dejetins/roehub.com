@@ -6,8 +6,13 @@ from pathlib import Path
 
 from tools.delivery.validate_roehub_delivery_model import (
     ACTIVE_REFERENCE_PATHS,
+    ARCHITECTURE_SPIKE_TICKET_ID,
+    DESIGN_BOUNDARY_TICKET_ID,
+    FIGMA_FOUNDATIONS_TICKET_ID,
     GRAPH_PATH,
     LEGACY_PENPOT_TICKET_PATH,
+    PROTOTYPE_README_PATH,
+    UI_INSTRUCTIONS_COPY_TICKET_ID,
     _read_ticket_front_matter,
     validate_delivery_model,
 )
@@ -18,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 def _fixture_repo(tmp_path: Path) -> Path:
     fixture_root = tmp_path / "repo"
     graph = json.loads((REPO_ROOT / GRAPH_PATH).read_text(encoding="utf-8"))
-    paths = [GRAPH_PATH, *ACTIVE_REFERENCE_PATHS]
+    paths = [GRAPH_PATH, PROTOTYPE_README_PATH, *ACTIVE_REFERENCE_PATHS]
     paths.extend(Path(entry["path"]) for entry in graph["tickets"])
     for relative_path in paths:
         source = REPO_ROOT / relative_path
@@ -117,3 +122,80 @@ def test_replaced_penpot_ticket_is_rejected(tmp_path: Path) -> None:
     assert f"replaced Penpot ticket still exists: {LEGACY_PENPOT_TICKET_PATH}" in (
         validate_delivery_model(fixture_root)
     )
+
+
+def test_architecture_spike_visual_rejection_is_required(tmp_path: Path) -> None:
+    fixture_root = _fixture_repo(tmp_path)
+    graph = json.loads((fixture_root / GRAPH_PATH).read_text(encoding="utf-8"))
+    ticket_path = next(
+        entry["path"]
+        for entry in graph["tickets"]
+        if entry["ticket_id"] == ARCHITECTURE_SPIKE_TICKET_ID
+    )
+    candidate = fixture_root / ticket_path
+    candidate.write_text(
+        candidate.read_text(encoding="utf-8").replace(
+            "visual_design_status: rejected_by_product_owner",
+            "visual_design_status: approved",
+        ),
+        encoding="utf-8",
+    )
+
+    assert "architecture spike must record the product-owner visual rejection" in (
+        validate_delivery_model(fixture_root)
+    )
+
+
+def test_agent_cannot_self_accept_ui_copy_or_figma_design(tmp_path: Path) -> None:
+    fixture_root = _fixture_repo(tmp_path)
+    graph = json.loads((fixture_root / GRAPH_PATH).read_text(encoding="utf-8"))
+    for ticket_id in (UI_INSTRUCTIONS_COPY_TICKET_ID, FIGMA_FOUNDATIONS_TICKET_ID):
+        ticket_path = next(
+            entry["path"] for entry in graph["tickets"] if entry["ticket_id"] == ticket_id
+        )
+        candidate = fixture_root / ticket_path
+        candidate.write_text(
+            candidate.read_text(encoding="utf-8").replace(
+                "agent_self_acceptance: prohibited",
+                "agent_self_acceptance: allowed",
+            ),
+            encoding="utf-8",
+        )
+
+    errors = validate_delivery_model(fixture_root)
+    assert all(
+        f"agent self-acceptance must be prohibited: {ticket_id}" in errors
+        for ticket_id in (UI_INSTRUCTIONS_COPY_TICKET_ID, FIGMA_FOUNDATIONS_TICKET_ID)
+    )
+
+
+def test_prototype_readme_must_remain_not_a_design_source(tmp_path: Path) -> None:
+    fixture_root = _fixture_repo(tmp_path)
+    readme_path = fixture_root / PROTOTYPE_README_PATH
+    readme_path.write_text(
+        readme_path.read_text(encoding="utf-8").replace(
+            "not_a_design_source",
+            "design_source",
+        ),
+        encoding="utf-8",
+    )
+
+    assert "prototype README must prohibit use as a design source" in (
+        validate_delivery_model(fixture_root)
+    )
+
+
+def test_ui_copy_review_is_the_next_frontier_after_boundary_repair(tmp_path: Path) -> None:
+    fixture_root = _fixture_repo(tmp_path)
+    graph = json.loads((fixture_root / GRAPH_PATH).read_text(encoding="utf-8"))
+    statuses = {}
+    for ticket_id in (DESIGN_BOUNDARY_TICKET_ID, UI_INSTRUCTIONS_COPY_TICKET_ID):
+        ticket_path = next(
+            entry["path"] for entry in graph["tickets"] if entry["ticket_id"] == ticket_id
+        )
+        statuses[ticket_id] = _read_ticket_front_matter(fixture_root / ticket_path)["status"]
+
+    assert statuses[DESIGN_BOUNDARY_TICKET_ID] == "accepted"
+    assert statuses[UI_INSTRUCTIONS_COPY_TICKET_ID] == "ready"
+    assert graph["priority_queue"][0] == UI_INSTRUCTIONS_COPY_TICKET_ID
+    assert validate_delivery_model(fixture_root) == []

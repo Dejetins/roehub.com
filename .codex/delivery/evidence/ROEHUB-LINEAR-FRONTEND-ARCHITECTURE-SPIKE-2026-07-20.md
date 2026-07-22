@@ -4,9 +4,23 @@ ticket_id: ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20
 status: accepted
 verdict: proceed
 observed_at: 2026-07-22T14:41:58Z
+visual_design_status: rejected_by_product_owner
+visual_source_role: prohibited
 ---
 
 # React coexistence architecture spike evidence
+
+## Later product-owner design decision
+
+On `2026-07-22`, after inspecting the visible prototype, the product owner
+rejected its composition, styling, component anatomy, interface copy, and
+screenshots as Roehub UI design. No product owner or designer had approved that
+visual result when this technical ticket was marked `accepted`.
+
+The historical technical measurements below remain factual. The visual layer
+is `not_a_design_source` and must not be inherited by Figma foundations or the
+production React shell. Only route isolation, SSR rollback, state/transport
+seams, tests, measurement harness, and dependency observations may be reused.
 
 ## Verdict
 

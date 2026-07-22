@@ -1,5 +1,14 @@
 # PROTOTYPE — Roehub frontend architecture spike
 
+> Visual design status: `rejected_by_product_owner`.
+> Visual source role: `prohibited` (`not_a_design_source`).
+>
+> This repository app is a technical route/state/transport/performance harness,
+> not an approved Roehub layout. Do not inherit its composition, styling,
+> component anatomy, copy, theme values, fixture presentation, or screenshots.
+> Production UI must replace the visual layer from product-owner-approved Figma
+> nodes. Only the bounded technical seams and their tests may be reused.
+
 This disposable prototype answers one architecture question:
 
 > Can a route-bounded React + TypeScript + Vite client coexist with the current

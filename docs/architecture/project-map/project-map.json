@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1105,
+      "file_count": 1108,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -3606,6 +3606,11 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-UI-DESIGN-ACCEPTANCE-BOUNDARY-REPAIR-2026-07-22.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "configuration",
       "path": ".codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json"
     },
@@ -4188,6 +4193,16 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/tickets/2026-07-22-roehub-figma-design-delivery-migration.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-22-roehub-ui-design-acceptance-boundary-repair.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-07-22-roehub-ui-instructions-and-copy-review.md"
     },
     {
       "area": "repository-meta",
@@ -17750,7 +17765,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3104,
+  "inventory_file_count": 3107,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17967,5 +17982,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "1e58f08b1e1e5a44ba9d78b29a8abda17433edd4b9ea13406ba42515f93f18ed"
+  "structural_digest": "4935784ca674482d8a34b92eb7ef6bac686baaa1f804cb48985d4fa6d7d6da6b"
 }

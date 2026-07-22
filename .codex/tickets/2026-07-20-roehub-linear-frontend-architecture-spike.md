@@ -7,6 +7,8 @@ depends_on:
   - ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20
 evidence:
   - .codex/delivery/evidence/ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20.md
+visual_design_status: rejected_by_product_owner
+visual_source_role: prohibited
 ---
 
 # Prove the Roehub React coexistence architecture
@@ -49,6 +51,9 @@ and a repeatable client performance harness.
 
 - No production shell, route cluster, Figma design, backend, trading, authorization,
   persistence, public-site, release, or deployment change.
+- No product-design direction. The product owner rejected the spike's visible
+  composition, styling, component anatomy, copy, and screenshots on
+  `2026-07-22`; they are `not_a_design_source`.
 
 ## Proof boundary
 
@@ -68,3 +73,8 @@ may prove client overhead but not API latency. Focused Python/Node tests and
 Terminal evidence records dependency versions, route rollback, state-boundary
 tests, browser traces, measurement method/results, residual risk, and a clear
 proceed/change/stop decision for Figma vNext and the production shell.
+
+This acceptance is technical only. Downstream work may reuse route isolation,
+state/transport seams, rollback, tests, measurement harness, and dependency
+evidence. It must replace the visual layer from an explicitly approved Figma
+state and may not treat this spike as product-owner approval.
