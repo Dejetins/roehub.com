@@ -56,6 +56,11 @@ def _build_parser() -> argparse.ArgumentParser:
         default=_DEFAULT_LOCK_KEY,
         help="Advisory lock key used with pg_advisory_lock during migration upgrade.",
     )
+    parser.add_argument(
+        "--revision",
+        default="head",
+        help="Alembic target revision. Defaults to head.",
+    )
     return parser
 
 
@@ -112,14 +117,21 @@ def _build_alembic_config(*, repo_root: Path) -> Config:
     return config
 
 
-def _upgrade_head_under_lock(*, config: Config, sqlalchemy_url: URL, lock_key: int) -> None:
+def _upgrade_revision_under_lock(
+    *,
+    config: Config,
+    sqlalchemy_url: URL,
+    lock_key: int,
+    revision: str,
+) -> None:
     """
-    Run `alembic upgrade head` while holding Postgres advisory lock.
+    Run `alembic upgrade <revision>` while holding the Postgres advisory lock.
 
     Args:
         config: Prepared Alembic config.
         sqlalchemy_url: SQLAlchemy URL built from URL DSN or libpq conninfo.
         lock_key: Advisory lock key.
+        revision: Alembic revision target.
     Returns:
         None.
     Assumptions:
@@ -140,8 +152,8 @@ def _upgrade_head_under_lock(*, config: Config, sqlalchemy_url: URL, lock_key: i
         _acquire_pg_advisory_lock(connection=connection, lock_key=lock_key)
         try:
             config.attributes["connection"] = connection
-            print("Running: alembic upgrade head")
-            command.upgrade(config, "head")
+            print(f"Running: alembic upgrade {revision}")
+            command.upgrade(config, revision)
             connection.commit()
             print("Migration success")
         except Exception:  # noqa: BLE001
@@ -150,6 +162,16 @@ def _upgrade_head_under_lock(*, config: Config, sqlalchemy_url: URL, lock_key: i
         finally:
             _release_pg_advisory_lock(connection=connection, lock_key=lock_key)
             connection.commit()
+
+
+def _upgrade_head_under_lock(*, config: Config, sqlalchemy_url: URL, lock_key: int) -> None:
+    """Run the default Alembic head upgrade under the shared advisory lock."""
+    _upgrade_revision_under_lock(
+        config=config,
+        sqlalchemy_url=sqlalchemy_url,
+        lock_key=lock_key,
+        revision="head",
+    )
 
 
 def _acquire_pg_advisory_lock(*, connection: Connection, lock_key: int) -> None:
@@ -312,9 +334,9 @@ def _to_sqlalchemy_url_from_conninfo_dsn(*, conninfo_dsn: str) -> URL:
         for key, value in sorted(conninfo_fields.items())
         if key not in {"dbname", "host", "hostaddr", "password", "port", "user"} and str(value)
     }
-    resolved_host = str(
-        conninfo_fields.get("host", conninfo_fields.get("hostaddr", ""))
-    ).strip() or None
+    resolved_host = (
+        str(conninfo_fields.get("host", conninfo_fields.get("hostaddr", ""))).strip() or None
+    )
     resolved_user = str(conninfo_fields.get("user", "")).strip() or None
     resolved_password = str(conninfo_fields.get("password", "")).strip() or None
 
@@ -331,7 +353,7 @@ def _to_sqlalchemy_url_from_conninfo_dsn(*, conninfo_dsn: str) -> URL:
 
 def main(argv: list[str] | None = None) -> int:
     """
-    Run fail-fast migration flow with advisory lock and `alembic upgrade head`.
+    Run fail-fast migration flow with advisory lock and an Alembic target revision.
 
     Args:
         argv: Optional CLI argument list without program name.
@@ -356,14 +378,25 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         dsn = _resolve_dsn(arg_dsn=args.dsn, environ=os.environ)
+        revision = args.revision.strip()
+        if not revision:
+            raise ValueError("Alembic revision cannot be empty")
         sqlalchemy_url = _to_sqlalchemy_psycopg_url(dsn=dsn)
         repo_root = Path(__file__).resolve().parents[2]
         config = _build_alembic_config(repo_root=repo_root)
-        _upgrade_head_under_lock(
-            config=config,
-            sqlalchemy_url=sqlalchemy_url,
-            lock_key=args.lock_key,
-        )
+        if revision == "head":
+            _upgrade_head_under_lock(
+                config=config,
+                sqlalchemy_url=sqlalchemy_url,
+                lock_key=args.lock_key,
+            )
+        else:
+            _upgrade_revision_under_lock(
+                config=config,
+                sqlalchemy_url=sqlalchemy_url,
+                lock_key=args.lock_key,
+                revision=revision,
+            )
     except Exception as error:  # noqa: BLE001
         print(f"Migration failed: {error}")
         return 1

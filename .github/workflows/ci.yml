@@ -191,7 +191,9 @@ jobs:
 
       - name: Migrations (fail-fast)
         run: |
-          uv run python -m apps.migrations.main --dsn "$POSTGRES_DSN"
+          uv run python -m apps.migrations.bootstrap_main \
+            --identity-dsn "$POSTGRES_DSN" \
+            --postgres-dsn "$POSTGRES_DSN"
 
   test_shards:
     name: test-shard (${{ matrix.name }})

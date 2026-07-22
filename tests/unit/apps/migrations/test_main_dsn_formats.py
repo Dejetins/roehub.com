@@ -94,3 +94,33 @@ def test_main_accepts_percent_encoded_url_password_without_interpolation_failure
     assert isinstance(captured_config, Config)
     configured_url = captured_config.get_main_option("sqlalchemy.url") or ""
     assert "%40" not in configured_url
+
+
+def test_main_forwards_explicit_revision_to_locked_upgrade(monkeypatch: Any) -> None:
+    """Verify the runner can stop at the identity bootstrap checkpoint revision."""
+    captured: dict[str, object] = {}
+
+    def _fake_upgrade_revision_under_lock(
+        *,
+        config: Config,
+        sqlalchemy_url: URL,
+        lock_key: int,
+        revision: str,
+    ) -> None:
+        captured["config"] = config
+        captured["sqlalchemy_url"] = sqlalchemy_url
+        captured["lock_key"] = lock_key
+        captured["revision"] = revision
+
+    monkeypatch.setattr(
+        migrations_main,
+        "_upgrade_revision_under_lock",
+        _fake_upgrade_revision_under_lock,
+    )
+
+    exit_code = migrations_main.main(
+        ["--dsn", "postgresql://roehub@postgres:5432/roehub", "--revision", "20260711_0043"]
+    )
+
+    assert exit_code == 0
+    assert captured["revision"] == "20260711_0043"

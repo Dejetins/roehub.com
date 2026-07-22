@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1097,
+      "file_count": 1098,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -8509,6 +8509,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/identity/identity-keycloak-auth-model-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/identity/identity-migration-channels-delegation-checkpoint-v1.md"
     },
     {
       "area": "knowledge",
@@ -17556,7 +17561,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3071,
+  "inventory_file_count": 3072,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17773,5 +17778,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "10fa1c91af71616846d05550dc937fccfd5545bd08eceb5bafc9f0622aeabe7d"
+  "structural_digest": "962cd0f2a53ae3c52e9fb64db863704c005bc7c61b6ea80cb114494d774c67bc"
 }

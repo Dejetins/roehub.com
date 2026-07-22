@@ -33,13 +33,9 @@ _NOTIFICATION_PROVIDER_INSTANCES_V1_SQL_FILE = "0016_notification_provider_insta
 _EXTENSIONS_PLUGIN_PLATFORM_V1ALPHA1_SQL_FILE = "0017_extensions_plugin_platform_v1alpha1.sql"
 _ARTIFACT_STORE_V1_SQL_FILE = "0018_artifact_store_v1.sql"
 _ISOLATED_JOB_RUNTIME_V1_SQL_FILE = "0019_isolated_job_runtime_v1.sql"
-_EXECUTION_GATEWAY_MAINNET_SAFETY_V1_SQL_FILE = (
-    "0020_execution_gateway_mainnet_safety_v1.sql"
-)
+_EXECUTION_GATEWAY_MAINNET_SAFETY_V1_SQL_FILE = "0020_execution_gateway_mainnet_safety_v1.sql"
 _CONTROL_OPERATION_AUDIT_V1_SQL_FILE = "0021_control_operation_audit_v1.sql"
-_MARKET_DATA_INSTRUMENT_SELECTIONS_V1_SQL_FILE = (
-    "0022_market_data_instrument_selections_v1.sql"
-)
+_MARKET_DATA_INSTRUMENT_SELECTIONS_V1_SQL_FILE = "0022_market_data_instrument_selections_v1.sql"
 
 
 @dataclass(frozen=True, slots=True)
@@ -216,7 +212,7 @@ def run_dev_db_bootstrap(
     alembic_upgrade_runner: Callable[[list[str] | None], int] = run_alembic_migrations_main,
 ) -> None:
     """
-    Execute deterministic dev bootstrap: identity SQL baseline and Alembic `upgrade head`.
+    Execute the deterministic identity SQL and Alembic bootstrap sequence.
 
     Args:
         identity_dsn: DSN for identity baseline SQL migrations.
@@ -226,7 +222,7 @@ def run_dev_db_bootstrap(
     Returns:
         None.
     Assumptions:
-        Identity SQL files `0001..0005` are present in `migrations_dir`.
+        Identity SQL files `0001..0022` are present in `migrations_dir`.
     Raises:
         ValueError: If DSN or migrations directory values are invalid.
         RuntimeError: If identity bootstrap or Alembic upgrade fails.
@@ -238,9 +234,10 @@ def run_dev_db_bootstrap(
         migrations_dir=migrations_dir,
         include_strategy_bindings=False,
     )
-    run_alembic_upgrade_head(
+    run_alembic_upgrade(
         postgres_dsn=postgres_dsn,
         alembic_upgrade_runner=alembic_upgrade_runner,
+        revision="20260711_0043",
     )
     apply_strategy_exchange_bindings_sql(
         identity_dsn=identity_dsn,
@@ -250,8 +247,40 @@ def run_dev_db_bootstrap(
         identity_dsn=identity_dsn,
         migrations_dir=migrations_dir,
     )
+    run_alembic_upgrade(
+        postgres_dsn=postgres_dsn,
+        alembic_upgrade_runner=alembic_upgrade_runner,
+        revision="head",
+    )
     apply_local_auth_sql(identity_dsn=identity_dsn, migrations_dir=migrations_dir)
     apply_oidc_provider_sql(identity_dsn=identity_dsn, migrations_dir=migrations_dir)
+    apply_research_organization_isolation_sql(
+        identity_dsn=identity_dsn,
+        migrations_dir=migrations_dir,
+    )
+    apply_trading_organization_isolation_sql(
+        identity_dsn=identity_dsn,
+        migrations_dir=migrations_dir,
+    )
+    apply_notification_provider_instances_sql(
+        identity_dsn=identity_dsn,
+        migrations_dir=migrations_dir,
+    )
+    apply_extensions_plugin_platform_sql(
+        identity_dsn=identity_dsn,
+        migrations_dir=migrations_dir,
+    )
+    apply_artifact_store_sql(identity_dsn=identity_dsn, migrations_dir=migrations_dir)
+    apply_isolated_job_runtime_sql(identity_dsn=identity_dsn, migrations_dir=migrations_dir)
+    apply_execution_gateway_mainnet_safety_sql(
+        identity_dsn=identity_dsn,
+        migrations_dir=migrations_dir,
+    )
+    apply_control_operation_audit_sql(identity_dsn=identity_dsn, migrations_dir=migrations_dir)
+    apply_market_data_instrument_selections_sql(
+        identity_dsn=identity_dsn,
+        migrations_dir=migrations_dir,
+    )
 
 
 def apply_identity_baseline_sql(
@@ -517,9 +546,7 @@ def apply_isolated_job_runtime_sql(*, identity_dsn: str, migrations_dir: Path) -
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
-def apply_execution_gateway_mainnet_safety_sql(
-    *, identity_dsn: str, migrations_dir: Path
-) -> None:
+def apply_execution_gateway_mainnet_safety_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
     """Apply persisted execution gateway and mainnet safety policy."""
 
     normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
@@ -532,9 +559,7 @@ def apply_execution_gateway_mainnet_safety_sql(
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
-def apply_control_operation_audit_sql(
-    *, identity_dsn: str, migrations_dir: Path
-) -> None:
+def apply_control_operation_audit_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
     """Apply durable control-agent audit events and reconciliation cursor."""
 
     normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
@@ -547,9 +572,7 @@ def apply_control_operation_audit_sql(
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
-def apply_market_data_instrument_selections_sql(
-    *, identity_dsn: str, migrations_dir: Path
-) -> None:
+def apply_market_data_instrument_selections_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
     """Apply organization-scoped market-data selection and catalog-state schema."""
 
     normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
@@ -562,17 +585,19 @@ def apply_market_data_instrument_selections_sql(
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
-def run_alembic_upgrade_head(
+def run_alembic_upgrade(
     *,
     postgres_dsn: str,
     alembic_upgrade_runner: Callable[[list[str] | None], int],
+    revision: str = "head",
 ) -> None:
     """
-    Run existing Alembic migration runner and fail fast on non-zero exit code.
+    Run an Alembic upgrade to an explicit target and fail fast on non-zero exit code.
 
     Args:
         postgres_dsn: DSN used by `apps.migrations.main`.
-        alembic_upgrade_runner: Callable that executes Alembic `upgrade head`.
+        alembic_upgrade_runner: Callable that executes the Alembic upgrade.
+        revision: Alembic target revision; defaults to `head`.
     Returns:
         None.
     Assumptions:
@@ -582,10 +607,23 @@ def run_alembic_upgrade_head(
     Side Effects:
         Executes Alembic schema upgrades for `POSTGRES_DSN`.
     """
-    print("Running Alembic upgrade head for POSTGRES_DSN")
-    exit_code = alembic_upgrade_runner(["--dsn", postgres_dsn])
+    print(f"Running Alembic upgrade {revision} for POSTGRES_DSN")
+    exit_code = alembic_upgrade_runner(["--dsn", postgres_dsn, "--revision", revision])
     if exit_code != 0:
         raise RuntimeError(f"Alembic migration runner failed with exit code {exit_code}")
+
+
+def run_alembic_upgrade_head(
+    *,
+    postgres_dsn: str,
+    alembic_upgrade_runner: Callable[[list[str] | None], int],
+) -> None:
+    """Preserve the existing head-upgrade helper for callers outside bootstrap."""
+    run_alembic_upgrade(
+        postgres_dsn=postgres_dsn,
+        alembic_upgrade_runner=alembic_upgrade_runner,
+        revision="head",
+    )
 
 
 def inspect_identity_exchange_keys_layout(
