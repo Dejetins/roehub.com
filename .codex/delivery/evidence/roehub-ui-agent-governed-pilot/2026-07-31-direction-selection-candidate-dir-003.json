@@ -1,0 +1,70 @@
+{
+  "evidence_id": "ROEHUB-UI-DIR-003-2026-07-31",
+  "ticket_id": "ROEHUB-UI-AGENT-GOVERNED-PILOT-2026-07-31",
+  "checkpoint": "direction_selection",
+  "status": "rejected_by_product_owner_for_visual_design",
+  "artifact": {
+    "artifact_id": "DIR-003",
+    "name": "Roehub Linear-native Backtests",
+    "direction": "linear_native_workspace",
+    "kind": "visual_direction_raster",
+    "reusable_source": false,
+    "source_image_path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/artifacts/dir-003-roehub-linear-native-backtests.png",
+    "source_image_sha256": "1e4c86de9c1891e8ee5b5f67bf8fc66c63b89dfc42252590df8361bc6f0106f2",
+    "source_pixel_size": {
+      "width": 1586,
+      "height": 992
+    },
+    "normalized_review_size": {
+      "width": 1440,
+      "height": 900,
+      "scale_mode": "FIT"
+    }
+  },
+  "figma": {
+    "file_key": "nzKVsXuCmoTbHJGckHfK3T",
+    "file_name": "Roehub Authenticated Platform UI",
+    "page_id": "3:2",
+    "page_name": "01 Direction Review",
+    "frame_id": "12:2",
+    "frame_name": "DIR-003 / Roehub Linear-native Backtests / v1 / CANDIDATE",
+    "raster_node_id": "12:5",
+    "frame_locked": true,
+    "image_hash": "c1c7bf0f21d5824208c55f5682a2a292e0174210",
+    "readback_screenshot_path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/artifacts/dir-003-figma-readback.png",
+    "readback_screenshot_sha256": "ba04f85edb3145159598a90ea786aaadf3e5fbe03e3538576e8011c589f2d3cb",
+    "readback": {
+      "page_child_ids": ["12:2"],
+      "archive_child_ids": ["4:2", "10:2"],
+      "frame_child_ids": ["12:3", "12:4", "12:5", "12:6"],
+      "raster_has_image_fill": true,
+      "raster_scale_mode": "FIT",
+      "frame_width": 1504,
+      "frame_height": 1064,
+      "raster_width": 1440,
+      "raster_height": 900
+    }
+  },
+  "gates": {
+    "brief_content_inventory": "passed",
+    "interaction_doctrine_antipattern_gate": "passed",
+    "static_visual_and_interaction_direction_audit": "passed",
+    "figma_target_preflight": "passed",
+    "figma_write_readback": "passed",
+    "figma_screenshot_visual_audit": "passed",
+    "rejected_or_failed_predecessors_active": false
+  },
+  "references": {
+    "interaction_doctrine": "docs/architecture/ui/roehub-linear-native-interaction-doctrine-v2.md",
+    "pilot_brief": "docs/architecture/ui/roehub-backtests-process-pilot-brief-v1.md",
+    "visual_review": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-5-linear-native-review.md",
+    "official_linear_redesign": "https://linear.app/now/how-we-redesigned-the-linear-ui"
+  },
+  "product_owner_decision": {
+    "decision": "rejected_for_visual_design",
+    "decided_at": "2026-07-31",
+    "message": "Этот вариант более всего близок по наполнению, но с точки зрения визуального дизайна он пока выглядит далеко от того, что необходимо.",
+    "reuse_policy": "product_content_relationships_only; visual_style_geometry_and_component_anatomy_prohibited"
+  },
+  "proof_boundary": "Static visual direction, content placement, and exact Figma raster placement only. No library, component, implementation, browser, accessibility runtime, publication, or implementation readiness is proven."
+}

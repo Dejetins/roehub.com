@@ -11,12 +11,13 @@ from typing import Any
 GRAPH_PATH = Path(".codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json")
 GRAPH_ID = "ROEHUB-AUTHENTICATED-PLATFORM-DELIVERY-V1"
 ROEHUB_FIGMA_STANDARD_PATH = Path(
-    "docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md"
+    "docs/architecture/ui/roehub-agent-governed-figma-delivery-standard-v2.md"
 )
 ARCHITECTURE_SPIKE_TICKET_ID = "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20"
 DESIGN_BOUNDARY_TICKET_ID = "ROEHUB-UI-DESIGN-ACCEPTANCE-BOUNDARY-REPAIR-2026-07-22"
 UI_INSTRUCTIONS_COPY_TICKET_ID = "ROEHUB-UI-INSTRUCTIONS-AND-COPY-REVIEW-2026-07-22"
 FIGMA_FOUNDATIONS_TICKET_ID = "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20"
+UI_AGENT_PILOT_TICKET_ID = "ROEHUB-UI-AGENT-GOVERNED-PILOT-2026-07-31"
 PROTOTYPE_README_PATH = Path("apps/platform-web/README.md")
 LEGACY_PENPOT_TICKET_PATH = Path(
     ".codex/tickets/2026-07-20-roehub-penpot-linear-vnext-foundations.md"
@@ -43,6 +44,7 @@ EXPECTED_TICKETS = {
     DESIGN_BOUNDARY_TICKET_ID,
     UI_INSTRUCTIONS_COPY_TICKET_ID,
     FIGMA_FOUNDATIONS_TICKET_ID,
+    UI_AGENT_PILOT_TICKET_ID,
     "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20",
     "ROEHUB-AUTHZ-BACKTESTS-2026-07-20",
     "ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20",
@@ -68,6 +70,7 @@ EXPECTED_DEPENDS_ON = {
         ARCHITECTURE_SPIKE_TICKET_ID,
         UI_INSTRUCTIONS_COPY_TICKET_ID,
     ],
+    UI_AGENT_PILOT_TICKET_ID: [DESIGN_BOUNDARY_TICKET_ID],
     "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20": [
         ARCHITECTURE_SPIKE_TICKET_ID,
         FIGMA_FOUNDATIONS_TICKET_ID,
@@ -137,24 +140,31 @@ EXPECTED_FIGMA_DESIGN_WORKSPACE = {
     "project_name": "roehub.com",
     "project_id": "629113387",
     "plan_key": "team::831604964356268687",
+    "ui_library_file_name": "Roehub UI Library",
+    "ui_library_file_key": "rgbNUPCuV7q2pARG4Cml8V",
+    "ui_library_file_url": "https://www.figma.com/design/rgbNUPCuV7q2pARG4Cml8V/Roehub-UI-Library",
     "authenticated_platform_file_name": "Roehub Authenticated Platform UI",
-    "authenticated_platform_file_key": "GBzmB9evtzqnAYNjp9W1sr",
-    "authenticated_platform_file_url": "https://www.figma.com/design/GBzmB9evtzqnAYNjp9W1sr",
+    "authenticated_platform_file_key": "nzKVsXuCmoTbHJGckHfK3T",
+    "authenticated_platform_file_url": "https://www.figma.com/design/nzKVsXuCmoTbHJGckHfK3T/Roehub-Authenticated-Platform-UI",
+    "historical_authenticated_platform_file_key": "GBzmB9evtzqnAYNjp9W1sr",
+    "historical_file_agent_input": "forbidden",
     "penpot_role": "historical_evidence_only",
 }
 EXPECTED_VISUAL_ACCEPTANCE = {
     "technical_spike_role": "architecture_harness_only",
     "technical_spike_visual_status": "rejected_by_product_owner",
     "technical_spike_visual_source_role": "prohibited",
-    "design_source": "product_owner_approved_figma_nodes_only",
-    "instructions_and_copy_ticket": UI_INSTRUCTIONS_COPY_TICKET_ID,
+    "design_source": "product_owner_approved_manifest_and_figma_nodes_only",
+    "coordination_mode": "single_codex_coordinator",
+    "executor_output_trust": "untrusted_until_all_required_gates_pass",
+    "pilot_ticket": UI_AGENT_PILOT_TICKET_ID,
     "agent_self_acceptance": "prohibited",
     "review_checkpoints": [
-        "structure_review",
+        "pilot_brief_approval",
         "direction_selection",
-        "foundation_review",
-        "interactive_flow_review",
-        "final_design_approval",
+        "library_slice_review",
+        "composed_candidate_review",
+        "pilot_final_approval",
     ],
 }
 
@@ -325,7 +335,11 @@ def validate_delivery_model(repo_root: Path) -> list[str]:
     if architecture_spike.get("visual_source_role") != "prohibited":
         errors.append("architecture spike visual layer must be prohibited as a design source")
 
-    for ticket_id in (UI_INSTRUCTIONS_COPY_TICKET_ID, FIGMA_FOUNDATIONS_TICKET_ID):
+    for ticket_id in (
+        UI_INSTRUCTIONS_COPY_TICKET_ID,
+        FIGMA_FOUNDATIONS_TICKET_ID,
+        UI_AGENT_PILOT_TICKET_ID,
+    ):
         ticket = tickets.get(ticket_id, {})
         if ticket.get("acceptance_authority") != "product_owner":
             errors.append(f"product-owner acceptance authority is missing: {ticket_id}")

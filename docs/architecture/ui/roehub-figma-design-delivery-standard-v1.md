@@ -2,7 +2,11 @@
 
 ## Status and decision
 
-- Status: `accepted architecture`.
+- Status: `superseded` for future authenticated-platform design on `2026-07-31`.
+- Superseded by:
+  `docs/architecture/ui/roehub-agent-governed-figma-delivery-standard-v2.md`.
+- This file and Figma key `GBzmB9evtzqnAYNjp9W1sr` remain historical evidence
+  only and must not be supplied to new design executors.
 - Decision date: `2026-07-22`.
 - Scope: all future Roehub design prototyping, design-system work, visual
   review, and design-to-code handoff.

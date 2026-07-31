@@ -1,18 +1,23 @@
 {
-  "schema_version": "1.4.0",
+  "schema_version": "2.0.0",
   "registry_id": "ROEHUB-LINEAR-UI-MIGRATION-V1",
   "shared_standard": "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md",
   "reference_manifest": "docs/architecture/ui/linear-workspace-reference-manifest-v1.json",
   "project_spec": ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md",
-  "design_standard": "docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md",
+  "design_standard": "docs/architecture/ui/roehub-agent-governed-figma-delivery-standard-v2.md",
   "design_workspace": {
     "provider": "figma",
     "project_name": "roehub.com",
     "project_id": "629113387",
     "plan_key": "team::831604964356268687",
+    "ui_library_file_name": "Roehub UI Library",
+    "ui_library_file_key": "rgbNUPCuV7q2pARG4Cml8V",
+    "ui_library_file_url": "https://www.figma.com/design/rgbNUPCuV7q2pARG4Cml8V/Roehub-UI-Library",
     "authenticated_platform_file_name": "Roehub Authenticated Platform UI",
-    "authenticated_platform_file_key": "GBzmB9evtzqnAYNjp9W1sr",
-    "authenticated_platform_file_url": "https://www.figma.com/design/GBzmB9evtzqnAYNjp9W1sr",
+    "authenticated_platform_file_key": "nzKVsXuCmoTbHJGckHfK3T",
+    "authenticated_platform_file_url": "https://www.figma.com/design/nzKVsXuCmoTbHJGckHfK3T/Roehub-Authenticated-Platform-UI",
+    "historical_authenticated_platform_file_key": "GBzmB9evtzqnAYNjp9W1sr",
+    "historical_file_agent_input": "forbidden",
     "penpot_role": "historical_evidence_only"
   },
   "delivery_model": {
@@ -50,10 +55,12 @@
     "technical_spike_role": "architecture_harness_only",
     "technical_spike_visual_status": "rejected_by_product_owner",
     "technical_spike_visual_source_role": "prohibited",
-    "design_source": "product_owner_approved_figma_nodes_only",
-    "instructions_and_copy_ticket": "ROEHUB-UI-INSTRUCTIONS-AND-COPY-REVIEW-2026-07-22",
+    "design_source": "product_owner_approved_manifest_and_figma_nodes_only",
+    "coordination_mode": "single_codex_coordinator",
+    "executor_output_trust": "untrusted_until_all_required_gates_pass",
+    "pilot_ticket": "ROEHUB-UI-AGENT-GOVERNED-PILOT-2026-07-31",
     "agent_self_acceptance": "prohibited",
-    "review_checkpoints": ["structure_review", "direction_selection", "foundation_review", "interactive_flow_review", "final_design_approval"]
+    "review_checkpoints": ["pilot_brief_approval", "direction_selection", "library_slice_review", "composed_candidate_review", "pilot_final_approval"]
   },
   "clusters": [
     {"cluster_id": "reference", "ticket": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md"},
@@ -61,6 +68,7 @@
     {"cluster_id": "design_acceptance_boundary", "ticket": ".codex/tickets/2026-07-22-roehub-ui-design-acceptance-boundary-repair.md"},
     {"cluster_id": "ui_instructions_and_copy", "ticket": ".codex/tickets/2026-07-22-roehub-ui-instructions-and-copy-review.md"},
     {"cluster_id": "figma_vnext", "ticket": ".codex/tickets/2026-07-20-roehub-figma-linear-vnext-foundations.md"},
+    {"cluster_id": "agent_governed_figma_pilot", "ticket": ".codex/tickets/2026-07-31-roehub-ui-agent-governed-pilot.md"},
     {"cluster_id": "application_shell", "ticket": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md"},
     {"cluster_id": "backtests_golden_slice", "ticket": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md"}
   ],

@@ -12,6 +12,7 @@ from tools.delivery.validate_roehub_delivery_model import (
     GRAPH_PATH,
     LEGACY_PENPOT_TICKET_PATH,
     PROTOTYPE_README_PATH,
+    UI_AGENT_PILOT_TICKET_ID,
     UI_INSTRUCTIONS_COPY_TICKET_ID,
     _read_ticket_front_matter,
     validate_delivery_model,
@@ -146,10 +147,17 @@ def test_architecture_spike_visual_rejection_is_required(tmp_path: Path) -> None
     )
 
 
-def test_agent_cannot_self_accept_ui_copy_or_figma_design(tmp_path: Path) -> None:
+def test_agent_cannot_self_accept_ui_copy_figma_design_or_current_pilot(
+    tmp_path: Path,
+) -> None:
     fixture_root = _fixture_repo(tmp_path)
     graph = json.loads((fixture_root / GRAPH_PATH).read_text(encoding="utf-8"))
-    for ticket_id in (UI_INSTRUCTIONS_COPY_TICKET_ID, FIGMA_FOUNDATIONS_TICKET_ID):
+    protected_ticket_ids = (
+        UI_INSTRUCTIONS_COPY_TICKET_ID,
+        FIGMA_FOUNDATIONS_TICKET_ID,
+        UI_AGENT_PILOT_TICKET_ID,
+    )
+    for ticket_id in protected_ticket_ids:
         ticket_path = next(
             entry["path"] for entry in graph["tickets"] if entry["ticket_id"] == ticket_id
         )
@@ -165,7 +173,7 @@ def test_agent_cannot_self_accept_ui_copy_or_figma_design(tmp_path: Path) -> Non
     errors = validate_delivery_model(fixture_root)
     assert all(
         f"agent self-acceptance must be prohibited: {ticket_id}" in errors
-        for ticket_id in (UI_INSTRUCTIONS_COPY_TICKET_ID, FIGMA_FOUNDATIONS_TICKET_ID)
+        for ticket_id in protected_ticket_ids
     )
 
 
@@ -185,17 +193,24 @@ def test_prototype_readme_must_remain_not_a_design_source(tmp_path: Path) -> Non
     )
 
 
-def test_ui_copy_review_is_the_next_frontier_after_boundary_repair(tmp_path: Path) -> None:
+def test_agent_governed_ui_pilot_is_the_next_frontier_after_reset(tmp_path: Path) -> None:
     fixture_root = _fixture_repo(tmp_path)
     graph = json.loads((fixture_root / GRAPH_PATH).read_text(encoding="utf-8"))
     statuses = {}
-    for ticket_id in (DESIGN_BOUNDARY_TICKET_ID, UI_INSTRUCTIONS_COPY_TICKET_ID):
+    for ticket_id in (
+        DESIGN_BOUNDARY_TICKET_ID,
+        UI_INSTRUCTIONS_COPY_TICKET_ID,
+        FIGMA_FOUNDATIONS_TICKET_ID,
+        UI_AGENT_PILOT_TICKET_ID,
+    ):
         ticket_path = next(
             entry["path"] for entry in graph["tickets"] if entry["ticket_id"] == ticket_id
         )
         statuses[ticket_id] = _read_ticket_front_matter(fixture_root / ticket_path)["status"]
 
     assert statuses[DESIGN_BOUNDARY_TICKET_ID] == "accepted"
-    assert statuses[UI_INSTRUCTIONS_COPY_TICKET_ID] == "ready"
-    assert graph["priority_queue"][0] == UI_INSTRUCTIONS_COPY_TICKET_ID
+    assert statuses[UI_INSTRUCTIONS_COPY_TICKET_ID] == "superseded"
+    assert statuses[FIGMA_FOUNDATIONS_TICKET_ID] == "superseded"
+    assert statuses[UI_AGENT_PILOT_TICKET_ID] == "active"
+    assert graph["priority_queue"][0] == UI_AGENT_PILOT_TICKET_ID
     assert validate_delivery_model(fixture_root) == []

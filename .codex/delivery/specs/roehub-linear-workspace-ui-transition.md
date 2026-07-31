@@ -47,14 +47,18 @@ useful block roles and relationships without cloning Linear screens.
   hierarchy while owning domain meaning, data, routes, permissions, copy,
   visual tokens, and composition.
 - All future Roehub design prototyping and handoff use the Figma project
-  `roehub.com` (`projectId` `629113387`). The authenticated-platform source is
-  `Roehub Authenticated Platform UI` (`fileKey` `GBzmB9evtzqnAYNjp9W1sr`).
-  Penpot remains historical evidence only and is not an active design surface.
+  `roehub.com` (`projectId` `629113387`) through two contract-separated files:
+  `Roehub UI Library` (`fileKey` `rgbNUPCuV7q2pARG4Cml8V`) owns reusable assets,
+  and `Roehub Authenticated Platform UI` (`fileKey`
+  `nzKVsXuCmoTbHJGckHfK3T`) owns candidates and accepted compositions. The
+  former Figma key `GBzmB9evtzqnAYNjp9W1sr` and Penpot remain historical only
+  and are forbidden as new design inputs.
 - The React coexistence spike is technical evidence only. Its visible
   composition, styling, component anatomy, copy and screenshots were rejected
   by the product owner and are not a design or implementation source.
-- UI instructions, terminology and interface copy are reviewed in a separate
-  product-owner-approved ticket before Figma foundations begin.
+- The agent-governed process is proven on a small Backtests design pilot before
+  a complete Figma foundation or application layout may begin. The pilot runs
+  automatic structural and visual gates before every product-owner checkpoint.
 - Agents cannot approve UI instructions, copy or visual design on behalf of the
   product owner. Figma work pauses at explicit structure, direction,
   foundations, interactive-flow and final-approval checkpoints.
@@ -72,7 +76,7 @@ not relabelled as browser or Penpot proof.
 
 The shared standard remains unchanged because it is also used outside Roehub.
 For Roehub, its Penpot-specific clauses are superseded by
-`docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md`; all other
+`docs/architecture/ui/roehub-agent-governed-figma-delivery-standard-v2.md`; all other
 transition, proof, browser, accessibility, performance, and rollback rules
 continue to apply.
 
@@ -137,11 +141,10 @@ statuses, dependencies, or priority.
 2. Prove React coexistence with the FastAPI/Jinja gateway, MobX/Query state
    boundaries, typed REST/SSE adapters, route fallback, and performance harness.
    Treat its visible layer as rejected and non-authoritative.
-3. Repair the design-acceptance boundary and separately review UI instructions,
-   terminology and interface copy with explicit product-owner approval.
-4. Create Figma structure and alternative directions, obtain product-owner
-   selection, then complete foundations and the interactive representative
-   Backtest flow. Accept only the explicitly approved named Figma state.
+3. Repair the design-acceptance boundary, then prove the agent-governed Figma
+   process on the bounded Backtests pilot with explicit product-owner decisions.
+4. Derive a new full-foundation ticket only after the pilot is accepted; keep
+   reusable assets and product composition in their separate canonical files.
 5. Implement the React application shell behind the reversible route boundary,
    replacing the spike visual layer from the accepted Figma source.
 6. Implement the real read-only Backtest list/detail golden slice.

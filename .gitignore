@@ -66,6 +66,8 @@ target/
 .codex/tmp/
 .codex/sessions/
 .codex/*.local.*
+# Local third-party visual-reference captures are evidence inputs, not distributable repo assets.
+.codex/delivery/evidence/roehub-ui-agent-governed-pilot/references/
 .opencode/
 .playwright-cli/
 **/auth-state*.json

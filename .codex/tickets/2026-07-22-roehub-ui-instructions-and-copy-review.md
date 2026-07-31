@@ -1,6 +1,6 @@
 ---
 ticket_id: ROEHUB-UI-INSTRUCTIONS-AND-COPY-REVIEW-2026-07-22
-status: ready
+status: superseded
 owner: unassigned
 ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json
 depends_on:
@@ -8,6 +8,7 @@ depends_on:
 evidence: []
 acceptance_authority: product_owner
 agent_self_acceptance: prohibited
+superseded_by: ROEHUB-UI-AGENT-GOVERNED-PILOT-2026-07-31
 ---
 
 # Review Roehub UI instructions and interface copy

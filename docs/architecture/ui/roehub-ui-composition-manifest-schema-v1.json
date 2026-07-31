@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://roehub.local/schemas/ui-composition-manifest-v1.json",
+  "title": "Roehub UI composition manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_id",
+    "manifest_id",
+    "ticket_id",
+    "state",
+    "target",
+    "source_contracts",
+    "viewport",
+    "library",
+    "components",
+    "required_content",
+    "mutation_boundary",
+    "raw_node_allowlist"
+  ],
+  "properties": {
+    "schema_id": {
+      "const": "io.roehub.ui.composition-manifest/v1"
+    },
+    "manifest_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]+$"
+    },
+    "ticket_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state": {
+      "enum": ["brief_draft", "brief_approved", "executing", "gate_failed", "candidate_ready", "accepted", "rejected", "archived"]
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_key", "page_id", "page_name", "parent_node_id"],
+      "properties": {
+        "file_key": {"const": "nzKVsXuCmoTbHJGckHfK3T"},
+        "page_id": {"type": "string", "minLength": 1},
+        "page_name": {"const": "02 Candidate"},
+        "parent_node_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "source_contracts": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1}
+    },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height", "state"],
+      "properties": {
+        "width": {"type": "integer", "minimum": 320, "maximum": 7680},
+        "height": {"type": "integer", "minimum": 320, "maximum": 7680},
+        "state": {"type": "string", "minLength": 1}
+      }
+    },
+    "library": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file_key", "publication_status", "approved_component_keys"],
+      "properties": {
+        "file_key": {"const": "rgbNUPCuV7q2pARG4Cml8V"},
+        "publication_status": {"const": "published_and_enabled"},
+        "approved_component_keys": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      }
+    },
+    "components": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["slot", "component_key", "variant_properties", "text_overrides"],
+        "properties": {
+          "slot": {"type": "string", "minLength": 1},
+          "component_key": {"type": "string", "minLength": 1},
+          "variant_properties": {"type": "object"},
+          "text_overrides": {
+            "type": "object",
+            "additionalProperties": {"type": "string"}
+          }
+        }
+      }
+    },
+    "required_content": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actions", "fields", "states"],
+      "properties": {
+        "actions": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "fields": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "states": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+      }
+    },
+    "mutation_boundary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["create_under_node_id", "owned_node_ids", "max_top_level_nodes_created"],
+      "properties": {
+        "create_under_node_id": {"type": "string", "minLength": 1},
+        "owned_node_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "max_top_level_nodes_created": {"type": "integer", "minimum": 1, "maximum": 3}
+      }
+    },
+    "raw_node_allowlist": {
+      "type": "array",
+      "maxItems": 0
+    }
+  }
+}

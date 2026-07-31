@@ -61,6 +61,7 @@ The global table remains the default. These rows narrow Roehub behavior.
 | Accepted plan needs executor prompts | `prompt-manager` | A current accepted plan needs a reusable prompt pack and ledger | The plan is historical, unaccepted, or direct ticket execution is sufficient |
 | Existing active staged workflow | `staged-plan-runner` | The current triad is consistent and the ledger permits one stage | A pack merely exists or any triad link is missing, stale, or historical |
 | Backend gates | `backend-quality-gates` | Focused `uv run ruff`, `uv run pyright`, `uv run pytest`, or failing Python gate triage is needed | Local gates would be used to claim runtime or browser acceptance |
+| Interface craft for an authorized current surface | Use only the exact crossed domain skill from `better-accessibility`, `better-layout`, `better-writing`, `better-typography`, `better-colors`, or `better-ui`; combine their evidence when a holistic review crosses several domains | A selected Roehub ticket asks to review or implement interface craft, accessibility, layout, copy, typography, color, visual polish, icons, or motion within a current authorized UI surface | Creating or replacing design authority, mutating canonical Figma nodes without the exact `figma:*` route, overriding Roehub UI standards or product-owner decisions, or claiming browser proof |
 | Authenticated-platform Figma work | `figma:figma-use`; add `figma:figma-generate-library` or `figma:figma-generate-design` for their exact surfaces | The selected ticket authorizes the existing canonical project/file and owned nodes | Creating a replacement canonical file, inferring approval, browser proof, or historical Penpot work |
 | Ship-readiness only | `pre-ship-gate` | A readiness verdict is requested without delivery authority | Push, merge, release, deploy, CI watch, or post-deploy proof |
 | Publish, push, merge, release, deploy, CI watch, or runtime proof | `publish-ci-deploy` | The user explicitly authorizes the requested publication lifecycle action; without a current runtime runbook the flow ends at `green-pr` or `shipped-no-runtime` | Authority is absent or readiness-only review is requested |
@@ -72,17 +73,20 @@ The global table remains the default. These rows narrow Roehub behavior.
 | `docs/architecture/README.md` | Architecture index; read only for crossed documented boundaries |
 | `docs/architecture/project-map/AGENT_GUIDE.md` | Repository-wide or cross-context navigation; pair with one narrow project-map slice |
 | `docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md` | Shared authenticated-Web transition standard |
-| `docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md` | Roehub Figma delivery standard |
+| `docs/architecture/ui/roehub-agent-governed-figma-delivery-standard-v2.md` | Current Roehub two-file, contract-driven Figma delivery standard |
 | `.codex/delivery/specs/` | Selected accepted Roehub transition specification |
 | `.codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json` | Authenticated-platform dependencies and priority; ticket front matter remains status authority |
 | `.codex/PLANS.md` | Historical coordination only; never default task context or execution authority |
 
-All future Roehub design prototyping and design-to-code handoff use Figma
-project `roehub.com` (`projectId` `629113387`) and the existing file
-`Roehub Authenticated Platform UI` (`fileKey`
-`GBzmB9evtzqnAYNjp9W1sr`). Do not create a replacement or second canonical
-file. Before mutation, verify the authenticated plan, project/file identity,
-and exact owned pages/nodes.
+All future Roehub authenticated-platform design work uses Figma project
+`roehub.com` (`projectId` `629113387`) and exactly two canonical files:
+`Roehub UI Library` (`fileKey` `rgbNUPCuV7q2pARG4Cml8V`) for variables,
+styles, icons, components, and patterns; and `Roehub Authenticated Platform UI`
+(`fileKey` `nzKVsXuCmoTbHJGckHfK3T`) for direction review, isolated candidates,
+and explicitly accepted compositions. The former file
+`GBzmB9evtzqnAYNjp9W1sr` is historical only and forbidden as agent input.
+Before mutation, verify the authenticated plan, exact file/page identity,
+current manifest, and owned nodes.
 
 For authenticated Web transition work, read the two UI standards above, the
 selected specification, and the applicable graph node. Accepted 2026-07-20
@@ -101,10 +105,12 @@ More generally, architecture and browser spikes prove technical feasibility
 only. Their visible output is never a design source unless a design ticket and
 an explicit product-owner decision approve named Figma nodes.
 
-Before Figma foundations begin, the selected UI instructions-and-copy review
-ticket must be accepted by the product owner. Pause at its named checkpoints;
-do not infer approval from silence or mark instructions, copy, or visual design
-`accepted` without an explicit decision identifying the reviewed artifact.
+The current UI pilot follows
+`.codex/tickets/2026-07-31-roehub-ui-agent-governed-pilot.md`. Pause at its
+named product-owner checkpoints; run all structural and visual QA automatically
+before presenting a candidate. Do not infer approval from silence or mark
+instructions, copy, visual direction, library assets, or composition `accepted`
+without an explicit decision identifying the reviewed artifact.
 Linear is a functional-structure input, not a screen template or tracker. Map
 navigation, page context, primary work, and contextual status/progress/activity/
 resource blocks to Roehub semantics or record a justified omission. Do not copy

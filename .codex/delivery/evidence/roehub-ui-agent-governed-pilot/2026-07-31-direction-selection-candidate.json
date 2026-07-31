@@ -1,0 +1,68 @@
+{
+  "evidence_id": "ROEHUB-UI-DIR-001-2026-07-31",
+  "ticket_id": "ROEHUB-UI-AGENT-GOVERNED-PILOT-2026-07-31",
+  "checkpoint": "direction_selection",
+  "status": "rejected_by_product_owner",
+  "artifact": {
+    "artifact_id": "DIR-001",
+    "name": "Roehub Graphite Workspace",
+    "direction": "premium_linear_workspace",
+    "kind": "visual_direction_raster",
+    "reusable_source": false,
+    "source_image_path": "/Users/daniildegtyarev/.codex/generated_images/019fb4fa-5eba-7fa0-a94f-ab5e05510b4d/exec-442576f8-7587-4124-954c-f9553be012de.png",
+    "source_image_sha256": "d7699fbdfff60f9771f06c3a626d7defd1db9e901e253047e4d6d7da8d539e24",
+    "source_pixel_size": {
+      "width": 1586,
+      "height": 992
+    },
+    "normalized_review_size": {
+      "width": 1440,
+      "height": 900,
+      "scale_mode": "FIT"
+    }
+  },
+  "figma": {
+    "file_key": "nzKVsXuCmoTbHJGckHfK3T",
+    "file_name": "Roehub Authenticated Platform UI",
+    "page_id": "3:2",
+    "page_name": "01 Direction Review",
+    "frame_id": "4:2",
+    "frame_name": "DIR-001 / Roehub Graphite Workspace / v1 / CANDIDATE",
+    "raster_node_id": "4:5",
+    "frame_locked": true,
+    "image_hash": "b50ec4b0beaadfe6ceb780e07bf70f23ed789206",
+    "readback": {
+      "page_child_count": 1,
+      "frame_child_count": 4,
+      "raster_has_image_fill": true,
+      "raster_scale_mode": "FIT",
+      "frame_width": 1504,
+      "frame_height": 1064,
+      "raster_width": 1440,
+      "raster_height": 900
+    }
+  },
+  "gates": {
+    "brief_content_inventory": "passed",
+    "visual_doctrine_antipattern_gate": "passed",
+    "better_interface_full_review": "passed",
+    "better_interface_verdict": "Approve",
+    "figma_target_preflight": "passed",
+    "figma_write_readback": "passed",
+    "figma_screenshot_visual_audit": "passed",
+    "rejected_attempts_uploaded_to_figma": false
+  },
+  "references": {
+    "visual_doctrine": "docs/architecture/ui/roehub-premium-linear-visual-doctrine-v1.md",
+    "pilot_brief": "docs/architecture/ui/roehub-backtests-process-pilot-brief-v1.md",
+    "better_interface_review": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-2-better-interface-review.md",
+    "official_linear_redesign": "https://linear.app/now/how-we-redesigned-the-linear-ui"
+  },
+  "product_owner_decision": {
+    "decision": "rejected",
+    "decided_at": "2026-07-31",
+    "message": "DIR-001 отклонен полностью. ты не уловил суть дизайна.",
+    "reuse_policy": "prohibited_as_visual_component_layout_or_interaction_source"
+  },
+  "proof_boundary": "Static visual-language direction and exact Figma raster placement only. No library, component, screen, runtime, browser, accessibility implementation, publication, or implementation readiness is proven."
+}

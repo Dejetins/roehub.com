@@ -23,7 +23,9 @@
   "source_contracts": [
     ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md",
     "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md",
-    "docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md",
+    "docs/architecture/ui/roehub-agent-governed-figma-delivery-standard-v2.md",
+    "docs/architecture/ui/roehub-ui-agent-delivery-contract-v1.json",
+    "docs/architecture/ui/roehub-ui-composition-manifest-schema-v1.json",
     "docs/architecture/ui/roehub-linear-ui-migration-registry-v1.json",
     "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v1.json",
     "docs/architecture/apps/web/roehub-local-platform-information-architecture-v1.md"
@@ -37,6 +39,7 @@
     {"ticket_id": "ROEHUB-UI-DESIGN-ACCEPTANCE-BOUNDARY-REPAIR-2026-07-22", "path": ".codex/tickets/2026-07-22-roehub-ui-design-acceptance-boundary-repair.md", "depends_on": ["ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20"]},
     {"ticket_id": "ROEHUB-UI-INSTRUCTIONS-AND-COPY-REVIEW-2026-07-22", "path": ".codex/tickets/2026-07-22-roehub-ui-instructions-and-copy-review.md", "depends_on": ["ROEHUB-UI-DESIGN-ACCEPTANCE-BOUNDARY-REPAIR-2026-07-22"]},
     {"ticket_id": "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-figma-linear-vnext-foundations.md", "depends_on": ["ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20", "ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20", "ROEHUB-UI-INSTRUCTIONS-AND-COPY-REVIEW-2026-07-22"]},
+    {"ticket_id": "ROEHUB-UI-AGENT-GOVERNED-PILOT-2026-07-31", "path": ".codex/tickets/2026-07-31-roehub-ui-agent-governed-pilot.md", "depends_on": ["ROEHUB-UI-DESIGN-ACCEPTANCE-BOUNDARY-REPAIR-2026-07-22"]},
     {"ticket_id": "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md", "depends_on": ["ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20", "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20"]},
     {"ticket_id": "ROEHUB-AUTHZ-BACKTESTS-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-backtests.md", "depends_on": ["ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20", "ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20"]},
     {"ticket_id": "ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md", "depends_on": ["ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20", "ROEHUB-AUTHZ-BACKTESTS-2026-07-20"]},
@@ -48,8 +51,7 @@
     {"ticket_id": "ROEHUB-AUTHZ-INTEGRATION-PROOF-2026-07-20", "path": ".codex/tickets/2026-07-20-roehub-authz-integration-proof.md", "depends_on": ["ROEHUB-AUTHZ-DASHBOARD-DATA-2026-07-20", "ROEHUB-AUTHZ-SETTINGS-ADMIN-2026-07-20", "ROEHUB-AUTHZ-STRATEGIES-2026-07-20", "ROEHUB-AUTHZ-BACKTESTS-2026-07-20", "ROEHUB-AUTHZ-CONNECTIONS-2026-07-20", "ROEHUB-AUTHZ-OPERATIONS-INSTALLATION-2026-07-20"]}
   ],
   "priority_queue": [
-    "ROEHUB-UI-INSTRUCTIONS-AND-COPY-REVIEW-2026-07-22",
-    "ROEHUB-FIGMA-LINEAR-VNEXT-FOUNDATIONS-2026-07-20",
+    "ROEHUB-UI-AGENT-GOVERNED-PILOT-2026-07-31",
     "ROEHUB-REACT-LINEAR-APPLICATION-SHELL-2026-07-20",
     "ROEHUB-AUTHZ-BACKTESTS-2026-07-20",
     "ROEHUB-BACKTESTS-LINEAR-GOLDEN-SLICE-2026-07-20",
