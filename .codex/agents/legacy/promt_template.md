@@ -76,6 +76,10 @@ required_literals:
   - "<literal_1>"
   - "<literal_2>"
 
+required_keywords:
+  - "<domain_keyword_that_bounds_scope_or_evidence>"
+  - "<route_symbol_or_contract_name>"
+
 non_goals:
   - "<explicit non-goal 1>"
   - "<explicit non-goal 2>"
@@ -165,7 +169,7 @@ stage_execution_ledger:
   plan_doc: <architecture_or_implementation_plan_path>
   current_stage: <stage_id_or_name>
   required_update: <true|false>
-  template: .codex/agents/stage_execution_ledger_template.md
+  template: .codex/agents/legacy/stage_execution_ledger_template.md
 
 prompt_pack_execution:
   mode: <manual_sequential|goal_driven>

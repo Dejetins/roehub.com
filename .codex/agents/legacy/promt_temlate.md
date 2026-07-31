@@ -112,7 +112,7 @@ stage_execution_ledger:
   plan_doc: <architecture_or_implementation_plan_path>
   current_stage: <stage_id_or_name>
   required_update: <true|false>
-  template: .codex/agents/stage_execution_ledger_template.md
+  template: .codex/agents/legacy/stage_execution_ledger_template.md
 
 expected_primary_touches:
   - "<path_directly_likely_to_change_1>"
@@ -127,6 +127,12 @@ safety_notes:
   - "<safety_note_2>"
   - "<browser_runtime_safety_note_if_applicable>"
 ---
+
+# Deprecated Typo Copy
+
+Do not use this file as a prompt template. The active legacy template is
+`.codex/agents/legacy/promt_template.md`. This typo copy is retained only for
+historical references.
 
 # Task
 

@@ -91,4 +91,4 @@
 
 | Date | Stage | Change | Evidence |
 |---|---|---|---|
-| YYYY-MM-DD | 00 | Created ledger from template. | `.codex/agents/stage_execution_ledger_template.md` |
+| YYYY-MM-DD | 00 | Created ledger from template. | `.codex/agents/legacy/stage_execution_ledger_template.md` |
