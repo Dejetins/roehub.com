@@ -1,0 +1,572 @@
+{
+  "schema_id": "io.roehub.local-platform-journey-registry/v1",
+  "registry_id": "roehub-local-platform-journey-registry-v1",
+  "status": "review",
+  "authority": "proposal_for_product_owner_review",
+  "scope": "authenticated_self_hosted_web_platform_only",
+  "mobile_scope": "unauthorized",
+  "source_contracts": [
+    {
+      "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+      "sha256": "b9f1e28ec9761fe5ea9c2d3432d0ae9b561e74659fca06f7d712e77b53a587de",
+      "authority": "accepted screen and journey identity source"
+    },
+    {
+      "path": "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json",
+      "sha256": "5aaea5ee4a1ff2ea3f554716cfb840411906d358b7cb15c71ce133453aae2126",
+      "authority": "accepted surface, route, and journey relationship source"
+    },
+    {
+      "path": "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md",
+      "sha256": "fc5a0e32f62151d71b45007d543044e7b13043fd5fd4782621e65c45f4499171",
+      "authority": "accepted role by task by entity by lifecycle source"
+    },
+    {
+      "path": "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md",
+      "sha256": "b67e57624b47a0f01d137f740eb6c927d6d189fffaeaa464cfc93d16c94604cc",
+      "authority": "accepted navigation and screen responsibility source"
+    },
+    {
+      "path": "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v2.json",
+      "sha256": "1deef86ab86bfd44b63ef6d43fa9719907f250f2e80e6d3f64bacbafe79e00be",
+      "authority": "accepted role, capability, route, and safe-action source"
+    },
+    {
+      "path": "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+      "sha256": "19e1e54e2b2c772622713f26d7422d64c4e59086606b2f9bc63d715a391697f0",
+      "authority": "accepted product transformation requirements"
+    },
+    {
+      "path": "docs/architecture/live_execution/live-execution-universal-order-gateway-v1.md",
+      "sha256": "93cdd3925b955f92bd3a57d83ef4afc5f7367c616f001c36fbd82f32fc821e21",
+      "authority": "accepted universal execution, manual request, risk, and reconciliation lifecycle"
+    },
+    {
+      "path": "docs/architecture/platform/artifact-store-v1.md",
+      "sha256": "f1bb3e477b21729588fbb7b18719a61ddba033952cd1bc6754d49c0bbfbf95a8",
+      "authority": "accepted artifact identity and failure contract"
+    },
+    {
+      "path": "docs/architecture/platform/isolated-job-runtime-v1.md",
+      "sha256": "ced54fddb901f3eb4f5a884881f849bf47e1adf4ca4b8249de2461210da6e608",
+      "authority": "accepted job, attempt, terminal evidence, cancellation, and retry lifecycle"
+    }
+  ],
+  "graph_policy": {
+    "node_granularity": "registered_screen_or_explicit_external_boundary",
+    "transition_granularity": "cross_screen_only",
+    "same_screen_state_policy": "Screen-local validation, loading, failure, retry, confirmation, and recovery states remain required_states coverage and do not create self-loop journey edges.",
+    "terminal_policy": "A terminal screen has no outgoing transition. A screen that can continue to another registered screen is intermediate even when a user may pause there.",
+    "supporting_link_policy": "A supporting or deep link is included only when it is part of the bounded journey completion graph; unrelated links remain navigation relationships.",
+    "failure_policy": "A failure or recovery screen is declared only when the failure crosses a registered screen boundary. Same-screen failure and recovery remain intra_screen_paths.",
+    "external_boundary_policy": "External boundaries are used only for a real identity, provider, or system handoff that has no registered product screen.",
+    "source_precedence": [
+      "accepted product and lifecycle contracts",
+      "accepted access and route contract",
+      "accepted information architecture",
+      "accepted screen registry identity",
+      "accepted surface journey relationship"
+    ]
+  },
+  "compatibility": {
+    "classification": "compatible_additive_contract",
+    "screen_ids_changed": false,
+    "journey_ids_changed": false,
+    "routes_changed": false,
+    "roles_or_capabilities_changed": false,
+    "g1_revision_2_invalidated": false,
+    "accepted_screen_membership_pairs": 57,
+    "graph_membership_pairs": 63,
+    "missing_accepted_screen_membership_pairs": 0,
+    "additional_graph_memberships": [
+      {"screen_id": "screen.backtests.builder", "journey_id": "journey.artifacts.inspect_and_use", "origin": "accepted journey terminal identity"},
+      {"screen_id": "screen.docs.runbook", "journey_id": "journey.monitoring.diagnose_service_or_datastore", "origin": "accepted journey terminal identity"},
+      {"screen_id": "screen.models.detail", "journey_id": "journey.artifacts.inspect_and_use", "origin": "accepted journey terminal identity"},
+      {"screen_id": "screen.strategies.detail", "journey_id": "journey.backtests.inspect_and_promote", "origin": "accepted journey terminal identity"},
+      {"screen_id": "screen.strategies.detail", "journey_id": "journey.connections.manage_exchange", "origin": "accepted journey terminal identity"},
+      {"screen_id": "screen.system.error_and_recovery", "journey_id": "journey.setup.first_launch", "origin": "review-candidate cross-screen bootstrap failure normalization"}
+    ],
+    "g2_integration": "For revision 3, keep the v2 screen registry as the authoritative /screens collection, remove its /journey_entrypoints declaration from source_contracts, declare this registry /journeys as the sole authoritative journey collection, and point journey_ref and transition_ref values here."
+  },
+  "journeys": [
+    {
+      "journey_id": "journey.auth.sign_in_and_continue",
+      "label": "Sign in, recover, and continue",
+      "entry_screen_ids": ["screen.auth.login"],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": ["screen.settings.security"],
+      "failure_screen_ids": ["screen.system.error_and_recovery"],
+      "recovery_screen_ids": ["screen.auth.login"],
+      "terminal_screen_ids": ["screen.dashboard.overview"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.auth.login.dashboard", "from_id": "screen.auth.login", "to_id": "screen.dashboard.overview", "outcome": "terminal", "trigger": "authenticated_session_established"},
+        {"transition_id": "transition.auth.login.security", "from_id": "screen.auth.login", "to_id": "screen.settings.security", "outcome": "alternate", "trigger": "authenticated_session_requires_security_or_recovery_follow_up"},
+        {"transition_id": "transition.auth.security.dashboard", "from_id": "screen.settings.security", "to_id": "screen.dashboard.overview", "outcome": "terminal", "trigger": "security_follow_up_completed_or_safely_dismissed"},
+        {"transition_id": "transition.auth.login.failure", "from_id": "screen.auth.login", "to_id": "screen.system.error_and_recovery", "outcome": "failure", "trigger": "identity_or_session_failure_requires_recovery_surface"},
+        {"transition_id": "transition.auth.failure.login", "from_id": "screen.system.error_and_recovery", "to_id": "screen.auth.login", "outcome": "recovery", "trigger": "safe_authentication_retry"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.auth.login", "state_ids": ["passkey", "password_fallback", "recovery", "session_expired", "invalid_next_sanitized"], "outcomes": ["alternate", "failure", "recovery"]},
+        {"screen_id": "screen.settings.security", "state_ids": ["sessions", "audit", "recovery", "recent_auth_required", "session_revoked", "error_retry"], "outcomes": ["forward", "failure", "recovery"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/0",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/0",
+        "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md#role--task--entity--lifecycle-matrix"
+      ]
+    },
+    {
+      "journey_id": "journey.setup.first_launch",
+      "label": "Initialize the installation and first selection",
+      "entry_screen_ids": ["screen.setup.first_launch"],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": ["screen.system.error_and_recovery"],
+      "recovery_screen_ids": ["screen.setup.first_launch"],
+      "terminal_screen_ids": ["screen.dashboard.overview", "screen.data.catalog"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.setup.dashboard", "from_id": "screen.setup.first_launch", "to_id": "screen.dashboard.overview", "outcome": "terminal", "trigger": "setup_completed_or_selection_skipped"},
+        {"transition_id": "transition.setup.catalog", "from_id": "screen.setup.first_launch", "to_id": "screen.data.catalog", "outcome": "terminal", "trigger": "continue_initial_instrument_selection"},
+        {"transition_id": "transition.setup.failure", "from_id": "screen.setup.first_launch", "to_id": "screen.system.error_and_recovery", "outcome": "failure", "trigger": "setup_failure_requires_recovery_surface"},
+        {"transition_id": "transition.setup.failure.resume", "from_id": "screen.system.error_and_recovery", "to_id": "screen.setup.first_launch", "outcome": "recovery", "trigger": "resume_idempotent_setup"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.setup.first_launch", "state_ids": ["owner_creation", "organization_creation", "catalog_snapshot", "instrument_selection", "empty_selection", "resume_after_failure"], "outcomes": ["forward", "alternate", "failure", "recovery"]}
+      ],
+      "normalization_decision": "screen.system.error_and_recovery is added only for a bootstrap failure that exits the hosted setup surface and requires the registered system recovery family. Ordinary resumable setup failure remains the accepted same-screen resume_after_failure state and does not create another transition.",
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/1",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/1",
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md#6-первый-запуск-и-данные"
+      ]
+    },
+    {
+      "journey_id": "journey.data.select_instruments",
+      "label": "Select instruments from dashboard onboarding",
+      "entry_screen_ids": ["screen.dashboard.overview"],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": ["screen.data.ingestion"],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.data.catalog"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.data.dashboard.catalog", "from_id": "screen.dashboard.overview", "to_id": "screen.data.catalog", "outcome": "terminal", "trigger": "open_data_selection"},
+        {"transition_id": "transition.data.dashboard.ingestion", "from_id": "screen.dashboard.overview", "to_id": "screen.data.ingestion", "outcome": "alternate", "trigger": "selection_requires_ingestion_or_coverage_resolution"},
+        {"transition_id": "transition.data.ingestion.catalog", "from_id": "screen.data.ingestion", "to_id": "screen.data.catalog", "outcome": "terminal", "trigger": "coverage_resolution_returns_to_instrument_selection"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.data.catalog", "state_ids": ["snapshot_ready", "snapshot_expired", "coverage_unknown", "empty", "error_retry"], "outcomes": ["forward", "failure", "recovery"]},
+        {"screen_id": "screen.data.ingestion", "state_ids": ["empty_selection", "provisioning", "coverage_partial", "coverage_complete", "gap_detected", "failed", "safe_retry_available"], "outcomes": ["alternate", "failure", "recovery"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/2",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/2",
+        "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md#navigation-model"
+      ]
+    },
+    {
+      "journey_id": "journey.connections.manage_exchange",
+      "label": "Manage an exchange connection in one bounded workspace",
+      "entry_screen_ids": ["screen.connections.workspace"],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.settings.profile", "screen.strategies.detail"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.connections.workspace.profile", "from_id": "screen.connections.workspace", "to_id": "screen.settings.profile", "outcome": "terminal", "trigger": "open_personal_connection_limits_context"},
+        {"transition_id": "transition.connections.workspace.strategy", "from_id": "screen.connections.workspace", "to_id": "screen.strategies.detail", "outcome": "terminal", "trigger": "open_strategy_bound_to_validated_connection"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.connections.workspace", "state_ids": ["empty", "validation_pending", "ready", "degraded", "unavailable", "recent_auth_required", "destructive_confirmation", "safe_status_only"], "outcomes": ["forward", "alternate", "failure", "recovery", "terminal"]}
+      ],
+      "normalization_decision": "screen.connections.workspace cannot be both entry and terminal while the accepted screen registry also assigns screen.settings.profile and the v2 journey identity links strategy context. Connection create, validate, bind, rotate, recheck, disconnect, and archive still complete as intra-screen states; cross-screen graph terminals are the accepted profile-limits context and bound-strategy context.",
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/3",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/3",
+        "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md#role--task--entity--lifecycle-matrix",
+        "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md#navigation-model"
+      ]
+    },
+    {
+      "journey_id": "journey.backtests.configure_and_run",
+      "label": "Configure and run a backtest",
+      "entry_screen_ids": ["screen.backtests.builder"],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": ["screen.backtests.library"],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.backtests.detail"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.backtests.builder.detail", "from_id": "screen.backtests.builder", "to_id": "screen.backtests.detail", "outcome": "terminal", "trigger": "backtest_submission_accepted"},
+        {"transition_id": "transition.backtests.builder.library", "from_id": "screen.backtests.builder", "to_id": "screen.backtests.library", "outcome": "alternate", "trigger": "return_to_backtest_jobs_and_history"},
+        {"transition_id": "transition.backtests.library.detail", "from_id": "screen.backtests.library", "to_id": "screen.backtests.detail", "outcome": "terminal", "trigger": "open_submitted_or_historical_backtest"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.backtests.library", "state_ids": ["empty", "queued", "running", "completed", "failed", "cancelled", "rate_limited", "server_filtered", "error_retry"], "outcomes": ["alternate", "failure", "recovery"]},
+        {"screen_id": "screen.backtests.builder", "state_ids": ["configure", "auto_selection_reason", "artifact", "direct_db", "preflight", "resource_admission", "equivalence_failure", "validation_error", "submission_pending"], "outcomes": ["forward", "failure", "recovery"]},
+        {"screen_id": "screen.backtests.detail", "state_ids": ["queued", "running_measured_progress", "completed", "failed", "cancelled", "materializing", "degraded"], "outcomes": ["terminal", "failure", "recovery"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/4",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/4",
+        "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md#role--task--entity--lifecycle-matrix"
+      ]
+    },
+    {
+      "journey_id": "journey.backtests.inspect_and_promote",
+      "label": "Inspect a backtest and promote a strategy",
+      "entry_screen_ids": ["screen.backtests.detail"],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": ["screen.backtests.library"],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.strategies.detail"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.backtests.detail.strategy", "from_id": "screen.backtests.detail", "to_id": "screen.strategies.detail", "outcome": "terminal", "trigger": "strategy_promotion_succeeded"},
+        {"transition_id": "transition.backtests.detail.library", "from_id": "screen.backtests.detail", "to_id": "screen.backtests.library", "outcome": "alternate", "trigger": "return_to_backtest_jobs_and_history"},
+        {"transition_id": "transition.backtests.library.strategy", "from_id": "screen.backtests.library", "to_id": "screen.strategies.detail", "outcome": "terminal", "trigger": "promote_selected_completed_variant"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.backtests.library", "state_ids": ["completed", "failed", "cancelled", "server_filtered", "error_retry"], "outcomes": ["alternate", "failure", "recovery"]},
+        {"screen_id": "screen.backtests.detail", "state_ids": ["completed", "promotion_confirmation", "permission_forbidden", "degraded"], "outcomes": ["forward", "failure", "recovery"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/5",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/5",
+        "docs/architecture/live_execution/live-execution-universal-order-gateway-v1.md#бизнес-смысл"
+      ]
+    },
+    {
+      "journey_id": "journey.strategies.create_and_control",
+      "label": "Create, inspect, and control a strategy",
+      "entry_screen_ids": ["screen.strategies.library"],
+      "intermediate_screen_ids": ["screen.strategies.editor", "screen.strategies.detail"],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.live.workspace"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.strategies.library.editor", "from_id": "screen.strategies.library", "to_id": "screen.strategies.editor", "outcome": "forward", "trigger": "create_strategy"},
+        {"transition_id": "transition.strategies.editor.detail", "from_id": "screen.strategies.editor", "to_id": "screen.strategies.detail", "outcome": "forward", "trigger": "strategy_saved"},
+        {"transition_id": "transition.strategies.library.detail", "from_id": "screen.strategies.library", "to_id": "screen.strategies.detail", "outcome": "forward", "trigger": "open_existing_strategy"},
+        {"transition_id": "transition.strategies.detail.live", "from_id": "screen.strategies.detail", "to_id": "screen.live.workspace", "outcome": "terminal", "trigger": "eligible_strategy_started_or_opened_in_live_workspace"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.strategies.editor", "state_ids": ["draft", "validation_error", "unsaved_changes", "save_pending", "save_success", "permission_forbidden"], "outcomes": ["forward", "failure", "recovery", "cancel"]},
+        {"screen_id": "screen.strategies.detail", "state_ids": ["ready", "running", "stopped", "blocked", "unknown_runtime", "degraded", "permission_forbidden"], "outcomes": ["forward", "failure", "recovery", "terminal"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/6",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/6",
+        "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md#role--task--entity--lifecycle-matrix"
+      ]
+    },
+    {
+      "journey_id": "journey.live.observe_execution",
+      "label": "Observe execution and choose detail or incident context",
+      "entry_screen_ids": ["screen.live.workspace"],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": ["screen.strategies.detail"],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.live.execution_activity", "screen.monitoring.workspace"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.live.workspace.activity", "from_id": "screen.live.workspace", "to_id": "screen.live.execution_activity", "outcome": "terminal", "trigger": "inspect_execution_activity"},
+        {"transition_id": "transition.live.workspace.monitoring", "from_id": "screen.live.workspace", "to_id": "screen.monitoring.workspace", "outcome": "terminal", "trigger": "inspect_platform_impact_or_degradation"},
+        {"transition_id": "transition.live.workspace.strategy", "from_id": "screen.live.workspace", "to_id": "screen.strategies.detail", "outcome": "alternate", "trigger": "inspect_strategy_runtime_control"},
+        {"transition_id": "transition.live.strategy.activity", "from_id": "screen.strategies.detail", "to_id": "screen.live.execution_activity", "outcome": "terminal", "trigger": "open_strategy_execution_activity"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.live.workspace", "state_ids": ["paper", "live", "positions", "orders", "fills", "degraded", "risk_blocked", "execution_unknown", "safe_stop", "reconciliation"], "outcomes": ["forward", "alternate", "failure", "recovery", "terminal"]},
+        {"screen_id": "screen.strategies.detail", "state_ids": ["running", "stopped", "blocked", "unknown_runtime", "degraded", "destructive_confirmation", "permission_forbidden"], "outcomes": ["alternate", "failure", "recovery"]}
+      ],
+      "normalization_decision": "The entry workspace is not also terminal when the bounded graph continues to activity or monitoring. Completion inside /live remains an intra-screen terminal state; cross-screen terminal nodes are activity and monitoring.",
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/7",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/7",
+        "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md#live-execution-and-manual-position-control"
+      ]
+    },
+    {
+      "journey_id": "journey.models.inspect_and_operate",
+      "label": "Inspect and operate a model",
+      "entry_screen_ids": ["screen.models.registry"],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.models.detail"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.models.registry.detail", "from_id": "screen.models.registry", "to_id": "screen.models.detail", "outcome": "terminal", "trigger": "open_model_or_experiment"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.models.detail", "state_ids": ["experiment_comparison", "training", "readiness", "promotion_confirmation", "rollback_confirmation", "permission_forbidden"], "outcomes": ["forward", "failure", "recovery", "terminal"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/8",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/8",
+        "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md#role--task--entity--lifecycle-matrix"
+      ]
+    },
+    {
+      "journey_id": "journey.monitor_and_follow_runbook",
+      "label": "Inspect monitoring detail and follow a runbook",
+      "entry_screen_ids": ["screen.monitoring.workspace"],
+      "intermediate_screen_ids": ["screen.monitoring.service_detail"],
+      "alternate_screen_ids": ["screen.admin.overview"],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.docs.runbook"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.monitoring.workspace.service", "from_id": "screen.monitoring.workspace", "to_id": "screen.monitoring.service_detail", "outcome": "forward", "trigger": "open_service_or_datastore_detail"},
+        {"transition_id": "transition.monitoring.service.runbook", "from_id": "screen.monitoring.service_detail", "to_id": "screen.docs.runbook", "outcome": "terminal", "trigger": "open_contextual_runbook"},
+        {"transition_id": "transition.monitoring.service.admin", "from_id": "screen.monitoring.service_detail", "to_id": "screen.admin.overview", "outcome": "alternate", "trigger": "open_role_allowed_administrative_remediation"},
+        {"transition_id": "transition.monitoring.admin.runbook", "from_id": "screen.admin.overview", "to_id": "screen.docs.runbook", "outcome": "terminal", "trigger": "open_runbook_before_or_after_safe_admin_action"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.monitoring.service_detail", "state_ids": ["degraded", "unavailable", "dependency_impact", "incident", "related_jobs", "runbook_available", "safe_action", "error_retry"], "outcomes": ["forward", "failure", "recovery"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/9",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/9",
+        "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md#monitoring-and-datastores"
+      ]
+    },
+    {
+      "journey_id": "journey.administer_and_recover",
+      "label": "Administer and recover the installation",
+      "entry_screen_ids": ["screen.admin.overview"],
+      "intermediate_screen_ids": ["screen.admin.members", "screen.admin.resources", "screen.admin.extensions"],
+      "alternate_screen_ids": ["screen.settings.security"],
+      "failure_screen_ids": ["screen.system.error_and_recovery"],
+      "recovery_screen_ids": ["screen.admin.overview"],
+      "terminal_screen_ids": ["screen.admin.maintenance"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.admin.overview.members", "from_id": "screen.admin.overview", "to_id": "screen.admin.members", "outcome": "forward", "trigger": "manage_members"},
+        {"transition_id": "transition.admin.members.overview", "from_id": "screen.admin.members", "to_id": "screen.admin.overview", "outcome": "back", "trigger": "return_to_admin_overview"},
+        {"transition_id": "transition.admin.overview.resources", "from_id": "screen.admin.overview", "to_id": "screen.admin.resources", "outcome": "forward", "trigger": "manage_resource_policy"},
+        {"transition_id": "transition.admin.resources.overview", "from_id": "screen.admin.resources", "to_id": "screen.admin.overview", "outcome": "back", "trigger": "return_to_admin_overview"},
+        {"transition_id": "transition.admin.overview.extensions", "from_id": "screen.admin.overview", "to_id": "screen.admin.extensions", "outcome": "forward", "trigger": "manage_extensions"},
+        {"transition_id": "transition.admin.extensions.overview", "from_id": "screen.admin.extensions", "to_id": "screen.admin.overview", "outcome": "back", "trigger": "return_to_admin_overview"},
+        {"transition_id": "transition.admin.overview.security", "from_id": "screen.admin.overview", "to_id": "screen.settings.security", "outcome": "alternate", "trigger": "inspect_security_sessions_or_personal_audit"},
+        {"transition_id": "transition.admin.security.overview", "from_id": "screen.settings.security", "to_id": "screen.admin.overview", "outcome": "back", "trigger": "return_to_administration_overview"},
+        {"transition_id": "transition.admin.overview.maintenance", "from_id": "screen.admin.overview", "to_id": "screen.admin.maintenance", "outcome": "terminal", "trigger": "open_installation_maintenance"},
+        {"transition_id": "transition.admin.overview.failure", "from_id": "screen.admin.overview", "to_id": "screen.system.error_and_recovery", "outcome": "failure", "trigger": "administrative_operation_unknown_or_unavailable"},
+        {"transition_id": "transition.admin.failure.overview", "from_id": "screen.system.error_and_recovery", "to_id": "screen.admin.overview", "outcome": "recovery", "trigger": "safe_admin_recovery"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.settings.security", "state_ids": ["sessions", "audit", "recovery", "recent_auth_required", "session_revoked", "error_retry"], "outcomes": ["alternate", "failure", "recovery"]},
+        {"screen_id": "screen.admin.maintenance", "state_ids": ["backup_pending", "update_available", "operation_confirmation", "installation_owner_required", "recovery", "rollback"], "outcomes": ["forward", "failure", "recovery", "terminal"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/10",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/10",
+        "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md#role--task--entity--lifecycle-matrix"
+      ]
+    },
+    {
+      "journey_id": "journey.local_documentation",
+      "label": "Find and read installed documentation",
+      "entry_screen_ids": ["screen.docs.index"],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.docs.runbook"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.docs.index.runbook", "from_id": "screen.docs.index", "to_id": "screen.docs.runbook", "outcome": "terminal", "trigger": "open_installed_document_or_runbook"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.docs.index", "state_ids": ["search", "empty", "version_unavailable", "not_found"], "outcomes": ["forward", "failure", "recovery"]},
+        {"screen_id": "screen.docs.runbook", "state_ids": ["ready", "not_found_404", "permission_forbidden_403", "login_redirect_with_next", "version_unavailable"], "outcomes": ["terminal", "failure", "recovery"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/11",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/11",
+        "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md#role--task--entity--lifecycle-matrix"
+      ]
+    },
+    {
+      "journey_id": "journey.data.manage_ingestion_and_coverage",
+      "label": "Manage ingestion, coverage, and a resulting job",
+      "entry_screen_ids": ["screen.data.catalog"],
+      "intermediate_screen_ids": ["screen.data.ingestion"],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.operations.job_detail"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.data.catalog.ingestion", "from_id": "screen.data.catalog", "to_id": "screen.data.ingestion", "outcome": "forward", "trigger": "inspect_provisioning_coverage_or_gap"},
+        {"transition_id": "transition.data.ingestion.job", "from_id": "screen.data.ingestion", "to_id": "screen.operations.job_detail", "outcome": "terminal", "trigger": "open_backfill_or_ingestion_job"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.data.ingestion", "state_ids": ["provisioning", "backfill_queued", "backfill_running", "coverage_partial", "coverage_complete", "gap_detected", "stale", "failed", "safe_retry_available"], "outcomes": ["forward", "failure", "recovery", "retry"]},
+        {"screen_id": "screen.operations.job_detail", "state_ids": ["queued", "running_measured_progress", "succeeded", "failed", "cancelled", "timed_out", "crashed", "recovering", "retry_available", "retry_forbidden"], "outcomes": ["terminal", "failure", "recovery", "retry", "cancel"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/12",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/12",
+        "docs/architecture/platform/isolated-job-runtime-v1.md#контракты",
+        "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md#gap-decisions"
+      ]
+    },
+    {
+      "journey_id": "journey.artifacts.inspect_and_use",
+      "label": "Inspect an artifact and use it in a consumer",
+      "entry_screen_ids": ["screen.artifacts.catalog"],
+      "intermediate_screen_ids": ["screen.artifacts.detail"],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.backtests.builder", "screen.models.detail"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.artifacts.catalog.detail", "from_id": "screen.artifacts.catalog", "to_id": "screen.artifacts.detail", "outcome": "forward", "trigger": "open_artifact_manifest"},
+        {"transition_id": "transition.artifacts.detail.backtest", "from_id": "screen.artifacts.detail", "to_id": "screen.backtests.builder", "outcome": "terminal", "trigger": "use_compatible_artifact_for_backtest"},
+        {"transition_id": "transition.artifacts.detail.model", "from_id": "screen.artifacts.detail", "to_id": "screen.models.detail", "outcome": "terminal", "trigger": "open_model_or_experiment_consumer"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.artifacts.detail", "state_ids": ["manifest_verified", "manifest_invalid", "compatible", "incompatible", "storage_available", "storage_degraded", "quota_impact", "consumer_links", "not_found", "permission_forbidden"], "outcomes": ["forward", "alternate", "failure", "recovery", "terminal"]}
+      ],
+      "normalization_decision": "screen.artifacts.detail is intermediate for the complete inspect-and-use journey. Inspection-only completion remains an intra-screen terminal state and does not make the screen a graph terminal with outgoing consumer edges. The surface-level platform.models.workspace relationship is normalized to the accepted target terminal screen.models.detail; the legacy workspace mapping does not add screen.models.registry membership to this journey.",
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/13",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/13",
+        "docs/architecture/platform/artifact-store-v1.md#идентичность-и-неизменяемость",
+        "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md#artifacts"
+      ]
+    },
+    {
+      "journey_id": "journey.jobs.inspect_and_operate",
+      "label": "Inspect and safely operate a job",
+      "entry_screen_ids": ["screen.operations.jobs"],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.operations.job_detail"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.jobs.queue.detail", "from_id": "screen.operations.jobs", "to_id": "screen.operations.job_detail", "outcome": "terminal", "trigger": "open_job_attempt"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.operations.job_detail", "state_ids": ["queued", "running_measured_progress", "succeeded", "failed", "cancelled", "timed_out", "crashed", "resource_exhausted", "recovering", "retry_available", "retry_forbidden", "outputs_available"], "outcomes": ["terminal", "failure", "recovery", "retry", "cancel"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/14",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/14",
+        "docs/architecture/platform/isolated-job-runtime-v1.md#долговечное-состояние",
+        "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md#role--task--entity--lifecycle-matrix"
+      ]
+    },
+    {
+      "journey_id": "journey.live.manual_position_control",
+      "label": "Open or close a strategy position manually",
+      "entry_screen_ids": ["screen.strategies.detail"],
+      "intermediate_screen_ids": ["screen.live.manual_position_flow"],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.live.execution_detail", "screen.live.workspace"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.live.manual.strategy.flow", "from_id": "screen.strategies.detail", "to_id": "screen.live.manual_position_flow", "outcome": "forward", "trigger": "open_manual_position_control_for_eligible_strategy"},
+        {"transition_id": "transition.live.manual.open.execution", "from_id": "screen.live.manual_position_flow", "to_id": "screen.live.execution_detail", "outcome": "terminal", "trigger": "manual_open_request_created"},
+        {"transition_id": "transition.live.manual.close.execution", "from_id": "screen.live.manual_position_flow", "to_id": "screen.live.execution_detail", "outcome": "terminal", "trigger": "manual_close_request_created"},
+        {"transition_id": "transition.live.manual.flow.workspace", "from_id": "screen.live.manual_position_flow", "to_id": "screen.live.workspace", "outcome": "terminal", "trigger": "return_to_position_workspace_after_safe_completion_or_cancel"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.live.manual_position_flow", "state_ids": ["configure_open", "configure_close", "strategy_and_connection_context", "size_or_close_scope", "risk_preflight", "recent_auth_required", "confirmation", "submission_pending", "accepted", "rejected", "execution_unknown", "reconciliation_required"], "outcomes": ["forward", "alternate", "failure", "recovery", "cancel", "terminal"]},
+        {"screen_id": "screen.live.execution_detail", "state_ids": ["source_event", "risk_accepted", "risk_rejected", "dispatch_pending", "order_acknowledged", "partially_filled", "filled", "cancelled", "execution_unknown", "reconciliation_required", "reconciled"], "outcomes": ["terminal", "failure", "recovery"]}
+      ],
+      "safety_invariants": [
+        "Manual entry and manual exit use the same universal execution path as automatic execution.",
+        "Recent authentication, server role enforcement, risk admission, idempotency, and audit are mandatory.",
+        "Rejected and unknown outcomes retain a durable execution identity and link to screen.live.execution_detail.",
+        "An unknown submit is reconciled before retry and is never blindly repeated."
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/15",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/15",
+        "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md#live-execution-and-manual-position-control",
+        "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v2.json#/capabilities/10",
+        "docs/architecture/live_execution/live-execution-universal-order-gateway-v1.md#ошибки-retry-и-idempotency"
+      ]
+    },
+    {
+      "journey_id": "journey.live.inspect_and_reconcile",
+      "label": "Inspect an execution chain and reconcile impact",
+      "entry_screen_ids": ["screen.live.workspace"],
+      "intermediate_screen_ids": ["screen.live.execution_activity"],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.live.execution_detail", "screen.monitoring.service_detail"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.live.reconcile.workspace.activity", "from_id": "screen.live.workspace", "to_id": "screen.live.execution_activity", "outcome": "forward", "trigger": "inspect_execution_ledger"},
+        {"transition_id": "transition.live.reconcile.activity.detail", "from_id": "screen.live.execution_activity", "to_id": "screen.live.execution_detail", "outcome": "terminal", "trigger": "open_execution_chain"},
+        {"transition_id": "transition.live.reconcile.workspace.monitoring", "from_id": "screen.live.workspace", "to_id": "screen.monitoring.service_detail", "outcome": "terminal", "trigger": "inspect_impacted_execution_service"},
+        {"transition_id": "transition.live.reconcile.activity.monitoring", "from_id": "screen.live.execution_activity", "to_id": "screen.monitoring.service_detail", "outcome": "terminal", "trigger": "inspect_dependency_impact_for_unknown_or_stale_execution"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.live.execution_activity", "state_ids": ["signals", "intents", "orders", "fills", "rejections", "notifications", "unknown", "reconciliation_required", "stale", "error_retry"], "outcomes": ["forward", "failure", "recovery"]},
+        {"screen_id": "screen.live.execution_detail", "state_ids": ["risk_rejected", "dispatch_pending", "order_acknowledged", "partially_filled", "filled", "cancelled", "execution_unknown", "reconciliation_required", "reconciled"], "outcomes": ["terminal", "failure", "recovery"]}
+      ],
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/16",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/16",
+        "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md#live-execution-and-manual-position-control",
+        "docs/architecture/live_execution/live-execution-universal-order-gateway-v1.md#ошибки-retry-и-idempotency"
+      ]
+    },
+    {
+      "journey_id": "journey.monitoring.diagnose_service_or_datastore",
+      "label": "Diagnose a service or datastore and open its runbook",
+      "entry_screen_ids": ["screen.monitoring.workspace"],
+      "intermediate_screen_ids": ["screen.monitoring.service_detail"],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": ["screen.docs.runbook"],
+      "external_boundary_ids": [],
+      "transitions": [
+        {"transition_id": "transition.monitoring.diagnose.workspace.service", "from_id": "screen.monitoring.workspace", "to_id": "screen.monitoring.service_detail", "outcome": "forward", "trigger": "open_registered_service_or_datastore"},
+        {"transition_id": "transition.monitoring.diagnose.service.runbook", "from_id": "screen.monitoring.service_detail", "to_id": "screen.docs.runbook", "outcome": "terminal", "trigger": "open_role_allowed_contextual_runbook"}
+      ],
+      "intra_screen_paths": [
+        {"screen_id": "screen.monitoring.service_detail", "state_ids": ["service", "datastore", "worker", "fresh", "stale", "degraded", "unavailable", "dependency_impact", "metrics", "backlog", "incident", "related_jobs", "runbook_available", "safe_action", "permission_forbidden", "error_retry"], "outcomes": ["forward", "alternate", "failure", "recovery", "terminal"]}
+      ],
+      "datastore_boundary": "PostgreSQL, ClickHouse, Redis, OpenBao, workers, and artifact storage are registered service identities inside screen.monitoring.service_detail. They do not become routes, navigation destinations, screens, or families.",
+      "source_refs": [
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/journey_entrypoints/17",
+        "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json#/journeys/17",
+        "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md#monitoring-and-datastores",
+        "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md#gap-decisions"
+      ]
+    }
+  ],
+  "counts": {
+    "journeys": 18,
+    "cross_screen_transitions": 61,
+    "screen_ids_added": 0,
+    "journey_ids_added": 0,
+    "external_boundaries": 0
+  },
+  "unresolved_decisions": [],
+  "owner_decision_ref": null
+}
