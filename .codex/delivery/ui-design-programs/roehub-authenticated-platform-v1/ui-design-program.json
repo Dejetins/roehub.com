@@ -1,0 +1,2522 @@
+{
+  "$schema": "ui-design-program.schema.json",
+  "schema_id": "codex.ui-design-program/v1",
+  "program_id": "roehub.authenticated-platform.ui-design.v1",
+  "program_name": "RoeHub Authenticated Platform UI Design Program",
+  "revision": 2,
+  "status": "accepted",
+  "validation_profile": "atlas_gate",
+  "source_contracts": [
+    {
+      "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+      "authority": "accepted target all-screen and journey identity registry for the product-complete authenticated self-hosted Web platform",
+      "required_status": "accepted_target_architecture",
+      "sha256": "b9f1e28ec9761fe5ea9c2d3432d0ae9b561e74659fca06f7d712e77b53a587de",
+      "screen_collections": [
+        {
+          "json_pointer": "/screens",
+          "id_key": "screen_id"
+        }
+      ],
+      "journey_collections": [
+        {
+          "json_pointer": "/journey_entrypoints",
+          "id_key": "journey_id"
+        }
+      ]
+    },
+    {
+      "path": "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json",
+      "authority": "accepted reconciliation source for 43 local-platform surface records, 36 canonical route screen identities across 37 route records, and 18 journey identities; not an additional screen collection",
+      "required_status": "accepted_target_architecture",
+      "sha256": "5aaea5ee4a1ff2ea3f554716cfb840411906d358b7cb15c71ce133453aae2126",
+      "screen_collections": [],
+      "journey_collections": []
+    },
+    {
+      "path": "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md",
+      "authority": "accepted product-completeness matrix and authenticated local/public/historical boundary",
+      "required_status": null,
+      "sha256": "fc5a0e32f62151d71b45007d543044e7b13043fd5fd4782621e65c45f4499171",
+      "screen_collections": [],
+      "journey_collections": []
+    },
+    {
+      "path": "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md",
+      "authority": "accepted target information architecture for the authenticated self-hosted Web platform",
+      "required_status": null,
+      "sha256": "b67e57624b47a0f01d137f740eb6c927d6d189fffaeaa464cfc93d16c94604cc",
+      "screen_collections": [],
+      "journey_collections": []
+    },
+    {
+      "path": "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v2.json",
+      "authority": "accepted target route, role, capability, lifecycle, and server-enforcement contract",
+      "required_status": "accepted_target_architecture",
+      "sha256": "1deef86ab86bfd44b63ef6d43fa9719907f250f2e80e6d3f64bacbafe79e00be",
+      "screen_collections": [],
+      "journey_collections": []
+    },
+    {
+      "path": "docs/architecture/ui/roehub-ui-agent-delivery-contract-v2.json",
+      "authority": "active HTML-first delivery and G0 accepted-visual authority contract",
+      "required_status": "active",
+      "sha256": "a8be6df57ed33b21d7f9724aab6d2779b4e9cfc5a796a6eb06249ba4ba43c5b7",
+      "screen_collections": [],
+      "journey_collections": []
+    },
+    {
+      "path": ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md",
+      "authority": "accepted authenticated-Web transition scope and family-only visual-authority boundary",
+      "required_status": "accepted",
+      "sha256": "650e5d5ad05056af84df34c2e078cb823a9ddbbbbbb1d3928a74635f28c23381",
+      "screen_collections": [],
+      "journey_collections": []
+    },
+    {
+      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html",
+      "authority": "family-level accepted visual source for Backtests family only; no topology, fixed canvas, token, composition, responsive, or cross-family transfer",
+      "required_status": null,
+      "sha256": "3ff799ac5a5872662dda8b67fc1bd4db0c7860b7de9d84e6597465209d5dd2a4",
+      "screen_collections": [],
+      "journey_collections": []
+    },
+    {
+      "path": ".codex/delivery/evidence/roehub-html-first-ui-pilot/2026-08-03-backtests-v23-owner-acceptance.md",
+      "authority": "product-owner receipt for the exact v23 Backtests-family accepted visual; mobile scope unauthorized and program acceptance not granted",
+      "required_status": null,
+      "sha256": "3454e86d69357de14461265c914480fc911a74fa5eb86615167a069959b7058f",
+      "screen_collections": [],
+      "journey_collections": []
+    }
+  ],
+  "scope": {
+    "product": "roehub",
+    "platform": "web",
+    "included_release_slices": [
+      "authenticated_self_hosted_platform"
+    ],
+    "excluded_release_slices": [
+      "public_site",
+      "mobile_product"
+    ],
+    "origin": {
+      "kind": "normative_requirement",
+      "ref": "conversation:2026-08-03#g0-product-completeness-package-v2-acceptance-and-g1-revision-2"
+    }
+  },
+  "expected_inventory": {
+    "total": 44,
+    "route_screens": 33,
+    "route_flows": 1,
+    "persistent_shells": 1,
+    "route_backed_transients": 0,
+    "overlays": 1,
+    "system_state_families": 1,
+    "internal_or_non_visual": 6,
+    "historical_exclusions": 1,
+    "journeys": 18
+  },
+  "screens": [
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/0",
+        "expected_id": "screen.auth.login"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/0/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/0/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/1",
+        "expected_id": "screen.setup.first_launch"
+      },
+      "classification": "route_flow",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/1/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/1/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/2",
+        "expected_id": "screen.shell.application"
+      },
+      "classification": "persistent_shell",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/2/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/2/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/3",
+        "expected_id": "screen.dashboard.overview"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/3/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/3/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/4",
+        "expected_id": "screen.data.catalog"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/4/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/4/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/5",
+        "expected_id": "screen.strategies.library"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/5/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/5/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/6",
+        "expected_id": "screen.strategies.editor"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/6/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/6/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/7",
+        "expected_id": "screen.strategies.detail"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/7/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/7/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/8",
+        "expected_id": "screen.models.registry"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/8/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/8/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/9",
+        "expected_id": "screen.models.detail"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/9/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/9/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/10",
+        "expected_id": "screen.backtests.library"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/10/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/10/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/11",
+        "expected_id": "screen.backtests.builder"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/11/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/11/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/12",
+        "expected_id": "screen.backtests.detail"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/12/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/12/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/13",
+        "expected_id": "screen.live.workspace"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/13/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/13/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/14",
+        "expected_id": "screen.monitoring.workspace"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/14/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/14/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/15",
+        "expected_id": "screen.connections.workspace"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/15/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/15/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/16",
+        "expected_id": "screen.data.ingestion"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/16/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/16/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/17",
+        "expected_id": "screen.artifacts.catalog"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/17/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/17/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/18",
+        "expected_id": "screen.artifacts.detail"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/18/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/18/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/19",
+        "expected_id": "screen.operations.jobs"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/19/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/19/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/20",
+        "expected_id": "screen.operations.job_detail"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/20/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/20/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/21",
+        "expected_id": "screen.live.execution_activity"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/21/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/21/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/22",
+        "expected_id": "screen.live.execution_detail"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/22/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/22/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/23",
+        "expected_id": "screen.live.manual_position_flow"
+      },
+      "classification": "overlay",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/23/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/23/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/24",
+        "expected_id": "screen.monitoring.service_detail"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/24/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/24/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/25",
+        "expected_id": "screen.settings.profile"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/25/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/25/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/26",
+        "expected_id": "screen.settings.preferences"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/26/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/26/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/27",
+        "expected_id": "screen.settings.notifications"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/27/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/27/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/28",
+        "expected_id": "screen.settings.security"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/28/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/28/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/29",
+        "expected_id": "screen.admin.overview"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/29/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/29/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/30",
+        "expected_id": "screen.admin.members"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/30/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/30/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/31",
+        "expected_id": "screen.admin.resources"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/31/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/31/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/32",
+        "expected_id": "screen.admin.extensions"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/32/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/32/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/33",
+        "expected_id": "screen.admin.maintenance"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/33/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/33/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/34",
+        "expected_id": "screen.docs.index"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/34/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/34/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/35",
+        "expected_id": "screen.docs.runbook"
+      },
+      "classification": "route_screen",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/35/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/35/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/36",
+        "expected_id": "screen.system.error_and_recovery"
+      },
+      "classification": "system_state_family",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/36/kind"
+      },
+      "disposition": "in_scope",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/36/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/37",
+        "expected_id": "screen.qa.plugin_panel_lab"
+      },
+      "classification": "internal_or_non_visual",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/37/kind"
+      },
+      "disposition": "internal",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/37/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/38",
+        "expected_id": "contract.diagnostics.health"
+      },
+      "classification": "internal_or_non_visual",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/38/kind"
+      },
+      "disposition": "internal",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/38/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/39",
+        "expected_id": "contract.integration.api_proxy"
+      },
+      "classification": "internal_or_non_visual",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/39/kind"
+      },
+      "disposition": "internal",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/39/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/40",
+        "expected_id": "contract.delivery.static_assets"
+      },
+      "classification": "internal_or_non_visual",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/40/kind"
+      },
+      "disposition": "internal",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/40/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/41",
+        "expected_id": "contract.authorization.target_matrix"
+      },
+      "classification": "internal_or_non_visual",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/41/kind"
+      },
+      "disposition": "internal",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/41/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/42",
+        "expected_id": "contract.framework.api_docs"
+      },
+      "classification": "internal_or_non_visual",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/42/kind"
+      },
+      "disposition": "internal",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/42/kind"
+      },
+      "disposition_reason_ref": null,
+      "review_consequence": null,
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    },
+    {
+      "screen_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/screens/43",
+        "expected_id": "historical.react_prototype"
+      },
+      "classification": "historical_exclusion",
+      "classification_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-classification;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/43/kind"
+      },
+      "disposition": "excluded",
+      "disposition_origin": {
+        "kind": "normative_requirement",
+        "ref": "conversation:2026-08-03#g1-source-backed-disposition;docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/43/kind"
+      },
+      "disposition_reason_ref": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#/screens/43/target_status",
+      "review_consequence": "Exclude from active design review and preserve only as historical evidence; it provides no product-wide, implementation, responsive-Web, or mobile authority.",
+      "design_family_id": null,
+      "family_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "wave_id": null,
+      "wave_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "representative": false,
+      "coverage_profile": null,
+      "coverage_assignment_origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#g2-journeys-and-families"
+      },
+      "visual_baseline_ref": null,
+      "unresolved_fields": [
+        "design_family_id",
+        "family_assignment_origin",
+        "wave_id",
+        "wave_assignment_origin",
+        "representative",
+        "coverage_profile",
+        "coverage_assignment_origin"
+      ]
+    }
+  ],
+  "journeys": [
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/0",
+        "expected_id": "journey.auth.sign_in_and_continue"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/1",
+        "expected_id": "journey.setup.first_launch"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/2",
+        "expected_id": "journey.data.select_instruments"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/3",
+        "expected_id": "journey.connections.manage_exchange"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/4",
+        "expected_id": "journey.backtests.configure_and_run"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/5",
+        "expected_id": "journey.backtests.inspect_and_promote"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/6",
+        "expected_id": "journey.strategies.create_and_control"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/7",
+        "expected_id": "journey.live.observe_execution"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/8",
+        "expected_id": "journey.models.inspect_and_operate"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/9",
+        "expected_id": "journey.monitor_and_follow_runbook"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/10",
+        "expected_id": "journey.administer_and_recover"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/11",
+        "expected_id": "journey.local_documentation"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/12",
+        "expected_id": "journey.data.manage_ingestion_and_coverage"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/13",
+        "expected_id": "journey.artifacts.inspect_and_use"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/14",
+        "expected_id": "journey.jobs.inspect_and_operate"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/15",
+        "expected_id": "journey.live.manual_position_control"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/16",
+        "expected_id": "journey.live.inspect_and_reconcile"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    },
+    {
+      "journey_ref": {
+        "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json",
+        "json_pointer": "/journey_entrypoints/17",
+        "expected_id": "journey.monitoring.diagnose_service_or_datastore"
+      },
+      "entry_screen_ids": [],
+      "intermediate_screen_ids": [],
+      "alternate_screen_ids": [],
+      "failure_screen_ids": [],
+      "recovery_screen_ids": [],
+      "terminal_screen_ids": [],
+      "external_boundary_ids": [],
+      "transitions": [],
+      "unresolved_fields": [
+        "journey_graph"
+      ]
+    }
+  ],
+  "coverage_profiles": [],
+  "families": [],
+  "waves": [],
+  "gates": [
+    {
+      "gate_id": "G0",
+      "title": "Authoritative sources",
+      "owner_decision_required": false
+    },
+    {
+      "gate_id": "G1",
+      "title": "Complete screen atlas",
+      "owner_decision_required": true
+    },
+    {
+      "gate_id": "G2",
+      "title": "Journeys, families, and waves",
+      "owner_decision_required": true
+    },
+    {
+      "gate_id": "G3",
+      "title": "Foundations and application shell",
+      "owner_decision_required": true
+    },
+    {
+      "gate_id": "G4",
+      "title": "Representative family",
+      "owner_decision_required": true
+    },
+    {
+      "gate_id": "G5",
+      "title": "Screen wave",
+      "owner_decision_required": true
+    },
+    {
+      "gate_id": "G6",
+      "title": "Cross-program QA and implementation handoff",
+      "owner_decision_required": true
+    }
+  ],
+  "responsive_policy": {
+    "adaptive_web_required": true,
+    "supported_web_width_range": {
+      "min_width": null,
+      "max_width": null,
+      "origin": {
+        "kind": "normative_requirement",
+        "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/stage-profiles-v1.md#manifest-field-ownership"
+      }
+    },
+    "anchor_viewports": [],
+    "breakpoint_policy": "content_driven",
+    "breakpoint_policy_origin": {
+      "kind": "normative_requirement",
+      "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/responsive-policy-v1.md#breakpoints-and-components"
+    },
+    "component_adaptation": "prefer_container_queries",
+    "component_adaptation_origin": {
+      "kind": "normative_requirement",
+      "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/responsive-policy-v1.md#breakpoints-and-components"
+    },
+    "logical_properties_required": true,
+    "logical_properties_origin": {
+      "kind": "normative_requirement",
+      "ref": "/Users/daniildegtyarev/.codex/skills/ui-design-program/references/responsive-policy-v1.md#breakpoints-and-components"
+    },
+    "mobile_scope": "unauthorized",
+    "mobile_scope_origin": {
+      "kind": "product_contract",
+      "ref": "docs/architecture/ui/roehub-ui-agent-delivery-contract-v2.json#/g0_source_authority/mobile_scope"
+    },
+    "mobile_authorization_ref": null,
+    "authorized_mobile_surfaces": [],
+    "authorized_mobile_viewports": [],
+    "allowed_mobile_changes": []
+  },
+  "invention_policy": {
+    "default": "forbidden",
+    "unknown_value": "record_and_block",
+    "implicit_screen_addition": "forbidden",
+    "implicit_state_removal": "forbidden",
+    "unsourced_visual_value": "forbidden",
+    "agent_self_acceptance": "forbidden"
+  },
+  "program_acceptance": {
+    "agent_self_acceptance": "prohibited",
+    "owner_decision_ref": "owner-decision://13b41b35ab78502c4f013724a633456a980cbf79b59a0fa4cfe5e5ef4c13a9bf/.codex/delivery/evidence/roehub-authenticated-platform-ui-design/2026-08-03-g1-atlas-r2-owner-acceptance.json?value_sha256=b44c89d958cd8d4c48251cd80f2f0c044d283904b44666beee0fcf73260b0136#/decisions/0",
+    "accepted_revision": 2
+  },
+  "execution_artifacts": {
+    "plan_doc": "/Users/daniildegtyarev/Projects/roehub.com/.codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/ui-design-program.json",
+    "prompt_pack_dir": "<prompt-manager-prompt-pack-dir>",
+    "stage_ledger": "<prompt-manager-stage-ledger>"
+  }
+}

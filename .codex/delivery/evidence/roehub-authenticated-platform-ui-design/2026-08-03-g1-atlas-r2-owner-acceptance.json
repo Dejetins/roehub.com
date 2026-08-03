@@ -1,0 +1,29 @@
+{
+  "schema_id": "codex.owner-decision-receipt/v1",
+  "receipt_id": "roehub.authenticated-platform.g1-atlas-r2.owner-acceptance",
+  "decisions": [
+    {
+      "decision_id": "roehub.authenticated-platform.g1-atlas-r2.accepted",
+      "status": "accepted",
+      "revision": 2,
+      "program_id": "roehub.authenticated-platform.ui-design.v1",
+      "validation_profile": "atlas_gate",
+      "source_user_message_ref": "conversation:2026-08-03#g1-atlas-revision-2-owner-acceptance",
+      "source_user_message": "Принимаю RoeHub G1 {\"program_id\":\"roehub.authenticated-platform.ui-design.v1\",\"revision\":2,\"validation_profile\":\"atlas_gate\"} как полный source/atlas gate authenticated self-hosted Web platform",
+      "accepted_identity": {
+        "program_id": "roehub.authenticated-platform.ui-design.v1",
+        "revision": 2,
+        "validation_profile": "atlas_gate"
+      },
+      "canonical_compatibility_identity": {
+        "program_id": "roehub.authenticated-platform.ui-design.v1",
+        "revision": 2
+      },
+      "accepted_value_sha256s": [
+        "b44c89d958cd8d4c48251cd80f2f0c044d283904b44666beee0fcf73260b0136"
+      ],
+      "acceptance_boundary": "source_and_atlas_only",
+      "mobile_scope": "unauthorized"
+    }
+  ]
+}

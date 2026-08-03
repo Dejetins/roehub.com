@@ -2,7 +2,7 @@
 artifact_kind: delivery_spec
 delivery_contract: global/v1
 delivery_schema_version: 1
-spec_version: 1.3.0
+spec_version: 1.4.1
 status: accepted
 ---
 
@@ -46,22 +46,27 @@ useful block roles and relationships without cloning Linear screens.
   equivalence. Roehub preserves analogous interaction roles and information
   hierarchy while owning domain meaning, data, routes, permissions, copy,
   visual tokens, and composition.
-- All future Roehub design prototyping and handoff use the Figma project
-  `roehub.com` (`projectId` `629113387`) through two contract-separated files:
-  `Roehub UI Library` (`fileKey` `rgbNUPCuV7q2pARG4Cml8V`) owns reusable assets,
-  and `Roehub Authenticated Platform UI` (`fileKey`
-  `nzKVsXuCmoTbHJGckHfK3T`) owns candidates and accepted compositions. The
-  former Figma key `GBzmB9evtzqnAYNjp9W1sr` and Penpot remain historical only
-  and are forbidden as new design inputs.
+- All future Roehub design prototyping and handoff are HTML-first. Semantic CSS
+  tokens and reusable HTML component masters feed a machine-readable registry;
+  typed screen manifests produce deterministic HTML candidates for real-browser
+  QA and explicit product-owner acceptance. Historical design-tool artifacts
+  are forbidden as new design inputs.
 - The React coexistence spike is technical evidence only. Its visible
   composition, styling, component anatomy, copy and screenshots were rejected
   by the product owner and are not a design or implementation source.
-- The agent-governed process is proven on a small Backtests design pilot before
-  a complete Figma foundation or application layout may begin. The pilot runs
+- The agent-governed process is proven on a small Backtests HTML pilot before
+  a complete application layout may begin. The pilot runs
   automatic structural and visual gates before every product-owner checkpoint.
 - Agents cannot approve UI instructions, copy or visual design on behalf of the
-  product owner. Figma work pauses at explicit structure, direction,
-  foundations, interactive-flow and final-approval checkpoints.
+  product owner. HTML work pauses at explicit direction, component-contract,
+  composed-candidate, interactive-flow, and final-approval checkpoints.
+- The current accepted Backtests-family visual is
+  `.codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html`
+  at SHA-256
+  `3ff799ac5a5872662dda8b67fc1bd4db0c7860b7de9d84e6597465209d5dd2a4`,
+  accepted by the product owner in
+  `.codex/delivery/evidence/roehub-html-first-ui-pilot/2026-08-03-backtests-v23-owner-acceptance.md`.
+  Its scope is the Backtests family only; mobile scope remains unauthorized.
 
 ## Current authority and supersession
 
@@ -75,13 +80,18 @@ future UI implementation by this specification and the shared standard. It is
 not relabelled as browser or Penpot proof.
 
 The shared standard remains unchanged because it is also used outside Roehub.
-For Roehub, its Penpot-specific clauses are superseded by
-`docs/architecture/ui/roehub-agent-governed-figma-delivery-standard-v2.md`; all other
-transition, proof, browser, accessibility, performance, and rollback rules
-continue to apply.
+For Roehub, its design-tool-specific clauses are superseded by
+`docs/architecture/ui/roehub-html-first-ui-delivery-v1.md`; all other transition,
+proof, browser, accessibility, performance, and rollback rules continue to apply.
 
 Historical SSR UI and `prototypes/roehub-v2/` remain migration observations, not
 the new visual source of truth. No accepted server ticket is superseded.
+
+The earlier v9 acceptance and the current v9-derived token, component,
+registry, manifest, generated-screen, screenshot, and browser-QA artifacts
+remain truthful lineage evidence. They are not current v23 visual provenance
+and require a separate explicitly authorized non-G0 regeneration and validation
+unit before reuse against v23.
 
 ## Formal reference translation contract
 
@@ -107,7 +117,7 @@ access, and authoritative data ownership.
 Literal replication is prohibited. Do not copy Linear branding, text, product
 taxonomy, proprietary assets, exact pixel coordinates, or unsupported concepts.
 Do not add labels, assignees, milestones, progress, activity, or collaboration
-objects merely because they appear in the reference. Each Figma or runtime
+objects merely because they appear in the reference. Each HTML candidate or runtime
 surface must include a mapping table with `reference block`, `Roehub function`,
 `authoritative source`, `required states`, and `evidence or justified omission`.
 
@@ -120,8 +130,8 @@ surface must include a mapping table with `reference block`, `Roehub function`,
 | Theme IDs | `breaking-change before new design implementation` | `slate` and `sand` are removed from the future target. |
 | Routes/capabilities | `compatible-change` | Existing canonical route and capability identities are preserved. |
 | Public site | `none` | Excluded from this transition. |
-| Figma | `new canonical target` | Future vNext design is accepted separately in the registered project and file. |
-| Historical Penpot evidence | `none` | Retained as factual history and not used for future writes. |
+| HTML design delivery | `breaking-change` | Versioned registry and manifests now generate the canonical review surface. |
+| Historical design evidence | `none` | Retained as factual history and not used for future design work. |
 
 ## Repository delivery queue
 
@@ -141,12 +151,13 @@ statuses, dependencies, or priority.
 2. Prove React coexistence with the FastAPI/Jinja gateway, MobX/Query state
    boundaries, typed REST/SSE adapters, route fallback, and performance harness.
    Treat its visible layer as rejected and non-authoritative.
-3. Repair the design-acceptance boundary, then prove the agent-governed Figma
+3. Repair the design-acceptance boundary, then prove the agent-governed HTML
    process on the bounded Backtests pilot with explicit product-owner decisions.
 4. Derive a new full-foundation ticket only after the pilot is accepted; keep
-   reusable assets and product composition in their separate canonical files.
+   reusable component masters and product composition separate through registry
+   and manifest contracts.
 5. Implement the React application shell behind the reversible route boundary,
-   replacing the spike visual layer from the accepted Figma source.
+   replacing the spike visual layer from the accepted HTML source.
 6. Implement the real read-only Backtest list/detail golden slice.
 
 Further route-cluster tickets are derived after the golden slice establishes
@@ -160,7 +171,7 @@ states and are sufficient for dark shell and functional-block reference, not
 for complete visual or motion acceptance. The reference ticket must close or
 explicitly waive every missing manifest item.
 
-Figma proves design intent only. Source tests do not prove browser performance.
+Generated HTML proves design intent only. Source tests do not prove browser performance.
 The shell and golden slice require real-browser traces on declared local
 hardware with client overhead, REST/SSE latency, and render time separated.
 

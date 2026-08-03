@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/screen-design-contract.schema.json",
+  "title": "Exact UI screen design contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "screen_revision_id", "program_revision_ref", "status", "product_identity", "source_visual", "render_environment", "viewport_contract", "regions", "allowed_provenance_kinds", "unresolved_decisions", "acceptance"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_id": {"const": "codex.ui-screen-design-contract/v1"},
+    "screen_revision_id": {"type": "string", "minLength": 1},
+    "program_revision_ref": {"type": "string", "minLength": 1},
+    "status": {"enum": ["draft", "review", "accepted", "superseded"]},
+    "product_identity": {"$ref": "#/$defs/productIdentity"},
+    "source_visual": {"$ref": "#/$defs/sourceVisual"},
+    "render_environment": {"$ref": "#/$defs/renderEnvironment"},
+    "viewport_contract": {"$ref": "#/$defs/viewportContract"},
+    "regions": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/region"}
+    },
+    "allowed_provenance_kinds": {
+      "type": "array",
+      "items": {"enum": ["product_contract", "normative_requirement", "accepted_visual", "measured_baseline", "design_token", "owner_decision", "derived_formula"]},
+      "uniqueItems": true
+    },
+    "unresolved_decisions": {"type": "array", "items": {"type": "object"}},
+    "acceptance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_self_acceptance", "machine_receipt_required", "owner_decision_required", "owner_decision_ref", "screen_acceptance_receipt_path", "screen_acceptance_receipt_sha256", "pixel_diff_policy"],
+      "properties": {
+        "agent_self_acceptance": {"const": "prohibited"},
+        "machine_receipt_required": {"const": true},
+        "owner_decision_required": {"const": true},
+        "owner_decision_ref": {"type": ["string", "null"]},
+        "screen_acceptance_receipt_path": {"type": ["string", "null"]},
+        "screen_acceptance_receipt_sha256": {"type": ["string", "null"]},
+        "pixel_diff_policy": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["channel_threshold", "approved_max_different_pixels"],
+          "properties": {
+            "channel_threshold": {"$ref": "#/$defs/specifiedValue"},
+            "approved_max_different_pixels": {"$ref": "#/$defs/specifiedValue"}
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref"],
+      "properties": {
+        "kind": {"enum": ["product_contract", "normative_requirement", "accepted_visual", "measured_baseline", "design_token", "owner_decision", "derived_formula"]},
+        "ref": {"type": "string", "minLength": 1},
+        "locator": {"type": "string"},
+        "property": {"type": "string"},
+        "formula": {"type": "string"}
+      }
+    },
+    "specifiedValue": {
+      "type": "object",
+      "required": ["value", "origin", "change_policy"],
+      "properties": {
+        "value": {},
+        "unit": {"type": ["string", "null"]},
+        "origin": {"$ref": "#/$defs/origin"},
+        "tolerance": {"type": ["number", "null"], "minimum": 0},
+        "change_policy": {"enum": ["fixed", "source_revision_required", "owner_approval_required"]}
+      }
+    },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["anchor_id", "width", "height", "class", "state_ref", "origin"],
+      "properties": {
+        "anchor_id": {"type": "string", "minLength": 1},
+        "width": {"type": "integer", "minimum": 1},
+        "height": {"type": "integer", "minimum": 1},
+        "class": {"enum": ["responsive_web", "mobile"]},
+        "state_ref": {"type": "string", "minLength": 1},
+        "origin": {"$ref": "#/$defs/origin"}
+      }
+    },
+    "viewportContract": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "supported_web_width_range", "anchors", "breakpoint_policy", "breakpoint_policy_origin", "below_supported_range", "below_supported_range_origin", "above_supported_range", "above_supported_range_origin", "mobile_scope", "mobile_scope_origin", "mobile_authorization_ref", "mobile_specific_composition", "authorized_mobile_surfaces", "authorized_mobile_viewports", "allowed_mobile_changes"],
+      "properties": {
+        "mode": {"const": "responsive_web"},
+        "supported_web_width_range": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["min_width", "max_width", "origin"],
+          "properties": {
+            "min_width": {"type": ["integer", "null"], "minimum": 1},
+            "max_width": {"type": ["integer", "null"], "minimum": 1},
+            "origin": {"$ref": "#/$defs/origin"}
+          }
+        },
+        "anchors": {"type": "array", "items": {"$ref": "#/$defs/viewport"}},
+        "breakpoint_policy": {"const": "content_driven"},
+        "breakpoint_policy_origin": {"$ref": "#/$defs/origin"},
+        "below_supported_range": {"enum": ["out_of_scope", "graceful_overflow", "explicit_contract"]},
+        "below_supported_range_origin": {"$ref": "#/$defs/origin"},
+        "above_supported_range": {"enum": ["out_of_scope", "max_content_width", "explicit_contract"]},
+        "above_supported_range_origin": {"$ref": "#/$defs/origin"},
+        "mobile_scope": {"enum": ["unauthorized", "authorized"]},
+        "mobile_scope_origin": {"$ref": "#/$defs/origin"},
+        "mobile_authorization_ref": {"type": ["string", "null"]},
+        "mobile_specific_composition": {"type": "boolean"},
+        "authorized_mobile_surfaces": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "authorized_mobile_viewports": {"type": "array", "items": {"$ref": "#/$defs/viewport"}},
+        "allowed_mobile_changes": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["region_id", "locator", "visibility", "component_id", "component_status", "variant", "state", "source_refs", "geometry", "layout_rules", "visual_properties", "content", "interactions", "accessibility", "responsive_behavior", "geometry_tolerance_px", "geometry_tolerance_origin", "computed_style_properties", "computed_style_properties_origin"],
+      "properties": {
+        "region_id": {"type": "string", "minLength": 1},
+        "locator": {"type": "string", "minLength": 1},
+        "visibility": {"enum": ["required", "conditional", "forbidden"]},
+        "component_id": {"type": ["string", "null"]},
+        "component_status": {"enum": ["registered", "candidate", "one_off", "unresolved"]},
+        "variant": {"type": ["string", "null"]},
+        "state": {"type": ["string", "null"]},
+        "source_refs": {"type": "array", "items": {"$ref": "#/$defs/origin"}, "minItems": 1},
+        "geometry": {"type": "object", "additionalProperties": {"$ref": "#/$defs/specifiedValue"}},
+        "layout_rules": {"type": "array", "items": {"$ref": "#/$defs/specifiedValue"}},
+        "visual_properties": {"type": "object", "additionalProperties": {"$ref": "#/$defs/specifiedValue"}},
+        "content": {"type": "object", "additionalProperties": {"$ref": "#/$defs/specifiedValue"}},
+        "interactions": {"type": "array", "items": {"$ref": "#/$defs/specifiedValue"}},
+        "accessibility": {"type": "object", "additionalProperties": {"$ref": "#/$defs/specifiedValue"}},
+        "responsive_behavior": {"type": "array", "items": {"$ref": "#/$defs/specifiedValue"}},
+        "geometry_tolerance_px": {"type": "number", "minimum": 0},
+        "geometry_tolerance_origin": {"$ref": "#/$defs/origin"},
+        "computed_style_properties": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+        "computed_style_properties_origin": {"$ref": "#/$defs/origin"}
+      }
+    },
+    "productIdentity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["screen_id", "route_id", "route", "state_id", "role_id", "permission_profile", "locale", "theme"],
+      "properties": {
+        "screen_id": {"type": "string", "minLength": 1},
+        "route_id": {"type": ["string", "null"]},
+        "route": {"type": ["string", "null"]},
+        "state_id": {"type": "string", "minLength": 1},
+        "role_id": {"type": "string", "minLength": 1},
+        "permission_profile": {"type": "string", "minLength": 1},
+        "locale": {"type": "string", "minLength": 1},
+        "theme": {"type": "string", "minLength": 1}
+      }
+    },
+    "sourceVisual": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "html_path", "image_path", "html_sha256", "image_sha256", "owner_decision_ref"],
+      "properties": {
+        "kind": {"const": "accepted_visual"},
+        "html_path": {"type": ["string", "null"]},
+        "image_path": {"type": ["string", "null"]},
+        "html_sha256": {"type": ["string", "null"]},
+        "image_sha256": {"type": ["string", "null"]},
+        "owner_decision_ref": {"type": ["string", "null"]}
+      }
+    },
+    "renderEnvironment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["browser", "device_scale_factor", "timezone", "fixed_clock_iso", "reduced_motion", "animations", "fixture_data_path", "fixture_data_sha256", "font_bundle_sha256", "asset_bundle_sha256"],
+      "properties": {
+        "browser": {"type": "string", "minLength": 1},
+        "device_scale_factor": {"type": "number", "minimum": 0.1},
+        "timezone": {"type": "string", "minLength": 1},
+        "fixed_clock_iso": {"type": "string", "minLength": 1},
+        "reduced_motion": {"const": true},
+        "animations": {"const": "disabled"},
+        "fixture_data_path": {"type": "string", "minLength": 1},
+        "fixture_data_sha256": {"type": ["string", "null"]},
+        "font_bundle_sha256": {"type": ["string", "null"]},
+        "asset_bundle_sha256": {"type": ["string", "null"]}
+      }
+    }
+  }
+}
