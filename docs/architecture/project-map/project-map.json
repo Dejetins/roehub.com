@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1177,
+      "file_count": 1178,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -7083,6 +7083,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/apps/web/roehub-local-platform-journey-registry-v1.json"
     },
     {
       "area": "knowledge",
@@ -18125,7 +18130,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3179,
+  "inventory_file_count": 3180,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -18342,5 +18347,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "bc2b4a8f2eb9cc6e81977e24d909f23b0f8ae5f5ba9a753741b47213a96c4795"
+  "structural_digest": "46dd074cd91f06903cf83576167ceb400868347fbf0aedd4ad97ccdda25ca461"
 }
