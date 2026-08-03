@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1159,
+      "file_count": 1177,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -3616,6 +3616,16 @@
     },
     {
       "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-authenticated-platform-ui-design/2026-08-03-g1-atlas-r2-owner-acceptance.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/roehub-html-first-ui-pilot/2026-08-03-backtests-v23-owner-acceptance.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-1-better-interface-review.md"
     },
@@ -3796,6 +3806,11 @@
     },
     {
       "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html"
+    },
+    {
+      "area": "knowledge",
       "kind": "configuration",
       "path": ".codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json"
     },
@@ -3803,6 +3818,51 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/owner-review.template.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-acceptance.schema.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-acceptance.template.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-atlas.html"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-atlas.resolved.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-design-contract.schema.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-design-contract.template.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/ui-design-program.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/ui-design-program.schema.json"
     },
     {
       "area": "knowledge",
@@ -6997,6 +7057,11 @@
     {
       "area": "knowledge",
       "kind": "configuration",
+      "path": "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v2.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-local-platform-component-registry-v1.json"
     },
     {
@@ -7016,8 +7081,18 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json"
     },
     {
       "area": "knowledge",
@@ -7036,8 +7111,18 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-ui-surface-registry-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json"
     },
     {
       "area": "knowledge",
@@ -10058,6 +10143,11 @@
       "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/ui/roehub-ui-agent-delivery-contract-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/ui/roehub-ui-agent-delivery-contract-v2.json"
     },
     {
       "area": "knowledge",
@@ -18035,7 +18125,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3161,
+  "inventory_file_count": 3179,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -18252,5 +18342,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "1230b6f118ffe69ef3a2706ba6ac0068e88349a28e645b457e502bc0b658e62a"
+  "structural_digest": "bc2b4a8f2eb9cc6e81977e24d909f23b0f8ae5f5ba9a753741b47213a96c4795"
 }
