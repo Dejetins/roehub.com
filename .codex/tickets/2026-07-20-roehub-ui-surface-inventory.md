@@ -9,8 +9,8 @@ owner: unassigned
 ## Outcome
 
 Roehub has one verified current-state inventory and one proposed target registry
-covering the local platform and the public site without changing Penpot or
-product code. Every target surface is traceable to an observed route, API,
+covering the local platform and the public site without changing a design tool
+or product code. Every target surface is traceable to an observed route, API,
 accepted requirement, historical evidence, or an explicitly labelled gap.
 
 ## Context
@@ -23,7 +23,9 @@ accepted requirement, historical evidence, or an explicitly labelled gap.
   `docs/architecture/platform/roehub-public-site-identity-release-and-measurement-v1.md`
 - Current local UI: `apps/web/`
 - Current API: `apps/api/`
-- Historical prototype: `prototypes/roehub-v2/`
+- Historical prototype: Git baseline
+  `c6ef2f32464ea681c7582aa8b689aacdc02b5d70`; its live directory has been
+  removed.
 
 ## Scope
 
@@ -40,8 +42,8 @@ accepted requirement, historical evidence, or an explicitly labelled gap.
   documentation, releases, downloads, account, future demo, security,
   community, support, and legal pages.
 - Identify route compatibility requirements and unresolved product decisions.
-- Produce a compact machine-readable registry suitable for later Penpot
-  traceability.
+- Produce a compact machine-readable registry suitable for a later UI-program
+  atlas and traceability.
 
 ## Deliverables
 
@@ -50,12 +52,12 @@ accepted requirement, historical evidence, or an explicitly labelled gap.
 - `docs/architecture/apps/web/roehub-public-site-surface-registry-v1.json`
 
 The registries must use stable, product-owned `surface_id` values without
-embedding temporary Penpot IDs.
+embedding temporary design-tool IDs.
 
 ## Non-goals
 
-- No Penpot read or write is required for acceptance.
-- No new Penpot file, component, token, page, or board.
+- No design-tool read or write is required for acceptance.
+- No visual program, component, token, screen contract, or board.
 - No Web, API, persistence, authentication, release, or documentation-site
   implementation.
 - No final visual design or component specification.
@@ -103,5 +105,5 @@ embedding temporary Penpot IDs.
 - Status becomes `accepted` only after the three deliverables exist, validation
   passes, and a cold self-review finds no unclassified surface or hidden product
   decision.
-- Acceptance authorizes the next architecture/design ticket only; it does not
-  authorize Penpot or implementation work.
+- Acceptance authorizes the next separately selected architecture or UI-program
+  execution unit only; it does not authorize implementation work.

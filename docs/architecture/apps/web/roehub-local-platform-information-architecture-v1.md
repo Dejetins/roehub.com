@@ -8,8 +8,9 @@
 - Scope: the self-hosted local platform only.
 - This document converts the accepted surface inventory into a target screen,
   navigation, route, and authorization structure.
-- It is not a design-system contract, Penpot artifact, Web implementation, API
-  implementation, or evidence that target behavior already exists.
+- It is not a visual design program, design-system contract, Web
+  implementation, API implementation, or evidence that target behavior already
+  exists.
 - The public `roehub.com` site remains a separate trust and delivery boundary.
 
 Machine-readable companions:
@@ -26,15 +27,16 @@ The architecture supplies the final product structure needed before design:
 - every inventoried local surface has a target screen or an explicit non-visual
   or historical disposition;
 - every canonical journey has an entry point and terminal screen;
-- navigation is stable enough to create Penpot boards without inventing routes;
+- navigation is stable enough to build a complete UI-program atlas without
+  inventing routes;
 - permissions are expressed as server capabilities rather than hidden UI;
 - current enforcement and future policy remain visibly different;
 - compatibility URLs have explicit migration behavior.
 
 This task deliberately does not define visual tokens, component anatomy,
-typography, chart styling, spacing, motion, or Penpot page IDs. It also does not
-resolve implementation work for first launch, data modes, ETA, server roles, or
-redirects; it makes those dependencies explicit.
+typography, chart styling, spacing, motion, or visual-authority IDs. It also
+does not resolve implementation work for first launch, data modes, ETA, server
+roles, or redirects; it makes those dependencies explicit.
 
 ## Observed facts
 
@@ -139,8 +141,9 @@ grant capabilities; the server filters every destination and action.
 - the plugin panel laboratory remains feature-flagged QA-only behavior and is
   absent from product navigation;
 - framework API documentation is an internal developer surface;
-- `prototypes/roehub-v2/` remains historical evidence and cannot authorize a
-  board, route, role, or responsive target.
+- the removed `prototypes/roehub-v2/` remains available in Git history at the
+  accepted inventory baseline commit and cannot authorize a screen, route,
+  role, responsive target, or current visual direction.
 
 ## Canonical journey rules
 
@@ -357,12 +360,12 @@ Specific decisions:
 | Persisted organization role names | `none` | Existing `owner/admin/operator/trader/viewer` values are retained. |
 | Future authorization behavior | `breaking-change` for previously over-broad access | Server denial may remove actions currently reachable by authenticated users. |
 | Public-site identity and routes | `none` | Explicitly outside this contract. |
-| Penpot and Web implementation | `none` | No design or runtime write occurs. |
+| Visual program and Web implementation | `none` | No design or runtime write occurs. |
 
 ## Design handoff boundary
 
-After user acceptance, the next allowed artifact is a separate design-system
-contract. It may consume:
+After user acceptance, the architecture becomes an input to a separately
+initialized `ui-design-program`. Its G0 intake and later gates may consume:
 
 - stable `screen_id` and `surface_id` mappings;
 - navigation groups;
@@ -370,10 +373,9 @@ contract. It may consume:
 - supported widths `820`, `1024`, and `1440`;
 - capability-driven visibility and forbidden states.
 
-It must not reinterpret role grants, invent public-site boards, or claim an
-unimplemented API. Penpot work remains unauthorized until the design-system
-contract is separately accepted and the user supplies the intended Roehub file
-IDs.
+The program must not reinterpret role grants, silently add public-site scope,
+or claim an unimplemented API. It chooses and hash-binds its visual authority
+in G0 and produces a complete atlas before family or wave design begins.
 
 ## Proof boundary
 
@@ -388,8 +390,8 @@ Acceptance of this architecture proves documentation consistency only:
   pass.
 
 It does not prove browser behavior, API authorization, redirect behavior,
-Penpot completeness, accessibility runtime, persistence, performance, release,
-or deployment.
+visual-program completeness, accessibility runtime, persistence, performance,
+release, or deployment.
 
 ## Sources
 

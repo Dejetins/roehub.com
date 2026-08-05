@@ -13,7 +13,7 @@ evidence:
 Roehub has one review-ready, implementation-independent target information
 architecture for the self-hosted platform. Every inventoried local surface and
 journey maps to a canonical screen, system boundary, role/capability rule, or
-explicit historical exclusion before any Penpot or Web UI implementation
+explicit historical exclusion before any visual program or Web UI implementation
 begins. Product-owner acceptance was recorded separately after ticket
 completion on `2026-07-20`.
 
@@ -60,8 +60,8 @@ completion on `2026-07-20`.
 
 ## Non-goals
 
-- No Penpot read or write.
-- No design-system contract, visual styling, tokens, components, or mockups.
+- No design-tool read or write.
+- No visual program, styling, tokens, components, or mockups.
 - No product, API, persistence, authentication, route, or Web implementation.
 - No public-site information architecture beyond preserving the existing trust
   boundary.
@@ -116,4 +116,5 @@ completion on `2026-07-20`.
   implementation claim.
 - Only then may status become `accepted`.
 - Acceptance authorizes user review of this architecture. It does not authorize
-  a design-system contract, Penpot work, or Web implementation.
+  a UI design program or Web implementation; those require their own current
+  execution authority.

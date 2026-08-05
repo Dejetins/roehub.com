@@ -6,7 +6,7 @@
     },
     "third_party_notices": {
       "path": "tools/release/THIRD_PARTY_NOTICES.md",
-      "sha256": "73e58dee1d721b3ccc717e31a3f84878561875edf73a3e9d1e4e6c9de9d03957"
+      "sha256": "1467318b3eeabb80fb17d3989854a4742371e98d64d994ccb9657a5bd91d0f35"
     }
   },
   "compatibility": {

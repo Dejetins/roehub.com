@@ -4,6 +4,8 @@
 
 ## Статус
 
+- Назначение: `historical browser evidence`; визуальные результаты этого отчёта
+  не являются authority для будущей UI design program.
 - Дата локальной проверки: `2026-07-10`.
 - Статус: `deployed; production browser verified`.
 - Runtime: FastAPI SSR, Jinja2, CSS, vanilla JavaScript и HTMX.
@@ -24,7 +26,7 @@
 | Live | `apps/web/templates/pages/monitoring.html`, существующий dashboard summary contract |
 | Connections и Settings | `apps/web/templates/pages/connections.html`, account fragments, `apps/web/dist/js/pages/settings.js` |
 | Безопасные mutation outcomes | `apps/web/dist/js/core/api.js` |
-| Прототип и visual source | `prototypes/roehub-v2` |
+| Прототип и visual source | удалённый `prototypes/roehub-v2`, сохранённый в Git history проверенной revision |
 
 ## Локальная браузерная методика
 

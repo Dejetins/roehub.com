@@ -169,41 +169,6 @@ def _python_components(policy: dict[str, Any], pyproject: dict[str, Any]) -> lis
     return sorted(components, key=lambda item: (item.group, item.name))
 
 
-def _prototype_components(policy: dict[str, Any]) -> list[Component]:
-    lock_path = ROOT / "prototypes" / "roehub-v2" / "package-lock.json"
-    lock = _load_json(lock_path)
-    root_package = lock["packages"][""]
-    direct = {
-        **root_package.get("dependencies", {}),
-        **root_package.get("devDependencies", {}),
-    }
-    policy_records = policy["prototype_javascript"]
-    if set(direct) != set(policy_records):
-        missing = sorted(set(direct) - set(policy_records))
-        stale = sorted(set(policy_records) - set(direct))
-        raise PolicyError(f"prototype JavaScript policy mismatch; missing={missing}, stale={stale}")
-
-    components: list[Component] = []
-    for name in sorted(direct):
-        package = lock["packages"].get(f"node_modules/{name}", {})
-        version = package.get("version")
-        if not version:
-            raise PolicyError(f"no locked prototype version for {name}")
-        record = policy_records[name]
-        components.append(
-            Component(
-                kind="prototype-javascript",
-                name=name,
-                version=version,
-                license_expression=record["license"],
-                status=record["status"],
-                source=f"https://www.npmjs.com/package/{name}/v/{version}",
-                group="excluded-prototype",
-            )
-        )
-    return components
-
-
 def _discover_container_images(tracked: list[str]) -> set[str]:
     images: set[str] = set()
     for relative in tracked:
@@ -508,9 +473,6 @@ def _notices_bytes(policy: dict[str, Any], components: list[Component]) -> bytes
         "Встроенные Web-ресурсы": [
             item for item in third_party_components if item.kind == "bundled-asset"
         ],
-        "Исключённый прототип": [
-            item for item in third_party_components if item.kind == "prototype-javascript"
-        ],
     }
     lines = [
         "# Реестр сторонних компонентов Roehub",
@@ -581,7 +543,6 @@ def _expected_outputs() -> dict[Path, bytes]:
     _validate_first_party_assets(policy, tracked)
     components = [
         *_python_components(policy, pyproject),
-        *_prototype_components(policy),
         *_container_components(policy, tracked),
         *_release_image_components(policy),
         *_bundled_components(policy, tracked),

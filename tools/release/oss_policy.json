@@ -73,14 +73,6 @@
     "uvicorn": {"license": "BSD-3-Clause", "status": "compatible"},
     "webauthn": {"license": "BSD-3-Clause", "status": "compatible"}
   },
-  "prototype_javascript": {
-    "@phosphor-icons/react": {"license": "MIT", "status": "excluded"},
-    "@vitejs/plugin-react": {"license": "MIT", "status": "excluded"},
-    "react": {"license": "MIT", "status": "excluded"},
-    "react-dom": {"license": "MIT", "status": "excluded"},
-    "recharts": {"license": "MIT", "status": "excluded"},
-    "vite": {"license": "MIT", "status": "excluded"}
-  },
   "release_supported_architectures": [
     "linux/amd64",
     "linux/arm64"

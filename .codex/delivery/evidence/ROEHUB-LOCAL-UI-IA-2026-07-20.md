@@ -8,15 +8,16 @@
 - Accepted inventory baseline commit:
   `c6ef2f32464ea681c7582aa8b689aacdc02b5d70`.
 - Scope: self-hosted local-platform information architecture only.
-- Penpot access: not performed.
+- Design-tool access: not performed.
 - Product-code changes: none.
 - Commit or push for this ticket: not performed.
 
 Ticket acceptance means that this execution unit and its evidence are complete.
 The product owner subsequently accepted the target information architecture and
-authorization matrix. This acceptance authorizes preparation of the separate
-design-system contract and the server-authorization ticket graph; it does not
-authorize Penpot writes or Web implementation by itself.
+authorization matrix. The former design-system follow-up was retired during the
+2026-08-05 cleanup; the accepted IA remains an input to a separately initialized
+`ui-design-program` and to the server-authorization ticket graph. It does not
+authorize visual or Web implementation by itself.
 
 ## Delivered artifacts
 
@@ -68,7 +69,7 @@ was `Release`, with no unresolved material finding.
 This task proves documentation and registry consistency, source traceability,
 surface and journey coverage, and the independent review of the target
 authorization boundary. It does not prove runtime authorization, browser
-behavior, redirects, persistence, Penpot completeness, accessibility,
+behavior, redirects, persistence, visual-program completeness, accessibility,
 performance, release, or deployment.
 
 ## Verification

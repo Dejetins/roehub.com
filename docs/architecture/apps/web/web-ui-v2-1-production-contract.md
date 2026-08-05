@@ -27,7 +27,9 @@ Same-origin, backend authority, защита секретов, unknown-result re
 - `/strategies`, `/backtests` и `/settings` уже используют same-origin `/api/*` и реальные UI read/write contracts.
 - Exchange connection lifecycle уже включает create, validate, rotate, disable, archive, account configuration и audit events.
 - `/monitoring` реализован как read-only поверхность поверх существующего dashboard summary contract.
-- Прототип `prototypes/roehub-v2` является визуальным эталоном, но не технологическим шаблоном production.
+- Удалённый `prototypes/roehub-v2` был историческим visual source этой
+  реализации и доступен в Git history; он не является будущим визуальным
+  контрактом.
 - Production shell уже перенесён в `apps/web`: единственная sidebar navigation, command palette, mobile bottom navigation, шесть browser-local тем и route-owned состояния.
 
 ## Решения оболочки
@@ -80,7 +82,10 @@ Compatibility routes сохраняются. Deep links используют р�
 
 Каждый route имеет собственный active navigation key и canonical link. Новые страницы не создают отдельные доменные API и не меняют identity существующих сущностей.
 
-## Визуальный и адаптивный контракт
+## Исторически проверенная визуальная и адаптивная граница
+
+Следующие значения описывают развёрнутый контур v2.1 и не являются входными
+требованиями для будущей UI design program.
 
 - Dark baseline: `graphite`; light baseline: `paper`.
 - Дополнительные темы: `abyss`, `slate`, `frost`, `sand`.

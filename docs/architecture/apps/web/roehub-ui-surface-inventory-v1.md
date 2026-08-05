@@ -8,12 +8,13 @@ specified public-site target surface map.
 - Status: `accepted inventory`.
 - Ticket: `ROEHUB-UI-INVENTORY-2026-07-20`.
 - Evidence date: `2026-07-20`.
-- This is an inventory, not a design, delivery plan, implementation authority,
-  or Penpot artifact. No Penpot resource was read or changed.
+- This is an inventory, not a visual design program, delivery plan, or
+  implementation authority. No design resource was changed.
 - The current SSR Web service is the authority for implemented local behaviour.
   Product and public-site documents are authority only for their labelled target
-  requirements. `prototypes/roehub-v2/` is historical visual/interaction
-  evidence and never implementation authority.
+  requirements. The removed `prototypes/roehub-v2/` is available only in Git
+  history at the accepted inventory baseline and never implementation or visual
+  authority.
 
 The companion registries are [local platform registry](roehub-ui-surface-registry-v1.json)
 and [public-site registry](roehub-public-site-surface-registry-v1.json). They
@@ -39,7 +40,7 @@ listed for route completeness, but are not product navigation.
 |---|---|---|---|
 | Local platform | `apps/web/` is FastAPI + Jinja + static JavaScript, using same-origin `/api/*` proxying and an API current-user lookup. | A later `apps/platform-web` client may replace this UI only through a separate accepted task. | A public-site account, release history, or demo gives no access to an installation. |
 | `roehub.com` | No `apps/site` implementation or public-site route exists in the current codebase. | The separate registry records accepted product/specification targets and labelled proposals. | It is not a central Roehub installation and must not publish local operator runbooks by default. |
-| Historical prototype | `prototypes/roehub-v2/` has local fixture data and hash-routed pages for login, overview, strategies, backtests, live, models, connections, settings, program map, and state gallery. | It can inform later design traceability. | It does not prove API, roles, persistence, browser behaviour, or a mobile local-platform target. |
+| Historical prototype | Commit `c6ef2f32464ea681c7582aa8b689aacdc02b5d70` records the removed fixture-driven React prototype and its route set. | It remains Git history only. | It does not prove API, roles, persistence, browser behaviour, a mobile local-platform target, or a current visual direction. |
 
 ## Current route inventory
 
@@ -137,4 +138,6 @@ unverified boundaries, not accepted implementation claims.
 - `docs/architecture/platform/roehub-product-transformation-requirements-v1.md`
 - `docs/architecture/apps/web/roehub-ui-design-and-delivery-architecture-v1.md`
 - `docs/architecture/platform/roehub-public-site-identity-release-and-measurement-v1.md`
-- `prototypes/roehub-v2/README.md`, `prototypes/roehub-v2/src/`
+- Git history at accepted inventory baseline
+  `c6ef2f32464ea681c7582aa8b689aacdc02b5d70` for the removed
+  `prototypes/roehub-v2/`

@@ -135,17 +135,6 @@
 | `lightweight-charts` | `5.2.0` | `Apache-2.0 AND 0BSD` | `compatible` |
 | ↳ обязательство |  |  | Preserve the upstream NOTICE and user-visible TradingView attribution/link requirement. |
 
-## Исключённый прототип
-
-| Компонент | Версия | Лицензия | Статус |
-|---|---:|---|---|
-| `@phosphor-icons/react` | `2.1.10` | `MIT` | `excluded` |
-| `@vitejs/plugin-react` | `5.0.4` | `MIT` | `excluded` |
-| `react` | `19.2.0` | `MIT` | `excluded` |
-| `react-dom` | `19.2.0` | `MIT` | `excluded` |
-| `recharts` | `3.9.2` | `MIT` | `excluded` |
-| `vite` | `6.4.2` | `MIT` | `excluded` |
-
 ## Известные риски транзитивных лицензий
 
 - Raw Syft NOASSERTION records in first-party runtime images must be resolved by the digest-bound runtime license audit; any new or unmatched record blocks release.

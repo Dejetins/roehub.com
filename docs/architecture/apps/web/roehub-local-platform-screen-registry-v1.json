@@ -74,7 +74,7 @@
       "target_status": "target_not_implemented",
       "source_surface_ids": ["platform.shell.preferences"],
       "journey_ids": [],
-      "required_states": ["expanded_navigation", "compact_navigation", "command_palette", "notifications", "organization_context", "six_themes", "ru_en", "session_warning"]
+      "required_states": ["expanded_navigation", "compact_navigation", "command_palette", "notifications", "organization_context", "theme_preferences", "ru_en", "session_warning"]
     },
     {
       "screen_id": "screen.dashboard.overview",
@@ -239,7 +239,7 @@
       "target_status": "target_not_implemented",
       "source_surface_ids": ["platform.settings.preferences"],
       "journey_ids": [],
-      "required_states": ["ready", "six_themes", "ru_en", "refresh_off", "refresh_preset", "save_error"]
+      "required_states": ["ready", "theme_preferences", "ru_en", "refresh_off", "refresh_preset", "save_error"]
     },
     {
       "screen_id": "screen.settings.notifications",

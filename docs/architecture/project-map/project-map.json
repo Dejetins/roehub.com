@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1081,
+      "file_count": 1057,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -209,7 +209,7 @@
       "title": "Документация и агентные контракты"
     },
     {
-      "file_count": 52,
+      "file_count": 0,
       "id": "experiments",
       "paths": [
         "prototypes/",
@@ -3423,101 +3423,6 @@
     {
       "area": "knowledge",
       "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1-stage-09-results/00-inventory-stage09-current-contract.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1-stage-09-results/01-implement-lazy-trades-materialization-contract.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1-stage-09-results/02-harden-result-statistics-endpoints.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1-stage-09-results/03-implement-backtests-results-ui.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1-stage-09-results/04-stage09-final-verification-and-delivery.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/00-contract-freeze-and-cleanup-boundary.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/01-implement-shell-auth-register.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/02-implement-design-system-js-core.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/03-implement-landing.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/04-implement-dashboard.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/05-implement-settings-account.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/06-implement-strategy-library-detail.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/07-implement-strategy-monitoring.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/08-5-implement-backtest-runtime-hardening.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/08-9-prepare-backtests-results-readiness.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/08-implement-backtests-history-configurator.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/09-implement-backtests-results.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/11-implement-security-performance-delivery-hardening.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/agents/generated/web-ui-backend-v1/12-implement-capacity-load-validation.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
       "path": ".codex/agents/legacy/promt_temlate.md"
     },
     {
@@ -3539,6 +3444,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-LOCAL-UI-IA-2026-07-20.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html"
     },
     {
       "area": "knowledge",
@@ -4069,11 +3979,6 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/tickets/2026-07-20-roehub-authz-strategies.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/tickets/2026-07-20-roehub-local-ui-design-system-contract.md"
     },
     {
       "area": "knowledge",
@@ -6609,21 +6514,6 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/apps/web/web-strategy-ui-crud-builder-delete-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/apps/web/web-ui-backend-implementation-plan-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/apps/web/web-ui-design-manifest-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/apps/web/web-ui-product-redesign-master-plan-v2.md"
     },
     {
       "area": "knowledge",
@@ -9543,11 +9433,6 @@
     {
       "area": "knowledge",
       "kind": "documentation",
-      "path": "docs/deep-research-report.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
       "path": "docs/repository_three.md"
     },
     {
@@ -9924,11 +9809,6 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/runbooks/web-ui-gateway-same-origin.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/web-ui+backend-plan-deep-research.md"
     },
     {
       "area": "quality",
@@ -10589,266 +10469,6 @@
       "area": "automation",
       "kind": "documentation",
       "path": "notebooks/README.md"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/.gitignore"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/.npmrc"
-    },
-    {
-      "area": "experiments",
-      "kind": "documentation",
-      "path": "prototypes/roehub-v2/AGENTS.md"
-    },
-    {
-      "area": "experiments",
-      "kind": "documentation",
-      "path": "prototypes/roehub-v2/README.md"
-    },
-    {
-      "area": "experiments",
-      "kind": "documentation",
-      "path": "prototypes/roehub-v2/browser-qa.md"
-    },
-    {
-      "area": "experiments",
-      "kind": "documentation",
-      "path": "prototypes/roehub-v2/design-qa.md"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/backtests-mobile.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/connections-desktop-spacing-v2.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/implementation-focus.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/login-mobile.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/models-before-spacing.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/models-desktop-spacing-v2.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/models-mobile-spacing-v2.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/models-spacing-comparison.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/navigation-single-nav-focus-comparison-1189x611.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/overview-before-spacing.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/overview-desktop-final.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/overview-desktop-pass1.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/overview-desktop-pass2.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/overview-desktop-spacing-v2.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/overview-mobile-spacing-v2.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/overview-mobile.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/overview-spacing-comparison.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/overview-tablet.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/program-map-before-tab-fix.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/program-map-mobile-final.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/reference-focus.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/settings-before-spacing.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/settings-desktop-spacing-v2.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/settings-mobile-spacing-v2.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/settings-paper-mobile.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/settings-spacing-comparison.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/strategies-after-single-nav-1189x611.png"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/strategies-before-single-nav-1189x611.png"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/strategies-desktop-spacing-v2.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/strategies-mobile-spacing-v2.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/strategies-single-nav-comparison-1189x611.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/strategies-single-nav-desktop-1440x1024.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/strategies-single-nav-mobile-390x844.png"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/strategies-user-reference.png"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/visual-target-1440x1024.jpg"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/evidence/visual-target.png"
-    },
-    {
-      "area": "experiments",
-      "kind": "frontend",
-      "path": "prototypes/roehub-v2/index.html"
-    },
-    {
-      "area": "experiments",
-      "kind": "configuration",
-      "path": "prototypes/roehub-v2/package-lock.json"
-    },
-    {
-      "area": "experiments",
-      "kind": "configuration",
-      "path": "prototypes/roehub-v2/package.json"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/src/App.jsx"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/src/components.jsx"
-    },
-    {
-      "area": "experiments",
-      "kind": "frontend",
-      "path": "prototypes/roehub-v2/src/data.js"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/src/main.jsx"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/src/pages.jsx"
-    },
-    {
-      "area": "experiments",
-      "kind": "frontend",
-      "path": "prototypes/roehub-v2/src/styles.css"
-    },
-    {
-      "area": "experiments",
-      "kind": "other",
-      "path": "prototypes/roehub-v2/vite.config.mjs"
     },
     {
       "area": "repository-meta",
@@ -17381,7 +17001,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3036,
+  "inventory_file_count": 2960,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17598,5 +17218,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "ddc13cca21b3bca2690912414115d2e40fd4290e1175e14843b10579efb6c560"
+  "structural_digest": "6d2f1f2155076d5c09d8834578c978f4872899e39575ac1317936a20df7b1822"
 }
