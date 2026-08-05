@@ -1,8 +1,8 @@
 ---
 ticket_id: ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20
-status: accepted
+status: ready
 owner: unassigned
-ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json
+ticket_graph: .codex/delivery/graphs/roehub-server-authorization-stream-v1.json
 depends_on:
   - ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20
 evidence:
@@ -52,19 +52,3 @@ public API endpoints are left to a later integration ticket.
 
 - All scoped persistence/application evidence passes and the ticket becomes
   `accepted`; endpoint exposure remains unauthorized.
-
-## Migration bootstrap repair (2026-07-22)
-
-The clean-PostgreSQL CI defect is repaired within this ticket rather than as a
-new product boundary. The bootstrap contract is now SQL `0001..0009`, Alembic
-`20260711_0043`, SQL `0010..0011`, Alembic `head`, then SQL `0012..0022` in
-numeric order. `apps.migrations.main` accepts an explicit Alembic target while
-keeping `head` as its default, and CI exercises `apps.migrations.bootstrap_main`
-with both DSNs pointed at its one temporary PostgreSQL service.
-
-`0011_identity_organizations_rbac_audit_v1.sql` remains the sole owner of
-`identity_organizations` and `identity_memberships`; published Alembic revision
-`20260720_0044` remains unchanged and owns only delegated-capability storage.
-The compact decision and actual verification results are recorded in
-`docs/architecture/identity/identity-migration-channels-delegation-checkpoint-v1.md`
-and the linked evidence file.

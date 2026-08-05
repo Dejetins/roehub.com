@@ -2,7 +2,7 @@
 ticket_id: ROEHUB-AUTHZ-INTEGRATION-PROOF-2026-07-20
 status: draft
 owner: unassigned
-ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json
+ticket_graph: .codex/delivery/graphs/roehub-server-authorization-stream-v1.json
 depends_on:
   - ROEHUB-AUTHZ-DASHBOARD-DATA-2026-07-20
   - ROEHUB-AUTHZ-SETTINGS-ADMIN-2026-07-20
@@ -41,7 +41,7 @@ before a new Web UI relies on it.
 
 ## Non-goals
 
-- No Web UI, browser-visible acceptance, Figma artifact, model API creation, public site,
+- No Web UI, browser-visible acceptance, Penpot, model API creation, public site,
   release, or deploy.
 
 ## Proof boundary

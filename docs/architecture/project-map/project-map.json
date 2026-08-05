@@ -130,7 +130,7 @@
   ],
   "areas": [
     {
-      "file_count": 687,
+      "file_count": 675,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -152,7 +152,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 312,
+      "file_count": 291,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -161,7 +161,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 289,
+      "file_count": 288,
       "id": "operations",
       "paths": [
         "infra/",
@@ -174,7 +174,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 131,
+      "file_count": 128,
       "id": "automation",
       "paths": [
         "tools/",
@@ -186,7 +186,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 437,
+      "file_count": 429,
       "id": "quality",
       "paths": [
         "tests/",
@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1178,
+      "file_count": 1081,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -460,28 +460,6 @@
     },
     {
       "depends_on": [
-        "app:web"
-      ],
-      "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
-      "docs": [],
-      "entrypoints": [],
-      "file_count": 21,
-      "id": "app:platform-web",
-      "kind": "app",
-      "name": "platform-web",
-      "roots": [
-        "apps/platform-web",
-        "apps/platform-web/scripts",
-        "apps/platform-web/src",
-        "apps/platform-web/src/data",
-        "apps/platform-web/src/state",
-        "apps/platform-web/tests",
-        "apps/platform-web/tests/browser"
-      ],
-      "used_by": []
-    },
-    {
-      "depends_on": [
         "core:integration"
       ],
       "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
@@ -598,9 +576,7 @@
         "apps/web/main",
         "apps/web/templates"
       ],
-      "used_by": [
-        "app:platform-web"
-      ]
+      "used_by": []
     },
     {
       "depends_on": [
@@ -798,7 +774,7 @@
         "docs/architecture/identity/identity-2fa-totp-policy-v1.md"
       ],
       "entrypoints": [],
-      "file_count": 87,
+      "file_count": 75,
       "id": "context:identity",
       "kind": "context",
       "name": "identity",
@@ -1784,11 +1760,6 @@
       "kind": "python-import",
       "source": "app:migrations",
       "target": "core:shared_kernel"
-    },
-    {
-      "kind": "python-import",
-      "source": "app:platform-web",
-      "target": "app:web"
     },
     {
       "kind": "python-import",
@@ -3062,11 +3033,6 @@
     {
       "area": "knowledge",
       "kind": "documentation",
-      "path": ".codex/agents/generated/roehub-backtests-figma-pilot-v1/task.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
       "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/00-contract-baseline-and-repair-route.md"
     },
     {
@@ -3567,42 +3533,7 @@
     {
       "area": "knowledge",
       "kind": "documentation",
-      "path": ".codex/delivery/evidence/ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/ROEHUB-DELIVERY-MODEL-CONSOLIDATION-2026-07-22.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/ROEHUB-FIGMA-DESIGN-DELIVERY-MIGRATION-2026-07-22.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/ROEHUB-LINEAR-FRONTEND-ARCHITECTURE-SPIKE-2026-07-20.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/ROEHUB-LINEAR-REFERENCE-COMPLETION-2026-07-20.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/ROEHUB-LOCAL-UI-DESIGN-SYSTEM-CONTRACT-2026-07-20.md"
     },
     {
       "area": "knowledge",
@@ -3611,258 +3542,8 @@
     },
     {
       "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/ROEHUB-UI-DESIGN-ACCEPTANCE-BOUNDARY-REPAIR-2026-07-22.md"
-    },
-    {
-      "area": "knowledge",
       "kind": "configuration",
-      "path": ".codex/delivery/evidence/roehub-authenticated-platform-ui-design/2026-08-03-g1-atlas-r2-owner-acceptance.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-html-first-ui-pilot/2026-08-03-backtests-v23-owner-acceptance.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-1-better-interface-review.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-2-better-interface-review.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-2-owner-rejection-audit.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-3-source-contamination-rejection.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-4-action-gate-rejection.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-5-linear-native-review.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-tahoe-v3-owner-rejection.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-tahoe-v4-owner-feedback.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-attempt-tahoe-v4-review.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-linear-black-v5-review.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-linear-black-v6-owner-feedback.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-linear-black-v6-review.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-linear-black-v7-better-interface-review.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-linear-black-v8-interface-review.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-linear-black-v8-owner-refinement.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-selection-candidate-dir-003.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-direction-selection-candidate.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-figma-page-scaffold.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-07-31-preparation-review.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-08-01-backtests-figma-pilot-handoff-cold-head-review.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-08-01-direction-linear-black-v9-owner-acceptance.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/2026-08-01-direction-linear-black-v9-owner-refinement.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/artifacts/dir-002-roehub-linear-native-backtests.png"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/artifacts/dir-003-figma-readback.png"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/artifacts/dir-003-roehub-linear-native-backtests.png"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-linear-black-workbench-v5.png"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-linear-black-workbench-v6.png"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-linear-black-workbench-v7-repair-2.png"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-linear-black-workbench-v7.png"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-linear-black-workbench-v8.png"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-tahoe-1-workbench.png"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-tahoe-2-compare-desk.png"
-    },
-    {
-      "area": "knowledge",
-      "kind": "other",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-tahoe-3-focus-studio.png"
-    },
-    {
-      "area": "knowledge",
-      "kind": "frontend",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-07-31-linear-black-workbench-v7-repair-2.html"
-    },
-    {
-      "area": "knowledge",
-      "kind": "frontend",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-07-31-linear-black-workbench-v8.html"
-    },
-    {
-      "area": "knowledge",
-      "kind": "frontend",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-01-linear-black-workbench-v9.html"
-    },
-    {
-      "area": "knowledge",
-      "kind": "frontend",
-      "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/specs/roehub-linear-workspace-ui-transition.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/owner-review.template.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-acceptance.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-acceptance.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "frontend",
-      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-atlas.html"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-atlas.resolved.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-design-contract.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/screen-design-contract.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/ui-design-program.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-design-programs/roehub-authenticated-platform-v1/ui-design-program.schema.json"
+      "path": ".codex/delivery/graphs/roehub-server-authorization-stream-v1.json"
     },
     {
       "area": "knowledge",
@@ -4392,26 +4073,6 @@
     {
       "area": "knowledge",
       "kind": "documentation",
-      "path": ".codex/tickets/2026-07-20-roehub-backtests-linear-golden-slice.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/tickets/2026-07-20-roehub-figma-linear-vnext-foundations.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/tickets/2026-07-20-roehub-linear-frontend-architecture-spike.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/tickets/2026-07-20-roehub-linear-reference-completion.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
       "path": ".codex/tickets/2026-07-20-roehub-local-ui-design-system-contract.md"
     },
     {
@@ -4422,37 +4083,7 @@
     {
       "area": "knowledge",
       "kind": "documentation",
-      "path": ".codex/tickets/2026-07-20-roehub-react-linear-application-shell.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
       "path": ".codex/tickets/2026-07-20-roehub-ui-surface-inventory.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/tickets/2026-07-22-roehub-delivery-model-consolidation.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/tickets/2026-07-22-roehub-figma-design-delivery-migration.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/tickets/2026-07-22-roehub-ui-design-acceptance-boundary-repair.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/tickets/2026-07-22-roehub-ui-instructions-and-copy-review.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/tickets/2026-07-31-roehub-ui-agent-governed-pilot.md"
     },
     {
       "area": "repository-meta",
@@ -4763,11 +4394,6 @@
       "area": "operations",
       "kind": "python",
       "path": "alembic/versions/20260711_0043_notification_delivery_counters_v1.py"
-    },
-    {
-      "area": "operations",
-      "kind": "python",
-      "path": "alembic/versions/20260720_0044_identity_delegated_capabilities_v1.py"
     },
     {
       "area": "delivery",
@@ -5328,111 +4954,6 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/monitoring/operational_health.py"
-    },
-    {
-      "area": "delivery",
-      "kind": "documentation",
-      "path": "apps/platform-web/README.md"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/index.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "python",
-      "path": "apps/platform-web/prototype_gateway.py"
-    },
-    {
-      "area": "delivery",
-      "kind": "other",
-      "path": "apps/platform-web/scripts/report-sizes.mjs"
-    },
-    {
-      "area": "delivery",
-      "kind": "other",
-      "path": "apps/platform-web/src/App.integration.test.tsx"
-    },
-    {
-      "area": "delivery",
-      "kind": "other",
-      "path": "apps/platform-web/src/App.tsx"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/src/data/api.test.ts"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/src/data/api.ts"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/src/data/sse.test.ts"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/src/data/sse.ts"
-    },
-    {
-      "area": "delivery",
-      "kind": "other",
-      "path": "apps/platform-web/src/main.tsx"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/src/metrics.ts"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/src/state/uiStore.test.ts"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/src/state/uiStore.ts"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/src/styles.css"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/tests/browser/architecture.spec.ts"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/tests/browser/performance.spec.ts"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/tests/browser/playwright.config.ts"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/tests/setup.ts"
-    },
-    {
-      "area": "delivery",
-      "kind": "configuration",
-      "path": "apps/platform-web/tsconfig.json"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/platform-web/vite.config.ts"
     },
     {
       "area": "delivery",
@@ -7056,48 +6577,13 @@
     },
     {
       "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v2.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/apps/web/roehub-local-platform-component-registry-v1.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/apps/web/roehub-local-platform-design-system-contract-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/apps/web/roehub-local-platform-design-token-contract-v1.json"
-    },
-    {
-      "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/apps/web/roehub-local-platform-information-architecture-v1.md"
     },
     {
       "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/apps/web/roehub-local-platform-information-architecture-v2.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/apps/web/roehub-local-platform-journey-registry-v1.json"
-    },
-    {
-      "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json"
     },
     {
       "area": "knowledge",
@@ -7116,18 +6602,8 @@
     },
     {
       "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/apps/web/roehub-ui-surface-inventory-v2.md"
-    },
-    {
-      "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-ui-surface-registry-v1.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/apps/web/roehub-ui-surface-registry-v2.json"
     },
     {
       "area": "knowledge",
@@ -8967,11 +8443,6 @@
     {
       "area": "knowledge",
       "kind": "documentation",
-      "path": "docs/architecture/identity/identity-migration-channels-delegation-checkpoint-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
       "path": "docs/architecture/identity/identity-telegram-login-user-model-v1.md"
     },
     {
@@ -10071,101 +9542,6 @@
     },
     {
       "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/ui/linear-workspace-reference-manifest-v1.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/linear-workspace-reference-measurements-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/linear-workspace-ui-transition-standard-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/roehub-agent-governed-figma-delivery-standard-v2.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/roehub-backtests-process-pilot-brief-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/roehub-figma-design-delivery-standard-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/roehub-linear-black-authenticated-workspace-visual-standard-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/roehub-linear-black-backtests-workbench-doctrine-v5.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/roehub-linear-black-backtests-workbench-doctrine-v6.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/roehub-linear-black-backtests-workbench-doctrine-v7.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/roehub-linear-native-interaction-doctrine-v2.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/ui/roehub-linear-ui-migration-registry-v1.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/roehub-premium-linear-visual-doctrine-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/roehub-tahoe-backtests-visual-and-interaction-doctrine-v3.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/architecture/ui/roehub-tahoe-backtests-workstation-doctrine-v4.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/ui/roehub-ui-agent-delivery-contract-v1.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/ui/roehub-ui-agent-delivery-contract-v2.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/ui/roehub-ui-component-registry-schema-v1.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": "docs/architecture/ui/roehub-ui-composition-manifest-schema-v1.json"
-    },
-    {
-      "area": "knowledge",
       "kind": "documentation",
       "path": "docs/deep-research-report.md"
     },
@@ -11213,16 +10589,6 @@
       "area": "automation",
       "kind": "documentation",
       "path": "notebooks/README.md"
-    },
-    {
-      "area": "repository-root",
-      "kind": "configuration",
-      "path": "package-lock.json"
-    },
-    {
-      "area": "repository-root",
-      "kind": "configuration",
-      "path": "package.json"
     },
     {
       "area": "experiments",
@@ -12837,11 +12203,6 @@
     {
       "area": "domain",
       "kind": "python",
-      "path": "src/trading/contexts/identity/adapters/inbound/api/mutation_guard.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
       "path": "src/trading/contexts/identity/adapters/inbound/api/routes/__init__.py"
     },
     {
@@ -12892,11 +12253,6 @@
     {
       "area": "domain",
       "kind": "python",
-      "path": "src/trading/contexts/identity/adapters/outbound/persistence/in_memory/delegation_repository.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
       "path": "src/trading/contexts/identity/adapters/outbound/persistence/in_memory/exchange_keys_repository.py"
     },
     {
@@ -12933,11 +12289,6 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/identity/adapters/outbound/persistence/postgres/account_settings_repository.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
-      "path": "src/trading/contexts/identity/adapters/outbound/persistence/postgres/delegation_repository.py"
     },
     {
       "area": "domain",
@@ -13052,46 +12403,6 @@
     {
       "area": "domain",
       "kind": "python",
-      "path": "src/trading/contexts/identity/application/delegation/__init__.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
-      "path": "src/trading/contexts/identity/application/delegation/models.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
-      "path": "src/trading/contexts/identity/application/delegation/service.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
-      "path": "src/trading/contexts/identity/application/mutation_security/__init__.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
-      "path": "src/trading/contexts/identity/application/mutation_security/effective_authorizer.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
-      "path": "src/trading/contexts/identity/application/mutation_security/idempotency.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
-      "path": "src/trading/contexts/identity/application/mutation_security/models.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
-      "path": "src/trading/contexts/identity/application/mutation_security/service.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
       "path": "src/trading/contexts/identity/application/ports/__init__.py"
     },
     {
@@ -13113,11 +12424,6 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/identity/application/ports/current_user.py"
-    },
-    {
-      "area": "domain",
-      "kind": "python",
-      "path": "src/trading/contexts/identity/application/ports/delegation_repository.py"
     },
     {
       "area": "domain",
@@ -17447,11 +16753,6 @@
     {
       "area": "quality",
       "kind": "python",
-      "path": "tests/unit/docs/test_roehub_local_platform_design_system_contract.py"
-    },
-    {
-      "area": "quality",
-      "kind": "python",
       "path": "tests/unit/docs/test_roehub_local_platform_information_architecture.py"
     },
     {
@@ -17463,31 +16764,6 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/identity/authorization/test_capability_authorization.py"
-    },
-    {
-      "area": "quality",
-      "kind": "python",
-      "path": "tests/unit/identity/delegation/test_delegated_capability_service.py"
-    },
-    {
-      "area": "quality",
-      "kind": "python",
-      "path": "tests/unit/identity/delegation/test_delegation_migration_contract.py"
-    },
-    {
-      "area": "quality",
-      "kind": "python",
-      "path": "tests/unit/identity/delegation/test_postgres_delegation_repository.py"
-    },
-    {
-      "area": "quality",
-      "kind": "python",
-      "path": "tests/unit/identity/mutation_security/test_mutation_guard.py"
-    },
-    {
-      "area": "quality",
-      "kind": "python",
-      "path": "tests/unit/identity/mutation_security/test_mutation_security.py"
     },
     {
       "area": "quality",
@@ -17792,16 +17068,6 @@
     {
       "area": "quality",
       "kind": "python",
-      "path": "tests/unit/tools/test_validate_roehub_delivery_model.py"
-    },
-    {
-      "area": "quality",
-      "kind": "python",
-      "path": "tests/unit/tools/test_validate_roehub_ui_delivery.py"
-    },
-    {
-      "area": "quality",
-      "kind": "python",
       "path": "tests/unit/tools/test_verify_market_data_readiness.py"
     },
     {
@@ -17928,21 +17194,6 @@
       "area": "automation",
       "kind": "python",
       "path": "tools/codex_quality_benchmark/skill_discovery.py"
-    },
-    {
-      "area": "automation",
-      "kind": "python",
-      "path": "tools/delivery/validate_roehub_delivery_model.py"
-    },
-    {
-      "area": "automation",
-      "kind": "python",
-      "path": "tools/design/__init__.py"
-    },
-    {
-      "area": "automation",
-      "kind": "python",
-      "path": "tools/design/validate_roehub_ui_delivery.py"
     },
     {
       "area": "automation",
@@ -18130,7 +17381,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3180,
+  "inventory_file_count": 3036,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -18347,5 +17598,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "46dd074cd91f06903cf83576167ceb400868347fbf0aedd4ad97ccdda25ca461"
+  "structural_digest": "ddc13cca21b3bca2690912414115d2e40fd4290e1175e14843b10579efb6c560"
 }

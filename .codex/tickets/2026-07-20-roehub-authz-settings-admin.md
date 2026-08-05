@@ -2,7 +2,7 @@
 ticket_id: ROEHUB-AUTHZ-SETTINGS-ADMIN-2026-07-20
 status: draft
 owner: unassigned
-ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json
+ticket_graph: .codex/delivery/graphs/roehub-server-authorization-stream-v1.json
 depends_on:
   - ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20
   - ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20
@@ -34,7 +34,7 @@ with server-filtered projections.
 ## Non-goals
 
 - No installation trust/resources/recovery or operational actions; no Dashboard,
-  Strategies, Backtests, Connections, Web UI, or Figma artifact.
+  Strategies, Backtests, Connections, Web UI, or Penpot.
 
 ## Proof boundary
 

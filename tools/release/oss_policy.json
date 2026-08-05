@@ -285,50 +285,6 @@
     }
   },
   "first_party_assets": {
-    ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/artifacts/dir-002-roehub-linear-native-backtests.png": {
-      "license": "Apache-2.0",
-      "sha256": "7d02e4ecb2c806574e584ebba463dbfc1c4be9b86d73700c693a4e1c4e908e2b"
-    },
-    ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/artifacts/dir-003-figma-readback.png": {
-      "license": "Apache-2.0",
-      "sha256": "ba04f85edb3145159598a90ea786aaadf3e5fbe03e3538576e8011c589f2d3cb"
-    },
-    ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/artifacts/dir-003-roehub-linear-native-backtests.png": {
-      "license": "Apache-2.0",
-      "sha256": "1e4c86de9c1891e8ee5b5f67bf8fc66c63b89dfc42252590df8361bc6f0106f2"
-    },
-    ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-linear-black-workbench-v5.png": {
-      "license": "Apache-2.0",
-      "sha256": "29142362193ebcca0b830701d3e576468c1a511f4de190bd13bb42a016f58551"
-    },
-    ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-linear-black-workbench-v6.png": {
-      "license": "Apache-2.0",
-      "sha256": "810d526e2d6055cdc65a48118e0460cbf7476d7494673fb2bf3da11a501040e1"
-    },
-    ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-linear-black-workbench-v7-repair-2.png": {
-      "license": "Apache-2.0",
-      "sha256": "8def0c403dad0bf599510aade9dd4e192ebfe3c9658a61fe35769f5a67c4ddb6"
-    },
-    ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-linear-black-workbench-v7.png": {
-      "license": "Apache-2.0",
-      "sha256": "f22519f0e99a9f46580c62cb4c007b04195577d2f7d404fe73c602f317c8faa7"
-    },
-    ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-linear-black-workbench-v8.png": {
-      "license": "Apache-2.0",
-      "sha256": "91e095a664f6f4aee1bdfd1bce026f91ac33423611b72d2f8a111ccec42e997d"
-    },
-    ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-tahoe-1-workbench.png": {
-      "license": "Apache-2.0",
-      "sha256": "6fea94a2e1e822a5865aec6dc520704837876ff00f745a741fc692448026f18e"
-    },
-    ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-tahoe-2-compare-desk.png": {
-      "license": "Apache-2.0",
-      "sha256": "bdb1a13d5032a0f7f403befa0ca81ab060c39171e988b7f8e7a748cd00cce4b8"
-    },
-    ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/images/2026-07-31-tahoe-3-focus-studio.png": {
-      "license": "Apache-2.0",
-      "sha256": "1a09de63b83e4c17ab105b17bd6b5616f3a10d838b6116a4a988c09125197ab7"
-    },
     "apps/web/dist/favicon.svg": {
       "license": "Apache-2.0",
       "sha256": "08d56b70ff1cad000fa25cbce10cd3de3c63bf172654e3db06c88fe698f86ee9"

@@ -2,7 +2,7 @@
 ticket_id: ROEHUB-AUTHZ-OPERATIONS-INSTALLATION-2026-07-20
 status: draft
 owner: unassigned
-ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json
+ticket_graph: .codex/delivery/graphs/roehub-server-authorization-stream-v1.json
 depends_on:
   - ROEHUB-AUTHZ-SETTINGS-ADMIN-2026-07-20
   - ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20
@@ -41,7 +41,7 @@ and shared-service actions, enforcing the accepted closed action set.
 
 ## Non-goals
 
-- No deployment target, host SSH, Mac Studio, UI, Figma artifact, plugin lifecycle,
+- No deployment target, host SSH, Mac Studio, UI, Penpot, plugin lifecycle,
   release, or deploy.
 
 ## Proof boundary

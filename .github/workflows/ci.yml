@@ -109,11 +109,6 @@ jobs:
         run: |
           python .codex/hooks/tests/run_tests.py
 
-      - name: Roehub delivery model
-        if: needs.changes.outputs.code == 'true' || needs.changes.outputs.docs == 'true'
-        run: |
-          python -m tools.delivery.validate_roehub_delivery_model
-
       - name: Type check
         if: needs.changes.outputs.code == 'true'
         run: |
@@ -196,13 +191,7 @@ jobs:
 
       - name: Migrations (fail-fast)
         run: |
-          uv run python -m apps.migrations.bootstrap_main \
-            --identity-dsn "$POSTGRES_DSN" \
-            --postgres-dsn "$POSTGRES_DSN"
-
-      - name: Delegation PostgreSQL parity (fail-fast)
-        run: |
-          ROEHUB_TEST_DELEGATION_PG_DSN="$POSTGRES_DSN" uv run pytest -q tests/unit/identity/delegation/test_postgres_delegation_repository.py
+          uv run python -m apps.migrations.main --dsn "$POSTGRES_DSN"
 
   test_shards:
     name: test-shard (${{ matrix.name }})

@@ -1,8 +1,8 @@
 ---
 ticket_id: ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20
-status: accepted
+status: ready
 owner: unassigned
-ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json
+ticket_graph: .codex/delivery/graphs/roehub-server-authorization-stream-v1.json
 depends_on:
   - ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20
 evidence:

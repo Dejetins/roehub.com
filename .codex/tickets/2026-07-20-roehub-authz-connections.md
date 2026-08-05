@@ -2,7 +2,7 @@
 ticket_id: ROEHUB-AUTHZ-CONNECTIONS-2026-07-20
 status: draft
 owner: unassigned
-ticket_graph: .codex/delivery/graphs/roehub-authenticated-platform-delivery-v1.json
+ticket_graph: .codex/delivery/graphs/roehub-server-authorization-stream-v1.json
 depends_on:
   - ROEHUB-AUTHZ-DELEGATION-CORE-2026-07-20
   - ROEHUB-AUTHZ-BROWSER-MUTATION-ENVELOPE-2026-07-20
@@ -30,7 +30,7 @@ ever returning stored secret material.
 
 ## Non-goals
 
-- No exchange-order submission, strategy UI, new credential provider, Figma artifact,
+- No exchange-order submission, strategy UI, new credential provider, Penpot,
   release, or deploy.
 
 ## Proof boundary
