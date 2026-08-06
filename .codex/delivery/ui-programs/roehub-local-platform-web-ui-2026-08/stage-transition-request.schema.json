@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/stage-transition-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["program_id", "from_stage_id", "from_gate", "from_target", "from_revision", "artifact", "to_gate", "to_stage_id", "to_target", "to_task", "status", "owner_decision", "decision_inventory", "blockers", "checks", "summary", "review_artifacts", "questions"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "program_id": {"type": "string", "minLength": 1},
+    "from_stage_id": {"type": "string", "minLength": 1},
+    "from_gate": {"enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"]},
+    "from_target": {"type": "string", "minLength": 1},
+    "from_revision": {"type": "integer", "minimum": 1},
+    "artifact": {"type": "string", "minLength": 1},
+    "to_gate": {"type": ["string", "null"], "enum": ["G1", "G2", "G3", "G4", "G5", "G6", null]},
+    "to_stage_id": {"type": ["string", "null"]},
+    "to_target": {"type": ["string", "null"]},
+    "to_task": {"type": ["string", "null"]},
+    "status": {"enum": ["ready", "review_ready", "blocked"]},
+    "owner_decision": {"type": ["string", "null"]},
+    "decision_inventory": {"type": ["string", "null"]},
+    "blockers": {"type": ["string", "null"]},
+    "checks": {"type": "array", "minItems": 7, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z_]+=(N/A|.+)$"}},
+    "summary": {"type": "string", "minLength": 1},
+    "review_artifacts": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "questions": {"type": "array", "maxItems": 3, "items": {"type": "string", "minLength": 1}}
+  }
+}

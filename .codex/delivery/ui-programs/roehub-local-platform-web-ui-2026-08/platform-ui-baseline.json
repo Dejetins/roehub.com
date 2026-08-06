@@ -1,0 +1,128 @@
+{
+  "$schema": "platform-ui-baseline.schema.json",
+  "schema_id": "codex.platform-ui-baseline/v1",
+  "contract_profile": "codex.platform-ui-baseline/v1@1.0.0",
+  "baseline_id": "roehub.platform-baseline.v1",
+  "revision": 1,
+  "status": "draft",
+  "source_visual": {
+    "path": "<accepted-pilot-path>",
+    "sha256": null,
+    "owner_decision_ref": "<revisioned-owner-decision-path>",
+    "native_viewport": {
+      "width": null,
+      "height": null
+    },
+    "state_id": "<reviewed-state-id>",
+    "theme_id": "<reviewed-theme-id>"
+  },
+  "scope": {
+    "screen_acceptance_scope": "<exact-scope>",
+    "visual_language_scope": "<exact-scope>",
+    "reusable_foundation_scope": "<exact-scope>",
+    "inheritance_policy": "required",
+    "mobile_scope": "unauthorized"
+  },
+  "supporting_sources": [],
+  "default_shell_variant_id": "shell.authenticated.default",
+  "shell_variants": [],
+  "navigation_contracts": [],
+  "foundation_tokens": {
+    "color": [],
+    "typography": [],
+    "spacing": [],
+    "sizing": [],
+    "radius": [],
+    "border": [],
+    "elevation": [],
+    "opacity": [],
+    "motion": [],
+    "z_index": []
+  },
+  "font_contract": {
+    "families": [],
+    "bundle_path": null,
+    "bundle_sha256": null,
+    "fallback_policy": "<exact-fallback-policy>",
+    "source_refs": []
+  },
+  "asset_contract": {
+    "bundle_paths": [],
+    "bundle_sha256s": [],
+    "replacement_policy": "exact_assets_only",
+    "source_refs": []
+  },
+  "icon_contract": {
+    "library": "<icon-library>",
+    "version_or_commit": "<exact-version-or-commit>",
+    "source_path": "<icon-library-source-path>",
+    "source_sha256": null,
+    "icons": [],
+    "default_size": null,
+    "default_stroke_width": null,
+    "fill_policy": "<exact-fill-policy>",
+    "optical_alignment": "<exact-alignment-policy>",
+    "source_refs": [],
+    "forbidden_replacements": [
+      "emoji",
+      "unicode_glyph",
+      "improvised_svg",
+      "css_drawing"
+    ]
+  },
+  "component_contracts": [],
+  "interaction_patterns": [],
+  "layout_contract": {
+    "grid": "<exact-grid-rule>",
+    "content_width": "<exact-content-width-rule>",
+    "scroll_policy": "<exact-scroll-policy>",
+    "region_gap_rules": [],
+    "layering_rules": [],
+    "source_refs": []
+  },
+  "responsive_contract": {
+    "supported_web_width_range": {
+      "min_width": null,
+      "max_width": null
+    },
+    "anchor_viewports": [],
+    "breakpoint_policy": "content_driven",
+    "shell_transformations": [],
+    "navigation_identity_must_remain_exact": true,
+    "component_adaptation": "prefer_container_queries",
+    "overflow_policy": "<exact-overflow-policy>",
+    "zoom_policy": "<exact-zoom-policy>",
+    "localization_stress_policy": "<exact-localization-policy>",
+    "below_supported_range": "out_of_scope",
+    "above_supported_range": "out_of_scope",
+    "source_refs": []
+  },
+  "accessibility_contract": {
+    "focus_indicator": "<exact-focus-rule>",
+    "keyboard_navigation": "<exact-keyboard-rule>",
+    "target_size": "<exact-target-size-rule>",
+    "contrast": "<exact-contrast-rule>",
+    "reduced_motion": "<exact-reduced-motion-rule>",
+    "source_refs": []
+  },
+  "exceptions": [],
+  "change_control": {
+    "default_change_policy": "fixed",
+    "fixed_domains": [
+      "shell",
+      "navigation",
+      "foundation_tokens",
+      "font_contract",
+      "asset_contract",
+      "icon_contract",
+      "component_contracts",
+      "interaction_patterns",
+      "layout_contract",
+      "responsive_contract",
+      "accessibility_contract"
+    ],
+    "exception_requires_owner_decision": true,
+    "delegated_design_may_change_fixed_domains": false
+  },
+  "unresolved_inputs": []
+}

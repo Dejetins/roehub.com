@@ -1,0 +1,71 @@
+{
+  "$schema": "ui-program-intake.schema.json",
+  "schema_id": "codex.ui-program-intake/v1",
+  "contract_profile": "codex.ui-program-intake/v1@1.0.0",
+  "intake_id": "roehub-local-platform-web-ui-2026-08.intake.v1",
+  "revision": 1,
+  "status": "draft",
+  "product": {
+    "product_id": "roehub",
+    "product_name": "Roehub Local Platform",
+    "purpose": "<why-the-product-exists>",
+    "operating_model": "<end-to-end-description-of-how-the-platform-works>",
+    "primary_user_outcomes": [],
+    "domain_entities": [],
+    "domain_terms": [],
+    "supported_platforms": [
+      "web"
+    ]
+  },
+  "program_scope": {
+    "included_release_slices": [],
+    "excluded_release_slices": [],
+    "public_site_in_scope": false,
+    "mobile_scope": "unauthorized",
+    "source_ref": "<exact-owner-scope-decision>"
+  },
+  "authoritative_inventory": {
+    "path": "<authoritative-inventory-path>",
+    "sha256": null,
+    "screen_collection": {
+      "json_pointer": "/screens",
+      "id_key": "screen_id"
+    },
+    "journey_collection": {
+      "json_pointer": "/journeys",
+      "id_key": "journey_id"
+    }
+  },
+  "source_contracts": [],
+  "roles": [],
+  "permission_profiles": [],
+  "locales": [],
+  "themes": [],
+  "global_data_contracts": [],
+  "journeys": [],
+  "screens": [],
+  "pilot": {
+    "source_visual_ref": "<accepted-pilot-path>",
+    "source_visual_sha256": null,
+    "source_evidence_mode": "renderable_html",
+    "owner_decision_ref": "<revisioned-owner-decision-path>",
+    "native_viewport": {
+      "width": null,
+      "height": null
+    },
+    "reviewed_state_ids": [],
+    "reviewed_theme_ids": [],
+    "represented_screen_ids": [],
+    "screen_acceptance_scope": "<exact-scope>",
+    "visual_language_scope": "<exact-scope>",
+    "reusable_foundation_scope": "<exact-scope>",
+    "inheritance_policy": "required"
+  },
+  "accepted_decisions": [],
+  "baseline_contract": {
+    "baseline_id": "roehub.platform-baseline.v1",
+    "path": "/Users/daniildegtyarev/Projects/roehub.com/.codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/platform-ui-baseline.json",
+    "sha256": "<fill-after-baseline-ready>"
+  },
+  "unresolved_inputs": []
+}

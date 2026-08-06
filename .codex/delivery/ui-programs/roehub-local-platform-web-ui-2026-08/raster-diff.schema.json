@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/raster-diff.schema.json",
+  "title": "Raster comparison receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "screen_revision_id", "anchor_id", "generated_by", "reference", "implementation", "render_provenance", "comparison", "diff_image", "pixel_diff", "result"],
+  "properties": {
+    "schema_id": {"const": "codex.ui-raster-diff/v1"},
+    "screen_revision_id": {"type": "string", "minLength": 1},
+    "anchor_id": {"type": "string", "minLength": 1},
+    "generated_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["script", "version", "command"],
+      "properties": {
+        "script": {"const": "compare_visual_revision.py"},
+        "version": {"const": "1.4.0"},
+        "command": {"const": "compare_visual_revision.py <paths-redacted>"}
+      }
+    },
+    "reference": {"$ref": "#/$defs/evidenceRef"},
+    "implementation": {"$ref": "#/$defs/evidenceRef"},
+    "render_provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "implementation"],
+      "properties": {
+        "reference": {"oneOf": [{"$ref": "#/$defs/evidenceRef"}, {"type": "null"}]},
+        "implementation": {"oneOf": [{"$ref": "#/$defs/evidenceRef"}, {"type": "null"}]}
+      }
+    },
+    "comparison": {"$ref": "#/$defs/comparison"},
+    "diff_image": {"type": ["string", "null"]},
+    "pixel_diff": {"$ref": "#/$defs/pixelDiff"},
+    "result": {"enum": ["passed", "blocked"]}
+  },
+  "$defs": {
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "comparison": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "purpose", "reference_logical_artifact_id", "implementation_logical_artifact_id",
+        "visual_authority_ref", "visual_authority_sha256",
+        "reference_render_provenance_sha256", "implementation_render_provenance_sha256",
+        "reference_source_artifact_ref", "reference_source_artifact_sha256",
+        "implementation_source_artifact_ref", "implementation_source_artifact_sha256",
+        "provenance_passed", "proves_fidelity", "blockers"
+      ],
+      "properties": {
+        "purpose": {"enum": ["deterministic_render", "source_fidelity", "native_image_comparison", "visual_language_conformance"]},
+        "reference_logical_artifact_id": {"type": ["string", "null"]},
+        "implementation_logical_artifact_id": {"type": ["string", "null"]},
+        "visual_authority_ref": {"type": ["string", "null"]},
+        "visual_authority_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "reference_render_provenance_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "implementation_render_provenance_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "reference_source_artifact_ref": {"type": ["string", "null"]},
+        "reference_source_artifact_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "implementation_source_artifact_ref": {"type": ["string", "null"]},
+        "implementation_source_artifact_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+        "provenance_passed": {"type": "boolean"},
+        "proves_fidelity": {"type": "boolean"},
+        "blockers": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "pixelDiff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dimensions_match", "reference_size", "implementation_size", "different_pixels",
+        "different_ratio", "maximum_channel_delta", "channel_threshold",
+        "approved_max_different_pixels", "passed"
+      ],
+      "properties": {
+        "dimensions_match": {"type": "boolean"},
+        "reference_size": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer", "minimum": 1}},
+        "implementation_size": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "integer", "minimum": 1}},
+        "different_pixels": {"type": "integer", "minimum": 0},
+        "different_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+        "maximum_channel_delta": {"type": "integer", "minimum": 0, "maximum": 255},
+        "channel_threshold": {"type": "integer", "minimum": 0, "maximum": 255},
+        "approved_max_different_pixels": {"type": "integer", "minimum": 0},
+        "passed": {"type": "boolean"}
+      }
+    }
+  }
+}

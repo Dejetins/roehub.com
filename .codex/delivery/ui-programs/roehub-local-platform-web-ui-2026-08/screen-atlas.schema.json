@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/screen-atlas.schema.json",
+  "title": "Resolved all-screen atlas",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "program_id", "program_revision", "program_sha256", "mobile_scope", "journeys", "coverage_profiles", "screens"],
+  "properties": {
+    "schema_id": {"const": "codex.ui-screen-atlas/v1"},
+    "program_id": {"type": "string", "minLength": 1},
+    "program_revision": {"type": "integer", "minimum": 1},
+    "program_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "mobile_scope": {"enum": ["unauthorized", "authorized"]},
+    "journeys": {"type": "array"},
+    "coverage_profiles": {"type": "array"},
+    "screens": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["screen_id", "classification", "disposition", "action_ids", "unresolved_fields", "source_ref"],
+        "properties": {
+          "screen_id": {"type": "string", "minLength": 1},
+          "classification": {"type": "string"},
+          "disposition": {"type": "string"},
+          "action_ids": {"type": "array", "items": {"type": "string"}},
+          "unresolved_fields": {"type": "array", "items": {"type": "string"}},
+          "source_ref": {"type": "object"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/implementation-handoff.schema.json",
+  "title": "Reproducible UI design implementation handoff",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "generated_by", "program_id", "program_revision", "program_input", "program_core_sha256", "expected_wave_ids", "expected_critical_journey_ids", "accepted_wave_receipts", "critical_journey_evidence", "implementation_inputs", "reproduction_commands", "proof_boundary", "result", "blockers"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_id": {"const": "codex.ui-implementation-handoff/v1"},
+    "generated_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["script", "version", "command"],
+      "properties": {
+        "script": {"const": "assemble_implementation_handoff.py"},
+        "version": {"const": "1.1.0"},
+        "command": {"const": "assemble_implementation_handoff.py <paths-redacted>"}
+      }
+    },
+    "program_id": {"type": "string", "minLength": 1},
+    "program_revision": {"type": "integer", "minimum": 1},
+    "program_input": {"$ref": "#/$defs/evidenceRef"},
+    "program_core_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "expected_wave_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "expected_critical_journey_ids": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "accepted_wave_receipts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["wave_id", "path", "sha256", "result"],
+        "properties": {
+          "wave_id": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "result": {"const": "passed"}
+        }
+      }
+    },
+    "critical_journey_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["journey_id", "path", "sha256", "result"],
+        "properties": {
+          "journey_id": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "result": {"const": "passed"}
+        }
+      }
+    },
+    "implementation_inputs": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["input_id", "kind", "path", "sha256"],
+        "properties": {
+          "input_id": {"enum": ["input_contract:intake", "input_contract:baseline", "artifact_index:screens", "artifact_index:journeys", "artifact_index:families", "artifact_index:waves"]},
+          "kind": {"enum": ["product_intake", "platform_baseline", "screen_index", "journey_index", "family_index", "wave_index"]},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+        }
+      }
+    },
+    "reproduction_commands": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command_id", "purpose", "runner", "entrypoint", "working_directory", "arguments", "target"],
+        "properties": {
+          "command_id": {"type": "string", "minLength": 1},
+          "purpose": {"enum": ["validate_program_snapshot", "validate_wave_acceptance", "validate_critical_journey"]},
+          "runner": {"const": "python3"},
+          "entrypoint": {"$ref": "#/$defs/evidenceRef"},
+          "working_directory": {"const": "project_root"},
+          "arguments": {"type": "array", "minItems": 5, "items": {"type": "string", "minLength": 1}},
+          "target": {"$ref": "#/$defs/evidenceRef"}
+        }
+      }
+    },
+    "proof_boundary": {"const": "design_handoff_only_not_production_readiness"},
+    "result": {"enum": ["passed", "blocked"]},
+    "blockers": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}
+  },
+  "$defs": {
+    "evidenceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"type": "string", "minLength": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

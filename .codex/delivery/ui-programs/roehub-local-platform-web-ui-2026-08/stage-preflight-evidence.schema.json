@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/stage-preflight-evidence.schema.json",
+  "title": "Typed evidence for one UI stage-transition preflight check",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "check_id", "program_id", "stage_instance_id", "gate_id", "status", "facts"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_id": {"const": "codex.ui-stage-preflight-evidence/v1"},
+    "check_id": {"enum": ["current_gate", "source_freshness", "next_stage_inputs", "write_scope", "foreign_changes", "execution_route", "handoff_artifact"]},
+    "program_id": {"type": "string", "minLength": 1},
+    "stage_instance_id": {"type": "string", "minLength": 1},
+    "gate_id": {"enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"]},
+    "status": {"const": "passed"},
+    "facts": {"type": "object", "minProperties": 1}
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/program-artifact-index.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "program_id", "program_revision", "index_kind", "entries"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_id": {"const": "codex.ui-program-artifact-index/v1"},
+    "program_id": {"type": "string", "minLength": 1},
+    "program_revision": {"type": "integer", "minimum": 1},
+    "index_kind": {"enum": ["screens", "journeys", "families", "waves"]},
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "path", "sha256", "json_pointer"],
+        "properties": {
+          "id": {"type": "string", "minLength": 1},
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "json_pointer": {"type": "string", "pattern": "^/"}
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/owner-input-response.schema.json",
+  "title": "Typed response that may resume one needs_input stage row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "generated_by", "program_id", "stage_instance_id", "decision_packet_ref", "decision_packet_sha256", "response_kind", "owner_input", "canonical_owner_decision_ref", "canonical_owner_decision_sha256"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_id": {"const": "codex.ui-owner-input-response/v1"},
+    "generated_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["script", "version", "command"],
+      "properties": {
+        "script": {"const": "assemble_owner_input_response.py"},
+        "version": {"const": "1.1.0"},
+        "command": {"const": "assemble_owner_input_response.py <paths-redacted>"}
+      }
+    },
+    "program_id": {"type": "string", "minLength": 1},
+    "stage_instance_id": {"type": "string", "minLength": 1},
+    "decision_packet_ref": {"type": "string", "minLength": 1},
+    "decision_packet_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "response_kind": {"enum": ["product_answer", "visual_acceptance", "requested_changes", "rejection"]},
+    "owner_input": {"type": "string", "minLength": 1},
+    "canonical_owner_decision_ref": {"type": ["string", "null"], "minLength": 1},
+    "canonical_owner_decision_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+  }
+}

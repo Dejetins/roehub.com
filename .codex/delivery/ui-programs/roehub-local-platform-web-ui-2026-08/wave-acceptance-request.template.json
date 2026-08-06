@@ -1,0 +1,10 @@
+{
+  "$schema": "wave-acceptance-request.schema.json",
+  "program_path": "<active-program-path>",
+  "wave_id": "<wave-id>",
+  "wave_revision_id": "<wave-id>@r1",
+  "revision": 1,
+  "screen_acceptance_paths": ["<one-path-per-required-screen-state>"],
+  "review_board_path": "<wave-review-board-path>",
+  "owner_decision_ref": null
+}

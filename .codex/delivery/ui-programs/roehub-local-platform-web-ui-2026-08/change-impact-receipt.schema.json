@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/change-impact-receipt.schema.json",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema_id", "generated_by", "program_id", "change_id", "change_kind", "current_stage_instance_id", "changed_artifacts", "earliest_gate", "same_row_allowed", "invalidated_gates", "affected_stage_instances", "required_action"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_id": {"const": "codex.ui-change-impact-receipt/v1"},
+    "generated_by": {"type": "object", "additionalProperties": false, "required": ["script", "version", "command"], "properties": {"script": {"const": "assemble_change_impact.py"}, "version": {"const": "1.1.0"}, "command": {"const": "assemble_change_impact.py <paths-redacted>"}}},
+    "program_id": {"type": "string", "minLength": 1},
+    "change_id": {"type": "string", "minLength": 1},
+    "change_kind": {"type": "string", "minLength": 1},
+    "current_stage_instance_id": {"type": "string", "minLength": 1},
+    "changed_artifacts": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"type": "string", "minLength": 1}, "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}}},
+    "earliest_gate": {"type": "string", "minLength": 1},
+    "same_row_allowed": {"type": "boolean"},
+    "invalidated_gates": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+    "affected_stage_instances": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+    "required_action": {"type": "string", "minLength": 1}
+  }
+}

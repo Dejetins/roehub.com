@@ -1,0 +1,18 @@
+{
+  "$schema": "screen-acceptance.schema.json",
+  "schema_id": "codex.ui-screen-acceptance/v1",
+  "screen_revision_id": "<exact-screen-revision>",
+  "screen_id": "<screen-id>",
+  "state_id": "<state-id>",
+  "accessibility_claim": "accessibility_smoke",
+  "generated_by": {
+    "script": "assemble_screen_acceptance.py",
+    "version": "1.3.0",
+    "command": "assemble_screen_acceptance.py <paths-redacted>"
+  },
+  "contract_input": {"path": "<path>", "sha256": "<sha256>"},
+  "required_anchor_ids": [],
+  "anchor_receipts": [],
+  "result": "blocked",
+  "blockers": ["template_not_a_generated_receipt"]
+}

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/render-provenance-receipt.schema.json",
+  "title": "Render provenance receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "generated_by", "target", "logical_artifact_id", "program_id", "validation_profile", "anchor_id", "visual_authority_sha256", "source_artifact_ref", "source_artifact_sha256", "capture_ref", "capture_sha256", "geometry_receipt_ref", "geometry_receipt_sha256"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_id": {"const": "codex.ui-render-provenance/v1"},
+    "generated_by": {"type": "object", "additionalProperties": false, "required": ["script", "version", "command"], "properties": {"script": {"const": "assemble_render_provenance.py"}, "version": {"const": "1.0.0"}, "command": {"const": "assemble_render_provenance.py <paths-redacted>"}}},
+    "target": {"enum": ["reference", "implementation"]},
+    "logical_artifact_id": {"type": "string", "minLength": 1},
+    "program_id": {"type": "string", "minLength": 1},
+    "validation_profile": {"const": "program_ready"},
+    "anchor_id": {"type": "string", "minLength": 1},
+    "visual_authority_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "source_artifact_ref": {"type": "string", "minLength": 1},
+    "source_artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "capture_ref": {"type": "string", "minLength": 1},
+    "capture_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "geometry_receipt_ref": {"type": "string", "minLength": 1},
+    "geometry_receipt_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

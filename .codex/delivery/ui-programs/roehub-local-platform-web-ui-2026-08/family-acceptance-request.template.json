@@ -1,0 +1,10 @@
+{
+  "$schema": "family-acceptance-request.schema.json",
+  "program_path": "<active-program-path>",
+  "family_id": "<family-id>",
+  "family_revision_id": "<family-id>@r1",
+  "revision": 1,
+  "screen_acceptance_paths": ["<one-path-per-required-screen-state>"],
+  "review_board_path": "<family-review-board-path>",
+  "owner_decision_ref": null
+}

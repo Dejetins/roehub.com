@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/stage-transition-readiness.schema.json",
+  "title": "UI design stage transition readiness receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "generated_by", "program_id", "transition_kind", "from_stage", "to_stage", "readiness_status", "next_stage_allowed", "decision_inventory", "preflight_checks", "known_blockers", "owner_summary", "program_complete"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_id": {"const": "codex.ui-stage-transition-readiness/v1"},
+    "generated_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["script", "version", "command"],
+      "properties": {
+        "script": {"const": "assemble_stage_transition.py"},
+        "version": {"const": "1.2.0"},
+        "command": {"const": "assemble_stage_transition.py <paths-redacted>"}
+      }
+    },
+    "program_id": {"type": "string", "minLength": 1},
+    "transition_kind": {"enum": ["advance", "complete"]},
+    "from_stage": {"$ref": "#/$defs/fromStage"},
+    "to_stage": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["stage_instance_id", "gate_id", "target_id", "task_ref"],
+      "properties": {
+        "stage_instance_id": {"type": "string", "minLength": 1},
+        "gate_id": {"enum": ["G1", "G2", "G3", "G4", "G5", "G6"]},
+        "target_id": {"type": "string", "minLength": 1},
+        "task_ref": {"type": "string", "minLength": 1}
+      }
+    },
+    "readiness_status": {"enum": ["ready", "review_ready", "blocked"]},
+    "next_stage_allowed": {"type": "boolean"},
+    "decision_inventory": {"type": "array", "items": {"$ref": "#/$defs/decision"}},
+    "preflight_checks": {"type": "array", "items": {"$ref": "#/$defs/check"}},
+    "known_blockers": {"type": "array", "items": {"$ref": "#/$defs/blocker"}},
+    "owner_summary": {"$ref": "#/$defs/ownerSummary"},
+    "owner_decision_ref": {"type": ["string", "null"], "minLength": 1},
+    "owner_decision_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"},
+    "program_complete": {"type": "boolean"}
+  },
+  "$defs": {
+    "fromStage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage_instance_id", "gate_id", "target_id", "revision", "validation_profile", "gate_result", "artifact_ref", "artifact_sha256"],
+      "properties": {
+        "stage_instance_id": {"type": "string", "minLength": 1},
+        "gate_id": {"enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"]},
+        "target_id": {"type": "string", "minLength": 1},
+        "revision": {"type": "integer", "minimum": 1},
+        "validation_profile": {"type": "string", "minLength": 1},
+        "gate_result": {"enum": ["passed", "failed"]},
+        "artifact_ref": {"type": "string", "minLength": 1},
+        "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "class", "status", "summary", "resolution_ref"],
+      "properties": {
+        "decision_id": {"type": "string", "minLength": 1},
+        "class": {"enum": ["agent_decidable", "owner_required", "external_authority"]},
+        "status": {"enum": ["resolved", "pending"]},
+        "summary": {"type": "string", "minLength": 1},
+        "resolution_ref": {"type": ["string", "null"]}
+      }
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["check_id", "status", "evidence_ref", "evidence_sha256"],
+      "properties": {
+        "check_id": {"enum": ["current_gate", "source_freshness", "next_stage_inputs", "write_scope", "foreign_changes", "execution_route", "handoff_artifact"]},
+        "status": {"enum": ["passed", "failed", "not_applicable"]},
+        "evidence_ref": {"type": "string", "minLength": 1},
+        "evidence_sha256": {"type": ["string", "null"], "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "blocker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["blocker_id", "class", "summary", "recovery"],
+      "properties": {
+        "blocker_id": {"type": "string", "minLength": 1},
+        "class": {"enum": ["authority_conflict", "unsafe_foreign_change", "unavailable_required_evidence", "policy_or_permission", "external_state"]},
+        "summary": {"type": "string", "minLength": 1},
+        "recovery": {"type": "string", "minLength": 1}
+      }
+    },
+    "ownerSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["result_summary", "review_artifact_refs", "questions"],
+      "properties": {
+        "result_summary": {"type": "string", "minLength": 1},
+        "review_artifact_refs": {"type": "array", "items": {"type": "string"}, "maxItems": 5},
+        "questions": {"type": "array", "items": {"type": "string"}, "maxItems": 3}
+      }
+    }
+  }
+}

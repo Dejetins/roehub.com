@@ -1,0 +1,55 @@
+{
+  "$schema": "visual-qa-receipt.schema.json",
+  "schema_id": "codex.ui-visual-qa-receipt/v1",
+  "screen_revision_id": "<exact-screen-revision>",
+  "anchor_id": "<exact-anchor-id>",
+  "contract_sha256": "<sha256>",
+  "generated_by": {
+    "script": "assemble_visual_qa_receipt.py",
+    "version": "1.4.0",
+    "command": "<exact-command>"
+  },
+  "evidence_inputs": {
+    "contract": {"path": "<path>", "sha256": "<sha256>"},
+    "reference_geometry": {"path": "<path>", "sha256": "<sha256>"},
+    "implementation_geometry": {"path": "<path>", "sha256": "<sha256>"},
+    "raster": {"path": "<path>", "sha256": "<sha256>"}
+  },
+  "environment": {
+    "browser": "<browser-revision>",
+    "viewport": {"width": 0, "height": 0},
+    "device_scale_factor": 1,
+    "locale": "<locale>",
+    "theme": "<theme>",
+    "font_bundle_sha256": "<sha256>",
+    "fixture_sha256": "<sha256>"
+  },
+  "captures": {
+    "reference_sha256": "<sha256>",
+    "implementation_sha256": "<sha256>"
+  },
+  "geometry": [],
+  "computed_style_mismatches": [],
+  "missing_required_regions": [],
+  "unexpected_visible_regions": [],
+  "console_errors": [],
+  "request_failures": [],
+  "accessibility": {
+    "automated_violations": [],
+    "keyboard_issues": [],
+    "keyboard_sequence": [],
+    "focusable_count": 0,
+    "passed": false
+  },
+  "pixel_diff": {
+    "different_pixels": 0,
+    "different_ratio": 0,
+    "maximum_channel_delta": 0,
+    "channel_threshold": 0,
+    "approved_max_different_pixels": 0,
+    "passed": false
+  },
+  "mobile_scope": "unauthorized",
+  "result": "blocked",
+  "blockers": ["template_not_a_generated_receipt"]
+}

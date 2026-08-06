@@ -1,0 +1,43 @@
+{
+  "$schema": "contract-versions.schema.json",
+  "schema_id": "codex.ui-design-contract-versions/v1",
+  "version": "1.0.0",
+  "active": {
+    "runtime_profile": "codex.ui-stage-runtime-profiles/v1@1.6.0",
+    "program_contract": "codex.ui-design-program/v1@1.6.0",
+    "screen_contract": "codex.ui-screen-design-contract/v1@1.4.0",
+    "intake_contract": "codex.ui-program-intake/v1@1.0.0",
+    "baseline_contract": "codex.platform-ui-baseline/v1@1.0.0",
+    "capture_tool": "1.5.0",
+    "raster_diff_tool": "1.4.0",
+    "visual_qa_assembler": "1.4.0",
+    "screen_acceptance_assembler": "1.3.0",
+    "owner_decision_assembler": "1.0.0",
+    "owner_input_response_assembler": "1.1.0",
+    "render_provenance_assembler": "1.0.0",
+    "change_impact_assembler": "1.1.0",
+    "family_acceptance_assembler": "1.1.0",
+    "wave_acceptance_assembler": "1.1.0",
+    "journey_proof_assembler": "1.0.0",
+    "implementation_handoff_assembler": "1.1.0",
+    "transition_assembler": "1.2.0"
+  },
+  "historical_read_only": {
+    "runtime_profiles": [
+      "codex.ui-stage-runtime-profiles/v1@1.4.0",
+      "codex.ui-stage-runtime-profiles/v1@1.5.0"
+    ],
+    "program_contracts": [
+      "codex.ui-design-program/v1@1.1.0",
+      "codex.ui-design-program/v1@1.2.0",
+      "codex.ui-design-program/v1@1.3.0",
+      "codex.ui-design-program/v1@1.4.0",
+      "codex.ui-design-program/v1@1.5.0"
+    ],
+    "screen_contracts": [
+      "codex.ui-screen-design-contract/v1@1.1.0",
+      "codex.ui-screen-design-contract/v1@1.2.0",
+      "codex.ui-screen-design-contract/v1@1.3.0"
+    ]
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/geometry-capture.schema.json",
+  "title": "Browser geometry and interaction capture",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema_id", "screen_revision_id", "target", "generated_by", "contract_sha256", "render_source", "screenshot_sha256", "environment", "regions", "elements", "document_geometry", "accessibility", "accessibility_claim", "browser_interaction", "console_errors", "request_failures", "evidence_safety", "result", "blockers"],
+  "properties": {
+    "schema_id": {"const": "codex.ui-geometry-capture/v1"},
+    "screen_revision_id": {"type": "string", "minLength": 1},
+    "target": {"type": "string", "minLength": 1},
+    "generated_by": {
+      "type": "object",
+      "required": ["script", "version", "command"],
+      "properties": {
+        "script": {"const": "capture_geometry.cjs"},
+        "version": {"const": "1.5.0"},
+        "command": {"type": "string", "minLength": 1}
+      }
+    },
+    "contract_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "render_source": {"type": "object", "additionalProperties": false, "required": ["artifact_ref", "artifact_sha256", "logical_artifact_id", "main_document_response_sha256"], "properties": {"artifact_ref": {"type": "string", "minLength": 1}, "artifact_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "logical_artifact_id": {"type": "string", "minLength": 1}, "main_document_response_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}}},
+    "screenshot_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "environment": {"type": "object"},
+    "regions": {"type": "array"},
+    "elements": {"type": "array"},
+    "document_geometry": {"type": "object"},
+    "accessibility": {"type": "object"},
+    "accessibility_claim": {"const": "accessibility_smoke"},
+    "browser_interaction": {"type": "object"},
+    "console_errors": {"type": "array"},
+    "request_failures": {"type": "array"},
+    "evidence_safety": {
+      "type": "object",
+      "required": ["fixture_mode", "redaction_required", "redaction_applied", "redaction_selectors", "redaction_match_counts", "uncovered_sensitive_elements", "loopback_only", "network_isolated", "allowed_origins", "blocked_external_requests"],
+      "properties": {
+        "fixture_mode": {"enum": ["isolated_local", "mocked_external"]},
+        "redaction_required": {"const": true},
+        "redaction_applied": {"type": "boolean"},
+        "redaction_selectors": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "redaction_match_counts": {"type": "array", "minItems": 1, "items": {"type": "integer", "minimum": 0}},
+        "uncovered_sensitive_elements": {"type": "integer", "minimum": 0},
+        "loopback_only": {"const": true},
+        "network_isolated": {"const": true},
+        "allowed_origins": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "blocked_external_requests": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "result": {"enum": ["passed", "blocked"]},
+    "blockers": {"type": "array", "items": {"type": "string"}}
+  }
+}

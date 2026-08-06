@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/stage-runtime-profiles.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "version", "core", "stages"],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_id": {"const": "codex.ui-stage-runtime-profiles/v1"},
+    "version": {"const": "1.6.0"},
+    "core": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contract_registry", "control_plane", "control_assets", "control_commands", "input_contracts", "visual_authority_fields", "decision_classes", "user_role_policy", "owner_surface", "invariants", "preflight_checks", "state_policy"],
+      "properties": {
+        "contract_registry": {"const": "assets/contract-versions.json"},
+        "control_plane": {"type": "array", "minItems": 3, "uniqueItems": true, "items": {"type": "string"}},
+        "control_assets": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "control_commands": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string"}},
+        "input_contracts": {"type": "array", "minItems": 2, "uniqueItems": true, "items": {"enum": ["ui-program-intake", "platform-ui-baseline"]}},
+        "visual_authority_fields": {"type": "array", "minItems": 9, "uniqueItems": true, "items": {"type": "string"}},
+        "decision_classes": {"type": "object", "required": ["agent_decidable", "owner_required", "external_authority"], "additionalProperties": false, "properties": {"agent_decidable": {"type": "string"}, "owner_required": {"type": "string"}, "external_authority": {"type": "string"}}},
+        "user_role_policy": {"type": "array", "minItems": 3, "items": {"type": "string"}},
+        "owner_surface": {"type": "array", "items": {"type": "string"}},
+        "invariants": {"type": "array", "items": {"type": "string"}},
+        "preflight_checks": {"type": "array", "minItems": 7, "uniqueItems": true, "items": {"type": "string"}},
+        "state_policy": {"type": "object", "required": ["review_ready", "needs_input", "blocked", "revision"], "additionalProperties": false, "properties": {"review_ready": {"type": "string"}, "needs_input": {"type": "string"}, "blocked": {"type": "string"}, "revision": {"type": "string"}}}
+      }
+    },
+    "stages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"],
+      "properties": {
+        "G0": {"$ref": "#/$defs/stage"}, "G1": {"$ref": "#/$defs/stage"}, "G2": {"$ref": "#/$defs/stage"}, "G3": {"$ref": "#/$defs/stage"}, "G4": {"$ref": "#/$defs/stage"}, "G5": {"$ref": "#/$defs/stage"}, "G6": {"$ref": "#/$defs/stage"}
+      }
+    }
+  },
+  "$defs": {
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "artifact_kind", "validation_profile", "objective", "owns", "required_outputs", "allowed_unresolved", "forbidden", "required_references", "read_set", "required_assets", "required_commands", "required_validators", "companion_skills", "owner_gate", "owner_review_surface", "requires_visual_authority_context", "next_gates", "completion_behavior", "next_preflight"],
+      "properties": {
+        "title": {"type": "string", "minLength": 1},
+        "artifact_kind": {"enum": ["program", "family_acceptance", "wave_acceptance"]},
+        "validation_profile": {"enum": ["draft", "atlas_gate", "structure_gate", "program_ready", "family_gate", "wave_gate", "handoff_ready"]},
+        "objective": {"type": "string", "minLength": 1},
+        "owns": {"type": "array", "items": {"type": "string"}},
+        "required_outputs": {"type": "array", "items": {"type": "string"}},
+        "allowed_unresolved": {"type": "array", "items": {"type": "string"}},
+        "forbidden": {"type": "array", "items": {"type": "string"}},
+        "required_references": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "read_set": {
+          "type": "object", "additionalProperties": false,
+          "required": ["always", "exact", "conditional", "max_files", "target_tokens"],
+          "properties": {
+            "always": {"type": "array", "items": {"type": "string"}},
+            "exact": {"type": "array", "items": {"type": "string"}},
+            "conditional": {"type": "array", "items": {"type": "string"}},
+            "max_files": {"type": "integer", "minimum": 1, "maximum": 8},
+            "target_tokens": {"type": "integer", "minimum": 1000, "maximum": 50000}
+          }
+        },
+        "required_assets": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "required_commands": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "required_validators": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "companion_skills": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+        "owner_gate": {
+          "type": "object", "additionalProperties": false,
+          "required": ["required", "review_profile", "decision_kind"],
+          "properties": {
+            "required": {"type": "boolean"},
+            "review_profile": {"type": ["string", "null"]},
+            "decision_kind": {"type": ["string", "null"]}
+          }
+        },
+        "owner_review_surface": {"type": "string", "minLength": 1},
+        "requires_visual_authority_context": {"type": "boolean"},
+        "next_gates": {"type": "array", "uniqueItems": true, "items": {"enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"]}},
+        "completion_behavior": {
+          "type": "object", "additionalProperties": false,
+          "required": ["transition_kind", "next_stage_allowed", "program_complete"],
+          "properties": {
+            "transition_kind": {"enum": ["advance", "complete"]},
+            "next_stage_allowed": {"type": "boolean"},
+            "program_complete": {"type": "boolean"}
+          }
+        },
+        "next_preflight": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}

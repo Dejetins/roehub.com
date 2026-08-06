@@ -1,0 +1,17 @@
+{
+  "$schema": "owner-input-response.schema.json",
+  "schema_id": "codex.ui-owner-input-response/v1",
+  "generated_by": {
+    "script": "assemble_owner_input_response.py",
+    "version": "1.1.0",
+    "command": "assemble_owner_input_response.py <paths-redacted>"
+  },
+  "program_id": "<program-id>",
+  "stage_instance_id": "<stage-instance-id>",
+  "decision_packet_ref": "<decision-packet>",
+  "decision_packet_sha256": "<computed-by-agent>",
+  "response_kind": "<product_answer|visual_acceptance|requested_changes|rejection>",
+  "owner_input": "<natural-language-owner-input>",
+  "canonical_owner_decision_ref": null,
+  "canonical_owner_decision_sha256": null
+}

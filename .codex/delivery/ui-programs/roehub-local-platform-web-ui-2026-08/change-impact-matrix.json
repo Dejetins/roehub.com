@@ -1,0 +1,14 @@
+{
+  "schema_id": "codex.ui-change-impact-matrix/v1",
+  "version": "1.0.0",
+  "rules": [
+    {"change_kind": "bounded_unaccepted_visual", "earliest_gate": "same_stage", "same_row_allowed": true, "invalidates_gates": [], "required_action": "revise_same_row_and_re_review"},
+    {"change_kind": "accepted_family_visual", "earliest_gate": "G4", "same_row_allowed": false, "invalidates_gates": ["G4", "G5", "G6"], "required_action": "create_successor_and_invalidate_dependants"},
+    {"change_kind": "accepted_wave_local", "earliest_gate": "G5", "same_row_allowed": false, "invalidates_gates": ["G5", "G6"], "required_action": "create_successor_and_invalidate_dependants"},
+    {"change_kind": "g3_realization_inside_accepted_baseline", "earliest_gate": "G3", "same_row_allowed": false, "invalidates_gates": ["G3", "G4", "G5", "G6"], "required_action": "create_successor_and_invalidate_dependants"},
+    {"change_kind": "family_wave_coverage_structure", "earliest_gate": "G2", "same_row_allowed": false, "invalidates_gates": ["G2", "G3", "G4", "G5", "G6"], "required_action": "create_successor_and_invalidate_dependants"},
+    {"change_kind": "atlas_identity_classification", "earliest_gate": "G1", "same_row_allowed": false, "invalidates_gates": ["G1", "G2", "G3", "G4", "G5", "G6"], "required_action": "create_successor_and_invalidate_dependants"},
+    {"change_kind": "product_semantics_scope_or_mobile", "earliest_gate": "G0", "same_row_allowed": false, "invalidates_gates": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"], "required_action": "create_successor_and_invalidate_dependants"},
+    {"change_kind": "baseline_or_visual_authority_replacement", "earliest_gate": "G0", "same_row_allowed": false, "invalidates_gates": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"], "required_action": "create_successor_and_invalidate_dependants"}
+  ]
+}

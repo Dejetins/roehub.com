@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/render-provenance-request.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["program_ref", "target", "logical_artifact_id", "anchor_id", "source_artifact_ref", "capture_ref", "geometry_receipt_ref"],
+  "properties": {
+    "program_ref": {"type": "string", "minLength": 1},
+    "target": {"enum": ["reference", "implementation"]},
+    "logical_artifact_id": {"type": "string", "minLength": 1},
+    "anchor_id": {"type": "string", "minLength": 1},
+    "source_artifact_ref": {"type": "string", "minLength": 1},
+    "capture_ref": {"type": "string", "minLength": 1},
+    "geometry_receipt_ref": {"type": "string", "minLength": 1}
+  }
+}

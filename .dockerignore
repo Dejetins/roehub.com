@@ -24,6 +24,8 @@ artifacts
 docs
 prototypes
 tests
+.codex/delivery/evidence/roehub-web-ui-2026-08-06/visual-authority/linear-reference-set/*.png
+.codex/delivery/evidence/roehub-web-ui-2026-08-06/visual-authority/supporting-custometry-pilot-v2/*.png
 
 # Release outputs bind the built image digest and must not become inputs to that
 # same image.  Keeping them outside the context prevents a self-referential

@@ -1,0 +1,26 @@
+{
+  "$schema": "family-acceptance.schema.json",
+  "schema_id": "codex.ui-family-acceptance/v1",
+  "generated_by": {
+    "script": "assemble_family_acceptance.py",
+    "version": "1.1.0",
+    "command": "assemble_family_acceptance.py <paths-redacted>"
+  },
+  "family_revision_id": "<family-revision-id>",
+  "revision": 1,
+  "program_id": "<program-id>",
+  "program_revision": 1,
+  "program_input": {"path": "<program-path>", "sha256": "<computed-by-agent>"},
+  "program_revision_ref": "<program-path>#revision-1",
+  "family_id": "<family-id>",
+  "expected_screen_revision_ids": [],
+  "screen_acceptance_receipts": [],
+  "coverage": {
+    "required_screen_state_ids": [],
+    "accepted_screen_state_ids": []
+  },
+  "review_board": {"path": "<review-board>", "sha256": "<computed-by-agent>"},
+  "result": "review_ready",
+  "blockers": [],
+  "owner_decision_ref": null
+}

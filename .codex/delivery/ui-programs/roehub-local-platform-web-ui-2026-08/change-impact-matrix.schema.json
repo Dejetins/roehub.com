@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://codex.local/skills/ui-design-program/change-impact-matrix.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_id", "version", "rules"],
+  "properties": {
+    "schema_id": {"const": "codex.ui-change-impact-matrix/v1"},
+    "version": {"const": "1.0.0"},
+    "rules": {
+      "type": "array", "minItems": 8, "maxItems": 8, "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["change_kind", "earliest_gate", "same_row_allowed", "invalidates_gates", "required_action"],
+        "properties": {
+          "change_kind": {"enum": ["bounded_unaccepted_visual", "accepted_family_visual", "accepted_wave_local", "g3_realization_inside_accepted_baseline", "family_wave_coverage_structure", "atlas_identity_classification", "product_semantics_scope_or_mobile", "baseline_or_visual_authority_replacement"]},
+          "earliest_gate": {"enum": ["same_stage", "G0", "G1", "G2", "G3", "G4", "G5"]},
+          "same_row_allowed": {"type": "boolean"},
+          "invalidates_gates": {"type": "array", "uniqueItems": true, "items": {"enum": ["G0", "G1", "G2", "G3", "G4", "G5", "G6"]}},
+          "required_action": {"enum": ["revise_same_row_and_re_review", "create_successor_and_invalidate_dependants"]}
+        }
+      }
+    }
+  }
+}

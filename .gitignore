@@ -66,6 +66,11 @@ target/
 .codex/tmp/
 .codex/sessions/
 .codex/*.local.*
+# Owner-supplied or locally rendered UI reference images stay local. Their
+# hash-pinned manifests are tracked, but the public repository does not
+# redistribute the image binaries.
+.codex/delivery/evidence/roehub-web-ui-2026-08-06/visual-authority/linear-reference-set/*.png
+.codex/delivery/evidence/roehub-web-ui-2026-08-06/visual-authority/supporting-custometry-pilot-v2/*.png
 .opencode/
 .playwright-cli/
 .local_artifacts/
