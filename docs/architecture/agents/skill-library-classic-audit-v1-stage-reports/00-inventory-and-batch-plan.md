@@ -1,3 +1,7 @@
+> Historical copy edited on 2026-09-04 to remove retired tooling references.
+> Original results and totals describe the original run, not current validation.
+> Unmodified originals: `/Users/daniildegtyarev/Documents/Codex/2026-09-04/new-chat/outputs/removed-skills-backup-2026-09-04.tar.gz`.
+
 # Stage 00 — Inventory And Batch Plan
 
 Полный canonical inventory локальной библиотеки skills/plugins и batch-план для clean-context аудита.
@@ -113,7 +117,6 @@
 | S082 | `root-cause-debugging` | `user_skill` | `workflow` | `B1` | 63 | `6adb991df8dbc1b7f89fa5a82309664d99e08f678b5e8a219fb8fea003db801d` | `/Users/daniildegtyarev/.codex/skills/root-cause-debugging/SKILL.md` |
 | S083 | `staged-plan-runner` | `user_skill` | `orchestrator` | `B1` | 85 | `77b3d61e1bceae0323aecd394861435bf87479ba040593c923a07a9a260143aa` | `/Users/daniildegtyarev/.codex/skills/staged-plan-runner/SKILL.md` |
 | S084 | `topological-data-analysis` | `user_skill` | `domain` | `B3` | 132 | `8c763dbd1041fc31d9152125d449e791a2545206f56368c21b6c040d0644e99d` | `/Users/daniildegtyarev/.codex/skills/topological-data-analysis/SKILL.md` |
-| S085 | `ui-ux-pro-max` | `user_skill` | `domain` | `B3` | 671 | `0d08fb3566b84c94b792b6751f83e06a0a0e97401b84279e705cc7d0edc359e1` | `/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md` |
 
 ## Batch plan
 

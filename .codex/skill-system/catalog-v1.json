@@ -3471,47 +3471,6 @@
       "visibility": "public"
     },
     {
-      "activation_policy": "preserve_public",
-      "aliases": [],
-      "baseline_membership": "audit_baseline",
-      "baseline_sha256": "0d08fb3566b84c94b792b6751f83e06a0a0e97401b84279e705cc7d0edc359e1",
-      "canonical_name": "ui-ux-pro-max",
-      "canonical_path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md",
-      "companions": [
-        "S072"
-      ],
-      "conflicts": [],
-      "discovery_state": "direct",
-      "effective_path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md",
-      "effective_sha256": "dd6131b6e80857874ef2f2ff1f793c4578083a009c5e28969db07c1f099f4597",
-      "evidence_refs": [
-        "`/root/classic_audit_b3`",
-        "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/01-wave0-direct-critical-repairs.md"
-      ],
-      "implementation_channel": "direct",
-      "implementation_status": "implemented",
-      "improvement_proposal": "compact router + web/mobile refs; infer stack; opt-in persist/install; browser QA",
-      "installed_enabled": true,
-      "logical_name": "ui-ux-pro-max",
-      "mutability": "source",
-      "owner": "user",
-      "primary_output": "patch",
-      "priority": "P0",
-      "recommended_action": "split_skill",
-      "result_contract_evidence": "docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/01-wave0-direct-critical-repairs.md",
-      "result_contract_provider": "skill_body",
-      "role": "domain",
-      "session_exposed": "public",
-      "side_effect_class": "local-write",
-      "skill_id": "S085",
-      "source_kind": "user_skill",
-      "source_sha256": "dd6131b6e80857874ef2f2ff1f793c4578083a009c5e28969db07c1f099f4597",
-      "stage": "01",
-      "supersedes": [],
-      "verification_status": "forward_pass",
-      "visibility": "public"
-    },
-    {
       "activation_policy": "preserve_dormant",
       "aliases": [],
       "baseline_membership": "supplemental",

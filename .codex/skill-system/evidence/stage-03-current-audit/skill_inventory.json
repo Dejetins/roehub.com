@@ -154,13 +154,6 @@
     "target_id": "global.topological-data-analysis"
   },
   {
-    "managed_cache": false,
-    "run_id": "skill-system-stage-03-v1",
-    "scope": "global_skill",
-    "source_path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md",
-    "target_id": "global.ui-ux-pro-max"
-  },
-  {
     "managed_cache": true,
     "run_id": "skill-system-stage-03-v1",
     "scope": "plugin_skill",

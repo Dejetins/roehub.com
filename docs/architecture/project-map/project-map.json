@@ -31,7 +31,6 @@
         "docs/architecture/apps/web/"
       ],
       "skills": [
-        "ui-ux-pro-max",
         "browser-qa-evidence"
       ]
     },
@@ -197,7 +196,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1058,
+      "file_count": 1057,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -3522,6 +3521,11 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/skill-system/evidence/README.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "configuration",
       "path": ".codex/skill-system/evidence/stage-00-contract-fixtures.json"
     },
@@ -3773,11 +3777,6 @@
     {
       "area": "knowledge",
       "kind": "documentation",
-      "path": ".codex/skill-system/rollback/blobs/0d08fb3566b84c94b792b6751f83e06a0a0e97401b84279e705cc7d0edc359e1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
       "path": ".codex/skill-system/rollback/blobs/21cd8a009a323702bd721180b918352e6b4900bf2cd810938346a3b6da48c5a1.md"
     },
     {
@@ -3904,11 +3903,6 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/skill-system/rollback/blobs/e542979fab6141f130b9129b7fdc4bccb2ec3762dd788538b6fdfe074d40c9e0.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/skill-system/rollback/blobs/ea42c60691e2567d1d24c962456fa72f4b7466d8377c7e4e35d83b5e77687a80.md"
     },
     {
       "area": "knowledge",
@@ -17006,7 +17000,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 2961,
+  "inventory_file_count": 2960,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17223,5 +17217,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "ab1af88a8df649c62031ac3b21fcb33207a785c510fca02fd58cc8f05c4414fa"
+  "structural_digest": "0ad96c64f4f1d8d1750b3b5dd5a205f72e692d3439bd0e5a50d42e2fb229069a"
 }

@@ -412,32 +412,6 @@
     "version_id": "live"
   },
   {
-    "audit_score_0_100": 92,
-    "compliance_status": "pass",
-    "description_length": 665,
-    "description_score": 25,
-    "findings": [
-      {
-        "category": "structure",
-        "code": "skill_body_too_long",
-        "message": "Skill body is too long for efficient progressive disclosure; move details to references or scripts.",
-        "points_lost": 8,
-        "severity": "high"
-      }
-    ],
-    "findings_count": 1,
-    "format_score": 25,
-    "line_count": 670,
-    "run_id": "skill-system-stage-00",
-    "safety_score": 25,
-    "severe_findings": 0,
-    "skill_type": "global_skill",
-    "source_path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md",
-    "structure_score": 17,
-    "target_id": "global.ui-ux-pro-max",
-    "version_id": "live"
-  },
-  {
     "audit_score_0_100": 94,
     "compliance_status": "pass",
     "description_length": 238,

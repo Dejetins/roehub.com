@@ -1,3 +1,7 @@
+> Historical copy edited on 2026-09-04 to remove retired tooling references.
+> Original results and totals describe the original run, not current validation.
+> Unmodified originals: `/Users/daniildegtyarev/Documents/Codex/2026-09-04/new-chat/outputs/removed-skills-backup-2026-09-04.tar.gz`.
+
 # Stage 02 — Consolidated Skill-System Improvement Backlog
 
 Консолидированный read-only результат классического аудита локальной библиотеки
@@ -653,7 +657,6 @@ Stage `00`; подробные findings — в Stage `01`.
 | S082 | user_skill | `/Users/daniildegtyarev/.codex/skills/root-cause-debugging/SKILL.md` | `6adb991df8dbc1b7f89fa5a82309664d99e08f678b5e8a219fb8fea003db801d` | B1 | workflow | hypothesis/reproduction and narrow fix | improve | improve | `/root/classic_audit_b1` | `RT,SE`: diagnose-only request flows to edit; log redaction absent | diagnose_only versus fix_authorized modes; sanitized evidence | P1 | unauthorized fix or log leak | rewrite_prompt_contract |
 | S083 | user_skill | `/Users/daniildegtyarev/.codex/skills/staged-plan-runner/SKILL.md` | `77b3d61e1bceae0323aecd394861435bf87479ba040593c923a07a9a260143aa` | B1 | orchestrator | clear three-artifact truth and stop gates | improve | improve | `/root/classic_audit_b1` | `RT`: status audit can mutate/execute; fallback stage inference too loose | inspect_status read-only mode; strict stage schema before execution | P1 | status query changes ledger or starts stage | rewrite_prompt_contract |
 | S084 | user_skill | `/Users/daniildegtyarev/.codex/skills/topological-data-analysis/SKILL.md` | `8c763dbd1041fc31d9152125d449e791a2545206f56368c21b6c040d0644e99d` | B3 | domain | strong hypothesis-not-causality and PII guardrails | improve | improve | `/root/classic_audit_b3` | `VG,PV`: reproducibility/compute thresholds/workspace drift | seed/config/version/features/sampling evidence; quadratic budget; current AGENTS | P2 | unstable topology or excessive compute | rewrite_prompt_contract |
-| S085 | user_skill | `/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md` | `0d08fb3566b84c94b792b6751f83e06a0a0e97401b84279e705cc7d0edc359e1` | B3 | domain | broad a11y/responsive guidance and repo override in description | split | split | `/root/classic_audit_b3` | `PD,AP,PV,OW`: React-Native contradiction; unrequested persist/install; no browser gate | compact router + web/mobile refs; infer stack; opt-in persist/install; browser QA | P0 | wrong stack, forbidden artifacts or static-only acceptance | split_skill |
 
 ## Final coverage reconciliation
 
@@ -815,7 +818,6 @@ Stage `00`; подробные findings — в Stage `01`.
 | S081 | `/Users/daniildegtyarev/.codex/skills/publish-ci-deploy/SKILL.md:2,18,36,47,59,67` | `RT,SX,SE`: SSH/deploy unconditional; docs-only deploy; raw provider artifacts | unnecessary production reload or blocked publish | routing/mode, external/paid/production side effect, secret/PII evidence | re-read anchors; run loader/hash check and RT,SX,SE prompt-contract fixture before implementation | Stage01 per-skill row `S081` + this source anchor; reviewer task is provenance only |
 | S082 | `/Users/daniildegtyarev/.codex/skills/root-cause-debugging/SKILL.md:3,20,31,37,46,62` | `RT,SE`: diagnose-only request flows to edit; log redaction absent | unauthorized fix or log leak | routing/mode, secret/PII evidence | re-read anchors; run loader/hash check and RT,SE prompt-contract fixture before implementation | Stage01 per-skill row `S082` + this source anchor; reviewer task is provenance only |
 | S083 | `/Users/daniildegtyarev/.codex/skills/staged-plan-runner/SKILL.md:3,33,45,53,66,80` | `RT`: status audit can mutate/execute; fallback stage inference too loose | status query changes ledger or starts stage | routing/mode | re-read anchors; run loader/hash check and RT prompt-contract fixture before implementation | Stage01 per-skill row `S083` + this source anchor; reviewer task is provenance only |
-| S085 | `/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md:3,45,129,187,225,235` | `PD,AP,PV,OW`: React-Native contradiction; unrequested persist/install; no browser gate | wrong stack, forbidden artifacts or static-only acceptance | context/progressive-disclosure, authority/precedence, portability/tool topology, file/output ownership | re-read anchors; run loader/hash check and PD,AP,PV,OW prompt-contract fixture before implementation | Stage01 per-skill row `S085` + this source anchor; reviewer task is provenance only |
 
 Evidence durability rule: Stage `01` row + exact source path/lines is the durable evidence. `/root/classic_audit_b1`, `/root/classic_audit_b2`, `/root/classic_audit_b3` remain reviewer provenance, not the only evidence locator. Future implementation must refresh anchors if the inventory hash changes.
 

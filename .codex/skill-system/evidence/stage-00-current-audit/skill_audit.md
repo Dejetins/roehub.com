@@ -1,3 +1,7 @@
+> Historical copy edited on 2026-09-04 to remove retired tooling references.
+> Original results and totals describe the original run, not current validation.
+> Unmodified originals: `/Users/daniildegtyarev/Documents/Codex/2026-09-04/new-chat/outputs/removed-skills-backup-2026-09-04.tar.gz`.
+
 # Skill Official-Format Audit Summary
 
 Deterministic audit for Codex/Claude skill shape, discovery metadata, progressive disclosure, and safety/locality risks.
@@ -26,7 +30,6 @@ Deterministic audit for Codex/Claude skill shape, discovery metadata, progressiv
 | global.root-cause-debugging | live | 100 | 25 | 25 | 25 | 25 | pass | 0 |
 | global.staged-plan-runner | live | 100 | 25 | 25 | 25 | 25 | pass | 0 |
 | global.topological-data-analysis | live | 100 | 25 | 25 | 25 | 25 | pass | 0 |
-| global.ui-ux-pro-max | live | 92 | 25 | 25 | 17 | 25 | pass | 1 |
 | plugin.openai-bundled.browser.26.707.30751.control-in-app-browser | live | 94 | 25 | 25 | 19 | 25 | pass | 1 |
 | plugin.openai-bundled.chrome.26.707.30751.control-chrome | live | 100 | 25 | 25 | 25 | 25 | pass | 0 |
 | plugin.openai-bundled.computer-use.1.0.1000362.computer-use | live | 100 | 25 | 25 | 25 | 25 | pass | 0 |

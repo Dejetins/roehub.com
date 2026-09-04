@@ -404,24 +404,6 @@
     "version_id": "live"
   },
   {
-    "audit_score_0_100": 100,
-    "compliance_status": "pass",
-    "description_length": 376,
-    "description_score": 25,
-    "findings": [],
-    "findings_count": 0,
-    "format_score": 25,
-    "line_count": 117,
-    "run_id": "skill-system-stage-01-final",
-    "safety_score": 25,
-    "severe_findings": 0,
-    "skill_type": "global_skill",
-    "source_path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md",
-    "structure_score": 25,
-    "target_id": "global.ui-ux-pro-max",
-    "version_id": "live"
-  },
-  {
     "audit_score_0_100": 94,
     "compliance_status": "pass",
     "description_length": 238,

@@ -41,16 +41,6 @@
         "logs receipts and cleanup are bounded and redacted"
       ],
       "structural_score": 100
-    },
-    "S085": {
-      "checks": [
-        "stack is inferred from repository and request",
-        "web and mobile references are selected conditionally",
-        "persist and package installation are opt-in",
-        "browser or device acceptance is required for visible behavior",
-        "repository design system remains authoritative"
-      ],
-      "structural_score": 100
     }
   },
   "contract_fixtures": {
@@ -59,5 +49,11 @@
     "failed": 0
   },
   "proof_boundary": "local skill validation and deterministic contract simulation",
-  "live_external_or_production_mutation": false
+  "live_external_or_production_mutation": false,
+  "historical_edit": {
+    "date": "2026-09-04",
+    "status": "historical_copy_edited_after_original_run",
+    "reason": "Retired skill entries were removed by user request. Original run statuses and aggregate counts were not rerun or recomputed and are not current validation proof.",
+    "originals_archive": "/Users/daniildegtyarev/Documents/Codex/2026-09-04/new-chat/outputs/removed-skills-backup-2026-09-04.tar.gz"
+  }
 }

@@ -70,8 +70,7 @@
         "S018",
         "S019",
         "S075",
-        "S080",
-        "S085"
+        "S080"
       ],
       "root_at_most_500_lines": 8,
       "failed": 0
@@ -284,5 +283,11 @@
   "residual_risks": [
     "Desktop and CLI plugin discovery can differ; the catalog remains a selection policy and fresh-process proof is repeated after plugin or loader updates.",
     "Ten supplemental Figma cache sources fail the current quick validator but remain inventory-only, uninstalled and unexposed in the verified fresh CLI process."
-  ]
+  ],
+  "historical_edit": {
+    "date": "2026-09-04",
+    "status": "historical_copy_edited_after_original_run",
+    "reason": "Retired skill entries were removed by user request. Original run statuses and aggregate counts were not rerun or recomputed and are not current validation proof.",
+    "originals_archive": "/Users/daniildegtyarev/Documents/Codex/2026-09-04/new-chat/outputs/removed-skills-backup-2026-09-04.tar.gz"
+  }
 }

@@ -1,3 +1,7 @@
+> Historical copy edited on 2026-09-04 to remove retired tooling references.
+> Original results and totals describe the original run, not current validation.
+> Unmodified originals: `/Users/daniildegtyarev/Documents/Codex/2026-09-04/new-chat/outputs/removed-skills-backup-2026-09-04.tar.gz`.
+
 # Полный all-skills аудит официального формата и A/B-test v1
 
 Статус: `accepted`.
@@ -54,7 +58,6 @@
 | Цель | `managed_cache` | До | После | Изменение | Статус до | Статус после | Что изменено |
 |---|---:|---:|---:|---:|---|---|---|
 | `global.numba-jit-performance` | `false` | `95` | `100` | `5` | `pass` | `pass` | `frontmatter` `description` начинается с `Use for ...`, чтобы ключевой сценарий был в начале описания. |
-| `global.ui-ux-pro-max` | `false` | `87` | `92` | `5` | `warn` | `pass` | `frontmatter` `description` начинается с `Use when ...`; добавлена граница против override repo policy/design/security contracts. |
 | `plugin.openai-curated.hugging-face.b1986b3d3da5bb8a04d3cb1e69af5a29bb5c2c04.jobs` | `true` | `87` | `92` | `5` | `warn` | `pass` | `frontmatter` `description` переписан в формате `action-first`; добавлена граница против чисто локальных или не-Hugging Face workloads. |
 | `plugin.openai-curated.hugging-face.b1986b3d3da5bb8a04d3cb1e69af5a29bb5c2c04.llm-trainer` | `true` | `87` | `92` | `5` | `warn` | `pass` | `frontmatter` `description` переписан в формате `action-first`; добавлена граница против generic prompt tuning/local-only LLM work. |
 | `plugin.openai-curated.hugging-face.b1986b3d3da5bb8a04d3cb1e69af5a29bb5c2c04.paper-publisher` | `true` | `87` | `92` | `5` | `warn` | `pass` | `frontmatter` `description` переписан в формате `action-first`; добавлена граница против generic academic writing без Hugging Face Hub publishing. |
@@ -82,7 +85,6 @@
 | `global.root-cause-debugging` | `global_skill` | `false` | `100` | `100` | `0` | `pass` | `baseline_retained` | `none` |
 | `global.staged-plan-runner` | `global_skill` | `false` | `100` | `100` | `0` | `pass` | `baseline_retained` | `none` |
 | `global.topological-data-analysis` | `global_skill` | `false` | `100` | `100` | `0` | `pass` | `baseline_retained` | `none` |
-| `global.ui-ux-pro-max` | `global_skill` | `false` | `87` | `92` | `5` | `pass` | `candidate` | `skill_body_too_long` |
 | `plugin.openai-bundled.browser.26.623.141536.control-in-app-browser` | `plugin_skill` | `true` | `94` | `94` | `0` | `pass` | `baseline_retained` | `missing_executable_steps` |
 | `plugin.openai-bundled.chrome.26.623.141536.control-chrome` | `plugin_skill` | `true` | `100` | `100` | `0` | `pass` | `baseline_retained` | `none` |
 | `plugin.openai-bundled.computer-use.1.0.857.computer-use` | `plugin_skill` | `true` | `100` | `100` | `0` | `pass` | `baseline_retained` | `none` |
@@ -130,7 +132,7 @@
 ## Остаточные риски и ограничения
 
 - Правки `managed plugin-cache` применены локально в `/Users/daniildegtyarev/.codex/plugins/cache/...`; они могут быть перезаписаны при `reinstall/update`. Для долговечного результата нужен `upstream repair` или `reinstall-safe overlay`.
-- `global.last30days`, `global.prompt-manager`, `global.ui-ux-pro-max` и часть Hugging Face plugin skills остаются ниже `100/100` из-за `skill_body_too_long`. Это требует отдельного `progressive-disclosure refactor` в `references/`, но не блокирует текущий `all-skills audit`, потому что статус уже `pass`.
+- `global.last30days`, `global.prompt-manager`, и часть Hugging Face plugin skills остаются ниже `100/100` из-за `skill_body_too_long`. Это требует отдельного `progressive-disclosure refactor` в `references/`, но не блокирует текущий `all-skills audit`, потому что статус уже `pass`.
 - `plugin.openai-primary-runtime.presentations...` и `plugin.openai-primary-runtime.spreadsheets...` имеют малые `format findings` (`description_too_short` или `nonportable_name`), но это `managed runtime skill naming/content`, поэтому прямой долговечный repair не делался.
 - `Runtime smoke` конкретных `tools/plugins` не запускался; проверялись контракты `SKILL.md`, `discovery text`, `structure` и `safety/locality wording`.
 
@@ -169,7 +171,6 @@ Roehub repo:
 
 - `/Users/daniildegtyarev/.codex/skills/.system/skill-creator/SKILL.md`
 - `/Users/daniildegtyarev/.codex/skills/numba-jit-performance/SKILL.md`
-- `/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md`
 - `/Users/daniildegtyarev/.codex/plugins/cache/openai-curated/hugging-face/b1986b3d3da5bb8a04d3cb1e69af5a29bb5c2c04/skills/jobs/SKILL.md`
 - `/Users/daniildegtyarev/.codex/plugins/cache/openai-curated/hugging-face/b1986b3d3da5bb8a04d3cb1e69af5a29bb5c2c04/skills/llm-trainer/SKILL.md`
 - `/Users/daniildegtyarev/.codex/plugins/cache/openai-curated/hugging-face/b1986b3d3da5bb8a04d3cb1e69af5a29bb5c2c04/skills/paper-publisher/SKILL.md`

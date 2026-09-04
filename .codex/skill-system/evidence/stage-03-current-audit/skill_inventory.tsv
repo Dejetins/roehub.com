@@ -21,7 +21,6 @@ skill-system-stage-03-v1	global.publish-ci-deploy	global_skill	/Users/daniildegt
 skill-system-stage-03-v1	global.root-cause-debugging	global_skill	/Users/daniildegtyarev/.codex/skills/root-cause-debugging/SKILL.md	false
 skill-system-stage-03-v1	global.staged-plan-runner	global_skill	/Users/daniildegtyarev/.codex/skills/staged-plan-runner/SKILL.md	false
 skill-system-stage-03-v1	global.topological-data-analysis	global_skill	/Users/daniildegtyarev/.codex/skills/topological-data-analysis/SKILL.md	false
-skill-system-stage-03-v1	global.ui-ux-pro-max	global_skill	/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md	false
 skill-system-stage-03-v1	plugin.openai-bundled.browser.26.707.30751.control-in-app-browser	plugin_skill	/Users/daniildegtyarev/.codex/plugins/cache/openai-bundled/browser/26.707.30751/skills/control-in-app-browser/SKILL.md	true
 skill-system-stage-03-v1	plugin.openai-bundled.chrome.26.707.30751.control-chrome	plugin_skill	/Users/daniildegtyarev/.codex/plugins/cache/openai-bundled/chrome/26.707.30751/skills/control-chrome/SKILL.md	true
 skill-system-stage-03-v1	plugin.openai-bundled.computer-use.1.0.1000362.computer-use	plugin_skill	/Users/daniildegtyarev/.codex/plugins/cache/openai-bundled/computer-use/1.0.1000362/skills/computer-use/SKILL.md	true

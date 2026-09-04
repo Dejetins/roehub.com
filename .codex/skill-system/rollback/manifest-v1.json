@@ -215,35 +215,6 @@
     },
     {
       "before_state": "present",
-      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/0d08fb3566b84c94b792b6751f83e06a0a0e97401b84279e705cc7d0edc359e1.md",
-      "path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md",
-      "restore": "copy_blob_to_path",
-      "sha256": "0d08fb3566b84c94b792b6751f83e06a0a0e97401b84279e705cc7d0edc359e1"
-    },
-    {
-      "before_state": "absent",
-      "path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/acceptance.md",
-      "restore": "delete_created_path"
-    },
-    {
-      "before_state": "absent",
-      "path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/mobile.md",
-      "restore": "delete_created_path"
-    },
-    {
-      "before_state": "absent",
-      "path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/web.md",
-      "restore": "delete_created_path"
-    },
-    {
-      "before_state": "present",
-      "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/ea42c60691e2567d1d24c962456fa72f4b7466d8377c7e4e35d83b5e77687a80.md",
-      "path": "/Users/daniildegtyarev/Projects/roehub.com/.codex/AGENTS.md",
-      "restore": "copy_blob_to_path",
-      "sha256": "ea42c60691e2567d1d24c962456fa72f4b7466d8377c7e4e35d83b5e77687a80"
-    },
-    {
-      "before_state": "present",
       "blob": "/Users/daniildegtyarev/Projects/roehub.com/.codex/skill-system/rollback/blobs/21cd8a009a323702bd721180b918352e6b4900bf2cd810938346a3b6da48c5a1.md",
       "path": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_codex_skill_audit.py",
       "restore": "copy_blob_to_path",

@@ -136,7 +136,6 @@
       "staged-plan-runner",
       "template-creator:template-creator",
       "topological-data-analysis",
-      "ui-ux-pro-max",
       "visualize:visualize"
     ],
     "figma_names": [],
@@ -179,5 +178,11 @@
   ],
   "residual_risks": [
     "Future plugin, cache, or loader updates can change discovery and require this proof to be rerun."
-  ]
+  ],
+  "historical_edit": {
+    "date": "2026-09-04",
+    "status": "historical_copy_edited_after_original_run",
+    "reason": "Retired skill entries were removed by user request. Original run statuses and aggregate counts were not rerun or recomputed and are not current validation proof.",
+    "originals_archive": "/Users/daniildegtyarev/Documents/Codex/2026-09-04/new-chat/outputs/removed-skills-backup-2026-09-04.tar.gz"
+  }
 }

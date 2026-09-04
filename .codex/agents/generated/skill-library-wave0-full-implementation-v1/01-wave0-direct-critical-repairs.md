@@ -27,7 +27,6 @@ file_manifest:
     - /Users/daniildegtyarev/.codex/skills/last30days/SKILL.md
     - /Users/daniildegtyarev/.codex/skills/pre-ship-gate/SKILL.md
     - /Users/daniildegtyarev/.codex/skills/publish-ci-deploy/SKILL.md
-    - /Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md
     - .codex/skill-system/catalog-v1.json
     - .codex/skill-system/rollback/manifest-v1.json
     - docs/architecture/agents/skill-library-wave0-full-implementation-v1-stage-reports/01-wave0-direct-critical-repairs.md

@@ -1,3 +1,7 @@
+> Historical copy edited on 2026-09-04 to remove retired tooling references.
+> Original results and totals describe the original run, not current validation.
+> Unmodified originals: `/Users/daniildegtyarev/Documents/Codex/2026-09-04/new-chat/outputs/removed-skills-backup-2026-09-04.tar.gz`.
+
 # Stage 01 — Wave 0 Direct Critical Repairs
 
 Статус: `accepted`.
@@ -68,7 +72,6 @@ Modified:
 - `/Users/daniildegtyarev/.codex/skills/last30days/SKILL.md`
 - `/Users/daniildegtyarev/.codex/skills/pre-ship-gate/SKILL.md`
 - `/Users/daniildegtyarev/.codex/skills/publish-ci-deploy/SKILL.md`
-- `/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md`
 - `.codex/skill-system/catalog-v1.json`
 - `.codex/skill-system/ownership-v1.json`
 - `.codex/skill-system/fixtures/skill-contract-cases-v1.json`
@@ -82,9 +85,6 @@ Created:
 - `/Users/daniildegtyarev/.codex/skills/last30days/references/execution.md`
 - `/Users/daniildegtyarev/.codex/skills/last30days/references/synthesis.md`
 - `/Users/daniildegtyarev/.codex/skills/last30days/references/security.md`
-- `/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/web.md`
-- `/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/mobile.md`
-- `/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/acceptance.md`
 - Stage `01` evidence artifacts и этот report.
 
 Deleted: none.

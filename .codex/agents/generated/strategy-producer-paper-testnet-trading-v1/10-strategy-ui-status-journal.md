@@ -32,10 +32,6 @@ skill_routing:
     use_when: "verifying desktop/mobile UI, console, network, and screenshots"
     timing: during verification
     reason: "UI acceptance must be browser-observed"
-  - skill: ui-ux-pro-max
-    use_when: "improving layout/interaction clarity without changing product scope"
-    timing: during implementation
-    reason: "UI needs operational clarity and no overlap"
   - skill: publish-ci-deploy
     use_when: "accepted UI/API changes need shipping"
     timing: before ship

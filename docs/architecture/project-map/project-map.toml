@@ -262,7 +262,7 @@ skills = ["root-cause-debugging", "contract-impact-analysis", "backend-quality-g
 match = "Web UI, template, locale, browser flow"
 components = ["app:web", "app:api"]
 read_first = ["apps/web/main/app.py", "apps/web/templates/", "apps/web/dist/", "docs/architecture/apps/web/"]
-skills = ["ui-ux-pro-max", "browser-qa-evidence"]
+skills = ["browser-qa-evidence"]
 
 [[agent_routes]]
 match = "Backtest, benchmark, optimize"

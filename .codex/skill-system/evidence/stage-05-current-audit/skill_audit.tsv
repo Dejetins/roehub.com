@@ -21,7 +21,6 @@ skill-system-stage-05-v1	global.publish-ci-deploy	live	global_skill	/Users/danii
 skill-system-stage-05-v1	global.root-cause-debugging	live	global_skill	/Users/daniildegtyarev/.codex/skills/root-cause-debugging/SKILL.md	100	25	25	25	25	pass	0	0	85	255
 skill-system-stage-05-v1	global.staged-plan-runner	live	global_skill	/Users/daniildegtyarev/.codex/skills/staged-plan-runner/SKILL.md	100	25	25	25	25	pass	0	0	99	260
 skill-system-stage-05-v1	global.topological-data-analysis	live	global_skill	/Users/daniildegtyarev/.codex/skills/topological-data-analysis/SKILL.md	100	25	25	25	25	pass	0	0	166	518
-skill-system-stage-05-v1	global.ui-ux-pro-max	live	global_skill	/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md	100	25	25	25	25	pass	0	0	117	376
 skill-system-stage-05-v1	plugin.s001	live	plugin_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S001/SKILL.md	100	25	25	25	25	pass	0	0	48	223
 skill-system-stage-05-v1	plugin.s002	live	plugin_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S002/SKILL.md	100	25	25	25	25	pass	0	0	60	232
 skill-system-stage-05-v1	plugin.s003	live	plugin_skill	/Users/daniildegtyarev/plugins/codex-skill-system-overrides/resources/skills/S003/SKILL.md	100	25	25	25	25	pass	0	0	59	246

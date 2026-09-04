@@ -1263,25 +1263,6 @@
       "stage": "05"
     },
     {
-      "activation_policy": "preserve_public",
-      "allowed_primary_touches": [
-        "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md"
-      ],
-      "allowed_secondary_touches": [
-        "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/web.md",
-        "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/mobile.md",
-        "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/references/acceptance.md"
-      ],
-      "before_sha256": "0d08fb3566b84c94b792b6751f83e06a0a0e97401b84279e705cc7d0edc359e1",
-      "discovery_state": "direct",
-      "effective_path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md",
-      "operation": "edit_source",
-      "session_exposed": "public",
-      "skill_id": "S085",
-      "source_path": "/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md",
-      "stage": "01"
-    },
-    {
       "activation_policy": "preserve_dormant",
       "allowed_primary_touches": [],
       "allowed_secondary_touches": [],

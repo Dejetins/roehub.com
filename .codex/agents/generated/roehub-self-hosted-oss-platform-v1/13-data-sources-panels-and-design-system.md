@@ -19,7 +19,6 @@ context_sources:
     - {path: apps/web/dist/js/pages/backtests.js, why: current Canvas result charts}
 skill_routing:
   - {skill: staged-plan-runner, timing: before actions, reason: ledger gate}
-  - {skill: ui-ux-pro-max, timing: before UI implementation, reason: accessible institutional design system and chart states}
   - {skill: contract-impact-analysis, timing: before DataFrame/panel API freeze, reason: public UI/data contracts}
   - {skill: browser-qa-evidence, timing: verification, reason: real browser, responsive and accessibility evidence}
 change_ownership:

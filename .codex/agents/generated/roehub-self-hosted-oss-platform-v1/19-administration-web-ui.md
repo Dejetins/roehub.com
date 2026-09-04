@@ -18,7 +18,6 @@ context_sources:
     - {path: src/trading/contexts/operations/, why: operation state}
 skill_routing:
   - {skill: staged-plan-runner, timing: before actions, reason: ledger gate}
-  - {skill: ui-ux-pro-max, timing: before implementation, reason: dense institutional admin UX and accessibility}
   - {skill: contract-impact-analysis, timing: before routes/defaults, reason: role and browser-visible behavior}
   - {skill: browser-qa-evidence, timing: verification, reason: real browser role and operation flows}
 change_ownership:

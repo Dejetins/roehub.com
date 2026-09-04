@@ -35,7 +35,7 @@ jq -r '.inventory[] | select(.area == "operations") | .path' docs/architecture/p
 
 - Компоненты: `app:web`, `app:api`
 - Читать сначала: `apps/web/main/app.py`, `apps/web/templates/`, `apps/web/dist/`, `docs/architecture/apps/web/`
-- Возможные workflow skills: `ui-ux-pro-max`, `browser-qa-evidence`
+- Возможные workflow skills: `browser-qa-evidence`
 
 ### Backtest, benchmark, optimize
 

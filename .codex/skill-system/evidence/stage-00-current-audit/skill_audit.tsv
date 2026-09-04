@@ -21,7 +21,6 @@ skill-system-stage-00	global.publish-ci-deploy	live	global_skill	/Users/daniilde
 skill-system-stage-00	global.root-cause-debugging	live	global_skill	/Users/daniildegtyarev/.codex/skills/root-cause-debugging/SKILL.md	100	25	25	25	25	pass	0	0	62	327
 skill-system-stage-00	global.staged-plan-runner	live	global_skill	/Users/daniildegtyarev/.codex/skills/staged-plan-runner/SKILL.md	100	25	25	25	25	pass	0	0	84	282
 skill-system-stage-00	global.topological-data-analysis	live	global_skill	/Users/daniildegtyarev/.codex/skills/topological-data-analysis/SKILL.md	100	25	25	25	25	pass	0	0	131	518
-skill-system-stage-00	global.ui-ux-pro-max	live	global_skill	/Users/daniildegtyarev/.codex/skills/ui-ux-pro-max/SKILL.md	92	25	25	17	25	pass	0	1	670	665
 skill-system-stage-00	plugin.openai-bundled.browser.26.707.30751.control-in-app-browser	live	plugin_skill	/Users/daniildegtyarev/.codex/plugins/cache/openai-bundled/browser/26.707.30751/skills/control-in-app-browser/SKILL.md	94	25	25	19	25	pass	0	1	43	238
 skill-system-stage-00	plugin.openai-bundled.chrome.26.707.30751.control-chrome	live	plugin_skill	/Users/daniildegtyarev/.codex/plugins/cache/openai-bundled/chrome/26.707.30751/skills/control-chrome/SKILL.md	100	25	25	25	25	pass	0	0	49	185
 skill-system-stage-00	plugin.openai-bundled.computer-use.1.0.1000362.computer-use	live	plugin_skill	/Users/daniildegtyarev/.codex/plugins/cache/openai-bundled/computer-use/1.0.1000362/skills/computer-use/SKILL.md	100	25	25	25	25	pass	0	0	197	158
