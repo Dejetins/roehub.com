@@ -42,8 +42,8 @@ accepted requirement, historical evidence, or an explicitly labelled gap.
   documentation, releases, downloads, account, future demo, security,
   community, support, and legal pages.
 - Identify route compatibility requirements and unresolved product decisions.
-- Produce a compact machine-readable registry suitable for a later UI-program
-  atlas and traceability.
+- Produce a compact machine-readable registry suitable for screen mapping and
+  traceability in a later user-authorized UI task.
 
 ## Deliverables
 
@@ -105,5 +105,5 @@ embedding temporary design-tool IDs.
 - Status becomes `accepted` only after the three deliverables exist, validation
   passes, and a cold self-review finds no unclassified surface or hidden product
   decision.
-- Acceptance authorizes the next separately selected architecture or UI-program
-  execution unit only; it does not authorize implementation work.
+- Acceptance makes the inventory an input to a later user-authorized
+  architecture or UI task; it does not authorize implementation work.

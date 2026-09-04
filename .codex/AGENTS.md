@@ -1,6 +1,6 @@
 ---
 doc: agents
-version: "2.0"
+version: "2.2"
 status: active
 language: en
 ---
@@ -28,6 +28,18 @@ does not provide a parallel router, role system, or workflow engine.
   workflow or a read-only legacy inspection.
 - Select only the skill that matches the task. Add browser, contract,
   performance, release, or quality tooling only when that boundary is crossed.
+
+## UI development
+
+The previous staged UI workflow is retired by the user's decision of
+2026-09-04. It must not be resumed or recreated as a prerequisite for UI work.
+The replacement development workflow has not been selected.
+
+The accepted visual pilot is
+`.codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html`.
+Preserve its path and contents during cleanup. It is a visual reference, not
+proof of implemented APIs or server authorization. Future UI work follows the
+user's selected scope and retains current product and security boundaries.
 
 ## Repository context
 

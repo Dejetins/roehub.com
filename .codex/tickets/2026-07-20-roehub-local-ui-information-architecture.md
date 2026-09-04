@@ -116,5 +116,5 @@ completion on `2026-07-20`.
   implementation claim.
 - Only then may status become `accepted`.
 - Acceptance authorizes user review of this architecture. It does not authorize
-  a UI design program or Web implementation; those require their own current
-  execution authority.
+  visual changes or Web implementation; those require their own current
+  user-authorized task.

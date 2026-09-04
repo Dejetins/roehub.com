@@ -27,8 +27,8 @@ The architecture supplies the final product structure needed before design:
 - every inventoried local surface has a target screen or an explicit non-visual
   or historical disposition;
 - every canonical journey has an entry point and terminal screen;
-- navigation is stable enough to build a complete UI-program atlas without
-  inventing routes;
+- navigation is stable enough to map the screens in the selected UI task
+  without inventing routes;
 - permissions are expressed as server capabilities rather than hidden UI;
 - current enforcement and future policy remain visibly different;
 - compatibility URLs have explicit migration behavior.
@@ -364,8 +364,8 @@ Specific decisions:
 
 ## Design handoff boundary
 
-After user acceptance, the architecture becomes an input to a separately
-initialized `ui-design-program`. Its G0 intake and later gates may consume:
+The accepted architecture supplies factual and product constraints for the
+user's selected UI task:
 
 - stable `screen_id` and `surface_id` mappings;
 - navigation groups;
@@ -373,9 +373,10 @@ initialized `ui-design-program`. Its G0 intake and later gates may consume:
 - supported widths `820`, `1024`, and `1440`;
 - capability-driven visibility and forbidden states.
 
-The program must not reinterpret role grants, silently add public-site scope,
-or claim an unimplemented API. It chooses and hash-binds its visual authority
-in G0 and produces a complete atlas before family or wave design begins.
+UI work must not reinterpret role grants, silently add public-site scope, or
+claim an unimplemented API. The accepted Backtests Workbench v23 supplies the
+visual reference. No staged design process is required before implementation;
+the replacement development workflow remains undecided.
 
 ## Proof boundary
 

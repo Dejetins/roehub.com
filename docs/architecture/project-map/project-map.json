@@ -197,7 +197,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1128,
+      "file_count": 1058,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -3438,6 +3438,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/2026-09-04-ui-rollback.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20.md"
     },
     {
@@ -3452,363 +3457,8 @@
     },
     {
       "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-web-ui-2026-08-06/analog-platform-ux-research.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-web-ui-2026-08-06/linear-v23-audit-and-design-direction.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-web-ui-2026-08-06/pre-g0-source-assessment.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-web-ui-2026-08-06/roehub-ui-intent-baseline.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-web-ui-2026-08-06/visual-authority/linear-reference-set/manifest.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/evidence/roehub-web-ui-2026-08-06/visual-authority/supporting-custometry-pilot-v2/manifest.md"
-    },
-    {
-      "area": "knowledge",
       "kind": "configuration",
       "path": ".codex/delivery/graphs/roehub-server-authorization-stream-v1.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/README.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/change-impact-matrix.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/change-impact-matrix.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/change-impact-receipt.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/change-impact-request.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/change-record.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/change-record.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/contract-versions.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/contract-versions.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/decisions/visual-authority-owner-decision-request.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/decisions/visual-authority-owner-decision.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/family-acceptance-request.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/family-acceptance-request.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/family-acceptance.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/family-acceptance.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/g0-intake-questionnaire.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/geometry-capture.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/implementation-handoff.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/implementation-handoff.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/owner-decision-packet.template.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/owner-decision-request.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/owner-decision-request.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/owner-decision.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/owner-decision.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/owner-input-response-request.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/owner-input-response.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/owner-input-response.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/owner-review.template.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/platform-ui-baseline.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/platform-ui-baseline.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/program-artifact-index.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/program-artifact-index.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/proposal-for-owner-review.template.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/raster-diff.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/render-provenance-receipt.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/render-provenance-receipt.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/render-provenance-request.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/render-provenance-request.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/screen-acceptance.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/screen-acceptance.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/screen-atlas.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/screen-design-contract.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/screen-design-contract.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-completion-receipt.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-context-manifest.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-ledger.template.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-preflight-evidence.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-preflight-evidence.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-prompt.template.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-runtime-profiles.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-runtime-profiles.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-transition-readiness.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-transition-readiness.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-transition-request.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/stage-transition-request.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/ui-design-program.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/ui-design-program.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/ui-program-intake.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/ui-program-intake.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/visual-qa-receipt.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/visual-qa-receipt.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/wave-acceptance-request.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/wave-acceptance-request.template.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/wave-acceptance.schema.json"
-    },
-    {
-      "area": "knowledge",
-      "kind": "configuration",
-      "path": ".codex/delivery/ui-programs/roehub-local-platform-web-ui-2026-08/wave-acceptance.template.json"
     },
     {
       "area": "knowledge",
@@ -17356,7 +17006,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3031,
+  "inventory_file_count": 2961,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -17573,5 +17223,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "0a5f06f2d11216e360ef2bcd835390cae5b8839eb3324716476516ebdfc51517"
+  "structural_digest": "ab1af88a8df649c62031ac3b21fcb33207a785c510fca02fd58cc8f05c4414fa"
 }

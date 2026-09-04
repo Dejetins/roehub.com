@@ -5,7 +5,7 @@
 ## Статус
 
 - Назначение: `historical browser evidence`; визуальные результаты этого отчёта
-  не являются authority для будущей UI design program.
+  не заменяют принятую пользователем визуальную базу.
 - Дата локальной проверки: `2026-07-10`.
 - Статус: `deployed; production browser verified`.
 - Runtime: FastAPI SSR, Jinja2, CSS, vanilla JavaScript и HTMX.

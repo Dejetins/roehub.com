@@ -15,9 +15,9 @@
 Ticket acceptance means that this execution unit and its evidence are complete.
 The product owner subsequently accepted the target information architecture and
 authorization matrix. The former design-system follow-up was retired during the
-2026-08-05 cleanup; the accepted IA remains an input to a separately initialized
-`ui-design-program` and to the server-authorization ticket graph. It does not
-authorize visual or Web implementation by itself.
+2026-08-05 cleanup. After the 2026-09-04 workflow retirement, the accepted IA
+remains an input to the user's selected UI task and to the server-authorization
+ticket graph. It does not authorize visual or Web implementation by itself.
 
 ## Delivered artifacts
 

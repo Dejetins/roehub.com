@@ -1,20 +1,19 @@
 # Roehub — архитектура проектирования и поставки интерфейса v1
 
-Документ сохраняет принятую целевую Web-архитектуру Roehub и связывает будущие
-UI-программы с глобальным `ui-design-program` без наследования старых visual requirements.
+Документ сохраняет принятую целевую Web-архитектуру Roehub, визуальную базу и
+границы совместимости будущих изменений интерфейса.
 
 ## Статус и полномочия
 
-- Статус: `accepted architecture`, обновлена после прекращения прежнего
-  design-system/Penpot workflow.
+- Статус: `accepted architecture`, обновлена 2026-09-04 после прекращения
+  прежнего поэтапного процесса проектирования.
 - Документ сохраняет принятые границы продукта, источники фактов и условия
   передачи дизайна в реализацию.
 - Документ не задаёт визуальный стиль, дизайн-систему, обязательный
   дизайн-инструмент, план реализации или разрешение на изменение кода,
   публикацию и развёртывание.
-- Полные программы проектирования Roehub создаются и исполняются только через
-  глобальный skill `ui-design-program`. Репозиторий не дублирует его G0–G6
-  control plane собственным workflow.
+- Новый процесс разработки пока не выбран. Прежние этапы, журналы и
+  управляющие артефакты не являются условием начала UI-работы.
 
 ## Цель
 
@@ -84,51 +83,44 @@ packages/
 | Роли, capabilities, маршруты и mutation policy | текущий код, API и принятые server contracts |
 | Текущее browser-visible поведение | `apps/web/` и воспроизводимые browser evidence |
 | Публичный сайт | public-site registry и `roehub-public-site-identity-release-and-measurement-v1.md` |
-| Желаемый визуальный результат | выбранный в G0 `visual_authority` текущей UI design program |
-| Реализационный handoff | принятый G6 `implementation_handoff` текущей UI design program |
+| Желаемый визуальный результат | принятый Backtests Workbench v23 и последующие явные решения пользователя |
+| Объём реализации | выбранная пользователем задача и её критерии проверки |
 | Публичный выпуск | SemVer из `pyproject.toml`, Git tag и GitHub Release |
 
 Исторический документ, прототип или screenshot не становится текущей
 authority только потому, что он хранится в репозитории. Текущий код также не
 может молча переопределить желаемый пользователем продуктовый смысл.
 
-## Вход в новую UI design program
+## Источники для разработки
 
-Перед G0 агент собирает один durable intent baseline из:
+В пределах выбранной задачи используются:
 
-- принятого product baseline;
+- принятый product baseline;
 - local-platform information architecture, screen registry и access/route
   contract;
 - public-site registry, если сайт входит в авторизованный scope;
-- текущих route/API/DTO/runtime sources как evidence, а не как второй product
+- текущие route/API/DTO/runtime sources как evidence, а не как второй product
   owner;
-- пользовательского brief и явно выбранного visual direction;
-- пилотного или другого visual source, если пользователь выбирает его как
-  основу.
+- пользовательская задача и принятые визуальные решения;
+- принятый пилот Backtests Workbench v23.
 
-G0 обязан зафиксировать purpose, users, outcomes, roles, journeys, included и
-excluded scope, platform, responsive range, mobile authorization и ровно один
-текущий `visual_authority`. Визуальные темы, tokens, component families,
-spacing, typography и motion не наследуются из удалённых исторических
-документов.
+Технические документы ограничивают совместимость и описывают текущую
+реализацию. Они не заменяют пользовательский замысел и не требуют создавать
+новую программу проектирования. Визуальные требования удалённых исторических
+документов не наследуются автоматически.
 
-`ui-design-program` владеет atlas, journeys, families, waves, review boards,
-hash-pinned provenance, owner receipts и G0–G6 transitions. Пользователю
-показываются законченные визуальные checkpoints; технические hashes и ledger
-mechanics остаются внутри control plane.
-
-## Защищённая историческая база
+## Принятая визуальная база
 
 Артефакт
 `.codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html`
-сохраняется как важная историческая база Backtests Workbench.
+принят пользователем как пилот Backtests Workbench и сохраняется по этому пути.
 
 - Его нельзя удалять или переписывать в рамках общей очистки старой UI
   документации.
-- Само наличие файла не делает его автоматически текущим `visual_authority`.
-- Если будущий G0 выбирает его как accepted pilot или visual-language anchor,
-  программа обязана привязать точный live path, SHA-256 и корректный evidence
-  mode.
+- SHA-256: `3ff799ac5a5872662dda8b67fc1bd4db0c7860b7de9d84e6597465209d5dd2a4`.
+- Повторная приёмка пилота через отдельный процесс не требуется.
+- Пилот задаёт визуальную базу, но не доказывает реализацию API, доступность
+  серверных операций или полноту всех экранов продукта.
 
 Старый `prototypes/roehub-v2/` не является этой защищённой базой. Его
 историческое существование фиксируется Git history и не требует сохранения
@@ -136,10 +128,10 @@ mechanics остаются внутри control plane.
 
 ## Граница design-to-code
 
-Реализация может начаться только из отдельно авторизованного handoff или
-delivery ticket. Handoff должен:
+Реализация выполняется в пределах выбранной пользователем задачи. Изменение
+должно:
 
-- exact-cover принятые screens, states, actions и critical journeys;
+- покрывать выбранные screens, states, actions и critical journeys;
 - сохранять server authority, same-origin boundary, CSRF/recent-auth,
   secret-redaction и unknown-result reconciliation;
 - отделять visual fidelity от API, persistence, performance и runtime proof;
@@ -152,15 +144,15 @@ Browser acceptance выполняется на реальном приложен
 Source tests не доказывают browser behavior, а дизайн не доказывает server-side
 authorization.
 
-## Граница завершения
+## Граница проверки
 
-UI program считается готовой к реализации только после принятого G6 handoff.
-Одна принятая screen family, component catalog, route list или pilot не
-заменяет полный all-screen atlas и journey coverage.
+Завершение конкретной задачи определяется её объёмом и полученными
+доказательствами. Принятый пилот не означает, что весь интерфейс реализован.
+Проверка одного экрана не подтверждает работоспособность остальных экранов.
 
-Изменение принятого визуального результата после G3–G6 проходит через change
-impact правила `ui-design-program`; принятая information architecture меняется
-только отдельным продуктовым решением.
+Изменения принятого визуального результата и информационной архитектуры
+опираются на явные решения пользователя. Этот документ не назначает новый
+процесс разработки.
 
 ## Связанные документы
 
