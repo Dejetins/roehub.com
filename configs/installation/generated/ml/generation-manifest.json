@@ -1,6 +1,6 @@
 {
   "inputs": {
-    "release_manifest_sha256": "7e70a9457908d0d1f2a2daaf0a008bc0453a05bad1823843fc7fa45b7ff9dbd0",
+    "release_manifest_sha256": "c3b7643c7ad67abb50c44c55b315d6fd44178c3d5e830935ab3ab4ff7aeaba54",
     "roehub_yaml_sha256": "a8eb8d0a622e16997de60bba23f06b42477b7fb4d41f8289d77e40fce8d26383",
     "runtime_service_manifest_sha256": "a32acc1889f755af92896be5ea089e6d8914b4553eceea44be35270be0f35f3e"
   },

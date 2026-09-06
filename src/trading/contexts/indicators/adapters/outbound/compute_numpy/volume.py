@@ -166,36 +166,6 @@ def _rolling_variance_series_f64(source: np.ndarray, window: int) -> np.ndarray:
     return out
 
 
-def _rolling_std_series_f64(source: np.ndarray, window: int) -> np.ndarray:
-    """
-    Compute one rolling-standard-deviation series (`ddof=0`) with NaN-window policy.
-
-    Args:
-        source: Float64 source series.
-        window: Positive integer window.
-    Returns:
-        np.ndarray: Float64 rolling-standard-deviation series.
-    Assumptions:
-        Standard deviation is square root of rolling variance from `_rolling_variance_series_f64`.
-    Raises:
-        None.
-    Side Effects:
-        Allocates one output vector.
-    """
-    variance = _rolling_variance_series_f64(source, window)
-    t_size = source.shape[0]
-    out = np.empty(t_size, dtype=np.float64)
-
-    for time_index in range(t_size):
-        value = float(variance[time_index])
-        if is_nan(value):
-            out[time_index] = np.nan
-        else:
-            out[time_index] = math.sqrt(value)
-
-    return out
-
-
 def _shift_series_f64(source: np.ndarray, periods: int) -> np.ndarray:
     """
     Shift one series by integer periods with NaN fill for out-of-range indices.

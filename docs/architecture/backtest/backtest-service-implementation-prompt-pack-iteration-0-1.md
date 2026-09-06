@@ -1,6 +1,11 @@
 # Backtest Service Implementation Prompt Pack — Iteration 0/1
 
-Статус: executable prompt pack для запуска первых двух итераций реализации
+Статус: `historical`; исполнение по этому документу не выбрано.
+Исторические инструкции и утверждения о состоянии host ниже относятся к дате
+исходного плана. Текущие entrypoints и installation contract: [индекс](README.md).
+
+
+Исходный статус: executable prompt pack для запуска первых двух итераций реализации
 `Backtest Service Artifact Runtime v1`.
 
 Этот pack не заменяет архитектурный документ. Source of truth для контрактов,

@@ -1,5 +1,0 @@
-check process roehub_keycloak matching "kc\\.sh start"
-  start program = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh start com.roehub.keycloak /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.keycloak.plist"
-  stop program  = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh stop com.roehub.keycloak /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.keycloak.plist"
-  if failed host 127.0.0.1 port 19000 protocol http request "/health/ready" for 2 cycles then restart
-  if 5 restarts within 10 cycles then unmonitor

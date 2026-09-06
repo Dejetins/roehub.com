@@ -1,8 +1,0 @@
-# Research monitor-only Stage 08K inference supervision.
-# This service must never create execution intents or exchange orders.
-check process roehub_rl_trading_inference matching "apps.worker.rl_trading_inference.main.main"
-  start program = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh start com.roehub.rl-trading-inference /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.rl-trading-inference.plist"
-  stop program  = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh stop com.roehub.rl-trading-inference /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.rl-trading-inference.plist"
-  if failed host 127.0.0.1 port 9213 protocol http request "/health/ready" for 2 cycles then alert
-  if failed host 127.0.0.1 port 9213 protocol http request "/metrics" for 2 cycles then alert
-  if 5 restarts within 10 cycles then unmonitor

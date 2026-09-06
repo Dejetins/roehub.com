@@ -42,7 +42,6 @@ def test_auth_templates_do_not_embed_inline_scripts() -> None:
         WEB_TEMPLATES / "pages" / "login.html",
         WEB_TEMPLATES / "pages" / "logout.html",
         WEB_TEMPLATES / "pages" / "register.html",
-        WEB_TEMPLATES / "fragments" / "auth" / "login_modal.html",
     ]
 
     for template_path in auth_templates:
@@ -56,8 +55,6 @@ def test_shell_no_longer_references_public_user_badge_partial() -> None:
     shell_templates = [
         WEB_TEMPLATES / "base.html",
         WEB_TEMPLATES / "pages" / "placeholder.html",
-        WEB_TEMPLATES / "fragments" / "shell" / "user_badge.html",
-        WEB_TEMPLATES / "components" / "user_badge.html",
     ]
 
     for template_path in shell_templates:

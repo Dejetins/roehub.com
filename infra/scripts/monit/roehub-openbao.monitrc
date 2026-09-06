@@ -1,6 +1,0 @@
-check process roehub_openbao matching "openbao/bin/bao server -config=/opt/roehub/config/openbao/openbao.prod.hcl"
-  start program = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh start com.roehub.openbao /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.openbao.plist"
-  stop program  = "/opt/homebrew/etc/monit.d/scripts/launchctl_service_control.sh stop com.roehub.openbao /Users/daniildegtyarev/Library/LaunchAgents/com.roehub.openbao.plist"
-  if failed host 127.0.0.1 port 8200 protocol http request "/v1/sys/health" for 2 cycles then exec "/opt/roehub/bin/recover_openbao_transit.sh"
-  if failed host 127.0.0.1 port 8200 protocol http request "/v1/sys/metrics?format=prometheus" for 2 cycles then alert
-  if 5 restarts within 10 cycles then unmonitor

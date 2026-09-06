@@ -151,7 +151,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 291,
+      "file_count": 270,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -160,7 +160,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 288,
+      "file_count": 222,
       "id": "operations",
       "paths": [
         "infra/",
@@ -169,23 +169,21 @@
         "alembic/",
         ".github/workflows/"
       ],
-      "purpose": "Docker, macOS runtime, edge, monitoring, конфигурация и миграции данных.",
+      "purpose": "Self-hosted Docker Compose, monitoring, конфигурация и миграции данных.",
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 128,
+      "file_count": 108,
       "id": "automation",
       "paths": [
         "tools/",
-        "scripts/",
-        "data_load/",
-        "notebooks/"
+        "scripts/"
       ],
-      "purpose": "Операторские скрипты, генераторы, CI helpers, загрузчики и notebooks.",
+      "purpose": "Операторские скрипты, генераторы и CI helpers.",
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 429,
+      "file_count": 427,
       "id": "quality",
       "paths": [
         "tests/",
@@ -219,15 +217,12 @@
       "title": "Прототипы и локальные результаты"
     },
     {
-      "file_count": 12,
+      "file_count": 9,
       "id": "repository-meta",
       "paths": [
         ".dockerignore",
         ".gitignore",
-        ".opencode/",
         ".python-version",
-        ".vscode/",
-        "Dockerfile.api",
         "LICENSE",
         "alembic.ini",
         "pyproject.toml",
@@ -305,7 +300,7 @@
       "entrypoints": [
         "apps/cli/main/main.py"
       ],
-      "file_count": 23,
+      "file_count": 22,
       "id": "app:cli",
       "kind": "app",
       "name": "cli",
@@ -557,7 +552,7 @@
         "apps/web/main/app.py",
         "apps/web/main/main.py"
       ],
-      "file_count": 97,
+      "file_count": 77,
       "id": "app:web",
       "kind": "app",
       "name": "web",
@@ -3451,6 +3446,11 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-REPOSITORY-HYGIENE-2026-09-06.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "frontend",
       "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html"
     },
@@ -3990,6 +3990,11 @@
       "path": ".codex/tickets/2026-07-20-roehub-ui-surface-inventory.md"
     },
     {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-09-06-repository-hygiene-cleanup.md"
+    },
+    {
       "area": "repository-meta",
       "kind": "other",
       "path": ".dockerignore"
@@ -4021,18 +4026,8 @@
     },
     {
       "area": "repository-meta",
-      "kind": "configuration",
-      "path": ".opencode/openai-codex-auth-config.json"
-    },
-    {
-      "area": "repository-meta",
       "kind": "other",
       "path": ".python-version"
-    },
-    {
-      "area": "repository-meta",
-      "kind": "configuration",
-      "path": ".vscode/settings.json"
     },
     {
       "area": "knowledge",
@@ -4043,11 +4038,6 @@
       "area": "repository-root",
       "kind": "documentation",
       "path": "CONTRIBUTING.md"
-    },
-    {
-      "area": "repository-meta",
-      "kind": "other",
-      "path": "Dockerfile.api"
     },
     {
       "area": "repository-meta",
@@ -4617,11 +4607,6 @@
     {
       "area": "delivery",
       "kind": "python",
-      "path": "apps/cli/test_backfill_1m_parsing.py"
-    },
-    {
-      "area": "delivery",
-      "kind": "python",
       "path": "apps/cli/wiring/__init__.py"
     },
     {
@@ -4972,11 +4957,6 @@
     {
       "area": "delivery",
       "kind": "frontend",
-      "path": "apps/web/dist/backtest_ui.js"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
       "path": "apps/web/dist/css/base.css"
     },
     {
@@ -5102,17 +5082,7 @@
     {
       "area": "delivery",
       "kind": "frontend",
-      "path": "apps/web/dist/js/core/formatters.js"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
       "path": "apps/web/dist/js/core/locale.js"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/dist/js/core/notifications.js"
     },
     {
       "area": "delivery",
@@ -5127,17 +5097,7 @@
     {
       "area": "delivery",
       "kind": "frontend",
-      "path": "apps/web/dist/js/core/sse.js"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
       "path": "apps/web/dist/js/core/theme.js"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/dist/js/core/validators.js"
     },
     {
       "area": "delivery",
@@ -5167,11 +5127,6 @@
     {
       "area": "delivery",
       "kind": "frontend",
-      "path": "apps/web/dist/js/pages/landing.js"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
       "path": "apps/web/dist/js/pages/plugin-panel-lab.js"
     },
     {
@@ -5183,16 +5138,6 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/web/dist/js/pages/strategies.js"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/dist/site.css"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/dist/strategy_ui.js"
     },
     {
       "area": "delivery",
@@ -5257,27 +5202,12 @@
     {
       "area": "delivery",
       "kind": "frontend",
-      "path": "apps/web/templates/backtests.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
       "path": "apps/web/templates/base.html"
     },
     {
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/web/templates/components/shell_preferences.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/templates/components/ui_kit_placeholder.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/templates/components/user_badge.html"
     },
     {
       "area": "delivery",
@@ -5327,16 +5257,6 @@
     {
       "area": "delivery",
       "kind": "frontend",
-      "path": "apps/web/templates/fragments/account/status_bar.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/templates/fragments/auth/login_modal.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
       "path": "apps/web/templates/fragments/backtests/loading_state.html"
     },
     {
@@ -5347,22 +5267,7 @@
     {
       "area": "delivery",
       "kind": "frontend",
-      "path": "apps/web/templates/fragments/shell/user_badge.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
       "path": "apps/web/templates/fragments/strategies/loading_state.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/templates/landing.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/templates/macros/ui.html"
     },
     {
       "area": "delivery",
@@ -5383,11 +5288,6 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/web/templates/pages/dashboard.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/templates/pages/landing.html"
     },
     {
       "area": "delivery",
@@ -5433,21 +5333,6 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/web/templates/pages/strategies.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/templates/strategies_list.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/templates/strategy_builder.html"
-    },
-    {
-      "area": "delivery",
-      "kind": "frontend",
-      "path": "apps/web/templates/strategy_details.html"
     },
     {
       "area": "delivery",
@@ -9386,11 +9271,6 @@
     },
     {
       "area": "knowledge",
-      "kind": "other",
-      "path": "docs/architecture/roadmap/.DS_Store"
-    },
-    {
-      "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/shared-kernel-primitives.md"
     },
@@ -9428,11 +9308,6 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/strategy/strategy-telegram-notifier-best-effort-policy-v1.md"
-    },
-    {
-      "area": "knowledge",
-      "kind": "documentation",
-      "path": "docs/repository_three.md"
     },
     {
       "area": "knowledge",
@@ -9817,16 +9692,6 @@
     {
       "area": "operations",
       "kind": "other",
-      "path": "infra/caddy/Caddyfile.vps"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/caddy/legacy/Caddyfile.vps.macstudio"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
       "path": "infra/docker/.env.example"
     },
     {
@@ -9847,17 +9712,7 @@
     {
       "area": "operations",
       "kind": "configuration",
-      "path": "infra/docker/docker-compose.backend.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
       "path": "infra/docker/docker-compose.market_data.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/docker/docker-compose.web.prod.yml"
     },
     {
       "area": "operations",
@@ -9906,303 +9761,43 @@
     },
     {
       "area": "operations",
-      "kind": "configuration",
-      "path": "infra/macos/blackbox/blackbox.test.yml"
+      "kind": "documentation",
+      "path": "infra/monitoring/rules/README.md"
     },
     {
       "area": "operations",
       "kind": "configuration",
-      "path": "infra/macos/blackbox/blackbox.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/clickhouse/config.test.xml"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/clickhouse/config.xml"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/clickhouse/users.d/roehub.xml"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.api.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.backtest-artifact-publisher.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.backtest-job-runner.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.blackbox-exporter.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.clickhouse-exporter.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.clickhouse.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.exchange-control.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.exchange-execution.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.market-data-scheduler.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.market-data-ws-worker.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.notification-dispatcher.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.notification-log-rotation.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.openbao-recover.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.openbao.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.postgres-exporter.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.redis-exporter.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.rl-trading-inference.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.strategy-live-runner.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.tailscale-runtime.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.telegram-egress-tunnel.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.api.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.backtest-artifact-publisher.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.backtest-job-runner.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.blackbox-exporter.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.clickhouse.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.exchange-execution.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.grafana.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.market-data-scheduler.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.market-data-ws-worker.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.postgres.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.prometheus.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/launchd/com.roehub.test.redis.plist"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/openbao/openbao.prod.hcl"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/openbao/policies/roehub-api-transit-deny-decrypt.hcl"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/openbao/policies/roehub-exchange-control-transit.hcl"
+      "path": "infra/monitoring/rules/live-execution-stage17.rules.yml"
     },
     {
       "area": "operations",
       "kind": "configuration",
-      "path": "infra/macos/prometheus/prometheus.prod.yml"
+      "path": "infra/monitoring/rules/market-data-funding.rules.yml"
     },
     {
       "area": "operations",
       "kind": "configuration",
-      "path": "infra/macos/prometheus/prometheus.test.yml"
+      "path": "infra/monitoring/rules/market-data-live-tail-repair.rules.yml"
     },
     {
       "area": "operations",
       "kind": "configuration",
-      "path": "infra/macos/prometheus/rules/live-execution-stage17.rules.yml"
+      "path": "infra/monitoring/rules/notifications-admin.rules.yml"
     },
     {
       "area": "operations",
       "kind": "configuration",
-      "path": "infra/macos/prometheus/rules/market-data-funding.rules.yml"
+      "path": "infra/monitoring/rules/platform-monitoring.rules.yml"
     },
     {
       "area": "operations",
       "kind": "configuration",
-      "path": "infra/macos/prometheus/rules/market-data-live-tail-repair.rules.yml"
+      "path": "infra/monitoring/rules/rl-trading-inference.rules.yml"
     },
     {
       "area": "operations",
       "kind": "configuration",
-      "path": "infra/macos/prometheus/rules/notifications-admin.rules.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/macos/prometheus/rules/rl-trading-inference.rules.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/macos/prometheus/rules/strategy-producer.rules.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/macos/ssh/roehub-telegram-egress.conf.example"
-    },
-    {
-      "area": "operations",
-      "kind": "script",
-      "path": "infra/monitoring/host-macos/install-node-exporter.sh"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/monitoring/monitoring/blackbox/blackbox.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/monitoring/monitoring/grafana/dashboards/roehub/01-platform-overview.json"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/monitoring/monitoring/grafana/dashboards/roehub/02-mac-studio-host.json"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/monitoring/monitoring/grafana/dashboards/roehub/03-containers.json"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/monitoring/monitoring/grafana/dashboards/roehub/04-datastores.json"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/monitoring/monitoring/grafana/dashboards/roehub/05-api-market-data.json"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/monitoring/monitoring/grafana/provisioning/dashboards/roehub-dashboards.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/monitoring/monitoring/grafana/provisioning/datasources/roehub-prometheus.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/monitoring/monitoring/prometheus/prometheus.yml"
-    },
-    {
-      "area": "operations",
-      "kind": "configuration",
-      "path": "infra/monitoring/monitoring/prometheus/rules/mac-studio-monitoring.rules.yml"
+      "path": "infra/monitoring/rules/strategy-producer.rules.yml"
     },
     {
       "area": "operations",
@@ -10263,56 +9858,6 @@
       "area": "operations",
       "kind": "python",
       "path": "infra/openbao/verify_runtime.py"
-    },
-    {
-      "area": "operations",
-      "kind": "script",
-      "path": "infra/scripts/monit/launchctl_service_control.sh"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/scripts/monit/roehub-backtest-artifact-publisher.monitrc"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/scripts/monit/roehub-backtest-job-runner.monitrc"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/scripts/monit/roehub-exchange-control.monitrc"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/scripts/monit/roehub-exchange-execution.monitrc"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/scripts/monit/roehub-keycloak.monitrc"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/scripts/monit/roehub-market-data.monitrc"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/scripts/monit/roehub-openbao.monitrc"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/scripts/monit/roehub-rl-trading-inference.monitrc"
-    },
-    {
-      "area": "operations",
-      "kind": "other",
-      "path": "infra/scripts/monit/roehub-strategy-live-runner.monitrc"
     },
     {
       "area": "operations",
@@ -10443,31 +9988,6 @@
       "area": "operations",
       "kind": "configuration",
       "path": "migrations/postgres/manifest.json"
-    },
-    {
-      "area": "automation",
-      "kind": "other",
-      "path": "notebooks/01_backtest_regression_smoke.ipynb"
-    },
-    {
-      "area": "automation",
-      "kind": "other",
-      "path": "notebooks/02_backtest_perf_memory_smoke.ipynb"
-    },
-    {
-      "area": "automation",
-      "kind": "other",
-      "path": "notebooks/03_sync_backtest_pickle_rollup_1h_ma_grid.ipynb"
-    },
-    {
-      "area": "automation",
-      "kind": "python",
-      "path": "notebooks/03_sync_backtest_pickle_rollup_1h_ma_grid.py"
-    },
-    {
-      "area": "automation",
-      "kind": "documentation",
-      "path": "notebooks/README.md"
     },
     {
       "area": "repository-meta",
@@ -10708,81 +10228,6 @@
       "area": "automation",
       "kind": "python",
       "path": "scripts/live_execution/sync_exchange_account_projection.py"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/bootstrap_native_prod.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/bootstrap_native_test.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/clickhouse_partition_dedup.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/configure_tailscale_serve.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/ensure_tailscale_runtime.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/export_container_backups.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/install_native_backend_prereqs.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/provision_openbao_transit_stage3a.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/recover_openbao_transit.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/reload_launchd_services.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/rotate_notification_logs.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/smoke_openbao_transit_acl.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/smoke_prod.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "script",
-      "path": "scripts/macos/smoke_test.sh"
-    },
-    {
-      "area": "automation",
-      "kind": "python",
-      "path": "scripts/macos/stage18a_rl_monitor_evidence.py"
     },
     {
       "area": "automation",
@@ -14972,6 +14417,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/cli/test_backfill_1m_parsing.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py"
     },
     {
@@ -15293,11 +14743,6 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/web/test_app_routes.py"
-    },
-    {
-      "area": "quality",
-      "kind": "python",
-      "path": "tests/unit/apps/web/test_backtest_ui_asset.py"
     },
     {
       "area": "quality",
@@ -16407,11 +15852,6 @@
     {
       "area": "quality",
       "kind": "python",
-      "path": "tests/unit/infra/test_prod_compose_files.py"
-    },
-    {
-      "area": "quality",
-      "kind": "python",
       "path": "tests/unit/infra/test_ui_compose_profile.py"
     },
     {
@@ -16463,11 +15903,6 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/platform/secrets/test_transport.py"
-    },
-    {
-      "area": "quality",
-      "kind": "python",
-      "path": "tests/unit/scripts/macos/test_stage18a_rl_monitor_evidence.py"
     },
     {
       "area": "quality",
@@ -17000,23 +16435,13 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 2960,
+  "inventory_file_count": 2848,
   "project": "Roehub",
   "runtime_flows": [
     {
-      "label": "HTTPS",
+      "label": "installation Web endpoint",
       "source": "browser",
-      "target": "edge"
-    },
-    {
-      "label": "UI",
-      "source": "edge",
       "target": "web"
-    },
-    {
-      "label": "/api/*",
-      "source": "edge",
-      "target": "api"
     },
     {
       "label": "same-origin API",
@@ -17084,12 +16509,12 @@
       "target": "workers"
     },
     {
-      "label": "metrics/traces",
+      "label": "metrics/logs",
       "source": "api",
       "target": "observability"
     },
     {
-      "label": "metrics/traces",
+      "label": "metrics/logs",
       "source": "workers",
       "target": "observability"
     }
@@ -17102,15 +16527,6 @@
         "apps/web/"
       ],
       "title": "Браузер"
-    },
-    {
-      "id": "edge",
-      "kind": "edge",
-      "paths": [
-        "infra/caddy/",
-        "infra/docker/docker-compose.web.prod.yml"
-      ],
-      "title": "VPS edge / TLS"
     },
     {
       "id": "web",
@@ -17201,8 +16617,8 @@
       "id": "exchanges",
       "kind": "external",
       "paths": [
-        "data_load/binance/",
-        "data_load/bybit/"
+        "src/trading/contexts/market_data/adapters/outbound/clients/binance/",
+        "src/trading/contexts/market_data/adapters/outbound/clients/bybit/"
       ],
       "title": "Binance / Bybit"
     },
@@ -17213,9 +16629,9 @@
         "infra/monitoring/",
         "apps/monitoring/"
       ],
-      "title": "Prometheus / Grafana / OTel"
+      "title": "Prometheus / Grafana / Loki"
     }
   ],
   "schema_version": 1,
-  "structural_digest": "0ad96c64f4f1d8d1750b3b5dd5a205f72e692d3439bd0e5a50d42e2fb229069a"
+  "structural_digest": "92a2054554e3c39cac40c7462d616d7c969621ed7d9bcc308529e3a3dad71452"
 }

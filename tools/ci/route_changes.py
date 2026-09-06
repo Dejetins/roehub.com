@@ -38,6 +38,8 @@ TEST_SHARDS: dict[str, TestShard] = {
     "backtest-artifacts": TestShard(
         name="backtest-artifacts",
         target=_target(
+            "tests/unit/contexts/backtest_artifacts",
+            "tests/unit/contexts/backtest/adapters/outbound/cache_fs",
             "tests/unit/contexts/backtest/adapters/outbound/artifacts_fs",
             "tests/unit/contexts/backtest/adapters/test_backtest_artifacts_runtime_config.py",
             "tests/unit/contexts/backtest/adapters/test_indicators_yaml_defaults_provider.py",
@@ -59,6 +61,8 @@ TEST_SHARDS: dict[str, TestShard] = {
     "backtest-scoring": TestShard(
         name="backtest-scoring",
         target=_target(
+            "tests/unit/contexts/backtest/application/services/v2/test_bitsets.py",
+            "tests/unit/contexts/backtest/application/services/v2/test_row_signatures.py",
             "tests/unit/contexts/backtest/application/services/"
             "test_signals_from_indicators_v1.py",
             "tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py",
@@ -94,6 +98,11 @@ TEST_SHARDS: dict[str, TestShard] = {
     "backtest-domain": TestShard(
         name="backtest-domain",
         target=_target(
+            "tests/unit/contexts/backtest/adapters/outbound/"
+            "test_postgres_research_organization_scope.py",
+            "tests/unit/contexts/backtest/application/services/"
+            "test_organization_scoped_market_data.py",
+            "tests/unit/contexts/backtest/application/services/test_research_identity.py",
             "tests/unit/contexts/backtest/application/test_backtest_errors.py",
             "tests/unit/contexts/backtest/application/services/v2/test_admission.py",
             "tests/unit/contexts/backtest/application/services/v2/"
@@ -147,6 +156,29 @@ TEST_SHARDS: dict[str, TestShard] = {
             "tests/unit/contexts/strategy",
         ),
     ),
+    "execution-notifications": TestShard(
+        name="execution-notifications",
+        target=_target(
+            "tests/unit/contexts/exchange_control",
+            "tests/unit/contexts/live_execution",
+            "tests/unit/contexts/notifications",
+        ),
+    ),
+    "rl-trading": TestShard(
+        name="rl-trading",
+        target="tests/unit/contexts/rl_trading tests/unit/scripts/rl_trading",
+    ),
+    "platform-contracts": TestShard(
+        name="platform-contracts",
+        target=_target(
+            "tests/unit/contexts/extensions",
+            "tests/unit/contexts/operations",
+            "tests/unit/integration",
+            "tests/unit/sdk",
+            "tests/unit/docs",
+            "tests/unit/identity",
+        ),
+    ),
 }
 
 BACKTEST_SHARDS = (
@@ -166,6 +198,9 @@ ALL_SHARDS = (
     *BACKTEST_SHARDS,
     *INDICATOR_SHARDS,
     "market-identity-strategy",
+    "execution-notifications",
+    "rl-trading",
+    "platform-contracts",
 )
 MATRIX_ORDER = ("web-api", *ALL_SHARDS)
 
@@ -189,10 +224,7 @@ def _is_code_path(path: str) -> bool:
         "uv.lock",
         "alembic.ini",
         "pyrightconfig.json",
-        "Dockerfile.api",
         "infra/docker/Dockerfile.market_data",
-        "infra/docker/docker-compose.web.prod.yml",
-        "infra/caddy/Caddyfile.vps",
     }:
         return True
     return _has_prefix(
@@ -208,8 +240,9 @@ def _is_code_path(path: str) -> bool:
             "configs/",
             "alembic/",
             "migrations/",
-            "infra/macos/",
-            "infra/scripts/",
+            "infra/",
+            "schemas/",
+            "sdk/",
         ),
     )
 
@@ -249,6 +282,7 @@ def _is_backtest_path(path: str) -> bool:
         path.startswith("src/trading/contexts/backtest/")
         or path.startswith("src/trading/contexts/backtest_artifacts/")
         or path.startswith("tests/unit/contexts/backtest/")
+        or path.startswith("tests/unit/contexts/backtest_artifacts/")
         or path.startswith("scripts/backtest/")
         or path.startswith("apps/worker/backtest_job_runner/")
         or path.startswith("tests/unit/apps/worker/backtest_job_runner/")
@@ -267,9 +301,7 @@ def _is_backtest_path(path: str) -> bool:
 
 
 def _is_backtest_config_path(path: str) -> bool:
-    return path.startswith("configs/") and (
-        "backtest" in path or path.endswith("/indicators.yaml")
-    )
+    return path.startswith("configs/") and ("backtest" in path or path.endswith("/indicators.yaml"))
 
 
 def _is_indicator_path(path: str) -> bool:
@@ -291,6 +323,7 @@ def _is_market_identity_strategy_path(path: str) -> bool:
             "tests/unit/contexts/identity/",
             "tests/unit/contexts/market_data/",
             "tests/unit/contexts/strategy/",
+            "tests/unit/identity/",
         ),
     )
 
@@ -317,25 +350,27 @@ def _needs_migration_check(path: str) -> bool:
             "alembic/",
             "migrations/",
             "scripts/backtest/",
-            "scripts/macos/",
-            "infra/macos/",
             "infra/scripts/",
         ),
     )
 
 
 def _is_web_image_path(path: str) -> bool:
-    return (
-        path.startswith("apps/web/")
-        or path
-        in {
-            ".python-version",
-            "pyproject.toml",
-            "uv.lock",
-            "infra/docker/Dockerfile.market_data",
-            ".github/workflows/publish-app-image.yml",
-        }
-    )
+    # Keep this list aligned with Dockerfile.market_data COPY inputs and .dockerignore.
+    if path.startswith(("configs/installation/generated/", "schemas/release/")) or path == (
+        "configs/installation/runtime-service-manifest.json"
+    ):
+        return False
+    return path.startswith(
+        ("apps/", "src/", "configs/", "schemas/", "alembic/", "migrations/")
+    ) or path in {
+        ".python-version",
+        "pyproject.toml",
+        "uv.lock",
+        "infra/docker/Dockerfile.market_data",
+        "alembic.ini",
+        ".github/workflows/publish-app-image.yml",
+    }
 
 
 def _matrix(shard_names: Iterable[str]) -> str:
@@ -388,20 +423,74 @@ def classify_ci(paths: Iterable[str], *, all_changes: bool = False) -> dict[str,
         if _is_market_identity_strategy_path(path):
             shards.add("market-identity-strategy")
 
+        if _has_prefix(
+            path,
+            (
+                "src/trading/contexts/exchange_control/",
+                "src/trading/contexts/live_execution/",
+                "src/trading/contexts/notifications/",
+                "tests/unit/contexts/exchange_control/",
+                "tests/unit/contexts/live_execution/",
+                "tests/unit/contexts/notifications/",
+            ),
+        ):
+            shards.add("execution-notifications")
+
+        if _has_prefix(
+            path,
+            (
+                "src/trading/contexts/rl_trading/",
+                "src/trading/contexts/ml/",
+                "scripts/rl_trading/",
+                "tests/unit/contexts/rl_trading/",
+                "tests/unit/scripts/rl_trading/",
+            ),
+        ):
+            shards.add("rl-trading")
+
+        if _has_prefix(
+            path,
+            (
+                "schemas/",
+                "sdk/",
+                "src/trading/integration/",
+                "src/trading/contexts/identity/",
+                "src/trading/contexts/extensions/",
+                "src/trading/contexts/operations/",
+                "tests/unit/contexts/extensions/",
+                "tests/unit/contexts/operations/",
+                "tests/unit/integration/",
+                "tests/unit/sdk/",
+                "tests/unit/docs/",
+                "tests/unit/identity/",
+            ),
+        ):
+            shards.add("platform-contracts")
+
+        # Schemas feed configuration, release tools and several domain contracts.
+        if path.startswith("schemas/"):
+            run_all = True
+
+        if path.startswith("docs/architecture/apps/web/"):
+            shards.add("platform-contracts")
+
         if _needs_migration_check(path):
             run_migrations = True
 
         if (
-            path.startswith("apps/")
-            or path.startswith("tests/unit/apps/")
-            or path.startswith("tests/unit/infra/")
-            or path.startswith("tests/unit/platform/")
-            or path.startswith("tests/unit/shared_kernel/")
-            or path.startswith("tests/unit/tools/")
-            or path.startswith("tools/")
-            or path.startswith("infra/")
-            or path.startswith("scripts/macos/")
-        ) and not _is_web_path(path) and not _is_backtest_path(path):
+            (
+                path.startswith("apps/")
+                or path.startswith("tests/unit/apps/")
+                or path.startswith("tests/unit/infra/")
+                or path.startswith("tests/unit/platform/")
+                or path.startswith("tests/unit/shared_kernel/")
+                or path.startswith("tests/unit/tools/")
+                or path.startswith("tools/")
+                or path.startswith("infra/")
+            )
+            and not _is_web_path(path)
+            and not _is_backtest_path(path)
+        ):
             shards.add("apps-platform")
 
         if path.startswith("src/trading/shared_kernel/") or path.startswith(

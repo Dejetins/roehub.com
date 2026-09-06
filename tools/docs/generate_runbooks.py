@@ -19,8 +19,7 @@ RU_LOCALE_DIR = Path("docs/runbooks/locales/ru")
 GENERATED_RU_DIR = Path("docs/runbooks/generated/ru")
 INDEX_PATH = Path("docs/runbooks/runbooks.json")
 ALERT_RULE_DIRS = (
-    Path("infra/macos/prometheus/rules"),
-    Path("infra/monitoring/monitoring/prometheus/rules"),
+    Path("infra/monitoring/rules"),
 )
 GENERATED_ALERT_RULE_FILES = (
     Path("configs/installation/generated/base/observability/alerts.yml"),

@@ -2403,17 +2403,6 @@ def _trade_sharpe_py(
     return (mean_trade_return / math.sqrt(variance)) * math.sqrt(trades_per_year)
 
 
-def _apply_direction_mode_py(*, raw_dir: int, direction_mode: str) -> int:
-    if direction_mode == DIRECTION_MODE_LONG_ONLY:
-        return 1 if raw_dir == 1 else 0
-    if direction_mode == DIRECTION_MODE_LONG_SHORT_REVERSAL:
-        return int(raw_dir)
-    raise BacktestNoRiskExactRejected(
-        f"Unsupported direction_mode={direction_mode!r}; expected "
-        f"{(DIRECTION_MODE_LONG_ONLY, DIRECTION_MODE_LONG_SHORT_REVERSAL)!r}"
-    )
-
-
 def _execution_context_from_prepared(
     prepared_result: BacktestPreparePoolsResult,
 ) -> BacktestNoRiskExecutionContext:

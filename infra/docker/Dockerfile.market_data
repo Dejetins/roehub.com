@@ -27,6 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 COPY src /app/src
 COPY apps /app/apps
 COPY configs /app/configs
+COPY schemas /app/schemas
 COPY alembic /app/alembic
 COPY alembic.ini /app/alembic.ini
 COPY migrations /app/migrations

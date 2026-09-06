@@ -138,7 +138,7 @@ class BacktestArtifactPublisherSchedule:
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
-      - infra/macos/launchd/com.roehub.backtest-artifact-publisher.plist
+      - configs/installation/runtime-service-manifest.json
     """
 
     timezone_name: str = "Europe/Moscow"
@@ -265,7 +265,7 @@ class FileBacktestArtifactPublisherHostLock:
       - docs/runbooks/backtest-artifacts-rebuild.md
       - docs/runbooks/mac-studio-native-backend-operations.md
     Related:
-      - infra/macos/launchd/com.roehub.backtest-artifact-publisher.plist
+      - configs/installation/runtime-service-manifest.json
       - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
     """
 
@@ -461,7 +461,7 @@ class BacktestArtifactPublisherApp:
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
       - apps/scheduler/backtest_artifact_publisher/main/main.py
-      - infra/macos/launchd/com.roehub.backtest-artifact-publisher.plist
+      - configs/installation/runtime-service-manifest.json
     """
 
     publish_use_case: PublishBacktestArtifactsV2UseCase

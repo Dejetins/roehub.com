@@ -17,7 +17,6 @@ from trading.contexts.market_data.application.dto.reference_api import (
 from trading.contexts.market_data.application.ports.stores import (
     BTCUSDTMarketReadinessReferenceReader,
 )
-from trading.shared_kernel.primitives import MarketId
 
 BTCUSDT_MARKET_READINESS_STALE_AFTER_SECONDS = 180
 
@@ -176,7 +175,3 @@ def _ensure_aware_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=UTC)
     return value.astimezone(UTC)
-
-
-def btcusdt_market_id(value: int | None) -> MarketId | None:
-    return MarketId(value) if value is not None else None

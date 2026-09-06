@@ -4,8 +4,6 @@ flowchart LR
   classDef service fill:#edf7ed,stroke:#2e7d32
   n_browser["Браузер"]
   class n_browser service
-  n_edge["VPS edge / TLS"]
-  class n_edge service
   n_web["Web UI"]
   class n_web service
   n_api["FastAPI API"]
@@ -28,11 +26,9 @@ flowchart LR
   class n_redis store
   n_exchanges["Binance / Bybit"]
   class n_exchanges external
-  n_observability["Prometheus / Grafana / OTel"]
+  n_observability["Prometheus / Grafana / Loki"]
   class n_observability service
-  n_browser -->|"HTTPS"| n_edge
-  n_edge -->|"UI"| n_web
-  n_edge -->|"/api/*"| n_api
+  n_browser -->|"installation Web endpoint"| n_web
   n_web -->|"same-origin API"| n_api
   n_api -->|"identity/config/jobs"| n_postgres
   n_api -->|"typed operation + short-lived identity"| n_control_agent
@@ -46,5 +42,5 @@ flowchart LR
   n_workers -->|"execution intents"| n_execution
   n_execution -->|"authenticated exchange API"| n_exchanges
   n_exchanges -->|"market/private streams"| n_workers
-  n_api -->|"metrics/traces"| n_observability
-  n_workers -->|"metrics/traces"| n_observability
+  n_api -->|"metrics/logs"| n_observability
+  n_workers -->|"metrics/logs"| n_observability

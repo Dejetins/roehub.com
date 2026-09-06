@@ -18,27 +18,16 @@
   "python_licenses": {
     "alembic": {"license": "MIT", "status": "compatible"},
     "argon2-cffi": {"license": "MIT", "status": "compatible"},
-    "beautifulsoup4": {"license": "MIT", "status": "compatible"},
-    "binance-historical-data": {"license": "MIT", "status": "compatible"},
     "clickhouse-connect": {"license": "Apache-2.0", "status": "compatible"},
-    "confluent-kafka": {"license": "Apache-2.0", "status": "compatible"},
     "cryptography": {"license": "Apache-2.0 OR BSD-3-Clause", "status": "compatible"},
     "fastapi": {"license": "MIT", "status": "compatible"},
     "hatchling": {"license": "MIT", "status": "compatible"},
     "httpx": {"license": "BSD-3-Clause", "status": "compatible"},
-    "itsdangerous": {"license": "BSD-3-Clause", "status": "compatible"},
     "jinja2": {"license": "BSD-3-Clause", "status": "compatible"},
     "jsonschema": {"license": "MIT", "status": "compatible"},
-    "lxml": {"license": "BSD-3-Clause", "status": "compatible"},
     "mypy": {"license": "MIT", "status": "compatible"},
     "numba": {"license": "BSD-2-Clause", "status": "compatible"},
     "numpy": {"license": "BSD-3-Clause", "status": "compatible"},
-    "opentelemetry-api": {"license": "Apache-2.0", "status": "compatible"},
-    "opentelemetry-exporter-otlp": {"license": "Apache-2.0", "status": "compatible"},
-    "opentelemetry-instrumentation": {"license": "Apache-2.0", "status": "compatible"},
-    "opentelemetry-instrumentation-fastapi": {"license": "Apache-2.0", "status": "compatible"},
-    "opentelemetry-instrumentation-requests": {"license": "Apache-2.0", "status": "compatible"},
-    "opentelemetry-sdk": {"license": "Apache-2.0", "status": "compatible"},
     "optuna": {"license": "MIT", "status": "compatible"},
     "orjson": {"license": "Apache-2.0 OR MIT", "status": "compatible"},
     "pandas": {"license": "BSD-3-Clause", "status": "compatible"},
@@ -50,26 +39,20 @@
     },
     "pyarrow": {"license": "Apache-2.0", "status": "compatible"},
     "pydantic": {"license": "MIT", "status": "compatible"},
-    "pydantic-settings": {"license": "MIT", "status": "compatible"},
-    "pyotp": {"license": "MIT", "status": "compatible"},
-    "pybit": {"license": "MIT", "status": "compatible"},
     "pyright": {"license": "MIT", "status": "compatible"},
     "pytest": {"license": "MIT", "status": "compatible"},
     "pytest-asyncio": {"license": "Apache-2.0", "status": "compatible"},
     "pytest-cov": {"license": "MIT", "status": "compatible"},
     "python-dateutil": {"license": "Apache-2.0 OR BSD-3-Clause", "status": "compatible"},
     "python-dotenv": {"license": "BSD-3-Clause", "status": "compatible"},
-    "python-multipart": {"license": "Apache-2.0", "status": "compatible"},
     "pyyaml": {"license": "MIT", "status": "compatible"},
     "redis": {"license": "MIT", "status": "compatible"},
+    "requests": {"license": "Apache-2.0", "status": "compatible"},
     "ruff": {"license": "MIT", "status": "compatible"},
     "sqlalchemy": {"license": "MIT", "status": "compatible"},
-    "structlog": {"license": "Apache-2.0 OR MIT", "status": "compatible"},
-    "tenacity": {"license": "Apache-2.0", "status": "compatible"},
     "torch": {"license": "BSD-3-Clause", "status": "compatible"},
     "types-python-dateutil": {"license": "Apache-2.0", "status": "compatible"},
     "types-pyyaml": {"license": "Apache-2.0", "status": "compatible"},
-    "ujson": {"license": "BSD-3-Clause", "status": "compatible"},
     "uvicorn": {"license": "BSD-3-Clause", "status": "compatible"},
     "webauthn": {"license": "BSD-3-Clause", "status": "compatible"}
   },
@@ -166,11 +149,6 @@
     }
   },
   "container_images": {
-    "${ROEHUB_APP_IMAGE:?ROEHUB_APP_IMAGE is required}": {
-      "license": "Apache-2.0",
-      "status": "compatible",
-      "obligation": "First-party image; release manifest must replace the variable with a digest-pinned Roehub image."
-    },
     "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce": {
       "license": "LicenseRef-Alpine-Base-Image",
       "status": "conditional",
@@ -194,7 +172,6 @@
       "obligation": "Build-only image for the OpenBao UI; preserve toolchain and base-image notices in provenance."
     },
     "ghcr.io/astral-sh/uv:0.8.4@sha256:40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0": {"license": "Apache-2.0 OR MIT", "status": "compatible"},
-    "ghcr.io/google/cadvisor:v0.56.2": {"license": "Apache-2.0", "status": "compatible"},
     "ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a": {
       "license": "MPL-2.0 AND MIT",
       "status": "conditional",
@@ -210,7 +187,6 @@
       "status": "conditional",
       "obligation": "Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest."
     },
-    "oliver006/redis_exporter:v1.80.1": {"license": "MIT", "status": "compatible"},
     "postgres:16": {"license": "PostgreSQL", "status": "compatible"},
     "postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c": {"license": "PostgreSQL", "status": "compatible"},
     "prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d": {
@@ -240,7 +216,6 @@
       "status": "conditional",
       "obligation": "Audit and notice Debian packages and all transitive image layers for the final digest."
     },
-    "quay.io/prometheuscommunity/postgres-exporter:v0.18.1": {"license": "Apache-2.0", "status": "compatible"},
     "redis:7.2-bookworm": {"license": "BSD-3-Clause", "status": "compatible"},
     "redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42": {"license": "BSD-3-Clause", "status": "compatible"},
     "roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8": {"license": "Apache-2.0", "status": "compatible"},

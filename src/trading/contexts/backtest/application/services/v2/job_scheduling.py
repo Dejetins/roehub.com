@@ -107,32 +107,6 @@ def scheduling_metadata_from_preflight(
     }
 
 
-def scheduling_class_from_job_request(
-    *,
-    request_json: Mapping[str, Any],
-) -> BacktestSchedulingClass:
-    raw_scheduling = request_json.get(SCHEDULING_METADATA_KEY)
-    if not isinstance(raw_scheduling, Mapping):
-        return "heavy"
-    raw_class = raw_scheduling.get("scheduling_class")
-    if raw_class in {"light_candidate", "light", "heavy"}:
-        return "heavy"
-    return "heavy"
-
-
-def estimated_combinations_upper_bound_from_job_request(
-    *,
-    request_json: Mapping[str, Any],
-) -> int:
-    raw_scheduling = request_json.get(SCHEDULING_METADATA_KEY)
-    if not isinstance(raw_scheduling, Mapping):
-        return 0
-    raw_estimate = raw_scheduling.get("estimated_combinations_upper_bound")
-    if isinstance(raw_estimate, bool) or not isinstance(raw_estimate, int):
-        return 0
-    return max(raw_estimate, 0)
-
-
 def raise_if_light_candidate_needs_heavy_slot(
     *,
     scheduling_class: BacktestSchedulingClass,

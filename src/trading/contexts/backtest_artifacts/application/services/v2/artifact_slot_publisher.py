@@ -516,34 +516,6 @@ class BacktestArtifactSlotPublisherV2:
         )
 
 
-def _require_existing_path_v2(path: Path, label: str) -> None:
-    """
-    Fail fast when one explicit artifact path required by publish validation is missing.
-
-    Args:
-        path: Explicit artifact path that must already exist on disk.
-        label: Stable human-readable label used in failure messages.
-    Returns:
-        None.
-    Assumptions:
-        Validation works only with explicit deterministic paths and never scans directories.
-    Raises:
-        ArtifactSlotPublishErrorV2: If the required path is missing or is not a file.
-    Side Effects:
-        None.
-    Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
-    Related:
-      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
-    """
-    if not path.is_file():
-        raise ArtifactSlotPublishErrorV2(
-            code="artifact_slot_validation_failed",
-            message=f"missing explicit artifact path for {label}: {path}",
-        )
-
-
 def _ensure_prices_mappings_publish_validation_spec_v2(
     validation_spec: ArtifactSlotValidationSpecV2,
 ) -> ArtifactSlotValidationSpecV2:

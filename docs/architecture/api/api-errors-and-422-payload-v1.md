@@ -1,74 +1,42 @@
-```md
-# STR-EPIC-02 — Strategy API v1 (updated): immutable CRUD + clone + run control + identity + standard errors
+# Ошибки API и payload 422
 
-Цель: пользователь через API может создать стратегию, клонировать как шаблон/из существующей, запускать/останавливать run’ы. Все правила владения/видимости — доменно-очевидны (use-case), identity подключается через порт `current_user`, ошибки унифицированы через `RoehubError` и общий 422 payload.
+Статус: active; сверено с обработчиками и тестами 2026-09-06.
 
-## Scope
+[Общие обработчики](../../../apps/api/common/errors.py) регистрируются для
+`RoehubError` и `RequestValidationError`. Они возвращают JSON следующей формы:
 
-### Endpoints
-- `POST /strategies` — create (immutable)
-- `POST /strategies/clone` — clone (template/existing → new strategy)
-- `GET /strategies` — list (только owner, по умолчанию без deleted)
-- `GET /strategies/{id}` — get (только owner, по умолчанию без deleted)
-- `POST /strategies/{id}/run` — создать новый run + перевести в running по правилам
-- `POST /strategies/{id}/stop` — остановить активный run (stopping → stopped)
-- `DELETE /strategies/{id}` — soft delete (deleted)
+```json
+{
+  "error": {
+    "code": "validation_error",
+    "message": "Validation failed",
+    "details": {
+      "errors": [
+        {"path": "body.name", "code": "missing", "message": "Field required"}
+      ]
+    }
+  }
+}
+```
 
-### Application / Use-cases (обязательно)
-- `ListMyStrategies(current_user)`
-- `GetMyStrategy(strategy_id, current_user)`
-- `CreateStrategy(payload, current_user)`
-- `CloneStrategy(source_strategy_id, overrides, current_user)`
-- `RunStrategy(strategy_id, current_user)`
-- `StopStrategy(strategy_id, current_user)`
-- `DeleteStrategy(strategy_id, current_user)`
+`RoehubError.code` определяет HTTP status через `_ROEHUB_STATUS_BY_CODE`.
+Например, `auth.required` → 401, `forbidden` → 403, `not_found` → 404,
+`conflict` → 409, `validation_error` → 422,
+`backtest.rate_limited` → 429, `backtest.artifacts_unavailable` → 503.
+Неизвестный код даёт 500; клиент не должен угадывать status по подстроке кода.
+Полный mapping поддерживается в обработчике, без дублирования таблицы здесь.
 
-Правило: ownership/visibility не “в SQL”, а в use-case (явная доменная семантика).
+`RequestValidationError` даёт 422 и `error.code = validation_error`.
+Каждый элемент `details.errors` содержит только `path`, `code`, `message`:
+`loc` превращается в путь с точками (включая `body`, `query` и индексы),
+`type` становится кодом, `msg` — сообщением. Список сортируется по
+`(path, code, message)`, обеспечивая детерминированный порядок. Исходные
+`input` и `ctx` Pydantic не копируются в этот список.
 
-### Identity integration (обязательно)
-- Strategy контекст использует порт `CurrentUser`/`CurrentUserProvider`.
-- API слой предоставляет реализацию порта через существующий identity (без копирования JWT логики в strategy).
+`details` доменных ошибок нормализуются в JSON-совместимые значения;
+для `validation_error` применяется тот же формат списка ошибок.
+Обработчики не устанавливают этот envelope для любого возможного ответа:
+обычные `HTTPException` и route-specific responses нужно проверять отдельно.
 
-### Runner semantics (обязательно)
-- Warmup считается в runner’е детерминированно по индикаторам стратегии.
-- “Второй run” (следующий запуск после остановки) должен быть возможен всегда при отсутствии активного run.
-
-### Run state machine (обязательно)
-- `stopped/failed -> run -> running`
-- `running -> stop -> stopping -> stopped`
-- конкурентность: один активный run на стратегию (fail-fast на гонках/конфликтах)
-
-### Errors (обязательно)
-- Единый 422 payload (как в indicators/market_data), детерминированный порядок ошибок.
-- Общий механизм ошибок:
-  - `RoehubError(code, message, details)` в `src/trading/platform/errors/`
-  - доменные ошибки мапятся в RoehubError
-  - API слой мапит RoehubError → HTTPException/Response
-
-## Non-goals
-- UI realtime и подписки на статусы (это STR-EPIC-04).
-- Сложные права доступа (кроме owner).
-- Распределённая оркестрация/кластерный runner.
-
-## DoD (Definition of Done)
-- Невозможно “обновить” стратегию: только новая через clone.
-- Clone работает:
-  - переносит indicator params,
-  - поддерживает overrides `instrument_id/timeframe` (и только явно разрешённые поля),
-  - owner = current_user.
-- Ownership/visibility правило реализовано и покрыто тестами как use-case (не как “фильтр в SQL”).
-- Run state machine соблюдается и покрыта unit + интеграционными тестами:
-  - stopped/failed → run → running
-  - running → stop → stopping → stopped
-  - повторный запуск после stop (second run) работает
-  - один активный run на стратегию (конкурентные запросы корректно дают конфликт/ошибку)
-- Warmup считается runner’ом детерминированно и фиксируется в метаданных run.
-- Ошибки:
-  - RoehubError внедрён,
-  - доменные ошибки мапятся в RoehubError,
-  - API отдаёт единый payload и детерминированный 422.
-- Документация:
-  - добавлены 2 архитектурных документа:
-    - `docs/architecture/strategy/strategy-api-immutable-crud-clone-run-control-v1.md`
-    - `docs/architecture/api/api-errors-and-422-payload-v1.md`
-  - индекс обновлён: `python -m tools.docs.generate_docs_index`
+Проверка: [tests/unit/apps/api/test_api_error_handlers.py](../../../tests/unit/apps/api/test_api_error_handlers.py),
+`python -m pytest -q tests/unit/apps/api/test_api_error_handlers.py`.

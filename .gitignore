@@ -38,23 +38,9 @@ htmlcov/
 
 # Build artifacts
 dist/
+# Web dist contains maintained source assets, not generated build output.
 !apps/web/dist/
-apps/web/dist/*
-!apps/web/dist/css/
-apps/web/dist/css/*
-!apps/web/dist/css/pages/
-apps/web/dist/css/pages/*
-!apps/web/dist/css/pages/admin.css
-!apps/web/dist/css/pages/plugin-panel-lab.css
-!apps/web/dist/js/
-apps/web/dist/js/*
-!apps/web/dist/js/components/
-apps/web/dist/js/components/*
-!apps/web/dist/js/components/plugin-panel.js
-!apps/web/dist/js/pages/
-apps/web/dist/js/pages/*
-!apps/web/dist/js/pages/admin.js
-!apps/web/dist/js/pages/plugin-panel-lab.js
+!apps/web/dist/**
 build/
 target/
 .dist/
@@ -77,7 +63,3 @@ local_artifacts/
 /data_load/*
 /data_load/promts/
 tests/notebook_tests/.cache/
-
-# Notebooks / experiments
-#test/
-#jup_tests/

@@ -1,7 +1,0 @@
-<div class="user-badge" data-user-badge>
-  {% if current_user %}
-    <span class="user-badge__value">{{ current_user.paid_level|lower|capitalize }}</span>
-  {% else %}
-    <span class="user-badge__value">{{ t("common.guest") }}</span>
-  {% endif %}
-</div>

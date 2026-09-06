@@ -55,7 +55,7 @@ def _build_parser() -> argparse.ArgumentParser:
       - docs/runbooks/mac-studio-native-backend-operations.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
-      - infra/macos/launchd/com.roehub.backtest-artifact-publisher.plist
+      - configs/installation/runtime-service-manifest.json
     """
     parser = argparse.ArgumentParser(prog="backtest-artifact-publisher")
     parser.add_argument(
@@ -166,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
       - docs/runbooks/mac-studio-native-backend-operations.md
       - docs/runbooks/backtest-artifacts-rebuild.md
     Related:
-      - infra/macos/launchd/com.roehub.backtest-artifact-publisher.plist
+      - configs/installation/runtime-service-manifest.json
     """
     _configure_logging()
     args = _build_parser().parse_args(argv)

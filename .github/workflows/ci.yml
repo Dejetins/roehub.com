@@ -104,6 +104,26 @@ jobs:
         run: |
           uv run ruff check .
 
+      - name: Wheel resource and hygiene contract
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          uv build --wheel --out-dir "$RUNNER_TEMP/roehub-wheel"
+          uv run python - "$RUNNER_TEMP/roehub-wheel" <<'PYCODE'
+          import pathlib, sys, zipfile
+          wheel = next(pathlib.Path(sys.argv[1]).glob("*.whl"))
+          with zipfile.ZipFile(wheel) as archive:
+              names = set(archive.namelist())
+          required = {
+              "schemas/plugins/roehub-plugin-manifest-v1alpha1.schema.json",
+              "apps/web/templates/pages/backtests.html",
+              "apps/web/dist/js/pages/backtests.js",
+              "apps/web/dist/vendor/lightweight-charts.NOTICE.txt",
+          }
+          assert required <= names, required - names
+          assert not any("__pycache__" in p or p.endswith(".pyc") for p in names)
+          assert "apps/cli/test_backfill_1m_parsing.py" not in names
+          PYCODE
+
       - name: Roehub hook regressions
         if: needs.changes.outputs.code == 'true'
         run: |
@@ -119,6 +139,16 @@ jobs:
         run: |
           uv run python -m tools.docs.generate_docs_index --check
 
+      - name: Project map, runbooks and release configuration drift checks
+        if: needs.changes.outputs.code == 'true'
+        run: |
+          uv run python -m tools.docs.generate_project_map --check
+          uv run python -m tools.docs.generate_runbooks --check
+          uv run python -m tools.artifacts.generate_schemas --check
+          uv run python -m tools.backup.generate_schemas --check
+          uv run python tools/release/generate_runtime_topology.py --check
+          uv run python tools/release/runtime_input_inventory.py --check
+
       - name: Job contract schema drift check
         if: needs.changes.outputs.code == 'true'
         run: |
@@ -128,6 +158,7 @@ jobs:
         if: needs.changes.outputs.code != 'true' && needs.changes.outputs.docs == 'true'
         run: |
           python -m tools.docs.generate_docs_index --check
+          python -m tools.docs.generate_project_map --check
 
   oss_metadata:
     name: oss-metadata
@@ -228,6 +259,10 @@ jobs:
           uv sync --locked --all-groups
           uv run python -V
 
+      - name: Install optional RL dependencies for their shard
+        if: matrix.name == 'rl-trading'
+        run: uv sync --locked --all-groups --extra rl-ml
+
       - name: Install apps-platform system dependencies
         if: matrix.name == 'apps-platform'
         run: |
@@ -236,7 +271,7 @@ jobs:
 
       - name: Tests
         run: |
-          uv run pytest -q -ra ${{ matrix.target }}
+          uv run --no-sync pytest -q -ra ${{ matrix.target }}
 
   perf_smoke:
     name: perf-smoke

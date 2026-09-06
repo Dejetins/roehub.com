@@ -5,8 +5,8 @@ Docs:
   - docs/runbooks/mac-studio-monitoring-plan.md
   - docs/runbooks/mac-studio-backend-operations.md
 Related:
-  - infra/docker/docker-compose.backend.yml
-  - infra/monitoring/monitoring/prometheus/prometheus.yml
+  - configs/installation/generated/base/docker-compose.yml
+  - configs/installation/generated/base/prometheus.yml
 """
 
 from __future__ import annotations
@@ -95,8 +95,8 @@ class HttpClickHouseMetricsClient:
     Docs:
       - docs/runbooks/mac-studio-monitoring-plan.md
     Related:
-      - infra/docker/docker-compose.backend.yml
-      - infra/monitoring/monitoring/prometheus/prometheus.yml
+      - configs/installation/generated/base/docker-compose.yml
+      - configs/installation/generated/base/prometheus.yml
 
     Args:
         database: Default database passed to ClickHouse HTTP interface.
@@ -256,8 +256,8 @@ class ClickHouseExporterCollector:
     Docs:
       - docs/runbooks/mac-studio-monitoring-plan.md
     Related:
-      - infra/monitoring/monitoring/prometheus/prometheus.yml
-      - infra/docker/docker-compose.backend.yml
+      - configs/installation/generated/base/prometheus.yml
+      - configs/installation/generated/base/docker-compose.yml
 
     Args:
         client: Client implementation used to fetch ClickHouse snapshots.

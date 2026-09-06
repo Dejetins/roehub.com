@@ -2,11 +2,11 @@
   "artifacts": {
     "preliminary_sbom": {
       "path": "tools/release/preliminary-sbom.spdx.json",
-      "sha256": "335a336d579bcd68ea1afe6b5e41e7cb4dcf900d3c1cd0d1f1b39cec392f9788"
+      "sha256": "e43be9aaf858e3ef54b9b66dd58af4387e7bec4f0f787875065c278d274babdc"
     },
     "third_party_notices": {
       "path": "tools/release/THIRD_PARTY_NOTICES.md",
-      "sha256": "1467318b3eeabb80fb17d3989854a4742371e98d64d994ccb9657a5bd91d0f35"
+      "sha256": "2cea39665bcc2ee28a98468677bd4d4e4c98b8856500fb843110b4135624cef6"
     }
   },
   "compatibility": {

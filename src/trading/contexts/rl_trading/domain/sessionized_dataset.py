@@ -829,31 +829,6 @@ def _validate_slab_for_sessions(*, slab: RawFeatureSlab, policy: SessionExtracti
         raise SessionizedDatasetError(reason="slab_has_minute_gaps", field="open_time_ms")
 
 
-def _score_pre_signal_window(window: np.ndarray) -> dict[str, float] | None:
-    close_idx = FEATURE_NAMES_V1.index("close")
-    high_idx = FEATURE_NAMES_V1.index("high")
-    low_idx = FEATURE_NAMES_V1.index("low")
-    close = window[:, close_idx].astype(np.float64)
-    if np.any(close <= 0.0):
-        return None
-    high = window[:, high_idx].astype(np.float64)
-    low = window[:, low_idx].astype(np.float64)
-    log_close = np.log(close)
-    log_returns = np.diff(log_close)
-    realized_volatility = float(np.std(log_returns, dtype=np.float64))
-    range_ratio = float(np.mean((high - low) / close, dtype=np.float64))
-    log_return = float(log_close[-1] - log_close[0])
-    volatility_score = realized_volatility + max(range_ratio, 0.0)
-    if not math.isfinite(volatility_score):
-        return None
-    return {
-        "pre_signal_log_return": log_return,
-        "pre_signal_range_ratio": range_ratio,
-        "pre_signal_realized_volatility": realized_volatility,
-        "volatility_score": volatility_score,
-    }
-
-
 def _score_pre_signal_windows(
     *,
     slab: RawFeatureSlab,

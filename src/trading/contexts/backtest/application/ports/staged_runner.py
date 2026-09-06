@@ -10,10 +10,6 @@ from trading.contexts.backtest.domain.value_objects import (
     ExecutionParamsV1,
     RiskParamsV1,
 )
-from trading.contexts.indicators.application.dto import (
-    CandleArrays,
-    IndicatorVariantSelection,
-)
 from trading.contexts.indicators.domain.specifications import GridParamSpec, GridSpec
 
 BacktestSignalParamsMap = Mapping[str, Mapping[str, BacktestVariantScalar]]
@@ -188,167 +184,11 @@ class BacktestGridDefaultsProvider(Protocol):
         ...
 
 
-class BacktestStagedVariantScorer(Protocol):
-    """
-    Backward-compatible Stage A / Stage B scoring port (`score_variant`).
-
-    This protocol is kept for compatibility with existing scorer implementations.
-    New ranking hot paths SHOULD prefer `BacktestStagedVariantMetricScorer`
-    (`score_variant_metric`) to avoid accidental details-path coupling.
-
-    Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
-      - docs/architecture/roadmap/milestone-4-epics-v1.md
-    Related:
-      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
-      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
-      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
-      - src/trading/contexts/backtest/application/use_cases/run_backtest.py
-      - tests/unit/contexts/backtest/application/services/test_staged_runner_v1.py
-    """
-
-    def score_variant(
-        self,
-        *,
-        stage: str,
-        candles: CandleArrays,
-        indicator_selections: tuple[IndicatorVariantSelection, ...],
-        signal_params: BacktestSignalParamsMap,
-        risk_params: Mapping[str, BacktestVariantScalar],
-        indicator_variant_key: str,
-        variant_key: str,
-    ) -> RankingMetricsV1:
-        """
-        Legacy compatibility scorer API for one deterministic Stage A/Stage B variant.
-
-        Args:
-            stage: Stage literal (`stage_a` or `stage_b`).
-            candles: Dense candles used by scoring backend.
-            indicator_selections: Explicit compute selections for indicators key builder.
-            signal_params: Signal parameter values for this variant.
-            risk_params: Risk payload (`sl_enabled/sl_pct/tp_enabled/tp_pct`) for this variant.
-            indicator_variant_key: Deterministic compute-only indicators key.
-            variant_key: Deterministic backtest variant key.
-        Returns:
-            RankingMetricsV1:
-                Metric mapping containing `total_return_pct` aliases and optional
-                ranking literals from `BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1`.
-        Assumptions:
-            Returned values are deterministic for identical inputs.
-        Raises:
-            ValueError: If scorer cannot produce required ranking metric.
-        Side Effects:
-            Depends on concrete adapter implementation.
-        """
-        ...
-
-
-class BacktestStagedVariantMetricScorer(Protocol):
-    """
-    Metric-only Stage A / Stage B scorer port for ranking hot paths.
-
-    Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
-    Related:
-      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
-      - src/trading/contexts/backtest/application/services/staged_core_runner_v1.py
-      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
-    """
-
-    def score_variant_metric(
-        self,
-        *,
-        stage: str,
-        candles: CandleArrays,
-        indicator_selections: tuple[IndicatorVariantSelection, ...],
-        signal_params: BacktestSignalParamsMap,
-        risk_params: Mapping[str, BacktestVariantScalar],
-        indicator_variant_key: str,
-        variant_key: str,
-    ) -> RankingMetricsV1:
-        """
-        Score one deterministic variant and return ranking metrics only.
-
-        Args:
-            stage: Stage literal (`stage_a` or `stage_b`).
-            candles: Dense candles used by scoring backend.
-            indicator_selections: Explicit compute selections for indicators key builder.
-            signal_params: Signal parameter values for this variant.
-            risk_params: Risk payload (`sl_enabled/sl_pct/tp_enabled/tp_pct`) for this variant.
-            indicator_variant_key: Deterministic compute-only indicators key.
-            variant_key: Deterministic backtest variant key.
-        Returns:
-            RankingMetricsV1:
-                Metric mapping containing `total_return_pct` aliases and optional
-                ranking literals from `BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1`.
-        Assumptions:
-            Returned values are deterministic for identical inputs.
-        Raises:
-            ValueError: If scorer cannot produce required ranking metric payload.
-        Side Effects:
-            Depends on concrete adapter implementation.
-        """
-        ...
-
-
-class BacktestStagedVariantScorerWithDetails(Protocol):
-    """
-    Optional scorer extension exposing deterministic Stage-B details for reporting payload.
-
-    Docs:
-      - docs/architecture/backtest/README.md
-      - docs/architecture/backtest/README.md
-    Related:
-      - src/trading/contexts/backtest/application/services/close_fill_scorer_v1.py
-      - src/trading/contexts/backtest/application/services/staged_runner_v1.py
-      - src/trading/contexts/backtest/application/services/reporting_service_v1.py
-    """
-
-    def score_variant_with_details(
-        self,
-        *,
-        stage: str,
-        candles: CandleArrays,
-        indicator_selections: tuple[IndicatorVariantSelection, ...],
-        signal_params: BacktestSignalParamsMap,
-        risk_params: Mapping[str, BacktestVariantScalar],
-        indicator_variant_key: str,
-        variant_key: str,
-    ) -> BacktestVariantScoreDetailsV1:
-        """
-        Score one variant and return detailed deterministic payload for report assembly.
-
-        Args:
-            stage: Stage literal (`stage_a` or `stage_b`).
-            candles: Dense candles used by scoring backend.
-            indicator_selections: Explicit compute selections for indicators key builder.
-            signal_params: Signal parameter values for this variant.
-            risk_params: Risk payload (`sl_enabled/sl_pct/tp_enabled/tp_pct`) for this variant.
-            indicator_variant_key: Deterministic compute-only indicators key.
-            variant_key: Deterministic backtest variant key.
-        Returns:
-            BacktestVariantScoreDetailsV1: Detailed payload used by reporting layer.
-        Assumptions:
-            Returned payload corresponds to the same deterministic execution as ranking score.
-        Raises:
-            ValueError: If scorer cannot produce deterministic details.
-        Side Effects:
-            Depends on concrete adapter implementation.
-        """
-        ...
-
-
 __all__ = [
     "BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1",
     "BACKTEST_SCORER_METRIC_KEYS_BY_RANKING_LITERAL_V1",
     "BacktestGridDefaultsProvider",
     "BacktestSignalParamsMap",
-    "BacktestStagedVariantMetricScorer",
-    "BacktestStagedVariantScorerWithDetails",
-    "BacktestStagedVariantScorer",
     "BacktestVariantScoreDetailsV1",
     "RankingMetricsV1",
 ]

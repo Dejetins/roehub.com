@@ -23,14 +23,14 @@ paths = ["apps/"]
 [[areas]]
 id = "operations"
 title = "Инфраструктура и эксплуатация"
-purpose = "Docker, macOS runtime, edge, monitoring, конфигурация и миграции данных."
+purpose = "Self-hosted Docker Compose, monitoring, конфигурация и миграции данных."
 paths = ["infra/", "configs/", "migrations/", "alembic/", ".github/workflows/"]
 
 [[areas]]
 id = "automation"
 title = "Инструменты и автоматизация"
-purpose = "Операторские скрипты, генераторы, CI helpers, загрузчики и notebooks."
-paths = ["tools/", "scripts/", "data_load/", "notebooks/"]
+purpose = "Операторские скрипты, генераторы и CI helpers."
+paths = ["tools/", "scripts/"]
 
 [[areas]]
 id = "quality"
@@ -54,7 +54,7 @@ paths = ["prototypes/", "output/", "local_artifacts/"]
 id = "repository-meta"
 title = "Корневые контракты репозитория"
 purpose = "Build metadata, dependency locks, root configuration and compatibility indexes."
-paths = [".dockerignore", ".gitignore", ".opencode/", ".python-version", ".vscode/", "Dockerfile.api", "LICENSE", "alembic.ini", "pyproject.toml", "pyrightconfig.json", "repo_tree.md", "uv.lock"]
+paths = [".dockerignore", ".gitignore", ".python-version", "LICENSE", "alembic.ini", "pyproject.toml", "pyrightconfig.json", "repo_tree.md", "uv.lock"]
 
 [descriptions.contexts]
 backtest = "Расчёт и оркестрация исторических прогонов."
@@ -100,12 +100,6 @@ id = "browser"
 title = "Браузер"
 kind = "client"
 paths = ["apps/web/"]
-
-[[runtime_nodes]]
-id = "edge"
-title = "VPS edge / TLS"
-kind = "edge"
-paths = ["infra/caddy/", "infra/docker/docker-compose.web.prod.yml"]
 
 [[runtime_nodes]]
 id = "web"
@@ -171,26 +165,18 @@ paths = ["infra/docker/"]
 id = "exchanges"
 title = "Binance / Bybit"
 kind = "external"
-paths = ["data_load/binance/", "data_load/bybit/"]
+paths = ["src/trading/contexts/market_data/adapters/outbound/clients/binance/", "src/trading/contexts/market_data/adapters/outbound/clients/bybit/"]
 
 [[runtime_nodes]]
 id = "observability"
-title = "Prometheus / Grafana / OTel"
+title = "Prometheus / Grafana / Loki"
 kind = "operations"
 paths = ["infra/monitoring/", "apps/monitoring/"]
 
 [[flows]]
 source = "browser"
-target = "edge"
-label = "HTTPS"
-[[flows]]
-source = "edge"
 target = "web"
-label = "UI"
-[[flows]]
-source = "edge"
-target = "api"
-label = "/api/*"
+label = "installation Web endpoint"
 [[flows]]
 source = "web"
 target = "api"
@@ -246,11 +232,11 @@ label = "market/private streams"
 [[flows]]
 source = "api"
 target = "observability"
-label = "metrics/traces"
+label = "metrics/logs"
 [[flows]]
 source = "workers"
 target = "observability"
-label = "metrics/traces"
+label = "metrics/logs"
 
 [[agent_routes]]
 match = "HTTP API, DTO, auth, UI API"

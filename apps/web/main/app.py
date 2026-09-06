@@ -639,25 +639,6 @@ def _render_public_page(
     return templates.TemplateResponse(request, template_name, context=context)
 
 
-def _render_protected_placeholder(
-    *,
-    request: Request,
-    templates: Jinja2Templates,
-    page: _ProtectedPage,
-    template_context: Mapping[str, Any] | None = None,
-) -> Response:
-    return _render_protected_page(
-        request=request,
-        templates=templates,
-        page_path=page.page_path,
-        active_path=page.active_path,
-        page_title_key=page.title_key,
-        page_description_key=page.description_key,
-        template_name="pages/placeholder.html",
-        template_context=template_context,
-    )
-
-
 def _resolve_current_user_api_client(*, request: Request) -> CurrentUserApiClient:
     api_client = getattr(request.app.state, "current_user_api_client", None)
     if api_client is None:

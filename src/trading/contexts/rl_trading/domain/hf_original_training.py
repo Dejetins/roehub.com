@@ -1053,10 +1053,6 @@ def _cpu_state_dict(module: Any) -> dict[str, Any]:
     return {key: value.detach().cpu() for key, value in module.state_dict().items()}
 
 
-def _synchronize_agent(agent: TorchD3qnPerAgent) -> None:
-    agent.release_device_cache()
-
-
 def _import_torch() -> Any:
     try:
         import importlib

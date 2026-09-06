@@ -70,52 +70,6 @@ def _rolling_mean_series_f64(source: np.ndarray, window: int) -> np.ndarray:
 
 
 @nb.njit(cache=True)
-def _rolling_mean_series_into_f64(out: np.ndarray, source: np.ndarray, window: int) -> None:
-    """
-    Compute one rolling-mean series into a preallocated output buffer.
-
-    Docs: docs/architecture/indicators/indicators-volatility-momentum-compute-numba-v1.md
-    Related:
-      src/trading/contexts/indicators/adapters/outbound/compute_numpy/momentum.py,
-      src/trading/contexts/indicators/adapters/outbound/compute_numba/kernels/momentum.py
-
-    Args:
-        out: Preallocated float64 output vector.
-        source: Float64 source series.
-        window: Positive integer window.
-    Returns:
-        None.
-    Assumptions:
-        `out` and `source` have identical length.
-    Raises:
-        None.
-    Side Effects:
-        Writes rolling mean values into `out` in-place.
-    """
-    t_size = source.shape[0]
-    running_sum = 0.0
-    nan_count = 0
-    for time_index in range(t_size):
-        incoming = float(source[time_index])
-        if is_nan(incoming):
-            nan_count += 1
-        else:
-            running_sum += incoming
-
-        if time_index >= window:
-            outgoing = float(source[time_index - window])
-            if is_nan(outgoing):
-                nan_count -= 1
-            else:
-                running_sum -= outgoing
-
-        if time_index + 1 < window or nan_count > 0:
-            out[time_index] = np.nan
-        else:
-            out[time_index] = running_sum / float(window)
-
-
-@nb.njit(cache=True)
 def _rolling_min_series_f64(source: np.ndarray, window: int) -> np.ndarray:
     """
     Compute one rolling-minimum series with NaN-window propagation policy.

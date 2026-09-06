@@ -10,7 +10,7 @@ from collections.abc import Callable, Hashable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, Protocol, cast
+from typing import Any, Literal, cast
 
 import numpy as np
 
@@ -481,11 +481,6 @@ class FilteredBacktestPolicy:
                 "short": self.short_action_threshold,
             },
         }
-
-
-class QValueProvider(Protocol):
-    def __call__(self, state: np.ndarray) -> np.ndarray:
-        ...
 
 
 @dataclass(frozen=True, slots=True)

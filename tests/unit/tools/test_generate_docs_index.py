@@ -1,14 +1,18 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
+from urllib.parse import unquote
 
 import pytest
 
 from tools.docs.generate_docs_index import (
     BEGIN_MARKER,
     END_MARKER,
+    build_document_entries,
     collect_markdown_files,
     extract_title_and_description,
+    render_generated_index,
     run_generator,
 )
 
@@ -65,7 +69,7 @@ def test_collect_markdown_files_stable_order_and_ignore_rules(tmp_path: Path) ->
 
     Related docs and files:
     - `tools/docs/generate_docs_index.py`
-    - `docs/repository_three.md`
+    - `docs/architecture/project-map/PROJECT_MAP.md`
     """
 
     docs_root = tmp_path / "docs"
@@ -179,3 +183,40 @@ def test_run_generator_check_detects_drift_and_reports_up_to_date(
     assert check_exit_code == 0
     assert "OK" in check_output
     assert "up-to-date" in check_output
+
+
+def test_generated_links_resolve_from_index_and_escape_spaces(tmp_path: Path) -> None:
+    _write(tmp_path / "docs/architecture/a b.md", "# Architecture")
+    _write(tmp_path / "docs/runbooks/help.md", "# Help")
+    _write(tmp_path / "docs/architecture/agents/old.md", "# Historical agent report")
+    _write(tmp_path / "docs/architecture/retired.md", "# Old plan\n\nStatus: retired")
+    _write(tmp_path / "docs/architecture/README.md", f"{BEGIN_MARKER}\n{END_MARKER}\n")
+    assert run_generator(tmp_path, check=False) == 0
+    readme = tmp_path / "docs/architecture/README.md"
+    text = readme.read_text()
+    links = re.findall(r"\]\(([^)]+)\)", text)
+    assert "a%20b.md" in links
+    assert "../runbooks/help.md" in links
+    assert all((readme.parent / unquote(link)).exists() for link in links)
+    history = text.split("<details>", 1)[1].split("</details>", 1)[0]
+    assert "agents/old.md" in history
+    assert "retired.md" in history
+    assert "a%20b.md" not in history
+
+
+@pytest.mark.parametrize(
+    "status",
+    [
+        "Статус: архивный документ",
+        "**Статус:** историческое описание",
+        "Статус: устаревшая процедура",
+    ],
+)
+def test_russian_historical_status_is_not_current_navigation(tmp_path: Path, status: str) -> None:
+    _write(tmp_path / "docs/architecture/old.md", f"# Old\n\n{status}")
+    assert build_document_entries(tmp_path)[0].group_key == "history"
+
+
+def test_empty_history_has_balanced_details_markup() -> None:
+    text = render_generated_index([])
+    assert text.count("<details>") == text.count("</details>") == 1

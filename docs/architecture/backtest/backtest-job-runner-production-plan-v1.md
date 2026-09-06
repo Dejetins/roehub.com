@@ -1,5 +1,10 @@
 # Backtest Job Runner Production Plan v1
 
+Статус: `historical`; исполнение по этому документу не выбрано.
+Исторические инструкции и утверждения о состоянии host ниже относятся к дате
+исходного плана. Текущие entrypoints и installation contract: [индекс](README.md).
+
+
 Статус: целевой production-план перед реализацией. Документ фиксирует решения
 для отдельного `backtest-job-runner` prompt pack и закрывает runtime gaps между
 job-based API, Web UI `/backtests`, lazy trades detail и Mac Studio native

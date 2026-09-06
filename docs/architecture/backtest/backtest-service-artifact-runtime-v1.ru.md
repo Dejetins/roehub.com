@@ -9,11 +9,15 @@ config keys, metric names, timer names, backend ids, file paths и значен�
 
 ## Статус
 
-Каноническая целевая архитектура для планирования реализации. Runtime-сервис
-реализуется итерационно; Iteration 7 принята для public jobs API,
-summary-only top-N persistence и service-only job orchestration evidence.
-Notebook и benchmark evidence ниже определяют production-прототип, которому
-сервис обязан соответствовать.
+Контракт artifact-backed runtime и история его реализации. Сверено 2026-09-06:
+API jobs, runtime services, job worker и lazy trades materialization присутствуют
+в текущем коде; ссылки на entrypoints и installation manifest собраны в [индексе](README.md).
+Формулировки будущих итераций ниже описывают исходный план и сохранённые records,
+а не незавершённость текущего worker или разрешение возобновить staged workflow.
+
+Mac Studio — оборудование исторических измерений. Для новой работы окружение
+выбирается текущим ticket/runbook; нужны сопоставимые baseline, fixture и hashes.
+Сам этот документ не выбирает production host и не доказывает deployment.
 
 Этот документ проектируется поверх:
 
@@ -57,16 +61,16 @@ compatibility-входы: адаптеры могут транслировать
 - поддерживает `no-risk` и `tp/sl grid` режимы;
 - возвращает persisted top N summary;
 - лениво пересчитывает trades для выбранного `variant_key` по запросу UI/API;
-- развивается итерационно, где каждая итерация проходит benchmark на `Mac Studio`;
+- развивается итерационно, где compute-изменения проходят benchmark в выбранном воспроизводимом окружении;
 - считается завершенным только если каждый pipeline segment держит не ниже 90%
   целевого baseline по скорости, памяти и CPU-метрикам из канонических benchmark
   evidence `2026-04-26_engine_test_btcusdt_15m`.
 
 ## Контекст
 
-Текущий backtest runtime официально сброшен: активной доверенной частью считаются artifact publisher/precompute, строгие manifests, `.npy` layout, signal rules, hit-times precompute, path/current-pointer adapters и job storage guard.
+Artifact publisher/precompute, manifests, `.npy` layout, signal rules, hit-times precompute и path/current-pointer adapters обеспечивают входные данные действующего runtime.
 
-Новый сервис должен стартовать поверх artifacts и не тащить legacy runtime kernels/scorers/shortlists. Если в репозитории остаются routes, templates, worker wiring или runtime modules со старым словарем, они должны быть явно классифицированы как `active`, `compatibility-only` или `obsolete` перед использованием в реализации.
+Действующий сервис работает поверх artifacts. Наличие API routes, Web pages и worker wiring является частью текущей реализации; старый словарь сам по себе не означает, что модуль нужно удалить.
 
 Целевая модель `hit_times`: `hit_times/15m`. Семантически таблицы обслуживают риск-исполнение через precomputed hit-time data, а request выбирает подмножество из заранее опубликованного достаточно широкого TP/SL grid.
 
@@ -1066,7 +1070,7 @@ apps/api routes
 
 ## Политика бенчмарков
 
-Запуск бенчмарков разрешен только на `Mac Studio`.
+Исторические acceptance runs выполнялись на `Mac Studio`. Новые сравнения выполняются в явно зафиксированном сопоставимом окружении.
 
 Канонические benchmark sources:
 
@@ -1093,7 +1097,7 @@ requests до `top_n=50` остаются поддержанными guardrails.
 
 Известный непринятый benchmark record:
 
-- [`2026-04-27_iteration_4_no_risk_exact_scoring_notebook_topk`](benchmark_iterations/2026-04-27_iteration_4_no_risk_exact_scoring_notebook_topk/)
+- `2026-04-27_iteration_4_no_risk_exact_scoring_notebook_topk` (исторический ID; исходный record отсутствует в текущем дереве, ссылка не является доступным доказательством)
   является failure record, а не accepted baseline;
 - этот record подтверждает, что `exact_scoring` может пройти `14 / 14`, но
   `heap_update` fail `13 / 14`, `top_result_proxy_fill` fail для arity 2, а
@@ -1577,7 +1581,7 @@ fail по `prepare_pools_total` сохранен в evidence как `stage_bound
 
 Известная неуспешная попытка:
 
-- [`2026-04-27_iteration_4_no_risk_exact_scoring_notebook_topk`](benchmark_iterations/2026-04-27_iteration_4_no_risk_exact_scoring_notebook_topk/)
+- `2026-04-27_iteration_4_no_risk_exact_scoring_notebook_topk` (исторический ID; исходный record отсутствует в текущем дереве, ссылка не является доступным доказательством)
   не принимается как успешное evidence;
 - подтверждено как корректное: semantic metrics parity `14 / 14`, proxy
   metadata parity `14 / 14`, `exact_scoring` latency `14 / 14`;
@@ -1980,7 +1984,7 @@ Static checks после docs updates:
 python -m tools.docs.generate_docs_index --check
 ```
 
-Проверки этапа реализации будут добавляться по итерациям. Benchmark checks должны запускаться на `Mac Studio`, а не на локальных non-production-equivalent hosts.
+Проверки реализованных этапов находятся в tests и benchmark records. Новый benchmark фиксирует окружение и сопоставимость baseline; developer smoke не доказывает performance в другой установке.
 
 ## Риски, пояснения и открытые решения
 

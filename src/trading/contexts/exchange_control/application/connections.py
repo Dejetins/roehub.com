@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
@@ -1786,21 +1785,10 @@ def _not_found() -> ExchangeConnectionError:
     )
 
 
-def stable_legacy_connection_id(*, key_id: UUID) -> UUID:
-    return key_id
-
-
-def stable_legacy_credential_version_id(*, key_id: UUID) -> UUID:
-    digest = hashlib.md5(f"credential:{key_id}".encode("ascii"), usedforsecurity=False)
-    return UUID(digest.hexdigest())
-
-
 __all__ = [
     "ExchangeConnectionError",
     "ExchangeConnectionRepository",
     "ExchangeConnectionService",
     "ExchangeConnectionView",
     "InMemoryExchangeConnectionRepository",
-    "stable_legacy_connection_id",
-    "stable_legacy_credential_version_id",
 ]

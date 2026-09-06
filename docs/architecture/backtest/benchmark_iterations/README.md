@@ -1,6 +1,7 @@
 # Backtest Benchmark Iterations
 
-Рабочая папка для фиксации benchmark evidence по каждой итерации backtest service.
+Статус: historical benchmark records. Сохранённые измерения относятся к указанным
+revision, hardware и fixtures; наличие records не выбирает текущий staged workflow.
 Активный контракт имен стадий берется из
 `docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md` и
 канонического JSON evidence
@@ -18,8 +19,10 @@
 - прошел ли stage gate `>= 90%` по скорости, памяти и CPU-метрикам;
 - прошли ли service-only absolute budgets.
 
-Benchmark вне `Mac Studio` не считается acceptance evidence. Локальные docs/static
-checks можно записывать как developer evidence, но не как acceptance benchmark.
+Для новых измерений окружение и acceptance boundary выбирает текущая задача.
+Сравнение требует одинаковых fixtures, hashes и сопоставимого baseline.
+Локальные docs/static checks не являются performance evidence. Упоминания
+Mac Studio и требований прежних stages ниже описывают исторические acceptance runs.
 
 Для compute acceleration stages из
 `docs/architecture/backtest/backtest-compute-acceleration-plan-v1.md` перед

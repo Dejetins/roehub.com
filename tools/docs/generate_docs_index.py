@@ -1,22 +1,32 @@
 from __future__ import annotations
 
 import argparse
+import posixpath
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
+from urllib.parse import quote
 
 BEGIN_MARKER = "<!-- BEGIN GENERATED DOCS INDEX -->"
 END_MARKER = "<!-- END GENERATED DOCS INDEX -->"
 
-KNOWN_GROUP_ORDER: tuple[str, ...] = ("architecture", "runbooks", "api", "decisions", "other")
+KNOWN_GROUP_ORDER: tuple[str, ...] = (
+    "architecture",
+    "runbooks",
+    "api",
+    "decisions",
+    "other",
+    "history",
+)
 GROUP_TITLES: dict[str, str] = {
     "architecture": "Архитектура",
     "runbooks": "Ранбуки",
     "api": "API",
     "decisions": "Решения",
     "other": "Прочее",
+    "history": "Исторические материалы",
 }
 
 
@@ -75,7 +85,7 @@ def _is_ignored_component(name: str) -> bool:
     - None.
 
     Related docs and files:
-    - `docs/repository_three.md`
+    - `docs/architecture/project-map/PROJECT_MAP.md`
     - `tools/docs/generate_docs_index.py`
     """
 
@@ -133,7 +143,7 @@ def collect_markdown_files(docs_root: Path) -> list[Path]:
     - Reads filesystem tree under `docs_root`.
 
     Related docs and files:
-    - `docs/repository_three.md`
+    - `docs/architecture/project-map/PROJECT_MAP.md`
     - `tests/unit/tools/test_generate_docs_index.py`
     """
 
@@ -208,7 +218,7 @@ def extract_title_and_description(markdown_text: str, fallback_title: str) -> tu
     return title, ""
 
 
-def _resolve_group_key(relative_to_docs: Path) -> str:
+def _resolve_group_key(relative_to_docs: Path, text: str = "") -> str:
     """
     Map docs relative path to deterministic high-level group key.
 
@@ -233,6 +243,15 @@ def _resolve_group_key(relative_to_docs: Path) -> str:
     - `tools/docs/generate_docs_index.py`
     """
 
+    if any(
+        part in {"agents", "legacy", "benchmark_iterations"} or part.endswith("-stage-reports")
+        for part in relative_to_docs.parts
+    ) or re.search(
+        r"(?:status|Статус)\**:.*(?:historical|retired|superseded|архивн|историческ|устаревш)",
+        text[:1500],
+        re.I,
+    ):
+        return "history"
     if len(relative_to_docs.parts) >= 2:
         top_level = relative_to_docs.parts[0]
         if top_level in {"architecture", "runbooks", "api", "decisions"}:
@@ -281,7 +300,7 @@ def build_document_entries(repo_root: Path) -> list[DocumentEntry]:
                 path=relative_repo_path.as_posix(),
                 title=title,
                 description=description,
-                group_key=_resolve_group_key(relative_to_docs),
+                group_key=_resolve_group_key(relative_to_docs, text),
             )
         )
 
@@ -351,19 +370,33 @@ def render_generated_index(entries: Sequence[DocumentEntry]) -> str:
 
     for group_key in KNOWN_GROUP_ORDER:
         group_entries = grouped[group_key]
+        if group_key == "history":
+            rendered_lines.extend(
+                [
+                    "<details>",
+                    "<summary>Исторические материалы (не источник текущего исполнения)</summary>",
+                    "",
+                ]
+            )
         rendered_lines.append(f"### {GROUP_TITLES[group_key]}")
         rendered_lines.append("")
         if not group_entries:
             rendered_lines.append("- (пока нет документов)")
             rendered_lines.append("")
+            if group_key == "history":
+                rendered_lines.extend(["</details>", ""])
             continue
 
         for entry in group_entries:
-            line = f"- [{entry.title}]({entry.path}) — `{entry.path}`"
+            target = quote(posixpath.relpath(entry.path, "docs/architecture"), safe="/")
+            title = entry.title.replace("[", r"\[").replace("]", r"\]")
+            line = f"- [{title}]({target}) — `{entry.path}`"
             if entry.description:
                 line = f"{line} — {entry.description}"
             rendered_lines.append(line)
         rendered_lines.append("")
+        if group_key == "history":
+            rendered_lines.extend(["</details>", ""])
 
     return "\n".join(rendered_lines).rstrip()
 
@@ -397,12 +430,12 @@ def default_manual_header() -> str:
         "# Архитектурная документация\n\n"
         "`docs/architecture/README.md` — каноническая точка входа для навигации по всем документам в `docs/**`.\n\n"  # noqa: E501
         "## Ключевые документы\n\n"
-        "- [Indicators Architecture](docs/architecture/indicators/README.md)\n"
-        "- [Market Data — Application Ports (Walking Skeleton v1)](docs/architecture/market_data/market-data-application-ports.md)\n"  # noqa: E501
+        "- [Indicators Architecture](indicators/README.md)\n"
+        "- [Market Data — Application Ports (Walking Skeleton v1)](market_data/market-data-application-ports.md)\n"  # noqa: E501
         "- [Strategy — Milestone 3 Epics]"
-        "(docs/architecture/strategy/strategy-milestone-3-epics-v1.md)\n"
-        "- [Shared Kernel — Primitives](docs/architecture/shared-kernel-primitives.md)\n"
-        "- [Runbook: Help commands](docs/runbooks/help_commands.md)\n\n"
+        "(strategy/strategy-milestone-3-epics-v1.md)\n"
+        "- [Shared Kernel — Primitives](shared-kernel-primitives.md)\n"
+        "- [Runbook: Help commands](../runbooks/help_commands.md)\n\n"
         "## Как обновлять индекс\n\n"
         "- Обновить файл: `python -m tools.docs.generate_docs_index`\n"
         "- Проверить актуальность: `python -m tools.docs.generate_docs_index --check`\n\n"

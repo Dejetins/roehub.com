@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import math
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -330,7 +329,3 @@ def report_to_json(*, report: StrategyCompatibilityReadinessReport) -> dict[str,
         "launch_blocked_reason": report.launch_blocked_reason,
         "checked_at": report.checked_at.astimezone(UTC).isoformat(),
     }
-
-
-def report_json_dumps(*, report: StrategyCompatibilityReadinessReport) -> str:
-    return json.dumps(report_to_json(report=report), sort_keys=True, separators=(",", ":"))

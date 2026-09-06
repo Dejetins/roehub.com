@@ -32,10 +32,6 @@ EffectivePermissions = Literal["none", "read", "trade"]
 PermissionWarning = Literal["exchange_permissions_exceed_requested"]
 
 
-class ExchangeCredentialValidationError(RuntimeError):
-    """Sanitized validation error safe for API and metrics."""
-
-
 @dataclass(frozen=True, slots=True, repr=False)
 class ExchangeCredentialPlaintext:
     api_key: str
@@ -105,7 +101,6 @@ class SkippedExchangeCredentialValidator:
 __all__ = [
     "VALIDATION_STATUSES",
     "ExchangeCredentialPlaintext",
-    "ExchangeCredentialValidationError",
     "ExchangeCredentialValidationRequest",
     "ExchangeCredentialValidationResult",
     "ExchangeCredentialValidator",

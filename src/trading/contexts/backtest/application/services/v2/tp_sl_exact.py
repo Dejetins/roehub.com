@@ -2389,50 +2389,6 @@ def build_trade_list_15m_for_indicator_rows_slow(
     )
 
 
-@nb.njit(cache=True, inline="always")
-def _tp_sl_trade_log_contrib_reference_kernel(
-    dirn: np.int8,
-    entry_abs: np.int32,
-    sig_exit_abs: np.int32,
-    tp_i: np.int32,
-    sl_i: np.int32,
-    price_open: np.ndarray,
-    last_close: float,
-    hit_long_tp: np.ndarray,
-    hit_long_sl: np.ndarray,
-    hit_short_tp: np.ndarray,
-    hit_short_sl: np.ndarray,
-    log_fac_tp_long: np.ndarray,
-    log_fac_sl_long: np.ndarray,
-    log_fac_tp_short: np.ndarray,
-    log_fac_sl_short: np.ndarray,
-    log_fee_two_sides: float,
-    close_on_end: np.int8,
-    t_exec_abs: np.int32,
-) -> float:
-    log_value, _closed = _tp_sl_trade_log_contrib_and_closed(
-        dirn,
-        entry_abs,
-        sig_exit_abs,
-        tp_i,
-        sl_i,
-        price_open,
-        last_close,
-        hit_long_tp,
-        hit_long_sl,
-        hit_short_tp,
-        hit_short_sl,
-        log_fac_tp_long,
-        log_fac_sl_long,
-        log_fac_tp_short,
-        log_fac_sl_short,
-        log_fee_two_sides,
-        close_on_end,
-        t_exec_abs,
-    )
-    return log_value
-
-
 @nb.njit(cache=True, fastmath=False)
 def evaluate_tp_sl_reference_trade_list_direct(
     entry_abs: np.ndarray,
