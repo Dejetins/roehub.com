@@ -1,0 +1,2264 @@
+{
+  "schema_id": "io.roehub.ui-functional-registry/v1",
+  "status": "current_functional_contract",
+  "scope": "self_hosted_local_platform_only",
+  "contract_doc": "docs/architecture/apps/web/roehub-ui-functional-contract-v1.md",
+  "evidence_date": "2026-09-08",
+  "implementation_evidence_boundary": "source_inspection_not_current_runtime_proof",
+  "status_labels": {
+    "implemented": "Реализовано: только указанная часть существующего кода/контракта",
+    "requires_ui": "Требуется UI",
+    "requires_api": "Требуется API: реализация, проекция или интеграция существующей политики",
+    "needs_clarification": "Нужно уточнение перед задачей соответствующей функции"
+  },
+  "supported_widths": [
+    820,
+    1024,
+    1440
+  ],
+  "excluded_widths": [
+    390
+  ],
+  "navigation_groups": [
+    {
+      "navigation_group_id": "overview",
+      "label": "Overview",
+      "items": [
+        "screen.dashboard.overview"
+      ]
+    },
+    {
+      "navigation_group_id": "research",
+      "label": "Research",
+      "items": [
+        "screen.data.catalog",
+        "screen.data.ingestion",
+        "screen.artifacts.catalog",
+        "screen.strategies.library",
+        "screen.backtests.library",
+        "screen.models.registry"
+      ]
+    },
+    {
+      "navigation_group_id": "operations",
+      "label": "Operations",
+      "items": [
+        "screen.live.workspace",
+        "screen.live.execution_activity",
+        "screen.operations.jobs",
+        "screen.monitoring.workspace",
+        "screen.connections.workspace"
+      ]
+    },
+    {
+      "navigation_group_id": "system",
+      "label": "System",
+      "items": [
+        "screen.docs.index",
+        "screen.settings.profile",
+        "screen.admin.overview"
+      ]
+    }
+  ],
+  "screens": [
+    {
+      "screen_id": "screen.auth.login",
+      "kind": "route_screen",
+      "label": "Local sign-in and recovery gateway",
+      "canonical_route": "/login",
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.auth.gateway",
+        "platform.auth.lifecycle"
+      ],
+      "journey_ids": [
+        "journey.auth.sign_in_and_continue"
+      ],
+      "required_states": [
+        "anonymous",
+        "passkey",
+        "password_fallback",
+        "recovery",
+        "session_expired",
+        "identity_unavailable",
+        "invalid_next_sanitized"
+      ],
+      "actions": [
+        "logout",
+        "credential_flow_completion"
+      ],
+      "capability_refs": [
+        "auth.session.manage",
+        "setup.bootstrap"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.auth.login",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.auth.login",
+        "apps/web/dist/js/pages/auth.js"
+      ],
+      "implemented_scope": "Local passkey/password/recovery/session endpoints and SSR login exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.setup.first_launch",
+      "kind": "route_flow",
+      "label": "First-launch setup",
+      "canonical_route": "/setup/{step}",
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.first_launch.full_setup"
+      ],
+      "journey_ids": [
+        "journey.setup.first_launch"
+      ],
+      "required_states": [
+        "owner_creation",
+        "organization_creation",
+        "passkey",
+        "recovery",
+        "catalog_snapshot",
+        "instrument_selection",
+        "skip_selection",
+        "empty_selection",
+        "resume_after_failure"
+      ],
+      "actions": [
+        "create_local_owner",
+        "create_organization",
+        "save_instrument_selection"
+      ],
+      "capability_refs": [
+        "data.selection.manage",
+        "setup.bootstrap"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.setup.first_launch",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.setup.first_launch",
+        "docs/architecture/identity/local-auth-sessions-recovery-v1.md"
+      ],
+      "implemented_scope": "Local bootstrap creates owner and organization; complete routed setup is absent.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Complete resumable setup routing and catalog protocol; do not rebuild existing owner bootstrap."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.shell.application",
+      "kind": "persistent_shell",
+      "label": "Authenticated application shell",
+      "canonical_route": null,
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.shell.preferences"
+      ],
+      "journey_ids": [],
+      "required_states": [
+        "expanded_navigation",
+        "compact_navigation",
+        "command_palette",
+        "notifications",
+        "organization_context",
+        "theme_preferences",
+        "ru_en",
+        "session_warning"
+      ],
+      "actions": [
+        "locale_cookie",
+        "preference_update"
+      ],
+      "capability_refs": [
+        "preferences.manage_personal"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.shell.application",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.shell.application",
+        "apps/web/templates/base.html"
+      ],
+      "implemented_scope": "SSR shell, locale and session handling exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.dashboard.overview",
+      "kind": "route_screen",
+      "label": "Overview dashboard",
+      "canonical_route": "/dashboard",
+      "navigation_group_id": "overview",
+      "source_surface_ids": [
+        "platform.dashboard.overview",
+        "platform.dashboard.data_onboarding"
+      ],
+      "journey_ids": [
+        "journey.auth.sign_in_and_continue",
+        "journey.setup.first_launch",
+        "journey.data.select_instruments"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "empty_selection",
+        "degraded_source",
+        "stale_source",
+        "error_retry",
+        "permission_filtered"
+      ],
+      "actions": [
+        "navigate_to_settings_market_data"
+      ],
+      "capability_refs": [
+        "data.catalog.read"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.dashboard.overview",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.dashboard.overview",
+        "apps/api/dto/ui_dashboard.py"
+      ],
+      "implemented_scope": "Dashboard read model and partial source states exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Target role-filtered projection requires authorization integration."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.data.catalog",
+      "kind": "route_screen",
+      "label": "Market-data catalog and selection",
+      "canonical_route": "/data",
+      "navigation_group_id": "research",
+      "source_surface_ids": [
+        "platform.settings.market_data_catalog"
+      ],
+      "journey_ids": [
+        "journey.data.select_instruments",
+        "journey.setup.first_launch",
+        "journey.data.manage_ingestion_and_coverage"
+      ],
+      "required_states": [
+        "loading",
+        "snapshot_ready",
+        "snapshot_expired",
+        "cursor_loading",
+        "coverage_unknown",
+        "artifact_unavailable",
+        "strategy_pinned",
+        "empty",
+        "error_retry"
+      ],
+      "actions": [
+        "select_instrument",
+        "unselect_instrument"
+      ],
+      "capability_refs": [
+        "data.catalog.read",
+        "data.selection.manage"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.data.catalog",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.data.catalog",
+        "apps/api/routes/market_data_reference.py"
+      ],
+      "implemented_scope": "Catalog and organization selection endpoints exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Target snapshot/cursor, provider-segment completeness and capability enforcement."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.strategies.library",
+      "kind": "route_screen",
+      "label": "Strategy library",
+      "canonical_route": "/strategies",
+      "navigation_group_id": "research",
+      "source_surface_ids": [
+        "platform.strategies.library"
+      ],
+      "journey_ids": [
+        "journey.strategies.create_and_control"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "empty",
+        "server_filtered",
+        "degraded",
+        "unavailable",
+        "error_retry"
+      ],
+      "actions": [
+        "create_immutable_strategy",
+        "clone_strategy",
+        "configure_launch_profile",
+        "delete_strategy"
+      ],
+      "capability_refs": [
+        "strategies.manage",
+        "strategies.read"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.strategies.library",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.strategies.library",
+        "apps/api/routes/strategies.py"
+      ],
+      "implemented_scope": "Immutable create/clone/delete endpoints and SSR library exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Target strategy role/ownership/delegation integration."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.strategies.editor",
+      "kind": "route_screen",
+      "label": "Strategy editor",
+      "canonical_route": "/strategies/new",
+      "navigation_group_id": "research",
+      "source_surface_ids": [],
+      "journey_ids": [
+        "journey.strategies.create_and_control"
+      ],
+      "required_states": [
+        "draft",
+        "validation_error",
+        "unsaved_changes",
+        "save_pending",
+        "save_success",
+        "permission_forbidden"
+      ],
+      "actions": [
+        "create_immutable_strategy",
+        "discard_unsaved_edits"
+      ],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.strategies.editor",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.strategies.editor",
+        "apps/web/dist/js/pages/strategies.js"
+      ],
+      "implemented_scope": "Visual builder exists; immutable spec changes create another strategy.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api",
+        "needs_clarification"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Target mutation-envelope integration; immutable spec and mutable profile remain separate.",
+        "Q-DRAFT: durable strategy draft/unsaved navigation policy before editor delivery."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.strategies.detail",
+      "kind": "route_screen",
+      "label": "Strategy detail and controlled runtime",
+      "canonical_route": "/strategies/{strategy_id}",
+      "navigation_group_id": "research",
+      "source_surface_ids": [
+        "platform.strategies.runtime_control"
+      ],
+      "journey_ids": [
+        "journey.strategies.create_and_control",
+        "journey.live.observe_execution",
+        "journey.live.manual_position_control"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "running",
+        "stopped",
+        "blocked",
+        "unknown_runtime",
+        "degraded",
+        "destructive_confirmation",
+        "permission_forbidden",
+        "manual_position_open_available",
+        "manual_position_close_available"
+      ],
+      "actions": [
+        "run",
+        "stop",
+        "restart",
+        "manual_entry",
+        "manual_exit"
+      ],
+      "capability_refs": [
+        "strategies.manual_trade",
+        "strategies.read",
+        "strategies.run",
+        "strategies.safe_stop"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.strategies.detail",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.strategies.detail",
+        "apps/api/routes/strategies.py"
+      ],
+      "implemented_scope": "Run-control and mutable launch-profile APIs exist separately from immutable specs.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Target safe-stop/manual-control policy and unknown-result handling."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.models.registry",
+      "kind": "route_screen",
+      "label": "Model and experiment registry",
+      "canonical_route": "/models",
+      "navigation_group_id": "research",
+      "source_surface_ids": [
+        "platform.strategies.rl_ml_compatibility",
+        "platform.models.workspace",
+        "platform.models.canonical_redirect"
+      ],
+      "journey_ids": [
+        "journey.models.inspect_and_operate"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "empty",
+        "training",
+        "readiness",
+        "promotion_blocked",
+        "rollback_available",
+        "server_filtered",
+        "error_retry"
+      ],
+      "actions": [
+        "operator_request_retraining",
+        "operator_request_rollback"
+      ],
+      "capability_refs": [
+        "models.manage",
+        "models.promote_or_rollback",
+        "models.read"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.models.registry",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.models.registry",
+        "apps/web/main/app.py"
+      ],
+      "implemented_scope": "Current /models reuses the strategies RL/ML presentation.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api",
+        "needs_clarification"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Dedicated model/experiment projections and authorized operations need contract binding.",
+        "Q-MODELS: exact comparison and promotion/rollback action mapping before Models ticket."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.models.detail",
+      "kind": "route_screen",
+      "label": "Model detail and experiment comparison",
+      "canonical_route": "/models/{model_id}",
+      "navigation_group_id": "research",
+      "source_surface_ids": [],
+      "journey_ids": [
+        "journey.models.inspect_and_operate"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "experiment_comparison",
+        "training",
+        "readiness",
+        "promotion_confirmation",
+        "rollback_confirmation",
+        "permission_forbidden"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.models.detail",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.models.detail",
+        "apps/web/dist/js/pages/strategies.js"
+      ],
+      "implemented_scope": "No dedicated target behavior is claimed. RL/ML presentation exists; dedicated model-detail journey is not established.",
+      "delivery_status": [
+        "requires_ui",
+        "requires_api",
+        "needs_clarification"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Model comparison/promotion/rollback API-to-screen mapping and capability proof.",
+        "Q-MODELS: reuse domain contracts; resolve only missing consumer behavior."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.backtests.library",
+      "kind": "route_screen",
+      "label": "Backtest jobs and history",
+      "canonical_route": "/backtests",
+      "navigation_group_id": "research",
+      "source_surface_ids": [
+        "platform.backtests.workstation"
+      ],
+      "journey_ids": [
+        "journey.backtests.configure_and_run",
+        "journey.backtests.inspect_and_promote"
+      ],
+      "required_states": [
+        "loading",
+        "empty",
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        "cancelled",
+        "rate_limited",
+        "server_filtered",
+        "error_retry"
+      ],
+      "actions": [
+        "preflight",
+        "create_job",
+        "cancel_job",
+        "delete_job"
+      ],
+      "capability_refs": [
+        "backtests.manage_own",
+        "backtests.queue_operate",
+        "backtests.read"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.backtests.library",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.backtests.library",
+        "apps/api/routes/ui_backtests.py"
+      ],
+      "implemented_scope": "Job/workstation list, filters and source freshness exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Target backtest read-policy integration; current owner-scoped API is reusable."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.backtests.builder",
+      "kind": "route_screen",
+      "label": "Backtest configuration and preflight",
+      "canonical_route": "/backtests/new",
+      "navigation_group_id": "research",
+      "source_surface_ids": [
+        "platform.backtests.target_data_modes"
+      ],
+      "journey_ids": [
+        "journey.backtests.configure_and_run"
+      ],
+      "required_states": [
+        "configure",
+        "auto_selection_reason",
+        "artifact",
+        "direct_db",
+        "preflight",
+        "resource_admission",
+        "equivalence_failure",
+        "validation_error",
+        "submission_pending"
+      ],
+      "actions": [
+        "select_data_mode"
+      ],
+      "capability_refs": [
+        "backtests.manage_own"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.backtests.builder",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.backtests.builder",
+        "apps/api/routes/backtests.py"
+      ],
+      "implemented_scope": "Artifact preflight and idempotent job submission exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "auto/direct_db, resource/ETA expansion and target mutation envelope are separate dependencies."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.backtests.detail",
+      "kind": "route_screen",
+      "label": "Backtest progress and result",
+      "canonical_route": "/backtests/{job_id}",
+      "navigation_group_id": "research",
+      "source_surface_ids": [
+        "platform.backtests.variant_detail",
+        "platform.backtests.strategy_promotion"
+      ],
+      "journey_ids": [
+        "journey.backtests.configure_and_run",
+        "journey.backtests.inspect_and_promote"
+      ],
+      "required_states": [
+        "queued",
+        "running_measured_progress",
+        "queue_eta",
+        "execution_eta",
+        "eta_unavailable",
+        "completed",
+        "failed",
+        "cancelled",
+        "materializing",
+        "degraded",
+        "promotion_confirmation",
+        "permission_forbidden"
+      ],
+      "actions": [
+        "refresh_result",
+        "download_trades_csv",
+        "create_strategy_from_variant",
+        "launch_strategy_from_variant"
+      ],
+      "capability_refs": [
+        "backtests.promote_own",
+        "backtests.read"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.backtests.detail",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.backtests.detail",
+        "apps/api/routes/backtests.py"
+      ],
+      "implemented_scope": "Job status, cancel/delete, variants, materialization, bounded series, CSV and strategy creation exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Target operator retry/promotion policy and reliable queue ETA are not provided by visual migration."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.live.workspace",
+      "kind": "route_screen",
+      "label": "Live operations workspace",
+      "canonical_route": "/live",
+      "navigation_group_id": "operations",
+      "source_surface_ids": [
+        "platform.live.workspace"
+      ],
+      "journey_ids": [
+        "journey.live.observe_execution",
+        "journey.strategies.create_and_control",
+        "journey.live.manual_position_control",
+        "journey.live.inspect_and_reconcile"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "paper",
+        "live",
+        "degraded",
+        "risk_blocked",
+        "execution_unknown",
+        "safe_stop",
+        "reconciliation",
+        "server_filtered",
+        "positions",
+        "orders",
+        "fills",
+        "manual_position_action"
+      ],
+      "actions": [
+        "safe_stop",
+        "open_manual_position_flow",
+        "close_manual_position_flow"
+      ],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.live.workspace",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.live.workspace",
+        "apps/api/routes/ui_execution.py"
+      ],
+      "implemented_scope": "Execution ingress and strategy/dashboard projections exist; dedicated workspace remains target.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Role-filtered dedicated live read model and safe-action capability mapping."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.monitoring.workspace",
+      "kind": "route_screen",
+      "label": "Grouped service monitoring",
+      "canonical_route": "/monitoring",
+      "navigation_group_id": "operations",
+      "source_surface_ids": [
+        "platform.monitoring.workspace"
+      ],
+      "journey_ids": [
+        "journey.live.observe_execution",
+        "journey.monitor_and_follow_runbook",
+        "journey.monitoring.diagnose_service_or_datastore"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "grouped_services",
+        "degraded",
+        "stale",
+        "alert",
+        "impact",
+        "safe_action",
+        "error_retry",
+        "service_drilldown_available",
+        "datastore_grouped_as_services"
+      ],
+      "actions": [
+        "manual_refresh"
+      ],
+      "capability_refs": [
+        "monitoring.read",
+        "monitoring.safe_action"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.monitoring.workspace",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.monitoring.workspace",
+        "apps/web/templates/pages/monitoring.html"
+      ],
+      "implemented_scope": "SSR monitoring uses dashboard summary.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Functional service grouping/read projection and safe-action policy."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.connections.workspace",
+      "kind": "route_screen",
+      "label": "Exchange and integration connections",
+      "canonical_route": "/connections",
+      "navigation_group_id": "operations",
+      "source_surface_ids": [
+        "platform.connections.workspace"
+      ],
+      "journey_ids": [
+        "journey.connections.manage_exchange"
+      ],
+      "required_states": [
+        "loading",
+        "empty",
+        "validation_pending",
+        "ready",
+        "degraded",
+        "unavailable",
+        "recent_auth_required",
+        "destructive_confirmation",
+        "safe_status_only"
+      ],
+      "actions": [
+        "connection_create",
+        "connection_rotate",
+        "connection_recheck",
+        "connection_disconnect",
+        "connection_archive"
+      ],
+      "capability_refs": [
+        "connections.bind_own",
+        "connections.manage",
+        "connections.safe_operate",
+        "connections.secret.reveal",
+        "connections.status.read"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.connections.workspace",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.connections.workspace",
+        "apps/web/dist/js/pages/settings.js"
+      ],
+      "implemented_scope": "Account connection lifecycle exists, with current security guards.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Target organization role/delegation policy; preserve existing secret guards."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.data.ingestion",
+      "kind": "route_screen",
+      "label": "Data ingestion and coverage operations",
+      "canonical_route": "/data/ingestion",
+      "navigation_group_id": "research",
+      "source_surface_ids": [
+        "platform.data.ingestion_operations"
+      ],
+      "journey_ids": [
+        "journey.data.select_instruments",
+        "journey.data.manage_ingestion_and_coverage"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "empty_selection",
+        "provisioning",
+        "backfill_queued",
+        "backfill_running",
+        "coverage_partial",
+        "coverage_complete",
+        "gap_detected",
+        "stale",
+        "failed",
+        "safe_retry_available",
+        "permission_forbidden"
+      ],
+      "actions": [
+        "safe_retry_ingestion"
+      ],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.data.ingestion",
+        "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md"
+      ],
+      "implemented_scope": "Data activation/selection pipeline exists; dedicated ingestion projection/action API is not established.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Bounded ingestion/coverage read model and allowlisted retry API."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.artifacts.catalog",
+      "kind": "route_screen",
+      "label": "Artifact catalog",
+      "canonical_route": "/artifacts",
+      "navigation_group_id": "research",
+      "source_surface_ids": [
+        "platform.artifacts.catalog"
+      ],
+      "journey_ids": [
+        "journey.artifacts.inspect_and_use"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "empty",
+        "server_filtered",
+        "search",
+        "type_filter",
+        "consumer_filter",
+        "compatible",
+        "incompatible",
+        "storage_degraded",
+        "error_retry"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.artifacts.catalog",
+        "docs/architecture/platform/artifact-store-v1.md",
+        "src/trading/integration/artifact_store.py"
+      ],
+      "implemented_scope": "ArtifactStore domain exists; its v1 scope excludes HTTP API.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Organization-filtered catalog HTTP projection."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.artifacts.detail",
+      "kind": "route_screen",
+      "label": "Artifact manifest and provenance detail",
+      "canonical_route": "/artifacts/{bundle_id}/{version}",
+      "navigation_group_id": "research",
+      "source_surface_ids": [
+        "platform.artifacts.detail"
+      ],
+      "journey_ids": [
+        "journey.artifacts.inspect_and_use"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "manifest_verified",
+        "manifest_invalid",
+        "compatible",
+        "incompatible",
+        "storage_available",
+        "storage_degraded",
+        "quota_impact",
+        "consumer_links",
+        "not_found",
+        "permission_forbidden"
+      ],
+      "actions": [
+        "navigate_to_consumer"
+      ],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.artifacts.detail",
+        "docs/architecture/platform/artifact-store-v1.md",
+        "src/trading/integration/artifact_store.py"
+      ],
+      "implemented_scope": "Manifest identity/compatibility/storage contracts exist; UI projection is required.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Manifest/consumer links and safe storage metadata HTTP projection."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.operations.jobs",
+      "kind": "route_screen",
+      "label": "Cross-capability jobs and queues",
+      "canonical_route": "/jobs",
+      "navigation_group_id": "operations",
+      "source_surface_ids": [
+        "platform.jobs.queue"
+      ],
+      "journey_ids": [
+        "journey.jobs.inspect_and_operate"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "empty",
+        "queued",
+        "running",
+        "recovering",
+        "terminal",
+        "server_filtered",
+        "capability_filter",
+        "owner_filter",
+        "error_retry"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.operations.jobs",
+        "docs/architecture/platform/isolated-job-runtime-v1.md",
+        "src/trading/integration/job_runtime.py"
+      ],
+      "implemented_scope": "General job/attempt runtime exists; cross-capability browser queue API is not established.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Organization-filtered cross-capability queue/list API."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.operations.job_detail",
+      "kind": "route_screen",
+      "label": "Job attempts, progress, outputs, and recovery",
+      "canonical_route": "/jobs/{job_id}",
+      "navigation_group_id": "operations",
+      "source_surface_ids": [
+        "platform.jobs.detail"
+      ],
+      "journey_ids": [
+        "journey.jobs.inspect_and_operate",
+        "journey.data.manage_ingestion_and_coverage"
+      ],
+      "required_states": [
+        "loading",
+        "queued",
+        "running_measured_progress",
+        "queue_eta",
+        "execution_eta",
+        "eta_unavailable",
+        "succeeded",
+        "failed",
+        "cancelled",
+        "timed_out",
+        "crashed",
+        "resource_exhausted",
+        "recovering",
+        "retry_available",
+        "retry_forbidden",
+        "outputs_available",
+        "permission_forbidden"
+      ],
+      "actions": [
+        "cancel_job",
+        "retry_job"
+      ],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.operations.job_detail",
+        "docs/architecture/platform/isolated-job-runtime-v1.md",
+        "src/trading/integration/job_runtime.py"
+      ],
+      "implemented_scope": "Persisted attempt, cancellation, recovery and retry semantics exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api",
+        "needs_clarification"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Attempt/status/output projection and capability-specific cancel/retry endpoints.",
+        "Q-JOB-ADAPTER: identify capability-specific job/attempt contract; never apply backtest retry globally."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.live.execution_activity",
+      "kind": "route_screen",
+      "label": "Execution activity ledger",
+      "canonical_route": "/live/activity",
+      "navigation_group_id": "operations",
+      "source_surface_ids": [
+        "platform.live.execution_activity"
+      ],
+      "journey_ids": [
+        "journey.live.observe_execution",
+        "journey.live.inspect_and_reconcile"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "empty",
+        "server_filtered",
+        "signals",
+        "intents",
+        "orders",
+        "fills",
+        "rejections",
+        "notifications",
+        "unknown",
+        "reconciliation_required",
+        "stale",
+        "error_retry"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.live.execution_activity",
+        "apps/api/routes/ui_execution.py"
+      ],
+      "implemented_scope": "Execution ingress and notifications exist; bounded ledger projection remains to be bound.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Bounded execution ledger read API with pagination/filtering."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.live.execution_detail",
+      "kind": "route_screen",
+      "label": "Execution chain and reconciliation detail",
+      "canonical_route": "/live/executions/{intent_id}",
+      "navigation_group_id": "operations",
+      "source_surface_ids": [
+        "platform.live.execution_detail"
+      ],
+      "journey_ids": [
+        "journey.live.manual_position_control",
+        "journey.live.inspect_and_reconcile"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "source_event",
+        "risk_accepted",
+        "risk_rejected",
+        "dispatch_pending",
+        "order_acknowledged",
+        "partially_filled",
+        "filled",
+        "cancelled",
+        "execution_unknown",
+        "reconciliation_required",
+        "reconciled",
+        "notification_state",
+        "safe_action",
+        "permission_forbidden"
+      ],
+      "actions": [
+        "reconcile_execution"
+      ],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.live.execution_detail",
+        "docs/architecture/live_execution/live-execution-universal-order-gateway-v1.md"
+      ],
+      "implemented_scope": "Durable execution and reconciliation domain contracts exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Source-to-fill detail and allowed reconciliation API mapping."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.live.manual_position_flow",
+      "kind": "overlay",
+      "label": "Manual strategy position open or close flow",
+      "canonical_route": null,
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.live.manual_position_control"
+      ],
+      "journey_ids": [
+        "journey.live.manual_position_control"
+      ],
+      "required_states": [
+        "configure_open",
+        "configure_close",
+        "strategy_and_connection_context",
+        "size_or_close_scope",
+        "risk_preflight",
+        "recent_auth_required",
+        "confirmation",
+        "submission_pending",
+        "accepted",
+        "rejected",
+        "execution_unknown",
+        "reconciliation_required"
+      ],
+      "actions": [
+        "manual_entry",
+        "manual_exit"
+      ],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.live.manual_position_flow",
+        "apps/web/dist/js/pages/strategies.js"
+      ],
+      "implemented_scope": "Manual entry/exit exist in strategy UI; target hosted flow must use universal execution.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Universal execution command mapping, policy/recent-auth/risk/idempotency proof."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.monitoring.service_detail",
+      "kind": "route_screen",
+      "label": "Service or datastore monitoring detail",
+      "canonical_route": "/monitoring/{service_id}",
+      "navigation_group_id": "operations",
+      "source_surface_ids": [
+        "platform.monitoring.service_datastore_detail"
+      ],
+      "journey_ids": [
+        "journey.monitor_and_follow_runbook",
+        "journey.monitoring.diagnose_service_or_datastore",
+        "journey.live.inspect_and_reconcile"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "service",
+        "datastore",
+        "worker",
+        "fresh",
+        "stale",
+        "degraded",
+        "unavailable",
+        "dependency_impact",
+        "metrics",
+        "backlog",
+        "incident",
+        "related_jobs",
+        "runbook_available",
+        "safe_action",
+        "permission_forbidden",
+        "error_retry"
+      ],
+      "actions": [
+        "safe_diagnostic_action"
+      ],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.monitoring.service_detail",
+        "apps/api/routes/admin.py"
+      ],
+      "implemented_scope": "Service/health projections and operational runbooks exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Service/datastore detail and safe-action API; no raw infrastructure controls."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.settings.profile",
+      "kind": "route_screen",
+      "label": "Personal profile and limits",
+      "canonical_route": "/settings/profile",
+      "navigation_group_id": "system",
+      "source_surface_ids": [
+        "platform.settings.profile_limits"
+      ],
+      "journey_ids": [
+        "journey.connections.manage_exchange"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "edit",
+        "save_pending",
+        "save_success",
+        "save_error"
+      ],
+      "actions": [
+        "profile_update"
+      ],
+      "capability_refs": [
+        "settings.personal.manage"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.settings.profile",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.settings.profile",
+        "apps/api/routes/ui_account.py"
+      ],
+      "implemented_scope": "Profile load/update exists.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.settings.preferences",
+      "kind": "route_screen",
+      "label": "Theme, locale, density and refresh preferences",
+      "canonical_route": "/settings/preferences",
+      "navigation_group_id": "system",
+      "source_surface_ids": [
+        "platform.settings.preferences"
+      ],
+      "journey_ids": [],
+      "required_states": [
+        "ready",
+        "theme_preferences",
+        "ru_en",
+        "refresh_off",
+        "refresh_preset",
+        "save_error"
+      ],
+      "actions": [
+        "locale_cookie",
+        "preference_update"
+      ],
+      "capability_refs": [
+        "preferences.manage_personal"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.settings.preferences",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.settings.preferences",
+        "apps/api/routes/ui_account.py"
+      ],
+      "implemented_scope": "Personal preference endpoints and locale handling exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.settings.notifications",
+      "kind": "route_screen",
+      "label": "Integrations and notifications",
+      "canonical_route": "/settings/notifications",
+      "navigation_group_id": "system",
+      "source_surface_ids": [
+        "platform.settings.integrations_notifications"
+      ],
+      "journey_ids": [],
+      "required_states": [
+        "loading",
+        "connected",
+        "disconnected",
+        "scoped_routes",
+        "save_pending",
+        "save_error"
+      ],
+      "actions": [
+        "integration_update",
+        "notification_update",
+        "scoped_notification_update"
+      ],
+      "capability_refs": [
+        "settings.personal.manage"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.settings.notifications",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.settings.notifications",
+        "apps/api/routes/ui_account.py"
+      ],
+      "implemented_scope": "Personal and scoped notification configuration exists.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.settings.security",
+      "kind": "route_screen",
+      "label": "Security, sessions and personal audit",
+      "canonical_route": "/settings/security",
+      "navigation_group_id": "system",
+      "source_surface_ids": [
+        "platform.settings.security_sessions_audit"
+      ],
+      "journey_ids": [
+        "journey.auth.sign_in_and_continue",
+        "journey.administer_and_recover"
+      ],
+      "required_states": [
+        "loading",
+        "sessions",
+        "audit",
+        "recovery",
+        "recent_auth_required",
+        "session_revoked",
+        "error_retry"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.settings.security",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.settings.security",
+        "docs/architecture/identity/local-auth-sessions-recovery-v1.md"
+      ],
+      "implemented_scope": "Session/audit UI and local recovery services exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Bind target server-scoped projection and authority/recent-auth policies; current endpoint presence alone does not establish complete target behavior."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.admin.overview",
+      "kind": "route_screen",
+      "label": "Administration overview",
+      "canonical_route": "/admin",
+      "navigation_group_id": "system",
+      "source_surface_ids": [
+        "platform.admin.console"
+      ],
+      "journey_ids": [
+        "journey.administer_and_recover",
+        "journey.monitor_and_follow_runbook"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "server_filtered",
+        "operation_pending",
+        "operation_failed",
+        "operation_succeeded",
+        "permission_forbidden"
+      ],
+      "actions": [
+        "member_role_change",
+        "installation_operation",
+        "plugin_install_or_update",
+        "plugin_rollback"
+      ],
+      "capability_refs": [
+        "admin.members.manage",
+        "admin.operations.execute",
+        "admin.overview.read",
+        "admin.plugins.manage",
+        "audit.organization.read",
+        "installation.recovery.execute",
+        "installation.resources.manage",
+        "installation.trust.manage",
+        "settings.organization.manage"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.admin.overview",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.admin.overview",
+        "apps/web/dist/js/pages/admin.js"
+      ],
+      "implemented_scope": "Administration snapshots and operation status UI exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Bind target server-scoped projection and authority/recent-auth policies; current endpoint presence alone does not establish complete target behavior."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.admin.members",
+      "kind": "route_screen",
+      "label": "Organization members and roles",
+      "canonical_route": "/admin/members",
+      "navigation_group_id": "system",
+      "source_surface_ids": [],
+      "journey_ids": [
+        "journey.administer_and_recover"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "last_owner_protected",
+        "recent_auth_required",
+        "permission_forbidden",
+        "save_error"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.admin.members",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.admin.members",
+        "src/trading/contexts/identity/adapters/inbound/api/routes/organizations.py"
+      ],
+      "implemented_scope": "Membership/role management APIs exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Bind target server-scoped projection and authority/recent-auth policies; current endpoint presence alone does not establish complete target behavior."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.admin.resources",
+      "kind": "route_screen",
+      "label": "Installation resource governance",
+      "canonical_route": "/admin/resources",
+      "navigation_group_id": "system",
+      "source_surface_ids": [],
+      "journey_ids": [
+        "journey.administer_and_recover"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "backtest_budget",
+        "artifact_budget",
+        "admission_profile",
+        "installation_owner_required",
+        "save_error"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.admin.resources",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.admin.resources",
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md"
+      ],
+      "implemented_scope": "No dedicated target behavior is claimed. Installation administration/resource concepts exist; target split budgets need task-level mapping.",
+      "delivery_status": [
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Bind separate artifact/backtest budgets and installation ceilings to actual APIs."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.admin.extensions",
+      "kind": "route_screen",
+      "label": "Extensions and providers",
+      "canonical_route": "/admin/extensions",
+      "navigation_group_id": "system",
+      "source_surface_ids": [],
+      "journey_ids": [
+        "journey.administer_and_recover"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "validation",
+        "install_pending",
+        "rollback_confirmation",
+        "permission_forbidden",
+        "error_retry"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.admin.extensions",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.admin.extensions",
+        "apps/api/routes/extensions.py"
+      ],
+      "implemented_scope": "Plugin administration lifecycle exists.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Bind target server-scoped projection and authority/recent-auth policies; current endpoint presence alone does not establish complete target behavior."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.admin.maintenance",
+      "kind": "route_screen",
+      "label": "Backups, updates and recovery",
+      "canonical_route": "/admin/maintenance",
+      "navigation_group_id": "system",
+      "source_surface_ids": [],
+      "journey_ids": [
+        "journey.administer_and_recover"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "backup_pending",
+        "update_available",
+        "operation_confirmation",
+        "installation_owner_required",
+        "recovery",
+        "rollback"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.admin.maintenance",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.admin.maintenance",
+        "apps/web/dist/js/pages/admin.js"
+      ],
+      "implemented_scope": "Administrative operation status and reconciliation UI exist.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Bind target server-scoped projection and authority/recent-auth policies; current endpoint presence alone does not establish complete target behavior."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.docs.index",
+      "kind": "route_screen",
+      "label": "Versioned local documentation",
+      "canonical_route": "/docs",
+      "navigation_group_id": "system",
+      "source_surface_ids": [],
+      "journey_ids": [
+        "journey.local_documentation"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "search",
+        "empty",
+        "version_unavailable",
+        "not_found"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.docs.index",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.docs.index",
+        "apps/web/main/app.py"
+      ],
+      "implemented_scope": "Local runbooks exist; /docs is currently framework documentation.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Versioned product documentation routing; framework docs migration."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.docs.runbook",
+      "kind": "route_screen",
+      "label": "Role-scoped operator runbook",
+      "canonical_route": "/docs/operator/runbooks/{runbook_id}/",
+      "navigation_group_id": "system",
+      "source_surface_ids": [
+        "platform.docs.legacy_runbook",
+        "platform.docs.canonical_runbook"
+      ],
+      "journey_ids": [
+        "journey.monitor_and_follow_runbook",
+        "journey.local_documentation"
+      ],
+      "required_states": [
+        "loading",
+        "ready",
+        "not_found_404",
+        "permission_forbidden_403",
+        "login_redirect_with_next",
+        "version_unavailable"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.docs.runbook",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.docs.runbook",
+        "apps/web/main/app.py"
+      ],
+      "implemented_scope": "Authenticated legacy runbook route exists.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
+        "Canonical route and server document visibility/403 policy."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.system.error_and_recovery",
+      "kind": "system_state_family",
+      "label": "Cross-surface error and recovery states",
+      "canonical_route": null,
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.system.error_and_recovery_states"
+      ],
+      "journey_ids": [
+        "journey.auth.sign_in_and_continue",
+        "journey.administer_and_recover"
+      ],
+      "required_states": [
+        "not_found_404",
+        "permission_forbidden_403",
+        "identity_unavailable_502",
+        "service_unavailable_503",
+        "proxy_failure_502",
+        "session_expired",
+        "operation_unknown",
+        "retry",
+        "safe_recovery"
+      ],
+      "actions": [
+        "retry",
+        "session_recovery_navigation"
+      ],
+      "capability_refs": [
+        "auth.session.manage"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.system.error_and_recovery",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.system.error_and_recovery",
+        "apps/web/dist/js/core/api.js"
+      ],
+      "implemented_scope": "API error normalization and mutation outcomeUnknown exist; per-action recovery is incomplete.",
+      "delivery_status": [
+        "implemented",
+        "requires_ui"
+      ],
+      "remaining_work": [
+        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only."
+      ],
+      "disposition": "product"
+    },
+    {
+      "screen_id": "screen.qa.plugin_panel_lab",
+      "kind": "qa_only_screen",
+      "label": "Feature-flagged plugin panel laboratory",
+      "canonical_route": "/__qa/plugin-panels",
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.qa.plugin_panel_lab"
+      ],
+      "journey_ids": [],
+      "required_states": [
+        "disabled_404",
+        "loading",
+        "renderer_state",
+        "query_error"
+      ],
+      "actions": [
+        "data_source_query"
+      ],
+      "capability_refs": [
+        "qa.plugin.query"
+      ],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.qa.plugin_panel_lab",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.qa.plugin_panel_lab",
+        "apps/web/main/app.py"
+      ],
+      "implemented_scope": "Protected feature-flagged panel laboratory exists.",
+      "delivery_status": [
+        "implemented"
+      ],
+      "remaining_work": [],
+      "disposition": "qa_only"
+    },
+    {
+      "screen_id": "contract.diagnostics.health",
+      "kind": "non_visual_contract",
+      "label": "Liveness and readiness endpoints",
+      "canonical_route": null,
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.diagnostics.health"
+      ],
+      "journey_ids": [],
+      "required_states": [
+        "live",
+        "ready",
+        "api_unavailable_503"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#contract.diagnostics.health",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#contract.diagnostics.health",
+        "apps/web/main/app.py"
+      ],
+      "implemented_scope": "Live/ready endpoints exist.",
+      "delivery_status": [
+        "implemented"
+      ],
+      "remaining_work": [],
+      "disposition": "nonvisual"
+    },
+    {
+      "screen_id": "contract.integration.api_proxy",
+      "kind": "non_visual_contract",
+      "label": "Same-origin API boundary",
+      "canonical_route": null,
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.integration.api_proxy"
+      ],
+      "journey_ids": [],
+      "required_states": [
+        "proxied",
+        "upstream_error_502"
+      ],
+      "actions": [
+        "method_passthrough"
+      ],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#contract.integration.api_proxy",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#contract.integration.api_proxy",
+        "apps/web/main/app.py"
+      ],
+      "implemented_scope": "Same-origin proxy exists.",
+      "delivery_status": [
+        "implemented"
+      ],
+      "remaining_work": [],
+      "disposition": "nonvisual"
+    },
+    {
+      "screen_id": "contract.delivery.static_assets",
+      "kind": "non_visual_contract",
+      "label": "Static asset delivery",
+      "canonical_route": null,
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.delivery.static_assets"
+      ],
+      "journey_ids": [],
+      "required_states": [
+        "served",
+        "missing_asset_404"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#contract.delivery.static_assets",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#contract.delivery.static_assets",
+        "apps/web/main/app.py"
+      ],
+      "implemented_scope": "Static asset delivery exists.",
+      "delivery_status": [
+        "implemented"
+      ],
+      "remaining_work": [],
+      "disposition": "nonvisual"
+    },
+    {
+      "screen_id": "contract.authorization.target_matrix",
+      "kind": "non_visual_contract",
+      "label": "Server-enforced authorization matrix",
+      "canonical_route": null,
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.target.role_matrix"
+      ],
+      "journey_ids": [],
+      "required_states": [
+        "allowed",
+        "server_filtered",
+        "forbidden",
+        "safe_stop",
+        "recent_reauthentication"
+      ],
+      "actions": [
+        "role_scoped_actions"
+      ],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#contract.authorization.target_matrix",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#contract.authorization.target_matrix",
+        ".codex/tickets/2026-07-20-roehub-authz-capability-kernel.md"
+      ],
+      "implemented_scope": "Capability decision kernel exists; route integration remains separate.",
+      "delivery_status": [
+        "implemented",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Delegation, browser envelope and route integrations remain unfinished."
+      ],
+      "disposition": "nonvisual"
+    },
+    {
+      "screen_id": "contract.framework.api_docs",
+      "kind": "internal_qa_contract",
+      "label": "Framework API documentation",
+      "canonical_route": null,
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.qa.framework_api_docs"
+      ],
+      "journey_ids": [],
+      "required_states": [
+        "disabled_by_default",
+        "development_only",
+        "authenticated_if_enabled"
+      ],
+      "actions": [],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#contract.framework.api_docs",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#contract.framework.api_docs",
+        "apps/web/main/app.py"
+      ],
+      "implemented_scope": "Framework docs currently occupy the product namespace.",
+      "delivery_status": [
+        "implemented",
+        "requires_api"
+      ],
+      "remaining_work": [
+        "Move developer docs to authenticated opt-in internal routes; remove anonymous aliases."
+      ],
+      "disposition": "nonvisual"
+    },
+    {
+      "screen_id": "historical.react_prototype",
+      "kind": "historical_exclusion",
+      "label": "Historical React prototype",
+      "canonical_route": null,
+      "navigation_group_id": null,
+      "source_surface_ids": [
+        "platform.historical.react_prototype"
+      ],
+      "journey_ids": [],
+      "required_states": [],
+      "actions": [
+        "fixture_only"
+      ],
+      "capability_refs": [],
+      "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
+      "source_refs": [
+        "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
+        "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#historical.react_prototype",
+        "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#historical.react_prototype"
+      ],
+      "delivery_status": [],
+      "implemented_scope": "Historical exclusion; no active UI requirement.",
+      "remaining_work": [],
+      "disposition": "historical_only"
+    }
+  ],
+  "journeys": [
+    {
+      "journey_id": "journey.auth.sign_in_and_continue",
+      "entry_screen_id": "screen.auth.login",
+      "terminal_screen_ids": [
+        "screen.dashboard.overview"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.auth.sign_in_and_continue",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.setup.first_launch",
+      "entry_screen_id": "screen.setup.first_launch",
+      "terminal_screen_ids": [
+        "screen.dashboard.overview",
+        "screen.data.catalog"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.setup.first_launch",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.data.select_instruments",
+      "entry_screen_id": "screen.dashboard.overview",
+      "terminal_screen_ids": [
+        "screen.data.catalog"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.data.select_instruments",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.connections.manage_exchange",
+      "entry_screen_id": "screen.connections.workspace",
+      "terminal_screen_ids": [
+        "screen.connections.workspace",
+        "screen.strategies.detail"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.connections.manage_exchange",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.backtests.configure_and_run",
+      "entry_screen_id": "screen.backtests.builder",
+      "terminal_screen_ids": [
+        "screen.backtests.detail"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.backtests.configure_and_run",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.backtests.inspect_and_promote",
+      "entry_screen_id": "screen.backtests.detail",
+      "terminal_screen_ids": [
+        "screen.strategies.detail"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.backtests.inspect_and_promote",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.strategies.create_and_control",
+      "entry_screen_id": "screen.strategies.library",
+      "terminal_screen_ids": [
+        "screen.strategies.detail",
+        "screen.live.workspace"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.strategies.create_and_control",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.live.observe_execution",
+      "entry_screen_id": "screen.live.workspace",
+      "terminal_screen_ids": [
+        "screen.live.workspace",
+        "screen.monitoring.workspace"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.live.observe_execution",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.models.inspect_and_operate",
+      "entry_screen_id": "screen.models.registry",
+      "terminal_screen_ids": [
+        "screen.models.detail"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.models.inspect_and_operate",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.monitor_and_follow_runbook",
+      "entry_screen_id": "screen.monitoring.workspace",
+      "terminal_screen_ids": [
+        "screen.docs.runbook"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.monitor_and_follow_runbook",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.administer_and_recover",
+      "entry_screen_id": "screen.admin.overview",
+      "terminal_screen_ids": [
+        "screen.admin.maintenance",
+        "screen.system.error_and_recovery"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.administer_and_recover",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.local_documentation",
+      "entry_screen_id": "screen.docs.index",
+      "terminal_screen_ids": [
+        "screen.docs.runbook"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.local_documentation",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.data.manage_ingestion_and_coverage",
+      "entry_screen_id": "screen.data.catalog",
+      "terminal_screen_ids": [
+        "screen.data.ingestion",
+        "screen.operations.job_detail"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.data.manage_ingestion_and_coverage",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.artifacts.inspect_and_use",
+      "entry_screen_id": "screen.artifacts.catalog",
+      "terminal_screen_ids": [
+        "screen.artifacts.detail",
+        "screen.backtests.builder",
+        "screen.models.detail"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.artifacts.inspect_and_use",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.jobs.inspect_and_operate",
+      "entry_screen_id": "screen.operations.jobs",
+      "terminal_screen_ids": [
+        "screen.operations.job_detail"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.jobs.inspect_and_operate",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.live.manual_position_control",
+      "entry_screen_id": "screen.strategies.detail",
+      "terminal_screen_ids": [
+        "screen.live.execution_detail",
+        "screen.live.workspace"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.live.manual_position_control",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.live.inspect_and_reconcile",
+      "entry_screen_id": "screen.live.workspace",
+      "terminal_screen_ids": [
+        "screen.live.execution_detail",
+        "screen.monitoring.service_detail"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.live.inspect_and_reconcile",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    },
+    {
+      "journey_id": "journey.monitoring.diagnose_service_or_datastore",
+      "entry_screen_id": "screen.monitoring.workspace",
+      "terminal_screen_ids": [
+        "screen.monitoring.service_detail",
+        "screen.docs.runbook"
+      ],
+      "source_ref": "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#journey.monitoring.diagnose_service_or_datastore",
+      "transition_authority": "Task-specific behavior contract; historical 48d23ad5 graph remains a candidate, not normative."
+    }
+  ],
+  "counts": {
+    "screen_records": 44,
+    "journeys": 18,
+    "source_surfaces": 43
+  }
+}

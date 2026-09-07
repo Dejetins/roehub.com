@@ -194,7 +194,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1057,
+      "file_count": 1065,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -3451,8 +3451,33 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-UI-CONTRACT-DELIVERY-2026-09-08.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-UI-FUNCTIONAL-COVERAGE-2026-09-08.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-UI-NEXT-STEPS-2026-09-08.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "frontend",
       "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/ui-next-steps-2026-09-08/v23-1672.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/ui-next-steps-2026-09-08/v23-820.png"
     },
     {
       "area": "knowledge",
@@ -3993,6 +4018,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/tickets/2026-09-06-repository-hygiene-cleanup.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/tickets/2026-09-08-roehub-backtests-client.md"
     },
     {
       "area": "repository-meta",
@@ -6383,6 +6413,16 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/apps/web/roehub-ui-design-and-delivery-architecture-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/roehub-ui-functional-contract-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/apps/web/roehub-ui-functional-registry-v1.json"
     },
     {
       "area": "knowledge",
@@ -16435,7 +16475,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 2848,
+  "inventory_file_count": 2856,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -16633,5 +16673,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "92a2054554e3c39cac40c7462d616d7c969621ed7d9bcc308529e3a3dad71452"
+  "structural_digest": "8617af148057cbd411741fc3a9332631013435bc883f7af457d4b43b4d624f77"
 }

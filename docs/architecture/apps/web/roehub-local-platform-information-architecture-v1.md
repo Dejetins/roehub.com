@@ -1,5 +1,14 @@
 # Roehub local-platform information architecture v1
 
+Current functional coverage is consolidated in the
+[UI functional contract](roehub-ui-functional-contract-v1.md) and its
+[registry](roehub-ui-functional-registry-v1.json), including the recovered
+ingestion, artifacts, jobs, execution detail/manual control and service-detail
+requirements. This v1 document preserves the baseline IA and security rules;
+its 12-journey/screen subset is not the complete current product scope. The
+functional contract owns additive target navigation; this document and the
+access contract retain existing compatibility and authorization constraints.
+
 ## Status and authority
 
 - Status: `accepted target architecture`.

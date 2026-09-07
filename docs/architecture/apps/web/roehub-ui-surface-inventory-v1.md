@@ -3,6 +3,13 @@
 A traceable inventory of current local-platform surfaces and the separately
 specified public-site target surface map.
 
+This is the preserved 2026-07-20 baseline inventory. The current complete local
+functional coverage and delivery statuses are in the
+[UI functional contract](roehub-ui-functional-contract-v1.md) and
+[functional registry](roehub-ui-functional-registry-v1.json): 44 records,
+43 source surfaces and 18 journeys. The counts below describe the original
+baseline, not the full current implementation backlog.
+
 ## Status and boundary
 
 - Status: `accepted inventory`.
@@ -18,7 +25,7 @@ specified public-site target surface map.
 
 The companion registries are [local platform registry](roehub-ui-surface-registry-v1.json)
 and [public-site registry](roehub-public-site-surface-registry-v1.json). They
-are the complete machine-readable list of surfaces, route patterns, API
+are the baseline machine-readable list of surfaces, route patterns, API
 bindings, roles, mutations, freshness fields, states, gaps, and journeys.
 
 ## Inventory totals

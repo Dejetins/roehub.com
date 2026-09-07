@@ -1,4 +1,5 @@
 {
+  "functional_coverage_ref": "docs/architecture/apps/web/roehub-ui-functional-registry-v1.json",
   "schema_id": "io.roehub.local-platform-screen-registry/v1",
   "registry_id": "roehub-local-platform-screen-registry-v1",
   "status": "accepted_target_architecture",

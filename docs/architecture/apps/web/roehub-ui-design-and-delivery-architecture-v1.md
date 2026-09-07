@@ -79,6 +79,7 @@ packages/
 | Граница | Канонический источник |
 |---|---|
 | Продуктовый результат и platform constraints | `docs/architecture/platform/roehub-product-transformation-requirements-v1.md` |
+| Актуальное функциональное покрытие UI и оставшаяся работа | `roehub-ui-functional-contract-v1.md` и `roehub-ui-functional-registry-v1.json` |
 | Принятая local-platform information architecture | `roehub-local-platform-information-architecture-v1.md` и её machine-readable registries |
 | Роли, capabilities, маршруты и mutation policy | текущий код, API и принятые server contracts |
 | Текущее browser-visible поведение | `apps/web/` и воспроизводимые browser evidence |
@@ -96,6 +97,10 @@ authority только потому, что он хранится в репоз�
 В пределах выбранной задачи используются:
 
 - принятый product baseline;
+- актуальный [функциональный контракт](roehub-ui-functional-contract-v1.md) и
+  [реестр функций](roehub-ui-functional-registry-v1.json), включая восстановленные
+  из истории требования; первая задача —
+  [Backtests client](../../../../.codex/tickets/2026-09-08-roehub-backtests-client.md);
 - local-platform information architecture, screen registry и access/route
   contract;
 - public-site registry, если сайт входит в авторизованный scope;

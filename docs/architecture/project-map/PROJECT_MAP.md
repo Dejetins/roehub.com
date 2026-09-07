@@ -2,7 +2,7 @@
 
 Этот документ — человекочитаемое представление единой карты проекта. Машиночитаемый источник для агентов — `docs/architecture/project-map/project-map.json`, семантический каталог — `docs/architecture/project-map/project-map.toml`, правила использования — `docs/architecture/project-map/AGENT_GUIDE.md`.
 
-Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `92a2054554e3c39cac40c7462d616d7c969621ed7d9bcc308529e3a3dad71452`; учтено файлов: **2848**.
+Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `8617af148057cbd411741fc3a9332631013435bc883f7af457d4b43b4d624f77`; учтено файлов: **2856**.
 
 ## Визуальная runtime-карта
 
@@ -294,7 +294,7 @@ flowchart TB
 | `operations` | Инфраструктура и эксплуатация | Self-hosted Docker Compose, monitoring, конфигурация и миграции данных. | 222 | `infra/`, `configs/`, `migrations/`, `alembic/`, `.github/workflows/` |
 | `automation` | Инструменты и автоматизация | Операторские скрипты, генераторы и CI helpers. | 108 | `tools/`, `scripts/` |
 | `quality` | Проверки и тестовые данные | Unit, integration, notebook и performance-smoke проверки, fixtures и typings. | 427 | `tests/`, `fixtures/`, `typings/` |
-| `knowledge` | Документация и агентные контракты | Архитектура, runbooks, планы, правила агентов и индекс проекта. | 1057 | `docs/`, `.codex/`, `AGENTS.md`, `README.md` |
+| `knowledge` | Документация и агентные контракты | Архитектура, runbooks, планы, правила агентов и индекс проекта. | 1065 | `docs/`, `.codex/`, `AGENTS.md`, `README.md` |
 | `experiments` | Прототипы и локальные результаты | Изолированные прототипы и каталоги воспроизводимых результатов. | 0 | `prototypes/`, `output/`, `local_artifacts/` |
 | `repository-meta` | Корневые контракты репозитория | Build metadata, dependency locks, root configuration and compatibility indexes. | 9 | `.dockerignore`, `.gitignore`, `.python-version`, `LICENSE`, `alembic.ini`, `pyproject.toml`, `pyrightconfig.json`, `repo_tree.md`, `uv.lock` |
 

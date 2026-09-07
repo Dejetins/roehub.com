@@ -1,4 +1,5 @@
 {
+  "functional_coverage_ref": "docs/architecture/apps/web/roehub-ui-functional-registry-v1.json",
   "schema_id": "io.roehub.local-platform-access-and-route-contract/v1",
   "contract_id": "roehub-local-platform-access-and-route-contract-v1",
   "status": "accepted_target_architecture",
