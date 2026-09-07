@@ -252,6 +252,14 @@
     }
   },
   "first_party_assets": {
+    ".codex/delivery/evidence/ui-next-steps-2026-09-08/v23-1672.png": {
+      "license": "Apache-2.0",
+      "sha256": "6d2d017d6c5a5c52358b164c7cfc65c72247fd08f5030cf6701ce2c67c54e468"
+    },
+    ".codex/delivery/evidence/ui-next-steps-2026-09-08/v23-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "45743633fe75233a7d834e7a4534654dac35eabf2656c9418a6065bf06e0019c"
+    },
     "apps/web/dist/favicon.svg": {
       "license": "Apache-2.0",
       "sha256": "08d56b70ff1cad000fa25cbce10cd3de3c63bf172654e3db06c88fe698f86ee9"
