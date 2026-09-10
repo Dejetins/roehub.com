@@ -1,5 +1,7 @@
 # Accepted Backtests UI publication
 
+Pull request: https://github.com/Dejetins/roehub.com/pull/33
+
 Product-owner acceptance: 2026-09-11. Authorized operation: publish the complete
 Backtests implementation through `codex/backtests-ui-accepted`, merge into `main`,
 then delete the technical branch. [Accepted iteration log](../../../docs/architecture/apps/web/backtests-ui-iteration-log.md).
@@ -16,7 +18,8 @@ isolation and artifact hygiene. Its identified compact-spec coverage gap is
 addressed by including `compact-builder.spec.ts` in the standard e2e runner.
 
 Local verification before publication:
-- `ruff check .`: passed.
+- `ruff check .` and repository Pyright: passed.
+- Documentation index/project-map drift checks: passed.
 - Focused web/API/candle/preview-session pytest suites: 98 passed.
 - Current frontend unit suite: 167 passed; typecheck and build passed.
 - Existing real-browser evidence covers the accepted UI, actual-price charts,
