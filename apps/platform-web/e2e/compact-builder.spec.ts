@@ -41,7 +41,8 @@ test('shared axes, compact short-value controls, date-only fields and accessible
       expect(Math.max(...compact.map(b=>b.width))).toBeLessThanOrEqual(100);
       expect(Math.max(...compact.map(b=>b.width))-Math.min(...compact.map(b=>b.width))).toBeLessThan(1);
       expect(dims.boxes.find(b=>b.id==='field-coordinates.symbol')!.width).toBeGreaterThan(compact[0].width);
-      if(width>=1440)expect(dims.axes).toHaveLength(5);
+      // The accepted Jobs column fits three aligned field columns at these desktop widths.
+      if(width>=1440)expect(dims.axes).toHaveLength(3);
       expect(await page.locator('.builder-fields input[type=date]').count()).toBe(2);
       expect(await page.locator('input[type=time],input[type=datetime-local]').count()).toBe(0);
       expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);

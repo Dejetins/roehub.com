@@ -202,7 +202,7 @@ test('controlled stale measurement, dialog keyboard, terminal during dialog, lat
   await page.unroute(`**/api/backtests/jobs/${controlledId}`);
   await page.route(`**/api/backtests/jobs/${controlledId}`,async route=>{started=true;await gate;await route.fulfill({status:200,json:{...controlledJob('succeeded'),request:{...current.request,ui_metadata:{strategy_name:'Late stale job'}}}}).catch(()=>{});});
   await expect.poll(()=>started).toBe(true);
-  await detail(page).getByRole('link',{name:'К библиотеке',exact:true}).click();release();await page.waitForTimeout(500);
+  await page.getByRole('link',{name:'Бэктесты',exact:true}).click();release();await page.waitForTimeout(500);
   expect(await page.getByText('Late stale job',{exact:true}).count()).toBe(0);
 });
 
@@ -210,7 +210,9 @@ test('controlled network failure retains stale measurement and identity outage b
   await controlled(page);let posts=0;page.on('request',r=>{if(r.method()==='POST')posts++;});
   await page.unroute(`**/api/backtests/jobs/${controlledId}`);
   await page.route(`**/api/backtests/jobs/${controlledId}`,route=>route.abort('failed'));
+  await page.locator('details.job-information > summary').click();
   await expect(detail(page).getByText(/Stale snapshot/)).toBeVisible({timeout:10000});
+  await page.locator('details.job-information > summary').click();
   await expect(detail(page).getByRole('progressbar')).toHaveAttribute('value','50');
   await expect(detail(page).getByRole('button',{name:'Cancel backtest',exact:true})).toBeDisabled();
   await page.unroute(`**/api/backtests/jobs/${controlledId}`);
