@@ -43,3 +43,11 @@ disabled` during report-to-saved-strategy navigation. The client shell opted in
 inline while the SSR shell waited for external CSS. The SSR head now declares
 the same opt-in before stylesheets. The real-results e2e retains its no-page-error
 assertion and the complete CSV/save/return/delete journey as regression coverage.
+
+Automated PR review disposition: the suggestion to substitute API `return_pct`
+for monthly account return is not adopted. `build_monthly_stats_read_model` in
+`result_series.py` sums individual trade percentages; that is not return on the
+opening monthly account balance. The accepted UI derives that percentage from
+server-provided cash/P&L, and explicitly shows unavailable when starting cash is
+missing instead of substituting a different statistic. `report-ui.test.tsx` covers
+cross-year balances and the missing-cash case. No invented percentage is shown.
