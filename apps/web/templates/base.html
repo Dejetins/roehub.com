@@ -4,6 +4,8 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="dark light">
+    <!-- Match the client shell before external CSS loads during navigation. -->
+    <style>@view-transition { navigation: auto; }</style>
     <title>{{ page_title }} | Roehub</title>
     <link rel="icon" type="image/svg+xml" href="{{ asset_url('/assets/favicon.svg') }}">
     <link rel="stylesheet" href="{{ asset_url('/assets/css/tokens.css') }}">

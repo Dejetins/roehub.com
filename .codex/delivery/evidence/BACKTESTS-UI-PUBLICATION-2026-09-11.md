@@ -37,3 +37,9 @@ the runtime-input inventory, and added candle coverage to the CI shard matrix.
 Updated browser assertions for the accepted embedded workspace and made the
 disposable session-expiry fault exceed the preview session lifetime. Focused
 release inventory and routing regression suite: 396 passed.
+
+Browser regression found an uncaught `InvalidStateError: ViewTransition opt-in
+disabled` during report-to-saved-strategy navigation. The client shell opted in
+inline while the SSR shell waited for external CSS. The SSR head now declares
+the same opt-in before stylesheets. The real-results e2e retains its no-page-error
+assertion and the complete CSV/save/return/delete journey as regression coverage.
