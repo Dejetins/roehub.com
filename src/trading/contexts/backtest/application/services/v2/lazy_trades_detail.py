@@ -87,6 +87,35 @@ class BacktestLazyTradesDetailService:
     cache: BacktestLazyTradesCache
     config: BacktestLazyTradesDetailConfig = BacktestLazyTradesDetailConfig()
 
+    def price_candles(
+        self, *, job: BacktestJob, max_bars: int, timeframe: str | None = None
+    ) -> dict[str, Any]:
+        """Read price bars from the same pinned artifact as the selected job."""
+        from .result_candles import project_result_candles
+
+        request = dict(job.request_json)
+        try:
+            context = self.prepare_pools.resolve_artifact_context(
+                coordinates=_coordinates_from_request(request),
+                artifact_metadata=_artifact_metadata_from_job(job=job),
+            )
+            prices = self.prepare_pools.artifact_array_loader.load_price_arrays(
+                context=context, timeframe="1m",
+            )
+            period = _mapping(request["time_range"])
+            return project_result_candles(
+                prices=prices, start=str(period["start"]), end=str(period["end"]),
+                max_bars=max_bars, timeframe=timeframe or str(request["timeframe"]),
+            )
+        except RoehubError:
+            raise
+        except Exception as error:
+            raise RoehubError(
+                code="backtest.artifacts_unavailable",
+                message="Pinned price candles are unavailable",
+                details={"job_id": str(job.job_id)},
+            ) from error
+
     def read_cached(
         self,
         *,

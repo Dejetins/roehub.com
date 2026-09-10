@@ -1,0 +1,8 @@
+{
+  "controlled": true,
+  "cancelStatus": 409,
+  "status429RetryAfter": 60,
+  "reads": 2,
+  "posts": 1,
+  "noReadsBeforeDeadline": true
+}

@@ -1,0 +1,73 @@
+{
+  "first": {
+    "jobId": "4ade86c7-10e0-45c0-bdf8-41caa5b75614",
+    "initial": "queued",
+    "terminal": "succeeded",
+    "variants": 1
+  },
+  "second": {
+    "jobId": "135c78dd-a543-4441-8a0b-d5ce82cc8aa5",
+    "initial": "queued",
+    "cancelResponse": "cancelled",
+    "cancelRequested": true,
+    "terminal": "cancelled"
+  },
+  "reads": [
+    {
+      "jobId": "4ade86c7-10e0-45c0-bdf8-41caa5b75614",
+      "state": "queued",
+      "processed": 0,
+      "total": 0
+    },
+    {
+      "jobId": "4ade86c7-10e0-45c0-bdf8-41caa5b75614",
+      "state": "queued",
+      "processed": 0,
+      "total": 0
+    },
+    {
+      "jobId": "4ade86c7-10e0-45c0-bdf8-41caa5b75614",
+      "state": "running",
+      "processed": 0,
+      "total": 1
+    },
+    {
+      "jobId": "4ade86c7-10e0-45c0-bdf8-41caa5b75614",
+      "state": "succeeded",
+      "processed": 1,
+      "total": 1
+    },
+    {
+      "jobId": "4ade86c7-10e0-45c0-bdf8-41caa5b75614",
+      "state": "succeeded",
+      "processed": 1,
+      "total": 1
+    },
+    {
+      "jobId": "135c78dd-a543-4441-8a0b-d5ce82cc8aa5",
+      "state": "queued",
+      "processed": 0,
+      "total": 0
+    }
+  ],
+  "observedWorkerStates": [
+    "queued",
+    "running",
+    "succeeded"
+  ],
+  "queuedSchedulerPaused": true,
+  "uiCancelPosts": 1,
+  "terminalCancelStatus": 200,
+  "reloadAndHistory": true,
+  "errors": [],
+  "http": [],
+  "loginHttp": [
+    {
+      "path": "/api/auth/oidc/status",
+      "status": 404
+    }
+  ],
+  "loginErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

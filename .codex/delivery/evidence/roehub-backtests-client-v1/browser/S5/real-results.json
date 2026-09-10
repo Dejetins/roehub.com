@@ -1,0 +1,237 @@
+{
+  "jobId": "c0eb8779-403b-4697-8063-c7c51022c794",
+  "variant": "job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279",
+  "counts": {
+    "drawdown": 1,
+    "monthly-stats": 1,
+    "symbol-stats": 1,
+    "trades": 1
+  },
+  "csvRows": 1,
+  "csvTruncated": false,
+  "strategyId": "7d8668b3-7ba3-4f56-b33f-f78b9f22a2f8",
+  "lostSavePosts": 1,
+  "lostSaveAcceptedStatus": 200,
+  "lostSaveReloadReplay": false,
+  "lazyTradesPostStatus": 200,
+  "lazyTradesPostInlineRows": 0,
+  "liveCompatibility": "not_launchable",
+  "saveStatus": 201,
+  "bodyless": true,
+  "replayStatus": 200,
+  "duplicateReason": "idempotent_replay",
+  "provenanceReason": "source_variant_exists",
+  "strategyReadStatus": 200,
+  "ssrStrategy": true,
+  "deleteStatus": 204,
+  "activeDeleteConflict": 409,
+  "starts": 0,
+  "errors": [],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 404 (Not Found)",
+    "Failed to load resource: net::ERR_FAILED",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "httpErrors": [
+    {
+      "path": "/api/auth/oidc/status",
+      "status": 404
+    },
+    {
+      "path": "/api/backtests/jobs/a0142b07-4760-4f1f-9cdd-a48b07a9b6a4",
+      "status": 404
+    }
+  ],
+  "network": [
+    {
+      "path": "/api/backtests/runtime-defaults",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/preflight",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/backtests/jobs",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/top",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/compatibility-readiness",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/equity",
+      "method": "GET",
+      "status": 202
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/equity",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/drawdown",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/monthly-stats",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/symbol-stats",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/trades",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/trades.csv",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/compatibility-readiness",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/strategies",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/backtests/jobs",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/top",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/equity",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/summary",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/compatibility-readiness",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794/variants/job_c0eb8779c794__ema_close_w10__risk_none__vh_b39c4279/compatibility-readiness",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/c0eb8779-403b-4697-8063-c7c51022c794",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/runtime-defaults",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/preflight",
+      "method": "POST",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs",
+      "method": "POST",
+      "status": 201
+    },
+    {
+      "path": "/api/backtests/jobs",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/a0142b07-4760-4f1f-9cdd-a48b07a9b6a4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/a0142b07-4760-4f1f-9cdd-a48b07a9b6a4",
+      "method": "GET",
+      "status": 200
+    },
+    {
+      "path": "/api/backtests/jobs/a0142b07-4760-4f1f-9cdd-a48b07a9b6a4",
+      "method": "DELETE",
+      "status": 204
+    },
+    {
+      "path": "/api/backtests/jobs/a0142b07-4760-4f1f-9cdd-a48b07a9b6a4",
+      "method": "GET",
+      "status": 404
+    },
+    {
+      "path": "/api/backtests/jobs",
+      "method": "GET",
+      "status": 200
+    }
+  ]
+}

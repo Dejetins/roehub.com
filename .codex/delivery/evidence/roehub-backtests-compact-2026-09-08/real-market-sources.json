@@ -1,0 +1,16 @@
+{
+  "sources": [
+    {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2026-02.zip",
+      "sha256": "cee2e913ed07e02834e2387c65ca430fe3576f620588bad8a02229238f385407"
+    },
+    {
+      "url": "https://data.binance.vision/data/spot/monthly/klines/BTCUSDT/1m/BTCUSDT-1m-2026-03.zip",
+      "sha256": "a2c1e689d39aa7877e218f436f15162e9a4436778a377d32e9d9b81b081381cd"
+    }
+  ],
+  "rows": 43200,
+  "start": 1772150400000,
+  "end_exclusive": 1774742400000,
+  "missing_minutes": 0
+}

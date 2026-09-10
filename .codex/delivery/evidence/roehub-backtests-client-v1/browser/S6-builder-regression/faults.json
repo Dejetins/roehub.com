@@ -1,0 +1,10 @@
+{
+  "bodyErrorsBlocked": true,
+  "field422Focused": true,
+  "labelOnlyKeepsPreflight": true,
+  "resultEditInvalidates": true,
+  "admission429": 1,
+  "storageFailureBeforePost": true,
+  "unknown503": 1,
+  "automaticRetries": 0
+}

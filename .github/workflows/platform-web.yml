@@ -1,0 +1,70 @@
+name: Platform Web
+
+on:
+  pull_request:
+    paths:
+      - 'apps/platform-web/**'
+      - 'apps/web/**'
+      - 'apps/api/**'
+      - 'apps/worker/backtest_job_runner/**'
+      - 'packages/**'
+      - 'src/trading/contexts/backtest/**'
+      - 'src/trading/contexts/identity/**'
+      - 'configs/test/**'
+      - 'migrations/**'
+      - 'alembic/**'
+      - 'tools/qa/backtests_client_fixture.py'
+      - 'tests/unit/apps/web/**'
+      - 'tests/unit/contexts/backtest/application/services/v2/**'
+      - '*pnpm*'
+      - 'package.json'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.github/workflows/platform-web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  foundation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [foundation-library, builder, compact-builder, execution, results, journey]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24.18.0'
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '11.13.0'
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: '.python-version'
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --locked --all-groups
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @roehub/platform-web typecheck
+      - run: pnpm --filter @roehub/platform-web test
+      - run: pnpm --filter @roehub/platform-web build
+      - run: .venv/bin/python -m pytest -q tests/unit/apps/web/test_web_v2_1_routes.py
+      - run: pnpm --filter @roehub/platform-web exec playwright install --with-deps chromium
+      - name: Browser regression
+        env:
+          SUITE: ${{ matrix.suite }}
+        run: |
+          if [ "$SUITE" = foundation-library ]; then
+            pnpm --filter @roehub/platform-web test:e2e foundation.spec.ts library.spec.ts
+          else
+            pnpm --filter @roehub/platform-web test:e2e "$SUITE.spec.ts"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: platform-web-${{ matrix.suite }}
+          path: .codex/delivery/evidence/roehub-backtests-client-v1/browser/
+          include-hidden-files: true

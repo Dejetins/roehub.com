@@ -32,6 +32,7 @@ from apps.web.main.i18n import (
     resolve_locale,
     translate,
 )
+from apps.web.main.platform_client import DEFAULT_PLATFORM_DIST, load_platform_assets
 from apps.web.main.security import sanitize_next_path
 from apps.web.main.settings import WebRuntimeSettings, resolve_web_runtime_settings
 
@@ -217,6 +218,14 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     templates = Jinja2Templates(directory=str(_TEMPLATES_PATH))
     app = FastAPI(title="Roehub Web", version="1.0.0")
     app.mount("/assets", StaticFiles(directory=str(_DIST_PATH)), name="assets")
+    app.state.platform_assets = None
+    if runtime_settings.backtests_client_enabled:
+        app.state.platform_assets = load_platform_assets(DEFAULT_PLATFORM_DIST)
+        app.mount(
+            "/platform-assets/assets",
+            StaticFiles(directory=str(DEFAULT_PLATFORM_DIST / "assets")),
+            name="platform-assets",
+        )
     app.state.current_user_api_client = HttpxCurrentUserApiClient(
         api_base_url=runtime_settings.api_base_url
     )
@@ -697,7 +706,9 @@ def _render_protected_page(
     api_result = api_client.fetch_current_user(cookie_header=request.headers.get("cookie"))
 
     if api_result.status_code == 401:
-        return _build_login_redirect_response(current_path=request.url.path)
+        return _build_login_redirect_response(
+            current_path=_build_current_browser_path(request=request)
+        )
 
     current_user = api_result.user if api_result.status_code == 200 else None
     error_message = _build_api_error_message(api_result=api_result)
@@ -719,6 +730,14 @@ def _render_protected_page(
         )
     if template_context is not None:
         context.update(template_context)
+    if current_user is not None and active_path == "/backtests":
+        platform_assets = getattr(request.app.state, "platform_assets", None)
+        if platform_assets is not None:
+            template_name = "pages/platform_client.html"
+            context["platform_assets"] = platform_assets
+            context["platform_bootstrap"] = {
+                "locale": context["locale"], "subject": current_user.user_id,
+            }
     response = templates.TemplateResponse(
         request,
         template_name,
@@ -732,7 +751,9 @@ def _render_protected_page(
 def _build_login_redirect_response(*, current_path: str) -> RedirectResponse:
     safe_next_path = sanitize_next_path(raw_next=current_path)
     query = urlencode({"next": safe_next_path})
-    return RedirectResponse(url=f"/login?{query}")
+    return RedirectResponse(
+        url=f"/login?{query}", headers={"Cache-Control": "private, no-store"}
+    )
 
 
 def _build_api_error_message(*, api_result: CurrentUserApiResult) -> str | None:

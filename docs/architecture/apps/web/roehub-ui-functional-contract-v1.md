@@ -8,6 +8,10 @@
   identity, account, release, responsive and deployment specifications.
 - Machine companion: [functional registry](roehub-ui-functional-registry-v1.json).
 - First execution task: [Backtests client](../../../../.codex/tickets/2026-09-08-roehub-backtests-client.md).
+- Local Backtests implementation and T1–T8 proof status:
+  [completion report](../../../../.codex/delivery/evidence/ROEHUB-BACKTESTS-CLIENT-2026-09-08.md).
+  Its bounded own-resource evidence does not accept target roles, default cutover,
+  or the wider platform; registry `requires_ui` / `requires_api` tags remain.
 - This document and its registry own current functional coverage and delivery
   classification. The older v1 inventory/screen registry remain baseline evidence;
   their smaller counts do not limit the current product scope.
@@ -21,6 +25,14 @@ not a source of fictional users, plan tiers, service status, new permissions or
 API behavior. Reuse its visual language while adapting composition to each task.
 The former staged design program remains retired; this contract selects no
 prompt pack, ledger, separate atlas ceremony or mandatory prototype series.
+
+## Accepted Backtests implementation
+
+The current Backtests UI iteration was accepted by the product owner on
+2026-09-11. Its accepted composition, chart behavior and retained limitations
+are recorded in the [iteration log](backtests-ui-iteration-log.md). This is a
+bounded acceptance of the implemented journey, not target-role/default-cutover
+acceptance for the entire platform.
 
 ## Sources and reconciled decisions
 
@@ -73,7 +85,7 @@ screens. The registry contains 44 records, 43 source surfaces and 18 journeys.
 | `/data`, `/data/ingestion` | Catalog/selection, provider segment, history, pinned instruments, coverage, gaps, backfill, freshness and permitted retry | Target UI; snapshot/cursor and ingestion projection/action API |
 | `/artifacts`, `/artifacts/{bundle_id}/{version}` | Search/filter, manifest, provenance, compatibility, storage/quota impact and consumer links | Existing ArtifactStore is reusable; browser catalog/detail API and UI required |
 | Strategies | Library, builder, clone, archive, immutable spec detail, launch profile, run/stop/restart and risk/unknown state | Target UI and role integration; durable editor draft policy needs clarification |
-| Backtests | Configure/preflight, source selection, admission, submit, queue/progress, cancel/delete, results, materialization, trades/CSV and create strategy | Artifact-mode APIs exist; new client needed; broader modes/ETA/target roles remain API work |
+| Backtests | Configure/preflight, source selection, admission, submit, queue/progress, cancel/delete, results, materialization, trades/CSV and create strategy | Opt-in artifact-mode own-resource client implemented with local browser/API evidence; broader modes/ETA/target roles and their UI remain separate work |
 | Models | Model/experiment registry, training, comparison, readiness, promotion and rollback | Dedicated API/UI binding; exact consumer actions need clarification before its task |
 | `/live`, `/live/activity`, `/live/executions/{intent_id}` | Paper/live positions, orders/fills, risk, bounded execution history, source-to-fill chain and reconciliation | Reuse execution domain; target projections and action policy integration |
 | Hosted manual position flow | Open/close, strategy/connection, size or close scope, risk preflight, recent auth, confirmation, result identity | Universal execution path and target UI; no independent trading engine |
@@ -163,6 +175,11 @@ bounded available contract; it cannot claim the deferred capability. Public
 site account/privacy/download/demo work remains in its separate specification.
 
 ## Delivery and compatibility
+
+The user-selected [UI implementation plan](roehub-ui-implementation-plan-v1.md)
+sequences this coverage. Its six-stage Backtests pack decomposes the existing
+ticket while retaining complete-journey acceptance; later blocks remain a
+dependency backlog. Pack entry readiness is tracked separately in its ledger.
 
 Use a ready task for one bounded journey. Specify fields, states, actions,
 API bindings, errors/recovery, owned paths and observable acceptance. Reuse

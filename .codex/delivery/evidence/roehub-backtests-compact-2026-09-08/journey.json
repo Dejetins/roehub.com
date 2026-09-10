@@ -1,0 +1,13 @@
+{
+  "jobId": "8f772c5d-ae42-4e90-be39-34f5123a23e5",
+  "browserTimezone": "America/New_York",
+  "range": {
+    "start": "2026-03-26T00:00:00Z",
+    "end": "2026-03-29T00:00:00Z"
+  },
+  "preflight": 200,
+  "create": 201,
+  "completed": true,
+  "errors": [],
+  "failures": []
+}

@@ -1,0 +1,11 @@
+{
+  "acceptedId": "6e7284c2-5452-481b-bafc-bd0729f20a37",
+  "createRequests": 1,
+  "exactBodyAndKeyRetained": true,
+  "organization": null,
+  "soleOrganizationChanged": true,
+  "newScopeHistoryEmpty": true,
+  "sameSubjectReauthRetained": true,
+  "automaticReplay": false,
+  "logoutCleared": true
+}

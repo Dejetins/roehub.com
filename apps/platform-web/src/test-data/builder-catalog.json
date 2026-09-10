@@ -1,0 +1,389 @@
+{
+  "defaults": {
+    "supported_timeframes": [
+      "15m",
+      "30m",
+      "1h",
+      "2h",
+      "4h",
+      "6h",
+      "8h",
+      "1d",
+      "2d",
+      "3d"
+    ],
+    "risk_modes": [
+      "none",
+      "tp_sl_grid"
+    ],
+    "direction_modes": [
+      "long_only",
+      "short",
+      "long_short_reversal"
+    ],
+    "sizing_modes": [
+      "all_in",
+      "fixed_quote",
+      "fixed_equity_pct",
+      "fixed_equity_pct_min_quote",
+      "fixed_equity_pct_max_quote"
+    ],
+    "ranking_metrics": [
+      "total_return_pct",
+      "total_return_pct_net_of_funding",
+      "max_drawdown_pct",
+      "return_over_max_drawdown",
+      "profit_factor",
+      "sharpe_trades",
+      "win_rate_pct"
+    ],
+    "ranking_default": {
+      "primary_metric": "total_return_pct",
+      "direction": "desc"
+    },
+    "top_n_default": 10,
+    "quality_constraints_default": {
+      "min_closed_trades_policy": "timeframe_sqrt_v1",
+      "base_trades_per_year_at_1h": 24,
+      "min_trades_per_year": 12,
+      "max_trades_per_year": 365
+    },
+    "guardrails": {
+      "max_active_jobs_per_user": 1000000000000,
+      "max_queued_jobs_per_user": 1000000000000,
+      "max_active_jobs_global": 1000000000000,
+      "max_top_n": 50,
+      "max_indicator_arity": 1000000000000,
+      "max_indicator_rows": 1000000000000,
+      "max_candidate_combinations": 10000000000000,
+      "max_tp_sl_cells": 1000000000000,
+      "lazy_trades_rate_limit": "30/10min",
+      "job_queue_timeout_seconds": 300,
+      "job_wall_timeout_seconds": 900,
+      "lazy_trades_timeout_seconds": 30
+    },
+    "execution_defaults": {
+      "direction_mode": "long_short_reversal",
+      "fee_rate": 0.00075,
+      "slippage_rate": 0.0001,
+      "initial_cash_quote": 10000,
+      "sizing": {
+        "mode": "all_in"
+      },
+      "profit_lock": {
+        "enabled": false
+      },
+      "close_on_end": true,
+      "funding": {
+        "mode": "include_when_futures",
+        "coverage_policy": "degraded_with_warning"
+      }
+    },
+    "supported_indicator_ids": [
+      "ma.dema",
+      "ma.ema",
+      "ma.vwma",
+      "momentum.stoch"
+    ],
+    "indicator_sources": {
+      "ma.dema": [
+        "close"
+      ],
+      "ma.ema": [
+        "close"
+      ],
+      "ma.vwma": [],
+      "momentum.stoch": []
+    },
+    "indicator_param_specs": {
+      "ma.dema": {
+        "params": {
+          "window": {
+            "mode": "explicit",
+            "values": [
+              10
+            ]
+          }
+        },
+        "inputs": {
+          "source": {
+            "mode": "explicit",
+            "values": [
+              "close"
+            ]
+          }
+        }
+      },
+      "ma.ema": {
+        "params": {
+          "window": {
+            "mode": "explicit",
+            "values": [
+              10
+            ]
+          }
+        },
+        "inputs": {
+          "source": {
+            "mode": "explicit",
+            "values": [
+              "close"
+            ]
+          }
+        }
+      },
+      "ma.vwma": {
+        "params": {
+          "window": {
+            "mode": "explicit",
+            "values": [
+              10
+            ]
+          }
+        },
+        "inputs": {}
+      },
+      "momentum.stoch": {
+        "params": {
+          "d_window": {
+            "mode": "explicit",
+            "values": [
+              3
+            ]
+          },
+          "k_window": {
+            "mode": "explicit",
+            "values": [
+              14
+            ]
+          },
+          "smoothing": {
+            "mode": "explicit",
+            "values": [
+              3
+            ]
+          }
+        },
+        "inputs": {}
+      }
+    },
+    "hit_times_grid": {
+      "timeframe": "15m",
+      "tp_levels_pct": [
+        1,
+        2
+      ],
+      "sl_levels_pct": [
+        1,
+        2
+      ]
+    },
+    "direction_market_compatibility": {
+      "version": "funding_short_policy_v1",
+      "short_like_direction_modes": [
+        "long_short_reversal",
+        "short"
+      ],
+      "markets": {
+        "spot": {
+          "allowed_direction_modes": [
+            "long_only"
+          ],
+          "rejected_direction_modes": {
+            "short": "short_direction_requires_futures_market",
+            "long_short_reversal": "short_direction_requires_futures_market"
+          },
+          "funding_default": {
+            "mode": "off",
+            "coverage_policy": "degraded_with_warning"
+          }
+        },
+        "futures": {
+          "allowed_direction_modes": [
+            "long_only",
+            "short",
+            "long_short_reversal"
+          ],
+          "rejected_direction_modes": {},
+          "funding_default": {
+            "mode": "include_when_futures",
+            "coverage_policy": "degraded_with_warning"
+          }
+        }
+      }
+    }
+  },
+  "catalog": {
+    "generated_at": "2026-09-07T23:24:35.845068Z",
+    "sources": [
+      {
+        "name": "runtime_defaults",
+        "status": "available",
+        "generated_at": "2026-09-07T23:24:35.845068Z"
+      },
+      {
+        "name": "backtest_jobs",
+        "status": "unavailable",
+        "generated_at": "2026-09-07T23:24:35.845068Z"
+      },
+      {
+        "name": "backtest_job_events",
+        "status": "available",
+        "generated_at": "2026-09-07T23:24:35.845068Z"
+      },
+      {
+        "name": "market_data_reference",
+        "status": "available",
+        "generated_at": "2026-09-07T23:24:35.845068Z"
+      }
+    ],
+    "config_draft": {
+      "coordinates": {
+        "exchange": "binance",
+        "market_type": "spot",
+        "symbol": "BTCUSDT"
+      },
+      "timeframe": "1h",
+      "time_range": {
+        "start": "2023-01-01T00:00:00Z",
+        "end": "2026-03-29T00:00:00Z"
+      },
+      "indicators": [
+        {
+          "indicator_id": "ma.dema",
+          "params": {
+            "window": 10
+          },
+          "sources": [
+            "close"
+          ]
+        }
+      ],
+      "risk": {
+        "mode": "none"
+      },
+      "execution": {
+        "direction_mode": "long_only",
+        "fee_rate": 0.00075,
+        "slippage_rate": 0.0001,
+        "initial_cash_quote": 10000,
+        "sizing": {
+          "mode": "all_in"
+        },
+        "profit_lock": {
+          "enabled": false
+        },
+        "close_on_end": true
+      }
+    },
+    "instrument_universe": {
+      "source": "market_data_reference",
+      "state": "ready",
+      "markets": [
+        {
+          "value": "binance",
+          "label": "Binance",
+          "status": "available"
+        }
+      ],
+      "market_types": [
+        {
+          "value": "spot",
+          "label": "Spot",
+          "status": "available"
+        }
+      ],
+      "symbols": [
+        {
+          "value": "BTCUSDT",
+          "label": "BTCUSDT",
+          "status": "available"
+        }
+      ],
+      "timeframes": [
+        {
+          "value": "15m",
+          "label": "15m",
+          "status": "available"
+        },
+        {
+          "value": "30m",
+          "label": "30m",
+          "status": "available"
+        },
+        {
+          "value": "1h",
+          "label": "1h",
+          "status": "available"
+        },
+        {
+          "value": "2h",
+          "label": "2h",
+          "status": "available"
+        },
+        {
+          "value": "4h",
+          "label": "4h",
+          "status": "available"
+        },
+        {
+          "value": "6h",
+          "label": "6h",
+          "status": "available"
+        },
+        {
+          "value": "8h",
+          "label": "8h",
+          "status": "available"
+        },
+        {
+          "value": "1d",
+          "label": "1d",
+          "status": "available"
+        },
+        {
+          "value": "2d",
+          "label": "2d",
+          "status": "available"
+        },
+        {
+          "value": "3d",
+          "label": "3d",
+          "status": "available"
+        }
+      ],
+      "selected_symbols": [
+        "BTCUSDT"
+      ],
+      "degradation_reason": null
+    },
+    "indicator_catalog": {
+      "source": "runtime_defaults",
+      "state": "ready",
+      "items": [
+        {
+          "indicator_id": "ma.dema",
+          "label": "DEMA",
+          "status": "available"
+        },
+        {
+          "indicator_id": "ma.ema",
+          "label": "EMA",
+          "status": "available"
+        },
+        {
+          "indicator_id": "ma.vwma",
+          "label": "VWMA",
+          "status": "available"
+        },
+        {
+          "indicator_id": "momentum.stoch",
+          "label": "STOCH",
+          "status": "available"
+        }
+      ],
+      "total_combinations_estimate": 144000,
+      "degradation_reason": null
+    }
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "controlled": true,
+  "checks": [
+    {
+      "locale": "en",
+      "width": 820,
+      "axe": 0,
+      "overflow": false
+    },
+    {
+      "locale": "en",
+      "width": 1024,
+      "axe": 0,
+      "overflow": false
+    },
+    {
+      "locale": "en",
+      "width": 1440,
+      "axe": 0,
+      "overflow": false
+    },
+    {
+      "locale": "ru",
+      "width": 820,
+      "axe": 0,
+      "overflow": false
+    },
+    {
+      "locale": "ru",
+      "width": 1024,
+      "axe": 0,
+      "overflow": false
+    },
+    {
+      "locale": "ru",
+      "width": 1440,
+      "axe": 0,
+      "overflow": false
+    }
+  ],
+  "keyboardTrap": true,
+  "dismissRestored": true,
+  "terminalClosedDialog": true
+}

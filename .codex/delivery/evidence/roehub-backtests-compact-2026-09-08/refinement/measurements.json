@@ -1,0 +1,446 @@
+[
+  {
+    "controls": [
+      {
+        "name": "coordinates.exchange",
+        "width": 209.1953125,
+        "x": 321.296875
+      },
+      {
+        "name": "coordinates.market_type",
+        "width": 209.203125,
+        "x": 546.4921875
+      },
+      {
+        "name": "coordinates.symbol",
+        "width": 209.1953125,
+        "x": 771.6953125
+      },
+      {
+        "name": "timeframe",
+        "width": 98,
+        "x": 996.890625
+      },
+      {
+        "name": "time_range.start",
+        "width": 182,
+        "x": 321.296875
+      },
+      {
+        "name": "time_range.end",
+        "width": 182,
+        "x": 546.4921875
+      },
+      {
+        "name": "indicators.0.indicator_id",
+        "width": 209.1953125,
+        "x": 321.296875
+      },
+      {
+        "name": "field-indicators.0.sources",
+        "width": 209.203125,
+        "x": 546.4921875
+      },
+      {
+        "name": "indicators.0.window.start",
+        "width": 98,
+        "x": 771.6953125
+      },
+      {
+        "name": "indicators.0.window.stop",
+        "width": 98,
+        "x": 996.890625
+      },
+      {
+        "name": "indicators.0.window.step",
+        "width": 98,
+        "x": 1222.09375
+      },
+      {
+        "name": "execution.direction_mode",
+        "width": 209.1953125,
+        "x": 321.296875
+      },
+      {
+        "name": "execution.initial_cash_quote",
+        "width": 140,
+        "x": 546.4921875
+      },
+      {
+        "name": "execution.fee_rate",
+        "width": 98,
+        "x": 771.6953125
+      },
+      {
+        "name": "execution.slippage_rate",
+        "width": 98,
+        "x": 996.890625
+      },
+      {
+        "name": "execution.sizing.mode",
+        "width": 209.1953125,
+        "x": 1222.09375
+      },
+      {
+        "name": "risk.mode",
+        "width": 209.1953125,
+        "x": 321.296875
+      },
+      {
+        "name": "ranking.primary_metric",
+        "width": 209.1953125,
+        "x": 321.296875
+      },
+      {
+        "name": "ranking.direction",
+        "width": 209.203125,
+        "x": 546.4921875
+      },
+      {
+        "name": "top_n",
+        "width": 98,
+        "x": 771.6953125
+      }
+    ],
+    "groupPadding": "22px",
+    "panelGap": "16px",
+    "scrollWidth": 1525,
+    "viewport": {
+      "height": 968,
+      "width": 1525
+    }
+  },
+  {
+    "controls": [
+      {
+        "name": "coordinates.exchange",
+        "width": 166,
+        "x": 21
+      },
+      {
+        "name": "coordinates.market_type",
+        "width": 166,
+        "x": 203
+      },
+      {
+        "name": "coordinates.symbol",
+        "width": 166,
+        "x": 21
+      },
+      {
+        "name": "timeframe",
+        "width": 98,
+        "x": 203
+      },
+      {
+        "name": "time_range.start",
+        "width": 166,
+        "x": 21
+      },
+      {
+        "name": "time_range.end",
+        "width": 166,
+        "x": 203
+      },
+      {
+        "name": "indicators.0.indicator_id",
+        "width": 166,
+        "x": 21
+      },
+      {
+        "name": "field-indicators.0.sources",
+        "width": 166,
+        "x": 203
+      },
+      {
+        "name": "indicators.0.window.start",
+        "width": 98,
+        "x": 21
+      },
+      {
+        "name": "indicators.0.window.stop",
+        "width": 98,
+        "x": 203
+      },
+      {
+        "name": "indicators.0.window.step",
+        "width": 98,
+        "x": 21
+      },
+      {
+        "name": "execution.direction_mode",
+        "width": 166,
+        "x": 21
+      },
+      {
+        "name": "execution.initial_cash_quote",
+        "width": 140,
+        "x": 203
+      },
+      {
+        "name": "execution.fee_rate",
+        "width": 98,
+        "x": 21
+      },
+      {
+        "name": "execution.slippage_rate",
+        "width": 98,
+        "x": 203
+      },
+      {
+        "name": "execution.sizing.mode",
+        "width": 166,
+        "x": 21
+      },
+      {
+        "name": "risk.mode",
+        "width": 166,
+        "x": 21
+      },
+      {
+        "name": "ranking.primary_metric",
+        "width": 166,
+        "x": 21
+      },
+      {
+        "name": "ranking.direction",
+        "width": 166,
+        "x": 203
+      },
+      {
+        "name": "top_n",
+        "width": 98,
+        "x": 21
+      }
+    ],
+    "groupPadding": "20px",
+    "panelGap": "16px",
+    "scrollWidth": 390,
+    "viewport": {
+      "height": 844,
+      "width": 390
+    }
+  },
+  {
+    "controls": [
+      {
+        "name": "coordinates.exchange",
+        "width": 232.796875,
+        "x": 260.59375
+      },
+      {
+        "name": "coordinates.market_type",
+        "width": 232.8046875,
+        "x": 509.390625
+      },
+      {
+        "name": "coordinates.symbol",
+        "width": 232.796875,
+        "x": 758.1953125
+      },
+      {
+        "name": "timeframe",
+        "width": 98,
+        "x": 260.59375
+      },
+      {
+        "name": "time_range.start",
+        "width": 182,
+        "x": 260.59375
+      },
+      {
+        "name": "time_range.end",
+        "width": 182,
+        "x": 509.390625
+      },
+      {
+        "name": "indicators.0.indicator_id",
+        "width": 232.796875,
+        "x": 260.59375
+      },
+      {
+        "name": "field-indicators.0.sources",
+        "width": 232.8046875,
+        "x": 509.390625
+      },
+      {
+        "name": "indicators.0.window.start",
+        "width": 98,
+        "x": 758.1953125
+      },
+      {
+        "name": "indicators.0.window.stop",
+        "width": 98,
+        "x": 260.59375
+      },
+      {
+        "name": "indicators.0.window.step",
+        "width": 98,
+        "x": 509.390625
+      },
+      {
+        "name": "execution.direction_mode",
+        "width": 232.796875,
+        "x": 260.59375
+      },
+      {
+        "name": "execution.initial_cash_quote",
+        "width": 140,
+        "x": 509.390625
+      },
+      {
+        "name": "execution.fee_rate",
+        "width": 98,
+        "x": 758.1953125
+      },
+      {
+        "name": "execution.slippage_rate",
+        "width": 98,
+        "x": 260.59375
+      },
+      {
+        "name": "execution.sizing.mode",
+        "width": 232.8046875,
+        "x": 509.390625
+      },
+      {
+        "name": "risk.mode",
+        "width": 232.796875,
+        "x": 260.59375
+      },
+      {
+        "name": "ranking.primary_metric",
+        "width": 232.796875,
+        "x": 260.59375
+      },
+      {
+        "name": "ranking.direction",
+        "width": 232.8046875,
+        "x": 509.390625
+      },
+      {
+        "name": "top_n",
+        "width": 98,
+        "x": 758.1953125
+      }
+    ],
+    "groupPadding": "22px",
+    "panelGap": "16px",
+    "scrollWidth": 1024,
+    "viewport": {
+      "height": 968,
+      "width": 1024
+    }
+  },
+  {
+    "controls": [
+      {
+        "name": "coordinates.exchange",
+        "width": 209.1953125,
+        "x": 321.296875
+      },
+      {
+        "name": "coordinates.market_type",
+        "width": 209.203125,
+        "x": 546.4921875
+      },
+      {
+        "name": "coordinates.symbol",
+        "width": 209.1953125,
+        "x": 771.6953125
+      },
+      {
+        "name": "timeframe",
+        "width": 98,
+        "x": 996.890625
+      },
+      {
+        "name": "time_range.start",
+        "width": 182,
+        "x": 321.296875
+      },
+      {
+        "name": "time_range.end",
+        "width": 182,
+        "x": 546.4921875
+      },
+      {
+        "name": "indicators.0.indicator_id",
+        "width": 209.1953125,
+        "x": 321.296875
+      },
+      {
+        "name": "field-indicators.0.sources",
+        "width": 209.203125,
+        "x": 546.4921875
+      },
+      {
+        "name": "indicators.0.window.start",
+        "width": 98,
+        "x": 771.6953125
+      },
+      {
+        "name": "indicators.0.window.stop",
+        "width": 98,
+        "x": 996.890625
+      },
+      {
+        "name": "indicators.0.window.step",
+        "width": 98,
+        "x": 1222.09375
+      },
+      {
+        "name": "execution.direction_mode",
+        "width": 209.1953125,
+        "x": 321.296875
+      },
+      {
+        "name": "execution.initial_cash_quote",
+        "width": 140,
+        "x": 546.4921875
+      },
+      {
+        "name": "execution.fee_rate",
+        "width": 98,
+        "x": 771.6953125
+      },
+      {
+        "name": "execution.slippage_rate",
+        "width": 98,
+        "x": 996.890625
+      },
+      {
+        "name": "execution.sizing.mode",
+        "width": 209.1953125,
+        "x": 1222.09375
+      },
+      {
+        "name": "risk.mode",
+        "width": 209.1953125,
+        "x": 321.296875
+      },
+      {
+        "name": "ranking.primary_metric",
+        "width": 209.1953125,
+        "x": 321.296875
+      },
+      {
+        "name": "ranking.direction",
+        "width": 209.203125,
+        "x": 546.4921875
+      },
+      {
+        "name": "top_n",
+        "width": 98,
+        "x": 771.6953125
+      }
+    ],
+    "groupPadding": "22px",
+    "panelGap": "16px",
+    "scrollWidth": 1525,
+    "viewport": {
+      "height": 968,
+      "width": 1525
+    }
+  }
+]

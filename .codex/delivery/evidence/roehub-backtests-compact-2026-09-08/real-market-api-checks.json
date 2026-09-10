@@ -1,0 +1,44 @@
+[
+  {
+    "timeframe": "1m",
+    "candles": 43200,
+    "missing_bars": 0,
+    "max_price_tolerance": 0.01
+  },
+  {
+    "timeframe": "5m",
+    "candles": 8640,
+    "missing_bars": 0,
+    "max_price_tolerance": 0.01
+  },
+  {
+    "timeframe": "15m",
+    "candles": 2880,
+    "missing_bars": 0,
+    "max_price_tolerance": 0.01
+  },
+  {
+    "timeframe": "30m",
+    "candles": 1440,
+    "missing_bars": 0,
+    "max_price_tolerance": 0.01
+  },
+  {
+    "timeframe": "1h",
+    "candles": 720,
+    "missing_bars": 0,
+    "max_price_tolerance": 0.01
+  },
+  {
+    "timeframe": "4h",
+    "candles": 180,
+    "missing_bars": 0,
+    "max_price_tolerance": 0.01
+  },
+  {
+    "timeframe": "1d",
+    "candles": 30,
+    "missing_bars": 0,
+    "max_price_tolerance": 0.01
+  }
+]

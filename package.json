@@ -1,0 +1,11 @@
+{
+  "name": "roehub-workspace",
+  "private": true,
+  "packageManager": "pnpm@11.13.0",
+  "engines": { "node": ">=24.18.0 <25" },
+  "scripts": {
+    "typecheck": "pnpm --filter @roehub/platform-web typecheck",
+    "test": "pnpm --filter @roehub/platform-web test",
+    "build": "pnpm --filter @roehub/platform-web build"
+  }
+}

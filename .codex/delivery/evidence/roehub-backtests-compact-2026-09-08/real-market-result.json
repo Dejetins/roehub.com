@@ -1,0 +1,18 @@
+{
+  "job_id": "4299f9ba-c5ad-43e9-b237-59695cf84525",
+  "variant_key": "job_4299f9ba4525__ema_close_w50__risk_tp_sl_grid__tp_1__sl_2__vh_b4392968",
+  "summary_metrics": {
+    "avg_trade_exec_bars": 5.293577981651376,
+    "avg_trade_ret_pct": -0.1387413927280297,
+    "best_sl_pct": 2.0,
+    "best_tp_pct": 1.0,
+    "exposure_pct": 20.03472222222222,
+    "max_drawdown_pct": 14.193119193012734,
+    "profit_factor": 0.5612647726876394,
+    "return_over_max_drawdown": -1.0000000000000002,
+    "sharpe_trades": -8.952931904402401,
+    "total_return_pct": -14.193098247051239,
+    "trade_count": 109.0,
+    "win_rate_pct": 22.018348623853214
+  }
+}

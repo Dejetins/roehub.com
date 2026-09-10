@@ -252,6 +252,1126 @@
     }
   },
   "first_party_assets": {
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2-foundation-regression/foundation-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "d6aeadb26fe30b71507c00605f84447de726583e0c77fbf5556ee490076e5fe3"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2-foundation-regression/foundation-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "62cd4f84f3ff052169c0a4e589ec4f750367c0a5a123cb5eacc7db8c363fcf75"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2-foundation-regression/foundation-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "360ec1e6eb9a1cda517e9ecceee34a3aff8568a472fae47c045bf2b428d335f6"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2-foundation-regression/foundation-ru.png": {
+      "license": "Apache-2.0",
+      "sha256": "acfc59f5ac2aa70b733f2f20e8d4d08027ce104c7cf2ce1a16a2ce0f5c951840"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2-foundation-regression/ssr-rollback.png": {
+      "license": "Apache-2.0",
+      "sha256": "4b4ceeec1cdeb7d0c2b71b23b9a1bf84ad8c40093fe50165b7b2b2c5d7690a69"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/empty.png": {
+      "license": "Apache-2.0",
+      "sha256": "f20093589606d958c9fac909b29f0f6e18becf1030214dc3c748aa707b3a3412"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "d402132993e2b38477f9a588671da4efcda729eb6a1cfcb512658ac078f14e45"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "b80842d472d838d8442cc39112a2333b6d3d0f07e7f7e4e1299410b29a43d31a"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "d2042b7860317217ab7d8c792a6de163ee169097c3bf4da4eaad9bdc5aba13a4"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/en-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "13d6eb71d99ae5c8bbf79f4b6b3f2cf201b7bb89bc309d2b091e53c7146e5f77"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "1920d304338cbeef106f773ed1eeab295d50d047a3a7a557258d4a28de5a0c7a"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/projection-unavailable.png": {
+      "license": "Apache-2.0",
+      "sha256": "bac94b48e509c5199c326615d714b608633eec20ef4ba6a89e076440ef59c18f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "19c2ff1acabf5a5fd7e49bca3527c82669f6bc0ec60804c1bed3145339ec8baa"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "af88cbb611cfb32ea46daa83fae183e4b9bba4ab7edc78828a83ee40176c40ab"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "b957d084223e4e53861961000624f4bb10e15ccef8d3d012cf6709c2cc8a9ae1"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/ru-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "5064a5baa3e4921bb108acfe4ef177855904f5a733aaad5b72329df7d30c32c9"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "b43d536635ff980d3c8604c10a33311eeffe40745f60e5a72021a7ca58ee8496"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-foundation-regression/foundation-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "78460b450da5fa02363df9f4ad7bf032531929dbdefad5aa4f8cda699222b729"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-foundation-regression/foundation-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "8b433d5225569d3f56086cd0fefe4ad191ec3d312d6b7879e46c60025b6cc57f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-foundation-regression/foundation-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "41cd19286619ea5acd2c4f5a7e6a775ed83593706be0893e8da860a18e77683a"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-foundation-regression/foundation-ru.png": {
+      "license": "Apache-2.0",
+      "sha256": "81174049a1552eafacca1ad89618c6bf6dad8014f7a2c14c1a0229c86b08bb47"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-foundation-regression/ssr-rollback.png": {
+      "license": "Apache-2.0",
+      "sha256": "83fda3cdf8a4a5fe2e2e36ade313feca6ac554b576a82f8d267149b5651e3f22"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/empty.png": {
+      "license": "Apache-2.0",
+      "sha256": "57ebe1f237e03d075f02c8e0ed1c959b8858f89032d52e0cc92bac9ca52b5d5e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "4f3d0bea47b3aa53aa87b086771fd4af4791ff44369c044698e68caca9486b8b"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "eeeb822eb25b778ac5c28a097ff7e54b9900e9ffac413e4e6acfd92eb6b1851f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "c5989599e5722dcfc5030f785d9bd1dbcb8ee794c19b69e05baaa49d65b29957"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/en-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "81f0c2cb60ec0774ffcdd13c6ffc4cd46b4eb3e29cea6fe73095359631c63795"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "52ef2852a72d46e0e5ec0e70762b9036ca7a2ef9d4237e8577e8d8bb75e478fe"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/projection-unavailable.png": {
+      "license": "Apache-2.0",
+      "sha256": "e10dd9c843ad9ecbfe44e42ab528c3605574e9cc88b3833978f4006b2e63d92d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "1be63ff9ac4900456e9890f0be77b2c18b59411239592b07bab4db5d0a2ad472"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "d4458a98ec5fbbee90bef009b3aedefb5a9caa7588748f782fa20e523bb3c62b"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "cbd070eb2e861653ad8774bbdde46b3fc13572e6ca0f76cb9c62568cca8d7dcb"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/ru-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "6751b50de6b79df7c558e7f0053e0df9a147d0dcabf83672acfb765057140972"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "b6fbc7fd1421e5ccf5eaf2c0330da763d5a1c0a6771ee824d5104f4b93b19ff3"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/created.png": {
+      "license": "Apache-2.0",
+      "sha256": "bbd7e722bb9fb29ad39dc1ebe3286b3ecaf6daafd99788f4815558989a3a31e7"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "82c8fb58e8f47a0a97ffdfdb28a0d9441eac9121e44fc74e5da480af59791c0e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "8035531b2d1cba584291b5015215f923fe97e3bfe076324331bd371b3922bf0e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "8aad93ab914a86849b4f31a9ff69efee610d80bb2b57c3a9f73961980eab370a"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/en-native-zoom-200-actions.png": {
+      "license": "Apache-2.0",
+      "sha256": "c11d5577b1d576d39e85b25f93b992cd75026786a77329a5adc60650a36d8fdd"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "9bcd05486cb212d9d1d3a2ad11aeba6ee62a38167f37fdfd2aa354b2fabd6b2e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/lost-response-reload.png": {
+      "license": "Apache-2.0",
+      "sha256": "05f52a597382d50f607f431e136474529413d6e32a31abdd03c08161935d2458"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/memory-only-unresolved.png": {
+      "license": "Apache-2.0",
+      "sha256": "e2fc5de00f5fe47211e65849c054159df123be9f4f54b199173f8759588bff38"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/preflight-expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/real-preflight-effective.png": {
+      "license": "Apache-2.0",
+      "sha256": "db2c7c14a6659a2bb9d03940d6dc08de975a1751c6dc56ca3d354eae5a32845d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/real-preflight.png": {
+      "license": "Apache-2.0",
+      "sha256": "2e773c514d5e747c4a592771fd7b25d7cc2a5c69918f5e6af504873e8fc307c2"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "1389449045fbb83924b273581900008ff2140f861c993a12c1ad17ff8e4b9aa8"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "fb064424561ad4e29f532cb269c6001c25fbc1d5faa6611f0a39bfb57f497457"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "09773521f521fa93675593215042c2c276199765ac771a62dfde30f535cfb72d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/ru-native-zoom-200-actions.png": {
+      "license": "Apache-2.0",
+      "sha256": "15b18d3c5170b6a986305ae6bce626d7cd136481d09823fe50bf565bb8b0cfb3"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "990f8ae75e1e929b7f24c3be6ddaca96c8730fe38b32527f9b3a9d38d4ae1ccf"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/created.png": {
+      "license": "Apache-2.0",
+      "sha256": "d9355d5ee1c8668b562410596c0f2864a450f38f7d4b6c077e912f489627a073"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "49074431217d621a8ba0e9d2a113a5c5de24699c29aade8683c07262292eb141"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "391209591c93e83d8fb09dd0b095dc5b9d92cf4f31b7b9a653e19e855ae09c77"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "ee913eaab666c420cc6f1e8909bca6293098abce5ebdddc4de78e5e66c0584e5"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/en-native-zoom-200-actions.png": {
+      "license": "Apache-2.0",
+      "sha256": "54a3a74ba1674c50ac7153f12385b1ef70727bd10e74d3bc5b4ad034d4429178"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "9bcd05486cb212d9d1d3a2ad11aeba6ee62a38167f37fdfd2aa354b2fabd6b2e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/lost-response-reload.png": {
+      "license": "Apache-2.0",
+      "sha256": "c2e4ec236a3e612f00499c33adc4c8b3f99de17f96edb0b2c6186c5724dc5b69"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/memory-only-unresolved.png": {
+      "license": "Apache-2.0",
+      "sha256": "d4a6c36a4fa477e71ec69bc9187bb1e7dc39a190a0c19add898238529ce4486c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/preflight-expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/real-preflight-effective.png": {
+      "license": "Apache-2.0",
+      "sha256": "db2c7c14a6659a2bb9d03940d6dc08de975a1751c6dc56ca3d354eae5a32845d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/real-preflight.png": {
+      "license": "Apache-2.0",
+      "sha256": "4282a10b23647c3b2a171876a40ec7d159257d8acffa7e3d0352746bfc324293"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "394e2cf351261b7278e5cc17d5d979d3cc240caac79c373b595708362defa503"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "f1964c020c0f294d6a1e8ac5541329be954b58fbb3fe4d8724217bc8666cb21e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "e26a5b2a23f2489f874546e1c8033a3870041ed1a3b83ce263041cb2b143390d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/ru-native-zoom-200-actions.png": {
+      "license": "Apache-2.0",
+      "sha256": "134b469b51f4cc8d41e91bd035ce6a2c9323aaa40239858a981c05867e493258"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "990f8ae75e1e929b7f24c3be6ddaca96c8730fe38b32527f9b3a9d38d4ae1ccf"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-foundation-regression/foundation-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "3c9593bfdfaf5b6bac94b72e39d02584fbbec6f0701a9f57a337bea9f5a4440f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-foundation-regression/foundation-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "f95f68f25ba10a37414ebcb107c8b0b7cd98da5c096f832f5ee7b30240a123b0"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-foundation-regression/foundation-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "c99b915cd1e0c6d9fcd38faa5eedc09d3d10bd10276766d90a82c33779f98c6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-foundation-regression/foundation-ru.png": {
+      "license": "Apache-2.0",
+      "sha256": "785240726b6d5563c4f0d0699289ee6df330b2511b6a0b21fc5f0afb8dd8503d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-foundation-regression/ssr-rollback.png": {
+      "license": "Apache-2.0",
+      "sha256": "15da4e2525d5445421c64be11c35c010ee8c5a9d64f600931946d4cb26984617"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/empty.png": {
+      "license": "Apache-2.0",
+      "sha256": "5a0fec170c010cce04795e707c41bd6d82ca30e35b28c27047c13008f4ee917b"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "559be35015dd3adaf885386dfde42cbff7da391429f5d34f8d000c94427c1327"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "d7f058961b8d51f491b85ca2011e0bfa0dbaa6a300587ba40dd2be1a9a46dfe5"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "2ad27cfd7961fa6f4c7c1bb5e5ca02cf8f1b33d1061182ef91e8711d20cdf0e8"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/en-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "a1261d1bd0ae00971ed65a6b3a92ec4f6e1bc5817cf1ad044eb3c01a4c55bd23"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "b2773e6746ccb99405b7d08702cf0a60d4d79899183bed0e970648266951d6a7"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/projection-unavailable.png": {
+      "license": "Apache-2.0",
+      "sha256": "5ea1a5d0284b562202965cf612d98632475137bf1c110159a8c2b672ae821b67"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "1e58c5650807178c28efe123260c522a95a7f718a43bcaa17d121bdf22f7cfbc"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "45cda7ef403841ac5e522a3bb758a701281358f519b850a95b0ebb89a9b2e4e4"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "ebe188010133737184f519168796b38d1391ffb547ecb5cf31760e5a18cf2d03"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/ru-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "5d81ae89a857e796c22d11d0035f277b776df823848c1aa223edb8fd8ce1aaf6"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef11177a1ef5bcc06c4485b64f5cf15822f71bfbc0d2bf491d34b64877c32a30"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/controlled-terminal-race.png": {
+      "license": "Apache-2.0",
+      "sha256": "9bf7717c74d32a9f3dda82ae85c3b03c3657650ca5b429c0e1fd5d7f3cb7723f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/controlled-transport-reload.png": {
+      "license": "Apache-2.0",
+      "sha256": "67b5b0c9fa3cd73711df46fb0df8d01f314fde7ca97e70a90cafb08c187eb8f4"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "58bbd8b1cf14ee5c156e13807a2983aa6f091c5ce08a76add2e5ea170e4d2675"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "125e89cd11fc278b3c1b2d2349e735bb1610ad03cf24202bf2f83593d5dbf0a2"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "22a78d4287dce1a0963277075c7b8763b1d89805618fa8cd3f125dea05fcaef5"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/en-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "c0e4ece6abf40ebfae95e72a495d5ce62efac459a26ade905868149c4224518d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "195f66833d05be5fc1174aaba19322e51fc05ba8b3ddde4cae2712704d0d4134"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/identity-outage.png": {
+      "license": "Apache-2.0",
+      "sha256": "b5347c5c483f03dcf2ee73896dfa2173cc3df2a7db2f0b4ff76811ee10408922"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/real-active.png": {
+      "license": "Apache-2.0",
+      "sha256": "31edd2a4aadb4999c8dca5c6d57950dd01402857e8a089a66d8449a554753897"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/real-cancelled.png": {
+      "license": "Apache-2.0",
+      "sha256": "219d19f885ab76a198694c7448f664a5ccfd8be56d4dfa40461ca4e5170d844b"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/real-completed.png": {
+      "license": "Apache-2.0",
+      "sha256": "47fb128991730ad14d5e1f027aa9784eb3526a02364f05bff982bfc871682d74"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "616ce4334f14848b7ababeb333952939dce48146bdc1276e9b059ae41ca70e7a"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "6a53d3b7b8075fbf35dd981802c9043ee994e3a682459721d696f88edee138e6"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "540c183d5028561df5858aa07580bfa3702c0933bdb0fcd5c9bdd93924fc5dc9"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/ru-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "a73f616dd84a9db8fbfeb5837021f70cc23027a720f67d8b67bf06c935a466aa"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "a138832a384dbdd6832c9f239f5aa97edccc94f3b8e769b74e470325c422cb04"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/session-expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/created.png": {
+      "license": "Apache-2.0",
+      "sha256": "2bbcffc64a3d3962499f2cae6e4fc44ccc4b54d3cfcb9302446a732945b03d7e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "e7e2dd7ea4dc01d151d4d46c067031b0415f5c523e39104e1418ded80a53b759"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "f2a40ecfc050f464cbc0d88f5a4c479bf1b42cb6fb9ec3e92df7796477fc8ffb"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "220bc5bf27e2cf43052a7b52c0f8228d13f5c6d7a7ad7bb74afca8227f3f4d68"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/en-native-zoom-200-actions.png": {
+      "license": "Apache-2.0",
+      "sha256": "b81beed06d83efb8a1437b35e27d8deace7da2546c631695a0e4de5e4e6cfa8d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "9bcd05486cb212d9d1d3a2ad11aeba6ee62a38167f37fdfd2aa354b2fabd6b2e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/lost-response-reload.png": {
+      "license": "Apache-2.0",
+      "sha256": "b8fd77560780a9c527ae2a0649eaa275ed6decb181d55cf2d3c9d7c4e12429e2"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/memory-only-unresolved.png": {
+      "license": "Apache-2.0",
+      "sha256": "3e5406ef35cc9059c3fc04c3a2e041f948effca2074b252ea7c67b314345c0c3"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/preflight-expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/real-preflight-effective.png": {
+      "license": "Apache-2.0",
+      "sha256": "db2c7c14a6659a2bb9d03940d6dc08de975a1751c6dc56ca3d354eae5a32845d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/real-preflight.png": {
+      "license": "Apache-2.0",
+      "sha256": "1d9ec4dd3583146b4e9dc2292f84c296109a16f453b9023a24e6f27c2ad2b2a0"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "e8fa432d255ad4a89fa12b16db35d47aa2a27ba3b7ce169fa19934075c95523c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "88a0b4056a4e4c385f15dce514c455fd6afb65279121546d3a7374ca2700ba61"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "09896ddd1793337d97bc1f41368d0ee1a02daaed471b6fe155913953d6ea8672"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/ru-native-zoom-200-actions.png": {
+      "license": "Apache-2.0",
+      "sha256": "5fab366458d9e56330e6eda336da358973296d6bb078adc5c5ebf4a19a99f572"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "990f8ae75e1e929b7f24c3be6ddaca96c8730fe38b32527f9b3a9d38d4ae1ccf"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/controlled-terminal-race.png": {
+      "license": "Apache-2.0",
+      "sha256": "ccfaea594e9b8baf1288045e02ea22b01fabc10e5b9b1eeac5d1cdede12cbed5"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/controlled-transport-reload.png": {
+      "license": "Apache-2.0",
+      "sha256": "f5880d3fdd2188b31a2de97b1b453f5ede171230b471ff2fc9434f35fe5fb722"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "21c768ab5adb164410b71f56340762fb35dccf29333b62041fd315a54f0c5e57"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "cdfce0009053a40c49503f15b903645bb83c556ba842dc2ca9088dcaa2f63396"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "de504e0dfb707d7cea167b478902c9895803065d854f3ae7bae2e5985bb88a4f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/en-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "d757380e0a1cee60371f3d55651e93b1abeb8471b4f164c7937132656314e800"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "5f65c6685ade4c03535e3141203a97653fc255b193204d05075574bb0e7497c9"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/identity-outage.png": {
+      "license": "Apache-2.0",
+      "sha256": "b5347c5c483f03dcf2ee73896dfa2173cc3df2a7db2f0b4ff76811ee10408922"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/real-active.png": {
+      "license": "Apache-2.0",
+      "sha256": "44bfb2955afc8a85835dd46802838b4b157b54f2018d0ccad4641a12c2540a34"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/real-cancelled.png": {
+      "license": "Apache-2.0",
+      "sha256": "eee20ec3867087a1d8f28702bb2323fb6801badd3312fcab57e9c8ab875e93d8"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/real-completed.png": {
+      "license": "Apache-2.0",
+      "sha256": "ff539a5582417cbb4619fe7572119e2911985a16614cb0fee13a10de96b634e6"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "8e39424a5f88c4ef60327faa6e267936f626be0729a6fb40c571d5a55ae8bbd8"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "14af0c36fce79394b353031d38f66e2c879bdc8cf10b48907ba68a6e96f0aa11"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "73795deeb086a4fee863d0f8587e0dc1faca014de1409fc77ef31287f17dc5a8"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/ru-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "c49473fd2e7f159524fd8631dbb7ad3f890f3a73f7f625eb51b2e0b6fc77ab43"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "b3500413c8829edffecaebeedb0f5617286aedb2cf132b691e629195f32016e9"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/session-expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-foundation-regression/foundation-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "41fbdb8f0358d1ae566cf6df03bb235eaa0c143b6ee572bdfe264662cd5fc27b"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-foundation-regression/foundation-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "9c4540b0ccbea9f13893dc7022bff56bc4f35131a7523792be309a07b37e1454"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-foundation-regression/foundation-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "c99b915cd1e0c6d9fcd38faa5eedc09d3d10bd10276766d90a82c33779f98c6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-foundation-regression/foundation-ru.png": {
+      "license": "Apache-2.0",
+      "sha256": "785240726b6d5563c4f0d0699289ee6df330b2511b6a0b21fc5f0afb8dd8503d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-foundation-regression/ssr-rollback.png": {
+      "license": "Apache-2.0",
+      "sha256": "030e59f6b6b475e06c82fe190ae26a8a417a810bab6ccb7cee0308ef9f2ee54d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/empty.png": {
+      "license": "Apache-2.0",
+      "sha256": "41d874ce1545d22541973429ec21ec8b9ec78db95512455e63997a13cb162b3f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "f6c36338fa2034ca73d465e0104b0e4cfebe25ca72941c9c5585a61489ba5753"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "bb0211c7a5d8750dd48211f9b85c21f137617c8a5e791cca75a6525080f49576"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "df90f0551baa2d3ce1ced94f3aa72478b3938440b8caafdf344e1671de9b6ea9"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/en-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "2ed3823baf0635919a8e724bf3ab216e7cebec4d33b1be97f964197da6ea7288"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "85c3a638a9df31dd5a08f5243e85dd2da4bb32c5a3b309bfde9c7c2099cc37a4"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/projection-unavailable.png": {
+      "license": "Apache-2.0",
+      "sha256": "85ce4e603a74d08f72070419ece06d501248e2f60ccb63a56cadebebeac0c97f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "f9236ae8b2c0757c5b74312da511625b4be9666ef5f871410f36d42ec6b71623"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "1625441f6cba1b8473ab062c6e1ebf5f120b27b39e9b6f86a9cc3d608dd5a18f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "7d464fc20005f5777de5a5a393715c0173ddc2d90759e289acdfc46d9c967844"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/ru-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "9247d66a0147fba59d753260619ed5f16f1e097e0ece57784cca37ff26bcec28"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "b3eec9cea09ec420436aec4f8a769e5c98c71b1ccae2eee6d8a033a76cd3d3b1"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "b70e2d948c644d2e54251a6f41a2b3cad8cbae70d203e9c5bc895293b66fb2f7"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "9d2bbdf398fd7256a69fba4cbbcb7caabd54b20c9bda73f2da7f87e704020f1e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "d3dc402cf0db42d0899a2f63004682049efb5d99f3a8bfd7cb3806232ad017bc"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/en-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "8349a5baf19ed357f11999bee5c1229d3d93dd426d0a8482459772a943936d82"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "45b556d654d9b82ad9e7256706db8f71a7a4ee7cf0da1947046712887b89e4f5"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/real-results.png": {
+      "license": "Apache-2.0",
+      "sha256": "55cebcdc9a60b87447bbae9c34a68b4738733ea318bb90a4ae3ff17d5b953ae0"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "16f1bbbfacee2fe0451b38249c38f1e51baeeabdb0e498bae0800cb951d4c0a8"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "c5ba0e469ceb71a5712dc02a5609d5337455019dbc28c7107cdcfd926254c5bf"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "f9d90a9f9264d6e6b80a9a681a0abf0c00a0f8ada32ec21895aca644d14ba5fb"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/ru-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "cee80ef46e92d67cefba1cd400a0f4e9fb826081a1711a2c79a42e62cf55a659"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "a85055dce204b4f80a96a5a1b6e8494da33d7be8a7b75b42724a9bb7a979a357"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/created.png": {
+      "license": "Apache-2.0",
+      "sha256": "1530557637839eb21fcb1a09ad1d1687151de753fcde740530a6a034840c8e53"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "b890550582497eee0f5cb2555ae7b41692858f9838425521d24692fd2c1ba7a5"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "de7dd919e3a6c8465aa691b26a0c79ef1c1f332960c4d9b82b0246a433f945d2"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "01b7ac5555ec88fcfa163dc8c65aa175b7a31a5d53160c6237c6e8749e66c3c0"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/en-native-zoom-200-actions.png": {
+      "license": "Apache-2.0",
+      "sha256": "70e3160ff588f3e55533176e3acca9dda1ae077b40c1ae3cdc82a085c3eb6088"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "9bcd05486cb212d9d1d3a2ad11aeba6ee62a38167f37fdfd2aa354b2fabd6b2e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/lost-response-reload.png": {
+      "license": "Apache-2.0",
+      "sha256": "e3bd60c7bbb1a556b39c268b2fdecd920d5d79a02d5033b64b8c3c42265993f7"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/memory-only-unresolved.png": {
+      "license": "Apache-2.0",
+      "sha256": "58872f9850f4ac60ab92188c3b102861412ac6da3f3ff30361462a3f3f00aed4"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/preflight-expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/real-preflight-effective.png": {
+      "license": "Apache-2.0",
+      "sha256": "db2c7c14a6659a2bb9d03940d6dc08de975a1751c6dc56ca3d354eae5a32845d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/real-preflight.png": {
+      "license": "Apache-2.0",
+      "sha256": "fa1e1218a348e9bc56b4c9228f317a1bdfddad0545e578c333962ff7ba89da00"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "1e889955c129f94ff8b3359980f439405de12d47fd35896f7f8768ceec339688"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "fcb10af569c7856a617d73400d61c390d9a0b71898dfbf6f322f2077d3b622fe"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "210c7029401b68b62d25366487ccdb1d84d975bd162f625d3e26e503079666ad"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/ru-native-zoom-200-actions.png": {
+      "license": "Apache-2.0",
+      "sha256": "3c6a26e5d20db40860b1573e983b52b85c1c8de0304376d8038a99a28c68478e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "990f8ae75e1e929b7f24c3be6ddaca96c8730fe38b32527f9b3a9d38d4ae1ccf"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/controlled-terminal-race.png": {
+      "license": "Apache-2.0",
+      "sha256": "16bcb0118641a56f078c1df5cb9d863f4df754829710c104b0879c33bd592888"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/controlled-transport-reload.png": {
+      "license": "Apache-2.0",
+      "sha256": "f67b1053edb721291db213a04910992830b643404379545c0ba996dcb0408157"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "1e7e976ff4e944abc3691db84947188d870dc1435368720c061946a33460cf9c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "317b2ef69ca696f6bcf6e2f81f96f6cf2dffc43f24ca34f16619a2fc91c5d260"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "2152ef6e09858a21b04d37e7ddd811c3d41c4115d125da920d49063ebf630a18"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/en-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "0d5e536905517d720f7a959dbe48f7306ed9bd80c55069a567ce3b63a10214cb"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "8bc01fd1c9cfea70ee7539bc3bd8072697d03450d24026e3441bfc6c24e5d107"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/identity-outage.png": {
+      "license": "Apache-2.0",
+      "sha256": "b5347c5c483f03dcf2ee73896dfa2173cc3df2a7db2f0b4ff76811ee10408922"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/real-active.png": {
+      "license": "Apache-2.0",
+      "sha256": "1f103ef6080846c67feed603ad1d1bd438d706ec0938baa9d2648f4c015c15ab"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/real-cancelled.png": {
+      "license": "Apache-2.0",
+      "sha256": "8fbef6d285be57bc5c6f29b15926623c66c2f0c422acd9777529bf873b25e994"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/real-completed.png": {
+      "license": "Apache-2.0",
+      "sha256": "fbb5f52619495b54cb5139f2aceb5a7f13f20ec8779769f08e1935cdf4435cc6"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "8e854bfe39b4170ec602a9734d2d2e5f1ed35d78d9951afdac971ab9461093ac"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "6d4251d4275368eb563c0b1f9bb2082182edbcc37220ac33e82215f3b3ae9107"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "1692a26bbc3d26cd87cd95fc6ee562b5eff6c7b8aaeb5b2daf92723073faaf2b"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/ru-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "e82ddb30b0b83f5b113267aca6742972841ccdc0b50b1140ce228597c87e231b"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "3d9eb32c16b5dc168006beaef4e6b3bc72cc2b987ba3b7a15f9953b8d5a61ce5"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/session-expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-foundation-regression/foundation-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "24a0958bb99bda3979fa536d256fb92b3921c031787b3f3f5ae3dd143b18f568"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-foundation-regression/foundation-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "4501db010cc0a6663b5c4072ac34b1231b2628dd491d3b22ecd8b36bccd66569"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-foundation-regression/foundation-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "c99b915cd1e0c6d9fcd38faa5eedc09d3d10bd10276766d90a82c33779f98c6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-foundation-regression/foundation-ru.png": {
+      "license": "Apache-2.0",
+      "sha256": "785240726b6d5563c4f0d0699289ee6df330b2511b6a0b21fc5f0afb8dd8503d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-foundation-regression/ssr-rollback.png": {
+      "license": "Apache-2.0",
+      "sha256": "91099be168d562579c55181dc83bfdca481eb255b1d4777f29ea31c463014fc6"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/empty.png": {
+      "license": "Apache-2.0",
+      "sha256": "f80827b68a7e14f439cea473e2db4c0dc16fd7eb58cd0c2b100fc9760889157f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "35ab2c894f6c5efb784fc0d9a1a3da3eddf5a248d2b7a0b746dfb25ac76b9936"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "fd24e7dbcef6d1ee47c1065fede642afe17fea02a1c04addd3e364169400d371"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "f697467c74e338582c1af648dab2ffd0f0309e0d7d9406ed9da93f38a549a94f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/en-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "2ed3823baf0635919a8e724bf3ab216e7cebec4d33b1be97f964197da6ea7288"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "9424f643dd8d2d993f6ae5320b4110af5acda876e42203689e05cac212323c9e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/expired.png": {
+      "license": "Apache-2.0",
+      "sha256": "ef0a2cea4156818ee64a551f680e3f3f4eebf02c99d7ae5e8ce5c1fdef9eca6c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/projection-unavailable.png": {
+      "license": "Apache-2.0",
+      "sha256": "13a505648d3267ea3f18350b6afbea72dcd3862ce17f6ad778218926c140417e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "2be85a16d0d97930599d503ff9a05e9fedfddf3833246c82aa5b7ba933090cf3"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "9be80f7ac4b0108907c07affaa561e6ca6ef8eb0d07c94c19c4e2e353b3efa1e"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "d65908dfb599b2f548ce17840ac48a543e14e9d247b664c99e9219fb4c8b8361"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/ru-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "d7ee62d8b609a750b8249593a6f11a91e9f77668628fc94447ad5e0bd865b1d7"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "55f5e02e5e9d03f65ca20a76a535d219f3fc1cb65f6014bf1a8bf45430d3bcd6"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "b4e586cd0274f5d202ee6b8973cf39838bc6d26a682d53771a7bc8f676d630da"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "d148beded2ebbfa38c3ec6e805f9e96174f5e3e221a09f894a26c412a3747cf3"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "04c6f37bad564218d5c44edf51e474b00f7b3be0a5f5eba7720bbbe1a2a9d0d9"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/en-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "a72e6b8046e23eb029023bc810e875f4c731c8aa20b4c833bc59a95f27293489"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "24c8f9e901444e56f5c334e32d8d94b6ea00d209c4b4c21e5b81e29329ca11dd"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/real-results.png": {
+      "license": "Apache-2.0",
+      "sha256": "963f9a1999e8ab7054963d3f3a4cc0e0f423500182665dd2c7f1b613da9800c8"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "63104464cda694a49ac78c15307a56357cdb86648c3751684d7b150daf217019"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "1ef344065bb8048767ab9faa259d6eb5a7b274e68cf6fce79b8dd71716f7a7a6"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "94a3c03b638ca8b8664e27e7d1cb8ae65f311d3ecd9dbf8a9a12726b3bda81c2"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/ru-native-zoom-200-dialog.png": {
+      "license": "Apache-2.0",
+      "sha256": "1894091d98cb514b1955f3508bbb50b2c00685b86250fb32a7bff2400add148c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "669126c2990d41b9e62ec01c83cb1c0b426d78e7a94d000cd6e10aace06a3ffe"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/flag-off-created-job.png": {
+      "license": "Apache-2.0",
+      "sha256": "4fd8b795d542059e46a32d0b8be4a0765bbf589b85f44f0941fc514db72a3eb7"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/flag-off-saved-strategy.png": {
+      "license": "Apache-2.0",
+      "sha256": "123cea07c50ed09b5ff0d88775948587e449d73faf4376ef5fd108e09ac99420"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/integrated-preflight.png": {
+      "license": "Apache-2.0",
+      "sha256": "c399795c015fb81531012cac9715baa423421107ae38b68581f5c32914ae5d00"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/integrated-queued.png": {
+      "license": "Apache-2.0",
+      "sha256": "68bf64596275ee08998036228fbac2cda39fd804f406bfd5e212ccbcd5d6d263"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/integrated-result.png": {
+      "license": "Apache-2.0",
+      "sha256": "8e35eeaaea202e62318bcdc9469359a043ab4891c846dcf273052f51f6946bd6"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/v23-reference.png": {
+      "license": "Apache-2.0",
+      "sha256": "760325956feb4dea01e6ef0ae0ad65a7ef86cac5508b7799e8936f4998fd87b0"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/foundation-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "4f017b8a0e4b1b72554289a3b02e961e2f8b492bdebdf07f6d860b35cefd5ffd"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/foundation-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "a39b9ea6c0fef981f6c3d52905f616fab8a2a73c6a71af250bfd5a45347389f0"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/foundation-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "6d774ab6dba70794b7834c3f753e9419cdf6a334e7cad269e933087f390442e1"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/foundation-ru.png": {
+      "license": "Apache-2.0",
+      "sha256": "5f3ace48e01affd74edbf3fe4455503b126aea8a6656c1c0cb54321dfd84e9e9"
+    },
+    ".codex/delivery/evidence/roehub-backtests-client-v1/browser/ssr-rollback.png": {
+      "license": "Apache-2.0",
+      "sha256": "05a903009b63e7c0fdcf25b230dd125014ce9319b645fa6f3adcb9bd2ce69059"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/completed.png": {
+      "license": "Apache-2.0",
+      "sha256": "f295a37091ef18796c3c9cf4ae09267ee17fbd2928912e06f2f6fbc18ceb7715"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "31b6c9e2aefda9b4b6ff72be674db850700b9d2c7521c15c43e0fdb54fa49005"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "cae9567e144bf40d94901321fbe2ed90e865b7d68f21e04ba74ea4147ab1a6c5"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/en-1672.png": {
+      "license": "Apache-2.0",
+      "sha256": "900283ef89602b9c9be0b6c9a9f50435d9269ddc5cce47035c1d09c87a429ace"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/en-390.png": {
+      "license": "Apache-2.0",
+      "sha256": "9060b004808f6ca42721a39cca13bcc236baf8f6a380a2338fab74c2240afbfa"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "2929184ae6029c88212d2c1dcad5e3078af319dca2f79001abf1c5daca50ed23"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/expanded.png": {
+      "license": "Apache-2.0",
+      "sha256": "0f98663e59c17b116954801728f274824042163cc61397b92bc86df17365087b"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/motion-v11-fullscreen.png": {
+      "license": "Apache-2.0",
+      "sha256": "2d6806e5f2957acbfbe24804c8b4e0bcd2b784e68ced3b342fead15f323c1871"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/overview-fullscreen-desktop.png": {
+      "license": "Apache-2.0",
+      "sha256": "4ec4b914fcc42d0bc6a9a516f106f61f0058852432544b9095a6a6f657e0bac6"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/overview-fullscreen-mobile.png": {
+      "license": "Apache-2.0",
+      "sha256": "3119a0493e8725d758583bb657aad226514e7ff94d6827269fa269241f11e936"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/overview-inline-final.png": {
+      "license": "Apache-2.0",
+      "sha256": "c8b407ec7d53c0f88750d021688d4707bf871d7590d86362964131f3d86f65a9"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/preflight.png": {
+      "license": "Apache-2.0",
+      "sha256": "2a136c44fbd08404f34578e3ca5006024b12a5a41c02b287add66d584ea1db71"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/real-market-15m.png": {
+      "license": "Apache-2.0",
+      "sha256": "081dc471bb8bf032f6af536363c5fcc1553848dc6974f592b60d940aa3f322c2"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/real-market-1h.png": {
+      "license": "Apache-2.0",
+      "sha256": "9fddbf3a970ca448fd421fcc91f7626ec404877a4d50dd9fef9aa55750f5b9e7"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/real-market-1m.png": {
+      "license": "Apache-2.0",
+      "sha256": "ed7d0cd44bf0f329f743b856e6057b832a5585632fb91aa84246538f6f1daac1"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/refinement/desktop-en.png": {
+      "license": "Apache-2.0",
+      "sha256": "7af406780a138b400d480edac779634a9efde437d6f90bb0689c95327cff4c21"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/refinement/desktop-ru.png": {
+      "license": "Apache-2.0",
+      "sha256": "e073575181d109f71a9555166be8a0a77692dc0b400303a05986760628a7fb58"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/refinement/mobile-en.png": {
+      "license": "Apache-2.0",
+      "sha256": "0fd7d966a971e04fd470234b97b83ef868787c97c7e711edfb9674dafe539ade"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/created.png": {
+      "license": "Apache-2.0",
+      "sha256": "49362af2ab3bb66dac65c75125a09c61349935e14c5a8ab49911d0e86bc94f58"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/en-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "aeae77cc47bd2a39ec74084a40c883b152936048ca97797056b65af1989174c4"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/en-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "4f902956bc695e33f54c6c9d248610bd888bd16838e07a566558e2919e5c6c75"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/en-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "491efcd17ead8baa7ae23ff0084f79e5ba4b19460fe204e90c80cf34e74a4e99"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/en-native-zoom-200-actions.png": {
+      "license": "Apache-2.0",
+      "sha256": "1afa08fc38a21ab904dc95e5bab8f91a5aa7f25a12a50027596b3a41b860510d"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/en-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "50e0141d233539ae5b376ce68910774d9e92521b52a22d2bf6be844f5f831587"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/memory-only-unresolved.png": {
+      "license": "Apache-2.0",
+      "sha256": "bb5cd56f8328f40e5381aa8d39df921c505d9b775b6928e76a062f9ff8d98e75"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/real-preflight-effective.png": {
+      "license": "Apache-2.0",
+      "sha256": "66db33f516a777b67de7096b0a5843ed0f9c67a6e4dc5f9b810a3723c6b1f765"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/real-preflight.png": {
+      "license": "Apache-2.0",
+      "sha256": "f290e088977c3d50b8c645b2a7e3090fdb1f46075904fa146aee8a806f8f9079"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "edd9a4f6b6ec6e4cbff331247ae4bfb942baceec94be095c8a5396cd3c935367"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "f35e41e8e9eaa5e452cb9e895aacce814c9775fa35f993e2be876acfee418d2f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "130b8fcd175001a4b297372e29bf042154c5f1a8bfa18e5a54c14b720433facc"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/ru-native-zoom-200-actions.png": {
+      "license": "Apache-2.0",
+      "sha256": "39bc0ba121ecefd878eeea79b85abab630ee04607a11a0188d5686532b4773e7"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/ru-native-zoom-200.png": {
+      "license": "Apache-2.0",
+      "sha256": "b09a24d357ac35c63cb76045c04c31b955d0fecfe734e3fab7333a60be8b7cf9"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/report-hover-zoom.png": {
+      "license": "Apache-2.0",
+      "sha256": "502138bde3594d07d791b72440ab5f66c495607fc422126ec58174ee856dcc3f"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/report-v7-drawdown.png": {
+      "license": "Apache-2.0",
+      "sha256": "a130d12f072a5b1f33881c0eb6f7af1a0720afbfa807e97dc9201c3d2f1d0f85"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/report-v7-monthly.png": {
+      "license": "Apache-2.0",
+      "sha256": "53e38f8283173d1cc5513c1b9de01ce8ce451c61b53c121abb4d18510804d20c"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/report-v7-trade-hover.png": {
+      "license": "Apache-2.0",
+      "sha256": "2999ed2cbe9a6c08fde3c9715e5915719cf3f47425f2d99881838a72ae10a903"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/report-v8-candles.png": {
+      "license": "Apache-2.0",
+      "sha256": "ab6f704941b30f38cd716ff4455d040caa6c9d61ce7a723fc59492dd9d3fa384"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/ru-1024.png": {
+      "license": "Apache-2.0",
+      "sha256": "a0f25ddcbb0e3184d522f6668c0eb1fbb780b5e6aaf2f76528b30c3eaa3a5c83"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/ru-1440.png": {
+      "license": "Apache-2.0",
+      "sha256": "4175883067a7d090835b1c1c46503a95c098444e9b48911e7159f594c0b3a2af"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/ru-1672.png": {
+      "license": "Apache-2.0",
+      "sha256": "bf6641b62ac82382643041bd622d938a5ef82a805ac9d8dce76ecde292374757"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/ru-390.png": {
+      "license": "Apache-2.0",
+      "sha256": "29b9f98494238df642c19d251075902f497eb7222fe560f704eb508c8b78bf30"
+    },
+    ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/ru-820.png": {
+      "license": "Apache-2.0",
+      "sha256": "68f336c388fbfd80915205f8e8ef116509440dc92658ee028d96244df716398b"
+    },
     ".codex/delivery/evidence/ui-next-steps-2026-09-08/v23-1672.png": {
       "license": "Apache-2.0",
       "sha256": "6d2d017d6c5a5c52358b164c7cfc65c72247fd08f5030cf6701ce2c67c54e468"

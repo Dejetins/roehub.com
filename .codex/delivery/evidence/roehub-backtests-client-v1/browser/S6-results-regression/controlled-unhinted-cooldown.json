@@ -1,0 +1,1 @@
+{"controlled":true,"observations":[{"hint":null,"initiallyEnabled":false,"enabledDuringCooldown":false,"reads":2,"intervalMs":5017,"remountCannotBypass":true},{"hint":1,"initiallyEnabled":false,"enabledDuringCooldown":false,"reads":2,"intervalMs":2020,"remountCannotBypass":true}]}
