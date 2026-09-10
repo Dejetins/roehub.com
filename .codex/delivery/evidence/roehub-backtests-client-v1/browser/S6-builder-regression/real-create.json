@@ -1,0 +1,18 @@
+{
+  "jobId": "679c4086-5143-4eca-bdb3-77ac8eeab952",
+  "status": 201,
+  "createRequests": 1,
+  "feeRate": 0.0015,
+  "slippageRate": 0.00025,
+  "labelReplayStatus": 200,
+  "changedRequestStatus": 409,
+  "http": [
+    {
+      "path": "/api/backtests/jobs",
+      "status": 409
+    }
+  ],
+  "errors": [
+    "console error"
+  ]
+}

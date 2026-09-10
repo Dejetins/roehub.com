@@ -1,0 +1,21 @@
+{
+  "nativeZoom": 2,
+  "sizes": [
+    {
+      "locale": "en",
+      "innerWidth": 720,
+      "outerWidth": 1440,
+      "devicePixelRatio": 2,
+      "scrollWidth": 720
+    },
+    {
+      "locale": "ru",
+      "innerWidth": 720,
+      "outerWidth": 1440,
+      "devicePixelRatio": 2,
+      "scrollWidth": 720
+    }
+  ],
+  "axe": 0,
+  "primaryActionsReachable": true
+}

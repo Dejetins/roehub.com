@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Mapping
+from typing import Any, Callable, Literal, Mapping
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response
@@ -167,6 +167,23 @@ class BacktestVariantScenarioMatrixResponse(BaseModel):
     backtest_direction_mode: str
     checked_at: Any
     rows: list[BacktestVariantScenarioMatrixRowResponse]
+
+
+class BacktestPriceCandleResponse(BaseModel):
+    time: str
+    open: float
+    high: float
+    low: float
+    close: float
+
+
+class BacktestPriceCandlesResponse(BaseModel):
+    job_id: UUID
+    variant_key: str
+    timeframe: str
+    source_bars: int
+    group_size: int
+    candles: list[BacktestPriceCandleResponse]
 
 
 def build_backtests_router(
@@ -527,6 +544,23 @@ def build_backtests_router(
         )
         _apply_materialization_status_code(response=response, result=result)
         return build_backtest_lazy_trades_response(result=result)
+
+    @router.get(
+        "/backtests/jobs/{job_id}/variants/{variant_key}/candles",
+        response_model=BacktestPriceCandlesResponse,
+    )
+    def get_backtest_job_variant_candles(
+        job_id: UUID,
+        variant_key: str,
+        max_bars: int = Query(default=6000, ge=100, le=60000),
+        timeframe: Literal["1m", "5m", "15m", "30m", "1h", "4h", "1d"] | None = None,
+        principal: CurrentUserPrincipal = Depends(require_backtest_user),
+        use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
+    ) -> dict[str, Any]:
+        return use_case.variant_candles(
+            user_id=principal.user_id, job_id=job_id,
+            variant_key=variant_key, max_bars=max_bars, timeframe=timeframe,
+        )
 
     @router.get(
         "/backtests/jobs/{job_id}/variants/{variant_key}/equity",

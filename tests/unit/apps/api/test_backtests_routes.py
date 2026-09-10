@@ -2826,3 +2826,38 @@ def _valid_request() -> dict[str, Any]:
         },
         "top_n": 50,
     }
+
+
+def test_candles_validate_membership_and_bounds_before_pinned_price_read():
+    class Prices(_FakeLazyTradesService):
+        reads = 0
+
+        def price_candles(self, *, job, max_bars, timeframe=None):
+            self.reads += 1
+            return {"timeframe": "15m", "source_bars": 1, "group_size": 1,
+                    "candles": [{"time": "2026-01-01T00:00:00Z",
+                                 "open": 10., "high": 12., "low": 9., "close": 11.}]}
+
+    repository = _FakeJobRepository()
+    service = Prices()
+    client = _build_client(jobs_use_case=_build_jobs_use_case(
+        repository=repository, lazy_trades_service=service,
+    ))
+    owner = {"x-user-id": "00000000-0000-0000-0000-000000000251"}
+    created = client.post("/backtests/jobs", headers=owner, json=_valid_request()).json()
+    job_id = created["job_id"]
+    _complete_job(repository=repository, job_id=UUID(job_id))
+    variant = client.get(f"/backtests/jobs/{job_id}/top", headers=owner).json()["items"][0]
+    path = f"/backtests/jobs/{job_id}/variants/{variant['variant_key']}/candles"
+    assert client.get(path).status_code == 401
+    assert client.get(path, headers={
+        "x-user-id": "00000000-0000-0000-0000-000000000252"
+    }).status_code == 403
+    assert client.get(path + "?max_bars=60001", headers=owner).status_code == 422
+    assert client.get(f"/backtests/jobs/{job_id}/variants/unknown/candles",
+                      headers=owner).status_code == 404
+    assert service.reads == 0
+    response = client.get(path, headers=owner)
+    assert response.status_code == 200
+    assert response.json()["candles"][0]["close"] == 11.
+    assert service.reads == 1

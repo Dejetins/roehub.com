@@ -1,0 +1,6 @@
+{
+  "fault": "Real persisted session expiration; direct jobs GET returned 401",
+  "privateContentRemoved": true,
+  "observationMs": 31000,
+  "protectedRequestsAfterExpiry": []
+}

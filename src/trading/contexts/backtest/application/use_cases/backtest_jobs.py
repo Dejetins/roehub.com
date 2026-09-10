@@ -311,6 +311,22 @@ class BacktestJobsUseCase:
             return context
         return context.probe.detail  # type: ignore[return-value]
 
+    def variant_candles(
+        self, *, user_id: UserId, job_id: UUID, variant_key: str, max_bars: int,
+        timeframe: str | None = None
+    ) -> dict[str, Any]:
+        # Resolve both access and variant membership before any artifact read.
+        self.variant(user_id=user_id, job_id=job_id, variant_key=variant_key)
+        job = self._require_visible_job(user_id=user_id, job_id=job_id)
+        if self.lazy_trades_service is None:
+            raise _error(
+                code="backtest.artifacts_unavailable",
+                message="Pinned price candles are unavailable", details={},
+            )
+        return {"job_id": str(job_id), "variant_key": variant_key,
+                **self.lazy_trades_service.price_candles(
+                    job=job, max_bars=max_bars, timeframe=timeframe)}
+
     def variant_series(
         self,
         *,

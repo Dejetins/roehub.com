@@ -1,0 +1,1429 @@
+{
+  "observations": [
+    {
+      "locale": "en",
+      "width": 390,
+      "inner": 390,
+      "scroll": 390,
+      "boxes": [
+        {
+          "id": "field-strategy_name",
+          "x": 17,
+          "y": 383.0625,
+          "width": 172
+        },
+        {
+          "id": "field-coordinates.exchange",
+          "x": 17,
+          "y": 505.609375,
+          "width": 172
+        },
+        {
+          "id": "field-coordinates.market_type",
+          "x": 201,
+          "y": 505.609375,
+          "width": 172
+        },
+        {
+          "id": "field-coordinates.symbol",
+          "x": 17,
+          "y": 585.15625,
+          "width": 172
+        },
+        {
+          "id": "field-timeframe",
+          "x": 201,
+          "y": 585.15625,
+          "width": 172
+        },
+        {
+          "id": "field-time_range.start",
+          "x": 17,
+          "y": 664.703125,
+          "width": 172
+        },
+        {
+          "id": "field-time_range.end",
+          "x": 201,
+          "y": 664.703125,
+          "width": 172
+        },
+        {
+          "id": "field-indicators.0.indicator_id",
+          "x": 17,
+          "y": 814.921875,
+          "width": 172
+        },
+        {
+          "id": "field-indicators.0.sources",
+          "x": 201,
+          "y": 814.921875,
+          "width": 172
+        },
+        {
+          "id": "field-indicators.0.window.start",
+          "x": 17,
+          "y": 894.46875,
+          "width": 172
+        },
+        {
+          "id": "field-indicators.0.window.stop",
+          "x": 201,
+          "y": 894.46875,
+          "width": 172
+        },
+        {
+          "id": "field-indicators.0.window.step",
+          "x": 17,
+          "y": 974.015625,
+          "width": 172
+        },
+        {
+          "id": "field-execution.direction_mode",
+          "x": 17,
+          "y": 1201.5625,
+          "width": 172
+        },
+        {
+          "id": "field-execution.initial_cash_quote",
+          "x": 201,
+          "y": 1201.5625,
+          "width": 172
+        },
+        {
+          "id": "field-execution.fee_rate",
+          "x": 17,
+          "y": 1281.109375,
+          "width": 172
+        },
+        {
+          "id": "field-execution.slippage_rate",
+          "x": 201,
+          "y": 1281.109375,
+          "width": 172
+        },
+        {
+          "id": "field-execution.sizing.mode",
+          "x": 17,
+          "y": 1360.65625,
+          "width": 172
+        },
+        {
+          "id": "field-risk.mode",
+          "x": 17,
+          "y": 1483.203125,
+          "width": 172
+        },
+        {
+          "id": "field-ranking.primary_metric",
+          "x": 17,
+          "y": 1605.75,
+          "width": 172
+        },
+        {
+          "id": "field-ranking.direction",
+          "x": 201,
+          "y": 1605.75,
+          "width": 172
+        },
+        {
+          "id": "field-top_n",
+          "x": 17,
+          "y": 1685.296875,
+          "width": 172
+        }
+      ],
+      "axes": [
+        17,
+        201
+      ],
+      "min": 172,
+      "max": 172,
+      "axe": 0
+    },
+    {
+      "locale": "en",
+      "width": 820,
+      "inner": 820,
+      "scroll": 820,
+      "boxes": [
+        {
+          "id": "field-strategy_name",
+          "x": 227.59375,
+          "y": 188.53125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-coordinates.exchange",
+          "x": 227.59375,
+          "y": 283.078125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-coordinates.market_type",
+          "x": 517.296875,
+          "y": 283.078125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-coordinates.symbol",
+          "x": 227.59375,
+          "y": 362.625,
+          "width": 277.703125
+        },
+        {
+          "id": "field-timeframe",
+          "x": 517.296875,
+          "y": 362.625,
+          "width": 277.703125
+        },
+        {
+          "id": "field-time_range.start",
+          "x": 227.59375,
+          "y": 442.171875,
+          "width": 277.703125
+        },
+        {
+          "id": "field-time_range.end",
+          "x": 517.296875,
+          "y": 442.171875,
+          "width": 277.703125
+        },
+        {
+          "id": "field-indicators.0.indicator_id",
+          "x": 227.59375,
+          "y": 566.390625,
+          "width": 277.703125
+        },
+        {
+          "id": "field-indicators.0.sources",
+          "x": 517.296875,
+          "y": 566.390625,
+          "width": 277.703125
+        },
+        {
+          "id": "field-indicators.0.window.start",
+          "x": 227.59375,
+          "y": 645.9375,
+          "width": 277.703125
+        },
+        {
+          "id": "field-indicators.0.window.stop",
+          "x": 517.296875,
+          "y": 645.9375,
+          "width": 277.703125
+        },
+        {
+          "id": "field-indicators.0.window.step",
+          "x": 227.59375,
+          "y": 725.484375,
+          "width": 277.703125
+        },
+        {
+          "id": "field-execution.direction_mode",
+          "x": 227.59375,
+          "y": 899.03125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-execution.initial_cash_quote",
+          "x": 517.296875,
+          "y": 899.03125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-execution.fee_rate",
+          "x": 227.59375,
+          "y": 978.578125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-execution.slippage_rate",
+          "x": 517.296875,
+          "y": 978.578125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-execution.sizing.mode",
+          "x": 227.59375,
+          "y": 1058.125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-risk.mode",
+          "x": 227.59375,
+          "y": 1154.671875,
+          "width": 277.703125
+        },
+        {
+          "id": "field-ranking.primary_metric",
+          "x": 227.59375,
+          "y": 1251.21875,
+          "width": 277.703125
+        },
+        {
+          "id": "field-ranking.direction",
+          "x": 517.296875,
+          "y": 1251.21875,
+          "width": 277.703125
+        },
+        {
+          "id": "field-top_n",
+          "x": 227.59375,
+          "y": 1330.765625,
+          "width": 277.703125
+        }
+      ],
+      "axes": [
+        228,
+        517
+      ],
+      "min": 277.703125,
+      "max": 277.703125,
+      "axe": 0
+    },
+    {
+      "locale": "en",
+      "width": 1024,
+      "inner": 1024,
+      "scroll": 1024,
+      "boxes": [
+        {
+          "id": "field-strategy_name",
+          "x": 248.59375,
+          "y": 188.53125,
+          "width": 242.125
+        },
+        {
+          "id": "field-coordinates.exchange",
+          "x": 248.59375,
+          "y": 283.078125,
+          "width": 242.125
+        },
+        {
+          "id": "field-coordinates.market_type",
+          "x": 502.71875,
+          "y": 283.078125,
+          "width": 242.140625
+        },
+        {
+          "id": "field-coordinates.symbol",
+          "x": 756.859375,
+          "y": 283.078125,
+          "width": 242.140625
+        },
+        {
+          "id": "field-timeframe",
+          "x": 248.59375,
+          "y": 362.625,
+          "width": 242.125
+        },
+        {
+          "id": "field-time_range.start",
+          "x": 248.59375,
+          "y": 442.171875,
+          "width": 242.125
+        },
+        {
+          "id": "field-time_range.end",
+          "x": 502.71875,
+          "y": 442.171875,
+          "width": 242.140625
+        },
+        {
+          "id": "field-indicators.0.indicator_id",
+          "x": 248.59375,
+          "y": 538.71875,
+          "width": 242.125
+        },
+        {
+          "id": "field-indicators.0.sources",
+          "x": 502.71875,
+          "y": 538.71875,
+          "width": 242.140625
+        },
+        {
+          "id": "field-indicators.0.window.start",
+          "x": 756.859375,
+          "y": 538.71875,
+          "width": 242.140625
+        },
+        {
+          "id": "field-indicators.0.window.stop",
+          "x": 248.59375,
+          "y": 618.265625,
+          "width": 242.125
+        },
+        {
+          "id": "field-indicators.0.window.step",
+          "x": 502.71875,
+          "y": 618.265625,
+          "width": 242.140625
+        },
+        {
+          "id": "field-execution.direction_mode",
+          "x": 248.59375,
+          "y": 791.8125,
+          "width": 242.125
+        },
+        {
+          "id": "field-execution.initial_cash_quote",
+          "x": 502.71875,
+          "y": 791.8125,
+          "width": 242.140625
+        },
+        {
+          "id": "field-execution.fee_rate",
+          "x": 756.859375,
+          "y": 791.8125,
+          "width": 242.140625
+        },
+        {
+          "id": "field-execution.slippage_rate",
+          "x": 248.59375,
+          "y": 871.359375,
+          "width": 242.125
+        },
+        {
+          "id": "field-execution.sizing.mode",
+          "x": 502.71875,
+          "y": 871.359375,
+          "width": 242.140625
+        },
+        {
+          "id": "field-risk.mode",
+          "x": 248.59375,
+          "y": 967.90625,
+          "width": 242.125
+        },
+        {
+          "id": "field-ranking.primary_metric",
+          "x": 248.59375,
+          "y": 1064.453125,
+          "width": 242.125
+        },
+        {
+          "id": "field-ranking.direction",
+          "x": 502.71875,
+          "y": 1064.453125,
+          "width": 242.140625
+        },
+        {
+          "id": "field-top_n",
+          "x": 756.859375,
+          "y": 1064.453125,
+          "width": 242.140625
+        }
+      ],
+      "axes": [
+        249,
+        503,
+        757
+      ],
+      "min": 242.125,
+      "max": 242.140625,
+      "axe": 0
+    },
+    {
+      "locale": "en",
+      "width": 1440,
+      "inner": 1440,
+      "scroll": 1440,
+      "boxes": [
+        {
+          "id": "field-strategy_name",
+          "x": 266.796875,
+          "y": 174.265625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-coordinates.exchange",
+          "x": 266.796875,
+          "y": 254.546875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-coordinates.market_type",
+          "x": 495.1875,
+          "y": 254.546875,
+          "width": 216.40625
+        },
+        {
+          "id": "field-coordinates.symbol",
+          "x": 723.59375,
+          "y": 254.546875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-timeframe",
+          "x": 951.984375,
+          "y": 254.546875,
+          "width": 216.40625
+        },
+        {
+          "id": "field-time_range.start",
+          "x": 266.796875,
+          "y": 319.828125,
+          "width": 216.390625
+        },
+        {
+          "id": "field-time_range.end",
+          "x": 495.1875,
+          "y": 319.828125,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.indicator_id",
+          "x": 266.796875,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-indicators.0.sources",
+          "x": 495.1875,
+          "y": 402.109375,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.window.start",
+          "x": 723.59375,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-indicators.0.window.stop",
+          "x": 951.984375,
+          "y": 402.109375,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.window.step",
+          "x": 1180.390625,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.direction_mode",
+          "x": 266.796875,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.initial_cash_quote",
+          "x": 495.1875,
+          "y": 561.390625,
+          "width": 216.40625
+        },
+        {
+          "id": "field-execution.fee_rate",
+          "x": 723.59375,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.slippage_rate",
+          "x": 951.984375,
+          "y": 561.390625,
+          "width": 216.40625
+        },
+        {
+          "id": "field-execution.sizing.mode",
+          "x": 1180.390625,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-risk.mode",
+          "x": 266.796875,
+          "y": 643.671875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-ranking.primary_metric",
+          "x": 266.796875,
+          "y": 725.953125,
+          "width": 216.390625
+        },
+        {
+          "id": "field-ranking.direction",
+          "x": 495.1875,
+          "y": 725.953125,
+          "width": 216.40625
+        },
+        {
+          "id": "field-top_n",
+          "x": 723.59375,
+          "y": 725.953125,
+          "width": 216.390625
+        }
+      ],
+      "axes": [
+        267,
+        495,
+        724,
+        952,
+        1180
+      ],
+      "min": 216.390625,
+      "max": 216.40625,
+      "axe": 0
+    },
+    {
+      "locale": "en",
+      "width": 1672,
+      "inner": 1672,
+      "scroll": 1672,
+      "boxes": [
+        {
+          "id": "field-strategy_name",
+          "x": 382.796875,
+          "y": 174.265625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-coordinates.exchange",
+          "x": 382.796875,
+          "y": 254.546875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-coordinates.market_type",
+          "x": 611.1875,
+          "y": 254.546875,
+          "width": 216.40625
+        },
+        {
+          "id": "field-coordinates.symbol",
+          "x": 839.59375,
+          "y": 254.546875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-timeframe",
+          "x": 1067.984375,
+          "y": 254.546875,
+          "width": 216.40625
+        },
+        {
+          "id": "field-time_range.start",
+          "x": 382.796875,
+          "y": 319.828125,
+          "width": 216.390625
+        },
+        {
+          "id": "field-time_range.end",
+          "x": 611.1875,
+          "y": 319.828125,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.indicator_id",
+          "x": 382.796875,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-indicators.0.sources",
+          "x": 611.1875,
+          "y": 402.109375,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.window.start",
+          "x": 839.59375,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-indicators.0.window.stop",
+          "x": 1067.984375,
+          "y": 402.109375,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.window.step",
+          "x": 1296.390625,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.direction_mode",
+          "x": 382.796875,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.initial_cash_quote",
+          "x": 611.1875,
+          "y": 561.390625,
+          "width": 216.40625
+        },
+        {
+          "id": "field-execution.fee_rate",
+          "x": 839.59375,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.slippage_rate",
+          "x": 1067.984375,
+          "y": 561.390625,
+          "width": 216.40625
+        },
+        {
+          "id": "field-execution.sizing.mode",
+          "x": 1296.390625,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-risk.mode",
+          "x": 382.796875,
+          "y": 643.671875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-ranking.primary_metric",
+          "x": 382.796875,
+          "y": 725.953125,
+          "width": 216.390625
+        },
+        {
+          "id": "field-ranking.direction",
+          "x": 611.1875,
+          "y": 725.953125,
+          "width": 216.40625
+        },
+        {
+          "id": "field-top_n",
+          "x": 839.59375,
+          "y": 725.953125,
+          "width": 216.390625
+        }
+      ],
+      "axes": [
+        383,
+        611,
+        840,
+        1068,
+        1296
+      ],
+      "min": 216.390625,
+      "max": 216.40625,
+      "axe": 0
+    },
+    {
+      "locale": "ru",
+      "width": 390,
+      "inner": 390,
+      "scroll": 390,
+      "boxes": [
+        {
+          "id": "field-strategy_name",
+          "x": 17,
+          "y": 383.078125,
+          "width": 172
+        },
+        {
+          "id": "field-coordinates.exchange",
+          "x": 17,
+          "y": 505.625,
+          "width": 172
+        },
+        {
+          "id": "field-coordinates.market_type",
+          "x": 201,
+          "y": 505.625,
+          "width": 172
+        },
+        {
+          "id": "field-coordinates.symbol",
+          "x": 17,
+          "y": 585.171875,
+          "width": 172
+        },
+        {
+          "id": "field-timeframe",
+          "x": 201,
+          "y": 585.171875,
+          "width": 172
+        },
+        {
+          "id": "field-time_range.start",
+          "x": 17,
+          "y": 664.71875,
+          "width": 172
+        },
+        {
+          "id": "field-time_range.end",
+          "x": 201,
+          "y": 664.71875,
+          "width": 172
+        },
+        {
+          "id": "field-indicators.0.indicator_id",
+          "x": 17,
+          "y": 814.9375,
+          "width": 172
+        },
+        {
+          "id": "field-indicators.0.sources",
+          "x": 201,
+          "y": 814.9375,
+          "width": 172
+        },
+        {
+          "id": "field-indicators.0.window.start",
+          "x": 17,
+          "y": 894.484375,
+          "width": 172
+        },
+        {
+          "id": "field-indicators.0.window.stop",
+          "x": 201,
+          "y": 894.484375,
+          "width": 172
+        },
+        {
+          "id": "field-indicators.0.window.step",
+          "x": 17,
+          "y": 974.03125,
+          "width": 172
+        },
+        {
+          "id": "field-execution.direction_mode",
+          "x": 17,
+          "y": 1201.578125,
+          "width": 172
+        },
+        {
+          "id": "field-execution.initial_cash_quote",
+          "x": 201,
+          "y": 1201.578125,
+          "width": 172
+        },
+        {
+          "id": "field-execution.fee_rate",
+          "x": 17,
+          "y": 1281.125,
+          "width": 172
+        },
+        {
+          "id": "field-execution.slippage_rate",
+          "x": 201,
+          "y": 1281.125,
+          "width": 172
+        },
+        {
+          "id": "field-execution.sizing.mode",
+          "x": 17,
+          "y": 1360.671875,
+          "width": 172
+        },
+        {
+          "id": "field-risk.mode",
+          "x": 17,
+          "y": 1483.21875,
+          "width": 172
+        },
+        {
+          "id": "field-ranking.primary_metric",
+          "x": 17,
+          "y": 1605.765625,
+          "width": 172
+        },
+        {
+          "id": "field-ranking.direction",
+          "x": 201,
+          "y": 1605.765625,
+          "width": 172
+        },
+        {
+          "id": "field-top_n",
+          "x": 17,
+          "y": 1685.3125,
+          "width": 172
+        }
+      ],
+      "axes": [
+        17,
+        201
+      ],
+      "min": 172,
+      "max": 172,
+      "axe": 0
+    },
+    {
+      "locale": "ru",
+      "width": 820,
+      "inner": 820,
+      "scroll": 820,
+      "boxes": [
+        {
+          "id": "field-strategy_name",
+          "x": 227.59375,
+          "y": 188.53125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-coordinates.exchange",
+          "x": 227.59375,
+          "y": 283.078125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-coordinates.market_type",
+          "x": 517.296875,
+          "y": 283.078125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-coordinates.symbol",
+          "x": 227.59375,
+          "y": 362.625,
+          "width": 277.703125
+        },
+        {
+          "id": "field-timeframe",
+          "x": 517.296875,
+          "y": 362.625,
+          "width": 277.703125
+        },
+        {
+          "id": "field-time_range.start",
+          "x": 227.59375,
+          "y": 442.171875,
+          "width": 277.703125
+        },
+        {
+          "id": "field-time_range.end",
+          "x": 517.296875,
+          "y": 442.171875,
+          "width": 277.703125
+        },
+        {
+          "id": "field-indicators.0.indicator_id",
+          "x": 227.59375,
+          "y": 566.390625,
+          "width": 277.703125
+        },
+        {
+          "id": "field-indicators.0.sources",
+          "x": 517.296875,
+          "y": 566.390625,
+          "width": 277.703125
+        },
+        {
+          "id": "field-indicators.0.window.start",
+          "x": 227.59375,
+          "y": 645.9375,
+          "width": 277.703125
+        },
+        {
+          "id": "field-indicators.0.window.stop",
+          "x": 517.296875,
+          "y": 645.9375,
+          "width": 277.703125
+        },
+        {
+          "id": "field-indicators.0.window.step",
+          "x": 227.59375,
+          "y": 725.484375,
+          "width": 277.703125
+        },
+        {
+          "id": "field-execution.direction_mode",
+          "x": 227.59375,
+          "y": 899.03125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-execution.initial_cash_quote",
+          "x": 517.296875,
+          "y": 899.03125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-execution.fee_rate",
+          "x": 227.59375,
+          "y": 978.578125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-execution.slippage_rate",
+          "x": 517.296875,
+          "y": 978.578125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-execution.sizing.mode",
+          "x": 227.59375,
+          "y": 1058.125,
+          "width": 277.703125
+        },
+        {
+          "id": "field-risk.mode",
+          "x": 227.59375,
+          "y": 1154.671875,
+          "width": 277.703125
+        },
+        {
+          "id": "field-ranking.primary_metric",
+          "x": 227.59375,
+          "y": 1251.21875,
+          "width": 277.703125
+        },
+        {
+          "id": "field-ranking.direction",
+          "x": 517.296875,
+          "y": 1251.21875,
+          "width": 277.703125
+        },
+        {
+          "id": "field-top_n",
+          "x": 227.59375,
+          "y": 1330.765625,
+          "width": 277.703125
+        }
+      ],
+      "axes": [
+        228,
+        517
+      ],
+      "min": 277.703125,
+      "max": 277.703125,
+      "axe": 0
+    },
+    {
+      "locale": "ru",
+      "width": 1024,
+      "inner": 1024,
+      "scroll": 1024,
+      "boxes": [
+        {
+          "id": "field-strategy_name",
+          "x": 248.59375,
+          "y": 188.53125,
+          "width": 242.125
+        },
+        {
+          "id": "field-coordinates.exchange",
+          "x": 248.59375,
+          "y": 283.078125,
+          "width": 242.125
+        },
+        {
+          "id": "field-coordinates.market_type",
+          "x": 502.71875,
+          "y": 283.078125,
+          "width": 242.140625
+        },
+        {
+          "id": "field-coordinates.symbol",
+          "x": 756.859375,
+          "y": 283.078125,
+          "width": 242.140625
+        },
+        {
+          "id": "field-timeframe",
+          "x": 248.59375,
+          "y": 362.625,
+          "width": 242.125
+        },
+        {
+          "id": "field-time_range.start",
+          "x": 248.59375,
+          "y": 442.171875,
+          "width": 242.125
+        },
+        {
+          "id": "field-time_range.end",
+          "x": 502.71875,
+          "y": 442.171875,
+          "width": 242.140625
+        },
+        {
+          "id": "field-indicators.0.indicator_id",
+          "x": 248.59375,
+          "y": 538.71875,
+          "width": 242.125
+        },
+        {
+          "id": "field-indicators.0.sources",
+          "x": 502.71875,
+          "y": 538.71875,
+          "width": 242.140625
+        },
+        {
+          "id": "field-indicators.0.window.start",
+          "x": 756.859375,
+          "y": 538.71875,
+          "width": 242.140625
+        },
+        {
+          "id": "field-indicators.0.window.stop",
+          "x": 248.59375,
+          "y": 618.265625,
+          "width": 242.125
+        },
+        {
+          "id": "field-indicators.0.window.step",
+          "x": 502.71875,
+          "y": 618.265625,
+          "width": 242.140625
+        },
+        {
+          "id": "field-execution.direction_mode",
+          "x": 248.59375,
+          "y": 791.8125,
+          "width": 242.125
+        },
+        {
+          "id": "field-execution.initial_cash_quote",
+          "x": 502.71875,
+          "y": 791.8125,
+          "width": 242.140625
+        },
+        {
+          "id": "field-execution.fee_rate",
+          "x": 756.859375,
+          "y": 791.8125,
+          "width": 242.140625
+        },
+        {
+          "id": "field-execution.slippage_rate",
+          "x": 248.59375,
+          "y": 871.359375,
+          "width": 242.125
+        },
+        {
+          "id": "field-execution.sizing.mode",
+          "x": 502.71875,
+          "y": 871.359375,
+          "width": 242.140625
+        },
+        {
+          "id": "field-risk.mode",
+          "x": 248.59375,
+          "y": 967.90625,
+          "width": 242.125
+        },
+        {
+          "id": "field-ranking.primary_metric",
+          "x": 248.59375,
+          "y": 1064.453125,
+          "width": 242.125
+        },
+        {
+          "id": "field-ranking.direction",
+          "x": 502.71875,
+          "y": 1064.453125,
+          "width": 242.140625
+        },
+        {
+          "id": "field-top_n",
+          "x": 756.859375,
+          "y": 1064.453125,
+          "width": 242.140625
+        }
+      ],
+      "axes": [
+        249,
+        503,
+        757
+      ],
+      "min": 242.125,
+      "max": 242.140625,
+      "axe": 0
+    },
+    {
+      "locale": "ru",
+      "width": 1440,
+      "inner": 1440,
+      "scroll": 1440,
+      "boxes": [
+        {
+          "id": "field-strategy_name",
+          "x": 266.796875,
+          "y": 174.265625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-coordinates.exchange",
+          "x": 266.796875,
+          "y": 254.546875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-coordinates.market_type",
+          "x": 495.1875,
+          "y": 254.546875,
+          "width": 216.40625
+        },
+        {
+          "id": "field-coordinates.symbol",
+          "x": 723.59375,
+          "y": 254.546875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-timeframe",
+          "x": 951.984375,
+          "y": 254.546875,
+          "width": 216.40625
+        },
+        {
+          "id": "field-time_range.start",
+          "x": 266.796875,
+          "y": 319.828125,
+          "width": 216.390625
+        },
+        {
+          "id": "field-time_range.end",
+          "x": 495.1875,
+          "y": 319.828125,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.indicator_id",
+          "x": 266.796875,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-indicators.0.sources",
+          "x": 495.1875,
+          "y": 402.109375,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.window.start",
+          "x": 723.59375,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-indicators.0.window.stop",
+          "x": 951.984375,
+          "y": 402.109375,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.window.step",
+          "x": 1180.390625,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.direction_mode",
+          "x": 266.796875,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.initial_cash_quote",
+          "x": 495.1875,
+          "y": 561.390625,
+          "width": 216.40625
+        },
+        {
+          "id": "field-execution.fee_rate",
+          "x": 723.59375,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.slippage_rate",
+          "x": 951.984375,
+          "y": 561.390625,
+          "width": 216.40625
+        },
+        {
+          "id": "field-execution.sizing.mode",
+          "x": 1180.390625,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-risk.mode",
+          "x": 266.796875,
+          "y": 643.671875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-ranking.primary_metric",
+          "x": 266.796875,
+          "y": 725.953125,
+          "width": 216.390625
+        },
+        {
+          "id": "field-ranking.direction",
+          "x": 495.1875,
+          "y": 725.953125,
+          "width": 216.40625
+        },
+        {
+          "id": "field-top_n",
+          "x": 723.59375,
+          "y": 725.953125,
+          "width": 216.390625
+        }
+      ],
+      "axes": [
+        267,
+        495,
+        724,
+        952,
+        1180
+      ],
+      "min": 216.390625,
+      "max": 216.40625,
+      "axe": 0
+    },
+    {
+      "locale": "ru",
+      "width": 1672,
+      "inner": 1672,
+      "scroll": 1672,
+      "boxes": [
+        {
+          "id": "field-strategy_name",
+          "x": 382.796875,
+          "y": 174.265625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-coordinates.exchange",
+          "x": 382.796875,
+          "y": 254.546875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-coordinates.market_type",
+          "x": 611.1875,
+          "y": 254.546875,
+          "width": 216.40625
+        },
+        {
+          "id": "field-coordinates.symbol",
+          "x": 839.59375,
+          "y": 254.546875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-timeframe",
+          "x": 1067.984375,
+          "y": 254.546875,
+          "width": 216.40625
+        },
+        {
+          "id": "field-time_range.start",
+          "x": 382.796875,
+          "y": 319.828125,
+          "width": 216.390625
+        },
+        {
+          "id": "field-time_range.end",
+          "x": 611.1875,
+          "y": 319.828125,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.indicator_id",
+          "x": 382.796875,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-indicators.0.sources",
+          "x": 611.1875,
+          "y": 402.109375,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.window.start",
+          "x": 839.59375,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-indicators.0.window.stop",
+          "x": 1067.984375,
+          "y": 402.109375,
+          "width": 216.40625
+        },
+        {
+          "id": "field-indicators.0.window.step",
+          "x": 1296.390625,
+          "y": 402.109375,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.direction_mode",
+          "x": 382.796875,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.initial_cash_quote",
+          "x": 611.1875,
+          "y": 561.390625,
+          "width": 216.40625
+        },
+        {
+          "id": "field-execution.fee_rate",
+          "x": 839.59375,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-execution.slippage_rate",
+          "x": 1067.984375,
+          "y": 561.390625,
+          "width": 216.40625
+        },
+        {
+          "id": "field-execution.sizing.mode",
+          "x": 1296.390625,
+          "y": 561.390625,
+          "width": 216.390625
+        },
+        {
+          "id": "field-risk.mode",
+          "x": 382.796875,
+          "y": 643.671875,
+          "width": 216.390625
+        },
+        {
+          "id": "field-ranking.primary_metric",
+          "x": 382.796875,
+          "y": 725.953125,
+          "width": 216.390625
+        },
+        {
+          "id": "field-ranking.direction",
+          "x": 611.1875,
+          "y": 725.953125,
+          "width": 216.40625
+        },
+        {
+          "id": "field-top_n",
+          "x": 839.59375,
+          "y": 725.953125,
+          "width": 216.390625
+        }
+      ],
+      "axes": [
+        383,
+        611,
+        840,
+        1068,
+        1296
+      ],
+      "min": 216.390625,
+      "max": 216.40625,
+      "axe": 0
+    }
+  ],
+  "errors": []
+}

@@ -1,6 +1,10 @@
 ---
 ticket_id: ROEHUB-BACKTESTS-CLIENT-2026-09-08
-status: ready
+status: implemented
+user_acceptance_status: accepted
+user_accepted_at: 2026-09-11
+local_journey_verified: true
+target_role_cutover_ready: false
 owner: unassigned
 scope: local_client_implementation_and_integration
 depends_on: []
@@ -13,22 +17,49 @@ evidence:
 
 # Implement the first Backtests journey in the platform client
 
+## Product-owner acceptance
+
+The user accepted the current implementation on 2026-09-11 and explicitly
+authorized publication through a technical branch merged into `main`, then
+branch deletion. See the [iteration log](../../docs/architecture/apps/web/backtests-ui-iteration-log.md).
+This authority supersedes earlier publication exclusions for this delivery only;
+role cutover and runtime deployment remain outside this acceptance.
+
 ## Outcome and readiness boundary
 
 A signed-in user can configure an artifact-backed backtest, preflight and
 submit it once, observe its real job state, request cancellation, inspect
 variants/results and export trades in the new client, following v23 visually.
 
-`ready` authorizes selection for **local implementation/integration**, not
-automatic execution from this document. The existing authenticated own-resource
-contract is the initial integration boundary. Full target-role behavior and
+The historical `ready` status authorized selection for local implementation.
+The current `implemented` status records the locally verified artifact-mode
+journey and its explicit user-authorized execution; it grants no publication or
+cutover authority. The existing authenticated own-resource contract is the
+verified integration boundary. Full target-role behavior and
 default-route cutover remain dependent on the named authz ticket, whose own
 delegation/envelope dependencies must pass. Never simulate target organization
 roles or mark that dependency accepted from frontend checks.
 
-This ticket is prepared, not executed, by the 2026-09-08 documentation task.
-Its future execution does not inherit the documentation task's Git/publication
-authority. The standalone HTML pilot is immutable reference material.
+The 2026-09-08 documentation task prepared this ticket without executing it.
+That preparation is historical: the user subsequently authorized S1–S6 local
+implementation, dependencies, checks and in-scope repairs through ordinary
+sequential execution. Git/publication authority is not inherited. The standalone
+HTML pilot remains immutable reference material.
+
+## Execution decomposition
+
+On 2026-09-08 the user selected the [UI implementation plan](../../docs/architecture/apps/web/roehub-ui-implementation-plan-v1.md)
+and a six-stage [Backtests pack](../agents/generated/roehub-backtests-client-v1/stage-ledger.md).
+This ticket remains the full behavior and acceptance source; it does not become
+six unrelated feature specifications. The pack's unclaimed draft and unresolved
+entry prerequisites describe historical preparation only. The user's subsequent
+instruction selected one coordinator and one active executor at a time, with
+existing S1–S6 prompts used as sequential implementation assignments. For this run,
+PACK-CLAIM, staged-plan-runner entry checks, updater, locks, claims, transition
+receipts and ledger management were explicitly superseded. The old ledger and
+accepted prompts remain unchanged as historical artifacts. Product requirements,
+safety, real browser/API proof and stage reports still apply. Default cutover and
+publication remain outside the authorized local implementation scope.
 
 ## Selected scope
 
@@ -268,9 +299,10 @@ python3 -m tools.docs.generate_project_map --check
 git diff --check
 ```
 
-Frontend scripts do not exist yet; these are implementation deliverables, not
-checks reported as passed by authoring. Test fixture setup must be discovered
-from current local configuration, never a retired host. If no usable local
+At authoring, frontend scripts were planned deliverables and no check was
+reported passed. They now exist in `apps/platform-web/package.json`; current
+execution evidence is recorded separately below. Test fixture setup uses the
+current disposable local configuration, never a retired host. If no usable local
 runtime/fixture exists, report the exact missing prerequisite before claiming
 API-backed acceptance. Record console/network checks, fixture identity, viewport,
 URL/auth state and redacted evidence in the declared receipt.
@@ -278,3 +310,125 @@ URL/auth state and redacted evidence in the declared receipt.
 Compatibility: additive client/build/feature setting `compatible-change`;
 runtime APIs, persistence and domain meaning `none`; default route replacement
 and target capability enforcement are outside this ticket's initial delivery.
+
+## Local execution outcome (S6, 2026-09-08)
+
+`local_journey_verified=true`; `target_role_cutover_ready=false`.
+The [completion report](../delivery/evidence/ROEHUB-BACKTESTS-CLIENT-2026-09-08.md)
+links T1–T8 to final real browser/API and explicitly controlled failure evidence.
+Final checks passed: typecheck, 145 frontend tests, build, 35 browser scenarios,
+98 focused Python tests, docs index/project map and whitespace checks.
+
+The integrated form-to-result/CSV/save journey and flag-off SSR preserve the actual
+job, saved strategy and trade without migration. Result429 manual refresh shares
+the automatic cooldown, and chart/table units are explicit in RU/EN. The feature
+setting remains disabled by default. Independent coordinator acceptance is
+separate from this executor's local verification.
+
+Remaining boundaries are explicit: unavailable workstation extended filters,
+server-unbound original-organization replay (read-only unresolved recovery),
+full auto/direct_db and reliable ETA, target operator/viewer/delegation policy and
+broader Jobs/Artifacts/ingestion/execution-detail UI/API work. The authz Backtests
+ticket remains `draft`; its delegation/envelope dependencies remain `ready`, not
+accepted. Optional fixture OIDC/Overview/account404 and pre-existing missing
+Settings assets are documented, not claimed fixed. No default cutover, push,
+merge, deployment or later task was performed. The registry retains all wider
+`requires_ui` / `requires_api` coverage.
+
+## Approved compact console refinement (2026-09-08)
+
+The owner approved the five-column calculation-console concept and explicitly
+required equal field widths and calendar dates only, with no time inputs. The
+subsequent implementation request selects that composition adapted to the v23
+pilot palette, typography, controls and surfaces. It supersedes the original
+timestamp editor and tall two-column builder composition, without reopening S1–S6.
+
+The editor now uses five equal tracks on wide screens, three/two/one as available
+width narrows; Market, Signal, Trade, Risk and Ranking share the same axes.
+Both dates represent UTC midnight, preserving the existing half-open interval.
+Ordered indicators, multiple price sources, TP/SL grids, sizing, policies,
+preflight, submission and recovery remain available. Policies and preflight
+details use disclosure; a received preflight opens its review automatically.
+
+Verification and compatibility are recorded in
+[the compact-console receipt](../delivery/evidence/roehub-backtests-compact-2026-09-08/README.md).
+This is a local frontend refinement. The v23 specimen and default client flag,
+API and authorization boundaries remain unchanged.
+
+Owner annotation follow-up: short-value fields should no longer fill their
+tracks. This supersedes equal width for every control, while retaining shared
+alignment axes. Window values, fees, slippage, Top N and timeframe use 98px;
+cash uses 140px. Section padding and panel gaps increase, with quieter control
+surfaces. The date-only and functional requirements above remain in force.
+
+## Approved persistent Backtests tabs (2026-09-08)
+
+The owner accepted the current form and explicitly authorized moving it into the
+main Backtests workspace: a shared title and History / Settings tabs; New
+backtest opens Settings; tab changes retain draft, history filters, scroll and
+selection; successful submission opens the created job; Close returns to History
+and Reset form is a separate action. This supersedes the separate centered
+builder page, retaining the accepted form controls and date-only contract.
+
+Implementation uses persistent in-memory panels and compatible deep links
+(`/backtests`, `/backtests/new`, `/backtests/:jobId`). Draft lifetime is the current
+Backtests document/session, not durable storage. Leaving the document still
+warns for dirty drafts. The created job uses the existing progress/results flow.
+A hidden result cannot change the active tab when its default variant arrives.
+
+Evidence and remaining browser gate:
+[workspace-tabs receipt](../delivery/evidence/roehub-backtests-compact-2026-09-08/workspace-tabs.md).
+
+Owner visual correction: Settings must retain the accepted bounded width and the
+same gray panel surface as History. Full-width transparent presentation is
+rejected. Restored the shared panel styles and 90rem builder cap; retained the
+approved persistent tabs and all draft/history behavior.
+
+Further owner correction: a separately capped Settings card still diverged from
+History. Use History's shared workspace panel surface and header; constrain the
+form content inside it. The preceding whole-panel 90rem cap is superseded by a
+90rem cap on the inner form, preserving compact controls and the existing workflow.
+
+## Approved inline disclosure above Jobs (2026-09-08)
+
+The owner accepts the current Settings form appearance, but selects a collapsible
+block above Jobs instead of separate History/Settings tabs. Keep History and the
+selected job visible, retain drafts when collapsed, show instrument/period/check
+state in the collapsed row, and collapse/open the created job after submission.
+Disclosure must animate smoothly with adjustable motion. This supersedes the tab
+placement and full-height Settings surface; retain accepted panel tokens and
+compact form fields. Implemented speed choices: off/fast/normal/slow (0/180/320/
+520ms), persisted as a non-sensitive browser preference; system reduced-motion
+wins. Reference proof remains in the workspace-tabs receipt below its amendments.
+
+## Approved disclosure inside Jobs (2026-09-08)
+
+Owner selected placing the existing animated configuration directly inside Jobs,
+after its heading/actions and before the history list. This supersedes the
+full-width disclosure above both columns. Preserve compact controls, draft,
+motion preference and the right results panel. Keep the Jobs/result column ratio
+stable when a result is selected; adapt field rows at existing container widths.
+
+Owner acceptance: the disclosure inside Jobs is accepted and fixed as the current
+visual/interaction baseline. Subsequent execution troubleshooting must preserve
+this layout. Owner reports inability to launch and inspect a backtest in the
+current preview. S1–S6 scope remains the complete artifact-mode configure/check/
+submit/progress/results journey, not just the editor. Historical S6 proof does
+not establish the current preview's end-to-end behavior after fixture restart and
+layout changes. Current Web/API/runner endpoints return 200; fixture source only
+precomputes 15m ma.ema signals over the three-day synthetic March 2026 interval.
+The owner's last screenshot uses 1h/ma.rma and a 2023 start, outside that fixture's
+verified configuration. This is a concrete configuration mismatch, not a reproduced
+current request failure. Preserve the accepted UI while resolving the execution
+and available-data experience.
+
+## Explicit synthetic demonstration preset
+
+Owner requests a prefilled version requiring only an explicit launch click.
+Local-host `?preset=synthetic` opts into the fixture configuration: binance spot
+BTCUSDT, 15m, ma.ema/close window10/10/1, 2026-03-26 through 2026-03-29 UTC,
+long_only, cash10000, fee0.00075, slippage0.0001, all_in, no TP/SL, return descending,
+Top10. Other execution/quality policies remain server defaults. The page labels
+synthetic data and performs one automatic real preflight after catalog/bounds are
+ready. No create is automatic; existing gates and explicit submission remain.
+Normal defaults and accepted layout remain unchanged.

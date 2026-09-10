@@ -4,7 +4,7 @@
   "scope": "self_hosted_local_platform_only",
   "contract_doc": "docs/architecture/apps/web/roehub-ui-functional-contract-v1.md",
   "evidence_date": "2026-09-08",
-  "implementation_evidence_boundary": "source_inspection_not_current_runtime_proof",
+  "implementation_evidence_boundary": "Backtests opt-in own-resource client and its bounded shell have linked local browser/API evidence; all other records retain their explicitly scoped source-inspection boundary.",
   "status_labels": {
     "implemented": "Реализовано: только указанная часть существующего кода/контракта",
     "requires_ui": "Требуется UI",
@@ -191,15 +191,16 @@
         "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
         "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.shell.application",
         "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.shell.application",
-        "apps/web/templates/base.html"
+        "apps/web/templates/base.html",
+        ".codex/delivery/evidence/ROEHUB-BACKTESTS-CLIENT-2026-09-08.md"
       ],
-      "implemented_scope": "SSR shell, locale and session handling exist.",
+      "implemented_scope": "Existing SSR shell plus the opt-in Backtests v23-derived client shell, RU/EN, keyboard/focus, safe session continuation, private-state cleanup and preserved SSR navigation are locally implemented and tested.",
       "delivery_status": [
         "implemented",
         "requires_ui"
       ],
       "remaining_work": [
-        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only."
+        "The broader shell still needs organization context, command palette, notifications, theme/preferences and target capability-filtered navigation."
       ],
       "disposition": "product"
     },
@@ -595,17 +596,18 @@
         "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
         "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.backtests.library",
         "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.backtests.library",
-        "apps/api/routes/ui_backtests.py"
+        "apps/api/routes/ui_backtests.py",
+        ".codex/delivery/evidence/ROEHUB-BACKTESTS-CLIENT-2026-09-08.md"
       ],
-      "implemented_scope": "Job/workstation list, filters and source freshness exist.",
+      "implemented_scope": "Opt-in artifact-mode own-resource client: real direct job list/status, state/risk/cursor filters, page counts, freshness/error states, independent deep links and terminal history deletion; local browser/API evidence linked below.",
       "delivery_status": [
         "implemented",
         "requires_ui",
         "requires_api"
       ],
       "remaining_work": [
-        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
-        "Target backtest read-policy integration; current owner-scoped API is reusable."
+        "Extended search/instrument/date filtering remains unavailable because the existing workstation jobs projection lacks organization_scope_resolver wiring; future UI binding is also required.",
+        "Target backtest read/queue policy, operator actions and default cutover remain separate UI/API work."
       ],
       "disposition": "product"
     },
@@ -643,17 +645,18 @@
         "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
         "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.backtests.builder",
         "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.backtests.builder",
-        "apps/api/routes/backtests.py"
+        "apps/api/routes/backtests.py",
+        ".codex/delivery/evidence/ROEHUB-BACKTESTS-CLIENT-2026-09-08.md"
       ],
-      "implemented_scope": "Artifact preflight and idempotent job submission exist.",
+      "implemented_scope": "Opt-in artifact-mode client: authoritative catalog/defaults/bounds, UTC/grid/direction/rate validation, preflight/admission, one-key job submission and per-tab unresolved recovery; actual local configure-to-job proof. No server-bound organization replay is available.",
       "delivery_status": [
         "implemented",
         "requires_ui",
         "requires_api"
       ],
       "remaining_work": [
-        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
-        "auto/direct_db, resource/ETA expansion and target mutation envelope are separate dependencies."
+        "auto/direct_db source selection and equivalence, expanded resource/ETA behavior and their target UI remain API/UI dependencies.",
+        "Target mutation envelope and server-bound original-organization replay remain separate API work; ordinary drafts are memory-only."
       ],
       "disposition": "product"
     },
@@ -700,17 +703,18 @@
         "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
         "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.backtests.detail",
         "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.backtests.detail",
-        "apps/api/routes/backtests.py"
+        "apps/api/routes/backtests.py",
+        ".codex/delivery/evidence/ROEHUB-BACKTESTS-CLIENT-2026-09-08.md"
       ],
-      "implemented_scope": "Job status, cancel/delete, variants, materialization, bounded series, CSV and strategy creation exist.",
+      "implemented_scope": "Opt-in own-resource client: measured job state/progress and stale/ETA-unavailable states, cancel/race/reconciliation, terminal deletion, URL variants, materialization, server equity/drawdown with accessible unit-labelled tables, statistics/trades/CSV, bodyless research-strategy save and existing SSR strategy link; locally tested real API/worker and controlled failure boundaries.",
       "delivery_status": [
         "implemented",
         "requires_ui",
         "requires_api"
       ],
       "remaining_work": [
-        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
-        "Target operator retry/promotion policy and reliable queue ETA are not provided by visual migration."
+        "Target operator retry/promotion/launch policy, reliable queue/execution ETA and corresponding broader UI remain unfinished.",
+        "Saved-strategy replay is disabled without server-bound original organization; default cutover remains dependent on API-AUTHZ."
       ],
       "disposition": "product"
     },

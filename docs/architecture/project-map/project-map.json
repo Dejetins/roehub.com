@@ -129,7 +129,7 @@
   ],
   "areas": [
     {
-      "file_count": 675,
+      "file_count": 676,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -151,7 +151,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 270,
+      "file_count": 317,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -160,7 +160,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 222,
+      "file_count": 223,
       "id": "operations",
       "paths": [
         "infra/",
@@ -173,7 +173,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 108,
+      "file_count": 110,
       "id": "automation",
       "paths": [
         "tools/",
@@ -183,7 +183,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 427,
+      "file_count": 429,
       "id": "quality",
       "paths": [
         "tests/",
@@ -194,7 +194,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1065,
+      "file_count": 1457,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -453,6 +453,23 @@
       ]
     },
     {
+      "depends_on": [],
+      "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
+      "docs": [],
+      "entrypoints": [],
+      "file_count": 45,
+      "id": "app:platform-web",
+      "kind": "app",
+      "name": "platform-web",
+      "roots": [
+        "apps/platform-web",
+        "apps/platform-web/e2e",
+        "apps/platform-web/src",
+        "apps/platform-web/src/test-data"
+      ],
+      "used_by": []
+    },
+    {
       "depends_on": [
         "core:integration"
       ],
@@ -552,7 +569,7 @@
         "apps/web/main/app.py",
         "apps/web/main/main.py"
       ],
-      "file_count": 77,
+      "file_count": 79,
       "id": "app:web",
       "kind": "app",
       "name": "web",
@@ -609,7 +626,7 @@
         "docs/architecture/backtest/benchmark_iterations/2026-05-01_iteration_4_1_no_risk_boundary/README.md"
       ],
       "entrypoints": [],
-      "file_count": 90,
+      "file_count": 91,
       "id": "context:backtest",
       "kind": "context",
       "name": "backtest",
@@ -3027,6 +3044,41 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-backtests-client-v1/01-client-foundation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-backtests-client-v1/02-shell-and-library.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-backtests-client-v1/03-configure-and-submit.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-backtests-client-v1/04-execution-and-cancel.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-backtests-client-v1/05-results-and-strategy.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-backtests-client-v1/06-complete-journey-acceptance.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-backtests-client-v1/stage-ledger.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/agents/generated/roehub-market-data-activation-and-instrument-selection-v1/00-contract-baseline-and-repair-route.md"
     },
     {
@@ -3437,7 +3489,17 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/BACKTESTS-UI-PUBLICATION-2026-09-11.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-AUTHZ-CAPABILITY-KERNEL-2026-07-20.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-BACKTESTS-CLIENT-2026-09-08.md"
     },
     {
       "area": "knowledge",
@@ -3462,7 +3524,1912 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-UI-IMPLEMENTATION-PLAN-2026-09-08.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-UI-NEXT-STEPS-2026-09-08.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/S1-client-foundation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/S2-shell-and-library.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/S3-configure-and-submit.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/S4-execution-and-cancel.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/S5-results-and-strategy.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2-foundation-regression/foundation-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2-foundation-regression/foundation-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2-foundation-regression/foundation-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2-foundation-regression/foundation-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2-foundation-regression/foundation-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2-foundation-regression/ssr-rollback.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/en-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/expiry-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/projection-unavailable.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/ru-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S2/zoom-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-foundation-regression/foundation-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-foundation-regression/foundation-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-foundation-regression/foundation-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-foundation-regression/foundation-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-foundation-regression/foundation-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-foundation-regression/ssr-rollback.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/en-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/expiry-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/projection-unavailable.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/ru-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3-library-regression/zoom-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/created.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/en-native-zoom-200-actions.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/faults.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/lost-response-reload.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/lost-response.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/memory-only-unresolved.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/preflight-expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/preflight-expiry.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/real-create.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/real-preflight-effective.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/real-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/ru-native-zoom-200-actions.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/visual.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S3/zoom.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/created.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/en-native-zoom-200-actions.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/faults.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/lost-response-reload.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/lost-response.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/memory-only-unresolved.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/preflight-expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/preflight-expiry.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/real-create.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/real-preflight-effective.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/real-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/ru-native-zoom-200-actions.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/visual.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-builder-regression/zoom.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-foundation-regression/foundation-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-foundation-regression/foundation-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-foundation-regression/foundation-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-foundation-regression/foundation-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-foundation-regression/foundation-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-foundation-regression/ssr-rollback.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/en-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/expiry-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/projection-unavailable.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/ru-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4-library-regression/zoom-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/controlled-cooldown.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/controlled-race.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/controlled-terminal-race.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/controlled-transport-reload.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/controlled-visual.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/en-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/identity-outage.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/real-active.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/real-cancelled.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/real-completed.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/real-lifecycle.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/ru-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/session-expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/session-expiry.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S4/zoom.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/created.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/en-native-zoom-200-actions.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/faults.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/lost-response-reload.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/lost-response.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/memory-only-unresolved.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/preflight-expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/preflight-expiry.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/real-create.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/real-preflight-effective.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/real-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/ru-native-zoom-200-actions.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/visual.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-builder-regression/zoom.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/controlled-cooldown.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/controlled-race.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/controlled-terminal-race.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/controlled-transport-reload.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/controlled-visual.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/en-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/identity-outage.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/real-active.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/real-cancelled.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/real-completed.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/real-lifecycle.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/ru-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/session-expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/session-expiry.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-execution-regression/zoom.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-foundation-regression/foundation-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-foundation-regression/foundation-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-foundation-regression/foundation-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-foundation-regression/foundation-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-foundation-regression/foundation-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-foundation-regression/ssr-rollback.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/en-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/expiry-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/projection-unavailable.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/ru-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5-library-regression/zoom-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/controlled-delete.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/controlled-export.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/controlled-materialization.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/controlled-save.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/en-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/real-results.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/real-results.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/ru-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/visual.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S5/zoom.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/created.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/en-native-zoom-200-actions.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/faults.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/lost-response-reload.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/lost-response.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/memory-only-unresolved.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/preflight-expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/preflight-expiry.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/real-create.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/real-preflight-effective.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/real-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/ru-native-zoom-200-actions.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/visual.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-builder-regression/zoom.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/controlled-cooldown.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/controlled-race.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/controlled-terminal-race.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/controlled-transport-reload.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/controlled-visual.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/en-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/identity-outage.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/real-active.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/real-cancelled.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/real-completed.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/real-lifecycle.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/ru-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/session-expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/session-expiry.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-execution-regression/zoom.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-foundation-regression/foundation-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-foundation-regression/foundation-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-foundation-regression/foundation-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-foundation-regression/foundation-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-foundation-regression/foundation-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-foundation-regression/ssr-rollback.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/en-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/expired.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/expiry-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/projection-unavailable.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/ru-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-library-regression/zoom-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/controlled-delete.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/controlled-export.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/controlled-materialization.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/controlled-readiness-freshness.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/controlled-save.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/controlled-unhinted-cooldown.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/en-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/real-results.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/real-results.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/ru-native-zoom-200-dialog.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/visual.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6-results-regression/zoom.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/429-before-fix.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/flag-off-created-job.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/flag-off-saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/integrated-journey.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/integrated-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/integrated-queued.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/integrated-result.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/S6/v23-reference.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/foundation-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/foundation-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/foundation-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/foundation-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/foundation-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-client-v1/browser/ssr-rollback.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/completed.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/en-1672.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/en-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/expanded-synthetic-proof.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/expanded.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/journey.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/layout.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/motion-v11-fullscreen.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/overview-fullscreen-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/overview-fullscreen-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/overview-inline-final.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/preview-sessions.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/real-market-15m.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/real-market-1h.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/real-market-1m.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/real-market-api-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/real-market-result.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/real-market-sources.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/refinement/desktop-en.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/refinement/desktop-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/refinement/measurements.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/refinement/mobile-en.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/created.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/en-native-zoom-200-actions.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/en-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/faults.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/memory-only-unresolved.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/real-create.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/real-preflight-effective.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/real-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/ru-native-zoom-200-actions.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/ru-native-zoom-200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/visual.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/regression/zoom.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/report-hover-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/report-v7-drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/report-v7-monthly.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/report-v7-trade-hover.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/report-v8-candles.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/ru-1672.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/ru-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/workspace-tabs.md"
     },
     {
       "area": "knowledge",
@@ -4038,6 +6005,11 @@
       "area": "operations",
       "kind": "configuration",
       "path": ".github/workflows/ci.yml"
+    },
+    {
+      "area": "operations",
+      "kind": "configuration",
+      "path": ".github/workflows/platform-web.yml"
     },
     {
       "area": "operations",
@@ -4876,6 +6848,231 @@
     },
     {
       "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/e2e/builder.spec.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/e2e/compact-builder.spec.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/e2e/execution.spec.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/e2e/foundation.spec.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/e2e/journey.spec.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/e2e/library.spec.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/e2e/results.spec.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/e2e/run.mjs"
+    },
+    {
+      "area": "delivery",
+      "kind": "configuration",
+      "path": "apps/platform-web/package.json"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/playwright.config.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/api.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/app.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/app.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/backtests-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/builder-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/builder-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/builder-model.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/builder.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/builder.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/delete-history.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/execution.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/execution.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/expandable-overview.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/library-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/library.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/library.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/main.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/motion.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/motion.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/price-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/query-client.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/recovery.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/report-ui.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/results-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/results-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/results.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/results.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/strategy-recovery.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/style.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "configuration",
+      "path": "apps/platform-web/src/test-data/builder-catalog.json"
+    },
+    {
+      "area": "delivery",
+      "kind": "configuration",
+      "path": "apps/platform-web/tsconfig.json"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/vite.config.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/vitest.config.ts"
+    },
+    {
+      "area": "delivery",
       "kind": "python",
       "path": "apps/plugin_gateway/__init__.py"
     },
@@ -5222,6 +7419,11 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/web/main/platform_client.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/web/main/security.py"
     },
     {
@@ -5338,6 +7540,11 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/web/templates/pages/placeholder.html"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/web/templates/pages/platform_client.html"
     },
     {
       "area": "delivery",
@@ -6391,6 +8598,11 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/backtests-ui-iteration-log.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v1.json"
     },
@@ -6423,6 +8635,11 @@
       "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-ui-functional-registry-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/roehub-ui-implementation-plan-v1.md"
     },
     {
       "area": "knowledge",
@@ -10030,6 +12247,31 @@
       "path": "migrations/postgres/manifest.json"
     },
     {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "package.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "packages/web-contracts/package.json"
+    },
+    {
+      "area": "repository-root",
+      "kind": "frontend",
+      "path": "packages/web-contracts/src/index.ts"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "pnpm-lock.yaml"
+    },
+    {
+      "area": "repository-root",
+      "kind": "configuration",
+      "path": "pnpm-workspace.yaml"
+    },
+    {
       "area": "repository-meta",
       "kind": "configuration",
       "path": "pyproject.toml"
@@ -10793,6 +13035,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/backtest/application/services/v2/prepare_pools.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest/application/services/v2/result_candles.py"
     },
     {
       "area": "domain",
@@ -14987,6 +17234,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_result_candles.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/backtest/application/services/v2/test_row_signatures.py"
     },
     {
@@ -16062,6 +18314,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/tools/test_backtests_preview_sessions.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/tools/test_build_openbao_image.py"
     },
     {
@@ -16352,6 +18609,16 @@
     {
       "area": "automation",
       "kind": "python",
+      "path": "tools/qa/backtests_client_fixture.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/backtests_expand_demo.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
       "path": "tools/qa/local_auth_browser_app.py"
     },
     {
@@ -16475,7 +18742,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 2856,
+  "inventory_file_count": 3306,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -16673,5 +18940,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "8617af148057cbd411741fc3a9332631013435bc883f7af457d4b43b4d624f77"
+  "structural_digest": "42d20c8c2b2f698880aacba898448c28743377c7611cb94b3dba3c255e87867f"
 }

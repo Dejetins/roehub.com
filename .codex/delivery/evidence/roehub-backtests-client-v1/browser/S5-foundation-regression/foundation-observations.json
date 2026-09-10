@@ -1,0 +1,274 @@
+{
+  "boundary": "Real Web + production auth/API + disposable PostgreSQL/ClickHouse + synthetic artifact files",
+  "api": [
+    {
+      "path": "/api/auth/current-user",
+      "status": 200,
+      "keys": [
+        "user_id",
+        "paid_level"
+      ]
+    },
+    {
+      "path": "/api/backtests/runtime-defaults",
+      "status": 200,
+      "keys": [
+        "supported_timeframes",
+        "risk_modes",
+        "direction_modes",
+        "sizing_modes",
+        "ranking_metrics",
+        "ranking_default",
+        "top_n_default",
+        "quality_constraints_default",
+        "guardrails",
+        "execution_defaults",
+        "supported_indicator_ids",
+        "indicator_sources",
+        "indicator_param_specs",
+        "hit_times_grid",
+        "direction_market_compatibility",
+        "links"
+      ]
+    },
+    {
+      "path": "/api/backtests/jobs",
+      "status": 200,
+      "keys": [
+        "items",
+        "next_cursor"
+      ]
+    },
+    {
+      "path": "/api/ui/backtests/workstation",
+      "status": 200,
+      "keys": [
+        "generated_at",
+        "refresh_status",
+        "next_allowed_refresh_at",
+        "retry_after_seconds",
+        "sources",
+        "runtime_defaults",
+        "config_draft",
+        "instrument_universe",
+        "indicator_catalog",
+        "optimization_overview",
+        "recent_events",
+        "job_table",
+        "footer_status",
+        "refresh_control"
+      ],
+      "sources": [
+        {
+          "name": "runtime_defaults",
+          "status": "available"
+        },
+        {
+          "name": "backtest_jobs",
+          "status": "unavailable"
+        },
+        {
+          "name": "backtest_job_events",
+          "status": "available"
+        },
+        {
+          "name": "market_data_reference",
+          "status": "available"
+        }
+      ]
+    },
+    {
+      "path": "/api/ui/backtests/artifact-date-bounds?exchange=binance&market_type=spot&symbol=BTCUSDT",
+      "status": 200,
+      "keys": [
+        "source",
+        "state",
+        "coordinates",
+        "default_end",
+        "max_end",
+        "artifact_metadata",
+        "degradation_reason"
+      ],
+      "state": "ready"
+    }
+  ],
+  "preflight": {
+    "status": 200,
+    "errorCount": 0,
+    "cost": {
+      "indicator_rows": 1,
+      "candidate_combinations": 1,
+      "tp_sl_cells": 0,
+      "cost_class": "small",
+      "estimated_combinations_upper_bound": 1,
+      "estimated_combinations": 1,
+      "arity": 1,
+      "row_count_upper_bounds_by_indicator": {
+        "ma.ema": 1
+      },
+      "risk_mode": "none",
+      "requested_range": {
+        "start": "2026-03-26T00:00:00Z",
+        "end": "2026-03-29T00:00:00Z"
+      },
+      "requested_top_n": 10,
+      "scheduling_class": "heavy"
+    }
+  },
+  "idleRunnerMetrics": 200,
+  "javascriptErrors": [],
+  "transportFailures": [
+    {
+      "phase": "preserved-ssr",
+      "path": "/assets/css/pages/market-data-settings.css",
+      "reason": "net::ERR_ABORTED"
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/assets/js/pages/market-data-settings.js",
+      "reason": "net::ERR_ABORTED"
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/auth/local/logout",
+      "reason": "net::ERR_ABORTED"
+    }
+  ],
+  "consoleErrors": [
+    {
+      "phase": "preserved-auth",
+      "page": "/login"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/dashboard"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/settings"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/settings"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/settings"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/settings"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/settings"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/settings"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/settings"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/settings"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/settings"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/settings"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/settings"
+    },
+    {
+      "phase": "preserved-ssr",
+      "page": "/login"
+    }
+  ],
+  "httpErrors": [
+    {
+      "phase": "preserved-auth",
+      "path": "/api/auth/oidc/status",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/ui/dashboard/summary",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/assets/css/pages/market-data-settings.css",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/assets/js/pages/market-data-settings.js",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/ui/account/profile",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/ui/account/limits",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/ui/account/notifications/scoped",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/ui/account/integrations",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/ui/account/notifications",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/ui/account/preferences",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/ui/account/sessions",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/ui/account/exchange-connections",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/ui/account/audit-events",
+      "status": 404
+    },
+    {
+      "phase": "preserved-ssr",
+      "path": "/api/auth/oidc/status",
+      "status": 404
+    }
+  ],
+  "preservedSsrNote": "Only existing page/navigation/assets are in this fixture; unrelated strategy/dashboard API projections are not installed.",
+  "viewportWidths": [
+    820,
+    1024,
+    1440
+  ],
+  "axeViolations": 0
+}

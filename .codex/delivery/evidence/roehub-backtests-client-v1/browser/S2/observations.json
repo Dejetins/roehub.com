@@ -1,0 +1,43 @@
+{
+  "boundary": "Production local Web/auth/API + disposable PostgreSQL/ClickHouse; two real API-created jobs from 4320 synthetic candles",
+  "jobs": [
+    {
+      "job_id": "1d17d7b4-d91a-4eff-be89-038abefed7ad",
+      "status": 201,
+      "state": "queued"
+    },
+    {
+      "job_id": "3b818fed-8ee7-4169-b124-66fb2b42cfff",
+      "status": 201,
+      "state": "queued"
+    }
+  ],
+  "javascriptAndConsoleErrors": [],
+  "httpErrors": [],
+  "transportFailures": [
+    {
+      "path": "/api/backtests/jobs",
+      "reason": "net::ERR_ABORTED"
+    }
+  ],
+  "widths": [
+    820,
+    1024,
+    1440
+  ],
+  "locales": [
+    "en",
+    "ru"
+  ],
+  "axeViolations": 0,
+  "checks": [
+    "real empty list",
+    "two real records",
+    "server risk empty-page cursor",
+    "state filter",
+    "deep-link refresh/back/forward",
+    "encoded variant",
+    "dialog keyboard containment/return",
+    "projection unavailable"
+  ]
+}

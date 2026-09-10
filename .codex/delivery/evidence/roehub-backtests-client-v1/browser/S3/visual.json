@@ -1,0 +1,48 @@
+{
+  "discardCancelledAndConfirmed": true,
+  "backForwardDiscardVerified": true,
+  "observations": [
+    {
+      "locale": "en",
+      "width": 820,
+      "inner": 820,
+      "scroll": 820,
+      "axe": 0
+    },
+    {
+      "locale": "en",
+      "width": 1024,
+      "inner": 1024,
+      "scroll": 1024,
+      "axe": 0
+    },
+    {
+      "locale": "en",
+      "width": 1440,
+      "inner": 1440,
+      "scroll": 1440,
+      "axe": 0
+    },
+    {
+      "locale": "ru",
+      "width": 820,
+      "inner": 820,
+      "scroll": 820,
+      "axe": 0
+    },
+    {
+      "locale": "ru",
+      "width": 1024,
+      "inner": 1024,
+      "scroll": 1024,
+      "axe": 0
+    },
+    {
+      "locale": "ru",
+      "width": 1440,
+      "inner": 1440,
+      "scroll": 1440,
+      "axe": 0
+    }
+  ]
+}

@@ -21,6 +21,7 @@ class WebRuntimeSettings:
 
     api_base_url: str
     api_upstream_url: str
+    backtests_client_enabled: bool = False
 
 
 def resolve_web_runtime_settings(*, environ: Mapping[str, str]) -> WebRuntimeSettings:
@@ -47,9 +48,14 @@ def resolve_web_runtime_settings(*, environ: Mapping[str, str]) -> WebRuntimeSet
     if raw_api_upstream_url is None or not raw_api_upstream_url.strip():
         raise ValueError("resolve_web_runtime_settings requires non-empty WEB_API_UPSTREAM_URL")
 
+    client_setting = environ.get("WEB_BACKTESTS_CLIENT_ENABLED", "false").strip().lower()
+    if client_setting not in {"true", "false"}:
+        raise ValueError("WEB_BACKTESTS_CLIENT_ENABLED must be true or false")
+
     normalized_api_base_url = raw_api_base_url.strip().rstrip("/")
     normalized_api_upstream_url = raw_api_upstream_url.strip().rstrip("/")
     return WebRuntimeSettings(
         api_base_url=normalized_api_base_url,
         api_upstream_url=normalized_api_upstream_url,
+        backtests_client_enabled=client_setting == "true",
     )

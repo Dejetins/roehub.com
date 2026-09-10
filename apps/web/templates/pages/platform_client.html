@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="{{ locale }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Opt in before external CSS loads, including history restoration from SSR. -->
+  <style>
+    @view-transition { navigation: auto; }
+    ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+  </style>
+  <title>{{ page_title }} · Roehub</title>
+  <link rel="icon" href="/favicon.ico">
+  {# Explicit revision lets a running local preview refresh cached build assets. #}
+  {% set asset_version = request.query_params.get('asset_version', '') %}
+  {% for style in platform_assets.styles %}<link rel="stylesheet" href="{{ style }}{% if asset_version %}?v={{ asset_version | urlencode }}{% endif %}">{% endfor %}
+</head>
+<body>
+  <div id="platform-root"></div>
+  <noscript>{{ t('page.backtests.title') }} — JavaScript required.</noscript>
+  <script type="application/json" id="platform-bootstrap">{{ platform_bootstrap | tojson }}</script>
+  <script type="module" src="{{ platform_assets.script }}{% if asset_version %}?v={{ asset_version | urlencode }}{% endif %}"></script>
+</body>
+</html>
