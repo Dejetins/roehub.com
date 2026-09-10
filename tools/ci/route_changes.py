@@ -63,6 +63,7 @@ TEST_SHARDS: dict[str, TestShard] = {
         target=_target(
             "tests/unit/contexts/backtest/application/services/v2/test_bitsets.py",
             "tests/unit/contexts/backtest/application/services/v2/test_row_signatures.py",
+            "tests/unit/contexts/backtest/application/services/v2/test_result_candles.py",
             "tests/unit/contexts/backtest/application/services/"
             "test_signals_from_indicators_v1.py",
             "tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py",

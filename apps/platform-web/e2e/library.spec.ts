@@ -90,9 +90,11 @@ test('real library, empty/cursor filters, independent deep link, focus, locale a
   await expect(page.getByRole('heading', { name: 'No jobs on this page' })).toBeVisible();
   expect(new URL(page.url()).searchParams.get('variant')).toBe('a/b');
   await page.reload(); await expect(page.getByRole('heading', { name: 'EMA · BTC research A' })).toBeVisible();
-  await page.getByRole('link', { name: 'Back to library' }).click();
-  await expect(page).toHaveURL(/\/backtests\?state=cancelled$/);
-  await page.goBack(); await expect(page.getByRole('heading', { name: 'EMA · BTC research A' })).toBeVisible();
+  await page.getByRole('button', { name: 'Hide history', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Show history', exact: true })).toBeVisible();
+  expect(new URL(page.url()).searchParams.get('state')).toBe('cancelled');
+  await page.getByRole('button', { name: 'Show history', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'EMA · BTC research A' })).toBeVisible();
   // Show a real selected row for the visual checkpoint.
   await page.goto(`/backtests/${first.job_id}`);
   await expect(page.getByRole('heading', { name: 'EMA · BTC research A' })).toBeVisible();

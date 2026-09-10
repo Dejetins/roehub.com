@@ -31,3 +31,9 @@ on successful relevant checks. The technical branch is removed only after merge.
 The repository selects no production installation target/runbook, so the intended
 terminal status is `shipped-no-runtime`, not deployed. Target-role cutover remains
 an explicit separate dependency (`target_role_cutover_ready=false`).
+
+CI reconciliation: registered the published first-party screenshot hashes, regenerated
+the runtime-input inventory, and added candle coverage to the CI shard matrix.
+Updated browser assertions for the accepted embedded workspace and made the
+disposable session-expiry fault exceed the preview session lifetime. Focused
+release inventory and routing regression suite: 396 passed.

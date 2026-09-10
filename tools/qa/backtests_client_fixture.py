@@ -475,9 +475,9 @@ if __name__ == "__main__":
         private = json.loads((STATE / "credentials.json").read_text())
         with psycopg.connect(private["dsn"]) as connection:
             connection.execute("""UPDATE identity_sessions SET
-                created_at=created_at - interval '2 days',
-                last_seen_at=last_seen_at - interval '2 days',
-                idle_expires_at=idle_expires_at - interval '2 days',
-                absolute_expires_at=absolute_expires_at - interval '2 days'""")
+                created_at=created_at - interval '366 days',
+                last_seen_at=last_seen_at - interval '366 days',
+                idle_expires_at=idle_expires_at - interval '366 days',
+                absolute_expires_at=absolute_expires_at - interval '366 days'""")
     else:
         run_stack()

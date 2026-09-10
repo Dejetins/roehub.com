@@ -6,7 +6,7 @@
     "user_installation_input": "configs/installation/roehub.yaml"
   },
   "counts": {
-    "explicit_legacy_runtime_handoff": 45,
+    "explicit_legacy_runtime_handoff": 46,
     "installation_generated_runtime": 55,
     "openbao_secret_reference": 26,
     "product_config_postgresql": 30
@@ -1364,6 +1364,14 @@
       ]
     },
     {
+      "classification": "explicit_legacy_runtime_handoff",
+      "key": "WEB_BACKTESTS_CLIENT_ENABLED",
+      "owner_stage": "17",
+      "sources": [
+        "apps/web/main/settings.py"
+      ]
+    },
+    {
       "classification": "installation_generated_runtime",
       "key": "WEB_HOST_PORT",
       "owner_stage": "03,17",
@@ -1575,5 +1583,5 @@
     "infra"
   ],
   "schema": "io.roehub.runtime-input-inventory/v1alpha1",
-  "total": 156
+  "total": 157
 }

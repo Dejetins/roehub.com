@@ -91,11 +91,11 @@ test('real session, selected routes, assets, locale, SSR navigation and rollback
   expect((await request.get('http://127.0.0.1:18483/metrics')).status()).toBe(200);
   await page.getByRole('link', { name: 'Русский', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
-  await expect(page.getByRole('heading', { name: 'Результаты бэктеста' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Бэктесты', level: 1 })).toBeVisible();
   await page.screenshot({ path: resolve(evidence, 'foundation-ru.png') });
   expect(new URL(page.url()).searchParams.get('variant')).toBe('a/b');
   await page.getByRole('link', { name: 'English', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Backtest detail' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Backtests', level: 1 })).toBeVisible();
 
   mkdirSync(evidence, { recursive: true });
   for (const width of [820, 1024, 1440]) {
@@ -125,7 +125,7 @@ test('real session, selected routes, assets, locale, SSR navigation and rollback
     await expect(page.locator('[data-platform-client]')).toBeVisible();
   }
   await page.goto('/backtests/new');
-  await expect(page.getByRole('heading', { name: 'New backtest', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Backtests', level: 1 })).toBeVisible();
   const ssr = await page.goto('http://localhost:18482/backtests/new');
   expect(ssr?.headers()['cache-control']).toBe('private, no-store');
   await expect(page.locator('[data-page="backtests"]')).toBeVisible();
