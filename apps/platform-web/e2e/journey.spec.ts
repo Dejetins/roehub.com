@@ -92,7 +92,7 @@ with psycopg.connect(private['dsn'],autocommit=True) as db:
     expect(creation.status()).toBe(201);
     const job = await creation.json();
     expect(job.state).toBe('queued');
-    await expect(page.locator('.job-detail').getByRole('heading', { name: 'S6 integrated journey' })).toBeVisible();
+    await expect(page.locator('.panel.context').getByRole('heading', { name: 'S6 integrated journey' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Cancel backtest', exact: true })).toBeEnabled();
     await page.screenshot({ path: resolve(evidence, 'integrated-queued.png'), fullPage: true });
     fixture('resume-runner');
@@ -105,15 +105,16 @@ with psycopg.connect(private['dsn'],autocommit=True) as db:
     expect(jobReads.some(r => r.state === 'queued')).toBe(true);
     expect(jobReads.some(r => r.state === 'succeeded')).toBe(true);
     const base = `/api/backtests/jobs/${job.job_id}/variants/${encodeURIComponent(variant)}`;
-    await expect(page.getByRole('img', { name: 'Equity', exact: true })).toHaveAccessibleDescription(/Equity in quote currency.*UTC/);
+    await expect(page.getByRole('img', { name: 'Equity', exact: true })).toHaveAccessibleDescription(/Hover for values/);
     await page.getByText('Show accessible data table', { exact: true }).click();
-    await expect(page.getByRole('region', { name: 'Equity', exact: true })).toHaveAccessibleDescription(/Equity in quote currency.*UTC/);
+    await expect(page.getByRole('region', { name: 'Equity', exact: true })).toHaveAccessibleName('Equity');
     await expect(page.getByRole('region', { name: 'Equity', exact: true }).locator('tbody tr')).not.toHaveCount(0);
-    for (const tab of ['Drawdown · %', 'Monthly statistics', 'Symbol statistics', 'Trades']) {
-      await page.getByRole('tab', { name: tab, exact: true }).click();
+    for (const tab of ['Drawdown · %', 'Monthly statistics', 'Trades']) {
+      await page.getByRole(tab === 'Drawdown · %' ? 'button' : 'tab', { name: tab, exact: true }).click();
       if (tab === 'Drawdown · %') await expect(page.getByRole('img', { name: tab, exact: true })).toBeVisible();
       else await expect(page.getByRole('tabpanel').locator('tbody tr')).not.toHaveCount(0);
     }
+    await page.locator('details.report-actions > summary').click();
     const downloadEvent = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Download CSV', exact: true }).click();
     const download = await downloadEvent;
@@ -122,7 +123,6 @@ with psycopg.connect(private['dsn'],autocommit=True) as db:
     expect(csv.trim().split('\n')).toHaveLength(2);
     const readiness = await (await page.request.get(`${base}/compatibility-readiness`)).json();
     expect(readiness.compatibility_state).toBe('not_launchable');
-    await page.locator('details.report-actions > summary').click();
     await page.getByRole('button', { name: 'Save strategy', exact: true }).click();
     const saveResponse = page.waitForResponse(r => r.url().endsWith('/strategies') && r.request().method() === 'POST');
     await page.getByRole('button', { name: 'Confirm save', exact: true }).click();

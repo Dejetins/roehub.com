@@ -145,6 +145,7 @@ test('dirty discard, catalog form in RU/EN at 820/1024/1440, axe and keyboard',a
   for(const locale of ['en','ru']){
     await page.getByRole('link',{name:locale==='ru'?'Русский':'English',exact:true}).click();
     await expect(page.getByRole('heading',{name:locale==='ru'?'Бэктесты':'Backtests',level:1})).toBeVisible();
+    await page.getByRole('link',{name:locale==='ru'?'Новый бэктест':'New backtest',exact:true}).click();
     for(const width of [820,1024,1440]){await page.setViewportSize({width,height:1000});await expect(page.locator('.builder-form form')).toBeVisible();
       expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
       const dims=await page.evaluate(()=>({inner:innerWidth,scroll:document.documentElement.scrollWidth}));expect(dims.scroll).toBeLessThanOrEqual(dims.inner);

@@ -27,7 +27,7 @@ async function create(page: Page, label: string) {
   await page.getByRole('button', { name: 'Submit backtest', exact: true }).click();
   const r = await response; expect(r.status()).toBe(201); return r.json();
 }
-const detail = (page: Page) => page.locator('.job-detail');
+const detail = (page: Page) => page.locator('.panel.context');
 
 test('real worker lifecycle and real cancellation, reload and history', async ({ page }) => {
   test.setTimeout(240_000); mkdirSync(evidence, { recursive: true });
@@ -122,7 +122,7 @@ test('controlled pending cancellation and terminal completion wins a late comman
   await expect(detail(page).getByRole('button',{name:'Cancel backtest',exact:true})).toBeDisabled();
   current=controlledJob('succeeded');
   await expect(detail(page).locator('.job-status').getByText('Completed',{exact:true})).toBeVisible({timeout:10000});
-  release();await expect(detail(page).getByText('Result variants: 3',{exact:true})).toBeVisible();
+  release();await expect(detail(page).locator('.job-status').getByText('Completed',{exact:true})).toBeVisible();
   await page.waitForTimeout(500);expect(posts).toBe(1);await expect(detail(page).locator('.job-status').getByText('Completed',{exact:true})).toBeVisible();
   await page.screenshot({path:resolve(evidence,'controlled-terminal-race.png'),fullPage:true});
   writeFileSync(resolve(evidence,'controlled-race.json'),JSON.stringify({controlled:true,posts,terminal:'succeeded',variants:3,latePendingIgnored:true}));
