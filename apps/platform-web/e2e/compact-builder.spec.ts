@@ -116,7 +116,7 @@ test('real date-only preflight and create preserve UTC boundaries and reach comp
   expect(response.request().postDataJSON().execution.fee_rate).toBe(0.00075);
   const job=await response.json();
   await expect(page).toHaveURL(new RegExp(`/backtests/${job.job_id}`));
-  await expect(page.getByText('The server reports completion.',{exact:true})).toBeVisible({timeout:120_000});
+  await expect(page.locator('.job-status').getByText('Completed',{exact:true})).toBeVisible({timeout:120_000});
   await expect(page.getByRole('img',{name:'Equity',exact:true})).toBeVisible({timeout:30_000});
   await page.screenshot({path:resolve(evidence,'completed.png'),fullPage:true});
   expect(errors).toEqual([]);expect(failures).toEqual([]);

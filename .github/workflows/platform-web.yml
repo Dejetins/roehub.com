@@ -30,6 +30,10 @@ jobs:
   foundation:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [foundation-library, builder, compact-builder, execution, results, journey]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -49,10 +53,18 @@ jobs:
       - run: pnpm --filter @roehub/platform-web build
       - run: .venv/bin/python -m pytest -q tests/unit/apps/web/test_web_v2_1_routes.py
       - run: pnpm --filter @roehub/platform-web exec playwright install --with-deps chromium
-      - run: pnpm --filter @roehub/platform-web test:e2e
+      - name: Browser regression
+        env:
+          SUITE: ${{ matrix.suite }}
+        run: |
+          if [ "$SUITE" = foundation-library ]; then
+            pnpm --filter @roehub/platform-web test:e2e foundation.spec.ts library.spec.ts
+          else
+            pnpm --filter @roehub/platform-web test:e2e "$SUITE.spec.ts"
+          fi
       - uses: actions/upload-artifact@v4
         if: success()
         with:
-          name: platform-web-foundation
+          name: platform-web-${{ matrix.suite }}
           path: .codex/delivery/evidence/roehub-backtests-client-v1/browser/
           include-hidden-files: true

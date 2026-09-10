@@ -96,7 +96,7 @@ with psycopg.connect(private['dsn'],autocommit=True) as db:
     await expect(page.getByRole('button', { name: 'Cancel backtest', exact: true })).toBeEnabled();
     await page.screenshot({ path: resolve(evidence, 'integrated-queued.png'), fullPage: true });
     fixture('resume-runner');
-    await expect(page.getByText('The server reports completion.', { exact: true })).toBeVisible({ timeout: 180_000 });
+    await expect(page.locator('.job-status').getByText('Completed', { exact: true })).toBeVisible({ timeout: 180_000 });
     await expect(page.getByRole('img', { name: 'Equity', exact: true })).toBeVisible({ timeout: 60_000 });
     const variant = new URL(page.url()).searchParams.get('variant')!;
     expect(variant).toBeTruthy();
@@ -122,6 +122,7 @@ with psycopg.connect(private['dsn'],autocommit=True) as db:
     expect(csv.trim().split('\n')).toHaveLength(2);
     const readiness = await (await page.request.get(`${base}/compatibility-readiness`)).json();
     expect(readiness.compatibility_state).toBe('not_launchable');
+    await page.locator('details.report-actions > summary').click();
     await page.getByRole('button', { name: 'Save strategy', exact: true }).click();
     const saveResponse = page.waitForResponse(r => r.url().endsWith('/strategies') && r.request().method() === 'POST');
     await page.getByRole('button', { name: 'Confirm save', exact: true }).click();
@@ -135,7 +136,8 @@ with psycopg.connect(private['dsn'],autocommit=True) as db:
     const deepLink = `/backtests/${job.job_id}?variant=${encodeURIComponent(variant)}`;
     await page.reload();
     await expect(page.locator('[data-result-variant]')).toHaveAttribute('data-result-variant', variant);
-    await page.getByRole('tab', { name: 'Equity', exact: true }).click();
+    await page.getByRole('tab', { name: 'Overview', exact: true }).click();
+    await page.getByRole('button', { name: 'Equity', exact: true }).click();
     await expect(page.getByRole('img', { name: 'Equity', exact: true })).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.screenshot({ path: resolve(evidence, 'integrated-result.png'), fullPage: true });

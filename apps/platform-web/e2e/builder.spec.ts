@@ -131,22 +131,27 @@ test('body errors, stale preflight, 422 field focus, renewed admission and memor
 
 test('dirty discard, catalog form in RU/EN at 820/1024/1440, axe and keyboard',async({page})=>{
   await signIn(page);await configure(page,'S3 unsent');let dialogs=0;page.on('dialog',async dialog=>{dialogs++;await dialog.dismiss();});
-  await page.getByRole('link',{name:'Back to library'}).click();await expect(page).toHaveURL(/backtests\/new/);await expect.poll(()=>dialogs).toBe(1);await expect(page.getByLabel('Job label (optional)')).toHaveValue('S3 unsent');
-  page.removeAllListeners('dialog');page.once('dialog',d=>d.accept());await page.getByRole('link',{name:'Back to library'}).click();await expect(page).toHaveURL(/backtests$/);
-  await page.getByRole('link',{name:'New backtest',exact:true}).click();await expect(page.getByLabel('Job label (optional)')).toHaveValue('');
-  await page.getByLabel('Job label (optional)').fill('Back guard');let backDialog=false;page.once('dialog',async d=>{backDialog=true;await d.dismiss();});await page.goBack();await expect.poll(()=>backDialog).toBe(true);await expect(page).toHaveURL(/backtests\/new/);await expect(page.getByLabel('Job label (optional)')).toHaveValue('Back guard');
-  page.once('dialog',d=>d.accept());await page.goBack();await expect(page).toHaveURL(/backtests$/);await page.goForward();await expect(page.getByLabel('Job label (optional)')).toHaveValue('');
+  await page.getByRole('link',{name:'Strategies',exact:true}).click();await expect(page).toHaveURL(/backtests\/new/);await expect.poll(()=>dialogs).toBe(1);await expect(page.getByLabel('Job label (optional)')).toHaveValue('S3 unsent');
+  page.removeAllListeners('dialog');page.once('dialog',d=>d.accept());await page.getByRole('link',{name:'Strategies',exact:true}).click();await expect(page).toHaveURL(/strategies$/);
+  await page.goBack();await expect(page.getByLabel('Job label (optional)')).toHaveValue('');
+  await page.getByLabel('Job label (optional)').fill('Retained draft');
+  await page.getByRole('button',{name:'Collapse settings',exact:true}).click();
+  await expect(page.locator('.builder-form form')).not.toBeVisible();
+  await page.getByRole('link',{name:'New backtest',exact:true}).click();
+  await expect(page.getByLabel('Job label (optional)')).toHaveValue('Retained draft');
+  page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'Reset form',exact:true}).click();
+  await expect(page.getByLabel('Job label (optional)')).toHaveValue('');
   const observations=[];
   for(const locale of ['en','ru']){
     await page.getByRole('link',{name:locale==='ru'?'Русский':'English',exact:true}).click();
-    await expect(page.getByRole('heading',{name:locale==='ru'?'Новый бэктест':'New backtest',level:1})).toBeVisible();
+    await expect(page.getByRole('heading',{name:locale==='ru'?'Бэктесты':'Backtests',level:1})).toBeVisible();
     for(const width of [820,1024,1440]){await page.setViewportSize({width,height:1000});await expect(page.locator('.builder-form form')).toBeVisible();
       expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
       const dims=await page.evaluate(()=>({inner:innerWidth,scroll:document.documentElement.scrollWidth}));expect(dims.scroll).toBeLessThanOrEqual(dims.inner);
       await page.screenshot({path:resolve(evidence,`${locale}-${width}.png`),fullPage:true});observations.push({locale,width,...dims,axe:0});
     }
   }
-  writeFileSync(resolve(evidence,'visual.json'),JSON.stringify({discardCancelledAndConfirmed:true,backForwardDiscardVerified:true,observations},null,2));
+  writeFileSync(resolve(evidence,'visual.json'),JSON.stringify({discardCancelledAndConfirmed:true,collapseRetainsDraft:true,observations},null,2));
 });
 
 test('native Chromium 200% zoom: RU/EN builder and primary actions remain reachable',async()=>{

@@ -67,12 +67,12 @@ with psycopg.connect(private['dsn'],autocommit=True) as db:
   const first = await create(page, 'S4 real completion');
   await expect(detail(page).getByRole('heading', { name: 'S4 real completion' })).toBeVisible();
   await page.screenshot({ path: resolve(evidence, 'real-active.png'), fullPage: true });
-  await expect(detail(page).getByText('The server reports completion.', { exact: true })).toBeVisible({ timeout: 180_000 });
+  await expect(detail(page).locator('.job-status').getByText('Completed', { exact: true })).toBeVisible({ timeout: 180_000 });
   completed = await (await page.request.get(`/api/backtests/jobs/${first.job_id}`)).json();
   expect(completed.state).toBe('succeeded'); expect(completed.terminal_summary.top_variants_count).toBeGreaterThan(0);
   await page.screenshot({ path: resolve(evidence, 'real-completed.png'), fullPage: true });
-  await page.reload(); await expect(detail(page).getByText('The server reports completion.', { exact: true })).toBeVisible();
-  await detail(page).getByRole('link', { name: 'Back to library' }).click(); await page.goBack();
+  await page.reload(); await expect(detail(page).locator('.job-status').getByText('Completed', { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Backtests', exact: true }).click(); await page.goBack();
   await expect(detail(page).getByRole('heading', { name: 'S4 real completion' })).toBeVisible(); await page.goForward();
   await expect(page).toHaveURL(/\/backtests$/);
   // The first job is actually terminal, releasing admission before the second create.
@@ -121,9 +121,9 @@ test('controlled pending cancellation and terminal completion wins a late comman
   await confirm(page);await expect(detail(page).getByText('Sending cancellation request…')).toBeVisible();
   await expect(detail(page).getByRole('button',{name:'Cancel backtest',exact:true})).toBeDisabled();
   current=controlledJob('succeeded');
-  await expect(detail(page).getByText('The server reports completion.',{exact:true})).toBeVisible({timeout:10000});
+  await expect(detail(page).locator('.job-status').getByText('Completed',{exact:true})).toBeVisible({timeout:10000});
   release();await expect(detail(page).getByText('Result variants: 3',{exact:true})).toBeVisible();
-  await page.waitForTimeout(500);expect(posts).toBe(1);await expect(detail(page).getByText('The server reports completion.',{exact:true})).toBeVisible();
+  await page.waitForTimeout(500);expect(posts).toBe(1);await expect(detail(page).locator('.job-status').getByText('Completed',{exact:true})).toBeVisible();
   await page.screenshot({path:resolve(evidence,'controlled-terminal-race.png'),fullPage:true});
   writeFileSync(resolve(evidence,'controlled-race.json'),JSON.stringify({controlled:true,posts,terminal:'succeeded',variants:3,latePendingIgnored:true}));
 });
