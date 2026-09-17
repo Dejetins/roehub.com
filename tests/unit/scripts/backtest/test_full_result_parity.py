@@ -42,7 +42,18 @@ def fixture(top_n=50, count=50, direction="desc", tp_sl=False):
             ],
             **request,
         }
-        metrics = {"total_return_pct": float(i // 2), "trade_count": 2.0, "profit_factor": None}
+        metrics = {
+            "total_return_pct": float(i // 2),
+            "trade_count": 2.0,
+            "profit_factor": None,
+            "max_drawdown_pct": 0.0,
+            "return_over_max_drawdown": None,
+            "sharpe_trades": 1.0,
+            "win_rate_pct": 100.0,
+            "avg_trade_ret_pct": 1.0,
+            "avg_trade_exec_bars": 2.0,
+            "exposure_pct": 50.0,
+        }
         if tp_sl:
             params["risk"] = {"mode": "tp_sl_grid", "best_tp_pct": 2.0, "best_sl_pct": 1.0}
             metrics.update(best_tp_pct=2.0, best_sl_pct=1.0)
@@ -69,6 +80,13 @@ def fixture(top_n=50, count=50, direction="desc", tp_sl=False):
                     "total_return_pct": float(i // 2),
                     "trade_count": 2,
                     "profit_factor": float("inf"),
+                    "max_drawdown_pct": 0.0,
+                    "return_over_max_drawdown": float("inf"),
+                    "sharpe_trades": 1.0,
+                    "win_rate_pct": 100.0,
+                    "avg_trade_ret_pct": 1.0,
+                    "avg_trade_exec_bars": 2.0,
+                    "exposure_pct": 50.0,
                 },
                 metadata={"alpha.source": "close", "alpha.window": i + 1},
             )
@@ -88,6 +106,21 @@ def fixture(top_n=50, count=50, direction="desc", tp_sl=False):
         ]
     reference = {
         "schema": "backtest_full_top_reference_v1",
+        "risk_mode": "tp_sl_grid" if tp_sl else "none",
+        "funding_included": False,
+        "metric_names": [
+            "total_return_pct",
+            "max_drawdown_pct",
+            "return_over_max_drawdown",
+            "profit_factor",
+            "trade_count",
+            "sharpe_trades",
+            "win_rate_pct",
+            "avg_trade_ret_pct",
+            "avg_trade_exec_bars",
+            "exposure_pct",
+        ]
+        + (["best_tp_pct", "best_sl_pct"] if tp_sl else []),
         "complete": True,
         "requested_top_n": top_n,
         "expected_count": count,
@@ -118,6 +151,7 @@ def assess(api, ref, **kwargs):
         context=CONTEXT,
         requested_top_n=ref["requested_top_n"],
         available_count=ref["expected_count"],
+        actual_metric_names=ref["metric_names"],
         **kwargs,
     )
 
@@ -216,6 +250,7 @@ def test_transport_producer_to_report_and_acceptance(tmp_path):
             "request_top_n": 50,
             "benchmark_top_k": 5,
             "top_results_count": 50,
+            "metric_names": ref["metric_names"],
         }
     }
     diagnostics["top_results_sample"] = [
@@ -356,6 +391,7 @@ def test_assessed_legacy_mismatch_cannot_contradict_aggregate_pass():
         "request_top_n": 50,
         "benchmark_top_k": 5,
         "top_results_count": 50,
+        "metric_names": ref["metric_names"],
     }
     samples = [
         {"rank": rank, "metrics": row["summary_metrics"]}
@@ -399,6 +435,7 @@ def test_aggregate_accepts_only_complete_independent_reference(top_n, count):
         "request_top_n": top_n,
         "benchmark_top_k": 5,
         "top_results_count": count,
+        "metric_names": ref["metric_names"],
     }
     child = {
         "exact_diagnostics": {"telemetry": telemetry},
@@ -413,3 +450,34 @@ def test_aggregate_accepts_only_complete_independent_reference(top_n, count):
     )
     assert result["status"] == "passed"
     assert result["full_reference"]["compared_count"] == count
+
+
+@pytest.mark.parametrize("also_drop_actual", [False, True])
+def test_truncated_metric_oracle_is_not_assessed(also_drop_actual):
+    api, ref, _ = fixture()
+    del ref["items"][0]["summary_metrics"]["trade_count"]
+    if also_drop_actual:
+        del api["items"][0]["summary_metrics"]["trade_count"]
+    assert assess(api, ref)["status"] == "not_assessed"
+
+
+def test_metric_manifest_cannot_omit_current_required_metrics():
+    api, ref, _ = fixture()
+    ref["metric_names"].remove("trade_count")
+    for expected, actual in zip(ref["items"], api["items"], strict=True):
+        del expected["summary_metrics"]["trade_count"]
+        del actual["summary_metrics"]["trade_count"]
+    assert assess(api, ref)["status"] == "not_assessed"
+
+
+def test_funding_metric_manifest_is_complete_without_changing_funding_calculation():
+    api, ref, _ = fixture()
+    ref["funding_included"] = True
+    ref["metric_names"] += [
+        "total_return_pct_net_of_funding",
+        "funding_return_pct",
+        "funding_pnl_quote",
+        "funding_events_count",
+    ]
+    # Deliberately missing metrics: matching base rows cannot pass a funding profile.
+    assert assess(api, ref)["status"] == "not_assessed"

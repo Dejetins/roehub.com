@@ -7,6 +7,12 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from trading.contexts.backtest.application.dto.tp_sl_exact import TP_SL_EXACT_METRIC_NAMES
+from trading.contexts.backtest.application.services.v2.no_risk_exact import NO_RISK_METRIC_NAMES
+from trading.contexts.backtest.application.services.v2.no_risk_funding import (
+    NO_RISK_FUNDING_METRIC_NAMES,
+)
+
 FLOAT_TOLERANCE = 1e-5  # Existing API-runner absolute tolerance; no relative tolerance.
 MAX_ROWS = 50
 CONTEXT_KEYS = (
@@ -93,6 +99,7 @@ def assess_full_parity(
     context: Mapping[str, Any],
     requested_top_n: int,
     available_count: int | None,
+    actual_metric_names: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """A missing, partial or semantically incompatible oracle is never assessed success."""
     rows = api_top.get("items")
@@ -143,15 +150,40 @@ def assess_full_parity(
         or len(expected) != count
     ):
         reasons.append("reference_incomplete")
+    risk_mode = reference.get("risk_mode")
+    funding_included = reference.get("funding_included")
+    metric_names = reference.get("metric_names")
+    required_metrics = set(
+        TP_SL_EXACT_METRIC_NAMES if risk_mode == "tp_sl_grid" else NO_RISK_METRIC_NAMES
+    )
+    if funding_included is True:
+        required_metrics.update(NO_RISK_FUNDING_METRIC_NAMES)
+    if (
+        risk_mode not in ("none", "tp_sl_grid")
+        or type(funding_included) is not bool
+        or not isinstance(metric_names, list)
+        or not all(isinstance(name, str) for name in metric_names)
+        or set(metric_names) != required_metrics
+        or len(metric_names) != len(required_metrics)
+    ):
+        reasons.append("reference_metric_manifest_incomplete_or_invalid")
+    if (
+        not isinstance(actual_metric_names, (list, tuple))
+        or not all(isinstance(name, str) for name in actual_metric_names)
+        or set(actual_metric_names) != required_metrics
+    ):
+        reasons.append("actual_metric_profile_missing_or_incompatible")
     if isinstance(expected, list):
         for row in expected:
             if (
                 not isinstance(row, Mapping)
                 or any(k not in row for k in ROW_FIELDS)
                 or not row.get("variant_hash")
-                or not row.get("canonical_variant_params")
+                or not isinstance(row.get("canonical_variant_params"), Mapping)
+                or not isinstance(row["canonical_variant_params"].get("risk"), Mapping)
                 or not isinstance(row.get("summary_metrics"), Mapping)
-                or "total_return_pct" not in row["summary_metrics"]
+                or set(row["summary_metrics"]) != required_metrics
+                or row["canonical_variant_params"].get("risk", {}).get("mode") != risk_mode
             ):
                 reasons.append("reference_required_fields_missing")
                 break

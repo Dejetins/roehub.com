@@ -98,6 +98,12 @@ Each reference run may provide `full_top_reference` with:
   request, quality filters, ranking/direction/tie policy, numerical engine policy,
   runtime configuration and artifact identity. This strict full-reference format
   does not infer historical-prefix compatibility from a different manifest hash.
+- `risk_mode`, boolean `funding_included` and a complete `metric_names` manifest.
+  The manifest must match the current `NO_RISK_METRIC_NAMES` or
+  `TP_SL_EXACT_METRIC_NAMES`, plus funding metrics when included. Every reference
+  row must have exactly those keys, and the child telemetry metric profile must
+  agree. A truncated oracle is `not_assessed`, even if API loses the same metrics;
+  a missing API metric against a complete oracle is a demonstrated mismatch.
 - Each item includes `rank`, stable `variant_hash`, `canonical_variant_params`,
   complete `summary_metrics`, `best_tp_pct`, and `best_sl_pct`.
 

@@ -116,3 +116,24 @@ and compatible full trusted reference. This does not block deterministic F03/F04
 correction. No deployment is authorized or performed. Publication target is
 `shipped-no-runtime`; actual PR/revision/CI and safe local fast-forward evidence
 belong to the final delivery report, not to an unobserved claim in this record.
+
+
+## GitHub review follow-up
+
+Automated review of `39f24da7` found that a candidate and oracle could lose the
+same required metric. Two regression cases reproduced `passed` / `failed` where
+an incomplete oracle required `not_assessed`. Full references now declare risk,
+funding inclusion and metric manifest; the manifest is checked against current
+metric-name contracts and child profile, and every reference row must be complete.
+This does not regenerate any financial baseline: synthetic transport fixtures
+independently prescribe values for the complete known metric shape.
+
+First PR Web run `35285477803` failed library.spec.ts:112 on
+`Transition was aborted because of invalid state. Viewport size changed`.
+No frontend files were changed by this task. No unrelated repair was made;
+the new revision triggers its own CI and the original failed run is retained.
+
+Follow-up verification: 67 tests passed with
+`PYTHONPATH=src $PY -m pytest -q tests/unit/scripts/backtest tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py`.
+Whole-repository Ruff and Pyright (0 errors) passed again; project-map drift check
+passed. Existing backend computation was not changed by this follow-up.

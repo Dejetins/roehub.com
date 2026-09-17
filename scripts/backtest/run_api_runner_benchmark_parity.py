@@ -1828,6 +1828,7 @@ def _compare_reference_results(
         context=comparison_context or {},
         requested_top_n=requested_top_n,
         available_count=telemetry.get("top_results_count"),
+        actual_metric_names=telemetry.get("metric_names"),
     )
     child_full = next((item.get("benchmark_full_top") for item in reversed(child_evidence)
                        if item.get("benchmark_full_top") is not None), None)
