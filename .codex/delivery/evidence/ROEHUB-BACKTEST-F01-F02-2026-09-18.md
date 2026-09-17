@@ -171,3 +171,34 @@ returned **968 passed**. Independent follow-up review: **approve**; reviewer ran
 `-k 'compiled_cell_metrics or preflight_to_actual_short'`: 66 passed,
 104 deselected. The deselection is the deliberate focused scope, not full-suite
 coverage. All 170 new regressions are covered by the 968-test final local gate.
+
+
+## Authorized UI gate repair
+
+After final backend CI passed, Platform Web journey failed twice at the same
+Axe assertion (run 35279656545, attempts 1 and 2). The Equity and Refresh results
+buttons had reported contrast 2.53 and 3.11 versus 4.5. The test ran Axe directly
+after an Equity click that starts a 320ms content-opacity animation.
+
+The user explicitly authorized the narrow test repair and completion of delivery.
+`journey.spec.ts` now polls for finite animations to finish before Axe and the
+screenshot, with a 3-second limit. Infinite animations are excluded to avoid
+waiting on unrelated continuous indicators. The contrast assertion, user flow,
+production UI and animation behavior are unchanged. This is a test-only change;
+public contracts and financial behavior are unaffected. Independent review:
+**approve**. Browser verification is the exact CI journey scenario at the new
+revision; its result is recorded separately in the publication report.
+
+Local verification: the existing TypeScript binary with
+`--noEmit -p apps/platform-web/tsconfig.json` passed. The initial pnpm script
+attempt tried its automatic dependency reconciliation and aborted before running
+the check (no TTY); no dependency installation was completed. The direct compiler
+used existing dependencies. Temporary worktree symlinks were removed afterward.
+
+The original checkout has foreign edits to the journey test, including its own
+equivalent animation wait. They were not copied into this PR. A disposable Git
+repository verified that preparing the target blob for only an overlapping path
+in the empty index, then `git merge --ff-only`, can preserve different working
+bytes while leaving the final index clean. Real synchronization still requires
+an exact target SHA, empty initial index, overlap inventory and before/after
+foreign-file hashes. No stash, reset, cleanup or foreign commit is needed.
