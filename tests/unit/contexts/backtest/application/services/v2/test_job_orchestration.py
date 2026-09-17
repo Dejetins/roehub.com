@@ -59,7 +59,8 @@ def test_no_risk_job_runs_sample_warmup_before_measured_exact() -> None:
     assert [call["rows"] for call in exact.calls] == [2, 3]
     assert result.stage_timings[SAMPLE_WARMUP_STAGE_NAME] >= 0.0
     assert result.stage_timings[SERVICE_TOTAL_WITHOUT_WARMUP_STAGE_NAME] == pytest.approx(
-        0.1 + 0.2 + 0.3 + 0.4
+        result.stage_timings["service_wall_clock_s"]
+        - result.stage_timings[SAMPLE_WARMUP_STAGE_NAME]
     )
     counters = result.instrumentation_counters
     assert counters["artifact_load_ms"] is None
@@ -560,3 +561,66 @@ def _pool(*, indicator_id: str, rows: int) -> PreparedIndicatorPool:
             for index in range(rows)
         ),
     )
+
+
+def test_controlled_interval_reporting_excludes_final_diagnostics_and_gc(monkeypatch, tmp_path):
+    import json
+
+    from apps.worker.backtest_job_runner.wiring.modules.child_ipc import child_success_to_mapping
+    from apps.worker.backtest_job_runner.wiring.modules.child_process import _write_result_evidence
+    from scripts.backtest.run_api_runner_benchmark_parity import (
+        _merged_stage_timings,
+        _timing_accounting,
+    )
+    from trading.contexts.backtest.application.services.v2 import job_orchestration as module
+
+    clock = [0.0]
+    collections = []
+    monkeypatch.setattr(module.time, 'perf_counter', lambda: clock[0])
+
+    def collect():
+        collections.append(clock[0])
+        clock[0] += 2
+
+    monkeypatch.setattr(module.gc, 'collect', collect)
+    original_counters = module._instrumentation_counters
+
+    def counters(**kwargs):
+        clock[0] += 4  # Post-boundary diagnostic serialization.
+        return original_counters(**kwargs)
+
+    monkeypatch.setattr(module, '_instrumentation_counters', counters)
+
+    class Prepare(_PreparePools):
+        def execute(self, **kwargs):
+            clock[0] += 1  # Bitset diagnostic GC below adds another two seconds.
+            return super().execute(**kwargs)
+
+    class Exact(_ExactService):
+        def execute(self, **kwargs):
+            clock[0] += 3 if not self.calls else 5
+            return super().execute(**kwargs)
+
+    class Assembly(_TopResultAssembly):
+        def assemble(self, **kwargs):
+            clock[0] += 1
+            return super().assemble(**kwargs)
+
+    result = BacktestRuntimeJobOrchestrationService(
+        prepare_pools=Prepare(_prepared_result(rows=3)), combo_planning=_ComboPlanning(),
+        no_risk_exact=Exact(), tp_sl_hit_times=_UnusedService(), tp_sl_exact=_UnusedService(),
+        artifact_array_loader=_UnusedService(), top_result_assembly=cast(Any, Assembly()),
+    ).execute(job_id=uuid4(), preflight=_preflight(top_n=50, risk_mode='none'),
+              updated_at=datetime.now(UTC))
+    assert collections == [1, 6, 18]
+    assert clock[0] == 20
+    assert result.stage_timings['service_wall_clock_s'] == 14
+    assert result.stage_timings['sample_warmup'] == 5  # Includes warmup's own GC.
+    assert result.stage_timings['service_total_without_warmup'] == 9
+    assert 'persist_top_n_io' not in result.stage_timings
+    _write_result_evidence(env={'ROEHUB_BACKTEST_CHILD_EVIDENCE_DIR': str(tmp_path)},
+                           job_id=uuid4(), payload=child_success_to_mapping(result=result),
+                           process_evidence={})
+    evidence = [json.loads(next(tmp_path.glob('*.json')).read_text())]
+    assert _merged_stage_timings(evidence)['service_total_without_warmup'] == 9
+    assert _timing_accounting(evidence)['status'] == 'passed'

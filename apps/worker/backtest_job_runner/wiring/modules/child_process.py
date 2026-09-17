@@ -203,6 +203,23 @@ def _write_result_evidence(
         "top_variants_count": top_variants_count,
         "process_evidence": dict(process_evidence),
     }
+    # Opt-in benchmark evidence is capped independently of requested job size.
+    # Normal child diagnostics remain a five-row sample.
+    if env.get("ROEHUB_BACKTEST_BENCHMARK_FULL_TOP") == "1":
+        rows = top_variants if isinstance(top_variants, list) else []
+        evidence["benchmark_full_top"] = {
+            "count": len(rows),
+            "complete": isinstance(top_variants, list) and len(rows) <= 50,
+            "items": [
+                {
+                    "rank": row["rank"], "variant_hash": row["variant_key"],
+                    "canonical_variant_params": row["payload_json"]["canonical_variant_params"],
+                    "summary_metrics": row["summary_metrics_json"],
+                    "best_tp_pct": row["best_tp_pct"], "best_sl_pct": row["best_sl_pct"],
+                }
+                for row in rows[:50]
+            ],
+        }
     suffix = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     path = evidence_dir / f"full-job-result-{job_id}-{suffix}.json"
     path.write_text(
