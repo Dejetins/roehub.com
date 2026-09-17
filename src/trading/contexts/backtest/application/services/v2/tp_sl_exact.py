@@ -2723,34 +2723,163 @@ def _ranking_scores_for_selected_cells(
     buffers: _TpSlScoreBuffers,
     metric_name: str,
 ) -> np.ndarray:
+    metric_code = {
+        "max_drawdown_pct": 0,
+        "return_over_max_drawdown": 1,
+        "profit_factor": 2,
+        "sharpe_trades": 3,
+        "win_rate_pct": 4,
+    }[metric_name]
+    pools = _pool_by_id(prepared_result)
+    # Reuse signal matrices; do not materialize a full consensus/tape per candidate.
+    signals = tuple(pools[key].trade_T for key in prepared_result.indicator_ids)
+    rows = np.ascontiguousarray([
+        selected_rows_by_indicator[key] for key in prepared_result.indicator_ids
+    ], dtype=np.int32)
     scores = np.empty(buffers.size, dtype=np.float64)
-    for index in range(buffers.size):
-        local_indices = tuple(
-            int(selected_rows_by_indicator[indicator_id][index])
-            for indicator_id in prepared_result.indicator_ids
-        )
-        entry_abs, directions, exits = build_trade_list_15m_for_indicator_rows_slow(
-            prepared_result=prepared_result,
-            local_indices=local_indices,
-            direction_mode=direction_mode,
-        )
-        trade_returns, bars_held = _selected_cell_trade_returns(
-            entry_abs=entry_abs,
-            dir_arr=directions,
-            sig_exit_abs=exits,
-            best_tp_idx=int(buffers.best_tp_idx[index]),
-            best_sl_idx=int(buffers.best_sl_idx[index]),
-            hit_times=hit_times,
-            runtime=runtime,
-        )
-        metrics = _summary_metrics_from_trade_returns(
-            trade_returns=trade_returns,
-            bars_held=bars_held,
-            t_exec_abs=int(runtime.t_exec_abs_15m),
-            runtime=runtime,
-        )
-        scores[index] = metrics[metric_name]
+    _tp_sl_selected_cell_ranking_scores(
+        signals, rows, buffers.best_tp_idx, buffers.best_sl_idx,
+        runtime.run_abs_start_15m, runtime.t_exec_abs_15m,
+        runtime.price_open_15m, runtime.last_close_15m,
+        hit_times.long_tp, hit_times.long_sl, hit_times.short_tp, hit_times.short_sl,
+        runtime.log_fac_tp_long, runtime.log_fac_sl_long,
+        runtime.log_fac_tp_short, runtime.log_fac_sl_short,
+        runtime.log_fee_two_sides, runtime.close_on_end,
+        runtime.initial_cash_quote, runtime.sizing_mode_code, runtime.quote_amount,
+        runtime.equity_pct, runtime.min_quote, runtime.max_quote,
+        runtime.safe_profit_percent, runtime.use_profit_lock,
+        _direction_mode_code(direction_mode), np.int8(metric_code), scores,
+    )
     return scores
+
+
+@nb.njit(cache=True, parallel=True, fastmath=False)
+def _tp_sl_selected_cell_ranking_scores(
+    signals: tuple[np.ndarray, ...],
+    rows: np.ndarray,
+    best_tp_idx: np.ndarray,
+    best_sl_idx: np.ndarray,
+    run_abs_start: np.int32,
+    t_exec_abs: np.int32,
+    price_open: np.ndarray,
+    last_close: float,
+    hit_long_tp: np.ndarray,
+    hit_long_sl: np.ndarray,
+    hit_short_tp: np.ndarray,
+    hit_short_sl: np.ndarray,
+    log_fac_tp_long: np.ndarray,
+    log_fac_sl_long: np.ndarray,
+    log_fac_tp_short: np.ndarray,
+    log_fac_sl_short: np.ndarray,
+    log_fee_two_sides: float,
+    close_on_end: np.int8,
+    initial_cash_quote: float,
+    sizing_mode_code: np.int8,
+    configured_quote_amount: float,
+    equity_pct: float,
+    min_quote: float,
+    max_quote: float,
+    safe_profit_percent: float,
+    use_profit_lock: np.int8,
+    direction_mode: np.int8,
+    metric_code: np.int8,
+    scores: np.ndarray,
+) -> None:
+    """Score every chosen cell in compiled chunks with constant per-candidate state."""
+    for candidate in nb.prange(rows.shape[1]):
+        current_dir = np.int8(0)
+        entry = np.int32(0)
+        available = initial_cash_quote
+        safe = 0.0
+        equity = initial_cash_quote
+        peak = equity
+        drawdown = 0.0
+        gross_profit = 0.0
+        gross_loss = 0.0
+        wins = 0
+        count = 0
+        sum_return = 0.0
+        sum_squared = 0.0
+        for signal_idx in range(signals[0].shape[1] + 1):
+            execution_idx = np.int32(run_abs_start + signal_idx + 1)
+            final = execution_idx >= t_exec_abs or signal_idx == signals[0].shape[1]
+            if final:
+                execution_idx = t_exec_abs
+                next_dir = np.int8(0)
+            else:
+                raw = signals[0][rows[0, candidate], signal_idx]
+                for pos in range(1, rows.shape[0]):
+                    if signals[pos][rows[pos, candidate], signal_idx] != raw:
+                        raw = np.int8(0)
+                        break
+                next_dir = _tp_sl_apply_direction_mode(raw, direction_mode)
+                if next_dir == 0 and direction_mode == 2:
+                    continue
+                if next_dir == current_dir:
+                    continue
+            if current_dir != 0:
+                log_value, closed = _tp_sl_trade_log_contrib_and_closed(
+                    current_dir, entry, execution_idx,
+                    np.int32(best_tp_idx[candidate]), np.int32(best_sl_idx[candidate]),
+                    price_open, last_close, hit_long_tp, hit_long_sl, hit_short_tp, hit_short_sl,
+                    log_fac_tp_long, log_fac_sl_long, log_fac_tp_short, log_fac_sl_short,
+                    log_fee_two_sides, close_on_end, t_exec_abs,
+                )
+                quote = execution_quote_amount(
+                    available, equity, sizing_mode_code, configured_quote_amount,
+                    equity_pct, min_quote, max_quote,
+                )
+                if closed != 0 and quote > 0.0:
+                    trade_return = -1.0 if log_value <= -1.0e200 else math.exp(log_value) - 1.0
+                    pnl = quote * trade_return
+                    available += pnl
+                    if use_profit_lock == 1 and pnl > 0.0:
+                        locked = pnl * (safe_profit_percent / 100.0)
+                        available -= locked
+                        safe += locked
+                    equity = available + safe
+                    if equity > peak:
+                        peak = equity
+                    elif peak > 0.0:
+                        drawdown = max(drawdown, ((peak - equity) / peak) * 100.0)
+                    if pnl > 0.0:
+                        gross_profit += pnl
+                        wins += 1
+                    elif pnl < 0.0:
+                        gross_loss += abs(pnl)
+                    sum_return += trade_return
+                    sum_squared += trade_return * trade_return
+                    count += 1
+            if final:
+                break
+            current_dir = next_dir
+            entry = execution_idx
+        total_return = ((equity / initial_cash_quote) - 1.0) * 100.0
+        if metric_code == 0:
+            scores[candidate] = drawdown
+        elif metric_code == 1:
+            scores[candidate] = (
+                total_return / drawdown if drawdown > 0.0
+                else math.inf if total_return > 0.0 else 0.0
+            )
+        elif metric_code == 2:
+            scores[candidate] = (
+                gross_profit / gross_loss if gross_loss > 0.0
+                else math.inf if gross_profit > 0.0 else 0.0
+            )
+        elif metric_code == 3:
+            sharpe = 0.0
+            if count > 1:
+                mean = sum_return / float(count)
+                variance = sum_squared / float(count) - mean * mean
+                if variance > 0.0:
+                    years = float(t_exec_abs) / (BARS_PER_YEAR_EXEC_1M / 15.0)
+                    if years <= 0.0:
+                        years = 1.0
+                    sharpe = mean / math.sqrt(variance) * math.sqrt(float(count) / years)
+            scores[candidate] = sharpe
+        else:
+            scores[candidate] = (float(wins) / float(count)) * 100.0 if count > 0 else 0.0
 
 
 def _update_heap_ranked(

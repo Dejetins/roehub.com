@@ -818,6 +818,8 @@ Self-check является частью benchmark evidence и должен fail
 
 Short использует тот же financial kernel, sizing и funding, что и short-сегменты
 reversal, но закрывается также по neutral и никогда не открывает long.
+При стандартном dispatch no-risk arity 6/7 использует те же matrix/prefix
+backend gates, что и остальные поддерживаемые направления.
 Сохраняется существующее различие моделей: no-risk применяет slippage к обеим
 ценам и комиссии к фактическим notionals; TP/SL использует raw prices и множитель
 `(1 - fee_rate)^2`, а slippage в TP/SL не применяется. Исправление направления
@@ -851,7 +853,8 @@ boundary:
 - TP/SL сохраняет выбор max-return cell для каждой combo независимо от направления
   ranking. Запрошенная метрика выбранной cell и `asc`/`desc` применяются до
   локального отбора в chunk и глобального heap, затем при финальном ordering.
-  Для метрик кроме return полный расчёт метрики выбранной cell нужен до отбора;
+  Для метрик кроме return расчёт метрики выбранной cell выполняется до отбора
+  скомпилированным проходом по chunk, без Python reconstruction каждой combo;
 - равные TP/SL scores сохраняют прежний tie-break: больше TP, затем SL, затем
   меньший ordinal. Бесконечные ratio metrics участвуют в числовом сравнении;
   при сборке JSON nonfinite значения по-прежнему заменяются на `null`;

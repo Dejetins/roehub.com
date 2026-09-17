@@ -250,7 +250,8 @@ def test_short_no_risk_backends(
 
 
 @pytest.mark.parametrize("risk_mode", ["none", "tp_sl_grid"])
-def test_preflight_to_actual_short_orchestration(risk_mode: str) -> None:
+@pytest.mark.parametrize("arity", [1, 6, 7])
+def test_preflight_to_actual_short_orchestration(risk_mode: str, arity: int) -> None:
     from datetime import UTC, datetime
     from uuid import UUID
 
@@ -276,10 +277,15 @@ def test_preflight_to_actual_short_orchestration(risk_mode: str) -> None:
         sizing={"mode": "all_in"},
         funding={"mode": "off", "coverage_policy": "degraded_with_warning"},
     )
+    ids = ("ma.dema", "ma.ema", "ma.hma", "ma.sma", "ma.tema", "ma.wma", "ma.zlema")[:arity]
+    request["indicators"] = [
+        {"indicator_id": key, "sources": ["close"], "window": {"start": 5, "stop": 5, "step": 1}}
+        for key in ids
+    ]
     preflight = _service().execute(request)
     prepared = _prepared_result(
-        indicator_ids=("ma.dema",),
-        trade_rows_by_id={"ma.dema": [[-1, -1, 0, 1]]},
+        indicator_ids=ids,
+        trade_rows_by_id={key: [[-1, -1, 0, 1]] for key in ids},
         open_1m=[100, 100, 110, 120],
         close_1m=[100, 100, 110, 90],
     )
@@ -297,6 +303,11 @@ def test_preflight_to_actual_short_orchestration(risk_mode: str) -> None:
         updated_at=datetime(2026, 9, 18, tzinfo=UTC),
     )
     assert len(result.top_variants) == 1
+    if risk_mode == "none" and arity in (6, 7):
+        expected_backend = (
+            "matrix_bitset_no_risk_v1" if arity == 6 else "compiled_prefix_product_traversal_v1"
+        )
+        assert result.exact_diagnostics["telemetry"]["backend_id"] == expected_backend
     row = result.top_variants[0]
     assert row.summary_metrics_json["total_return_pct"] == pytest.approx(-20, abs=1e-4)
     assert row.summary_metrics_json["trade_count"] == 1
@@ -571,3 +582,79 @@ def test_tp_sl_nonfinite_ratios_keep_existing_json_policy() -> None:
     assert row.payload_json["source_top_result"]["metrics"]["profit_factor"] is None
     assert row.payload_json["source_top_result"]["metrics"]["return_over_max_drawdown"] is None
     json.dumps(dict(row.payload_json), allow_nan=False)
+
+
+@pytest.mark.parametrize(
+    "metric",
+    [
+        "max_drawdown_pct",
+        "return_over_max_drawdown",
+        "profit_factor",
+        "sharpe_trades",
+        "win_rate_pct",
+    ],
+)
+@pytest.mark.parametrize("direction_mode", ["long_only", "short", "long_short_reversal"])
+@pytest.mark.parametrize("close_on_end", [True, False])
+@pytest.mark.parametrize("offset", [0, 3])
+def test_compiled_cell_metrics_match_reference_with_sizing_and_profit_lock(
+    metric: str,
+    direction_mode: str,
+    close_on_end: bool,
+    offset: int,
+) -> None:
+    from dataclasses import replace
+
+    import numpy as np
+
+    from trading.contexts.backtest.application.dto import BacktestTpSlHitTimesSubset
+
+    prepared = _prepared_result(
+        indicator_ids=("alpha", "beta"),
+        trade_rows_by_id={
+            "alpha": [[1, -1, 1, 0], [-1, 0, -1, 1], [1, 1, -1, 0]],
+            "beta": [[1, -1, 1, 0], [-1, 0, -1, 1], [1, 1, -1, 0]],
+        },
+        open_1m=[100, 100, 110, 120],
+        close_1m=[100, 100, 110, 90],
+    )
+    prepared = replace(prepared, time_slice_start_15m=offset, time_slice_stop_15m=offset + 4)
+    hits = _no_hit_times_result()
+    table = np.full((1, offset + 4), offset + 4, dtype=np.uint32)
+    hits = replace(
+        hits,
+        hit_times=BacktestTpSlHitTimesSubset(
+            tp_values=hits.hit_times.tp_values,
+            sl_values=hits.hit_times.sl_values,
+            long_tp=table,
+            long_sl=table,
+            short_tp=table,
+            short_sl=table,
+            sentinel_index=offset + 4,
+        ),
+    )
+    request = _normalized_request(
+        direction_mode=direction_mode,
+        market_type="futures",
+        close_on_end=close_on_end,
+        fee_rate=0.001,
+        profit_lock_enabled=True,
+        sizing={"mode": "fixed_equity_pct", "equity_pct": 25.0},
+        top_n=9,
+    )
+    request["ranking"] = {"primary_metric": metric, "direction": "asc"}
+    result = BacktestTpSlExactScoringService().execute(
+        prepared_result=prepared,
+        combo_planning_result=_combo_planning_result(
+            prepared=prepared, direction_mode=direction_mode
+        ),
+        normalized_request=request,
+        hit_times_result=hits,
+    )
+    assert len(result.top_results) == 9
+    # Metrics are rebuilt by the independent slow selected-cell detail path after
+    # admission; score was computed by the compiled, pre-truncation path.
+    for top in result.top_results:
+        assert top.score == pytest.approx(top.metrics[metric], abs=1e-6)
+    scores = [top.score for top in result.top_results]
+    assert scores == sorted(scores)

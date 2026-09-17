@@ -34,12 +34,13 @@ F02: TP/SL normalized ranking was only consumed by funding reranking; local
 selection, heap admission and final order always used descending total return.
 Thread the ranking criterion through both truncations, retain the actual score
 separately from total return, and compute other ranking metrics for every
-candidate's selected cell before truncation. The canonical max-gross-return
+candidate's selected cell before truncation in a compiled chunk pass. The canonical max-gross-return
 cell contract is unchanged, including when row order is ascending. Funding
 retains its existing bounded gross-return pool and posthoc net reranking.
 
 Owned production paths under `src/trading/contexts/backtest/application/services/v2/`:
-`combo_planning.py`, `execution_sizing.py`, `no_risk_exact.py`, `tp_sl_exact.py`,
+`combo_planning.py`, `execution_sizing.py`, `job_orchestration.py`,
+`no_risk_exact.py`, `tp_sl_exact.py`,
 `matrix_backend/no_risk_score.py`, `matrix_backend/prefix_traversal.py`.
 Also changed: the new `test_short_and_tp_sl_ranking.py`, its explicit CI shard
 in `tools/ci/route_changes.py`, canonical runtime documentation, generated
@@ -58,7 +59,7 @@ ranking. After correction the same six passed. Independent audit arithmetic:
 descending +20%. Absolute tolerance 1e-4 percentage points matches the audit's
 float32 policy (observed positive result 20.000000298023224).
 
-Final new regression file: **106 passed**. Coverage:
+Final new regression file after PR review: **170 passed**. Coverage:
 
 - preflight -> real planning, warmup, scoring and assembly for both short modes;
   only artifact I/O is replaced by deterministic fixture ports;
@@ -130,11 +131,43 @@ the task-owned environment symlink before final map generation. Final verdict:
 Known retained model limitation: no-risk uses fill slippage and fees on actual
 notionals; TP/SL uses raw prices and `(1-fee_rate)^2`, ignoring slippage. This is
 existing behavior, documented rather than changed by this correction.
-Alternate-metric TP/SL ranking now needs full selected-cell statistics for every
-candidate; default return ranking retains the compact path. No latency or
+Alternate-metric TP/SL ranking now needs selected-cell statistics for every
+candidate in a compiled pass with constant per-candidate state; default return ranking retains the compact path. No latency or
 performance claim, real-market-data proof, HTTP/queue/DB proof or runtime
 installation proof is made.
 
 Publication is verified separately on the PR and remote-main revision. The
 intended terminal state is `shipped-no-runtime`; this local evidence alone does
 not establish publication or deployment.
+
+
+## PR review follow-up
+
+PR #34, initial revision `84f87d8cf2ec98dd9ad503051c580a92402d4e88`:
+GitHub review identified missing short routing through the standard arity 6/7
+matrix/prefix gates, and the Python reconstruction cost of alternate-metric
+preselection. Both were addressed: routing guards now include short, and the
+alternate-metric pass uses Numba with shared input matrices and constant state
+per candidate. The requested metric is still computed for every candidate
+before truncation; the search space and cell policy are unchanged.
+
+Added actual preflight-to-orchestration arity 6/7 tests and 60 comparisons of
+compiled scores against the slow final-detail metric path across all alternate
+metrics, directions, close-on-end settings, nonzero time slices, sizing and
+profit locking. Final new suite: 170 passed. Focused Pyright: 0 errors;
+full Ruff and project-map check passed. No benchmark or speed claim is made.
+
+Initial PR CI passed all backend/static/migration shards. Platform Web failed
+builder color contrast (4.25 vs 4.5) and library viewport-change transition
+rejection. Those UI paths are unchanged by this task. A comparative baseline
+workflow was dispatched at the original main SHA: run `35279370276`.
+These initial failures are retained as evidence; final publication depends on
+checks for the follow-up revision and is reported separately.
+
+
+Final local follow-up gate:
+`PYTHONPATH=src:. NUMBA_NUM_THREADS=1 /Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python -m pytest -q tests/unit/contexts/backtest tests/unit/contexts/backtest_artifacts tests/unit/tools/test_ci_route_changes.py`
+returned **968 passed**. Independent follow-up review: **approve**; reviewer ran
+`-k 'compiled_cell_metrics or preflight_to_actual_short'`: 66 passed,
+104 deselected. The deselection is the deliberate focused scope, not full-suite
+coverage. All 170 new regressions are covered by the 968-test final local gate.
