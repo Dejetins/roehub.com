@@ -40,7 +40,7 @@ COMBO_CHUNK_SIZE = 4096
 LEGACY_PRODUCT_HELPER_MAX_COMBINATIONS = 1_000_000
 NEG_INF = np.float32(-1e30)
 
-_SUPPORTED_DIRECTIONS = ("long_only", "long_short_reversal")
+_SUPPORTED_DIRECTIONS = ("long_only", "short", "long_short_reversal")
 _SUPPORTED_ARITIES = tuple(range(1, 11))
 
 

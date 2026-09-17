@@ -411,6 +411,8 @@ def matrix_bitset_no_risk(
                 word_idx,
                 arity,
             ) & word_mask
+            if direction_mode == np.int8(3):
+                pos_bits = np.uint64(0)
             neg_bits = np.uint64(0)
             if direction_mode != np.int8(1):
                 neg_bits = _consensus_word(
@@ -461,7 +463,7 @@ def matrix_bitset_no_risk(
                     dirn = np.int8(-1)
 
                 if dirn == 0:
-                    if direction_mode == np.int8(1) and current_dir != 0:
+                    if direction_mode != np.int8(2) and current_dir != 0:
                         (
                             available_quote,
                             safe_quote,

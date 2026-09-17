@@ -75,6 +75,7 @@ TEST_SHARDS: dict[str, TestShard] = {
             "tests/unit/contexts/backtest/application/services/v2/"
             "test_no_risk_exact_scoring_service.py",
             "tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py",
+            "tests/unit/contexts/backtest/application/services/v2/test_short_and_tp_sl_ranking.py",
             "tests/unit/contexts/backtest/application/services/v2/test_signal_rules_engine_v2.py",
             "tests/unit/contexts/backtest/application/services/v2/test_top_result_assembly.py",
             "tests/unit/contexts/backtest/application/services/v2/"

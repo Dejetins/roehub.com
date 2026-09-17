@@ -37,6 +37,7 @@ from trading.contexts.backtest.application.services.v2.combo_planning import (
 from trading.contexts.backtest.application.services.v2.execution_sizing import (
     DIRECTION_MODE_LONG_ONLY,
     DIRECTION_MODE_LONG_SHORT_REVERSAL,
+    DIRECTION_MODE_SHORT,
     execution_quote_amount,
     execution_settings_from_normalized,
 )
@@ -1088,6 +1089,8 @@ def _apply_direction_mode(raw_dir: np.int8 | int, direction_mode: np.int8 | int)
         if raw_dir == 1:
             return np.int8(1)
         return np.int8(0)
+    if direction_mode == 3:
+        return np.int8(-1 if raw_dir == -1 else 0)
     return np.int8(raw_dir)
 
 
@@ -1428,7 +1431,7 @@ def event_segments_2_no_risk(
                     right_segment_values[right_row, right_segment_idx],
                 )
                 dirn = _apply_direction_mode(raw_dir, direction_mode)
-                if dirn != 0 or (direction_mode == 1 and current_dir != 0):
+                if dirn != 0 or (direction_mode != 2 and current_dir != 0):
                     entry_exec = sig_entry_exec_idx[segment_start]
                     if entry_exec >= t_exec:
                         break
@@ -1675,7 +1678,7 @@ def streaming_2_no_risk(
                 right_trade_t[right_row, signal_idx],
             )
             dirn = _apply_direction_mode(raw_dir, direction_mode)
-            if dirn == 0 and not (direction_mode == 1 and current_dir != 0):
+            if dirn == 0 and not (direction_mode != 2 and current_dir != 0):
                 continue
             entry_exec = sig_entry_exec_idx[signal_idx]
             if entry_exec >= t_exec:
@@ -1949,7 +1952,7 @@ def event_segments_n_no_risk(
                             raw_dir = np.int8(0)
                             break
                 dirn = _apply_direction_mode(raw_dir, direction_mode)
-                if dirn != 0 or (direction_mode == 1 and current_dir != 0):
+                if dirn != 0 or (direction_mode != 2 and current_dir != 0):
                     entry_exec = sig_entry_exec_idx[segment_start]
                     if entry_exec >= t_exec:
                         break
@@ -2180,12 +2183,14 @@ def build_trade_list_for_indicator_rows_slow(
         )
     if direction_mode == DIRECTION_MODE_LONG_ONLY:
         direction_signal = (raw_signal == np.int8(1)).astype(np.int8)
+    elif direction_mode == DIRECTION_MODE_SHORT:
+        direction_signal = -(raw_signal == np.int8(-1)).astype(np.int8)
     elif direction_mode == DIRECTION_MODE_LONG_SHORT_REVERSAL:
         direction_signal = raw_signal
     else:
         raise BacktestNoRiskExactRejected(
             f"Unsupported direction_mode={direction_mode!r}; expected "
-            f"{(DIRECTION_MODE_LONG_ONLY, DIRECTION_MODE_LONG_SHORT_REVERSAL)!r}"
+            "long_only, short or long_short_reversal"
         )
 
     entry_exec: list[int] = []
@@ -2207,7 +2212,7 @@ def build_trade_list_for_indicator_rows_slow(
         if entry_idx >= t_exec_limit:
             break
         if dirn == 0:
-            if direction_mode != DIRECTION_MODE_LONG_ONLY or current_dir == 0:
+            if direction_mode == DIRECTION_MODE_LONG_SHORT_REVERSAL or current_dir == 0:
                 continue
             entry_exec.append(current_entry)
             directions.append(current_dir)

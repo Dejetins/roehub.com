@@ -545,6 +545,8 @@ exact scoring, но не является production pipeline stage.
 
 - `long_only`: raw consensus `+1` открывает/держит long; raw `0` или `-1`
   закрывает открытый long; short trades никогда не открываются;
+- `short` (только futures): raw consensus `-1` открывает/держит short; raw `0`
+  или `+1` закрывает short на следующем execution open; long не открывается;
 - `long_short_reversal`: raw consensus `+1` открывает/держит long; raw `-1`
   открывает/держит short; противоположный signal закрывает и разворачивает позицию.
 
@@ -812,6 +814,22 @@ Self-check является частью benchmark evidence и должен fail
   selected best cell в service может считаться отдельным
   `tp_sl_full_metrics_second_pass`, чтобы не раздувать `exact_scoring` boundary.
 
+### Исправление standalone short и ranking (2026-09-18)
+
+Short использует тот же financial kernel, sizing и funding, что и short-сегменты
+reversal, но закрывается также по neutral и никогда не открывает long.
+Сохраняется существующее различие моделей: no-risk применяет slippage к обеим
+ценам и комиссии к фактическим notionals; TP/SL использует raw prices и множитель
+`(1 - fee_rate)^2`, а slippage в TP/SL не применяется. Исправление направления
+не меняет эту модель и не подтверждает её эквивалентность no-risk.
+
+Ранее сохранённые jobs и top-N остаются историческими результатами. Для
+пересчёта F01/F02 нужен новый job без старого `Idempotency-Key` (или с новым
+ключом); replay прежнего ключа в пределах TTL возвращает прежний job. Request
+и variant identity описывают параметры, их схема не меняется. Lazy cache
+включает `job_id`, поэтому новый job не получает старый shortlist/detail.
+Удаление данных и миграция не требуются.
+
 ### Измеряемая стадия бенчмарка: `heap_update`
 
 Notebook использует Python `heapq`, чтобы держать top K.
@@ -830,6 +848,15 @@ boundary:
 Эта stage:
 
 - ranks по selected metric, default `total_return_pct desc`;
+- TP/SL сохраняет выбор max-return cell для каждой combo независимо от направления
+  ranking. Запрошенная метрика выбранной cell и `asc`/`desc` применяются до
+  локального отбора в chunk и глобального heap, затем при финальном ordering.
+  Для метрик кроме return полный расчёт метрики выбранной cell нужен до отбора;
+- равные TP/SL scores сохраняют прежний tie-break: больше TP, затем SL, затем
+  меньший ordinal. Бесконечные ratio metrics участвуют в числовом сравнении;
+  при сборке JSON nonfinite значения по-прежнему заменяются на `null`;
+- funding сохраняет существующую ограниченную gross-return candidate pool и
+  posthoc reranking; exact global net optimum не гарантируется;
 - строит deterministic heap key из score и original row ids;
 - держит только `top_k` rows в heap;
 - добавляет compact per-indicator metadata только для rows, которые реально

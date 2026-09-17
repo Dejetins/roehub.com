@@ -6,6 +6,8 @@ from typing import Any, Mapping
 import numba as nb
 import numpy as np
 
+DIRECTION_MODE_SHORT = "short"
+DIRECTION_MODE_SHORT_CODE = np.int8(3)
 DIRECTION_MODE_LONG_ONLY = "long_only"
 DIRECTION_MODE_LONG_SHORT_REVERSAL = "long_short_reversal"
 DIRECTION_MODE_LONG_ONLY_CODE = np.int8(1)
@@ -172,13 +174,15 @@ def direction_mode_code(
     direction_mode: str,
     rejection_cls: type[ValueError] = BacktestExecutionSizingRejected,
 ) -> np.int8:
+    if direction_mode == DIRECTION_MODE_SHORT:
+        return DIRECTION_MODE_SHORT_CODE
     if direction_mode == DIRECTION_MODE_LONG_ONLY:
         return DIRECTION_MODE_LONG_ONLY_CODE
     if direction_mode == DIRECTION_MODE_LONG_SHORT_REVERSAL:
         return DIRECTION_MODE_LONG_SHORT_REVERSAL_CODE
     raise rejection_cls(
         f"Unsupported direction_mode={direction_mode!r}; expected "
-        f"{(DIRECTION_MODE_LONG_ONLY, DIRECTION_MODE_LONG_SHORT_REVERSAL)!r}"
+        f"{(DIRECTION_MODE_LONG_ONLY, DIRECTION_MODE_SHORT, DIRECTION_MODE_LONG_SHORT_REVERSAL)!r}"
     )
 
 
