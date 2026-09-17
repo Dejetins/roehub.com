@@ -43,7 +43,7 @@ def collect_compiled_prefix_candidates(
         raise ValueError("compiled prefix traversal supports arity 6 and 7 only")
     if len(packed_by_indicator) != arity:
         raise ValueError("packed bitset arity mismatch")
-    if direction_mode not in {"long_only", "long_short_reversal"}:
+    if direction_mode not in {"long_only", "short", "long_short_reversal"}:
         raise ValueError(f"unsupported direction_mode={direction_mode!r}")
 
     pos_stack, neg_stack, row_counts, signal_length, word_count = _bitset_stacks(
@@ -72,7 +72,7 @@ def collect_compiled_prefix_candidates(
         row_counts,
         selectivity_order,
         np.int32(max(int(min_closed_trades), 1)),
-        np.int8(1 if direction_mode == "long_only" else 2),
+        np.int8(1 if direction_mode == "long_only" else 3 if direction_mode == "short" else 2),
         np.int32(signal_length),
         np.int32(word_count),
         _last_word_mask(signal_length),
@@ -166,7 +166,9 @@ def _selectivity_order(
     for pos in range(int(row_counts.shape[0])):
         rows = int(row_counts[pos])
         active = pos_stack[pos, :rows, :]
-        if direction_mode != "long_only":
+        if direction_mode == "short":
+            active = neg_stack[pos, :rows, :]
+        elif direction_mode != "long_only":
             active = active | neg_stack[pos, :rows, :]
         byte_view = np.ascontiguousarray(active).view(np.uint8)
         active_counts.append((int(np.sum(np.unpackbits(byte_view))), pos))
@@ -224,6 +226,8 @@ def _collect_prefix_candidates(
             if word_idx == int(word_count) - 1:
                 word_mask = last_word_mask
             pos_bits = pos_stack[original_pos, row_idx, word_idx] & word_mask
+            if direction_mode == np.int8(3):
+                pos_bits = np.uint64(0)
             neg_bits = np.uint64(0)
             if direction_mode != np.int8(1):
                 neg_bits = neg_stack[original_pos, row_idx, word_idx] & word_mask

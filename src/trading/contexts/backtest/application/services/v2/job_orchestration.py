@@ -424,14 +424,14 @@ def _matrix_backend_override(
             MATRIX_BACKEND_MODE_STAGE_05_AND_12_NO_RISK,
         }
         and risk_mode == "none"
-        and direction_mode in {"long_only", "long_short_reversal"}
+        and direction_mode in {"long_only", "short", "long_short_reversal"}
         and arity == 6
     ):
         return MATRIX_BITSET_NO_RISK_V1_BACKEND
     if (
         mode == MATRIX_BITSET_NO_RISK_V1_BACKEND
         and risk_mode == "none"
-        and direction_mode in {"long_only", "long_short_reversal"}
+        and direction_mode in {"long_only", "short", "long_short_reversal"}
         and arity in (2, 3, 6)
     ):
         return MATRIX_BITSET_NO_RISK_V1_BACKEND
@@ -443,7 +443,7 @@ def _matrix_backend_override(
             COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
         }
         and risk_mode == "none"
-        and direction_mode in {"long_only", "long_short_reversal"}
+        and direction_mode in {"long_only", "short", "long_short_reversal"}
         and (
             arity == 7
             or (

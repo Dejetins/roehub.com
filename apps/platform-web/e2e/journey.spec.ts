@@ -139,6 +139,10 @@ with psycopg.connect(private['dsn'],autocommit=True) as db:
     await page.getByRole('tab', { name: 'Overview', exact: true }).click();
     await page.getByRole('button', { name: 'Equity', exact: true }).click();
     await expect(page.getByRole('img', { name: 'Equity', exact: true })).toBeVisible();
+    // Measure resting-state contrast after the content fade and button transitions.
+    await expect.poll(() => page.evaluate(() => document.getAnimations().filter(animation =>
+      animation.effect?.getTiming().iterations !== Infinity && animation.playState !== 'finished',
+    ).length), { timeout: 3_000 }).toBe(0);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.screenshot({ path: resolve(evidence, 'integrated-result.png'), fullPage: true });
 

@@ -39,6 +39,8 @@ from trading.contexts.backtest.application.services.v2.execution_sizing import (
     DIRECTION_MODE_LONG_ONLY_CODE,
     DIRECTION_MODE_LONG_SHORT_REVERSAL,
     DIRECTION_MODE_LONG_SHORT_REVERSAL_CODE,
+    DIRECTION_MODE_SHORT,
+    DIRECTION_MODE_SHORT_CODE,
     SIZING_MODE_ALL_IN_CODE,
     execution_quote_amount,
     execution_quote_amount_py,
@@ -328,6 +330,12 @@ class BacktestTpSlExactScoringService:
         funding_adjustment_enabled = _funding_adjustment_enabled(
             normalized_request=normalized_request
         )
+        # Funding retains the established gross-return candidate pool and cell policy.
+        base_ranking = (
+            _RankingSpec(metric_name="total_return_pct", direction="desc")
+            if funding_adjustment_enabled
+            else requested_ranking
+        )
         candidate_pool_top_k = (
             _funding_candidate_pool_size(request_top_n)
             if funding_adjustment_enabled
@@ -412,6 +420,7 @@ class BacktestTpSlExactScoringService:
                     heap=heap,
                     top_k_context=top_k_context,
                     top_k=candidate_pool_top_k,
+                    ranking=base_ranking,
                     candidate_ordinal_start=candidate_ordinal_start,
                     min_closed_trades=min_closed_trades,
                     cell_block_tp_count=cell_block_tp_count,
@@ -439,6 +448,7 @@ class BacktestTpSlExactScoringService:
                     heap=heap,
                     top_k_context=top_k_context,
                     top_k=candidate_pool_top_k,
+                    ranking=base_ranking,
                     candidate_ordinal_start=candidate_ordinal_start,
                     min_closed_trades=min_closed_trades,
                     cell_block_tp_count=cell_block_tp_count,
@@ -569,6 +579,7 @@ class BacktestTpSlExactScoringService:
         heap: list[tuple[tuple[float, float, float, int, tuple[int, ...]], _TpSlHeapEntry]],
         top_k_context: _TopKContext,
         top_k: int,
+        ranking: _RankingSpec,
         candidate_ordinal_start: int,
         min_closed_trades: int,
         cell_block_tp_count: int,
@@ -614,13 +625,32 @@ class BacktestTpSlExactScoringService:
                 hit_times=hit_times,
                 index=sample_index,
             )
+        # Cell selection remains maximum gross return. Other metrics must be
+        # evaluated for every selected cell before either local or global truncation.
+        score_values = buffers.total_return_pct
+        if ranking.metric_name != "total_return_pct":
+            metrics_start = time.perf_counter()
+            score_values = _ranking_scores_for_selected_cells(
+                selected_rows_by_indicator=selected_rows_by_indicator,
+                prepared_result=prepared_result,
+                hit_times=hit_times,
+                runtime=runtime,
+                direction_mode=combo_planning_result.backend.direction_mode,
+                buffers=buffers,
+                metric_name=ranking.metric_name,
+            )
+            stage_timings["tp_sl_ranking_metrics"] = stage_timings.get(
+                "tp_sl_ranking_metrics", 0.0
+            ) + time.perf_counter() - metrics_start
         heap_start = time.perf_counter()
-        _update_heap_total_return_desc(
+        _update_heap_ranked(
             heap=heap,
             top_k_context=top_k_context,
             selected_rows_by_indicator=selected_rows_by_indicator,
             hit_times=hit_times,
             buffers=buffers,
+            score_values=score_values,
+            score_multiplier=1.0 if ranking.direction == "desc" else -1.0,
             top_k=top_k,
             candidate_ordinal_start=candidate_ordinal_start,
             min_closed_trades=min_closed_trades,
@@ -1543,7 +1573,7 @@ def event_segments_n_tp_sl_15m_grid_cell_blocks(
                             raw_dir = np.int8(0)
                             break
                 dirn = _tp_sl_apply_direction_mode(raw_dir, direction_mode)
-                if dirn != 0 or (direction_mode == 1 and current_dir != 0):
+                if dirn != 0 or (direction_mode != 2 and current_dir != 0):
                     entry_abs = np.int32(run_abs_start + segment_start + 1)
                     if entry_abs >= t_exec_abs:
                         break
@@ -1731,7 +1761,7 @@ def event_segments_n_tp_sl_15m_grid(
                             raw_dir = np.int8(0)
                             break
                 dirn = _tp_sl_apply_direction_mode(raw_dir, direction_mode)
-                if dirn != 0 or (direction_mode == 1 and current_dir != 0):
+                if dirn != 0 or (direction_mode != 2 and current_dir != 0):
                     entry_abs = np.int32(run_abs_start + segment_start + 1)
                     if entry_abs >= t_exec_abs:
                         break
@@ -1958,7 +1988,7 @@ def event_segments_n_tp_sl_15m_grid_execution_sizing(
                                     raw_dir = np.int8(0)
                                     break
                         dirn = _tp_sl_apply_direction_mode(raw_dir, direction_mode)
-                        if dirn != 0 or (direction_mode == 1 and current_dir != 0):
+                        if dirn != 0 or (direction_mode != 2 and current_dir != 0):
                             entry_abs = np.int32(run_abs_start + segment_start + 1)
                             if entry_abs >= t_exec_abs:
                                 break
@@ -2268,6 +2298,8 @@ def _tp_sl_apply_direction_mode(raw_dir: np.int8 | int, direction_mode: np.int8 
         if raw_dir == 1:
             return np.int8(1)
         return np.int8(0)
+    if direction_mode == 3:
+        return np.int8(-1 if raw_dir == -1 else 0)
     return np.int8(raw_dir)
 
 
@@ -2337,12 +2369,14 @@ def build_trade_list_15m_for_indicator_rows_slow(
         )
     if direction_mode == DIRECTION_MODE_LONG_ONLY:
         direction_signal = (raw_signal == np.int8(1)).astype(np.int8)
+    elif direction_mode == DIRECTION_MODE_SHORT:
+        direction_signal = -(raw_signal == np.int8(-1)).astype(np.int8)
     elif direction_mode == DIRECTION_MODE_LONG_SHORT_REVERSAL:
         direction_signal = raw_signal
     else:
         raise BacktestTpSlExactRejected(
             f"Unsupported direction_mode={direction_mode!r}; expected "
-            f"{(DIRECTION_MODE_LONG_ONLY, DIRECTION_MODE_LONG_SHORT_REVERSAL)!r}"
+            "long_only, short or long_short_reversal"
         )
     entry_abs: list[int] = []
     directions: list[int] = []
@@ -2354,7 +2388,7 @@ def build_trade_list_15m_for_indicator_rows_slow(
     for signal_idx in range(int(direction_signal.shape[0])):
         dirn = int(direction_signal[signal_idx])
         if dirn == 0 and not (
-            direction_mode == DIRECTION_MODE_LONG_ONLY and current_dir != 0
+            direction_mode != DIRECTION_MODE_LONG_SHORT_REVERSAL and current_dir != 0
         ):
             continue
         entry_idx = start_15m + signal_idx + 1
@@ -2679,7 +2713,176 @@ def _top_k_context_from_prepared(prepared_result: BacktestPreparePoolsResult) ->
     )
 
 
-def _update_heap_total_return_desc(
+def _ranking_scores_for_selected_cells(
+    *,
+    selected_rows_by_indicator: Mapping[str, np.ndarray],
+    prepared_result: BacktestPreparePoolsResult,
+    hit_times: BacktestTpSlHitTimesSubset,
+    runtime: _TpSlRuntimeContext,
+    direction_mode: str,
+    buffers: _TpSlScoreBuffers,
+    metric_name: str,
+) -> np.ndarray:
+    metric_code = {
+        "max_drawdown_pct": 0,
+        "return_over_max_drawdown": 1,
+        "profit_factor": 2,
+        "sharpe_trades": 3,
+        "win_rate_pct": 4,
+    }[metric_name]
+    pools = _pool_by_id(prepared_result)
+    # Reuse signal matrices; do not materialize a full consensus/tape per candidate.
+    signals = tuple(pools[key].trade_T for key in prepared_result.indicator_ids)
+    rows = np.ascontiguousarray([
+        selected_rows_by_indicator[key] for key in prepared_result.indicator_ids
+    ], dtype=np.int32)
+    scores = np.empty(buffers.size, dtype=np.float64)
+    _tp_sl_selected_cell_ranking_scores(
+        signals, rows, buffers.best_tp_idx, buffers.best_sl_idx,
+        runtime.run_abs_start_15m, runtime.t_exec_abs_15m,
+        runtime.price_open_15m, runtime.last_close_15m,
+        hit_times.long_tp, hit_times.long_sl, hit_times.short_tp, hit_times.short_sl,
+        runtime.log_fac_tp_long, runtime.log_fac_sl_long,
+        runtime.log_fac_tp_short, runtime.log_fac_sl_short,
+        runtime.log_fee_two_sides, runtime.close_on_end,
+        runtime.initial_cash_quote, runtime.sizing_mode_code, runtime.quote_amount,
+        runtime.equity_pct, runtime.min_quote, runtime.max_quote,
+        runtime.safe_profit_percent, runtime.use_profit_lock,
+        _direction_mode_code(direction_mode), np.int8(metric_code), scores,
+    )
+    return scores
+
+
+@nb.njit(cache=True, parallel=True, fastmath=False)
+def _tp_sl_selected_cell_ranking_scores(
+    signals: tuple[np.ndarray, ...],
+    rows: np.ndarray,
+    best_tp_idx: np.ndarray,
+    best_sl_idx: np.ndarray,
+    run_abs_start: np.int32,
+    t_exec_abs: np.int32,
+    price_open: np.ndarray,
+    last_close: float,
+    hit_long_tp: np.ndarray,
+    hit_long_sl: np.ndarray,
+    hit_short_tp: np.ndarray,
+    hit_short_sl: np.ndarray,
+    log_fac_tp_long: np.ndarray,
+    log_fac_sl_long: np.ndarray,
+    log_fac_tp_short: np.ndarray,
+    log_fac_sl_short: np.ndarray,
+    log_fee_two_sides: float,
+    close_on_end: np.int8,
+    initial_cash_quote: float,
+    sizing_mode_code: np.int8,
+    configured_quote_amount: float,
+    equity_pct: float,
+    min_quote: float,
+    max_quote: float,
+    safe_profit_percent: float,
+    use_profit_lock: np.int8,
+    direction_mode: np.int8,
+    metric_code: np.int8,
+    scores: np.ndarray,
+) -> None:
+    """Score every chosen cell in compiled chunks with constant per-candidate state."""
+    for candidate in nb.prange(rows.shape[1]):
+        current_dir = np.int8(0)
+        entry = np.int32(0)
+        available = initial_cash_quote
+        safe = 0.0
+        equity = initial_cash_quote
+        peak = equity
+        drawdown = 0.0
+        gross_profit = 0.0
+        gross_loss = 0.0
+        wins = 0
+        count = 0
+        sum_return = 0.0
+        sum_squared = 0.0
+        for signal_idx in range(signals[0].shape[1] + 1):
+            execution_idx = np.int32(run_abs_start + signal_idx + 1)
+            final = execution_idx >= t_exec_abs or signal_idx == signals[0].shape[1]
+            if final:
+                execution_idx = t_exec_abs
+                next_dir = np.int8(0)
+            else:
+                raw = signals[0][rows[0, candidate], signal_idx]
+                for pos in range(1, rows.shape[0]):
+                    if signals[pos][rows[pos, candidate], signal_idx] != raw:
+                        raw = np.int8(0)
+                        break
+                next_dir = _tp_sl_apply_direction_mode(raw, direction_mode)
+                if next_dir == 0 and direction_mode == 2:
+                    continue
+                if next_dir == current_dir:
+                    continue
+            if current_dir != 0:
+                log_value, closed = _tp_sl_trade_log_contrib_and_closed(
+                    current_dir, entry, execution_idx,
+                    np.int32(best_tp_idx[candidate]), np.int32(best_sl_idx[candidate]),
+                    price_open, last_close, hit_long_tp, hit_long_sl, hit_short_tp, hit_short_sl,
+                    log_fac_tp_long, log_fac_sl_long, log_fac_tp_short, log_fac_sl_short,
+                    log_fee_two_sides, close_on_end, t_exec_abs,
+                )
+                quote = execution_quote_amount(
+                    available, equity, sizing_mode_code, configured_quote_amount,
+                    equity_pct, min_quote, max_quote,
+                )
+                if closed != 0 and quote > 0.0:
+                    trade_return = -1.0 if log_value <= -1.0e200 else math.exp(log_value) - 1.0
+                    pnl = quote * trade_return
+                    available += pnl
+                    if use_profit_lock == 1 and pnl > 0.0:
+                        locked = pnl * (safe_profit_percent / 100.0)
+                        available -= locked
+                        safe += locked
+                    equity = available + safe
+                    if equity > peak:
+                        peak = equity
+                    elif peak > 0.0:
+                        drawdown = max(drawdown, ((peak - equity) / peak) * 100.0)
+                    if pnl > 0.0:
+                        gross_profit += pnl
+                        wins += 1
+                    elif pnl < 0.0:
+                        gross_loss += abs(pnl)
+                    sum_return += trade_return
+                    sum_squared += trade_return * trade_return
+                    count += 1
+            if final:
+                break
+            current_dir = next_dir
+            entry = execution_idx
+        total_return = ((equity / initial_cash_quote) - 1.0) * 100.0
+        if metric_code == 0:
+            scores[candidate] = drawdown
+        elif metric_code == 1:
+            scores[candidate] = (
+                total_return / drawdown if drawdown > 0.0
+                else math.inf if total_return > 0.0 else 0.0
+            )
+        elif metric_code == 2:
+            scores[candidate] = (
+                gross_profit / gross_loss if gross_loss > 0.0
+                else math.inf if gross_profit > 0.0 else 0.0
+            )
+        elif metric_code == 3:
+            sharpe = 0.0
+            if count > 1:
+                mean = sum_return / float(count)
+                variance = sum_squared / float(count) - mean * mean
+                if variance > 0.0:
+                    years = float(t_exec_abs) / (BARS_PER_YEAR_EXEC_1M / 15.0)
+                    if years <= 0.0:
+                        years = 1.0
+                    sharpe = mean / math.sqrt(variance) * math.sqrt(float(count) / years)
+            scores[candidate] = sharpe
+        else:
+            scores[candidate] = (float(wins) / float(count)) * 100.0 if count > 0 else 0.0
+
+
+def _update_heap_ranked(
     *,
     heap: list[tuple[tuple[float, float, float, int, tuple[int, ...]], _TpSlHeapEntry]],
     top_k_context: _TopKContext,
@@ -2689,14 +2892,19 @@ def _update_heap_total_return_desc(
     top_k: int,
     candidate_ordinal_start: int,
     min_closed_trades: int,
+    score_values: np.ndarray | None = None,
+    score_multiplier: float = 1.0,
 ) -> None:
+    if score_values is None:
+        score_values = buffers.total_return_pct
+    comparable_scores = score_values if score_multiplier == 1.0 else -score_values
     selected_rows_by_pos = tuple(
         selected_rows_by_indicator[indicator_id]
         for indicator_id in top_k_context.indicator_ids
     )
     row_ids_by_pos = top_k_context.row_ids_by_pos
     selected_indices, selected_count = _tp_sl_select_top_k_indices(
-        buffers.total_return_pct,
+        comparable_scores,
         buffers.trade_count,
         buffers.best_tp_idx,
         buffers.best_sl_idx,
@@ -2716,13 +2924,15 @@ def _update_heap_total_return_desc(
             original_values.append(int(row_ids_by_pos[pos][local_row]))
         local_indices = tuple(local_values)
         original_rows = tuple(original_values)
-        score = float(buffers.total_return_pct[result_index])
+        score = float(score_values[result_index])
         best_tp_idx = int(buffers.best_tp_idx[result_index])
         best_sl_idx = int(buffers.best_sl_idx[result_index])
         best_tp_pct = float(hit_times.tp_values[best_tp_idx] * np.float32(100.0))
         best_sl_pct = float(hit_times.sl_values[best_sl_idx] * np.float32(100.0))
         candidate_ordinal = candidate_ordinal_start + result_index
-        heap_key = (score, best_tp_pct, best_sl_pct, -candidate_ordinal, original_rows)
+        heap_key = (
+            score * score_multiplier, best_tp_pct, best_sl_pct, -candidate_ordinal, original_rows
+        )
         if len(heap) < top_k:
             heapq.heappush(
                 heap,
@@ -2733,6 +2943,7 @@ def _update_heap_total_return_desc(
                         local_indices=local_indices,
                         original_rows=original_rows,
                         score=score,
+                        total_return_pct=float(buffers.total_return_pct[result_index]),
                         best_tp_idx=best_tp_idx,
                         best_sl_idx=best_sl_idx,
                         best_tp_pct=best_tp_pct,
@@ -2752,6 +2963,7 @@ def _update_heap_total_return_desc(
                         local_indices=local_indices,
                         original_rows=original_rows,
                         score=score,
+                        total_return_pct=float(buffers.total_return_pct[result_index]),
                         best_tp_idx=best_tp_idx,
                         best_sl_idx=best_sl_idx,
                         best_tp_pct=best_tp_pct,
@@ -2919,6 +3131,7 @@ def _materialize_heap_entry(
     local_indices: tuple[int, ...],
     original_rows: tuple[int, ...],
     score: float,
+    total_return_pct: float,
     best_tp_idx: int,
     best_sl_idx: int,
     best_tp_pct: float,
@@ -2934,7 +3147,7 @@ def _materialize_heap_entry(
         best_sl_idx=best_sl_idx,
         best_tp_pct=best_tp_pct,
         best_sl_pct=best_sl_pct,
-        total_return_pct=score,
+        total_return_pct=total_return_pct,
         trade_count=trade_count,
         candidate_ordinal=candidate_ordinal,
         metadata_by_pos=tuple(
@@ -3518,13 +3731,15 @@ def _tp_sl_runtime_context_from_prepared(
 
 
 def _direction_mode_code(direction_mode: str) -> np.int8:
+    if direction_mode == DIRECTION_MODE_SHORT:
+        return DIRECTION_MODE_SHORT_CODE
     if direction_mode == DIRECTION_MODE_LONG_ONLY:
         return DIRECTION_MODE_LONG_ONLY_CODE
     if direction_mode == DIRECTION_MODE_LONG_SHORT_REVERSAL:
         return DIRECTION_MODE_LONG_SHORT_REVERSAL_CODE
     raise BacktestTpSlExactRejected(
         f"Unsupported direction_mode={direction_mode!r}; expected "
-        f"{(DIRECTION_MODE_LONG_ONLY, DIRECTION_MODE_LONG_SHORT_REVERSAL)!r}"
+        f"{(DIRECTION_MODE_LONG_ONLY, DIRECTION_MODE_SHORT, DIRECTION_MODE_LONG_SHORT_REVERSAL)!r}"
     )
 
 
