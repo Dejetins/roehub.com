@@ -67,6 +67,7 @@ TEST_SHARDS: dict[str, TestShard] = {
             "tests/unit/contexts/backtest/application/services/"
             "test_signals_from_indicators_v1.py",
             "tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py",
+            "tests/unit/scripts/backtest",
             "tests/unit/contexts/backtest/application/services/v2/test_combo_planning_service.py",
             "tests/unit/contexts/backtest/application/services/v2/test_hit_times_compute_v2.py",
             "tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py",
@@ -286,6 +287,7 @@ def _is_backtest_path(path: str) -> bool:
         or path.startswith("tests/unit/contexts/backtest/")
         or path.startswith("tests/unit/contexts/backtest_artifacts/")
         or path.startswith("scripts/backtest/")
+        or path.startswith("tests/unit/scripts/backtest/")
         or path.startswith("apps/worker/backtest_job_runner/")
         or path.startswith("tests/unit/apps/worker/backtest_job_runner/")
         or path

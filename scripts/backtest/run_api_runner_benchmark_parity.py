@@ -47,6 +47,11 @@ from scripts.backtest import (
 from scripts.backtest import (
     run_iteration_6_tp_sl_exact_scoring_benchmark as tp_sl_bench,  # noqa: E402,E501
 )
+from scripts.backtest.full_result_parity import (
+    assess_full_parity,
+    compare_rows,
+    metric_equal,
+)
 from trading.contexts.backtest.application.services.v2.matrix_backend.tp_sl_cells import (  # noqa: E402,E501
     TP_SL_SELECTED_CELL_SHADOW_ENV_KEY,
 )
@@ -196,7 +201,8 @@ def main(argv: list[str] | None = None) -> int:
     session_id: str | None = None
     started_at = datetime.now(UTC)
     payload: dict[str, Any] = {
-        "schema": "backtest_api_runner_compute_memory_parity_v1",
+        "schema": "backtest_api_runner_compute_memory_parity_v2",
+        "mode": "diagnostic_only" if args.no_fail_on_threshold else "acceptance",
         "generated_at": started_at.isoformat(),
         "host": platform.node(),
         "python": platform.python_version(),
@@ -345,7 +351,7 @@ def main(argv: list[str] | None = None) -> int:
     summary_path.write_text(_render_summary(payload=payload), encoding="utf-8")
     print(f"wrote {results_path}")
     print(f"wrote {summary_path}")
-    return 0 if payload.get("pass") or args.no_fail_on_threshold else 1
+    return _exit_code(payload, diagnostic_only=args.no_fail_on_threshold)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -438,7 +444,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Retired Stage 09 SL block size; ignored because Stage 09 is disabled.",
     )
     parser.add_argument("--allow-backlog", action="store_true")
-    parser.add_argument("--no-fail-on-threshold", action="store_true")
+    parser.add_argument(
+        "--no-fail-on-threshold", action="store_true",
+        help="Diagnostic-only: exit zero without acceptance when gates are incomplete.",
+    )
     parser.add_argument(
         "--cpu-sample-interval-seconds",
         type=float,
@@ -718,6 +727,8 @@ def _run_reference_jobs(
             api_top=top,
             child_evidence=child_evidence,
             reference_run=reference_run,
+            comparison_context=row_before,
+            requested_top_n=int(request["top_n"]),
             stage_08_tp_sl_selected_cells=stage_08_tp_sl_selected_cells,
             stage_12_compiled_prefix_rows=stage_12_compiled_prefix_rows,
             stage_05_12_production_default_rows=stage_05_12_production_default_rows,
@@ -752,6 +763,7 @@ def _run_reference_jobs(
                 "api_top_count": len(_list(top.get("items"))),
                 "parity": parity,
                 "stage_timings": stage_timings,
+                "timing_accounting": _timing_accounting(child_evidence),
                 "instrumentation_counters": instrumentation_counters,
                 "service_only_overhead": _service_only_overhead(stage_timings),
                 "cpu_sampling": _mapping(run_result.get("cpu_sampling")),
@@ -1287,6 +1299,7 @@ def _build_runner_harness(
     env.update(
         {
             "ROEHUB_BACKTEST_CHILD_EVIDENCE_DIR": str(child_evidence_dir),
+            "ROEHUB_BACKTEST_BENCHMARK_FULL_TOP": "1",
             "ROEHUB_BACKTEST_CHILD_EVIDENCE_SAMPLE_INTERVAL_SECONDS": "0.2",
             "ROEHUB_BACKTEST_RUNNER_CONCURRENCY": "1",
             "ROEHUB_BACKTEST_LIGHT_CONCURRENCY": "0",
@@ -1741,6 +1754,8 @@ def _compare_reference_results(
     stage_08_tp_sl_selected_cells: bool = False,
     stage_12_compiled_prefix_rows: bool = False,
     stage_05_12_production_default_rows: bool = False,
+    comparison_context: Mapping[str, Any] | None = None,
+    requested_top_n: int = REQUEST_TOP_N,
 ) -> dict[str, Any]:
     items = [cast(Mapping[str, Any], item) for item in _list(api_top.get("items"))]
     diagnostics = _latest_exact_diagnostics(child_evidence=child_evidence)
@@ -1753,6 +1768,7 @@ def _compare_reference_results(
     telemetry_mismatches = _compare_telemetry(
         telemetry=telemetry,
         reference_run=reference_run,
+        requested_top_n=requested_top_n,
         allow_pruned_exact_candidates=(
             stage_12_compiled_prefix_rows or stage_05_12_production_default_rows
         )
@@ -1806,21 +1822,64 @@ def _compare_reference_results(
             and selected_sl_count <= 8
         )
     )
-    accepted_top_required = (
-        bool(reference_top_results)
-        and not quality_gate_enabled
-        and not stage_08_tp_sl_selected_cells
+    full_reference = assess_full_parity(
+        api_top=api_top,
+        reference=_mapping(reference_run.get("full_top_reference")),
+        context=comparison_context or {},
+        requested_top_n=requested_top_n,
+        available_count=telemetry.get("top_results_count"),
+        actual_metric_names=telemetry.get("metric_names"),
     )
-    accepted_top_pass = not accepted_top_required or not accepted_top_mismatches
+    child_full = next((item.get("benchmark_full_top") for item in reversed(child_evidence)
+                       if item.get("benchmark_full_top") is not None), None)
+    transport: dict[str, Any] = {
+        "status": "not_assessed", "pass": False, "compared_count": 0,
+        "proof": "API/child transport consistency; not independent financial correctness",
+        "reason": "bounded_full_child_evidence_missing_or_incomplete",
+    }
+    if (isinstance(child_full, Mapping) and child_full.get("complete") is True
+        and isinstance(child_full.get("items"), list)
+        and child_full.get("count") == len(child_full["items"])
+        and api_top.get("_status", 200) == 200
+        and not api_top.get("next_cursor") and not api_top.get("pagination")
+        and not api_top.get("has_more")):
+        transport_mismatches = compare_rows(items, child_full["items"])
+        transport.update(status="failed" if transport_mismatches else "passed",
+                         mismatches=transport_mismatches, compared_count=min(
+                             len(items), len(child_full["items"])),
+                         reason=None)
+        transport["pass"] = not transport_mismatches
+    # Empty output needs an independent empty oracle; the quality flag is not an oracle.
+    api_shape_pass = api_top.get("_status", 200) == 200 and isinstance(api_top.get("items"), list)
+    accepted_top_required = True
+    accepted_top_pass = full_reference["status"] == "passed"
     pass_value = (
         api_shape_pass
         and not telemetry_mismatches
         and not sample_mismatches
         and accepted_top_pass
+        and not accepted_top_mismatches
         and not api_child_mismatches
         and selected_cell_pass
+        and transport["pass"]
     )
     return {
+        "status": "passed" if pass_value else (
+            "failed" if full_reference["status"] == "failed" or transport["status"] == "failed"
+            or not api_shape_pass or telemetry_mismatches or sample_mismatches
+            or accepted_top_mismatches or api_child_mismatches or not selected_cell_pass
+            else "not_assessed"
+        ),
+        "full_reference": full_reference,
+        "transport_consistency": transport,
+        "partial_sample_comparison": {
+            "status": "not_assessed" if quality_gate_enabled or stage_08_tp_sl_selected_cells
+            or not reference_top_results or not top_results_sample
+            else "failed" if accepted_top_mismatches else "passed",
+            "compared_count": 0 if quality_gate_enabled or stage_08_tp_sl_selected_cells
+            else min(len(top_results_sample), len(reference_top_results)),
+            "proof": "historical top-5 metrics only; not full-N parity",
+        },
         "accepted_reference_iteration": "2026-05-02_iteration_8_execution_sizing_completion",
         "stage_08_tp_sl_selected_cells": stage_08_tp_sl_selected_cells,
         "api_items": len(items),
@@ -1894,6 +1953,7 @@ def _compare_telemetry(
     telemetry: Mapping[str, Any],
     reference_run: Mapping[str, Any],
     allow_pruned_exact_candidates: bool = False,
+    requested_top_n: int = REQUEST_TOP_N,
 ) -> list[dict[str, Any]]:
     mismatches: list[dict[str, Any]] = []
     for key in ("risk_mode", "arity", "direction_mode"):
@@ -1924,11 +1984,11 @@ def _compare_telemetry(
                 "actual": actual_candidates,
             }
         )
-    if telemetry.get("request_top_n") != REQUEST_TOP_N:
+    if telemetry.get("request_top_n") != requested_top_n:
         mismatches.append(
             {
                 "field": "request_top_n",
-                "expected": REQUEST_TOP_N,
+                "expected": requested_top_n,
                 "actual": telemetry.get("request_top_n"),
             }
         )
@@ -1973,6 +2033,17 @@ def _compare_top_result_samples(
             mismatches.append({"rank": index + 1, "reason": "missing_actual_row"})
             continue
         actual = actual_items[index]
+        sample_identity = actual.get("indicator_rows")
+        if sample_identity is None and "canonical_variant_params" in actual:
+            sample_identity = {
+                item["indicator_id"]: item["row_id"]
+                for item in _list(_mapping(actual["canonical_variant_params"]).get("indicators"))
+            }
+        comparable_actual = {"rank": actual.get("rank"), "indicator_rows": sample_identity}
+        for key in ("rank", "indicator_rows"):
+            if key in expected and comparable_actual[key] != expected[key]:
+                mismatches.append({"rank": index + 1, "field": key,
+                                   "reason": "identity_or_order_mismatch"})
         actual_metrics = _mapping(actual.get(actual_metrics_key))
         expected_metrics = _mapping(expected.get("metrics", expected))
         mismatches.extend(
@@ -1994,6 +2065,7 @@ def _compare_metric_mapping(
     mismatches: list[dict[str, Any]] = []
     for key, expected_value in expected.items():
         if key not in actual:
+            mismatches.append({"rank": rank, "field": key, "reason": "missing_metric"})
             continue
         actual_value = actual.get(key)
         if not _float_equal(expected_value, actual_value):
@@ -2026,13 +2098,43 @@ def _read_lazy_child_evidence(
     return [_load_json(path) for path in paths]
 
 
+def _timing_accounting(child_evidence: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+    import math
+
+    diagnostics = _mapping(child_evidence[-1].get("exact_diagnostics")) if child_evidence else {}
+    definition = _mapping(diagnostics.get("timing_accounting"))
+    timers = _merged_stage_timings(child_evidence)
+    if definition.get("schema") != "orchestration_elapsed_v2":
+        return {"status": "not_assessed", "reason": "legacy_or_missing_elapsed_definition"}
+    required = ["service_wall_clock_s", "service_total_without_warmup"]
+    if definition.get("warmup") == "measured_inside_interval":
+        required.append("sample_warmup")
+    elif definition.get("warmup") != "not_run":
+        return {"status": "not_assessed", "reason": "warmup_evidence_missing"}
+    if any(k not in timers for k in required):
+        return {"status": "not_assessed", "reason": "elapsed_measurement_missing"}
+    if any(not math.isfinite(timers[k]) or timers[k] < 0 for k in required):
+        return {"status": "failed", "reason": "invalid_interval"}
+    warmup = timers["sample_warmup"] if "sample_warmup" in required else 0.0
+    valid = warmup <= timers["service_wall_clock_s"] and math.isclose(
+        timers["service_total_without_warmup"], timers["service_wall_clock_s"] - warmup,
+        rel_tol=0, abs_tol=1e-9,
+    )
+    return {"status": "passed" if valid else "failed", "definition": dict(definition),
+            "reason": None if valid else "inconsistent_intervals",
+            "unattributed_seconds": None,
+            "unattributed_reason": "diagnostic_stages_overlap; no additive decomposition"}
+
+
 def _merged_stage_timings(child_evidence: Sequence[Mapping[str, Any]]) -> dict[str, float]:
-    merged: dict[str, float] = {}
-    for item in child_evidence:
-        for key, value in _mapping(item.get("stage_timings")).items():
-            if isinstance(value, int | float):
-                merged[key] = float(value)
-    return dict(sorted(merged.items()))
+    # Never combine retries: missing fields in the latest attempt remain missing.
+    if not child_evidence:
+        return {}
+    return dict(sorted(
+        (key, float(value))
+        for key, value in _mapping(child_evidence[-1].get("stage_timings")).items()
+        if isinstance(value, int | float) and not isinstance(value, bool)
+    ))
 
 
 _INSTRUMENTATION_COUNTER_FIELDS: tuple[str, ...] = (
@@ -2265,12 +2367,15 @@ def _system_memory_cleanup_gate(
 
 
 def _parity_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    failed = [job["job_name"] for job in jobs if not cast(Mapping[str, Any], job["parity"])["pass"]]
+    failed = [job["job_name"] for job in jobs if _mapping(job.get("parity")).get("status")
+              == "failed"]
+    unassessed = [job["job_name"] for job in jobs if _mapping(job.get("parity")).get("status")
+                  not in ("passed", "failed")]
+    passed = len(jobs) - len(failed) - len(unassessed)
+    status = "failed" if failed else "not_assessed" if unassessed or not jobs else "passed"
     return {
-        "required_jobs": len(jobs),
-        "passed_jobs": len(jobs) - len(failed),
-        "failed_jobs": failed,
-        "pass": not failed,
+        "required_jobs": len(jobs), "passed_jobs": passed, "failed_jobs": failed,
+        "not_assessed_jobs": unassessed, "status": status, "pass": status == "passed",
     }
 
 
@@ -2305,7 +2410,8 @@ def _performance_summary(jobs: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "failed_cpu_sampling_jobs": failed_cpu_sampling_jobs,
         "pass": all(bool(job.get("stage_timings")) for job in jobs)
         and not failed_speed_jobs
-        and not failed_cpu_sampling_jobs,
+        and not failed_cpu_sampling_jobs
+        and all(_mapping(job.get("timing_accounting")).get("status") == "passed" for job in jobs),
     }
 
 
@@ -2661,8 +2767,12 @@ def _require_clean_backlog(backlog: Mapping[str, int], *, allow_existing: bool) 
         )
 
 
+def _exit_code(payload: Mapping[str, Any], *, diagnostic_only: bool = False) -> int:
+    return 0 if diagnostic_only or _overall_pass(payload) else 1
+
+
 def _overall_pass(payload: Mapping[str, Any]) -> bool:
-    return all(
+    return _mapping(payload.get("parity")).get("status") == "passed" and all(
         bool(_mapping(payload.get(key)).get("pass"))
         for key in (
             "api_runner_path",
@@ -2851,12 +2961,7 @@ def _reference_job_name(*, run: Mapping[str, Any]) -> str:
 
 
 def _float_equal(left: Any, right: Any) -> bool:
-    try:
-        left_float = float(left)
-        right_float = float(right)
-    except (TypeError, ValueError):
-        return left == right
-    return abs(left_float - right_float) <= _PARITY_FLOAT_TOLERANCE
+    return metric_equal(left, right)
 
 
 def _pid_for_tcp_port(port: int) -> int | None:
@@ -3137,6 +3242,24 @@ def _render_summary(*, payload: Mapping[str, Any]) -> str:
         "",
         f"- Passed jobs: `{parity.get('passed_jobs')}/{parity.get('required_jobs')}`",
         f"- Failed jobs: `{parity.get('failed_jobs')}`",
+        f"- Status: `{parity.get('status')}`",
+        f"- Not assessed: `{parity.get('not_assessed_jobs')}`",
+        f"- Mode: `{payload.get('mode', 'acceptance')}`",
+        "- Historical top-5 metrics are partial evidence, not a full-N oracle.",
+        "- Full reference and API/child transport are separate checks.",
+        *[
+            f"- {job.get('job_name')}: "
+            + json.dumps(_mapping(job.get("parity")).get("full_reference"), sort_keys=True)
+            for job in jobs
+        ],
+        "",
+        "## Timing boundaries",
+        "",
+        "- Seconds: execute start through assembly; final diagnostics and final GC excluded.",
+        "- Non-warmup elapsed subtracts only the measured in-interval sample warmup.",
+        "- Nested stages/aliases are non-additive; unattributed time is not assessed.",
+        "- Queue, HTTP, child startup and persistence are outside this interval.",
+        *[f"- {job.get('job_name')}: {job.get('timing_accounting')}" for job in jobs],
         "",
         "## Performance",
         "",

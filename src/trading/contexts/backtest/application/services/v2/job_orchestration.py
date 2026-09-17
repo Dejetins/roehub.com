@@ -37,7 +37,6 @@ from .matrix_backend.tp_sl_cells import (
 )
 from .prepare_pools import build_signal_segments, row_metadata_order_hash
 from .top_result_assembly import (
-    TOP_RESULT_ASSEMBLY_STAGE_NAME,
     BacktestTopResultAssemblyService,
 )
 
@@ -250,6 +249,16 @@ class BacktestRuntimeJobOrchestrationService:
                 "scheduling_class": confirmed_scheduling_class,
             }
             exact_diagnostics = {
+                "timing_accounting": {
+                    "schema": "orchestration_elapsed_v2",
+                    "unit": "seconds",
+                    "boundary": "execute_start_through_assembly_before_diagnostics_and_final_gc",
+                    "warmup": "measured_inside_interval" if warmup_elapsed_s is not None
+                    else "not_run",
+                    "stages_additive": False,
+                    "final_cleanup_included": False,
+                    "persistence_included": False,
+                },
                 "telemetry": exact_result.telemetry.as_mapping(),
                 "combo_planning": combo_result.telemetry.as_mapping(),
                 "row_signatures": row_signature_telemetry.as_mapping(),
@@ -483,11 +492,19 @@ def _stage_timings(
     if exact_result is not None:
         timers.update(dict(exact_result.telemetry.stage_timings))
     timers.update(dict(assembly_timings))
-    timers[SERVICE_TOTAL_WITHOUT_WARMUP_STAGE_NAME] = math.fsum(timers.values())
+    # This interval ends after assembly, before diagnostic serialization and final GC.
+    # Stage timers below overlap (including aliases); they are never an elapsed sum.
+    if not isinstance(elapsed, (int, float)) or not math.isfinite(elapsed) or elapsed < 0:
+        raise ValueError("missing or invalid orchestration elapsed interval")
+    if warmup_elapsed_s is not None and (
+        not math.isfinite(warmup_elapsed_s) or not 0 <= warmup_elapsed_s <= elapsed
+    ):
+        raise ValueError("warmup must be measured inside the orchestration interval")
+    timers[SERVICE_TOTAL_WITHOUT_WARMUP_STAGE_NAME] = elapsed - (
+        warmup_elapsed_s if warmup_elapsed_s is not None else 0.0
+    )
     if warmup_elapsed_s is not None:
         timers[SAMPLE_WARMUP_STAGE_NAME] = float(warmup_elapsed_s)
-    timers.setdefault(TOP_RESULT_ASSEMBLY_STAGE_NAME, 0.0)
-    timers.setdefault(PERSIST_TOP_N_IO_STAGE_NAME, 0.0)
     timers["service_wall_clock_s"] = elapsed
     return timers
 

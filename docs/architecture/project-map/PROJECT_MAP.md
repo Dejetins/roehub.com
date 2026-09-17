@@ -2,7 +2,7 @@
 
 Этот документ — человекочитаемое представление единой карты проекта. Машиночитаемый источник для агентов — `docs/architecture/project-map/project-map.json`, семантический каталог — `docs/architecture/project-map/project-map.toml`, правила использования — `docs/architecture/project-map/AGENT_GUIDE.md`.
 
-Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `0b1943fbd6e2596cc3435338e7d5c27dad354519999f7d2383d663c06a0c8992`; учтено файлов: **3308**.
+Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `90c221f0dc12e34194f7b08aff45f2f3b23e3e1f23441b5a9f009ff9f5dd4d1d`; учтено файлов: **3312**.
 
 ## Визуальная runtime-карта
 
@@ -294,9 +294,9 @@ flowchart TB
 | `shared-core` | Shared kernel и платформа | Общие типы, конфигурация, ошибки, интеграционные и производительные примитивы. | 36 | `src/trading/__init__.py`, `src/trading/shared_kernel/`, `src/trading/platform/`, `src/trading/integration/`, `src/trading/fastpath/` |
 | `delivery` | Приложения и delivery | HTTP, HTML, CLI, workers, schedulers, migrations и composition roots. | 317 | `apps/` |
 | `operations` | Инфраструктура и эксплуатация | Self-hosted Docker Compose, monitoring, конфигурация и миграции данных. | 223 | `infra/`, `configs/`, `migrations/`, `alembic/`, `.github/workflows/` |
-| `automation` | Инструменты и автоматизация | Операторские скрипты, генераторы и CI helpers. | 110 | `tools/`, `scripts/` |
-| `quality` | Проверки и тестовые данные | Unit, integration, notebook и performance-smoke проверки, fixtures и typings. | 430 | `tests/`, `fixtures/`, `typings/` |
-| `knowledge` | Документация и агентные контракты | Архитектура, runbooks, планы, правила агентов и индекс проекта. | 1458 | `docs/`, `.codex/`, `AGENTS.md`, `README.md` |
+| `automation` | Инструменты и автоматизация | Операторские скрипты, генераторы и CI helpers. | 111 | `tools/`, `scripts/` |
+| `quality` | Проверки и тестовые данные | Unit, integration, notebook и performance-smoke проверки, fixtures и typings. | 432 | `tests/`, `fixtures/`, `typings/` |
+| `knowledge` | Документация и агентные контракты | Архитектура, runbooks, планы, правила агентов и индекс проекта. | 1459 | `docs/`, `.codex/`, `AGENTS.md`, `README.md` |
 | `experiments` | Прототипы и локальные результаты | Изолированные прототипы и каталоги воспроизводимых результатов. | 0 | `prototypes/`, `output/`, `local_artifacts/` |
 | `repository-meta` | Корневые контракты репозитория | Build metadata, dependency locks, root configuration and compatibility indexes. | 9 | `.dockerignore`, `.gitignore`, `.python-version`, `LICENSE`, `alembic.ini`, `pyproject.toml`, `pyrightconfig.json`, `repo_tree.md`, `uv.lock` |
 
