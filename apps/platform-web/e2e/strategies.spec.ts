@@ -36,14 +36,14 @@ test('real library, independent detail, filters, keyboard, status, return contex
   await firstRow.hover();expect(await firstRow.evaluate(element=>element.matches(':hover'))).toBe(true);
   await firstRow.focus();await page.keyboard.press('Enter');await expect(heading(page)).toHaveText(first.name);
   await expect(firstRow).toHaveAttribute('aria-current','true');await expect(heading(page)).toBeFocused();
-  await page.getByRole('tab',{name:'Settings',exact:true}).click();
-  await expect(page.getByText('MA(20,50)',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Refresh',exact:true})).toHaveCount(1);await expect(page.getByText('Fast period',{exact:true})).toBeVisible();
+  await expect(page.locator('.operations-workspace')).toBeVisible();await expect(page.getByRole('button',{name:'Refresh',exact:true})).toHaveCount(1);
+  await page.locator('.strategy-filter-panel summary').click();
   await expect(page.getByRole('link',{name:'Return to report',exact:true})).toHaveCount(0);
   await page.getByLabel('Search strategies').fill('never-matches');
   await expect(page.getByText('No matching strategies',{exact:true})).toBeVisible();
   await expect(page.getByText('The selected strategy is outside the current filters.')).toBeVisible();
   await expect(heading(page)).toHaveText(first.name);await page.getByRole('button',{name:'Reset filters'}).click();
-  await page.getByRole('combobox',{name:'Market type',exact:true}).selectOption('spot');
+  await page.getByRole('button',{name:'Market type',exact:true}).click();await page.getByRole('checkbox',{name:'All',exact:true}).click();await page.getByRole('checkbox',{name:'spot',exact:true}).click();await page.keyboard.press('Escape');
   await page.locator(`.strategy-row[href^="/strategies/${second.strategy_id}"]`).click();await expect(heading(page)).toHaveText(second.name);
   await page.goBack();await expect(heading(page)).toHaveText(first.name);expect(new URL(page.url()).searchParams.get('market')).toBe('spot');
   await page.goForward();await expect(heading(page)).toHaveText(second.name);
@@ -81,12 +81,11 @@ test('real library, independent detail, filters, keyboard, status, return contex
   expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
   await page.screenshot({path:resolve(evidence,'strategies-en-zoom200-repeat.png'),fullPage:true});
   await page.evaluate(()=>{document.documentElement.style.zoom='';});
-  await page.getByLabel('Animation',{exact:true}).selectOption('slow');
+  await page.evaluate(()=>localStorage.setItem('roehub.backtests.motion','slow'));await page.reload();await expect(heading(page)).toBeVisible();
   for(let i=0;i<4;i++){await page.getByRole('button',{name:/Hide strategy list|Show strategy list/,exact:true}).click();}
   await firstRow.click();await page.locator(`.strategy-row[href^="/strategies/${second.strategy_id}"]`).click();await expect(heading(page)).toHaveText(second.name);
-  await page.getByRole('tab',{name:'Settings',exact:true}).click();
   await page.getByText('Technical details',{exact:true}).click();await page.getByText('Technical details',{exact:true}).click();
-  await page.getByLabel('Animation',{exact:true}).selectOption('off');
+  await page.evaluate(()=>localStorage.setItem('roehub.backtests.motion','off'));await page.reload();await expect(heading(page)).toBeVisible();
   await page.getByRole('link',{name:'Backtests',exact:true}).click();await expect(page.getByLabel('Animation',{exact:true})).toHaveValue('off');
   for(const locale of ['ru','en']) {
     await page.getByRole('link',{name:locale==='ru'?'Русский':'English',exact:true}).click();
@@ -96,7 +95,7 @@ test('real library, independent detail, filters, keyboard, status, return contex
     await page.screenshot({path:resolve(evidence,`backtests-${locale}-zoom200.png`),fullPage:true});
     await page.evaluate(()=>{document.documentElement.style.zoom='';});
   }
-  await page.getByRole('link',{name:'Strategies',exact:true}).click();await expect(page.getByLabel('Animation',{exact:true})).toHaveValue('off');
+  await page.getByRole('link',{name:'Strategies',exact:true}).click();expect(await page.evaluate(()=>localStorage.getItem('roehub.backtests.motion'))).toBe('off');
   await page.emulateMedia({reducedMotion:'reduce'});expect(await page.evaluate(()=>getComputedStyle(document.documentElement).getPropertyValue('--motion-duration').trim())).toMatch(/^0(?:ms|s)$/);await firstRow.click();await expect(heading(page)).toHaveText(first.name);
   expect(commands).toEqual([]);expect(errors).toEqual([]);
   writeFileSync(resolve(evidence,'real-observations.json'),JSON.stringify({first:first.strategy_id,second:second.strategy_id,realList:true,realDetail:true,standaloneProvenance:false,invalidReturnIgnored:true,absentSourceTruthful:true,keyboard:true,filterBackForward:true,viewportWidths:[820,1024,1440],locales:['ru','en'],zoom:200,axeViolations:0,commands,errors,httpErrors,consoleErrors},null,2));
@@ -135,7 +134,7 @@ test('controlled optional errors, stale spec, late identity, cooldown, logout an
   }
   await page.route(dashboard,route=>route.fulfill({status:429,headers:{'Retry-After':'60'},json:{}}));await page.reload();
   await expect(heading(page)).toHaveText(first.name);await expect(page.locator('.operations-workspace')).toBeVisible();
-  await expect(page.locator('.strategies-refresh')).toBeEnabled();let cooldownReads=0;page.on('request',request=>{if(request.url().includes('/api/ui/strategies/dashboard'))cooldownReads++;});await page.locator('.strategies-refresh').click();await expect(page.locator('.strategies-refresh')).toHaveText('Refresh');expect(cooldownReads).toBe(0);await page.unrouteAll({behavior:'wait'});
+  await expect(page.locator('.strategies-refresh')).toBeEnabled();let cooldownReads=0;page.on('request',request=>{if(request.url().includes('/api/ui/strategies/dashboard'))cooldownReads++;});await page.locator('.strategies-refresh').click();await expect(page.locator('.strategies-refresh')).toBeEnabled();expect(cooldownReads).toBe(0);await page.unrouteAll({behavior:'wait'});
   await page.route(dashboard,route=>route.fulfill({status:503,json:{}}));await page.reload();await expect(heading(page)).toHaveText(first.name);
   await expect(page.locator('.operations-workspace')).toBeVisible();await page.unrouteAll({behavior:'wait'});
   await page.route(dashboard,async route=>{const response=await route.fetch();const body=await response.json();body.selected_strategy.strategy_id=second.strategy_id;await route.fulfill({json:body});});
@@ -181,12 +180,12 @@ test('long library keeps its scroll, filters and selected identity across Back/F
 
 test('strategy list animates intermediate geometry and reverses without scaling text',async({page})=>{
  await login(page);const strategy=await seed(page,20);await page.goto(`/strategies/${strategy.strategy_id}`);await expect(heading(page)).toHaveText(strategy.name);
- await page.getByLabel('Animation',{exact:true}).selectOption('slow');
+ await page.evaluate(()=>localStorage.setItem('roehub.backtests.motion','slow'));await page.reload();await expect(heading(page)).toBeVisible();
  const observations=[];
  for(const width of [1440,820]){
   await page.setViewportSize({width,height:1000});
   const samples=await page.evaluate(async()=>{
-   const button=document.querySelector<HTMLButtonElement>('.history-toggle')!;
+   const button=document.querySelector<HTMLButtonElement>('.strategy-list-toggle')!;
    const slot=document.querySelector<HTMLElement>('.strategy-list-slot')!;
    const library=document.querySelector<HTMLElement>('#strategies-library')!;
    const frames:{time:number;size:number;textWidth:number;overflow:boolean}[]=[];
@@ -204,5 +203,5 @@ test('strategy list animates intermediate geometry and reverses without scaling 
   observations.push({width,samples});
  }
  mkdirSync(evidence,{recursive:true});writeFileSync(resolve(evidence,'list-motion-frames.json'),JSON.stringify(observations,null,2));
- await page.getByLabel('Animation',{exact:true}).selectOption('off');await page.getByRole('button',{name:'Hide strategy list',exact:true}).click();await expect(page.locator('.strategy-list-slot')).toHaveAttribute('inert','');
+ await page.evaluate(()=>localStorage.setItem('roehub.backtests.motion','off'));await page.reload();await expect(heading(page)).toBeVisible();await page.getByRole('button',{name:'Hide strategy list',exact:true}).click();await expect(page.locator('.strategy-list-slot')).toHaveAttribute('inert','');
 });

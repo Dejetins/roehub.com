@@ -67,7 +67,7 @@ test('real library, empty/cursor filters, independent deep link, focus, locale a
   await expect(popup).toBeVisible();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await popup.getByRole('button', { name: /Risk mode/ }).click();
-  await popup.getByRole('menuitemradio', { name: 'TP/SL grid', exact: true }).click();
+  await popup.getByRole('radio', { name: 'TP/SL grid', exact: true }).click();
   await page.keyboard.press('Escape');
   await expect(popup).not.toBeVisible(); await expect(filters).toBeFocused();
   // Preserve cursor traversal coverage with a supported one-item URL page size.

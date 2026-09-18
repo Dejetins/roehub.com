@@ -26,8 +26,7 @@ test('saved backtest remains accessible separately; standalone strategy contains
  const researchReads:string[]=[];page.on('request',r=>{if(/research-source|\/api\/backtests\//.test(r.url()))researchReads.push(new URL(r.url()).pathname);});
  await page.goto(`/strategies/${id}`);await expect(page.locator('#selected-strategy-heading')).toBeVisible();await page.reload();await expect(page.locator('.operations-workspace')).toBeVisible();
  await expect(page.getByRole('tab',{name:'Backtest',exact:true})).toHaveCount(0);await expect(page.locator('.strategy-research-metrics')).toHaveCount(0);
- await page.getByRole('tab',{name:'Settings',exact:true}).click();await expect(page.getByText('EMA · Exponential moving average',{exact:true})).toBeVisible();
- await page.getByRole('tab',{name:'Settings',exact:true}).press('ArrowLeft');await expect(page.getByRole('tab',{name:'Events',exact:true})).toBeFocused();
+ await page.getByRole('tab',{name:'Price & executions',exact:true}).press('ArrowLeft');await expect(page.getByRole('tab',{name:'Events',exact:true})).toBeFocused();
  expect(researchReads).toEqual([]);expect(commands).toEqual([]);expect(errors).toEqual([]);
  await page.screenshot({path:resolve(evidence,'saved-strategy-operations.png'),fullPage:true});
  expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);
