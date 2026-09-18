@@ -33,32 +33,37 @@ class StrategyOperationReads:
                 run_id=run.run_id,
                 paper=profile.mode == "paper",
             )
-            facts = []
-            for raw in rows[:5000]:
-                row = dict(raw)
-                explicit = row.get("exit_reason") or row.get("signal_reason")
-                row["reason"] = (
-                    explicit
-                    if explicit in {"stop_loss", "take_profit", "trailing_stop"}
-                    else "manual"
-                    if row.get("source_type") == "manual_request"
-                    else "signal"
-                    if row.get("source_type") == "strategy_signal"
-                    else "unknown_reason"
+            if len(rows) > 5000:
+                # Neither a stale prefix nor an unseeded suffix can describe current trades.
+                operations = StrategyOperationsResponse(
+                    partial=True, reason="execution_history_limit_exceeded"
                 )
-                # Costs in another asset cannot be subtracted from quote P&L without conversion.
-                symbol = str(strategy.spec.instrument_id.symbol)
-                if not row.get("fee_asset") or not symbol.endswith(str(row["fee_asset"])):
-                    row["fee"] = None
-                row["costs_complete"] = strategy.spec.market_type == "spot"
-                facts.append(row)
-            operations = project_fills(
-                facts,
-                initial_cash=float(rows[0]["initial_cash"])
-                if rows and rows[0].get("initial_cash") is not None
-                else None,
-                partial=len(rows) > 5000,
-            )
+            else:
+                facts = []
+                for raw in rows:
+                    row = dict(raw)
+                    explicit = row.get("exit_reason") or row.get("signal_reason")
+                    row["reason"] = (
+                        explicit
+                        if explicit in {"stop_loss", "take_profit", "trailing_stop"}
+                        else "manual"
+                        if row.get("source_type") == "manual_request"
+                        else "signal"
+                        if row.get("source_type") == "strategy_signal"
+                        else "unknown_reason"
+                    )
+                    # Costs in another asset cannot be subtracted from quote P&L without conversion.
+                    symbol = str(strategy.spec.instrument_id.symbol)
+                    if not row.get("fee_asset") or not symbol.endswith(str(row["fee_asset"])):
+                        row["fee"] = None
+                    row["costs_complete"] = strategy.spec.market_type == "spot"
+                    facts.append(row)
+                operations = project_fills(
+                    facts,
+                    initial_cash=float(rows[0]["initial_cash"])
+                    if rows and rows[0].get("initial_cash") is not None
+                    else None,
+                )
         except Exception:
             operations = StrategyOperationsResponse(reason="execution_read_unavailable")
         if self.candle_reader is not None:

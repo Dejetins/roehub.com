@@ -979,3 +979,8 @@ on original :20110 preview with original session/data retained. No publication.
 - Generated project map and runtime-input inventory refreshed; existing first-party screenshot hashes registered in OSS policy.
 - Review mode: cold self-review plus independent read-only tenant/security and policy consistency review; no blocker found in reviewed scope. Compatibility: compatible-change for additive API fields/routes and opt-in Strategies client; no schema migration. Runtime adapter absent.
 - GitHub CI and merge remain separate observable publication boundaries; final PR status is authoritative.
+
+### 2026-09-19 — PR review corrections
+- Confirmed and corrected three automated review findings: accept the API's nullable operations field, release an owned recovery lock after a definitive reconciliation rejection (retain transport/unknown outcomes), and return `unavailable` / `execution_history_limit_exceeded` beyond 5000 fills rather than projecting an obsolete prefix or an unseeded suffix.
+- Compatibility: compatible-change for the current dashboard consumer; no persistence/request identity changes. Oversized histories intentionally withhold trades and P&L until a correctly seeded bounded projection exists.
+- Regression coverage adds nullable parsing, failed-versus-unknown recovery, oversized history and a real-browser reconciliation 409 followed by reload. Updated remaining library zoom/session-expiry selectors for the accepted nonmodal filter popup.

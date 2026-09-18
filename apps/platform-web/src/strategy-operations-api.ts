@@ -9,7 +9,7 @@ export type Operations=z.infer<typeof operationsSchema>;export type OperationTra
 export const operationalDashboard={
  strategy_selector:z.object({state:z.string(),items:z.array(z.object({strategy_id:z.uuid(),status:z.string(),run_state:z.string().nullable()}))}).optional(),
  execution_outcomes:z.object({items:z.array(z.object({intent_id:z.uuid().nullable(),order_status:z.string().nullable(),intent_status:z.string().nullable(),reconciliation_status:z.string().nullable()}))}).optional(),
- operations:operationsSchema.optional(),
+ operations:operationsSchema.nullable().optional(),
  chart:z.object({state:z.string(),candles:z.array(z.object({timestamp:time,open:n.nullable(),high:n.nullable(),low:n.nullable(),close:n.nullable()}))}).optional(),
  selected_strategy:z.object({strategy_id:z.uuid().nullable(),actions:z.object({can_run:z.boolean(),can_stop:z.boolean(),can_delete:z.boolean(),can_create:z.boolean(),can_clone:z.boolean()}).optional()}),
 };

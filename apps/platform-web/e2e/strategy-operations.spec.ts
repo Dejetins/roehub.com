@@ -124,6 +124,14 @@ test('operational strategy: executed chart, position, commands, reasons, layouts
  for(const locale of ['en','ru']){await page.getByRole('link',{name:locale==='en'?'English':'Русский',exact:true}).click();for(const width of [820,1024,1440]){await page.setViewportSize({width,height:1000});await expect(page.locator('.operations-chart canvas')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.screenshot({path:resolve(evidence,`operations-${locale}-${width}.png`),fullPage:true});expect((await new AxeBuilder({page}).analyze()).violations).toEqual([]);}}
  expect((await request.post(`/api/strategies/${strategy.strategy_id}/run`)).status()).toBe(401);
  await page.getByRole('link',{name:'English',exact:true}).click();
+ // A definitive rejection during reconciliation releases the retained command lock.
+ await page.route(`**/api/strategies/${strategy.strategy_id}/manual-exit`,route=>route.fulfill({status:503,json:{}}),{times:1});
+ await page.getByRole('button',{name:'Close position',exact:true}).click();await page.getByRole('button',{name:'Confirm',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Check outcome',exact:true})).toBeVisible();
+ await page.route(`**/api/strategies/${strategy.strategy_id}/manual-exit`,route=>route.fulfill({status:409,json:{error:{code:'strategy_manual_execution.blocked',details:{reason:'strategy_run_changed'}}}}),{times:1});
+ await page.getByRole('button',{name:'Check outcome',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Close position',exact:true})).toBeEnabled();
+ await page.reload();await expect(page.getByRole('button',{name:'Close position',exact:true})).toBeEnabled();
  await page.getByRole('button',{name:'Close position',exact:true}).click();await page.getByRole('button',{name:'Confirm',exact:true}).click();await expect(page.getByText('No open position',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Stop',exact:true}).click();await page.getByRole('button',{name:'Confirm',exact:true}).click();await expect(page.getByRole('button',{name:'Start',exact:true})).toBeEnabled();
  await page.getByRole('button',{name:'Delete',exact:true}).click();await page.getByRole('button',{name:'Confirm',exact:true}).click();await expect(page).toHaveURL(/\/strategies$/);await expect(page.locator('.strategy-row')).toHaveCount(0);

@@ -146,9 +146,9 @@ test('native Chromium 200% zoom retains usable RU/EN shell and dialog', async ()
       sizes.push({ locale, ...metrics });
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
       await page.getByRole('button', { name: locale === 'en' ? 'Filters' : 'Фильтры', exact: true }).click();
-      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.locator('#library-filter-popup')).toBeVisible();
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-      const box = await page.getByRole('dialog').boundingBox();
+      const box = await page.locator('#library-filter-popup').boundingBox();
       expect(box!.x).toBeGreaterThanOrEqual(0);
       expect(box!.x + box!.width).toBeLessThanOrEqual(metrics.innerWidth);
       await nativeScreenshot(`${locale}-native-zoom-200-dialog.png`);
@@ -166,7 +166,8 @@ test('real API expiry removes private content and stops protected reads', async 
   execFileSync(resolve(root, '.venv/bin/python'), ['-m', 'tools.qa.backtests_client_fixture', 'expire'], { cwd: root });
   await page.getByRole('button', { name: 'Filters', exact: true }).click();
   const expiredRead = page.waitForResponse(response => new URL(response.url()).pathname === '/api/backtests/jobs' && response.status() === 401);
-  await page.getByRole('dialog').getByRole('combobox', { name: 'State', exact: true }).selectOption('cancelled');
+  await page.locator('#library-filter-popup').getByRole('button', { name: 'State', exact: true }).click();
+  await page.getByRole('radio', { name: 'Cancelled', exact: true }).click();
   await expiredRead;
   await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible();
   await expect(page.locator('[data-platform-client]')).toHaveCount(0);

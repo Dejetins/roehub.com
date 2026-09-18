@@ -120,3 +120,26 @@ def test_reference_price_is_preserved_per_execution_and_missing_is_unknown():
     assert trade.fills[0].reference_price == 100
     assert trade.fills[0].price == 101
     assert trade.fills[1].reference_price is None
+
+
+def test_oversized_history_does_not_publish_stale_trades_or_unseeded_pnl():
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    from apps.api.wiring.modules.strategy_operation_reads import StrategyOperationReads
+
+    reader = Mock()
+    reader.read.return_value = facts(*[("buy", 1, 100, 1, "manual")] * 5001)
+    strategy = SimpleNamespace(
+        strategy_id="strategy", spec=SimpleNamespace(
+            instrument_id=SimpleNamespace(symbol="BTCUSDT"), market_type="spot"
+        ),
+    )
+    operations, _ = StrategyOperationReads(reader).read(
+        organization_id="org", user_id="owner", strategy=strategy,
+        run=SimpleNamespace(run_id="run"), profile=SimpleNamespace(mode="paper"),
+    )
+    assert operations.state == "unavailable"
+    assert operations.reason == "execution_history_limit_exceeded"
+    assert operations.partial is True
+    assert operations.trades == operations.equity == operations.drawdown == []
