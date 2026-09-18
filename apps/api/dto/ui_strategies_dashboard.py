@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from apps.api.dto.strategy_operations import StrategyOperationsResponse
+
 SourceStatus = Literal["available", "degraded", "unavailable"]
 RefreshStatus = Literal["fresh", "degraded", "rate_limited"]
 FinancialDirection = Literal["positive", "negative", "neutral"]
@@ -619,9 +621,12 @@ class StrategyDashboardRefreshControlResponse(BaseModel):
     refresh_status: RefreshStatus
 
 
+
+
 class StrategyDashboardResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    operations: StrategyOperationsResponse | None = None
     generated_at: datetime
     refresh_status: RefreshStatus
     next_allowed_refresh_at: datetime | None

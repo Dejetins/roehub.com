@@ -56,6 +56,7 @@ from trading.contexts.strategy.application.ports.exchange_connection_readiness i
 )
 from trading.contexts.strategy.application.ports.repositories import (
     LiveStrategyProfileRepository,
+    StrategyBacktestVariantProvenanceRepository,
     StrategyRunRepository,
 )
 from trading.contexts.strategy.application.use_cases import (
@@ -360,6 +361,7 @@ class ManualStrategyExecutionRequest(BaseModel):
     client_request_id: str | None = Field(default=None, min_length=1, max_length=128)
     quote_notional: Decimal | None = Field(default=None, gt=0)
     reference_price: Decimal | None = Field(default=None, gt=0)
+    expected_run_id: UUID | None = None
 
 
 class ManualStrategyExecutionResponse(BaseModel):
@@ -435,6 +437,15 @@ class RlRiskSizingPolicyResponse(BaseModel):
     updated_at: datetime | None
 
 
+class StrategyResearchSourceResponse(BaseModel):
+    """Persisted research origin, distinct from user-supplied return navigation."""
+
+    model_config = ConfigDict(extra="forbid")
+    strategy_id: UUID
+    source_job_id: UUID | None
+    source_variant_key: str | None
+
+
 def build_strategies_router(
     *,
     create_use_case: CreateStrategyUseCase,
@@ -446,6 +457,7 @@ def build_strategies_router(
     restart_use_case: RestartStrategyUseCase,
     delete_use_case: DeleteStrategyUseCase,
     current_user_provider_dependency: CurrentUserProviderDependency,
+    provenance_repository: StrategyBacktestVariantProvenanceRepository | None = None,
     live_profile_service: LiveStrategyProfileService | None = None,
     current_user_principal_dependency: CurrentUserPrincipalDependency | None = None,
     compatibility_readiness_service: StrategyCompatibilityReadinessService | None = None,
@@ -720,6 +732,38 @@ def build_strategies_router(
             observed_at=datetime.now(timezone.utc),
         )
         return _to_rl_risk_policy_response(record=record)
+
+    @router.get(
+        "/strategies/{strategy_id}/research-source",
+        response_model=StrategyResearchSourceResponse,
+    )
+    def get_strategy_research_source(
+        strategy_id: UUID,
+        current_user_provider: CurrentUserProvider = Depends(current_user_provider_dependency),
+    ) -> StrategyResearchSourceResponse:
+        """Read an owned strategy's saved origin; never execute or record a check."""
+        current_user = current_user_provider.require_current_user()
+        get_use_case.execute(strategy_id=strategy_id, current_user=current_user)
+        if provenance_repository is None:
+            raise RoehubError(
+                code="strategy.research_source_unavailable",
+                message="Research source unavailable",
+            )
+        try:
+            origin = provenance_repository.find_by_strategy_id(
+                strategy_id=strategy_id, user_id=current_user.user_id,
+                organization_id=current_user.organization_id,
+            )
+        except Exception as error:  # Optional projection: never expose driver details.
+            raise RoehubError(
+                code="strategy.research_source_unavailable",
+                message="Research source unavailable",
+            ) from error
+        return StrategyResearchSourceResponse(
+            strategy_id=strategy_id,
+            source_job_id=origin.source_job_id if origin else None,
+            source_variant_key=origin.source_variant_key if origin else None,
+        )
 
     @router.get("/strategies/{strategy_id}", response_model=StrategyResponse)
     def get_strategy_by_id(
@@ -1481,6 +1525,13 @@ def _execute_manual_strategy_action(
             code="strategy_manual_execution.blocked",
             message="Manual execution is blocked",
             details={"reason": "strategy_run_inactive"},
+        )
+    # Bind optional new-client recovery to the exact run used below for deduplication.
+    if payload.expected_run_id is not None and payload.expected_run_id != active_run.run_id:
+        raise RoehubError(
+            code="strategy_manual_execution.blocked",
+            message="Manual execution is blocked",
+            details={"reason": "strategy_run_changed"},
         )
     profile = profile_repository.get_for_strategy(
         organization_id=current_user.organization_id,

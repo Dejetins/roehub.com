@@ -130,6 +130,7 @@ _ROEHUB_STATUS_BY_CODE: Mapping[str, int] = {
     "strategy_launch.invalid_config": 422,
     "strategy_launch.readiness_blocked": 409,
     "strategy_launch.unavailable": 503,
+    "strategy.research_source_unavailable": 503,
     "strategy_manual_execution.blocked": 409,
     "strategy_manual_execution.idempotency_required": 422,
     "strategy_manual_execution.invalid_request": 400,

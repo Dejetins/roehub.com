@@ -304,7 +304,7 @@ sequential execution instruction; its ledger and accepted prompts are unchanged.
 | Роли, capabilities, маршруты и mutation policy | текущий код, API и принятые server contracts |
 | Текущее browser-visible поведение | `apps/web/` и воспроизводимые browser evidence |
 | Публичный сайт | public-site registry и `roehub-public-site-identity-release-and-measurement-v1.md` |
-| Желаемый визуальный результат | принятый Backtests Workbench v23 и последующие явные решения пользователя |
+| Желаемый визуальный результат | текущая доработанная страница Backtests, принятая 2026-09-11 и выбранная эталоном платформы 2026-09-12; `backtests-ui-iteration-log.md` и D4 актуального плана |
 | Объём реализации | выбранная пользователем задача и её критерии проверки |
 | Публичный выпуск | SemVer из `pyproject.toml`, Git tag и GitHub Release |
 
@@ -327,7 +327,8 @@ authority только потому, что он хранится в репоз�
 - текущие route/API/DTO/runtime sources как evidence, а не как второй product
   owner;
 - пользовательская задача и принятые визуальные решения;
-- принятый пилот Backtests Workbench v23.
+- текущая принятая реализация Backtests и правила её использования из D4
+  [актуального плана](roehub-ui-implementation-plan-v1.md).
 
 Технические документы ограничивают совместимость и описывают текущую
 реализацию. Они не заменяют пользовательский замысел и не требуют создавать
@@ -336,15 +337,24 @@ authority только потому, что он хранится в репоз�
 
 ## Принятая визуальная база
 
-Артефакт
+По решению пользователя от 2026-09-12 визуальным эталоном дальнейшей разработки
+локальной платформы является доработанная страница Backtests, принятая 2026-09-11.
+Исходная ревизия: `191a9f8169dab0639d8fb3456eb73b060eb1d2c4` (merge PR #33).
+[Журнал итераций](backtests-ui-iteration-log.md) фиксирует принятый результат,
+а D4 [актуального плана](roehub-ui-implementation-plan-v1.md) — правила сохранения
+подложек, плотности, элементов управления и общей анимации. Композиция следующих
+страниц адаптируется к их функциям в рамках этой стилистики.
+
+Исторический артефакт
 `.codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html`
-принят пользователем как пилот Backtests Workbench и сохраняется по этому пути.
+ранее был принят как пилот Backtests Workbench и сохраняется по этому пути.
 
 - Его нельзя удалять или переписывать в рамках общей очистки старой UI
   документации.
 - SHA-256: `3ff799ac5a5872662dda8b67fc1bd4db0c7860b7de9d84e6597465209d5dd2a4`.
-- Повторная приёмка пилота через отдельный процесс не требуется.
-- Пилот задаёт визуальную базу, но не доказывает реализацию API, доступность
+- Пилот больше не задаёт текущую визуальную базу; не восстанавливать его старые
+  компоненты и размеры при разработке новых страниц.
+- Ни пилот, ни текущая визуальная база не доказывают реализацию API, доступность
   серверных операций или полноту всех экранов продукта.
 
 Старый `prototypes/roehub-v2/` не является этой защищённой базой. Его
@@ -397,3 +407,76 @@ pytest -q tests/unit/docs/test_roehub_ui_surface_inventory.py \
   tests/unit/docs/test_roehub_local_platform_information_architecture.py
 git diff --check
 ```
+
+
+## Opt-in Strategies library/detail — 2026-09-12
+
+`WEB_STRATEGIES_CLIENT_ENABLED=false` is independent from the unchanged default-off
+`WEB_BACKTESTS_CLIENT_ENABLED`. Both use strict true/false parsing. Web loads the
+shared validated asset manifest when either flag is enabled; authenticated routes
+select their own presentation gate. Missing opted-in assets fail startup. Protected
+HTML remains `private, no-store` under the existing identity/proxy boundary.
+
+The additive bootstrap `client_routes` allowlists `/backtests` and `/strategies` for
+presentation only. Older bootstraps mean Backtests-only client navigation. This does
+not grant API access. Client/server query selection uses the last repeated `view` or
+`mode` value. `/strategies/new`, non-default `mode` and `view=classic` stay SSR;
+canonical list/detail and the existing `strategy_id` query entry remain supported.
+Classic continuation survives locale/login redirects and client visits navigate to
+Web. Page title, active navigation, footer and focus follow the active client page.
+
+The client reads the complete owned strategy list and immutable selected detail using
+subject/identity-scoped caches and cancellation. The optional dashboard observation
+is independently identity-bound, does not poll, respects refresh hints/429 and strips
+raw provider/debug fields. Dashboard itself may record a compatibility event; this
+client never calls the direct compatibility endpoint to recover provenance.
+
+Validated save responses retain the explicit Open-strategy action. Only local job
+UUID and validated variant are carried as `from_job`/`from_variant`; after reload they
+are untrusted navigation context, never persisted provenance. No reverse-provenance
+API, storage migration, launch/profile mutation or trading command is introduced.
+
+Local fixture isolation uses `ROEHUB_PROOF_PORT`, `ROEHUB_PROOF_STATE`, and
+`ROEHUB_PROOF_STRATEGIES=true`; the last adds all four presentation combinations.
+`ROEHUB_PROOF_EVIDENCE` redirects new foundation/journey images away from accepted
+historical evidence. See the [implementation report](../../../../.codex/delivery/evidence/ROEHUB-STRATEGIES-CLIENT-2026-09-12.md)
+for exact invocations and proof limits. Flag-off rollback changes presentation only;
+existing jobs/strategies survive. Target-role cutover and production remain separate.
+
+
+### Strategies analysis read extension — 2026-09-12
+
+After user rejection of the specification-only card, the client adds Overview,
+Backtest, Execution and Specification views. The additive authenticated
+`GET /api/strategies/{strategy_id}/research-source` returns only strategy ID and
+nullable persisted source job/variant. Existing owner/organization/nondeleted
+checks run before an owner-and-organization-scoped provenance lookup. Missing
+origin is a 200 null pair; unavailable storage is canonical sanitized 503. The
+source report still enforces its own access checks. No migration or save replay.
+
+Performance reads use the persisted origin, never URL return context. Existing
+Backtests parsers and ECharts rendering provide simulation metrics, conditions,
+equity/drawdown and trades. Trading profile, paper accounting and recent signals
+use allowlisted dashboard observations with explicit unknown/empty states; absent
+profiles must not expose default zero limits as a configured profile. This does
+not provide live exchange P&L, a full research history or new trading commands.
+The two presentation flags and classic rollback semantics are unchanged.
+
+
+### Operational Strategies continuation — 2026-09-12
+
+The approved operational screen supersedes the analysis tabs above. The client no
+longer requests backtest/provenance data on Strategies. Dashboard adds an optional
+`operations` projection: owned run fills, position cycles, reason-separated partial
+executions, closed-trade equity/drawdown and canonical OHLC. PostgreSQL readers scope
+all joins by organization/owner and select strategy/run; no schema migration. Missing
+or unsupported observations remain independent from immutable specification reads.
+
+Existing run/stop/restart/manual-entry/manual-exit/DELETE routes are called explicitly,
+without automatic mutation retries. DELETE accepts the existing bodyless 204. Manual
+recovery stores only bounded command identity/amount (never responses or credentials),
+retains the original idempotency key, and reconciles known terminal outcomes. Selected
+status refresh honours server hints; access failures stop reads. Flags and classic
+entries retain their meaning. The opt-in QA command simulator is imported only by the
+disposable fixture, verifies real owned access before simulation, and never calls a
+runner or provider. It is not evidence of exchange execution or full history coverage.

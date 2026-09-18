@@ -30,6 +30,15 @@ class InMemoryStrategyBacktestVariantProvenanceRepository(
         self._strategy_repository = strategy_repository
         self._by_strategy_id: dict[UUID, StrategyBacktestVariantProvenance] = {}
 
+    def find_by_strategy_id(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID,
+    ) -> StrategyBacktestVariantProvenance | None:
+        """Return only provenance in the exact owner/organization scope."""
+        record = self._by_strategy_id.get(strategy_id)
+        if record and record.organization_id == organization_id and record.user_id == user_id:
+            return record
+        return None
+
     def find_by_idempotency_key(
         self,
         *,

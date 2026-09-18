@@ -29,6 +29,17 @@ Target organization/role authorization and default cutover remain separate.
 No production runtime is selected by the repository adapter; Git publication
 must not be described as production deployment.
 
+## Platform visual baseline — 2026-09-12
+
+The product owner selected this refined Backtests implementation as the visual
+baseline for subsequent local-platform UI, replacing the old v23 pilot as the
+active design reference. The accepted code is pinned by merge commit
+`191a9f8169dab0639d8fb3456eb73b060eb1d2c4` (PR #33). The
+[implementation plan, D4](roehub-ui-implementation-plan-v1.md#d4-the-accepted-backtests-implementation-is-the-visual-authority)
+records reuse of the current surfaces, control density, hierarchy and shared motion.
+The historical pilot and prior evidence remain unchanged. This decision selects
+visual authority and further planning; it does not implement the next UI area.
+
 ## Iteration history
 
 | Period | Accepted change | Evidence |
@@ -38,6 +49,7 @@ must not be described as production deployment.
 | 2026-09-10 | Actual Binance candles, artifact-pinned rollups and interactive charts | Same evidence, real-market section |
 | 2026-09-10 | Expandable Overview, shared motion, icon-only control and density correction | Same evidence, motion sections |
 | 2026-09-11 | Product-owner acceptance and authorized merge publication | This entry; [publication record](../../../../.codex/delivery/evidence/BACKTESTS-UI-PUBLICATION-2026-09-11.md) |
+| 2026-09-12 | Refined Backtests promoted to the platform visual baseline; next Strategies library/detail iteration planned | Platform visual baseline entry above; [current plan](roehub-ui-implementation-plan-v1.md) |
 
 The dates describe recorded local iterations; individual evidence entries are
 historical observations, not claims that every later revision was rechecked by

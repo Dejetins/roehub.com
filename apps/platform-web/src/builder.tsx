@@ -68,7 +68,7 @@ function KnownRecovery({record,onCreated}:{record:Recovery;onCreated?: (id:strin
   return <><RecoveryNotice record={record}/>{known.error && <p role="alert" className="notice">{t(`builder.errors.${known.error instanceof ApiError?known.error.kind:'unavailable'}`)}</p>}</>;
 }
 function Configure({subject,defaults:d,catalog:initialCatalog,embedded=false,onClose,onCreated,onSummary,demoPreset=false}:{subject:string;defaults:Defaults;catalog:Catalog} & BuilderPlacement) {
-  const {t}=useTranslation(); const navigate=useNavigate(); const client=useQueryClient();
+  const {t,i18n}=useTranslation(); const navigate=useNavigate(); const client=useQueryClient();
   const initial=()=>demoPreset ? syntheticResearch(d,initialCatalog) : initialResearch(d,initialCatalog);
   const form=useForm<Research>({defaultValues:initial()});
   const autoChecked=useRef(false);
@@ -102,10 +102,10 @@ function Configure({subject,defaults:d,catalog:initialCatalog,embedded=false,onC
   function field(path:FieldPath<Research>,label:string,type='text',options?:{value:string;label?:string;disabled?:boolean}[],factor=1):ReactNode {
     const value=path.split('.').reduce<unknown>((v,k)=>(v as Record<string,unknown>)?.[k],b); const errors=issueFor(path);
     const props={id:`field-${path}`,name:path,'aria-invalid':errors.length>0 as boolean,'aria-describedby':errors.length?`error-${path}`:undefined};
-    return <div className="field" key={path}><label htmlFor={props.id}>{label}</label>{options ? <select {...props} value={String(value ?? '')} onChange={e=>set(path,e.target.value)}>
+    return <div className="field" key={path}><label className={path==='strategy_name'?'sr-only':undefined} htmlFor={props.id}>{label}</label>{options ? <select {...props} value={String(value ?? '')} onChange={e=>set(path,e.target.value)}>
       {!options.some(o=>o.value===value) && <option value={String(value ?? '')}>{String(value ?? '')} — {t('soon')}</option>}
       {options.map(o=><option key={o.value} value={o.value} disabled={o.disabled}>{o.label ?? o.value}</option>)}</select> :
-      <input {...props} type={type} step={type==='number'?'any':undefined} value={type==='date'?String(value ?? '').slice(0,10):typeof value==='number' ? (Number.isFinite(value)?Number((value*factor).toPrecision(14)):'') : String(value ?? '')}
+      <input {...props} placeholder={path==='strategy_name'?(i18n.language.startsWith('ru')?'Название':'Name'):undefined} type={type} step={type==='number'?'any':undefined} value={type==='date'?String(value ?? '').slice(0,10):typeof value==='number' ? (Number.isFinite(value)?Number((value*factor).toPrecision(14)):'') : String(value ?? '')}
         onChange={e=>set(path,type==='date'?dateBoundary(e.target.value):type==='number'?(e.target.value===''?NaN:Number(e.target.value)/factor):e.target.value)}/>}
       {errors.length>0 && <span className="field-error" id={`error-${path}`}>{errors.map(i=>i.message===i.code?t(`builder.errors.${i.code}`):i.message).join(' · ')}</span>}</div>;
   }
@@ -174,13 +174,13 @@ function Configure({subject,defaults:d,catalog:initialCatalog,embedded=false,onC
         {tooLarge && <p className="notice error">{t('builder.tooLarge')}</p>}
         {record && <><RecoveryNotice record={record} rejected={rejected}/>{rejected && <div className="notice"><button type="button" disabled={wait>0} onClick={()=>{clearRecovery();setRecord(null);setReview(null);setRejected(false);}}>{t('builder.revise')}</button></div>}</>}
         <fieldset className="builder-fields" disabled={!!record || pending==='submit'}><legend className="sr-only">{t('builder.configure')}</legend>
-          <div className="builder-meta">{field('strategy_name',t('builder.label'))}<p className="muted" title={t('builder.draftHelp')}>{t('builder.draftShort')}</p></div>
+          <div className="builder-meta">{field('strategy_name',t('builder.label'))}</div>
           <section className="config-band" aria-labelledby="market-heading"><h3 id="market-heading">{t('builder.groupMarket')}</h3><div className="band-content">
             <div className="config-grid">{field('coordinates.exchange',t('builder.exchange'),'text',c.instrument_universe.markets.map(o=>({...o,disabled:o.status!=='available'})))}
               {field('coordinates.market_type',t('builder.market'),'text',c.instrument_universe.market_types.map(o=>({...o,disabled:o.status!=='available'})))}
               {field('coordinates.symbol',t('builder.symbol'),'text',c.instrument_universe.symbols.map(o=>({...o,disabled:o.status!=='available'})))}
-              {field('timeframe',t('builder.timeframe'),'text',options(d.supported_timeframes))}</div>
-            <div className="config-grid date-grid">{field('time_range.start',t('builder.start'),'date')}{field('time_range.end',t('builder.end'),'date')}<p className="muted date-help">{t('builder.utcHelp')}</p></div>
+              {field('timeframe',t('builder.timeframe'),'text',options(d.supported_timeframes))}
+              {field('time_range.start',t('builder.start'),'date')}{field('time_range.end',t('builder.end'),'date')}</div>
           </div></section>
           <section className="config-band" aria-labelledby="signal-heading"><h3 id="signal-heading">{t('builder.groupSignal')}</h3><div className="band-content">
             {b.indicators.map((indicator,index)=><section className="indicator-row" key={index} aria-label={`${t('builder.indicator')} ${index+1}`}>
@@ -210,7 +210,8 @@ function Configure({subject,defaults:d,catalog:initialCatalog,embedded=false,onC
               {b.execution.sizing.mode.endsWith('max_quote') && field('execution.sizing.max_quote',t('builder.maxQuote'),'number')}</div>}
           </div></section>
           <section className="config-band" aria-labelledby="risk-heading"><h3 id="risk-heading">{t('builder.groupRisk')}</h3><div className="band-content">
-            <div className="config-grid">{field('risk.mode',t('builder.risk'),'text',options(d.risk_modes))}</div>
+            <label className="check-label risk-toggle"><input id="field-risk.mode" type="checkbox" role="switch" checked={b.risk.mode==='tp_sl_grid'} disabled={!d.risk_modes.includes('tp_sl_grid')} onChange={e=>set('risk.mode',e.target.checked?'tp_sl_grid':'none')}/>{t('builder.tp')} / {t('builder.sl')}</label>
+            {issueFor('risk.mode').map((issue,index)=><p className="field-error" key={index}>{issue.message===issue.code?t(`builder.errors.${issue.code}`):issue.message}</p>)}
             {b.risk.mode==='tp_sl_grid' && <><p className="muted">{d.hit_times_grid.timeframe} · {t('builder.covered')}</p>{(['tp','sl'] as const).map(side=><section key={side} className="risk-row" aria-label={t(`builder.${side}`)}>
               <div className="config-grid"><label className="check-label"><input id={`field-risk.${side}.enabled`} type="checkbox" checked={b.risk[side]?.enabled ?? false} onChange={e=>set(`risk.${side}`,{...b.risk[side],enabled:e.target.checked})}/>{t(`builder.${side}`)}</label>
                 {b.risk[side]?.enabled && <>{field(`risk.${side}.start_pct`,t('builder.startPct'),'number')}{field(`risk.${side}.stop_pct`,t('builder.stopPct'),'number')}{field(`risk.${side}.step_pct`,t('builder.stepPct'),'number')}</>}</div>

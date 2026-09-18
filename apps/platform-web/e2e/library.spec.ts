@@ -63,19 +63,15 @@ test('real library, empty/cursor filters, independent deep link, focus, locale a
   await page.getByText('Search, instrument and date filters', { exact: true }).click();
   const filters = page.getByRole('button', { name: 'Filters', exact: true });
   await filters.focus(); await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Close filters' })).toBeFocused();
-  await page.keyboard.press('Shift+Tab');
-  await expect(dialog.getByRole('button', { name: 'Done' })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(dialog.getByRole('button', { name: 'Close filters' })).toBeFocused();
+  const popup = page.getByRole('group', { name: 'Filters', exact: true });
+  await expect(popup).toBeVisible();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await dialog.getByLabel('Risk mode').selectOption('tp_sl_grid');
-  await dialog.getByLabel('Page size (1–250)').fill('1');
-  await dialog.getByLabel('Page size (1–250)').press('Tab');
+  await popup.getByRole('button', { name: /Risk mode/ }).click();
+  await popup.getByRole('menuitemradio', { name: 'TP/SL grid', exact: true }).click();
   await page.keyboard.press('Escape');
-  await expect(dialog).not.toBeVisible(); await expect(filters).toBeFocused();
+  await expect(popup).not.toBeVisible(); await expect(filters).toBeFocused();
+  // Preserve cursor traversal coverage with a supported one-item URL page size.
+  await page.goto('/backtests?risk_mode=tp_sl_grid&limit=1');
   await expect(page.getByRole('heading', { name: 'No matching jobs on this page' })).toBeVisible();
   await page.getByRole('button', { name: 'Next page' }).click();
   await expect(page).toHaveURL(/cursor=/);

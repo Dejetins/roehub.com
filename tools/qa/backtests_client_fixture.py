@@ -13,6 +13,7 @@ import os
 import secrets
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -27,7 +28,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 ROOT = Path(__file__).resolve().parents[2]
-STATE = ROOT / ".local_artifacts/backtests-client"
+STATE = ROOT / os.environ.get("ROEHUB_PROOF_STATE", ".local_artifacts/backtests-client")
+PORT = int(os.environ.get("ROEHUB_PROOF_PORT", "18480"))
 PG_IMAGE = "postgres@sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685"
 CH_IMAGE = (
     "clickhouse/clickhouse-server@sha256:"
@@ -84,12 +86,61 @@ def create_api() -> FastAPI:
         )
     )
 
+
     @app.middleware("http")
     async def identity_fault(request: Request, call_next):
         if request.url.path == "/auth/current-user" and (STATE / "identity-unavailable").exists():
             return JSONResponse({"detail": "Fixture identity outage"}, status_code=503)
-        return await call_next(request)
+        demo = STATE / "execution-demo-strategy.txt"
+        if demo.exists() and os.environ.get("ROEHUB_ENV") == "test" and request.method == "POST":
+            strategy_id = demo.read_text().strip()
+            prefix = f"/strategies/{strategy_id}/"
+            command = request.url.path.removeprefix(prefix)
+            if request.url.path.startswith(prefix) and command in {
+                "run",
+                "stop",
+                "restart",
+                "manual-entry",
+                "manual-exit",
+            }:
+                transport = httpx.ASGITransport(app=app)
+                async with httpx.AsyncClient(
+                    transport=transport, base_url=str(request.base_url)
+                ) as probe:
+                    owned = await probe.get(
+                        f"/strategies/{strategy_id}",
+                        headers={"cookie": request.headers.get("cookie", "")},
+                    )
+                if owned.status_code != 200:
+                    return JSONResponse(
+                        {"detail": "Strategy is not accessible"}, status_code=owned.status_code
+                    )
+                from tools.qa.strategy_execution_demo import simulate_command
 
+                body = await request.json() if command.startswith("manual-") else {}
+                payload, status = simulate_command(
+                    strategy_id, command, body, STATE / "execution-demo-state.json"
+                )
+                return JSONResponse(payload, status_code=status)
+        response = await call_next(request)
+        if (
+            request.url.path == "/ui/strategies/dashboard"
+            and response.status_code == 200
+            and demo.exists()
+        ):
+            from tools.qa.strategy_execution_demo import apply_execution_demo
+
+            body = b"".join([chunk async for chunk in response.body_iterator])
+            payload = apply_execution_demo(
+                json.loads(body), demo.read_text().strip(), STATE / "execution-demo-state.json"
+            )
+            headers = {
+                key: value
+                for key, value in response.headers.items()
+                if key.lower() not in {"content-length", "content-type"}
+            }
+            return JSONResponse(payload, headers=headers)
+        return response
     @app.get("/health")
     def health():
         return {"healthy": True}
@@ -158,6 +209,33 @@ def _seed_postgres(dsn: str, password: str):
     return str(user)
 
 
+def _preview_candles(rows):
+    """Opt-in oscillating synthetic prices for multi-trade interactive previews."""
+    if os.environ.get("ROEHUB_PROOF_CANDLES", "baseline") != "cycles":
+        return rows
+    from dataclasses import replace
+    from math import pi, sin
+
+    def price(minute):
+        # Slow trends, faster reversals and a choppy middle regime. Not market history.
+        amplitude = 1800 if minute < 1440 or minute >= 2880 else 450
+        return 65000 + amplitude * sin(2 * pi * minute / 360) + 650 * sin(
+            2 * pi * minute / 97
+        ) + 120 * sin(2 * pi * minute / 23)
+
+    result = []
+    for index, row in enumerate(rows):
+        opening, closing = price(index), price(index + 1)
+        volume = 12 + 8 * abs(sin(index / 37))
+        candle = replace(
+            row.candle, open=opening, close=closing,
+            high=max(opening, closing) + 35, low=min(opening, closing) - 35,
+            volume_base=volume, volume_quote=volume * closing,
+        )
+        result.append(replace(row, candle=candle))
+    return tuple(result)
+
+
 def _artifacts(env: dict[str, str], dsn: str) -> Path:
     """Build real artifact files from deterministic, disposable canonical input candles."""
     from datetime import UTC, datetime
@@ -211,7 +289,7 @@ def _artifacts(env: dict[str, str], dsn: str) -> Path:
         runtime_settings=fixture.runtime_settings,
         artifact_loader=fixture.loader,
         canonical_candle_reader=_FakeCanonicalCandleReader(
-            rows=_build_canonical_rows_v2(bar_indexes=tuple(range(4320)))
+            rows=_preview_candles(_build_canonical_rows_v2(bar_indexes=tuple(range(4320))))
         ),
         defaults_provider=defaults,
         signal_rules_engine=BacktestSignalRulesEngineV2(defaults_provider=defaults),
@@ -248,6 +326,15 @@ def _artifacts(env: dict[str, str], dsn: str) -> Path:
 
 def run_stack():
     """Start only new, named loopback containers; refuse to overwrite another run."""
+    count = 6 if os.environ.get("ROEHUB_PROOF_STRATEGIES") == "true" else 4
+    for port in range(PORT, PORT + count):
+        with socket.socket() as probe:
+            try:
+                probe.bind(("127.0.0.1", port))
+            except OSError as error:
+                raise RuntimeError(
+                    f"Local proof port {port} is occupied; choose another base"
+                ) from error
     STATE.mkdir(parents=True, exist_ok=False)
     STATE.chmod(0o700)
     suffix = secrets.token_hex(4)
@@ -263,6 +350,8 @@ def run_stack():
     }
     env.update(
         {
+            "ROEHUB_PROOF_STATE": str(STATE),
+            "ROEHUB_PROOF_PORT": str(PORT),
             "PYTHONPATH": str(ROOT / "src") + os.pathsep + str(ROOT),
             "ROEHUB_ENV": "test",
             "NUMBA_NUM_THREADS": "1",
@@ -371,9 +460,9 @@ def run_stack():
                 "ROEHUB_INDICATORS_CONFIG": str(ROOT / "configs/test/indicators.yaml"),
                 "ROEHUB_BACKTEST_TRADES_CACHE_ROOT": str(STATE / "trades-cache"),
                 "IDENTITY_LOCAL_RP_ID": "localhost",
-                "IDENTITY_LOCAL_ORIGIN": "http://localhost:18480",
-                "WEB_API_BASE_URL": "http://127.0.0.1:18480",
-                "WEB_API_UPSTREAM_URL": "http://127.0.0.1:18481",
+                "IDENTITY_LOCAL_ORIGIN": f"http://localhost:{PORT}",
+                "WEB_API_BASE_URL": f"http://127.0.0.1:{PORT}",
+                "WEB_API_UPSTREAM_URL": f"http://127.0.0.1:{PORT + 1}",
             }
         )
         private = STATE / "credentials.json"
@@ -399,21 +488,50 @@ def run_stack():
             if name == "runner":
                 (STATE / "runner.pid").write_text(str(processes[-1].pid))
 
-        for name, module, port, extra in (
-            ("api", "tools.qa.backtests_client_fixture:create_api", "18481", {}),
+        servers = [
+            ("api", "tools.qa.backtests_client_fixture:create_api", str(PORT + 1), {}),
             (
                 "web",
                 "apps.web.main.app:create_app",
-                "18480",
-                {"WEB_BACKTESTS_CLIENT_ENABLED": "true"},
+                str(PORT),
+                {
+                    "WEB_BACKTESTS_CLIENT_ENABLED": "true",
+                    "WEB_STRATEGIES_CLIENT_ENABLED": os.environ.get(
+                        "ROEHUB_PROOF_STRATEGIES", "false"
+                    ),
+                },
             ),
             (
                 "ssr",
                 "apps.web.main.app:create_app",
-                "18482",
-                {"WEB_BACKTESTS_CLIENT_ENABLED": "false"},
+                str(PORT + 2),
+                {"WEB_BACKTESTS_CLIENT_ENABLED": "false", "WEB_STRATEGIES_CLIENT_ENABLED": "false"},
             ),
-        ):
+        ]
+        if os.environ.get("ROEHUB_PROOF_STRATEGIES") == "true":
+            servers.extend(
+                [
+                    (
+                        "backtests-only",
+                        "apps.web.main.app:create_app",
+                        str(PORT + 4),
+                        {
+                            "WEB_BACKTESTS_CLIENT_ENABLED": "true",
+                            "WEB_STRATEGIES_CLIENT_ENABLED": "false",
+                        },
+                    ),
+                    (
+                        "strategies-only",
+                        "apps.web.main.app:create_app",
+                        str(PORT + 5),
+                        {
+                            "WEB_BACKTESTS_CLIENT_ENABLED": "false",
+                            "WEB_STRATEGIES_CLIENT_ENABLED": "true",
+                        },
+                    ),
+                ]
+            )
+        for name, module, port, extra in servers:
             launch(
                 name,
                 [
@@ -430,17 +548,19 @@ def run_stack():
                 extra,
             )
         launch(
-            "runner", ["-m", "apps.worker.backtest_job_runner.main.main", "--metrics-port", "18483"]
+            "runner",
+            ["-m", "apps.worker.backtest_job_runner.main.main", "--metrics-port", str(PORT + 3)],
         )
         for port, path in (
-            (18481, "/health"),
-            (18480, "/health/live"),
-            (18482, "/health/live"),
-            (18483, "/metrics"),
+            (PORT + 1, "/health"),
+            (PORT, "/health/live"),
+            (PORT + 2, "/health/live"),
+            (PORT + 3, "/metrics"),
         ):
             _wait(lambda: httpx.get(f"http://127.0.0.1:{port}{path}").status_code == 200)
         print(
-            "Local proof ready: Web :18480, API :18481, SSR :18482, idle runner :18483", flush=True
+            f"Local proof ready: Web :{PORT}, API :{PORT + 1}, SSR :{PORT + 2}, runner :{PORT + 3}",
+            flush=True,
         )
         while all(process.poll() is None for process in processes):
             time.sleep(0.5)

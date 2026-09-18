@@ -1,6 +1,5 @@
 import { MotionSettings } from './motion';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import { Route, Routes, useLocation, useNavigate } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { Builder, type BuilderSummary } from './builder';
@@ -22,7 +21,6 @@ export function BacktestsPage({ subject }: { subject: string }) {
   const [draft, setDraft] = useState<BuilderSummary | null>(null);
   const submitted = useRef(false);
   const receiveSummary = useCallback((summary: BuilderSummary) => { if (!submitted.current) setDraft(summary); }, []);
-  const trigger = useRef<HTMLButtonElement>(null);
   const previousPath = useRef(location.pathname);
   useEffect(() => {
     const prior = previousPath.current; previousPath.current = location.pathname;
@@ -32,30 +30,25 @@ export function BacktestsPage({ subject }: { subject: string }) {
     }
     else if (prior !== location.pathname) {
       setExpanded(false);
-      (document.getElementById('selected-job-heading') ?? trigger.current)?.focus({ preventScroll: true });
+      (document.getElementById('selected-job-heading') ?? document.getElementById('library-tab-history'))?.focus({ preventScroll: true });
     }
   }, [location.pathname, newRoute]);
   function open() {
     if (submitted.current) { submitted.current = false; setGeneration(value => value + 1); setDraft(null); }
     setVisited(true); setExpanded(true);
-    trigger.current?.focus({ preventScroll: true });
-    trigger.current?.scrollIntoView?.({ behavior: 'auto', block: 'nearest' });
+    document.getElementById('library-tab-new')?.focus({ preventScroll: true });
+    document.getElementById('library-tab-new')?.scrollIntoView?.({ behavior: 'auto', block: 'nearest' });
   }
   function close() {
-    trigger.current?.focus({ preventScroll: true }); setExpanded(false);
+    document.getElementById('library-tab-history')?.focus({ preventScroll: true }); setExpanded(false);
     if (newRoute) navigate(`${history.current.pathname}${history.current.search}${history.current.hash}`);
   }
   function date(value: string) {
     const parsed = new Date(value);
     return Number.isFinite(parsed.getTime()) ? new Intl.DateTimeFormat(i18n.language, { dateStyle: 'medium', timeZone: 'UTC' }).format(parsed) : '—';
   }
-  const configuration = <section className="config-disclosure" aria-labelledby="configure-toggle">
-      <div className="panel-head disclosure-head">
-        <h3><button ref={trigger} id="configure-toggle" type="button" className="disclosure-toggle" aria-expanded={expanded} aria-controls="configuration-body"
-          onClick={() => expanded ? close() : open()}><ChevronDown aria-hidden="true" />{t(expanded ? 'builder.collapse' : draft?.dirty ? 'builder.resume' : 'new')}</button></h3>
-        <p className="draft-summary">{draft ? <>{draft.symbol} · {draft.timeframe}<span>{date(draft.start)} — {date(draft.end)}</span><span>{t(`builder.${draft.status}`)}</span></> : t('builder.configure')}</p>
-
-      </div>
+  const configuration = <section className="config-disclosure" aria-label={t('new')}>
+      {draft&&<div className="panel-head disclosure-head"><p className="draft-summary">{draft.symbol} · {draft.timeframe}<span>{date(draft.start)} — {date(draft.end)}</span><span>{t(`builder.${draft.status}`)}</span></p></div>}
       <div id="configuration-body" className="disclosure-body" data-expanded={expanded} aria-hidden={!expanded} inert={!expanded}
         onKeyDown={event => { if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); close(); } }}>
         <div className="disclosure-clip">
@@ -71,8 +64,8 @@ export function BacktestsPage({ subject }: { subject: string }) {
     <div className="workspace-title"><h1 id="workspace-heading" tabIndex={-1}>{t('title')}</h1><span className="scope-label">{t('research')}</span><MotionSettings /></div>
     <div id="panel-history">
       <Routes location={history.current}>
-        <Route path="/backtests" element={<BacktestsWorkspace subject={subject} embedded active={!newRoute} configuration={configuration} onNew={open} />} />
-        <Route path="/backtests/:jobId" element={<BacktestsWorkspace subject={subject} mode="detail" embedded active={!newRoute} configuration={configuration} onNew={open} />} />
+        <Route path="/backtests" element={<BacktestsWorkspace subject={subject} embedded active={!newRoute} configuration={configuration} configurationActive={expanded} onHistory={close} onNew={open} />} />
+        <Route path="/backtests/:jobId" element={<BacktestsWorkspace subject={subject} mode="detail" embedded active={!newRoute} configuration={configuration} configurationActive={expanded} onHistory={close} onNew={open} />} />
       </Routes>
     </div>
   </div>;

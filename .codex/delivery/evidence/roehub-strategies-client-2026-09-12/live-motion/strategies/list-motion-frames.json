@@ -1,0 +1,648 @@
+[
+  {
+    "width": 1440,
+    "samples": [
+      {
+        "time": 0,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 14.500000047683727,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 31.200000047683716,
+        "size": 240.4375,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 47.80000004768374,
+        "size": 204.234375,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 64.50000004768373,
+        "size": 171.34375,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 81.20000004768372,
+        "size": 142.28125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 97.80000004768374,
+        "size": 117.28125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 114.50000004768373,
+        "size": 95.859375,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 131.1000000476837,
+        "size": 78,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 147.80000004768374,
+        "size": 63.09375,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 164.50000004768373,
+        "size": 50.8125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 181.1000000476837,
+        "size": 40.8125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 197.9000000476837,
+        "size": 80.296875,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 214.50000004768373,
+        "size": 115.625,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 231.20000004768372,
+        "size": 146.875,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 247.9000000476837,
+        "size": 173.578125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 264.5000000476837,
+        "size": 195.6875,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 281.2000000476837,
+        "size": 213.828125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 297.80000004768374,
+        "size": 228.328125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 314.50000004768367,
+        "size": 239.953125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 331.2000000476837,
+        "size": 249.125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 347.80000004768374,
+        "size": 256.296875,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 364.50000004768367,
+        "size": 261.96875,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 381.1000000476837,
+        "size": 266.359375,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 397.80000004768374,
+        "size": 269.8125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 414.40000004768376,
+        "size": 272.46875,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 431.2000000476837,
+        "size": 274.546875,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 447.80000004768374,
+        "size": 276.109375,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 464.50000004768367,
+        "size": 277.28125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 481.2000000476837,
+        "size": 278.171875,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 497.80000004768374,
+        "size": 278.796875,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 514.5000000476837,
+        "size": 279.25,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 531.1000000476837,
+        "size": 279.5625,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 547.8000000476837,
+        "size": 279.765625,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 564.4000000476838,
+        "size": 279.890625,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 581.1000000476837,
+        "size": 279.953125,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 597.8000000476837,
+        "size": 279.984375,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 614.5000000476837,
+        "size": 279.984375,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 631.1000000476837,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 647.8000000476837,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 664.5000000476837,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 681.1000000476837,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 697.8000000476837,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 714.4000000476838,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 731.1000000476837,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 747.7000000476837,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 764.4000000476838,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 781.1000000476837,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 797.8000000476836,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 814.5000000476837,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 831.1000000476838,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 847.8000000476836,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      },
+      {
+        "time": 864.4000000476838,
+        "size": 280,
+        "textWidth": 280,
+        "overflow": false
+      }
+    ]
+  },
+  {
+    "width": 820,
+    "samples": [
+      {
+        "time": 0,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 7.20000001192102,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 23.900000011920838,
+        "size": 312.671875,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 40.60000001192088,
+        "size": 265.3125,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 57.20000001192102,
+        "size": 222.828125,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 73.90000001192084,
+        "size": 185.046875,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 90.50000001192097,
+        "size": 152.515625,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 107.20000001192102,
+        "size": 124.671875,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 123.90000001192084,
+        "size": 101.328125,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 140.60000001192088,
+        "size": 81.953125,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 157.20000001192102,
+        "size": 66.09375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 173.90000001192084,
+        "size": 53.015625,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 190.60000001192088,
+        "size": 42.34375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 207.20000001192102,
+        "size": 93.171875,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 223.90000001192084,
+        "size": 139.671875,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 240.50000001192097,
+        "size": 180.59375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 257.200000011921,
+        "size": 216.0625,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 273.90000001192084,
+        "size": 245.875,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 290.500000011921,
+        "size": 270.28125,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 307.200000011921,
+        "size": 290.234375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 323.90000001192084,
+        "size": 306.25,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 340.500000011921,
+        "size": 318.953125,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 357.200000011921,
+        "size": 329.109375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 373.90000001192084,
+        "size": 337.140625,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 390.500000011921,
+        "size": 343.4375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 407.200000011921,
+        "size": 348.421875,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 423.90000001192084,
+        "size": 352.328125,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 440.500000011921,
+        "size": 355.34375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 457.200000011921,
+        "size": 357.703125,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 473.90000001192084,
+        "size": 359.5,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 490.6000000119209,
+        "size": 360.859375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 507.200000011921,
+        "size": 361.875,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 523.8000000119209,
+        "size": 362.609375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 540.500000011921,
+        "size": 363.140625,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 557.200000011921,
+        "size": 363.5,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 573.8000000119209,
+        "size": 363.734375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 590.500000011921,
+        "size": 363.875,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 607.200000011921,
+        "size": 363.953125,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 623.8000000119209,
+        "size": 363.984375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 640.6000000119209,
+        "size": 363.984375,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 657.200000011921,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 673.9000000119208,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 690.500000011921,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 707.200000011921,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 723.8000000119209,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 740.500000011921,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 757.200000011921,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 773.8000000119209,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 790.500000011921,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 807.200000011921,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 823.9000000119208,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 840.500000011921,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      },
+      {
+        "time": 857.200000011921,
+        "size": 364,
+        "textWidth": 676.40625,
+        "overflow": false
+      }
+    ]
+  }
+]

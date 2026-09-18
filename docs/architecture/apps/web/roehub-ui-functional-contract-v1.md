@@ -20,9 +20,12 @@
   records never grant a role a new capability. No security policy or runtime
   route is implemented by this consolidation.
 
-The accepted v23 is the visual guide for all subsequent local UI work. It is
-not a source of fictional users, plan tiers, service status, new permissions or
-API behavior. Reuse its visual language while adapting composition to each task.
+By the user's decision of 2026-09-12, the refined Backtests implementation
+accepted on 2026-09-11 is the visual guide for subsequent local UI work; the old
+v23 pilot is historical only. The [implementation plan, D4](roehub-ui-implementation-plan-v1.md#d4-the-accepted-backtests-implementation-is-the-visual-authority)
+identifies the baseline and reuse rules. Preserve its current surfaces, density,
+controls and shared motion while adapting composition to each task. Visuals are
+not a source of fictional users, tiers, service status, permissions or API behavior.
 The former staged design program remains retired; this contract selects no
 prompt pack, ledger, separate atlas ceremony or mandatory prototype series.
 
@@ -53,7 +56,7 @@ acceptance for the entire platform.
 |---|---|
 | Client architecture | Existing accepted pnpm/React/TypeScript/Vite stack; `apps/platform-web`, separate `apps/site`, bounded Roehub packages; `apps/web` retains session/proxy authority during migration |
 | Charts | New charts use ECharts; backend owns metrics, time identity and aggregation |
-| Visual/responsive scope | v23 direction; 820/1024/1440, RU/EN, keyboard, zoom, reduced motion; no local phone product or inherited six-theme requirement |
+| Visual/responsive scope | Refined accepted Backtests implementation; old v23 is historical only. Preserve 820/1024/1440, RU/EN, keyboard, zoom, reduced motion; no local phone product or inherited six-theme requirement |
 | Strategy editing | Immutable spec changes create/clone a strategy; launch profile configuration is a separate mutable operation |
 | Backtest retry | Target operator retry creates a new domain job with the same immutable input and renewed admission; not a generic runtime retry |
 | General job retry | Same job, new attempt; retain semantic input identity and apply isolated runtime eligibility; cancellation is not automatically retryable |

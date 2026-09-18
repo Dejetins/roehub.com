@@ -246,7 +246,9 @@ class StrategyDashboardQueryService:
         rl_risk_sizing_policy_service: RlRiskSizingPolicyService | None = None,
         organization_scope_resolver: ResearchOrganizationScopeResolver | None = None,
         refresh_limiter: StrategyDashboardManualRefreshLimiter | None = None,
+        operation_reads=None,
     ) -> None:
+        self._operation_reads = operation_reads
         self._strategy_repository = strategy_repository
         self._run_repository = run_repository
         self._profile_repository = profile_repository
@@ -370,7 +372,15 @@ class StrategyDashboardQueryService:
         )
         selected_symbol = _selected_symbol(strategy=selected_strategy)
 
+        operations = None
+        chart = _build_unavailable_chart(symbol=selected_symbol)
+        if selected_strategy is not None and self._operation_reads is not None:
+            operations, chart = self._operation_reads.read(
+                organization_id=organization_id, user_id=principal.user_id,
+                strategy=selected_strategy, run=selected_run, profile=live_profile,
+            )
         return StrategyDashboardResponse(
+            operations=operations,
             generated_at=generated_at,
             refresh_status=effective_refresh_status,
             next_allowed_refresh_at=refresh_decision.next_allowed_refresh_at,
@@ -401,7 +411,7 @@ class StrategyDashboardQueryService:
                 state=state,
                 cursor=cursor,
             ),
-            chart=_build_unavailable_chart(symbol=selected_symbol),
+            chart=chart,
             metric_grid=_build_metric_grid(),
             monthly_stats=_build_monthly_stats(),
             long_short=_build_long_short(),
@@ -1175,6 +1185,7 @@ def build_strategy_dashboard_service(
         btcusdt_market_readiness_service=market_data_use_cases.btcusdt_market_readiness,
         account_projection_service=_build_account_projection_service(settings=settings),
         paper_accounting_service=_build_paper_accounting_service(settings=settings),
+        operation_reads=_build_operation_reads(settings=settings, environ=environ),
         execution_outcome_service=_build_execution_outcome_service(settings=settings),
         rl_live_ticker_entitlement_service=_build_rl_live_ticker_entitlement_service(
             settings=settings,
@@ -2397,4 +2408,26 @@ def _build_signal_journal_row(*, signal: StrategySignal) -> StrategySignalJourna
         bar_ts_close=signal.bar_ts_close,
         source_message_id=signal.source_message_id,
         created_at=signal.created_at,
+    )
+
+
+def _build_operation_reads(*, settings, environ):
+    if not settings.postgres_dsn:
+        return None
+    from apps.api.wiring.modules.strategy_operation_reads import StrategyOperationReads
+    from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+    from trading.contexts.live_execution.adapters.outbound.persistence.postgres.strategy_operation_reader import (  # noqa: E501
+        PostgresStrategyOperationReader,
+    )
+    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
+        ThreadLocalClickHouseConnectGateway,
+    )
+    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_reader import (  # noqa: E501
+        ClickHouseCanonicalCandleReader,
+    )
+    config = ClickHouseSettingsLoader(environ).load()
+    gateway = ThreadLocalClickHouseConnectGateway(client_factory=lambda: _clickhouse_client(config))
+    return StrategyOperationReads(
+        PostgresStrategyOperationReader(_build_live_execution_gateway(settings=settings)),
+        ClickHouseCanonicalCandleReader(gateway, database=config.database),
     )

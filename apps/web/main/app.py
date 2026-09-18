@@ -219,7 +219,13 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
     app = FastAPI(title="Roehub Web", version="1.0.0")
     app.mount("/assets", StaticFiles(directory=str(_DIST_PATH)), name="assets")
     app.state.platform_assets = None
-    if runtime_settings.backtests_client_enabled:
+    app.state.client_routes = [
+        path for path, enabled in (
+            ("/backtests", runtime_settings.backtests_client_enabled),
+            ("/strategies", runtime_settings.strategies_client_enabled),
+        ) if enabled
+    ]
+    if app.state.client_routes:
         app.state.platform_assets = load_platform_assets(DEFAULT_PLATFORM_DIST)
         app.mount(
             "/platform-assets/assets",
@@ -730,13 +736,22 @@ def _render_protected_page(
         )
     if template_context is not None:
         context.update(template_context)
-    if current_user is not None and active_path == "/backtests":
+    client_routes = getattr(request.app.state, "client_routes", [])
+    classic = (
+        request.query_params.get("view") == "classic"
+        or request.url.path.rstrip("/") == "/strategies/new"
+        or request.query_params.get("mode", "dashboard") not in {"", "dashboard"}
+    )
+    if current_user is not None and active_path in client_routes and not (
+        active_path == "/strategies" and classic
+    ):
         platform_assets = getattr(request.app.state, "platform_assets", None)
         if platform_assets is not None:
             template_name = "pages/platform_client.html"
             context["platform_assets"] = platform_assets
             context["platform_bootstrap"] = {
                 "locale": context["locale"], "subject": current_user.user_id,
+                "client_routes": client_routes,
             }
     response = templates.TemplateResponse(
         request,

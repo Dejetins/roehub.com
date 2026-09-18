@@ -225,7 +225,7 @@ class _StaticExchangeReadinessChecker:
         )
 
 
-def _build_client() -> TestClient:
+def _build_client(*, provenance_repository=None) -> TestClient:
     """
     Build TestClient with fully wired in-memory Strategy API router.
 
@@ -250,6 +250,7 @@ def _build_client() -> TestClient:
     )
 
     router = build_strategies_router(
+        provenance_repository=provenance_repository,
         create_use_case=CreateStrategyUseCase(
             repository=strategy_repository,
             event_repository=event_repository,
@@ -987,8 +988,19 @@ def test_manual_entry_paper_creates_idempotent_source_intent_and_paper_order() -
     run = client.post(f"/strategies/{strategy_id}/run", headers=headers)
     assert run.status_code == 200
 
+    mismatch = client.post(
+        f"/strategies/{strategy_id}/manual-entry",
+        json={"client_request_id": "manual-paper-entry-1", "reference_price": "50000",
+              "expected_run_id": "00000000-0000-0000-0000-000000000001"},
+        headers={**headers, "Idempotency-Key": "manual-paper-entry-1"},
+    )
+    assert mismatch.status_code == 409
+    assert len(execution_repository.source_events) == 0
+    assert len(paper_repository.fills) == 0
+
     request_headers = {**headers, "Idempotency-Key": "manual-paper-entry-1"}
-    payload = {"client_request_id": "manual-paper-entry-1", "reference_price": "50000"}
+    payload = {"client_request_id": "manual-paper-entry-1", "reference_price": "50000",
+               "expected_run_id": run.json()["run_id"]}
     first = client.post(
         f"/strategies/{strategy_id}/manual-entry",
         json=payload,
@@ -1437,3 +1449,70 @@ def _build_create_payload(*, symbol: str) -> dict[str, Any]:
         ],
         "signal_template": "MA(20,50)",
     }
+
+
+
+def test_research_source_owner_visibility_and_unavailable_storage() -> None:
+    """Origin reads enforce strategy access before storage and sanitize failures."""
+    from types import SimpleNamespace
+    from unittest.mock import Mock
+
+    repository = Mock()
+    repository.find_by_strategy_id.return_value = None
+    client = _build_client(provenance_repository=repository)
+    owner = {"x-user-id": "00000000-0000-0000-0000-000000001111"}
+    other = {"x-user-id": "00000000-0000-0000-0000-000000002222"}
+    created = client.post(
+        "/strategies", json=_build_create_payload(symbol="BTCUSDT"), headers=owner
+    )
+    assert created.status_code == 201
+    strategy_id = created.json()["strategy_id"]
+    path = f"/strategies/{strategy_id}/research-source"
+    absent = client.get(path, headers=owner)
+    assert absent.status_code == 200
+    assert absent.json() == {
+        "strategy_id": strategy_id,
+        "source_job_id": None,
+        "source_variant_key": None,
+    }
+    assert repository.find_by_strategy_id.call_args.kwargs == {
+        "strategy_id": UUID(strategy_id),
+        "user_id": UserId.from_string(owner["x-user-id"]),
+        "organization_id": _ORGANIZATION_ID,
+    }
+    repository.reset_mock()
+    assert client.get(path, headers=other).status_code == 403
+    repository.find_by_strategy_id.assert_not_called()
+    repository.find_by_strategy_id.return_value = SimpleNamespace(
+        source_job_id=UUID("00000000-0000-4000-8000-000000000888"),
+        source_variant_key="variant-1",
+    )
+    assert client.get(path, headers=owner).json()["source_variant_key"] == "variant-1"
+    repository.find_by_strategy_id.side_effect = RuntimeError("private database connection details")
+    failed = client.get(path, headers=owner)
+    assert failed.status_code == 503
+    assert "private database" not in failed.text
+    assert failed.json()["error"]["code"] == "strategy.research_source_unavailable"
+    repository.reset_mock()
+    assert client.delete(f"/strategies/{strategy_id}", headers=owner).status_code == 204
+    assert client.get(path, headers=owner).status_code == 404
+    repository.find_by_strategy_id.assert_not_called()
+    assert (
+        client.get(
+            "/strategies/00000000-0000-4000-8000-000000000999/research-source", headers=owner
+        ).status_code
+        == 404
+    )
+
+
+def test_research_source_unconfigured_returns_canonical_503() -> None:
+    client = _build_client()
+    owner = {"x-user-id": "00000000-0000-0000-0000-000000001111"}
+    created = client.post(
+        "/strategies", json=_build_create_payload(symbol="BTCUSDT"), headers=owner
+    )
+    result = client.get(
+        f"/strategies/{created.json()['strategy_id']}/research-source", headers=owner
+    )
+    assert result.status_code == 503
+    assert result.json()["error"]["code"] == "strategy.research_source_unavailable"

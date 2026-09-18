@@ -1,3 +1,4 @@
+import { savedStrategyHref } from './strategies-api';
 import { MotionLink as Link, useMotionState, transitionUI } from './motion';
 import { ExpandableOverview } from './expandable-overview';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
@@ -53,7 +54,7 @@ function MonthlyMatrix({data,initialCash}:{data:z.infer<typeof api.statsSchema>;
   const number=(n:number)=>n.toLocaleString(i18n.language,{minimumFractionDigits:1,maximumFractionDigits:1});
   return <><p className="muted report-explanation">{t('results.monthlyHelp')}</p><div className="table-scroll monthly-matrix" role="region" tabIndex={0} aria-label={t('results.monthly-stats')}><table><thead><tr><th scope="col">{t('results.year')}</th>{Array.from({length:12},(_,m)=><th key={m} scope="col">{new Date(Date.UTC(2020,m,1)).toLocaleDateString(i18n.language,{month:'short',timeZone:'UTC'})}</th>)}</tr></thead><tbody>{years.map(year=><tr key={year}><th scope="row">{year}</th>{Array.from({length:12},(_,m)=>{const row=rows.find(r=>r.month===`${year}-${String(m+1).padStart(2,'0')}`);return <td key={m} className={row?row.net_pnl_quote>0?'pnl-positive':row.net_pnl_quote<0?'pnl-negative':'':''}>{row?<><strong>{row.percent==null?'—':`${number(row.percent)}%`}</strong><span>{number(row.net_pnl_quote)}</span></>:'—'}</td>})}</tr>)}</tbody></table></div>{!years.length&&<p>{t('results.empty')}</p>}</>;
 }
-function Chart({data,label,group}:{data:z.infer<typeof api.seriesSchema>;label:string;group:string}){
+export function Chart({data,label,group}:{data:z.infer<typeof api.seriesSchema>;label:string;group:string}){
   const ref=useRef<HTMLDivElement>(null);const descriptionId=useId();const {t,i18n}=useTranslation();const [showTrades,setShowTrades]=useState(false);
   useEffect(()=>{
     if(!ref.current||!data.points.length)return;
@@ -126,7 +127,7 @@ function SaveStrategy({job,variant,subject,now}:{job:string;variant:string;subje
   return <section className="result-command" aria-label={t('results.save')}><p>{t('results.readiness')}: {t(`results.live.${liveState??'unavailable'}`)}{reasons&&` · ${reasons}`}</p><ReadError error={readiness.error}/><button disabled={!readiness.canRefresh||sending||now<failureDeadline||isRestricted(error)} onClick={async()=>{const checked=await readiness.refetch();if(!checked.error && !record && error instanceof ApiError && error.outcome==='failed')setError(null);}}>{t('results.refresh')}</button>{readiness.data&&<p className="muted">{t('results.feed',{state:t(`results.feedStates.${readiness.data.data.market_data_state}`,{defaultValue:t('results.unavailable')})})}</p>}{!storage&&<p className="notice">{t('results.storage')}</p>}
     <Confirm id="save" title={t('results.saveTitle')} help={`${t('results.saveHelp')} ${liveState!=='launchable'?t('results.liveWarning'):''} ${reasons??''}`} source={`${job} · ${variant}`} trigger={t('results.save')} disabled={!compatible||!!record||sending||!!saved||isRestricted(error)||!!error} onConfirm={()=>void save()}/>
     {sending&&<p role="status">{t('results.saving')}</p>}<ReadError error={error}/>{record&&!sending&&<p role="status" className="notice">{t(record.jobId===job&&record.variant===variant?'results.unresolved':'results.recoveryOther')} <a href="/strategies">{t('results.history')}</a>{record.resultId&&<a href={`/strategies/${record.resultId}`}>{t('results.open')}</a>}</p>}
-    {saved&&<p role="status">{t('results.saved')}. {saved.duplicate&&t('results.duplicate')} <a className="button-link" href={`/strategies/${saved.strategy.strategy_id}`}>{t('results.open')}</a></p>}
+    {saved&&<p role="status">{t('results.saved')}. {saved.duplicate&&t('results.duplicate')} <a className="button-link" href={savedStrategyHref(saved.strategy.strategy_id, job, variant)}>{t('results.open')}</a></p>}
   </section>;
 }
 function Export({job,variant,now}:{job:string;variant:string;now:number}){

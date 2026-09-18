@@ -43,6 +43,22 @@ class PostgresStrategyBacktestVariantProvenanceRepository(
         if not self._provenance_table:
             raise ValueError("provenance_table must be non-empty")
 
+    def find_by_strategy_id(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID,
+    ) -> StrategyBacktestVariantProvenance | None:
+        """Read one origin without recording checks or changing the strategy."""
+        row = self._gateway.fetch_one(
+            query=f"""
+                SELECT {_PROVENANCE_SELECT_COLUMNS}
+                FROM {self._provenance_table}
+                WHERE organization_id = %(organization_id)s
+                  AND user_id = %(user_id)s AND strategy_id = %(strategy_id)s
+            """,
+            parameters={"organization_id": str(organization_id),
+                        "user_id": str(user_id), "strategy_id": str(strategy_id)},
+        )
+        return None if row is None else _map_provenance_row(row=row)
+
     def find_by_idempotency_key(
         self,
         *,

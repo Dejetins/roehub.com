@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMotionState } from './motion';
 
 /** Expand in place: the mounted charts, zoom and timeframe survive both directions. */
-export function ExpandableOverview({ controls, children }: { controls: ReactNode; children: ReactNode }) {
+export function ExpandableOverview({ controls, children, className = "", label }: { controls: ReactNode; children: ReactNode; className?: string; label?: string }) {
   const { t } = useTranslation();
   const [expanded, setExpanded] = useMotionState(false, 'layout');
   const surface = useRef<HTMLDivElement>(null);
@@ -31,10 +31,10 @@ export function ExpandableOverview({ controls, children }: { controls: ReactNode
       trigger.current?.focus({ preventScroll: true });
     };
   }, [expanded]);
-  return <div ref={surface} className={`overview-charts expandable-overview${expanded ? ' overview-expanded' : ''}`}
-    role={expanded ? 'dialog' : undefined} aria-modal={expanded ? true : undefined} aria-label={expanded ? t('results.overview') : undefined}
+  return <div ref={surface} className={`overview-charts expandable-overview ${className}${expanded ? ' overview-expanded' : ''}`}
+    role={expanded ? 'dialog' : undefined} aria-modal={expanded ? true : undefined} aria-label={expanded ? label ?? t('results.overview') : undefined}
     onKeyDown={event => {
-      if (!expanded) return;
+      if (!expanded || (event.target instanceof Element && event.target.closest('dialog[open]'))) return;
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setExpanded(false); }
       if (event.key !== 'Tab') return;
       const focusable = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled),select:not(:disabled),input:not(:disabled),a[href],summary,[tabindex="0"]')].filter(el => el.getClientRects().length && !el.closest('[inert]'));

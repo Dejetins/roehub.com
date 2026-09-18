@@ -129,7 +129,7 @@
   ],
   "areas": [
     {
-      "file_count": 676,
+      "file_count": 677,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -151,7 +151,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 317,
+      "file_count": 344,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -173,7 +173,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 111,
+      "file_count": 112,
       "id": "automation",
       "paths": [
         "tools/",
@@ -183,7 +183,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 432,
+      "file_count": 434,
       "id": "quality",
       "paths": [
         "tests/",
@@ -194,7 +194,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 1459,
+      "file_count": 2236,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -265,7 +265,7 @@
         "apps/api/main/app.py",
         "apps/api/main/main.py"
       ],
-      "file_count": 47,
+      "file_count": 50,
       "id": "app:api",
       "kind": "app",
       "name": "api",
@@ -457,7 +457,7 @@
       "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
       "docs": [],
       "entrypoints": [],
-      "file_count": 45,
+      "file_count": 69,
       "id": "app:platform-web",
       "kind": "app",
       "name": "platform-web",
@@ -901,7 +901,7 @@
         "docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1-stage-reports/04-btcusdt-market-readiness.md"
       ],
       "entrypoints": [],
-      "file_count": 64,
+      "file_count": 65,
       "id": "context:live_execution",
       "kind": "context",
       "name": "live_execution",
@@ -3239,6 +3239,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/agents/generated/roehub-strategies-client-v1/implement-strategies-library-detail.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/agents/generated/skill-library-classic-audit-v1/00-inventory-and-batch-plan.md"
     },
     {
@@ -3520,6 +3525,11 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-REPOSITORY-HYGIENE-2026-09-06.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-STRATEGIES-CLIENT-2026-09-12.md"
     },
     {
       "area": "knowledge",
@@ -5443,6 +5453,3881 @@
     },
     {
       "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/journey/accepted-backtests-reference.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/journey/flag-off-created-job.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/journey/flag-off-saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/journey/integrated-journey.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/journey/integrated-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/journey/integrated-queued.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/journey/integrated-result.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/journey/saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/backtests-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/backtests-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/backtests-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/backtests-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/backtests-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/accepted/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/actions-height-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/actions-height-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/actions-height-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/actions-height-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/actions-height-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/actions-height-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/actions-height-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/actions-height-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/chart-display-menu.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/equity-controls-footer.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/active-sep16/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-b/insights/real-trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-b/insights/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-c/insights/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-c/insights/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-c/insights/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-c/insights/en-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-c/insights/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-c/insights/real-trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-c/insights/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-c/insights/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-c/insights/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-c/insights/ru-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-final/insights/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-final/insights/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-final/insights/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-final/insights/en-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-final/insights/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-final/insights/real-trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-final/insights/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-final/insights/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-final/insights/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-final/insights/ru-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-journey/journey/accepted-backtests-reference.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-journey/journey/flag-off-created-job.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-journey/journey/flag-off-saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-journey/journey/integrated-journey.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-journey/journey/integrated-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-journey/journey/integrated-queued.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-journey/journey/integrated-result.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-journey/journey/saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/backtests-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/backtests-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/backtests-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/backtests-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/backtests-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/analysis-regression/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/axis-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/chart-parity/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/chart-parity/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/chart-parity/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/chart-parity/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/chart-parity/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/chart-parity/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/chart-parity/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/chart-parity/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-proof/insights/en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-proof/insights/en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-proof/insights/en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-proof/insights/en-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-proof/insights/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-proof/insights/real-trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-proof/insights/ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-proof/insights/ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-proof/insights/ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-proof/insights/ru-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/backtests-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/backtests-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/backtests-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/backtests-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/backtests-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-final/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/backtests-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/backtests-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/backtests-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/backtests-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/backtests-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression-verified/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/backtests-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/backtests-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/backtests-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/backtests-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/backtests-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/cleanup-regression/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-controls/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-controls/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-controls/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-controls/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-controls/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-controls/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-controls/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-controls/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-header-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-header-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-header-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-header-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-header-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-header-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-header-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-header-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/chart-display-menu.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/equity-controls-footer.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/compact-popup-sep16/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/backtests-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/backtests-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/backtests-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/backtests-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/backtests-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/complete/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/disclosure-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/equal-height-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/equal-height-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/equal-height-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/equal-height-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/equal-height-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/equal-height-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/equal-height-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/equal-height-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/chart-display-menu.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/equity-controls-footer.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/event-menus-sep16/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/events-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/expand-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/chart-display-menu.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/equity-controls-footer.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/fill-sep16/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/foundation/foundation-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/foundation/foundation-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/foundation/foundation-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/foundation/foundation-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/foundation/foundation-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/foundation/ssr-rollback.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/journey/accepted-backtests-reference.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/journey/integrated-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/journey/integrated-queued.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/journey/saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/final/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused2/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused3/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused4/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused4/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused4/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused4/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused4/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused4/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused4/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused4/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused4/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused4/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused4/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused5/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused5/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused5/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused5/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused5/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused5/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused5/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused5/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused5/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused5/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused5/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/focused6/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/chart-display-menu.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/equity-controls-footer.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/footer-sep16/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/chart-display-menu.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/equity-controls-footer.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/library-menus-sep16/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/backtests-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/backtests-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/backtests-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/backtests-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/backtests-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/list-motion-frames.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/live-motion/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/chart-display-menu.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/menu-sep16/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/backtests-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/backtests-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/backtests-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/backtests-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/backtests-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-proof/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/motion-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/chart-display-menu.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/equity-controls-footer.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/multiselect-sep16/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-backtest-regression/foundation/foundation-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-backtest-regression/foundation/foundation-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-backtest-regression/foundation/foundation-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-backtest-regression/foundation/foundation-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-backtest-regression/foundation/foundation-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-backtest-regression/foundation/ssr-rollback.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-backtest-regression/journey/accepted-backtests-reference.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-backtest-regression/journey/integrated-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-backtest-regression/journey/integrated-queued.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-final-ui/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-final-ui/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-final-ui/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-final-ui/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-final-ui/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-final-ui/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-final-ui/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-journey-proof/journey/accepted-backtests-reference.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-journey-proof/journey/flag-off-created-job.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-journey-proof/journey/flag-off-saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-journey-proof/journey/integrated-journey.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-journey-proof/journey/integrated-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-journey-proof/journey/integrated-queued.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-journey-proof/journey/integrated-result.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-final/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-final/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-final/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-final/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-final/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-final/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-final/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v2/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v2/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v2/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v2/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v2/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v2/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v2/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v3/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v3/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v3/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v3/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v3/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v3/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof-v3/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-proof/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/backtests-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/backtests-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/backtests-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/backtests-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/backtests-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/list-motion-frames.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression-v2/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression/strategies/list-motion-frames.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-regression/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-run-guard-proof/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-run-guard-proof/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-run-guard-proof/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-run-guard-proof/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-run-guard-proof/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-run-guard-proof/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-run-guard-proof/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-save-regression/insights/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/operations-save-regression/insights/saved-strategy-operations.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/pagination-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/polish-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/chart-display-menu.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/equity-controls-footer.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/popup-sep16/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/foundation/foundation-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/foundation/foundation-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/foundation/foundation-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/foundation/foundation-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/foundation/foundation-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/foundation/ssr-rollback.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/journey/accepted-backtests-reference.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/journey/flag-off-created-job.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/journey/flag-off-saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/journey/integrated-journey.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/journey/integrated-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/journey/integrated-queued.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/journey/integrated-result.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression/journey/saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression2/journey/accepted-backtests-reference.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression2/journey/flag-off-created-job.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression2/journey/flag-off-saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression2/journey/integrated-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression2/journey/integrated-queued.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression2/journey/integrated-result.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression2/journey/saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression3/journey/accepted-backtests-reference.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression3/journey/flag-off-created-job.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression3/journey/flag-off-saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression3/journey/integrated-journey.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression3/journey/integrated-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression3/journey/integrated-queued.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression3/journey/integrated-result.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/regression3/journey/saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/status-filters-sep13-final/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/status-filters-sep13-final/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/status-filters-sep13-final/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/status-filters-sep13-final/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/status-filters-sep13-final/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/status-filters-sep13-final/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/status-filters-sep13-final/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/status-filters-sep13-final/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/table-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/chart-display-menu.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/equity-controls-footer.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/tabs-sep16/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/events-aligned-false.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/events-aligned-true.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/expanded-Drawdown.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/expanded-Equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/expanded-Events.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/expanded-Price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/expanded-Trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/timeframe-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/journey/accepted-backtests-reference.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/journey/flag-off-created-job.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/journey/flag-off-saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/journey/integrated-journey.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/journey/integrated-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/journey/integrated-queued.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/journey/integrated-result.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/journey/saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/backtests-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/backtests-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/backtests-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/backtests-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/backtests-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-final/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/journey/accepted-backtests-reference.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/journey/integrated-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/journey/integrated-queued.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/journey/saved-strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/backtests-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/backtests-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/backtests-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/backtests-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/backtests-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/backtests-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/backtests-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/backtests-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/real-observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/strategies-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/strategies-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/strategies-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/strategies-en-zoom200-repeat.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/strategies-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/strategies-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/strategies-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/strategies-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/ui-fix/strategies/strategies-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/unified-tabs-sep13/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/unified-tabs-sep13/operations-chart-zoom.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/unified-tabs-sep13/operations-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/unified-tabs-sep13/operations-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/unified-tabs-sep13/operations-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/unified-tabs-sep13/operations-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/unified-tabs-sep13/operations-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-strategies-client-2026-09-12/unified-tabs-sep13/operations-ru-820.png"
+    },
+    {
+      "area": "knowledge",
       "kind": "frontend",
       "path": ".codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html"
     },
@@ -6349,6 +10234,11 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/api/dto/strategy_operations.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/api/dto/ui_account.py"
     },
     {
@@ -6520,6 +10410,16 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/api/wiring/modules/strategy.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/api/wiring/modules/strategy_execution_projection.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/api/wiring/modules/strategy_operation_reads.py"
     },
     {
       "area": "delivery",
@@ -6898,6 +10798,21 @@
     },
     {
       "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/e2e/strategies.spec.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/e2e/strategy-insights.spec.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/e2e/strategy-operations.spec.ts"
+    },
+    {
+      "area": "delivery",
       "kind": "configuration",
       "path": "apps/platform-web/package.json"
     },
@@ -6959,6 +10874,16 @@
     {
       "area": "delivery",
       "kind": "other",
+      "path": "apps/platform-web/src/chart-display-menu.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/client-routes.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
       "path": "apps/platform-web/src/delete-history.tsx"
     },
     {
@@ -7013,6 +10938,41 @@
     },
     {
       "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/operation-recovery.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/operations-benchmark.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/operations-benchmark.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/operations-timeframe.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/operations-timeframe.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/price-chart-conventions.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/price-chart-conventions.ts"
+    },
+    {
+      "area": "delivery",
       "kind": "other",
       "path": "apps/platform-web/src/price-chart.tsx"
     },
@@ -7050,6 +11010,66 @@
       "area": "delivery",
       "kind": "other",
       "path": "apps/platform-web/src/results.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/strategies-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/strategies-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/strategies-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/strategies.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/strategy-insights-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/strategy-insights.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/strategy-insights.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/strategy-operations-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/strategy-operations-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/strategy-operations-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/strategy-operations.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/platform-web/src/strategy-operations.tsx"
     },
     {
       "area": "delivery",
@@ -14409,6 +18429,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/live_execution/adapters/outbound/persistence/postgres/strategy_operation_reader.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/live_execution/adapters/outbound/redis/__init__.py"
     },
     {
@@ -16674,6 +20699,16 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/api/test_strategy_execution_projection.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/api/test_strategy_research_source_repository.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/api/test_strategy_wiring_module.py"
     },
     {
@@ -18658,6 +22693,11 @@
     },
     {
       "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/strategy_execution_demo.py"
+    },
+    {
+      "area": "automation",
       "kind": "documentation",
       "path": "tools/release/README.md"
     },
@@ -18772,7 +22812,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 3312,
+  "inventory_file_count": 4120,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -18970,5 +23010,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "90c221f0dc12e34194f7b08aff45f2f3b23e3e1f23441b5a9f009ff9f5dd4d1d"
+  "structural_digest": "d9568ef335a53955d5bbdd163e3e636ee38a8bf8971b3794d327b2fe8aa8b40a"
 }
