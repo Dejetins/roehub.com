@@ -15,6 +15,12 @@ class StrategyBacktestVariantProvenanceRepository(Protocol):
     Storage port for atomic strategy creation with backtest-variant provenance.
     """
 
+    def find_by_strategy_id(
+        self, *, organization_id: OrganizationId, user_id: UserId, strategy_id: UUID,
+    ) -> StrategyBacktestVariantProvenance | None:
+        """Read persisted origin within the exact owner and organization scope."""
+        ...
+
     def find_by_idempotency_key(
         self,
         *,

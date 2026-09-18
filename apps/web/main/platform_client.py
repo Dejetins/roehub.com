@@ -41,6 +41,6 @@ def load_platform_assets(dist: Path) -> dict[str, Any]:
         return {"script": asset_url(entry["file"]), "styles": styles}
     except (OSError, ValueError, KeyError, TypeError) as error:
         raise ValueError(
-            "WEB_BACKTESTS_CLIENT_ENABLED requires a complete platform-web build; "
+            "An enabled platform client requires a complete platform-web build; "
             "run pnpm --filter @roehub/platform-web build or disable the setting"
         ) from error

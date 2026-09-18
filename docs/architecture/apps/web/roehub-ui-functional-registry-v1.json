@@ -343,7 +343,7 @@
         "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.strategies.library",
         "apps/api/routes/strategies.py"
       ],
-      "implemented_scope": "Immutable create/clone/delete endpoints and SSR library exist.",
+      "implemented_scope": "Immutable create/clone/delete endpoints and SSR library remain. Default-off Strategies client adds the complete owned snapshot list, local name/instrument/market/timeframe filtering, keyboard selection and independent immutable detail; local API/browser evidence: .codex/delivery/evidence/ROEHUB-STRATEGIES-CLIENT-2026-09-12.md. Client create/clone/archive and target-role cutover remain outside this scope.",
       "delivery_status": [
         "implemented",
         "requires_ui",
@@ -446,7 +446,7 @@
         "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.strategies.detail",
         "apps/api/routes/strategies.py"
       ],
-      "implemented_scope": "Run-control and mutable launch-profile APIs exist separately from immutable specs.",
+      "implemented_scope": "Default-off Strategies client provides an operational selected-run workspace: immutable settings, runtime actions via existing endpoints, current paper position/accounting, scoped executed-fill chart, separate entry/exit reasons, partial-fill trade detail and closed-trade equity/drawdown. Unknown manual outcomes retain original command identity/amount for intentional same-key recovery. No backtest content is requested by this screen. Local simulated command/browser proof is separate from real worker/provider execution; all-run history, live accounting and target-role cutover remain incomplete. Existing classic routes and default-off flags remain. Evidence: .codex/delivery/evidence/ROEHUB-STRATEGIES-CLIENT-2026-09-12.md.",
       "delivery_status": [
         "implemented",
         "requires_ui",
@@ -706,7 +706,7 @@
         "apps/api/routes/backtests.py",
         ".codex/delivery/evidence/ROEHUB-BACKTESTS-CLIENT-2026-09-08.md"
       ],
-      "implemented_scope": "Opt-in own-resource client: measured job state/progress and stale/ETA-unavailable states, cancel/race/reconciliation, terminal deletion, URL variants, materialization, server equity/drawdown with accessible unit-labelled tables, statistics/trades/CSV, bodyless research-strategy save and existing SSR strategy link; locally tested real API/worker and controlled failure boundaries.",
+      "implemented_scope": "Opt-in own-resource client: measured job state/progress and stale/ETA-unavailable states, cancel/race/reconciliation, terminal deletion, URL variants, materialization, server equity/drawdown with accessible unit-labelled tables, statistics/trades/CSV, bodyless research-strategy save and exact Strategies detail with bounded report-return context (or gated SSR continuation); locally tested real API/worker and controlled failure boundaries.",
       "delivery_status": [
         "implemented",
         "requires_ui",

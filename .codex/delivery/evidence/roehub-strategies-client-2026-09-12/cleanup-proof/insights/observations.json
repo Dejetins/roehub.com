@@ -1,0 +1,24 @@
+{
+  "job": "c5e3e541-2f5d-4083-b74a-cd5e347ccde9",
+  "variant": "job_c5e3e541cde9__ema_close_w10__risk_none__vh_b39c4279",
+  "strategy": "0dfc0cec-c026-41d0-88f7-8c336c74d15d",
+  "sourceStatus": 200,
+  "standaloneReload": true,
+  "conditions": true,
+  "chart": true,
+  "trades": true,
+  "optionalMissingTruthful": true,
+  "locales": [
+    "ru",
+    "en"
+  ],
+  "widths": [
+    820,
+    1024,
+    1440
+  ],
+  "zoom": 200,
+  "axe": 0,
+  "commands": [],
+  "errors": []
+}

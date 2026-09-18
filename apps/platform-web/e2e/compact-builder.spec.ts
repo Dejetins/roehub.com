@@ -73,7 +73,7 @@ test('sources, ordered indicators, risk levels and sizing remain editable in com
   await rows.nth(0).getByRole('button',{name:'Remove indicator',exact:true}).click();
   await expect(rows).toHaveCount(1);
   await expect(rows.getByLabel('Indicator',{exact:true})).toHaveValue('ma.ema');
-  await page.getByLabel('Risk mode',{exact:true}).selectOption('tp_sl_grid');
+  await page.getByRole('switch',{name:'Take profit / Stop loss',exact:true}).check();
   await page.getByRole('checkbox',{name:'Take profit',exact:true}).check();
   const risk=page.getByRole('region',{name:'Take profit',exact:true});
   await risk.getByLabel('Start (%)',{exact:true}).fill('1');

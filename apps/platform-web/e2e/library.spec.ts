@@ -63,19 +63,15 @@ test('real library, empty/cursor filters, independent deep link, focus, locale a
   await page.getByText('Search, instrument and date filters', { exact: true }).click();
   const filters = page.getByRole('button', { name: 'Filters', exact: true });
   await filters.focus(); await page.keyboard.press('Enter');
-  const dialog = page.getByRole('dialog');
-  await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Close filters' })).toBeFocused();
-  await page.keyboard.press('Shift+Tab');
-  await expect(dialog.getByRole('button', { name: 'Done' })).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(dialog.getByRole('button', { name: 'Close filters' })).toBeFocused();
+  const popup = page.getByRole('group', { name: 'Filters', exact: true });
+  await expect(popup).toBeVisible();
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await dialog.getByLabel('Risk mode').selectOption('tp_sl_grid');
-  await dialog.getByLabel('Page size (1–250)').fill('1');
-  await dialog.getByLabel('Page size (1–250)').press('Tab');
+  await popup.getByRole('button', { name: /Risk mode/ }).click();
+  await popup.getByRole('radio', { name: 'TP/SL grid', exact: true }).click();
   await page.keyboard.press('Escape');
-  await expect(dialog).not.toBeVisible(); await expect(filters).toBeFocused();
+  await expect(popup).not.toBeVisible(); await expect(filters).toBeFocused();
+  // Preserve cursor traversal coverage with a supported one-item URL page size.
+  await page.goto('/backtests?risk_mode=tp_sl_grid&limit=1');
   await expect(page.getByRole('heading', { name: 'No matching jobs on this page' })).toBeVisible();
   await page.getByRole('button', { name: 'Next page' }).click();
   await expect(page).toHaveURL(/cursor=/);
@@ -150,9 +146,9 @@ test('native Chromium 200% zoom retains usable RU/EN shell and dialog', async ()
       sizes.push({ locale, ...metrics });
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
       await page.getByRole('button', { name: locale === 'en' ? 'Filters' : 'Фильтры', exact: true }).click();
-      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.locator('#library-filter-popup')).toBeVisible();
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-      const box = await page.getByRole('dialog').boundingBox();
+      const box = await page.locator('#library-filter-popup').boundingBox();
       expect(box!.x).toBeGreaterThanOrEqual(0);
       expect(box!.x + box!.width).toBeLessThanOrEqual(metrics.innerWidth);
       await nativeScreenshot(`${locale}-native-zoom-200-dialog.png`);
@@ -170,7 +166,8 @@ test('real API expiry removes private content and stops protected reads', async 
   execFileSync(resolve(root, '.venv/bin/python'), ['-m', 'tools.qa.backtests_client_fixture', 'expire'], { cwd: root });
   await page.getByRole('button', { name: 'Filters', exact: true }).click();
   const expiredRead = page.waitForResponse(response => new URL(response.url()).pathname === '/api/backtests/jobs' && response.status() === 401);
-  await page.getByRole('dialog').getByRole('combobox', { name: 'State', exact: true }).selectOption('cancelled');
+  await page.locator('#library-filter-popup').getByRole('button', { name: 'State', exact: true }).click();
+  await page.getByRole('radio', { name: 'Cancelled', exact: true }).click();
   await expiredRead;
   await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toBeVisible();
   await expect(page.locator('[data-platform-client]')).toHaveCount(0);

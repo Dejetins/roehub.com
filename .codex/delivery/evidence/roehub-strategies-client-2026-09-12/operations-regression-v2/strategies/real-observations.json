@@ -1,0 +1,38 @@
+{
+  "first": "de92f567-6823-4440-888b-f91d62963a72",
+  "second": "3e13b4e3-4f2c-4be3-87a1-7ad041eeabbf",
+  "realList": true,
+  "realDetail": true,
+  "standaloneProvenance": false,
+  "invalidReturnIgnored": true,
+  "absentSourceTruthful": true,
+  "keyboard": true,
+  "filterBackForward": true,
+  "viewportWidths": [
+    820,
+    1024,
+    1440
+  ],
+  "locales": [
+    "ru",
+    "en"
+  ],
+  "zoom": 200,
+  "axeViolations": 0,
+  "commands": [],
+  "errors": [],
+  "httpErrors": [
+    {
+      "path": "/api/strategies",
+      "status": 503
+    },
+    {
+      "path": "/api/strategies/6d42b16b-227a-4a06-9c07-08c30f21ebe3",
+      "status": 404
+    }
+  ],
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 503 (Service Unavailable)",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ]
+}

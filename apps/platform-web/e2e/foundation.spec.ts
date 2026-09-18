@@ -5,8 +5,8 @@ import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '../../..');
-const state = resolve(root, '.local_artifacts/backtests-client');
-const evidence = resolve(root, `.codex/delivery/evidence/roehub-backtests-client-v1/browser/${process.env.ROEHUB_PROOF_STAGE === 'S6' ? 'S6-foundation-regression' : process.env.ROEHUB_PROOF_STAGE === 'S5' ? 'S5-foundation-regression' : process.env.ROEHUB_PROOF_STAGE === 'S4' ? 'S4-foundation-regression' : process.env.ROEHUB_PROOF_STAGE === 'S3' ? 'S3-foundation-regression' : 'S2-foundation-regression'}`);
+const state = resolve(root, process.env.ROEHUB_PROOF_STATE ?? '.local_artifacts/backtests-client');
+const evidence = resolve(root, process.env.ROEHUB_PROOF_EVIDENCE ? `${process.env.ROEHUB_PROOF_EVIDENCE}/foundation` : `.codex/delivery/evidence/roehub-backtests-client-v1/browser/${process.env.ROEHUB_PROOF_STAGE === 'S6' ? 'S6-foundation-regression' : process.env.ROEHUB_PROOF_STAGE === 'S5' ? 'S5-foundation-regression' : process.env.ROEHUB_PROOF_STAGE === 'S4' ? 'S4-foundation-regression' : process.env.ROEHUB_PROOF_STAGE === 'S3' ? 'S3-foundation-regression' : 'S2-foundation-regression'}`);
 
 // Real password -> production auth -> persisted cookie. Never emit credentials or storage.
 async function signIn(page: import('@playwright/test').Page) {
@@ -88,7 +88,7 @@ test('real session, selected routes, assets, locale, SSR navigation and rollback
   });
   expect(preflight.status).toBe(200);
   expect(preflight.errorCount).toBe(0);
-  expect((await request.get('http://127.0.0.1:18483/metrics')).status()).toBe(200);
+  expect((await request.get(`http://127.0.0.1:${Number(process.env.ROEHUB_PROOF_PORT ?? 18480)+3}/metrics`)).status()).toBe(200);
   await page.getByRole('link', { name: 'Русский', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('lang', 'ru');
   await expect(page.getByRole('heading', { name: 'Бэктесты', level: 1 })).toBeVisible();
@@ -112,8 +112,12 @@ test('real session, selected routes, assets, locale, SSR navigation and rollback
   await expect(page.locator('.nav-unavailable')).toHaveAttribute('aria-disabled', 'true');
   phase = 'preserved-ssr';
   await page.getByRole('link', { name: 'Strategies', exact: true }).click();
-  await expect(page.locator('[data-page="strategies"]')).toBeVisible();
-  await expect(page.locator('#platform-root')).toHaveCount(0);
+  if (process.env.ROEHUB_PROOF_STRATEGIES === 'true') {
+    await expect(page.getByRole('heading', {name:'Strategies', level:1})).toBeVisible();
+  } else {
+    await expect(page.locator('[data-page="strategies"]')).toBeVisible();
+    await expect(page.locator('#platform-root')).toHaveCount(0);
+  }
   await page.goBack();
   await expect(page.locator('[data-platform-client]')).toBeVisible();
   for (const [name, path] of [['Overview', '/dashboard'], ['Settings', '/settings']]) {
@@ -126,18 +130,18 @@ test('real session, selected routes, assets, locale, SSR navigation and rollback
   }
   await page.goto('/backtests/new');
   await expect(page.getByRole('heading', { name: 'Backtests', level: 1 })).toBeVisible();
-  const ssr = await page.goto('http://localhost:18482/backtests/new');
+  const ssr = await page.goto(`http://localhost:${Number(process.env.ROEHUB_PROOF_PORT ?? 18480)+2}/backtests/new`);
   expect(ssr?.headers()['cache-control']).toBe('private, no-store');
   await expect(page.locator('[data-page="backtests"]')).toBeVisible();
   await expect(page.locator('#platform-root')).toHaveCount(0);
   await page.screenshot({ path: resolve(evidence, 'ssr-rollback.png'), animations: 'disabled' });
-  await page.goto('http://localhost:18480/backtests');
+  await page.goto(`http://localhost:${process.env.ROEHUB_PROOF_PORT ?? '18480'}/backtests`);
   await expect(page.locator('[data-platform-client]')).toBeVisible();
   const logout = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/local/logout');
   await page.getByRole('link', { name: 'Sign out', exact: true }).click();
   expect((await logout).status()).toBe(204);
   await expect(page).toHaveURL(/\/login/);
-  await page.goto('http://localhost:18480/backtests');
+  await page.goto(`http://localhost:${process.env.ROEHUB_PROOF_PORT ?? '18480'}/backtests`);
   await expect(page).toHaveURL(/\/login\?next=/);
   await expect(page.locator('#platform-root')).toHaveCount(0);
   // SSR pages can call unrelated projections outside this focused fixture; inspect separately.

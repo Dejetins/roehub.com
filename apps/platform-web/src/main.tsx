@@ -1,7 +1,8 @@
 import 'vite/modulepreload-polyfill';
 import { createRoot } from 'react-dom/client';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { createBrowserRouter, RouterProvider } from 'react-router';
+import { createBrowserRouter } from 'react-router';
+import { RouterProvider } from 'react-router/dom';
 import { I18nextProvider } from 'react-i18next';
 import { z } from 'zod';
 import { App } from './app';
@@ -9,7 +10,7 @@ import { createI18n } from './i18n';
 import { createQueryClient } from './query-client';
 import './style.css';
 
-const bootstrap = z.object({ locale: z.enum(['ru', 'en']), subject: z.string().min(1) })
+const bootstrap = z.object({ locale: z.enum(['ru', 'en']), subject: z.string().min(1), client_routes: z.array(z.enum(['/backtests', '/strategies'])).optional() })
   .parse(JSON.parse(document.getElementById('platform-bootstrap')!.textContent!));
 const queryClient = createQueryClient();
 // Pages are fully reloaded for SSR/logout. Do not retain queries in the bfcache.

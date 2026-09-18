@@ -135,7 +135,7 @@ test('dirty discard, catalog form in RU/EN at 820/1024/1440, axe and keyboard',a
   page.removeAllListeners('dialog');page.once('dialog',d=>d.accept());await page.getByRole('link',{name:'Strategies',exact:true}).click();await expect(page).toHaveURL(/strategies$/);
   await page.goBack();await expect(page.getByLabel('Job label (optional)')).toHaveValue('');
   await page.getByLabel('Job label (optional)').fill('Retained draft');
-  await page.getByRole('button',{name:'Collapse settings',exact:true}).click();
+  await page.getByRole('tab',{name:'History',exact:true}).click();
   await expect(page.locator('.builder-form form')).not.toBeVisible();
   await page.getByRole('link',{name:'New backtest',exact:true}).click();
   await expect(page.getByLabel('Job label (optional)')).toHaveValue('Retained draft');

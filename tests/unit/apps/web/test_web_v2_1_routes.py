@@ -104,7 +104,7 @@ def test_compact_actions_keep_minimum_desktop_and_mobile_target_widths() -> None
 
 
 # Foundation route seam: unit doubles supplement the real HTTP/browser fixture.
-def _platform_client(tmp_path, monkeypatch, *, status=200, enabled=True):
+def _platform_client(tmp_path, monkeypatch, *, status=200, enabled=True, strategies=False):
     import json
 
     import apps.web.main.app as web_module
@@ -126,6 +126,7 @@ def _platform_client(tmp_path, monkeypatch, *, status=200, enabled=True):
             "WEB_API_BASE_URL": "http://web.local",
             "WEB_API_UPSTREAM_URL": "http://api.local",
             "WEB_BACKTESTS_CLIENT_ENABLED": str(enabled).lower(),
+            "WEB_STRATEGIES_CLIENT_ENABLED": str(strategies).lower(),
         }
     )
     app.state.current_user_api_client = SimpleNamespace(
@@ -241,3 +242,69 @@ def test_platform_flag_requires_complete_build_and_rejects_invalid_values(tmp_pa
         create_app(environ={**environ, "WEB_BACKTESTS_CLIENT_ENABLED": "true"})
     with pytest.raises(ValueError, match="must be true or false"):
         create_app(environ={**environ, "WEB_BACKTESTS_CLIENT_ENABLED": "yes"})
+
+
+def test_independent_strategy_gate_matrix_and_classic_continuation(tmp_path, monkeypatch):
+    import json
+    import re
+
+    for backtests in (False, True):
+        for strategies in (False, True):
+            client = _platform_client(
+                tmp_path, monkeypatch, enabled=backtests, strategies=strategies
+            )
+            for path, enabled in (
+                ("/backtests", backtests),
+                ("/backtests/new", backtests),
+                ("/strategies", strategies),
+                ("/strategies/00000000-0000-4000-8000-000000000123", strategies),
+                ("/strategies?strategy_id=old-bookmark", strategies),
+                ("/strategies/new", False),
+                ("/strategies?mode=rl_ml", False),
+                ("/strategies/id?mode=rl_ml", False),
+                ("/strategies?view=classic", False),
+                ("/strategies/id?view=classic", False),
+            ):
+                response = client.get(path)
+                assert response.status_code == 200
+                assert response.headers["cache-control"] == "private, no-store"
+                assert ('id="platform-root"' in response.text) == enabled
+                if enabled:
+                    match = re.search(
+                        r'<script type="application/json" id="platform-bootstrap">(.*?)</script>',
+                        response.text,
+                        re.S,
+                    )
+                    assert match
+                    bootstrap = json.loads(match.group(1))
+                    assert bootstrap["client_routes"] == [
+                        route for route, selected in (
+                            ("/backtests", backtests), ("/strategies", strategies)
+                        ) if selected
+                    ]
+            target = "/strategies/id?view=classic&mode=rl_ml"
+            locale = client.get("/locale", params={"locale": "ru", "next": target})
+            assert locale.url.path == "/strategies/id"
+            assert locale.url.params["view"] == "classic"
+            assert locale.url.params["mode"] == "rl_ml"
+            assert 'id="platform-root"' not in locale.text
+            anonymous = _platform_client(
+                tmp_path, monkeypatch, status=401, enabled=backtests, strategies=strategies
+            )
+            login = anonymous.get(target, follow_redirects=False)
+            from urllib.parse import parse_qs, urlsplit
+
+            assert parse_qs(urlsplit(login.headers["location"]).query)["next"] == [target]
+
+
+def test_strategies_flag_is_strict_and_requires_assets(tmp_path, monkeypatch):
+    import pytest
+
+    import apps.web.main.app as web_module
+
+    environ = {"WEB_API_BASE_URL": "http://web.local", "WEB_API_UPSTREAM_URL": "http://api.local"}
+    monkeypatch.setattr(web_module, "DEFAULT_PLATFORM_DIST", tmp_path)
+    with pytest.raises(ValueError, match="complete platform-web build"):
+        create_app(environ={**environ, "WEB_STRATEGIES_CLIENT_ENABLED": "true"})
+    with pytest.raises(ValueError, match="must be true or false"):
+        create_app(environ={**environ, "WEB_STRATEGIES_CLIENT_ENABLED": "1"})

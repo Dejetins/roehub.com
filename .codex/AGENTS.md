@@ -1,45 +1,34 @@
 ---
 doc: agents
-version: "2.2"
+version: "2.3"
 status: active
 language: en
 ---
 
 # Roehub Agent Guidance
 
-## Precedence
-
-Follow platform/system instructions, the user's explicit outcome and authority,
-this file, then current code and documentation. Non-waivable safety rules still
-apply. Treat chat history, old plans, generated prompts, and folder names as
-historical context unless a current source explicitly selects them.
-
 ## Native delivery
 
-Use the platform skill list and the global delivery contract directly. Roehub
-does not provide a parallel router, role system, or workflow engine.
-
-- For non-trivial or authority-unclear change work, start with
-  `delivery-orchestrator`. A bounded, explicit repair may execute directly.
-- One ready ticket is one execution unit. Create a plan, ledger, prompt pack,
-  or Goal only when the global contract selects it or the user explicitly asks.
-- Use `prompt-manager` only for a reusable procedure or an explicitly justified
-  prompt artifact. Use `staged-plan-runner` only for a selected active staged
-  workflow or a read-only legacy inspection.
-- Select only the skill that matches the task. Add browser, contract,
-  performance, release, or quality tooling only when that boundary is crossed.
+Use the platform skill list and global delivery contract directly. Roehub has
+no parallel router, role system or workflow engine.
 
 ## UI development
 
 The previous staged UI workflow is retired by the user's decision of
 2026-09-04. It must not be resumed or recreated as a prerequisite for UI work.
-The replacement development workflow has not been selected.
+Current UI sequencing is recorded in
+`docs/architecture/apps/web/roehub-ui-implementation-plan-v1.md`; its existence
+does not authorize execution of every backlog item or resume completed S1–S6.
 
-The accepted visual pilot is
-`.codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html`.
-Preserve its path and contents during cleanup. It is a visual reference, not
-proof of implemented APIs or server authorization. Future UI work follows the
-user's selected scope and retains current product and security boundaries.
+By the user's decision of 2026-09-12, the refined Backtests implementation
+accepted on 2026-09-11 is the visual baseline for subsequent local-platform UI.
+Use `docs/architecture/apps/web/backtests-ui-iteration-log.md` and the plan's D4
+for its source revision, current styles, compact controls and shared motion.
+The old v23 specimen at
+`.codex/delivery/evidence/roehub-ui-agent-governed-pilot/specimens/2026-08-03-linear-black-workbench-v23.html`
+is historical only; preserve its path and contents but do not use it as the
+current visual target. Visual acceptance is not proof of APIs or authorization.
+Future work follows the selected scope and current product/security boundaries.
 
 ## Repository context
 
@@ -57,17 +46,10 @@ their own current state and the selected work both make them authoritative.
 Never revive a legacy pack only because it exists. If it names a retired runtime
 or proof surface, create or select a new ticket instead.
 
-## Scope and evidence
+## Repository proof requirements
 
-- Preserve foreign changes in the shared checkout. Own exact paths or safely
-  separable hunks; never use broad staging, implicit staging, destructive Git,
-  speculative branches, worktrees, or stashes as a workaround.
-- Use focused repository checks first. Tests are a gate, not universal
-  acceptance: collect API, persistence, browser, runtime, performance, CI, or
-  recovery evidence only when the changed behavior requires it.
 - Browser-visible work requires real browser evidence when a suitable browser
-  surface is available. Use disposable local test data; never retain secrets,
-  cookies, session state, or raw provider payloads.
+  surface is available. Use disposable local test data.
 - Classify non-trivial compatibility dimensions as `none`,
   `compatible-change`, `breaking-change`, or `unknown`.
 
@@ -90,9 +72,7 @@ workflow. Legacy copies may be retained only as history and never override this
 file or the platform skills.
 
 Repository-authored engineering artifacts are English by default. Normative
-Russian product documents and localized content remain exceptions. Final
-user-facing reports are Russian unless the user asks otherwise; preserve paths,
-commands, identifiers, and statuses verbatim.
+Russian product documents and localized content remain exceptions.
 
 For changed policy, architecture, or reusable prompt artifacts, perform a cold
 self-review. Add one independent review only for shared/global policy, a

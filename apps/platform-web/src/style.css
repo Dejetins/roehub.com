@@ -10,7 +10,8 @@ button:disabled { color:var(--muted); cursor:not-allowed; opacity:.62; }
 button.primary { background:#6840dd; border-color:#9a78ff; }
 svg { width:1.1rem; height:1.1rem; flex-shrink:0; }
 a { color:var(--text); text-decoration:none; }
-a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible { outline:2px solid var(--violet); outline-offset:3px; }
+:focus {outline:none;}
+a:focus-visible,button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[contenteditable=true]:focus-visible {background-color:#303944;}
 p { line-height:1.55; }
 h1,h2,h3,p { margin-block-start:0; }
 h1 { font-size:1.15rem; font-weight:500; margin:0; }
@@ -99,7 +100,7 @@ dialog::backdrop { background:#000a; }.filter-fields { display:grid; gap:1.2rem;
 .builder input:not([type=checkbox]),.builder select,.source-picker>summary { width:100%; height:34px; min-height:34px; border-radius:10px; padding:6px 10px; font-size:.9rem; line-height:20px; background:#11171c; border:1px solid #303942; }
 .builder input:not([type=checkbox]):hover,.builder select:hover,.source-picker>summary:hover { border-color:#56616c; }
 .builder input[type=number],.builder select[name=timeframe] { width:min(100%,7rem); }
-.builder input[name="execution.initial_cash_quote"],.builder input[name^="execution.sizing."] { width:min(100%,10rem); }
+.builder input[name^="execution.sizing."] { width:min(100%,10rem); }
 .builder select { text-overflow:ellipsis; padding-inline-end:22px; }
 .builder input[type=date] { min-width:0; width:min(100%,13rem); padding-inline:8px; }
 .builder button,.builder .button-link { min-height:32px; font-size:.85rem; }
@@ -350,3 +351,382 @@ button,a.button-link { transition:background-color var(--motion-duration) ease-o
 ::view-transition-group(overview),::view-transition-image-pair(overview) { background:var(--panel,#151b21); }
 ::view-transition-old(report) { display:none; }
 ::view-transition-new(report) { animation:none; }
+
+/* Strategies uses the accepted shell, compact library and report workspace. */
+.strategies-panes .strategy-context { padding:0; }
+.strategy-detail { padding:0 20px 20px; overflow-wrap:anywhere; }
+.strategy-context>p,.strategy-context>a { margin:20px; }
+.strategy-filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin-bottom:16px; }
+.strategy-filters label:first-child { grid-column:1/-1; }
+.strategy-filters label { display:grid; gap:6px; }
+.strategy-filters input,.strategy-filters select { width:100%; min-width:0; }
+.strategy-rows { display:grid; }
+.strategy-row { display:grid; gap:6px; padding:12px 8px; border-bottom:1px solid var(--line); text-decoration:none; overflow-wrap:anywhere; }
+.strategy-row span { color:var(--muted); font-size:.8rem; }
+.strategy-row[aria-current=true] { background:#262037; box-shadow:inset 3px 0 var(--violet); }
+.strategy-row:hover { background:var(--surface-2); }
+.strategy-instrument { font-size:1rem; }
+.strategy-detail h3 { margin-top:24px; }
+.strategy-indicators { padding-inline-start:24px; }
+.strategy-indicators li { margin-block:12px; }
+.strategy-indicators dl { display:flex; flex-wrap:wrap; gap:10px 24px; }
+.strategy-indicators dd { margin:4px 0 0; }
+.strategy-detail details { margin-top:20px; }
+.strategy-detail pre { white-space:pre-wrap; overflow-wrap:anywhere; }
+.strategy-links { display:flex; flex-wrap:wrap; gap:16px; margin-top:24px; }
+.strategy-status { margin-top:28px; padding-top:8px; border-top:1px solid var(--line); }
+.strategy-status .panel-head { padding-inline:0; }
+.strategy-observations { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.strategy-observations dd { margin:6px 0 0; }
+@media(max-width:58rem) { .strategy-detail { padding:0 16px 16px; } }
+
+.strategies-panes .library { max-height:calc(100dvh - 170px); overflow:auto; }
+@media(max-width:58rem) { .strategies-panes .library { max-height:26rem; } }
+
+/* Strategies: readable saved configuration, one page refresh. */
+.strategies-refresh {display:inline-flex;align-items:center;gap:6px;flex-shrink:0}
+.strategy-overview {display:flex;flex-wrap:wrap;gap:20px 48px;margin:4px 0 24px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+.strategy-overview dt,.strategy-signal>span {font-size:.8rem;color:var(--muted)}
+.strategy-overview dd {margin:6px 0 0;font-size:1.1rem;font-weight:600}
+.strategy-detail .strategy-indicators {list-style:decimal-leading-zero;padding-inline-start:28px;margin:12px 0 20px}
+.strategy-indicators>li {padding:12px 16px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px}
+.strategy-indicators>li::marker {color:var(--muted);font-size:.8rem}
+.strategy-indicators>li>strong {display:block;margin-bottom:12px}
+.strategy-indicators .strategy-parameters {display:flex;flex-wrap:wrap;gap:12px 32px;margin:0}
+.strategy-parameters dt {font-size:.8rem;color:var(--muted)}
+.strategy-parameters dd {margin:6px 0 0}
+.strategy-parameters .strategy-parameters {margin-top:8px}
+.strategy-signal {display:flex;align-items:baseline;flex-wrap:wrap;gap:12px;margin:20px 0}
+.strategy-signal code {font-size:.9rem;overflow-wrap:anywhere}
+.strategy-detail .strategy-status {margin-top:24px;padding-top:20px}
+.strategy-status .panel-head {padding:0;border:0;min-height:0}
+.strategy-status h3 {margin:0}
+.strategy-status-summary {font-size:1.1rem;font-weight:600;margin:12px 0 6px}
+.strategy-status-details {font-size:.85rem}
+.strategy-status-details .strategy-observations {margin-top:20px}
+.strategies-page .workspace-title {flex-wrap:wrap}
+@media(max-width:58rem) {.strategy-overview {gap:16px 28px}.strategy-indicators .strategy-parameters {gap:12px 20px}}
+
+.strategy-insights .result-tabs {margin:0 0 20px;overflow-x:auto;max-width:100%}
+.strategy-insights h3 {margin-top:20px}
+.strategy-logic {line-height:1.6;max-width:72ch}
+.strategy-insights section+section {border-top:1px solid var(--line);margin-top:24px;padding-top:4px}
+.strategy-research-metrics {grid-template-columns:repeat(3,minmax(0,1fr));margin:16px 0}
+.strategy-research-metrics dd {font-size:1.4rem;font-variant-numeric:tabular-nums}
+.strategy-empty-research {padding:16px;border:1px solid var(--line);border-radius:8px}
+.strategy-profile {margin-top:24px}
+.strategy-insights .table-scroll {overflow-x:auto;max-width:100%}
+.strategy-insights .strategy-research-data {margin-top:16px;min-width:0}
+.strategy-insights .strategy-report-link {display:inline-block;margin:8px 0 12px}
+.strategy-insights .chart-switch {flex-wrap:wrap;margin-top:24px}
+@media(max-width:58rem){.strategy-research-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* ECharts resizes on the next observation tick; contain its previous canvas geometry. */
+.strategy-insights .result-chart {min-width:0;overflow:hidden}
+.strategy-insights .chart-toolbar {flex-wrap:wrap;min-width:0}
+.strategy-insights .chart-help {white-space:normal;min-width:0}
+
+/* Animate live columns, not scaled screenshots. Keep the list text at its final width. */
+.panes.report-workspace.strategies-panes {
+ --strategy-list-width:clamp(14rem,22vw,20rem);
+ grid-template-columns:minmax(0,1fr) var(--strategy-list-width);
+ transition:grid-template-columns var(--motion-duration) var(--motion-easing),column-gap var(--motion-duration) var(--motion-easing);
+}
+.panes.report-workspace.strategies-panes.list-collapsed { grid-template-columns:minmax(0,1fr) 0px; column-gap:0; }
+.strategy-list-slot { min-width:0; overflow:clip; opacity:1; transition:opacity var(--motion-duration) ease-out; }
+.strategy-list-clip { min-width:0; min-height:0; }
+.strategies-panes .strategy-list-slot .library { width:var(--strategy-list-width); box-sizing:border-box; }
+.list-collapsed .strategy-list-slot { opacity:0; }
+@media(max-width:58rem) {
+ .panes.report-workspace.strategies-panes,.panes.report-workspace.strategies-panes.list-collapsed { grid-template-columns:minmax(0,1fr); column-gap:0; row-gap:12px; transition:row-gap var(--motion-duration) var(--motion-easing); }
+ .panes.report-workspace.strategies-panes.list-collapsed { row-gap:0; }
+ .strategy-list-slot { display:grid; grid-template-rows:1fr; transition:grid-template-rows var(--motion-duration) var(--motion-easing),opacity var(--motion-duration) ease-out; }
+ .list-collapsed .strategy-list-slot { grid-template-rows:0fr; }
+ .strategy-list-clip { overflow:hidden; }
+ .strategies-panes .strategy-list-slot .library { width:100%; }
+}
+.strategies-panes .strategy-context { view-transition-name:none; }
+/* Strategy operations reuse platform surfaces and compact control scale. */
+.operations-workspace { min-width:0; }
+.strategy-detail:has(.operations-workspace) {padding:16px;}
+.operations-header { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+.operations-header h2 {font-size:1.1rem;margin:0 0 6px;overflow-wrap:anywhere;}
+.operations-header p {margin:0;font-size:.82rem;}
+.operations-actions {margin-left:auto;display:flex;gap:8px;align-items:center;}
+.operations-actions details {position:relative;}
+.operations-actions details>div {position:absolute;right:0;top:100%;z-index:10;padding:10px;background:var(--panel);border:1px solid var(--border);display:grid;gap:8px;min-width:140px;}
+.operation-state {font-size:.8rem;color:var(--muted);white-space:nowrap;}
+.operation-state.is-running {color:#65d69b;}
+.operations-metrics {display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin-top:20px;}
+.operations-metrics>div {background:rgba(255,255,255,.035);border:1px solid var(--border);border-radius:10px;padding:12px;}
+.operations-metrics span {display:block;font-size:.75rem;color:var(--muted);margin-bottom:6px;}
+.operations-metrics strong {font-size:1.15rem;font-variant-numeric:tabular-nums;}
+.operations-main {display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,260px);gap:12px;align-items:stretch;}
+.operations-market,.operations-position,.operations-secondary {border:1px solid var(--border);border-radius:12px;min-width:0;overflow:hidden;}
+.operations-market .chart-switch {padding:10px;border-bottom:1px solid var(--border);margin:0;}
+.operations-market .chart-switch>span {margin-left:auto;}
+.operations-chart {height:400px;width:100%;min-width:0;}
+.operations-chart-empty {min-height:300px;display:grid;place-items:center;color:var(--muted);}
+.operations-position {padding:14px;display:flex;flex-direction:column;gap:12px;}
+.operations-position h3 {margin:0;}
+.operations-position dl {display:grid;gap:13px;font-size:.82rem;flex:1;}
+.operations-position dl>div {display:flex;gap:12px;justify-content:space-between;}
+.operations-position dt {color:var(--muted);}
+.operations-position dd {margin:0;text-align:right;font-variant-numeric:tabular-nums;}
+.operations-secondary {margin-top:12px;padding:12px;}
+.operations-trade-tools {display:flex;gap:16px;align-items:center;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin:12px 0;}
+.operations-trade-tools select {width:auto;}
+.operations-trades {width:100%;min-width:760px;font-size:.8rem;}
+.operations-trades small {display:block;color:var(--muted);font-size:.72rem;margin-top:3px;}
+.operations-trades .selected {background:rgba(145,105,240,.12);}
+.operations-trade-detail {padding:14px;border:1px solid rgba(145,105,240,.4);border-radius:10px;}
+.operation-dialog {max-width:480px;width:calc(100% - 32px);}
+.operation-dialog .actions {margin-top:20px;justify-content:flex-end;}
+@media(max-width:1150px){.operations-main{grid-template-columns:minmax(0,1fr)}.operations-position dl{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:600px){.operations-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.operations-position dl{grid-template-columns:minmax(0,1fr)}.operations-chart{height:320px}.operations-actions{margin-left:0}.operations-header{align-items:flex-start}}
+.operations-workspace .primary,.operation-dialog .primary {color:#fff;}
+
+/* Execution rows use the compact report density, not the generic 44% first column. */
+.operations-trades td:first-child {width:1%;white-space:nowrap;}
+.operations-trades th,.operations-trades td {padding:6px 8px;white-space:nowrap;}
+.operations-trades small {margin-top:2px;white-space:nowrap;}
+.operations-trades td>button {padding:4px 7px;min-height:28px;}
+.operations-trade-detail td:first-child {width:auto;}
+.operations-market .chart-toolbar {flex-wrap:wrap;gap:12px;}
+
+.operations-market .operations-mini-toolbar {display:flex;justify-content:flex-start;width:fit-content;gap:4px;padding:3px;border:1px solid var(--border);border-radius:8px;}
+.operations-mini-toolbar .trade-toggle {display:inline-flex;flex:none;gap:5px;padding:3px 6px;font-size:.72rem;white-space:nowrap;}
+.operations-state-badge {display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border:1px solid var(--border);border-radius:8px;font-size:.8rem;font-weight:600;white-space:nowrap;}
+.operations-state-badge.is-running {background:rgba(101,214,155,.1);border-color:rgba(101,214,155,.3);}
+.strategy-row .strategy-row-status.is-running {color:#65d69b;font-weight:600;}
+.events-unread {display:inline-flex;min-width:18px;justify-content:center;padding:1px 5px;margin-left:6px;background:#7850d5;color:white;border-radius:9px;font-size:.7rem;}
+.operations-technical {margin-top:20px;padding-top:12px;border-top:1px solid var(--border);}
+.strategy-filter-panel>summary {cursor:pointer;font-size:.8rem;padding:6px 0;}
+.strategy-filter-panel .strategy-filters {display:flex;flex-direction:column;margin-top:8px;}
+
+.panes.report-workspace.strategies-panes {padding-top:0;}
+.strategy-panel-tools {display:flex;gap:5px;align-items:center;}
+.strategy-panel-tools button {display:inline-flex;align-items:center;justify-content:center;padding:6px;min-width:30px;min-height:30px;}
+.strategy-panel-tools svg {width:15px;height:15px;}
+.operations-view-tools {display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:10px 0;}
+.operations-view-tools .chart-switch,.operations-view-tools .result-tabs {margin:0;padding:0;gap:5px;}
+.operations-view-tools .chart-switch {flex:1;}
+.operations-view-tools .result-tabs {flex-shrink:0;}
+.operations-secondary {margin-top:12px;}
+
+.operations-main[hidden],.operations-secondary[hidden] {display:none;}
+.operations-view-tools .result-tabs {flex-wrap:wrap;}
+
+.operations-lifecycle {display:flex;gap:8px;padding-top:10px;border-top:1px solid var(--border);}
+.operations-lifecycle button {flex:1;}
+.operations-table-actions {display:flex;justify-content:flex-end;margin-top:12px;}
+.operations-table-actions .operations-lifecycle {min-width:220px;}
+@media(min-width:1151px) {
+ .strategy-detail:has(.operations-workspace) {min-height:calc(100dvh - 112px);box-sizing:border-box;}
+ .operations-chart {height:clamp(430px,calc(100dvh - 490px),680px);}
+}
+
+/* One stable viewport for every operational tab, including its actions. */
+.operations-stage {height:clamp(500px,calc(100dvh - 390px),700px);display:flex;flex-direction:column;min-width:0;overflow:hidden;}
+.operations-stage>.operations-main {flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;}
+.operations-stage .operations-market {display:flex;flex-direction:column;min-height:0;}
+.operations-stage .operations-chart {flex:1;height:auto;min-height:200px;}
+.operations-stage .operations-secondary {flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;margin:0;}
+.operations-stage .operations-table-actions {flex-shrink:0;}
+.operations-stage .operations-position {min-height:0;overflow:auto;overscroll-behavior:contain;}
+@media(max-width:1150px) {
+ .operations-stage>.operations-main {display:flex;flex-direction:column;}
+ .operations-stage .operations-market {min-height:360px;flex-shrink:0;}
+ .operations-stage .operations-position {flex-shrink:0;overflow:visible;}
+ .operations-stage>.operations-main[hidden] {display:none;}
+}
+
+/* Shared Backtests expansion; tables use only the outer fullscreen scroll. */
+.operations-workspace .operations-overview:not(.overview-expanded) {height:auto !important;}
+.operations-overview>.overview-toolbar {margin-bottom:0;}
+.operations-overview .operations-view-tools {margin:0;min-width:0;}
+.operations-overview.overview-expanded .operations-stage {height:auto;overflow:visible;flex:1 0 auto;}
+.operations-overview.overview-expanded .operations-stage>.operations-main {overflow:visible;min-height:calc(100dvh - 160px);}
+.operations-overview.overview-expanded .operations-secondary,
+.operations-overview.overview-expanded .operations-position {overflow:visible;max-height:none;}
+.operations-overview.overview-expanded .table-scroll {max-height:none;overflow:visible;}
+@media(max-width:1150px) {
+ .operations-overview.overview-expanded .operations-market {min-height:60dvh;}
+ .operations-overview.overview-expanded .table-scroll {overflow-x:auto;}
+}
+
+/* Match table origins and keep spacing independent of the selected view. */
+.operations-overview:not(.overview-expanded) {margin-top:12px;}
+.operations-overview:not(.overview-expanded) .operations-stage {height:clamp(488px,calc(100dvh - 402px),688px);}
+.operations-secondary .operations-trade-tools {height:36px;min-height:36px;flex-wrap:nowrap;overflow-x:auto;margin:0 0 12px;white-space:nowrap;}
+.operations-secondary .operations-trade-tools>* {flex-shrink:0;}
+.operations-secondary .operations-trade-tools+.table-scroll {margin-top:0;}
+
+/* Commit chart and selection together; the shared quiet transition owns fading. */
+.operations-view-tools .result-tabs button {
+ transition-duration:var(--motion-duration);
+ transition-timing-function:var(--motion-easing);
+}
+.operations-main.operations-chart-only {grid-template-columns:minmax(0,1fr);}
+
+.operations-event-pagination {justify-content:flex-end;gap:12px;flex-wrap:wrap;}
+.operations-event-pagination label {display:flex;align-items:center;gap:8px;}
+.operations-event-pagination select {width:auto;}
+
+/* Static table chrome; only the rows scroll in the bounded workspace. */
+.operations-stage .operations-secondary {overflow:hidden;scrollbar-gutter:auto;}
+.operations-secondary #operations-detail {height:100%;min-height:0;display:flex;flex-direction:column;}
+.operations-secondary .operations-trade-tools {height:30px;min-height:30px;flex:0 0 30px;margin:0 0 8px;}
+.operations-secondary #operations-detail>.table-scroll {flex:1;min-height:0;overflow:auto;margin:0;overscroll-behavior:contain;}
+.operations-secondary .operations-event-pagination {flex:0 0 auto;margin:8px 0 0;min-height:30px;flex-wrap:nowrap;gap:10px;font-size:.75rem;}
+.operations-secondary .operations-event-pagination label {display:flex;flex-direction:row;align-items:center;gap:8px;white-space:nowrap;}
+.operations-secondary select {height:28px;min-height:28px;padding:2px 24px 2px 10px;border-radius:999px;font-size:.75rem;width:auto;}
+.operations-secondary .operations-event-pagination button {width:28px;height:28px;min-height:28px;padding:0;border-radius:50%;}
+.operations-events th,.operations-events td {padding:7px 10px;line-height:18px;}
+.operations-overview .overview-expand {width:28px;height:28px;min-width:28px;min-height:28px;padding:5px;border-radius:50%;}
+.operations-overview.overview-expanded .operations-secondary #operations-detail {height:auto;}
+.operations-overview.overview-expanded .operations-secondary #operations-detail>.table-scroll {flex:none;overflow:visible;}
+.operations-event-pagination>span {min-width:64px;text-align:center;font-variant-numeric:tabular-nums;}
+.operations-event-pagination>span:nth-last-child(2) {min-width:42px;}
+
+.operations-view-tools #operations-events {position:relative;padding-right:40px;}
+#operations-events .events-unread {position:absolute;right:7px;top:50%;transform:translateY(-50%);box-sizing:border-box;width:28px;margin:0;padding:1px 2px;font-variant-numeric:tabular-nums;}
+.library-pagination select,.operations-secondary select,.operations-mini-toolbar .chart-timeframe select {appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b1b8c0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:12px;padding-right:30px;}
+.operation-dialog {box-sizing:border-box;padding:20px;}
+.operation-dialog form {display:flex;flex-direction:column;gap:16px;}
+.operation-dialog form>h3,.operation-dialog form>p {margin:0;}
+.operation-dialog .actions {margin-top:4px;gap:8px;}
+
+.operations-view-tools #operations-events {padding-right:10px;overflow:visible;}
+#operations-events .events-unread {right:-6px;top:-5px;transform:none;pointer-events:none;}
+.operations-secondary select:focus:not(:focus-visible) {outline:none;box-shadow:none;}
+.operations-mini-toolbar .chart-timeframe select {width:auto;height:28px;min-height:28px;padding:2px 30px 2px 10px;border-radius:999px;font-size:.75rem;}
+
+.operations-secondary select[data-pointer-focus=true]:focus {outline:none;box-shadow:none;}
+
+.operations-mini-toolbar .chart-timeframe {margin-left:auto;}
+.operations-workspace .chart-timeframe select[data-pointer-focus=true]:focus,
+.operations-workspace .overview-expand[data-pointer-focus=true]:focus,
+.operations-workspace .overview-expand:focus:not(:focus-visible) {outline:none;box-shadow:none;}
+
+.chart-display-menu {position:relative;flex:none;}
+.operations-mini-toolbar .chart-display-trigger {display:flex;align-items:center;justify-content:center;width:28px;height:28px;min-height:28px;padding:0;border-radius:999px;color:var(--muted);}
+.operations-mini-toolbar .chart-display-trigger[aria-expanded=true] {color:var(--text);background:#252c34;border-color:#56616d;}
+.chart-display-trigger:focus:not(:focus-visible) {outline:none;box-shadow:none;}
+.chart-display-popup {position:absolute;top:calc(100% + 8px);left:0;z-index:30;width:max-content;max-width:calc(100vw - 40px);padding:4px;background:#1c2129;border:1px solid #303942;border-radius:10px;box-shadow:0 8px 24px #0005;}
+.chart-display-popup .chart-display-option {display:flex;flex-direction:row;align-items:center;gap:8px;min-height:32px;padding:5px 8px;border-radius:6px;font-size:.85rem;white-space:nowrap;cursor:pointer;color:#e6e9ee;}
+.chart-display-option:hover,.chart-display-option:focus-within {background:#282f38;}
+.chart-display-check {position:relative;display:flex;flex:none;width:18px;height:18px;}
+.chart-display-check {border:2px solid #626b76;border-radius:5px;background:transparent;}
+.chart-display-check[data-checked=true] {background:#edf0f4;border-color:#edf0f4;}
+.chart-display-check svg {position:absolute;left:0;top:0;color:#171d23;pointer-events:none;opacity:0;stroke-width:3;}
+.chart-display-check[data-checked=true] svg {opacity:1;}
+.chart-display-popup .chart-display-option {width:100%;justify-content:flex-start;border:0;background:transparent;text-align:left;}
+.chart-display-popup .chart-display-option:hover,.chart-display-popup .chart-display-option:focus-visible {background:#282f38;}
+.chart-display-popup .chart-display-option:focus-visible {outline:none;}
+.chart-display-popup .chart-display-option:focus:not(:focus-visible) {outline:none;box-shadow:none;}
+.operations-mini-toolbar .chart-timeframe-trigger {width:auto;padding:2px 10px;gap:8px;font-size:.75rem;color:var(--text);}
+.operations-mini-toolbar .chart-timeframe-trigger svg {width:12px;height:12px;}
+
+/* Align chart controls with the tabs and give the two rows breathing room. */
+.operations-overview>.overview-toolbar {margin-bottom:12px;}
+.operations-market .operations-mini-toolbar {padding:0;border:0;gap:6px;}
+.operations-mini-toolbar .benchmark-toggle {display:inline-flex;align-items:center;gap:6px;height:28px;min-height:28px;padding:2px 10px;font-size:.75rem;border-radius:999px;}
+.benchmark-toggle[aria-pressed=true] {background:#262035;border-color:var(--violet);color:#eee8ff;}
+.benchmark-toggle:focus:not(:focus-visible) {outline:none;box-shadow:none;}
+.operations-footer {display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-top:20px;padding-top:12px;}
+.operations-footer .operations-technical {margin:0;padding:0;border:0;min-width:0;flex:1;}
+.operations-footer .operations-technical>details {margin-top:0;}
+.operations-metadata {margin-left:auto;text-align:right;max-width:55%;color:var(--muted);font-size:.75rem;}
+.operations-metadata p {margin:0;line-height:1.5;overflow-wrap:anywhere;}
+@media(max-width:640px) {.operations-footer {flex-direction:column;}.operations-metadata {max-width:100%;}}
+
+/* Strategy tabs indicate selection with a filled surface only. */
+.operations-view-tools .result-tabs button {border-color:transparent;background:transparent;}
+.operations-view-tools .result-tabs button[aria-selected=true],
+.operations-view-tools .result-tabs button[aria-selected=true]:hover {border-color:transparent;background:#252c34;color:var(--text);}
+.operations-view-tools .result-tabs button:hover {background:var(--surface-2);}
+.operations-view-tools .result-tabs button:focus-visible {outline:none;box-shadow:none;text-decoration:underline;text-underline-offset:4px;}
+.operations-overview .overview-expand:focus,
+.operations-overview .overview-expand:focus-visible {outline:none;box-shadow:none;}
+.operations-overview .overview-expand:focus-visible {background:var(--surface-2);color:var(--violet);}
+
+/* Direction uses the same compact popup as chart controls. */
+.operations-trade-tools:has(.chart-display-menu) {overflow:visible;flex-wrap:wrap;height:auto;flex-basis:auto;}
+.operations-trade-tools .chart-display-trigger {display:flex;align-items:center;justify-content:center;height:28px;min-height:28px;padding:2px 10px;gap:8px;border-radius:999px;font-size:.75rem;color:var(--text);}
+.operations-trade-tools .chart-display-trigger[aria-expanded=true] {background:#252c34;border-color:#56616d;}
+
+.operations-market .operations-toolbar-spacer {height:28px;min-height:28px;flex-shrink:0;}
+
+.operations-trades>thead>tr>th,.operations-events>thead>tr>th {height:30px;padding:6px 8px;line-height:18px;font-size:.8rem;white-space:nowrap;vertical-align:middle;}
+
+/* Use the table filter row's inset and centerline for every chart toolbar. */
+.operations-market .operations-mini-toolbar {margin:12px 0 0 12px;height:30px;min-height:30px;flex-shrink:0;}
+
+.strategy-library-filter {display:flex;flex-direction:column;gap:6px;}
+.strategy-library-filter .chart-display-trigger {display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;min-height:32px;padding:6px 10px;font-size:.8rem;}
+.strategy-library-filter .chart-display-popup {left:auto;right:0;}
+/* Open within the library above the trigger so its scroll container cannot clip options. */
+.strategy-library-filter .chart-display-popup {top:auto;bottom:calc(100% + 8px);}
+
+.library .panel-head .library-icon-action {display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;min-height:28px;padding:0;flex:none;border-radius:50%;}
+
+.library .panel-head a.library-icon-action {background:var(--canvas);color:var(--text);cursor:pointer;}
+.library .panel-head a.library-icon-action:hover {background:#23282e;}
+
+.library-filter-menu {position:relative;}
+.library-filter-popup {position:absolute;right:0;top:calc(100% + 8px);z-index:40;width:max-content;max-width:calc(100vw - 32px);display:grid;gap:12px;padding:12px;background:#1c2129;border:1px solid #303942;border-radius:10px;box-shadow:0 8px 24px #0005;}
+.library-filter-popup label,.library-filter-field {display:grid;gap:6px;font-size:.8rem;}
+.library-filter-popup input {width:100%;max-width:210px;}
+.library-filter-popup .chart-display-trigger {width:100%;justify-content:space-between;min-height:28px;gap:12px;font-size:.8rem;}
+.library-filter-popup .chart-display-popup {left:auto;right:0;}
+.library-filter-menu>.library-icon-action:focus {outline:none;box-shadow:none;}
+.library-filter-menu>.library-icon-action[aria-expanded=true],.library-filter-menu>.library-icon-action:focus-visible {background:#252c34;color:var(--violet);}
+
+.library-pagination {justify-content:flex-end;gap:10px;flex-wrap:wrap;font-size:.75rem;min-height:30px;}
+.library-pagination label {display:flex;flex-direction:row;align-items:center;gap:8px;white-space:nowrap;}
+.library-pagination select {width:auto;height:28px;min-height:28px;padding:2px 26px 2px 10px;border-radius:999px;font-size:.75rem;}
+.library-pagination button {width:28px;height:28px;min-height:28px;padding:0;border-radius:50%;}
+.library-pagination>span {width:auto;}
+.library-pagination select:focus:not(:focus-visible) {outline:none;box-shadow:none;}
+
+/* Controls use a filled focus treatment consistently, including native selects. */
+#platform-root :focus {outline:none;box-shadow:none;}
+#platform-root :is(button,select,input,textarea,a,summary,[contenteditable=true]):focus-visible {background-color:#303944;}
+@media(forced-colors:active) {
+ #platform-root :focus-visible {outline:2px solid Highlight;outline-offset:2px;}
+}
+
+.library-tabs {display:flex;gap:5px;padding:0 16px;margin:0 0 12px;flex-wrap:wrap;}
+.library-tabs button {border-color:transparent;background:transparent;padding:4px 10px;min-height:28px;}
+.library-tabs button[aria-selected=true] {background:#252c34;border-color:transparent;}
+.library-tabs button:hover {background:var(--surface-2);}
+.library [role=tabpanel][hidden] {display:none;}
+
+.builder-meta {padding-block:8px;}
+.builder-meta>.field {grid-column:span 2;}
+.builder-meta input::placeholder {color:var(--muted);opacity:1;}
+.builder-meta input:focus::placeholder {color:transparent;}
+@container (max-width:330px) {.builder-meta>.field {grid-column:1;}}
+
+/* Keep TP/SL ranges on one compact row without changing their input order. */
+.risk-row>.config-grid { grid-template-columns:minmax(8rem,1fr) repeat(3,minmax(0,1fr)); }
+.risk-row .field>label { min-height:1.2em; }
+@container (max-width:720px) {
+  .risk-row>.config-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .risk-row .check-label { grid-column:1/-1; min-height:20px; }
+}
+@container (max-width:330px) {
+  .risk-row>.config-grid { grid-template-columns:1fr; }
+}
+
+.risk-toggle { width:fit-content; cursor:pointer; }
+.builder .risk-toggle input { appearance:none; width:30px; min-width:30px; height:18px; border:1px solid var(--line); border-radius:20px; background:var(--surface-2); position:relative; cursor:pointer; }
+.risk-toggle input::before { content:''; position:absolute; width:12px; height:12px; top:2px; left:2px; border-radius:50%; background:var(--muted); }
+.risk-toggle input:checked { background:var(--violet); border-color:var(--violet); }
+.risk-toggle input:checked::before { left:14px; background:var(--text); }
+
+/* Align field captions with the text inset of their controls. */
+.builder .field { --caption-inset:11px; }
+.builder .field:has(>select) { --caption-inset:15px; }
+.builder .field:has(>input[type=date]) { --caption-inset:9px; }
+.builder .field>label:not(.sr-only),.builder .field>span:first-child { padding-inline-start:var(--caption-inset); }

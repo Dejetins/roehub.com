@@ -1,3 +1,4 @@
+import { strategiesEn, strategiesRu } from './strategies-i18n';
 import { resultsEn, resultsRu } from './results-i18n';
 import { builderEn, builderRu, builderTermsEn, builderTermsRu } from './builder-i18n';
 import i18next from 'i18next';
@@ -5,6 +6,7 @@ import { initReactI18next } from 'react-i18next';
 import type { Locale } from '@roehub/web-contracts';
 
 const en = {
+  strategy: strategiesEn,
   results: resultsEn,
   execution: { progress: 'Measured progress', units: '{{processed}} / {{total}} units processed', unmeasured: 'Progress measurement unavailable', staleProgress: 'Progress measurement is stale. No progress is inferred.', measuredAt: 'Measured at', eta: 'Completion estimate unavailable', polling: 'Active job state refreshes automatically after the server delay.', cancel: 'Cancel backtest', sending: 'Sending cancellation request…', unresolved: 'Cancellation outcome is pending. Checking the job; no request is resent.', confirmTitle: 'Cancel this backtest?', confirmHelp: 'Request cancellation of this job. It may finish before cancellation takes effect. The server state determines the outcome.', keep: 'Keep running', confirm: 'Confirm cancellation', succeeded: 'The server reports completion.', failed: 'The server reports failure.', cancelled: 'The server confirms cancellation.', variants: 'Result variants: {{count}}', started: 'Started · UTC', finished: 'Finished · UTC', results: 'Result context', resultsLater: 'Result views and exports are not available in this client yet.', resultContext: 'Go to result context' },
 
@@ -46,6 +48,7 @@ const en = {
     'invalid-response': 'The server response could not be read. Refresh to check again.' },
 };
 const ru = {
+  strategy: strategiesRu,
   results: resultsRu,
   execution: { progress: 'Измеренный прогресс', units: 'Обработано {{processed}} / {{total}} единиц', unmeasured: 'Измерение прогресса недоступно', staleProgress: 'Измерение прогресса устарело. Прогресс не рассчитывается по времени.', measuredAt: 'Время измерения', eta: 'Оценка времени завершения недоступна', polling: 'Состояние активного задания обновляется автоматически с задержкой сервера.', cancel: 'Отменить бэктест', sending: 'Отправляем запрос отмены…', unresolved: 'Исход отмены пока не определён. Проверяем задание; запрос не отправляется повторно.', confirmTitle: 'Отменить этот бэктест?', confirmHelp: 'Запросить отмену задания. Оно может завершиться раньше отмены. Результат определяется состоянием на сервере.', keep: 'Продолжить выполнение', confirm: 'Подтвердить отмену', succeeded: 'Сервер сообщает о завершении.', failed: 'Сервер сообщает об ошибке.', cancelled: 'Сервер подтвердил отмену.', variants: 'Вариантов результата: {{count}}', started: 'Запущено · UTC', finished: 'Завершено · UTC', results: 'Контекст результата', resultsLater: 'Просмотр результатов и экспорт в этом клиенте пока недоступны.', resultContext: 'К контексту результата' },
 

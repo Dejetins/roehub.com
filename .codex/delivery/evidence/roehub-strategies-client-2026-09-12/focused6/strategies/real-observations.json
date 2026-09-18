@@ -1,0 +1,24 @@
+{
+  "first": "3a2b4f08-33e6-4ab3-b8a7-eeb057c81948",
+  "second": "d415dd9b-0029-4bb8-9857-eed0f3f619b1",
+  "realList": true,
+  "realDetail": true,
+  "standaloneProvenance": false,
+  "invalidReturnIgnored": true,
+  "absentSourceTruthful": true,
+  "keyboard": true,
+  "filterBackForward": true,
+  "viewportWidths": [
+    820,
+    1024,
+    1440
+  ],
+  "locales": [
+    "ru",
+    "en"
+  ],
+  "zoom": 200,
+  "axeViolations": 0,
+  "commands": [],
+  "errors": []
+}

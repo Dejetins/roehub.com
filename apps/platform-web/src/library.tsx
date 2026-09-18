@@ -1,9 +1,10 @@
-import { MotionLink as Link, useMotionState, transitionUI } from './motion';
+import {ChartDisplayMenu} from './chart-display-menu';
+import { MotionLink as Link, useMotionState } from './motion';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useParams, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ArrowRight, Filter, Plus, RefreshCw, X } from 'lucide-react';
+import { ChevronsLeft, ArrowRight, Filter, Plus, RefreshCw } from 'lucide-react';
 import { useLocation } from 'react-router';
 import { JobEntry } from './execution';
 import { ApiError } from './api';
@@ -26,13 +27,13 @@ export function ReadError({ error }: { error: Error | null }) {
   const kind = error instanceof ApiError ? error.kind : 'unavailable';
   return <p className="notice error" role="alert">{t(`errors.${kind}`)}</p>;
 }
-export function Refresh({ query, deadline = 0, now }: { query: UseQueryResult<unknown, Error>; deadline?: number; now: number }) {
+export function Refresh({ query, deadline = 0, now, iconOnly = false }: { query: UseQueryResult<unknown, Error>; deadline?: number; now: number; iconOnly?: boolean }) {
   const { t } = useTranslation();
   const delay = query.error instanceof ApiError ? query.error.retryAfterSeconds ?? 0 : 0;
   const wait = Math.max(0, Math.ceil((Math.max(deadline, query.errorUpdatedAt + delay * 1000) - now) / 1000));
-  return <button type="button" disabled={query.isFetching || wait > 0 || isRestricted(query.error)}
+  return <button type="button" className={iconOnly?'library-icon-action':undefined} title={iconOnly?(query.isFetching?t('refreshing'):wait?t('wait',{seconds:wait}):t('refresh')):undefined} disabled={query.isFetching || wait > 0 || isRestricted(query.error)}
     onClick={() => void query.refetch()} aria-label={t('refresh')}>
-    <RefreshCw aria-hidden="true" />{query.isFetching ? t('refreshing') : wait ? t('wait', { seconds: wait }) : t('refresh')}
+    <RefreshCw aria-hidden="true" />{!iconOnly&&(query.isFetching ? t('refreshing') : wait ? t('wait', { seconds: wait }) : t('refresh'))}
   </button>;
 }
 export function JobState({ job }: { job: Job }) {
@@ -41,7 +42,7 @@ export function JobState({ job }: { job: Job }) {
     job.cancel_requested_at && ['queued', 'running'].includes(job.state) ? ` · ${t('cancelPending')}` : ''}</span>;
 }
 
-export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, active = true, onNew, configuration }: { subject: string; mode?: 'list' | 'new' | 'detail'; embedded?: boolean; active?: boolean; onNew?: () => void; configuration?: ReactNode }) {
+export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, active = true, onNew, configuration, configurationActive=false, onHistory }: { subject: string; mode?: 'list' | 'new' | 'detail'; embedded?: boolean; active?: boolean; onNew?: () => void; configuration?: ReactNode; configurationActive?:boolean; onHistory?:()=>void }) {
   const { t, i18n } = useTranslation();
   const { jobId } = useParams();
   const [historyCollapsed,setHistoryCollapsed]=useMotionState(false, 'layout');
@@ -57,7 +58,10 @@ export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, a
   const jobs = useQuery({ queryKey: ['private', subject, 'jobs', listQuery],
     refetchOnMount: false, queryFn: ({ signal }) => readJobs(new URLSearchParams(listQuery), signal) });
   const workstation = useQuery({ queryKey: ['private', subject, 'workstation'], refetchOnMount: false, queryFn: ({ signal }) => readWorkstation(signal) });
-  const dialog = useRef<HTMLDialogElement>(null);
+  const [filtersOpen,setFiltersOpen]=useState(false);
+  const filterRoot=useRef<HTMLDivElement>(null);
+  useEffect(()=>{if(configurationActive)setFiltersOpen(false);},[configurationActive]);
+  useEffect(()=>{if(!filtersOpen)return;const dismiss=(event:PointerEvent)=>{if(event.target instanceof Node&&!filterRoot.current?.contains(event.target))setFiltersOpen(false);};document.addEventListener('pointerdown',dismiss);return()=>document.removeEventListener('pointerdown',dismiss);},[filtersOpen]);
   const filterTrigger = useRef<HTMLButtonElement>(null);
   const hasFilters = !!listQuery;
   const data = isRestricted(jobs.error) ? undefined : jobs.data;
@@ -79,12 +83,23 @@ export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, a
       <section className="panel library" aria-labelledby="jobs-heading">
         <div className="panel-head"><h2 id="jobs-heading">{t('jobs')}</h2>
           {data && <span className="count" aria-label={t('pageCount')}>{data.items.length}</span>}
-          <div className="actions"><Link className="button-link" data-client-link="true" to={`/backtests/new${listQuery ? `?${listQuery}` : ''}`} aria-label={t('new')} onClick={event => { if (onNew && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); onNew(); } }}><Plus aria-hidden="true" />{t('new')}</Link>
-            <Refresh query={jobs} deadline={deadline} now={now} />
-            <button ref={filterTrigger} onClick={() => transitionUI(() => dialog.current?.showModal())} aria-label={t('filters')}><Filter aria-hidden="true" />{t('filters')}</button></div>
+          <Link className="button-link library-icon-action" title={t('new')} data-client-link="true" to={`/backtests/new${listQuery ? `?${listQuery}` : ''}`} aria-label={t('new')} onClick={event => { if (onNew && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); onNew(); } }}><Plus aria-hidden="true" /></Link>
+            {!configurationActive&&<div className="actions"><Refresh iconOnly query={jobs} deadline={deadline} now={now} />
+            <div className="library-filter-menu" ref={filterRoot} onBlur={event=>{if(!event.currentTarget.contains(event.relatedTarget))setFiltersOpen(false);}} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();setFiltersOpen(false);filterTrigger.current?.focus();}}}>
+            <button className="library-icon-action" title={t('filters')} ref={filterTrigger} onClick={()=>setFiltersOpen(value=>!value)} aria-label={t('filters')} aria-expanded={filtersOpen} aria-controls="library-filter-popup"><Filter aria-hidden="true" /></button>
+            {filtersOpen&&<div id="library-filter-popup" className="library-filter-popup" role="group" aria-label={t('filters')}>
+              <div className="library-filter-field"><span>{t('state')}</span><ChartDisplayMenu label={t('state')} value={params.get('state')?t(`states.${params.get('state')}`):t('allStates')} options={['',...jobStates].map(value=>({label:value?t(`states.${value}`):t('allStates'),checked:(params.get('state')??'')===value,onChange:()=>change('state',value)}))}/></div>
+              <div className="library-filter-field"><span>{t('risk')}</span><ChartDisplayMenu label={t('risk')} value={params.get('risk_mode')?t(`risks.${params.get('risk_mode')}`):t('allRisk')} options={['','none','tp_sl_grid'].map(value=>({label:value?t(`risks.${value}`):t('allRisk'),checked:(params.get('risk_mode')??'')===value,onChange:()=>change('risk_mode',value)}))}/></div>
+
+              <button onClick={()=>setParams(mode==='detail'&&normalized.has('variant')?{variant:normalized.get('variant')!}:{})}>{t('resetFilters')}</button>
+            </div>}
+            </div></div>}
         </div>
-        {configuration}
-        <div className="library-body">{location.state?.historyDeleted && <p role="status">{t('results.removed')}</p>}
+        {configuration&&<div className="result-tabs library-tabs" role="tablist" aria-label={t('jobs')}>
+          {[{id:'new',label:t('new'),selected:configurationActive,action:onNew},{id:'history',label:i18n.language.startsWith('ru')?'История':'History',selected:!configurationActive,action:onHistory}].map((tab,index)=><button key={tab.id} id={`library-tab-${tab.id}`} role="tab" aria-selected={tab.selected} aria-controls={`library-panel-${tab.id}`} tabIndex={tab.selected?0:-1} onClick={tab.action} onKeyDown={event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?'new':event.key==='End'?'history':index===0?'history':'new';(next==='new'?onNew:onHistory)?.();document.getElementById(`library-tab-${next}`)?.focus();}}}>{tab.label}</button>)}
+        </div>}
+        {configuration&&<div id="library-panel-new" role="tabpanel" aria-labelledby="library-tab-new" hidden={!configurationActive}>{configuration}</div>}
+        <div className="library-body" id="library-panel-history" role={configuration?'tabpanel':undefined} aria-labelledby={configuration?'library-tab-history':undefined} hidden={!!configuration&&configurationActive}>{location.state?.historyDeleted && <p role="status">{t('results.removed')}</p>}
 
           <p className="filter-summary">{t('filterSummary', { state: params.get('state') ? t(`states.${params.get('state')}`) : t('allStates'),
             risk: params.get('risk_mode') ? t(`risks.${params.get('risk_mode')}`) : t('allRisk') })}</p>
@@ -102,17 +117,17 @@ export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, a
                 <td><time dateTime={job.created_at}>{formatDate(job.created_at, i18n.language)}</time></td>
               </tr>)}</tbody></table>
           </div>}
-          <nav className="pagination" aria-label={t('pagination')}>
-            <button disabled={!params.has('cursor')} onClick={() => change('cursor', '')}><ArrowLeft aria-hidden="true" />{t('firstPage')}</button>
-            <span>{t('pageCount')}</span>
-            <button disabled={!data?.next_cursor || jobs.isFetching || !!jobs.error} onClick={() => change('cursor', data!.next_cursor!)}>{t('nextPage')}<ArrowRight aria-hidden="true" /></button>
+          <nav className="pagination library-pagination" aria-label={t('pagination')}>
+            <label>{i18n.language.startsWith('ru')?'Строк на странице':'Rows per page'}<select aria-label={t('pageSize')} value={params.get('limit')??'50'} onChange={event=>change('limit',event.target.value)}>{[...new Set([5,10,25,50,100,250,Number(params.get('limit')??50)])].sort((a,b)=>a-b).map(size=><option key={size} value={size}>{size}</option>)}</select></label>
+            <span>{t('pageCount')}: {data?.items.length??'—'}</span>
+            <button title={t('firstPage')} aria-label={t('firstPage')} disabled={!params.has('cursor')} onClick={() => change('cursor', '')}><ChevronsLeft aria-hidden="true" /></button>
+            <button title={t('nextPage')} aria-label={t('nextPage')} disabled={!data?.next_cursor || jobs.isFetching || !!jobs.error} onClick={() => change('cursor', data!.next_cursor!)}><ArrowRight aria-hidden="true" /></button>
           </nav>
           <p className="muted compact">{t('riskPagination')}</p>
           <details className="projection"><summary>{t('extendedFilters')}</summary>
             <p className="notice">{t(workstation.isPending ? 'loadingProjection' : workstation.error ? 'projectionError' :
               workstation.data?.job_table.state === 'unavailable' ? 'projectionUnavailable' : 'projectionNotBound')}</p>
             <ReadError error={workstation.error} />
-            <Refresh query={workstation} deadline={workstation.data ? refreshDeadline(workstation.data, workstation.dataUpdatedAt) : 0} now={now} />
             <fieldset disabled aria-label={t('extendedFilters')}><label>{t('search')}<input type="search" /></label>
               <label>{t('instrument')}<input /></label><label>{t('from')}<input type="date" /></label><label>{t('to')}<input type="date" /></label></fieldset>
           </details>
@@ -126,22 +141,6 @@ export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, a
             <p className="muted">{t('futureResults')}</p></div>}
       </section>
     </div>
-    <dialog ref={dialog} aria-labelledby="filter-title" onKeyDown={event => {
-      if (event.key !== 'Tab') return;
-      const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), a[href]'));
-      const first = controls[0]; const last = controls[controls.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
-    }} onClose={() => filterTrigger.current?.focus()}>
-      <div className="panel-head"><h2 id="filter-title">{t('filters')}</h2><button onClick={() => transitionUI(() => dialog.current?.close())} aria-label={t('close')}><X aria-hidden="true" /></button></div>
-      <div className="filter-fields"><label>{t('state')}<select value={params.get('state') ?? ''} onChange={event => change('state', event.target.value)}>
-        <option value="">{t('allStates')}</option>{jobStates.map(state => <option key={state} value={state}>{t(`states.${state}`)}</option>)}</select></label>
-        <label>{t('risk')}<select value={params.get('risk_mode') ?? ''} onChange={event => change('risk_mode', event.target.value)}>
-          <option value="">{t('allRisk')}</option><option value="none">{t('risks.none')}</option><option value="tp_sl_grid">{t('risks.tp_sl_grid')}</option></select></label>
-        <label>{t('pageSize')}<input type="number" min="1" max="250" defaultValue={params.get('limit') ?? '50'} key={params.get('limit')}
-          onBlur={event => { if (event.target.validity.valid && event.target.value) change('limit', event.target.value); }} /></label>
-        <p className="muted">{t('filterHelp')}</p><button onClick={() => { setParams(mode === 'detail' && normalized.has('variant') ? { variant: normalized.get('variant')! } : {}); }}>{t('resetFilters')}</button>
-        <button className="primary" onClick={() => transitionUI(() => dialog.current?.close())}>{t('done')}</button></div>
-    </dialog>
+
   </>;
 }

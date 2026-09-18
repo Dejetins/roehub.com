@@ -739,6 +739,9 @@ def build_strategy_router(
     )
 
     return build_strategies_router(
+        provenance_repository=(PostgresStrategyBacktestVariantProvenanceRepository(
+            gateway=PsycopgStrategyPostgresGateway(dsn=settings.postgres_dsn),
+        ) if settings.postgres_dsn else None),
         create_use_case=create_use_case,
         clone_use_case=clone_use_case,
         list_use_case=list_use_case,

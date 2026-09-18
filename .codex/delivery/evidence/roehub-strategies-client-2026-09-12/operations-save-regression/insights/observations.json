@@ -1,0 +1,10 @@
+{
+  "job": "a7e9f0ec-c32f-41b5-9194-0cc2fadc7767",
+  "variant": "job_a7e9f0ec7767__ema_close_w10__risk_none__vh_b39c4279",
+  "strategy": "58f5d5df-d210-452e-be93-6c5a7602226c",
+  "sourceStatus": 200,
+  "standaloneReload": true,
+  "noResearchReads": true,
+  "commands": [],
+  "errors": []
+}

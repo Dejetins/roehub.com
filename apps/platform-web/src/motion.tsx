@@ -26,9 +26,11 @@ export function transitionUI(update: () => void, kind: 'content' | 'layout' = 'c
     // Update immediately: rapid tab clicks must never wait for a document snapshot.
     flushSync(update);
     const target = document.querySelector<HTMLElement>('[aria-modal=true] [data-motion-content]') ?? document.querySelector<HTMLElement>('[data-motion-content]');
+    const quiet = target?.dataset.motionStyle === 'quiet';
+    const smooth = target?.dataset.motionStyle === 'smooth';
     if (motionDuration() && target?.animate) contentAnimation = target.animate(
-      [{ opacity: .2, transform: 'translateY(3px)' }, { opacity: 1, transform: 'translateY(0)' }],
-      { duration: motionDuration(), easing: 'cubic-bezier(.22,1,.36,1)' });
+      smooth ? [{opacity:.35},{opacity:1}] : quiet ? [{opacity:.85},{opacity:1}] : [{ opacity: .2, transform: 'translateY(3px)' }, { opacity: 1, transform: 'translateY(0)' }],
+      { duration: quiet ? motionDuration() / 2 : motionDuration(), easing: 'cubic-bezier(.22,1,.36,1)' });
     return;
   }
   if (!document.startViewTransition || motionDuration() === 0) { update(); return; }
@@ -74,6 +76,7 @@ export function MotionLink({ onClick, ...props }: LinkProps) {
 /** Native details retain their semantics and use the same layout transition. */
 export function useDisclosureMotion() {
   useEffect(() => {
+    const disclosures = new Map<HTMLDetailsElement, { animation: Animation; opening: boolean }>();
     const click = (event: MouseEvent) => {
       if (event.defaultPrevented || !(event.target instanceof Element)) return;
       const summary = event.target.closest('summary');
@@ -81,6 +84,26 @@ export function useDisclosureMotion() {
       if (!(details instanceof HTMLDetailsElement) || !details.closest('[data-platform-client]')) return;
       if (event.target.closest('a,button,input,select')) return;
       event.preventDefault();
+      if (details.closest('.operations-technical') && details.animate && motionDuration()) {
+        const previous = disclosures.get(details);
+        const opening = !(previous?.opening ?? details.open);
+        const start = details.getBoundingClientRect().height;
+        previous?.animation.cancel();
+        details.open = opening;
+        const end = details.getBoundingClientRect().height;
+        // Keep content rendered while closing; commit the native state at the end.
+        details.open = true;
+        const animation = details.animate([
+          { height: `${start}px`, overflow: 'hidden' },
+          { height: `${end}px`, overflow: 'hidden' },
+        ], { duration: motionDuration(), easing: 'cubic-bezier(.22,1,.36,1)' });
+        disclosures.set(details, { animation, opening });
+        animation.onfinish = () => {
+          details.open = opening;
+          disclosures.delete(details);
+        };
+        return;
+      }
       transitionUI(() => { details.open = !details.open; });
     };
     const cancel = (event: Event) => {
@@ -91,6 +114,6 @@ export function useDisclosureMotion() {
     };
     document.addEventListener('click', click);
     document.addEventListener('cancel', cancel, true);
-    return () => { document.removeEventListener('click', click); document.removeEventListener('cancel', cancel, true); };
+    return () => { for (const { animation } of disclosures.values()) animation.cancel(); document.removeEventListener('click', click); document.removeEventListener('cancel', cancel, true); };
   }, []);
 }
