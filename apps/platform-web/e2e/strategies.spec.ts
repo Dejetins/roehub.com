@@ -43,9 +43,9 @@ test('real library, independent detail, filters, keyboard, status, return contex
   await expect(page.getByText('No matching strategies',{exact:true})).toBeVisible();
   await expect(page.getByText('The selected strategy is outside the current filters.')).toBeVisible();
   await expect(heading(page)).toHaveText(first.name);await page.getByRole('button',{name:'Reset filters'}).click();
-  await page.getByRole('button',{name:'Market type',exact:true}).click();await page.getByRole('checkbox',{name:'All',exact:true}).click();await page.getByRole('checkbox',{name:'spot',exact:true}).click();await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'Market type',exact:true}).click();await page.getByRole('checkbox',{name:'All',exact:true}).click();await page.getByRole('checkbox',{name:'spot',exact:true}).click();await page.keyboard.press('Escape');await page.getByLabel('Search strategies').fill('BTC');
   await page.locator(`.strategy-row[href^="/strategies/${second.strategy_id}"]`).click();await expect(heading(page)).toHaveText(second.name);
-  await page.goBack();await expect(heading(page)).toHaveText(first.name);expect(new URL(page.url()).searchParams.get('market')).toBe('spot');
+  await page.goBack();await expect(heading(page)).toHaveText(first.name);expect(new URL(page.url()).searchParams.get('q')).toBe('BTC');
   await page.goForward();await expect(heading(page)).toHaveText(second.name);
   await page.reload();await expect(heading(page)).toHaveText(second.name);
   await page.route('**/api/strategies',route=>route.fulfill({status:503,json:{}}));
@@ -180,7 +180,7 @@ test('long library keeps its scroll, filters and selected identity across Back/F
 
 test('strategy list animates intermediate geometry and reverses without scaling text',async({page})=>{
  await login(page);const strategy=await seed(page,20);await page.goto(`/strategies/${strategy.strategy_id}`);await expect(heading(page)).toHaveText(strategy.name);
- await page.evaluate(()=>localStorage.setItem('roehub.backtests.motion','slow'));await page.reload();await expect(heading(page)).toBeVisible();
+ await page.evaluate(()=>localStorage.setItem('roehub.backtests.motion','slow'));await page.reload();await expect(heading(page)).toHaveText(strategy.name);
  const observations=[];
  for(const width of [1440,820]){
   await page.setViewportSize({width,height:1000});
@@ -191,7 +191,7 @@ test('strategy list animates intermediate geometry and reverses without scaling 
    const frames:{time:number;size:number;textWidth:number;overflow:boolean}[]=[];
    const measure=(time:number)=>frames.push({time,size:innerWidth>928?slot.getBoundingClientRect().width:slot.getBoundingClientRect().height,textWidth:library.getBoundingClientRect().width,overflow:document.documentElement.scrollWidth>innerWidth});
    measure(0);button.focus();button.click();const start=performance.now();let reversed=false;
-   await new Promise<void>(resolve=>{function tick(now:number){const elapsed=now-start;measure(elapsed);if(elapsed>=180&&!reversed){button.click();reversed=true;}if(elapsed<850)requestAnimationFrame(tick);else resolve();}requestAnimationFrame(tick);});
+   await new Promise<void>(resolve=>{function tick(now:number){const elapsed=now-start;measure(elapsed);if(elapsed>=180&&!reversed){document.querySelector<HTMLButtonElement>('.strategy-list-toggle')!.click();reversed=true;}if(elapsed<850)requestAnimationFrame(tick);else resolve();}requestAnimationFrame(tick);});
    return frames;
   });
   const initial=samples[0]!.size;

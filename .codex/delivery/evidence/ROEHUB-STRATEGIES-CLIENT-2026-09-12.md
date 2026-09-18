@@ -970,3 +970,12 @@ on original :20110 preview with original session/data retained. No publication.
 ### 2026-09-17 — Align builder captions to control text
 - Scoped style.css caption insets across builder fields: 11px for text/number/source controls, 9px for dates, 15px for native selects (including the observed native text inset). Hidden accessible name label remains unchanged.
 - Production build and git diff --check passed; existing bundle warning remains. In-app browser at 1480x968 verified captions and control text alignment; updated page left open. CSS-only, no data/API changes.
+
+### 2026-09-19 — technical branch synchronization
+- Publication scope: all pending Strategies/Operations, Backtests UI, API, documentation and existing browser evidence; technical PR #36.
+- Updated stale test selectors for accepted New/History tabs, compact filter popups, icon refresh, operational tabs and current list-toggle control. Motion proof waits for loaded strategy before capturing a toolbar element. No production behavior changed during synchronization.
+- Local passed: `pnpm typecheck`, `pnpm test` (191 tests), `pnpm build` (existing bundle-size warning), `uv run --no-sync ruff check .`, `uv run --no-sync pyright` (0 errors), focused Python API/web tests (44 tests), docs/project-map/runbook/runtime inventory/topology checks, OSS metadata check and `git diff --cached --check`.
+- Browser suites run separately on disposable stacks: `test:e2e strategies.spec.ts` (5 passed), `test:e2e strategy-insights.spec.ts` (1 passed), `test:e2e strategy-operations.spec.ts` (1 passed). Initial combined run exposed stale selectors and shared-fixture interference; final isolated runs passed. Local operations screenshot at 820px inspected. Browser observations are local fixture/demo evidence, not provider execution or production deployment.
+- Generated project map and runtime-input inventory refreshed; existing first-party screenshot hashes registered in OSS policy.
+- Review mode: cold self-review plus independent read-only tenant/security and policy consistency review; no blocker found in reviewed scope. Compatibility: compatible-change for additive API fields/routes and opt-in Strategies client; no schema migration. Runtime adapter absent.
+- GitHub CI and merge remain separate observable publication boundaries; final PR status is authoritative.
