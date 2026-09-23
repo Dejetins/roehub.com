@@ -19,6 +19,24 @@ Artifact-backed runtime реализован: API создаёт persisted jobs,
 Наличие реализации и тестов не подтверждает развёртывание. Репозиторий не выбирает
 действующий production host; запуск и runtime proof требуют конкретной установки.
 
+## Production compute dispatch (2026-09-23)
+
+Normal full-job worker composition automatically uses bounded cost permutation
+with inverse output restoration, exact local top-K prefix admission, integer-only
+TP/SL interval construction and the exact activity lower-bound prefix guard.
+There are no per-algorithm enable flags. `BacktestComputePolicy` carries immutable
+job resource bounds: default 12 threads, minimum 32 candidate rows for permutation,
+minimum 32 bars for tape and 64 MiB extra ndarray scratch per component.
+
+Unsupported scheduling/layouts, small inputs, funding/non-15m tape cases,
+insufficient prefix proof and bounded allocation failures retain necessary exact
+fallbacks. Those paths remain part of the supported engine. Financial kernels,
+precision, funding semantics, canonical order and public result identity are unchanged.
+Scratch is scoped to one job, warmup owns separate scratch, and the runner remains
+one heavy lane with no nested/concurrent workqueue use. See the
+[delivery and proof report](production-integration-20260923/delivery.md) and
+[thread/cache runbook](../../runbooks/indicators-numba-cache-and-threads.md).
+
 ## Исторические материалы
 
 - [План ввода job runner](backtest-job-runner-production-plan-v1.md).

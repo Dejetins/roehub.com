@@ -8,8 +8,9 @@
   "counts": {
     "explicit_legacy_runtime_handoff": 47,
     "installation_generated_runtime": 55,
+    "internal_runtime_tuning": 2,
     "openbao_secret_reference": 26,
-    "product_config_postgresql": 30
+    "product_config_postgresql": 31
   },
   "entries": [
     {
@@ -576,6 +577,22 @@
       ]
     },
     {
+      "classification": "internal_runtime_tuning",
+      "key": "NUMBA_NUM_THREADS",
+      "owner_stage": "17",
+      "sources": [
+        "src/trading/contexts/backtest/application/services/v2/job_scheduling.py"
+      ]
+    },
+    {
+      "classification": "internal_runtime_tuning",
+      "key": "NUMBA_THREADING_LAYER",
+      "owner_stage": "17",
+      "sources": [
+        "src/trading/contexts/backtest/application/services/v2/job_scheduling.py"
+      ]
+    },
+    {
       "classification": "installation_generated_runtime",
       "key": "OPENBAO_ADDR",
       "owner_stage": "03,17",
@@ -650,6 +667,14 @@
     },
     {
       "classification": "product_config_postgresql",
+      "key": "ROEHUB_BACKTEST_CPU_CAP",
+      "owner_stage": "04-16",
+      "sources": [
+        "apps/worker/backtest_job_runner/wiring/modules/compute_resources.py"
+      ]
+    },
+    {
+      "classification": "product_config_postgresql",
       "key": "ROEHUB_BACKTEST_DETAIL_CACHE_TTL_SECONDS",
       "owner_stage": "04-16",
       "sources": [
@@ -662,7 +687,8 @@
       "key": "ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS",
       "owner_stage": "04-16",
       "sources": [
-        "apps/worker/backtest_job_runner/main/full_job_child.py"
+        "apps/worker/backtest_job_runner/main/full_job_child.py",
+        "src/trading/contexts/backtest/application/services/v2/job_scheduling.py"
       ]
     },
     {
@@ -670,7 +696,8 @@
       "key": "ROEHUB_BACKTEST_EFFECTIVE_NUMBA_THREAD_SOURCE",
       "owner_stage": "04-16",
       "sources": [
-        "apps/worker/backtest_job_runner/main/full_job_child.py"
+        "apps/worker/backtest_job_runner/main/full_job_child.py",
+        "src/trading/contexts/backtest/application/services/v2/job_scheduling.py"
       ]
     },
     {
@@ -1591,5 +1618,5 @@
     "infra"
   ],
   "schema": "io.roehub.runtime-input-inventory/v1alpha1",
-  "total": 158
+  "total": 161
 }

@@ -62,6 +62,10 @@ from trading.contexts.backtest_artifacts.application.services.v2.contracts impor
     ArtifactFundingArraysV2,
 )
 
+from .compute_policy import BacktestComputePolicy
+from .cost_permutation import score_with_cost_permutation
+from .job_scratch import BacktestJobScratch
+from .local_top_k import local_admission_indices
 from .no_risk_funding import (
     FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING,
     FUNDING_ADJUSTMENT_SCOPE,
@@ -173,6 +177,8 @@ class _TopKContext:
 
 @dataclass(slots=True)
 class _NoRiskScratch:
+    compute_policy: BacktestComputePolicy = BacktestComputePolicy()
+    job_scratch: BacktestJobScratch | None = None
     segment_pos_workspace: np.ndarray | None = None
     matrix_packed_by_indicator: tuple[PackedSignalBitsets, ...] | None = None
     prefix_traversal_telemetry: Mapping[str, Any] | None = None
@@ -198,6 +204,8 @@ class BacktestNoRiskExactScoringService:
     """
 
     config: BacktestNoRiskExactConfig = BacktestNoRiskExactConfig()
+    compute_policy: BacktestComputePolicy = BacktestComputePolicy()
+    scratch: BacktestJobScratch | None = None
 
     def execute(
         self,
@@ -285,7 +293,9 @@ class BacktestNoRiskExactScoringService:
         first_selected_batch: _SelectedCandidateBatch | None = None
         selected_batch: _SelectedCandidateBatch | None = None
         heap: list[tuple[tuple[float, tuple[int, ...]], _NoRiskHeapEntry]] | None = None
-        scratch = _NoRiskScratch()
+        scratch = _NoRiskScratch(
+            compute_policy=self.compute_policy, job_scratch=self.scratch
+        )
         try:
             profile_stage_timings = stage_timings if _exact_profile_enabled() else None
             if backend.backend_id in {
@@ -562,6 +572,7 @@ class BacktestNoRiskExactScoringService:
                 proxy=selected_batch.proxy,
                 top_k=top_k,
                 min_closed_trades=min_closed_trades,
+                compute_policy=self.compute_policy,
             )
         else:
             _update_heap_generic_ranking(
@@ -574,6 +585,7 @@ class BacktestNoRiskExactScoringService:
                 top_k=top_k,
                 ranking=ranking,
                 min_closed_trades=min_closed_trades,
+                compute_policy=self.compute_policy,
             )
         stage_timings[NO_RISK_HEAP_UPDATE_STAGE_NAME] += time.perf_counter() - heap_start
         return (
@@ -741,7 +753,10 @@ def evaluate_no_risk_exact_chunk(
         left_id, right_id = indicator_ids
         left_pool = _pool_by_id(prepared_result)[left_id]
         right_pool = _pool_by_id(prepared_result)[right_id]
-        event_segments_2_no_risk(
+        score_with_cost_permutation(
+            event_segments_2_no_risk,
+            scratch.compute_policy if scratch is not None else BacktestComputePolicy(),
+            scratch.job_scratch if scratch is not None else None,
             np.asarray(selected_rows_by_indicator[left_id], dtype=np.int32),
             np.asarray(selected_rows_by_indicator[right_id], dtype=np.int32),
             left_pool.segments.starts,
@@ -785,7 +800,10 @@ def evaluate_no_risk_exact_chunk(
     if backend.backend_id == STREAMING_2_NO_RISK_BACKEND:
         left_id, right_id = indicator_ids
         pool_by_id = _pool_by_id(prepared_result)
-        streaming_2_no_risk(
+        score_with_cost_permutation(
+            streaming_2_no_risk,
+            scratch.compute_policy if scratch is not None else BacktestComputePolicy(),
+            scratch.job_scratch if scratch is not None else None,
             np.asarray(selected_rows_by_indicator[left_id], dtype=np.int32),
             np.asarray(selected_rows_by_indicator[right_id], dtype=np.int32),
             pool_by_id[left_id].trade_T,
@@ -843,7 +861,10 @@ def evaluate_no_risk_exact_chunk(
             combo_count=int(combo_idx_by_indicator.shape[1]),
             arity=int(combo_idx_by_indicator.shape[0]),
         )
-        event_segments_n_no_risk(
+        score_with_cost_permutation(
+            event_segments_n_no_risk,
+            scratch.compute_policy if scratch is not None else BacktestComputePolicy(),
+            scratch.job_scratch if scratch is not None else None,
             combo_idx_by_indicator,
             exact_context.starts,
             exact_context.ends,
@@ -918,7 +939,10 @@ def evaluate_no_risk_exact_chunk(
             else np.empty((0, 0), dtype=np.uint64)
         )
         if backend.direction_mode == DIRECTION_MODE_LONG_ONLY and arity in (2, 3):
-            matrix_bitset_no_risk_long_only(
+            score_with_cost_permutation(
+            matrix_bitset_no_risk_long_only,
+            scratch.compute_policy if scratch is not None else BacktestComputePolicy(),
+            scratch.job_scratch if scratch is not None else None,
                 combo_idx_by_indicator,
                 packed_by_indicator[0].pos_bits,
                 packed_by_indicator[1].pos_bits,
@@ -965,7 +989,10 @@ def evaluate_no_risk_exact_chunk(
         neg_bits_4 = packed_by_indicator[4].neg_bits if arity >= 5 else empty_bits
         neg_bits_5 = packed_by_indicator[5].neg_bits if arity >= 6 else empty_bits
         neg_bits_6 = packed_by_indicator[6].neg_bits if arity >= 7 else empty_bits
-        matrix_bitset_no_risk(
+        score_with_cost_permutation(
+            matrix_bitset_no_risk,
+            scratch.compute_policy if scratch is not None else BacktestComputePolicy(),
+            scratch.job_scratch if scratch is not None else None,
             combo_idx_by_indicator,
             packed_by_indicator[0].pos_bits,
             packed_by_indicator[1].pos_bits,
@@ -2552,6 +2579,7 @@ def _iter_selected_candidate_batches(
             packed_by_indicator=scratch.matrix_packed_by_indicator,
             min_closed_trades=min_closed_trades,
             direction_mode=combo_planning_result.backend.direction_mode,
+            guard_max_bytes=scratch.compute_policy.prefix_guard_max_bytes,
         )
         traversal_elapsed = time.perf_counter() - traversal_start
         prefix_telemetry = dict(traversal.telemetry)
@@ -2772,6 +2800,7 @@ def _update_heap_total_return_desc(
     proxy: np.ndarray | None,
     top_k: int,
     min_closed_trades: int,
+    compute_policy: BacktestComputePolicy = BacktestComputePolicy(),
 ) -> None:
     _update_heap_from_score_values(
         heap=heap,
@@ -2784,6 +2813,7 @@ def _update_heap_total_return_desc(
         proxy=proxy,
         top_k=top_k,
         min_closed_trades=min_closed_trades,
+        compute_policy=compute_policy,
     )
 
 
@@ -2798,6 +2828,7 @@ def _update_heap_generic_ranking(
     top_k: int,
     ranking: _RankingSpec,
     min_closed_trades: int,
+    compute_policy: BacktestComputePolicy = BacktestComputePolicy(),
 ) -> None:
     score_multiplier = 1.0 if ranking.direction == "desc" else -1.0
     _update_heap_from_score_values(
@@ -2811,6 +2842,7 @@ def _update_heap_generic_ranking(
         proxy=proxy,
         top_k=top_k,
         min_closed_trades=min_closed_trades,
+        compute_policy=compute_policy,
     )
 
 
@@ -2826,6 +2858,7 @@ def _update_heap_from_score_values(
     proxy: np.ndarray | None,
     top_k: int,
     min_closed_trades: int,
+    compute_policy: BacktestComputePolicy = BacktestComputePolicy(),
 ) -> None:
     selected_rows_by_pos = tuple(
         selected_rows_by_indicator[indicator_id]
@@ -2833,10 +2866,23 @@ def _update_heap_from_score_values(
     )
     row_ids_by_pos = top_k_context.row_ids_by_pos
     arity = len(selected_rows_by_pos)
+    admission = None
+    if not any(math.isnan(item[0][0]) for item in heap):
+        admission = local_admission_indices(
+            scores=score_values,
+            trades=buffers.trade_count,
+            selected=selected_rows_by_pos,
+            row_ids=row_ids_by_pos,
+            multiplier=score_multiplier,
+            minimum=min_closed_trades,
+            k=top_k,
+            max_bytes=compute_policy.local_top_k_max_bytes,
+        )
+    result_indices = range(buffers.size) if admission is None else admission
     if arity == 1:
         selected_0 = selected_rows_by_pos[0]
         row_ids_0 = row_ids_by_pos[0]
-        for result_index in range(buffers.size):
+        for result_index in result_indices:
             if int(buffers.trade_count[result_index]) < min_closed_trades:
                 continue
             local_0 = int(selected_0[result_index])
@@ -2885,7 +2931,7 @@ def _update_heap_from_score_values(
         selected_1 = selected_rows_by_pos[1]
         row_ids_0 = row_ids_by_pos[0]
         row_ids_1 = row_ids_by_pos[1]
-        for result_index in range(buffers.size):
+        for result_index in result_indices:
             if int(buffers.trade_count[result_index]) < min_closed_trades:
                 continue
             local_0 = int(selected_0[result_index])
@@ -2930,7 +2976,7 @@ def _update_heap_from_score_values(
                 )
         return
 
-    for result_index in range(buffers.size):
+    for result_index in result_indices:
         if int(buffers.trade_count[result_index]) < min_closed_trades:
             continue
         local_values = []

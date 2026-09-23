@@ -16,8 +16,12 @@ from trading.contexts.backtest.application.services.v2.combo_planning import (
     BacktestComboPlanningConfig,
     BacktestComboPlanningService,
 )
+from trading.contexts.backtest.application.services.v2.compute_policy import BacktestComputePolicy
 from trading.contexts.backtest.application.services.v2.job_orchestration import (
     BacktestRuntimeJobOrchestrationService,
+)
+from trading.contexts.backtest.application.services.v2.job_scheduling import (
+    resolve_backtest_numba_thread_decision,
 )
 from trading.contexts.backtest.application.services.v2.no_risk_exact import (
     BacktestNoRiskExactScoringService,
@@ -40,7 +44,13 @@ from trading.contexts.backtest_artifacts.application.services.v2.artifact_manife
 def build_full_job_compute_executor(
     *,
     environ: Mapping[str, str],
+    compute_policy: BacktestComputePolicy | None = None,
 ) -> BacktestRuntimeJobOrchestrationService:
+    policy = compute_policy or BacktestComputePolicy(
+        threads=resolve_backtest_numba_thread_decision(
+            environ=environ, scheduling_class="heavy", inherited=True
+        )
+    )
     artifact_config_path = resolve_backtest_artifacts_config_path(environ=environ)
     artifact_config = load_backtest_artifacts_runtime_config(Path(artifact_config_path))
     defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(
@@ -64,6 +74,7 @@ def build_full_job_compute_executor(
     )
     return BacktestRuntimeJobOrchestrationService(
         prepare_pools=prepare_pools,
+        compute_policy=policy,
         combo_planning=BacktestComboPlanningService(
             config=BacktestComboPlanningConfig(
                 combo_top_frac=1.0,

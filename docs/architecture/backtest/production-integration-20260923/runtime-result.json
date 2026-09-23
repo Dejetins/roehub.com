@@ -1,0 +1,62 @@
+{
+  "status": "passed",
+  "cap_seconds": 300,
+  "container": "roehub-production-proof-2705",
+  "bootstrap": {
+    "status": "pass",
+    "schema": "canonical migrations plus research organization isolation",
+    "version": [
+      "PostgreSQL 17.5 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit"
+    ]
+  },
+  "proof": {
+    "records": [
+      {
+        "job": "00000000-0000-0000-0000-000000002774",
+        "case": "MONTH_A6_V3_NONE",
+        "service_s": 7.347217625007033,
+        "end_to_end_s": 7.392624625004828,
+        "wait_s": 0.013798250001855195,
+        "state": "succeeded",
+        "lease_lost": false,
+        "rows": 50,
+        "parity": {
+          "status": "pass",
+          "mismatch_count": 0,
+          "compared_values": 9651,
+          "paths": [],
+          "atol": 0,
+          "rtol": 0
+        },
+        "readback_digest": "43b01d5d2b4422e8ef8859df42419fd3279f0688a5a9fc14e5e579e811ca205d"
+      },
+      {
+        "job": "00000000-0000-0000-0000-000000002775",
+        "case": "MONTH_A4_V6_TP_SL_GRID",
+        "service_s": 13.967181082989555,
+        "end_to_end_s": 21.38738116598688,
+        "wait_s": 7.383048749994487,
+        "state": "succeeded",
+        "lease_lost": false,
+        "rows": 50,
+        "parity": {
+          "status": "pass",
+          "mismatch_count": 0,
+          "compared_values": 9851,
+          "paths": [],
+          "atol": 0,
+          "rtol": 0
+        },
+        "readback_digest": "c9989608a01f80646518b8966023a42d2787ea4f0078bef38a0c2304c73cb6af"
+      }
+    ],
+    "makespan_s": 21.400518334005028,
+    "database_bytes": 13659283,
+    "persisted_rows": 100,
+    "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+    "cleanup_files": []
+  },
+  "container_removed": true,
+  "scratch_removed": true,
+  "elapsed_seconds": 24.229830667027272
+}

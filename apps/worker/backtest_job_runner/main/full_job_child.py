@@ -52,7 +52,9 @@ def main(argv: list[str] | None = None) -> int:
     _ = args.scheduling_class
     scheduling_class: BacktestSchedulingClass = "heavy"
     os.environ.update(
-        backtest_numba_environ(environ=os.environ, scheduling_class=scheduling_class)
+        backtest_numba_environ(
+            environ=os.environ, scheduling_class=scheduling_class, inherited=True
+        )
     )
     started_at = datetime.now(UTC)
     log.info(

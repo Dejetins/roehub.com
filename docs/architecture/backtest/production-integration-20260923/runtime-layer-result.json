@@ -1,0 +1,76 @@
+{
+  "status": "passed",
+  "cap_seconds": 300,
+  "container": "roehub-production-proof-2705",
+  "bootstrap": {
+    "status": "pass",
+    "schema": "canonical migrations plus research organization isolation",
+    "version": [
+      "PostgreSQL 17.5 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 14.2.0) 14.2.0, 64-bit"
+    ]
+  },
+  "proof": {
+    "records": [
+      {
+        "job": "00000000-0000-0000-0000-000000002774",
+        "case": "PRODUCTION_A7_V2_NONE",
+        "service_s": 8.20017420896329,
+        "end_to_end_s": 8.211021707975306,
+        "wait_s": 1.4416000340133905e-05,
+        "state": "succeeded",
+        "lease_lost": false,
+        "rows": 5,
+        "parity": {
+          "status": "pass",
+          "mismatch_count": 0,
+          "compared_values": 1036,
+          "paths": [],
+          "atol": 0,
+          "rtol": 0
+        },
+        "readback_digest": "705cf5b7a004d4d304a8c7167e384f8ea4199f104e5101e776f738543826d539",
+        "cost_permutation": {
+          "calls": {
+            "matrix_bitset_no_risk:enabled": 1,
+            "matrix_bitset_no_risk:insufficient_work": 1
+          },
+          "threading_layer": "workqueue"
+        },
+        "prefix": {
+          "backend_id": "compiled_prefix_product_traversal_v1",
+          "combo_count_planned": 128,
+          "combo_iteration_candidates_per_sec": 2295963.42320663,
+          "combo_iteration_mode": "canonical_product_bound_proved",
+          "compiled_loop_elapsed_s": null,
+          "first_canonical_ordinal": 0,
+          "last_canonical_ordinal": 127,
+          "prefix_candidates_pruned": 0,
+          "prefix_candidates_selected": 128,
+          "prefix_guard_enumeration_elapsed_s": 1.4499993994832039e-05,
+          "prefix_guard_lower_bound": 170,
+          "prefix_guard_proof_elapsed_s": 3.083399496972561e-05,
+          "prefix_guard_reason": "bound_proved_no_pruning",
+          "prefix_min_closed_trades": 13,
+          "prefix_nodes_reused": 0,
+          "prefix_nodes_visited": 0,
+          "prefix_pruned_candidate_upper_bound": 0,
+          "prefix_pruned_subtrees": 0,
+          "prefix_total_elapsed_s": 5.5750017054378986e-05,
+          "schema": "backtest_compiled_prefix_product_traversal_v1",
+          "selectivity_order": [],
+          "signal_length": 2976,
+          "traversal_status": "not_run_bound_proved_no_pruning",
+          "word_count": 47
+        }
+      }
+    ],
+    "makespan_s": 8.221590958011802,
+    "database_bytes": 13347987,
+    "persisted_rows": 5,
+    "child_module": "apps.worker.backtest_job_runner.main.full_job_child",
+    "cleanup_files": []
+  },
+  "container_removed": true,
+  "scratch_removed": true,
+  "elapsed_seconds": 11.211816833005287
+}

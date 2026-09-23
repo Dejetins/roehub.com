@@ -1043,7 +1043,9 @@ def test_no_risk_compiled_prefix_stage_12_matches_current_arity7_top_results() -
     prefix = compiled_result.telemetry.prefix_traversal
     assert prefix is not None
     assert prefix["prefix_candidates_selected"] == 1
-    assert prefix["selectivity_order"] == list(range(7))
+    assert prefix["selectivity_order"] == []
+    assert prefix["traversal_status"] == "not_run_bound_proved_no_pruning"
+    assert prefix["compiled_loop_elapsed_s"] is None
     assert compiled_result.telemetry.backend_id == COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND
     assert compiled_result.self_check.status == NO_RISK_SELF_CHECK_PASSED_STATUS
     assert canonical_no_risk_top_results_payload(compiled_result.top_results) == (

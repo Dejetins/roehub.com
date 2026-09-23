@@ -624,3 +624,75 @@ def test_controlled_interval_reporting_excludes_final_diagnostics_and_gc(monkeyp
     evidence = [json.loads(next(tmp_path.glob('*.json')).read_text())]
     assert _merged_stage_timings(evidence)['service_total_without_warmup'] == 9
     assert _timing_accounting(evidence)['status'] == 'passed'
+
+
+def test_s1_scratch_clears_after_prepare_failure():
+    import trading.contexts.backtest.application.services.v2.job_orchestration as module
+    original = module.BacktestJobScratch
+    created = []
+    def scratch(job_id):
+        value = original(job_id)
+        value.retain('injected', object())
+        created.append(value)
+        return value
+    class FailingPrepare:
+        def execute(self, **kwargs):
+            raise RuntimeError('injected prepare failure')
+    service = BacktestRuntimeJobOrchestrationService(
+        prepare_pools=FailingPrepare(), combo_planning=_UnusedService(),
+        no_risk_exact=_UnusedService(),tp_sl_hit_times=_UnusedService(),
+        tp_sl_exact=_UnusedService(),artifact_array_loader=_UnusedService(),scratch_factory=scratch)
+    with pytest.raises(RuntimeError, match='injected prepare failure'):
+        service.execute(job_id=uuid4(), preflight=_preflight(top_n=1,risk_mode='none'),
+                        updated_at=datetime.now(UTC))
+    assert len(created)==1 and created[0].closed and created[0].retained_count==0
+
+
+def test_s1_mixed_calls_use_fresh_job_and_warmup_scratch():
+    from trading.contexts.backtest.application.services.v2.job_scratch import BacktestJobScratch
+    created=[]
+    def factory(job_id):
+        scratch=BacktestJobScratch(job_id)
+        created.append(scratch)
+        return scratch
+    service=BacktestRuntimeJobOrchestrationService(
+        prepare_pools=_PreparePools(_prepared_result(rows=3)),combo_planning=_ComboPlanning(),
+        no_risk_exact=_ExactService(),tp_sl_hit_times=_UnusedService(),
+        tp_sl_exact=_UnusedService(),artifact_array_loader=_UnusedService(),
+        top_result_assembly=cast(Any,_TopResultAssembly()),scratch_factory=factory)
+    for _ in range(3):
+        service.execute(job_id=uuid4(),preflight=_preflight(top_n=1,risk_mode='none'),
+                        updated_at=datetime.now(UTC))
+    assert len(created)==6 and len({id(x) for x in created})==6
+    assert all(x.closed and x.retained_count==0 for x in created)
+    assert len({x.job_id for x in created})==3
+
+
+@pytest.mark.parametrize('failure_stage', ['warmup', 'score', 'assembly'])
+def test_s1_scratch_clears_after_allocated_inputs_on_failure(failure_stage):
+    from trading.contexts.backtest.application.services.v2.job_scratch import BacktestJobScratch
+    created=[]
+    def factory(job_id):
+        value=BacktestJobScratch(job_id)
+        created.append(value)
+        return value
+    class FailingExact(_ExactService):
+        def execute(self, **kwargs):
+            if failure_stage=='warmup' or (failure_stage=='score' and self.calls):
+                raise RuntimeError('injected scoring failure')
+            return super().execute(**kwargs)
+    class Assembly(_TopResultAssembly):
+        def assemble(self, **kwargs):
+            if failure_stage=='assembly':
+                raise RuntimeError('injected assembly failure')
+            return super().assemble(**kwargs)
+    service=BacktestRuntimeJobOrchestrationService(
+        prepare_pools=_PreparePools(_prepared_result(rows=3)), combo_planning=_ComboPlanning(),
+        no_risk_exact=FailingExact(), tp_sl_hit_times=_UnusedService(),
+        tp_sl_exact=_UnusedService(), artifact_array_loader=_UnusedService(),
+        top_result_assembly=cast(Any,Assembly()), scratch_factory=factory)
+    with pytest.raises(RuntimeError,match='injected'):
+        service.execute(job_id=uuid4(),preflight=_preflight(top_n=1,risk_mode='none'),
+                        updated_at=datetime.now(UTC))
+    assert len(created)==2
+    assert all(s.closed and s.retained_count==0 for s in created)

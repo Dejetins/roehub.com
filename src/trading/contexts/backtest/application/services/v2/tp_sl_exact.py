@@ -65,6 +65,10 @@ from trading.contexts.backtest_artifacts.application.services.v2.contracts impor
     ArtifactFundingArraysV2,
 )
 
+from .compute_policy import BacktestComputePolicy
+from .cost_permutation import score_with_cost_permutation
+from .integer_trade_tape import IntegerTradeTapeBuilder, TradeTapeBuilder
+from .job_scratch import BacktestJobScratch
 from .no_risk_funding import (
     FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING,
     FUNDING_ADJUSTMENT_SCOPE,
@@ -271,6 +275,9 @@ class BacktestTpSlExactScoringService:
     """
 
     config: BacktestTpSlExactConfig = BacktestTpSlExactConfig()
+    compute_policy: BacktestComputePolicy = BacktestComputePolicy()
+    scratch: BacktestJobScratch | None = None
+    trade_tape_builder: TradeTapeBuilder | None = None
 
     def execute(
         self,
@@ -467,6 +474,15 @@ class BacktestTpSlExactScoringService:
                 runtime=runtime,
                 top_k_context=top_k_context,
                 direction_mode=backend.direction_mode,
+                trade_tape_builder=(
+                    (self.trade_tape_builder or IntegerTradeTapeBuilder(
+                        baseline=build_trade_list_15m_for_indicator_rows_slow,
+                        min_bars=self.compute_policy.integer_tape_min_bars,
+                        max_bytes=self.compute_policy.integer_tape_max_bytes,
+                    ))
+                    if not funding_adjustment_enabled
+                    and prepared_result.timeframe == "15m" else None
+                ),
             )
             if funding_adjustment_enabled:
                 funding_start = time.perf_counter()
@@ -598,6 +614,8 @@ class BacktestTpSlExactScoringService:
         )
         exact_start = time.perf_counter()
         evaluate_tp_sl_exact_chunk(
+            compute_policy=self.compute_policy,
+            job_scratch=self.scratch,
             selected_rows_by_indicator=selected_rows_by_indicator,
             prepared_result=prepared_result,
             combo_planning_result=combo_planning_result,
@@ -703,6 +721,8 @@ def evaluate_tp_sl_exact_chunk(
     hit_times: BacktestTpSlHitTimesSubset,
     runtime: _TpSlRuntimeContext,
     buffers: _TpSlScoreBuffers,
+    compute_policy: BacktestComputePolicy = BacktestComputePolicy(),
+    job_scratch: BacktestJobScratch | None = None,
     cell_block_tp_count: int = 16,
     cell_block_sl_count: int = 16,
 ) -> None:
@@ -734,7 +754,8 @@ def evaluate_tp_sl_exact_chunk(
         and runtime.close_on_end == 1
     ):
         if combo_planning_result.backend.backend_id == MATRIX_CELL_TP_SL_V1_BACKEND:
-            event_segments_n_tp_sl_15m_grid_cell_blocks(
+            score_with_cost_permutation(
+            event_segments_n_tp_sl_15m_grid_cell_blocks, compute_policy, job_scratch,
                 combo_idx_by_indicator,
                 exact_context.starts,
                 exact_context.ends,
@@ -774,7 +795,8 @@ def evaluate_tp_sl_exact_chunk(
                 f"unsupported TP/SL exact backend: "
                 f"{combo_planning_result.backend.backend_id!r}"
             )
-        event_segments_n_tp_sl_15m_grid(
+        score_with_cost_permutation(
+            event_segments_n_tp_sl_15m_grid, compute_policy, job_scratch,
             combo_idx_by_indicator,
             exact_context.starts,
             exact_context.ends,
@@ -809,7 +831,8 @@ def evaluate_tp_sl_exact_chunk(
                 "matrix_cell_tp_sl_v1 currently supports all_in sizing, "
                 "profit_lock=false, and close_on_end=true only"
             )
-        event_segments_n_tp_sl_15m_grid_execution_sizing(
+        score_with_cost_permutation(
+            event_segments_n_tp_sl_15m_grid_execution_sizing, compute_policy, job_scratch,
             combo_idx_by_indicator,
             exact_context.starts,
             exact_context.ends,
@@ -3165,6 +3188,7 @@ def _top_results_from_heap(
     runtime: _TpSlRuntimeContext,
     top_k_context: _TopKContext,
     direction_mode: str,
+    trade_tape_builder: TradeTapeBuilder | None = None,
 ) -> tuple[BacktestTpSlTopResult, ...]:
     out: list[BacktestTpSlTopResult] = []
     for rank, (_, entry) in enumerate(
@@ -3177,6 +3201,7 @@ def _top_results_from_heap(
             hit_times=hit_times,
             runtime=runtime,
             direction_mode=direction_mode,
+            trade_tape_builder=trade_tape_builder,
         )
         metrics = {
             **full_metrics,
@@ -3452,8 +3477,10 @@ def _full_metrics_for_heap_entry(
     hit_times: BacktestTpSlHitTimesSubset,
     runtime: _TpSlRuntimeContext,
     direction_mode: str,
+    trade_tape_builder: TradeTapeBuilder | None = None,
 ) -> dict[str, float]:
-    entry_abs, dir_arr, sig_exit_abs = build_trade_list_15m_for_indicator_rows_slow(
+    builder = trade_tape_builder or build_trade_list_15m_for_indicator_rows_slow
+    entry_abs, dir_arr, sig_exit_abs = builder(
         prepared_result=prepared_result,
         local_indices=entry.local_indices,
         direction_mode=direction_mode,
