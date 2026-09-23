@@ -67,7 +67,7 @@
     "docs/architecture/README.md": "41613a0a84314898256e29b7ab29a78e14475a463a6a4d23bfa960d653d1d9a8",
     "docs/architecture/backtest/README.md": "7fd1b7372ec1740f5c16210487ef836977b79ca86e0d42293e806f760263c207",
     "docs/architecture/backtest/production-integration-20260923/bootstrap_database.py": "b501cabcdc5e71c05877a75348411b4a4c8e5be21aaebd09c327fdef6db4d5e0",
-    "docs/architecture/backtest/production-integration-20260923/delivery.md": "d82ac634637b650c8d2a9e436fbec526277ef9517b0f53c307ce59d28fe4a66e",
+    "docs/architecture/backtest/production-integration-20260923/delivery.md": "b8cc372c0cfeb5120f4caf826f00d249eedc8ae249b5900d9a656834b6c713e7",
     "docs/architecture/backtest/production-integration-20260923/dispatch-initial-incomplete.json": "6124ec677e4e498a96e06363ed7388f8b077b9f11c6ba2cacedba9f61ae609fb",
     "docs/architecture/backtest/production-integration-20260923/dispatch-result.json": "b6a33dc11eeeb205ad7036a9a659b1ab6a02b5feefa002941d5a018138130866",
     "docs/architecture/backtest/production-integration-20260923/dispatch_proof.py": "04396686f374b75b0031bf008100caca4e855fc2665db6fd99413511238d1e98",
@@ -85,8 +85,8 @@
     "docs/architecture/backtest/production-integration-20260923/runtime-prefix-result.json": "0eb1f394965fd1d592b29688a926c3eea2de20bd3ac7d68e34188dce6fd1028c",
     "docs/architecture/backtest/production-integration-20260923/runtime-result.json": "629106c84e0344aed7b2567e18238c86db7df0ab5955b6a6c9bd2aff24c2c969",
     "docs/architecture/backtest/production-integration-20260923/runtime_proof.py": "51dda4b3ba6151374f89411fe9ff486fc05ef45f7e66f6d9e23c00cffc087fdd",
-    "docs/architecture/project-map/PROJECT_MAP.md": "50564a1a2c5b2a87dfba1a8d6f607fd4f96fbbc12a78ce8d97104d4ce79b19bf",
-    "docs/architecture/project-map/project-map.json": "83abce73fe83fdcee6dcc3fec920c5688023a541c6836a9491bb7bbef66949bd",
+    "docs/architecture/project-map/PROJECT_MAP.md": "d51a2292df119cbb7bf545af0ebd95eb53dedc5f60d6dce953cef3fe432e60f3",
+    "docs/architecture/project-map/project-map.json": "b738eb0cf84c8998c817daef81ef57b1fb857bd194f021c9826142f36a08c59a",
     "docs/runbooks/indicators-numba-cache-and-threads.md": "8e77df89c61b8ffba97c1d2a61affaf5388ca98767a1e9fef8e2fd8c3ef2a7ea",
     "src/trading/contexts/backtest/application/services/v2/compute_policy.py": "e59711ff95d428dec27e93cbc14fa46432a34f336b421586d142b63ac31c53b1",
     "src/trading/contexts/backtest/application/services/v2/cost_permutation.py": "c3fbcc91b735084c004764f27f9ba66e7d84786548a4c9b3c7e7027a545fba18",
@@ -115,5 +115,5 @@
   "self_excluded_from_hash": "final-manifest.json",
   "baseline": "b4f2ddad9b508680fc6d4ad7dbf51b401b8f50b7",
   "excluded": "Source224b history, captures, research scripts and virtual environments; numba_runtime has no final diff.",
-  "review": "cold self-review plus coordinator independent pre-PR source review; published SHA review pending"
+  "review": "Coordinator preliminary source review found no blockers; final published SHA review and CI pending."
 }

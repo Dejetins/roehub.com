@@ -1,6 +1,6 @@
 # Backtest production integration — 2026-09-23
 
-Status: local implementation and verification complete; PR publication pending.
+Status: local implementation verified; published in PR #37, GitHub checks and final coordinator review in progress.
 
 ## Authority and delivery unit
 
@@ -167,3 +167,12 @@ findings after removing unused helper, restoring meaningful CI routing and closi
 normal arity-7 proof coverage. Independent coordinator review and GitHub CI are
 required before merge. New compute evidence is correctness-only and bounded; historical
 performance acceptance and failed gates are not reclassified.
+
+## Publication tracking
+
+PR: https://github.com/Dejetins/roehub.com/pull/37. Initial product commit
+`a241bcde67745833ec94691ec2b2d9666ffe8930`. The existing project-map bot added
+`0b335e54f703cc2d33f266254dd003750462084c` to include the final manifest itself
+in inventory. That generated-only commit was inspected and fast-forwarded; its
+`[skip ci]` message does not count as green verification. A follow-up evidence commit
+refreshes map hashes and triggers checks on the actual reviewed head.
