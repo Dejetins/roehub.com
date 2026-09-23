@@ -64,7 +64,7 @@
     "apps/worker/backtest_job_runner/wiring/modules/full_job_compute.py": "26d69b6f784f187e646796d0b69edd9031b7dd9432554407765430cb723400a3",
     "apps/worker/backtest_job_runner/wiring/modules/process_observation.py": "822abe9ca4c69460c5936d8484a3e9afb28469153daf7c9b763dc99bc10cd191",
     "configs/installation/runtime-input-inventory.json": "b021f6932e8170159f3923ba0f249f9ac06387b24e4379f949c7d1318b91199c",
-    "docs/architecture/README.md": "41613a0a84314898256e29b7ab29a78e14475a463a6a4d23bfa960d653d1d9a8",
+    "docs/architecture/README.md": "4dc081ec0c602e40829dc56b5565245ff115c76780e449795718602858c92866",
     "docs/architecture/backtest/README.md": "7fd1b7372ec1740f5c16210487ef836977b79ca86e0d42293e806f760263c207",
     "docs/architecture/backtest/production-integration-20260923/bootstrap_database.py": "b501cabcdc5e71c05877a75348411b4a4c8e5be21aaebd09c327fdef6db4d5e0",
     "docs/architecture/backtest/production-integration-20260923/delivery.md": "b8cc372c0cfeb5120f4caf826f00d249eedc8ae249b5900d9a656834b6c713e7",
