@@ -194,7 +194,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 2255,
+      "file_count": 2256,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -14389,6 +14389,11 @@
     {
       "area": "knowledge",
       "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/final-manifest.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
       "path": "docs/architecture/backtest/production-integration-20260923/financial-kernel-audit.json"
     },
     {
@@ -22982,7 +22987,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 4154,
+  "inventory_file_count": 4155,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -23180,5 +23185,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "b825272966eaeee194ca7f72b535e4afcbd1e5e143ad7eb09168bc9fc400d8cb"
+  "structural_digest": "c0afc632c65ea22691fca586077d4b14bd9f138eb96a1f191def8ae9b4ef0ff3"
 }
