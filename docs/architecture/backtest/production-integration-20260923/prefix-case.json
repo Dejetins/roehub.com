@@ -1,0 +1,126 @@
+[
+  {
+    "case_id": "PRODUCTION_A7_V2_NONE",
+    "request_payload": {
+      "coordinates": {
+        "exchange": "binance",
+        "market_type": "futures",
+        "symbol": "ETHUSDT"
+      },
+      "timeframe": "15m",
+      "time_range": {
+        "start": "2026-08-20T00:00:00Z",
+        "end": "2026-09-20T00:00:00Z"
+      },
+      "indicators": [
+        {
+          "indicator_id": "ma.dema",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 40,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.hma",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 40,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.ema",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 40,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.sma",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 40,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.wma",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 40,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.rma",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 40,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.zlema",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 40,
+            "step": 30
+          }
+        }
+      ],
+      "risk": {
+        "mode": "none"
+      },
+      "execution": {
+        "direction_mode": "long_short_reversal",
+        "fee_rate": 0.00075,
+        "slippage_rate": 0.0001,
+        "initial_cash_quote": 10000.0,
+        "sizing": {
+          "mode": "all_in"
+        },
+        "profit_lock": {
+          "enabled": false
+        },
+        "close_on_end": true,
+        "funding": {
+          "mode": "off",
+          "coverage_policy": "degraded_with_warning"
+        }
+      },
+      "ranking": {
+        "primary_metric": "total_return_pct",
+        "requested_primary_metric": "total_return_pct",
+        "effective_primary_metric": "total_return_pct",
+        "direction": "desc"
+      },
+      "top_n": 5,
+      "quality_constraints": {
+        "min_closed_trades": 13
+      }
+    }
+  }
+]

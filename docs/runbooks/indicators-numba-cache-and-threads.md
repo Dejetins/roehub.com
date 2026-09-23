@@ -90,3 +90,26 @@ uv run pytest -q tests/perf_smoke/contexts/indicators/test_compute_numba_perf_sm
 
 Ожидание:
 - warmup и compute проходят, ошибок по cache dir/threads нет.
+
+## Backtest full-job resource policy (2026-09-23)
+
+Full jobs keep default 12 threads and one heavy lane. The parent discovers hardware,
+affinity and Linux cgroup capacity without initializing Numba. Explicit heavy/general
+budgets and optional `ROEHUB_BACKTEST_CPU_CAP` are validated before launch. Default12
+is retained on smaller/unknown hosts unless an explicit cap requests validation.
+The selected budget is passed in a copied child environment before Numba import;
+inherited effective budget wins over stale selectors and must agree with
+`NUMBA_NUM_THREADS`.
+No environment field enables/disables the four production compute algorithms.
+
+The normal builder injects immutable resource bounds and creates fresh job scratch.
+Cost permutation starts at 32 rows (and at least as many rows as worker threads),
+integer TP/SL tape at 32 bars. Each component bounds extra ndarray scratch at 64 MiB;
+this is not a whole-process RSS limit. Necessary exact fallback paths remain active.
+Confirmed lease loss cancels owned compute; observation failures stop and reap the
+child before returning. Temporary IPC and scratch are cleaned on success and failure.
+
+First JIT compilation, warm calls, new-process cache loading and load-origin warm
+calls are different regimes. Source-specific caches must not be treated as evidence
+of cold compile time or transferred numerical validation. Historical diagnostic
+minimum-1 measurements do not establish performance for the normal minimum-32 policy.

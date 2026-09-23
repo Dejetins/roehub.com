@@ -1,0 +1,43 @@
+{
+  "no_risk_exact": {
+    "unchanged_decorated_functions": 9,
+    "names": [
+      "_consensus_dir2",
+      "proxy_for_two_rows",
+      "_apply_direction_mode",
+      "_trade_sharpe",
+      "_apply_no_risk_trade_to_state",
+      "_write_final_metrics",
+      "event_segments_2_no_risk",
+      "streaming_2_no_risk",
+      "event_segments_n_no_risk"
+    ]
+  },
+  "tp_sl_exact": {
+    "unchanged_decorated_functions": 22,
+    "names": [
+      "_tp_sl_add_row_range",
+      "_tp_sl_add_col_range",
+      "_tp_sl_add_rect",
+      "_tp_sl_lower_bound_ge_hit",
+      "_tp_sl_signal_exit_log_contrib",
+      "_tp_sl_final_close_log_contrib",
+      "_tp_sl_apply_trade_to_diff",
+      "_tp_sl_add_row_range_block",
+      "_tp_sl_add_col_range_block",
+      "_tp_sl_add_rect_block",
+      "_tp_sl_apply_trade_to_block_diff",
+      "event_segments_n_tp_sl_15m_grid_cell_blocks",
+      "event_segments_n_tp_sl_15m_grid",
+      "event_segments_n_tp_sl_15m_grid_execution_sizing",
+      "_tp_sl_apply_trade_to_account_for_cell",
+      "_tp_sl_trade_log_contrib_and_closed",
+      "_tp_sl_apply_direction_mode",
+      "evaluate_tp_sl_reference_trade_list_direct",
+      "_tp_sl_selected_cell_ranking_scores",
+      "_tp_sl_top_key_greater",
+      "_tp_sl_top_key_less",
+      "_tp_sl_select_top_k_indices"
+    ]
+  }
+}

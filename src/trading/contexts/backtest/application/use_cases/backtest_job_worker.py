@@ -258,6 +258,7 @@ class _LeaseHeartbeat:
             )
             if updated is None:
                 self._lease_lost = True
+                self._cancel_event.set()
                 return
             if updated.cancel_requested_at is not None:
                 self._cancel_requested = True

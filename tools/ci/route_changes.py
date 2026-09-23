@@ -61,6 +61,10 @@ TEST_SHARDS: dict[str, TestShard] = {
     "backtest-scoring": TestShard(
         name="backtest-scoring",
         target=_target(
+            "tests/unit/contexts/backtest/application/services/v2/test_cost_permutation.py",
+            "tests/unit/contexts/backtest/application/services/v2/test_local_top_k.py",
+            "tests/unit/contexts/backtest/application/services/v2/test_integer_trade_tape.py",
+            "tests/unit/contexts/backtest/application/services/v2/test_prefix_guard.py",
             "tests/unit/contexts/backtest/application/services/v2/test_bitsets.py",
             "tests/unit/contexts/backtest/application/services/v2/test_row_signatures.py",
             "tests/unit/contexts/backtest/application/services/v2/test_result_candles.py",

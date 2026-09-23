@@ -1,0 +1,419 @@
+[
+  {
+    "case_id": "MONTH_A6_V3_NONE",
+    "request": "requests/MONTH_A6_V3_NONE.json",
+    "request_file_sha256": "7e1e5d606f500ec8cd198775e0a569227a0df763601e31106b9e7a66f1e94ebd",
+    "arity": 6,
+    "variants_per_family": [
+      3,
+      3,
+      3,
+      3,
+      3,
+      3
+    ],
+    "raw_cartesian_upper_bound": 729,
+    "tp_sl_cells": 0,
+    "evaluation_bars_15m": 2976,
+    "risk_mode": "none",
+    "direction": "long_short_reversal",
+    "ranking": {
+      "primary_metric": "total_return_pct",
+      "requested_primary_metric": "total_return_pct",
+      "effective_primary_metric": "total_return_pct",
+      "direction": "desc"
+    },
+    "top_n": 50,
+    "group": "screen",
+    "mandatory": true,
+    "request_payload": {
+      "coordinates": {
+        "exchange": "binance",
+        "market_type": "futures",
+        "symbol": "ETHUSDT"
+      },
+      "timeframe": "15m",
+      "time_range": {
+        "start": "2026-08-20T00:00:00Z",
+        "end": "2026-09-20T00:00:00Z"
+      },
+      "indicators": [
+        {
+          "indicator_id": "ma.dema",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 70,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.hma",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 70,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.ema",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 70,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.sma",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 70,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.wma",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 70,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.rma",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 70,
+            "step": 30
+          }
+        }
+      ],
+      "risk": {
+        "mode": "none"
+      },
+      "execution": {
+        "direction_mode": "long_short_reversal",
+        "fee_rate": 0.00075,
+        "slippage_rate": 0.0001,
+        "initial_cash_quote": 10000.0,
+        "sizing": {
+          "mode": "all_in"
+        },
+        "profit_lock": {
+          "enabled": false
+        },
+        "close_on_end": true,
+        "funding": {
+          "mode": "off",
+          "coverage_policy": "degraded_with_warning"
+        }
+      },
+      "ranking": {
+        "primary_metric": "total_return_pct",
+        "requested_primary_metric": "total_return_pct",
+        "effective_primary_metric": "total_return_pct",
+        "direction": "desc"
+      },
+      "top_n": 50,
+      "quality_constraints": {
+        "min_closed_trades": 13
+      }
+    },
+    "expected": {
+      "evaluated": 729,
+      "eligible": 162,
+      "returned": 50
+    },
+    "historical_reference": {
+      "case_id": "MONTH_A6_V3_NONE",
+      "path": "references/details/MONTH_A6_V3_NONE.json",
+      "sha256": "7075f673d6a5497554ff954fbfce7b14cbf8c26dfcba19a41c81c382e13a3c88",
+      "run_id": "DBR_13.0",
+      "top_count": 50,
+      "score_audit": "runs/DBR_13/score_audit.jsonl",
+      "score_audit_sha256": "566775efc5f4ea63ddefbe2b6dd450402509b3a9e20d3c54cb1024348e04a2eb",
+      "requested_evaluated_candidates": 729,
+      "requested_eligible_candidates": 162,
+      "internal_service_candidate_counts": [
+        64
+      ],
+      "float_encoding": "raw IEEE-754 f64 word including NaN payload/sign",
+      "utc": "2026-09-20T08:31:50.987839+00:00"
+    }
+  },
+  {
+    "case_id": "MONTH_A4_V6_TP_SL_GRID",
+    "request": "requests/MONTH_A4_V6_TP_SL_GRID.json",
+    "request_file_sha256": "2a5303e997aa164b6f6ba63c13a6c88fedd11d50557a7c2b75846adf8ec864fb",
+    "arity": 4,
+    "variants_per_family": [
+      6,
+      6,
+      6,
+      6
+    ],
+    "raw_cartesian_upper_bound": 1296,
+    "tp_sl_cells": 100,
+    "evaluation_bars_15m": 2976,
+    "risk_mode": "tp_sl_grid",
+    "direction": "long_short_reversal",
+    "ranking": {
+      "primary_metric": "total_return_pct",
+      "requested_primary_metric": "total_return_pct",
+      "effective_primary_metric": "total_return_pct",
+      "direction": "desc"
+    },
+    "top_n": 50,
+    "group": "screen",
+    "mandatory": true,
+    "request_payload": {
+      "coordinates": {
+        "exchange": "binance",
+        "market_type": "futures",
+        "symbol": "ETHUSDT"
+      },
+      "timeframe": "15m",
+      "time_range": {
+        "start": "2026-08-20T00:00:00Z",
+        "end": "2026-09-20T00:00:00Z"
+      },
+      "indicators": [
+        {
+          "indicator_id": "ma.dema",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 160,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.hma",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 160,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.ema",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 160,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.sma",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 160,
+            "step": 30
+          }
+        }
+      ],
+      "risk": {
+        "mode": "tp_sl_grid",
+        "tp": {
+          "start_pct": 0.5,
+          "stop_pct": 5.0,
+          "step_pct": 0.5,
+          "enabled": true
+        },
+        "sl": {
+          "start_pct": 0.5,
+          "stop_pct": 5.0,
+          "step_pct": 0.5,
+          "enabled": true
+        }
+      },
+      "execution": {
+        "direction_mode": "long_short_reversal",
+        "fee_rate": 0.00075,
+        "slippage_rate": 0.0001,
+        "initial_cash_quote": 10000.0,
+        "sizing": {
+          "mode": "all_in"
+        },
+        "profit_lock": {
+          "enabled": false
+        },
+        "close_on_end": true,
+        "funding": {
+          "mode": "off",
+          "coverage_policy": "degraded_with_warning"
+        }
+      },
+      "ranking": {
+        "primary_metric": "total_return_pct",
+        "requested_primary_metric": "total_return_pct",
+        "effective_primary_metric": "total_return_pct",
+        "direction": "desc"
+      },
+      "top_n": 50,
+      "quality_constraints": {
+        "min_closed_trades": 13
+      }
+    },
+    "expected": {
+      "evaluated": 1296,
+      "eligible": 216,
+      "returned": 50
+    },
+    "historical_reference": {
+      "case_id": "MONTH_A4_V6_TP_SL_GRID",
+      "path": "references/details/MONTH_A4_V6_TP_SL_GRID.json",
+      "sha256": "9e23e2854546bb75e9e213cc076f0d7b39c3d93df6e5b2ab8adee76f44ac5b1d",
+      "run_id": "DBR_15.0",
+      "top_count": 50,
+      "score_audit": "runs/DBR_15/score_audit.jsonl",
+      "score_audit_sha256": "25e288dbe6ff169aa92ff3e62906235000d5d58b6ab524572ebd5008cedd28d1",
+      "requested_evaluated_candidates": 1296,
+      "requested_eligible_candidates": 216,
+      "internal_service_candidate_counts": [
+        16
+      ],
+      "float_encoding": "raw IEEE-754 f64 word including NaN payload/sign",
+      "utc": "2026-09-20T08:31:50.992217+00:00"
+    }
+  },
+  {
+    "case_id": "MONTH_A2_V1_NONE",
+    "request": "requests/MONTH_A2_V1_NONE.json",
+    "request_file_sha256": "e01090a64c6d2b2c93046eeb399fd1d68484868ad73787bda4a42e3055fdb036",
+    "arity": 2,
+    "variants_per_family": [
+      1,
+      1
+    ],
+    "raw_cartesian_upper_bound": 1,
+    "tp_sl_cells": 0,
+    "evaluation_bars_15m": 2976,
+    "risk_mode": "none",
+    "direction": "long_short_reversal",
+    "ranking": {
+      "primary_metric": "total_return_pct",
+      "requested_primary_metric": "total_return_pct",
+      "effective_primary_metric": "total_return_pct",
+      "direction": "desc"
+    },
+    "top_n": 1,
+    "group": "screen",
+    "mandatory": true,
+    "request_payload": {
+      "coordinates": {
+        "exchange": "binance",
+        "market_type": "futures",
+        "symbol": "ETHUSDT"
+      },
+      "timeframe": "15m",
+      "time_range": {
+        "start": "2026-08-20T00:00:00Z",
+        "end": "2026-09-20T00:00:00Z"
+      },
+      "indicators": [
+        {
+          "indicator_id": "ma.dema",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 10,
+            "step": 30
+          }
+        },
+        {
+          "indicator_id": "ma.hma",
+          "sources": [
+            "close"
+          ],
+          "window": {
+            "start": 10,
+            "stop": 10,
+            "step": 30
+          }
+        }
+      ],
+      "risk": {
+        "mode": "none"
+      },
+      "execution": {
+        "direction_mode": "long_short_reversal",
+        "fee_rate": 0.00075,
+        "slippage_rate": 0.0001,
+        "initial_cash_quote": 10000.0,
+        "sizing": {
+          "mode": "all_in"
+        },
+        "profit_lock": {
+          "enabled": false
+        },
+        "close_on_end": true,
+        "funding": {
+          "mode": "off",
+          "coverage_policy": "degraded_with_warning"
+        }
+      },
+      "ranking": {
+        "primary_metric": "total_return_pct",
+        "requested_primary_metric": "total_return_pct",
+        "effective_primary_metric": "total_return_pct",
+        "direction": "desc"
+      },
+      "top_n": 1,
+      "quality_constraints": {
+        "min_closed_trades": 13
+      }
+    },
+    "expected": {
+      "evaluated": 1,
+      "eligible": 0,
+      "returned": 0
+    },
+    "historical_reference": {
+      "case_id": "MONTH_A2_V1_NONE",
+      "path": "references/details/MONTH_A2_V1_NONE.json",
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570",
+      "run_id": "DBR_11.0",
+      "top_count": 0,
+      "score_audit": "runs/DBR_11/score_audit.jsonl",
+      "score_audit_sha256": "7ebc08ead7fe97f19db85d0a3e3bf6f5b0ee0fdefe0af684371de206d2837d04",
+      "requested_evaluated_candidates": 1,
+      "requested_eligible_candidates": 0,
+      "internal_service_candidate_counts": [
+        1
+      ],
+      "float_encoding": "raw IEEE-754 f64 word including NaN payload/sign",
+      "utc": "2026-09-20T08:31:50.984860+00:00"
+    }
+  }
+]

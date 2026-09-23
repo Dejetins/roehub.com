@@ -129,7 +129,7 @@
   ],
   "areas": [
     {
-      "file_count": 677,
+      "file_count": 682,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -151,7 +151,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 344,
+      "file_count": 345,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -183,7 +183,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 434,
+      "file_count": 443,
       "id": "quality",
       "paths": [
         "tests/",
@@ -194,7 +194,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 2236,
+      "file_count": 2255,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -626,7 +626,7 @@
         "docs/architecture/backtest/benchmark_iterations/2026-05-01_iteration_4_1_no_risk_boundary/README.md"
       ],
       "entrypoints": [],
-      "file_count": 91,
+      "file_count": 96,
       "id": "context:backtest",
       "kind": "context",
       "name": "backtest",
@@ -1356,7 +1356,7 @@
       "entrypoints": [
         "apps/worker/backtest_job_runner/main/main.py"
       ],
-      "file_count": 14,
+      "file_count": 15,
       "id": "worker:backtest_job_runner",
       "kind": "worker",
       "name": "backtest_job_runner",
@@ -11654,6 +11654,11 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/worker/backtest_job_runner/wiring/modules/compute_resources.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/worker/backtest_job_runner/wiring/modules/full_job_compute.py"
     },
     {
@@ -14358,6 +14363,101 @@
     },
     {
       "area": "knowledge",
+      "kind": "python",
+      "path": "docs/architecture/backtest/production-integration-20260923/bootstrap_database.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/backtest/production-integration-20260923/delivery.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/dispatch-initial-incomplete.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/dispatch-result.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": "docs/architecture/backtest/production-integration-20260923/dispatch_proof.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/financial-kernel-audit.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/ownership.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/parity-cases.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/parity-import-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/parity-prefix-result.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/parity-result.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": "docs/architecture/backtest/production-integration-20260923/parity_worker.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/prefix-case.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/proof-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": "docs/architecture/backtest/production-integration-20260923/run_parity.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": "docs/architecture/backtest/production-integration-20260923/run_runtime.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/runtime-prefix-result.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/runtime-result.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": "docs/architecture/backtest/production-integration-20260923/runtime_proof.py"
+    },
+    {
+      "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/identity/exchange-connections-stage-reports/00-baseline-current-state.md"
     },
@@ -16994,7 +17094,22 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest/application/services/v2/compute_policy.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest/application/services/v2/cost_permutation.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest/application/services/v2/execution_sizing.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest/application/services/v2/integer_trade_tape.py"
     },
     {
       "area": "domain",
@@ -17009,7 +17124,17 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest/application/services/v2/job_scratch.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest/application/services/v2/local_top_k.py"
     },
     {
       "area": "domain",
@@ -21109,6 +21234,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/worker/backtest_job_runner/s1_child.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/worker/backtest_job_runner/test_child_process_executor.py"
     },
     {
@@ -21120,6 +21250,16 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/worker/backtest_job_runner/test_runner_scheduler.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/worker/backtest_job_runner/test_s1_policy_lifecycle.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/worker/backtest_job_runner/test_s1_resource_discovery.py"
     },
     {
       "area": "quality",
@@ -21219,6 +21359,16 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/v2/raw_exact.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/v2/score_capture.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/backtest/application/services/v2/test_admission.py"
     },
     {
@@ -21259,7 +21409,17 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_cost_permutation.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/backtest/application/services/v2/test_hit_times_compute_v2.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_integer_trade_tape.py"
     },
     {
       "area": "quality",
@@ -21274,7 +21434,17 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_local_top_k.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_prefix_guard.py"
     },
     {
       "area": "quality",
@@ -22812,7 +22982,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 4120,
+  "inventory_file_count": 4154,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -23010,5 +23180,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "d9568ef335a53955d5bbdd163e3e636ee38a8bf8971b3794d327b2fe8aa8b40a"
+  "structural_digest": "b825272966eaeee194ca7f72b535e4afcbd1e5e143ad7eb09168bc9fc400d8cb"
 }

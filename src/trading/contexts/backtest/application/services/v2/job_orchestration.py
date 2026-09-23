@@ -4,7 +4,8 @@ import gc
 import math
 import os
 import time
-from collections.abc import Sequence
+from collections.abc import Callable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
@@ -25,20 +26,24 @@ from .combo_planning import (
     COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
     MATRIX_BITSET_NO_RISK_V1_BACKEND,
 )
+from .compute_policy import BacktestComputePolicy
 from .job_scheduling import (
     DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
     BacktestSchedulingClass,
 )
+from .job_scratch import BacktestJobScratch
 from .matrix_backend.bitsets import build_runtime_bitset_pack_telemetry
 from .matrix_backend.row_signatures import build_row_signature_telemetry
 from .matrix_backend.tp_sl_cells import (
     build_tp_sl_selected_cell_shadow,
     tp_sl_selected_cell_shadow_enabled,
 )
+from .no_risk_exact import BacktestNoRiskExactScoringService
 from .prepare_pools import build_signal_segments, row_metadata_order_hash
 from .top_result_assembly import (
     BacktestTopResultAssemblyService,
 )
+from .tp_sl_exact import BacktestTpSlExactScoringService
 
 PERSIST_TOP_N_IO_STAGE_NAME = "persist_top_n_io"
 SAMPLE_WARMUP_STAGE_NAME = "sample_warmup"
@@ -92,6 +97,8 @@ class BacktestRuntimeJobOrchestrationService:
     tp_sl_exact: Any
     artifact_array_loader: Any
     top_result_assembly: BacktestTopResultAssemblyService = BacktestTopResultAssemblyService()
+    compute_policy: BacktestComputePolicy = BacktestComputePolicy()
+    scratch_factory: Callable[[UUID], BacktestJobScratch] = BacktestJobScratch
 
     def execute(
         self,
@@ -101,6 +108,32 @@ class BacktestRuntimeJobOrchestrationService:
         updated_at: datetime,
         scheduling_class: BacktestSchedulingClass = "heavy",
         light_max_actual_combinations: int = DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
+    ) -> BacktestJobExecutionResult:
+        scratch = self.scratch_factory(job_id)
+        try:
+            scoped = replace(
+                self,
+                no_risk_exact=replace(self.no_risk_exact, compute_policy=self.compute_policy,
+                                      scratch=scratch)
+                if isinstance(self.no_risk_exact, BacktestNoRiskExactScoringService)
+                else self.no_risk_exact,
+                tp_sl_exact=replace(self.tp_sl_exact, compute_policy=self.compute_policy,
+                                    scratch=scratch)
+                if isinstance(self.tp_sl_exact, BacktestTpSlExactScoringService)
+                else self.tp_sl_exact,
+            )
+            return scoped._execute(
+                job_id=job_id, preflight=preflight, updated_at=updated_at,
+                scheduling_class=scheduling_class,
+                light_max_actual_combinations=light_max_actual_combinations, scratch=scratch,
+            )
+        finally:
+            scratch.clear()
+
+    def _execute(
+        self, *, job_id: UUID, preflight: BacktestPreflightResult, updated_at: datetime,
+        scheduling_class: BacktestSchedulingClass, light_max_actual_combinations: int,
+        scratch: BacktestJobScratch,
     ) -> BacktestJobExecutionResult:
         normalized_request = preflight.normalized_request
         risk = normalized_request.get("risk")
@@ -124,6 +157,7 @@ class BacktestRuntimeJobOrchestrationService:
                 normalized_request=normalized_request,
                 artifact_metadata=preflight.artifact_metadata,
             )
+            scratch.retain("prepared_inputs", prepared_result)
             row_signature_started = time.perf_counter()
             row_signature_telemetry = build_row_signature_telemetry(
                 prepared_result.indicator_pools
@@ -145,6 +179,7 @@ class BacktestRuntimeJobOrchestrationService:
                     prepared_result=prepared_result,
                 )
                 warmup_elapsed_s = self._run_no_risk_sample_warmup(
+                    job_id=job_id,
                     prepared_result=prepared_result,
                     normalized_request=normalized_request,
                     requested_backend_id=requested_no_risk_backend_id,
@@ -185,6 +220,7 @@ class BacktestRuntimeJobOrchestrationService:
                     context=context,
                 )
                 warmup_elapsed_s = self._run_tp_sl_sample_warmup(
+                    job_id=job_id,
                     prepared_result=prepared_result,
                     hit_times_result=hit_times_result,
                     normalized_request=normalized_request,
@@ -249,6 +285,16 @@ class BacktestRuntimeJobOrchestrationService:
                 "scheduling_class": confirmed_scheduling_class,
             }
             exact_diagnostics = {
+                "compute_policy": {
+                    "schema": "backtest_compute_policy_v1",
+                    "num_threads": self.compute_policy.threads.num_threads,
+                    "thread_source": self.compute_policy.threads.source,
+                    "cost_permutation": True,
+                    "local_top_k": True,
+                    "integer_tape": True,
+                    "prefix_guard": True,
+                    "scratch_lifetime": "per_call_with_separate_warmup",
+                },
                 "timing_accounting": {
                     "schema": "orchestration_elapsed_v2",
                     "unit": "seconds",
@@ -293,6 +339,7 @@ class BacktestRuntimeJobOrchestrationService:
                 instrumentation_counters=instrumentation_counters,
             )
         finally:
+            scratch.clear()
             del warmup_result
             del warmup_combo_result
             del warmup_prepared_result
@@ -308,6 +355,7 @@ class BacktestRuntimeJobOrchestrationService:
     def _run_no_risk_sample_warmup(
         self,
         *,
+        job_id: UUID,
         prepared_result: BacktestPreparePoolsResult,
         normalized_request: Mapping[str, Any],
         requested_backend_id: str | None,
@@ -321,11 +369,12 @@ class BacktestRuntimeJobOrchestrationService:
             normalized_request=warmup_request,
             requested_backend_id=requested_backend_id,
         )
-        warmup_result = self.no_risk_exact.execute(
-            prepared_result=warmup_prepared,
-            combo_planning_result=warmup_combo,
-            normalized_request=warmup_request,
-        )
+        with self._warmup_scorer(self.no_risk_exact, job_id=job_id) as scorer:
+            warmup_result = scorer.execute(
+                prepared_result=warmup_prepared,
+                combo_planning_result=warmup_combo,
+                normalized_request=warmup_request,
+            )
         del warmup_result
         del warmup_combo
         del warmup_prepared
@@ -335,6 +384,7 @@ class BacktestRuntimeJobOrchestrationService:
     def _run_tp_sl_sample_warmup(
         self,
         *,
+        job_id: UUID,
         prepared_result: BacktestPreparePoolsResult,
         hit_times_result: Any,
         normalized_request: Mapping[str, Any],
@@ -346,17 +396,31 @@ class BacktestRuntimeJobOrchestrationService:
             prepared_result=warmup_prepared,
             normalized_request=warmup_request,
         )
-        warmup_result = self.tp_sl_exact.execute(
-            prepared_result=warmup_prepared,
-            combo_planning_result=warmup_combo,
-            hit_times_result=hit_times_result,
-            normalized_request=warmup_request,
-        )
+        with self._warmup_scorer(self.tp_sl_exact, job_id=job_id) as scorer:
+            warmup_result = scorer.execute(
+                prepared_result=warmup_prepared,
+                combo_planning_result=warmup_combo,
+                hit_times_result=hit_times_result,
+                normalized_request=warmup_request,
+            )
         del warmup_result
         del warmup_combo
         del warmup_prepared
         gc.collect()
         return time.perf_counter() - started
+
+
+    @contextmanager
+    def _warmup_scorer(self, scorer: Any, *, job_id: UUID) -> Iterator[Any]:
+        scratch = self.scratch_factory(job_id)
+        try:
+            if isinstance(scorer, (BacktestNoRiskExactScoringService,
+                                   BacktestTpSlExactScoringService)):
+                yield replace(scorer, scratch=scratch, compute_policy=self.compute_policy)
+            else:
+                yield scorer
+        finally:
+            scratch.clear()
 
 
 def _execute_combo_planning(

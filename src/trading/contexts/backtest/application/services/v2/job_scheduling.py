@@ -130,8 +130,21 @@ def resolve_backtest_numba_thread_decision(
     *,
     environ: Mapping[str, str],
     scheduling_class: BacktestSchedulingClass,
+    inherited: bool = False,
 ) -> BacktestNumbaThreadDecision:
     _ = scheduling_class
+    if inherited and environ.get(ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS):
+        value = _positive_env_int(
+            key=ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS,
+            raw_value=environ[ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS],
+        )
+        if environ.get(NUMBA_NUM_THREADS) != str(value):
+            raise ValueError("inherited Numba budget does not match pre-import maximum")
+        return BacktestNumbaThreadDecision(
+            num_threads=value,
+            source=environ.get(ROEHUB_BACKTEST_EFFECTIVE_NUMBA_THREAD_SOURCE)
+            or ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS,
+        )
     for key in (
         ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS,
         ROEHUB_BACKTEST_NUMBA_NUM_THREADS,
@@ -153,10 +166,12 @@ def backtest_numba_environ(
     *,
     environ: Mapping[str, str],
     scheduling_class: BacktestSchedulingClass,
+    inherited: bool = False,
 ) -> dict[str, str]:
     decision = resolve_backtest_numba_thread_decision(
         environ=environ,
         scheduling_class=scheduling_class,
+        inherited=inherited,
     )
     return {
         **dict(environ),

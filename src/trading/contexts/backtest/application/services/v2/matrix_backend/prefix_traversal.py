@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import time
 from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
@@ -14,6 +15,10 @@ from trading.contexts.backtest.application.services.v2.matrix_backend.bitsets im
 
 ALL_BITS = np.uint64(18446744073709551615)
 MAX_PREFIX_MATERIALIZED_CANDIDATES = 2_000_000
+
+
+class PrefixMaterializationLimit(ValueError):
+    """Caller may preserve streaming traversal when materialization is unsafe."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,6 +41,7 @@ def collect_compiled_prefix_candidates(
     min_closed_trades: int,
     direction_mode: str,
     max_materialized_candidates: int = MAX_PREFIX_MATERIALIZED_CANDIDATES,
+    guard_max_bytes: int = 64 * 1024 * 1024,
 ) -> CompiledPrefixTraversalResult:
     ids = tuple(str(indicator_id) for indicator_id in indicator_ids)
     arity = len(ids)
@@ -46,16 +52,108 @@ def collect_compiled_prefix_candidates(
     if direction_mode not in {"long_only", "short", "long_short_reversal"}:
         raise ValueError(f"unsupported direction_mode={direction_mode!r}")
 
-    pos_stack, neg_stack, row_counts, signal_length, word_count = _bitset_stacks(
-        packed_by_indicator
-    )
-    total_count = int(np.prod(row_counts, dtype=np.int64))
-    if total_count > max_materialized_candidates:
-        raise ValueError(
+    first = packed_by_indicator[0]
+    for packed in packed_by_indicator:
+        if (
+            packed.signal_length != first.signal_length
+            or packed.word_count != first.word_count
+            or packed.signal_length < 0
+            or packed.word_count != (packed.signal_length + 63) // 64
+            or packed.pos_bits.ndim != 2
+            or packed.neg_bits.shape != packed.pos_bits.shape
+            or packed.pos_bits.shape[1] != packed.word_count
+        ):
+            raise ValueError("compiled prefix traversal requires aligned bitset shapes")
+    # Python integers BEFORE stack/output allocation; no int64 wrapping product.
+    counts = [int(packed.pos_bits.shape[0]) for packed in packed_by_indicator]
+    total_count = math.prod(counts)
+    if total_count > min(max_materialized_candidates, MAX_PREFIX_MATERIALIZED_CANDIDATES):
+        raise PrefixMaterializationLimit(
             "compiled prefix traversal materialization limit exceeded: "
             f"{total_count} > {max_materialized_candidates}"
         )
+    if total_count == 0:
+        return CompiledPrefixTraversalResult(
+            {name: np.empty(0, dtype=np.int32) for name in ids},
+            {
+                "schema": "backtest_compiled_prefix_product_traversal_v1",
+                "backend_id": "compiled_prefix_product_traversal_v1",
+                "combo_iteration_mode": "compiled_prefix_product_traversal",
+                "combo_count_planned": 0,
+                "prefix_candidates_selected": 0,
+                "prefix_candidates_pruned": 0,
+                "prefix_nodes_visited": 0,
+                "prefix_nodes_reused": 0,
+                "prefix_pruned_subtrees": 0,
+                "prefix_pruned_candidate_upper_bound": 0,
+                "prefix_min_closed_trades": max(int(min_closed_trades), 1),
+                "selectivity_order": [],
+                "signal_length": int(packed_by_indicator[0].signal_length),
+                "word_count": int(packed_by_indicator[0].word_count),
+                "compiled_loop_elapsed_s": None,
+                "traversal_status": "not_run_empty_product",
+                "prefix_guard_reason": "empty_pool",
+                "prefix_guard_lower_bound": None,
+                "prefix_guard_proof_elapsed_s": None,
+                "prefix_guard_enumeration_elapsed_s": None,
+                "combo_iteration_candidates_per_sec": None,
+                "first_canonical_ordinal": None,
+                "last_canonical_ordinal": None,
+            },
+        )
+    proof_start = time.perf_counter()
+    lower_bound, proof_reason = (None, "unsupported_minimum")
+    if max(int(min_closed_trades), 1) <= 2147483647:
+        lower_bound, proof_reason = _activity_lower_bound(
+            packed_by_indicator, direction_mode, guard_max_bytes
+        )
+    proof_elapsed = time.perf_counter() - proof_start
+    if lower_bound is not None and lower_bound >= max(int(min_closed_trades), 1):
+        # Output plus two int64 enumeration scratch vectors; checked before allocation.
+        if (arity * 4 + 16) * total_count <= guard_max_bytes:
+            try:
+                enumeration_start = time.perf_counter()
+                rows = _canonical_product(ids, counts, total_count)
+                enumeration_elapsed = time.perf_counter() - enumeration_start
+            except MemoryError:
+                proof_reason = "enumeration_allocation_failed"
+            else:
+                return CompiledPrefixTraversalResult(
+                    rows,
+                    {
+                        "schema": "backtest_compiled_prefix_product_traversal_v1",
+                        "backend_id": "compiled_prefix_product_traversal_v1",
+                        "combo_iteration_mode": "canonical_product_bound_proved",
+                        "combo_count_planned": total_count,
+                        "prefix_candidates_selected": total_count,
+                        "prefix_candidates_pruned": 0,
+                        "prefix_nodes_visited": 0,
+                        "prefix_nodes_reused": 0,
+                        "prefix_pruned_subtrees": 0,
+                        "prefix_pruned_candidate_upper_bound": 0,
+                        "prefix_min_closed_trades": max(int(min_closed_trades), 1),
+                        "selectivity_order": [],
+                        "signal_length": int(packed_by_indicator[0].signal_length),
+                        "word_count": int(packed_by_indicator[0].word_count),
+                        "compiled_loop_elapsed_s": None,
+                        "traversal_status": "not_run_bound_proved_no_pruning",
+                        "prefix_guard_reason": "bound_proved_no_pruning",
+                        "prefix_guard_lower_bound": lower_bound,
+                        "prefix_guard_proof_elapsed_s": proof_elapsed,
+                        "prefix_guard_enumeration_elapsed_s": enumeration_elapsed,
+                        "combo_iteration_candidates_per_sec": None,
+                        "first_canonical_ordinal": 0 if total_count else None,
+                        "last_canonical_ordinal": total_count - 1 if total_count else None,
+                    },
+                )
+        else:
+            proof_reason = "enumeration_byte_limit"
+    elif lower_bound is not None:
+        proof_reason = "bound_insufficient"
 
+    pos_stack, neg_stack, row_counts, signal_length, word_count = _bitset_stacks(
+        packed_by_indicator
+    )
     selectivity_order = _selectivity_order(
         pos_stack=pos_stack,
         neg_stack=neg_stack,
@@ -66,19 +164,23 @@ def collect_compiled_prefix_candidates(
     out_ordinals = np.empty(total_count, dtype=np.int64)
     counters = np.zeros(4, dtype=np.int64)
     started = time.perf_counter()
-    selected_count = _collect_prefix_candidates(
-        pos_stack,
-        neg_stack,
-        row_counts,
-        selectivity_order,
-        np.int32(max(int(min_closed_trades), 1)),
-        np.int8(1 if direction_mode == "long_only" else 3 if direction_mode == "short" else 2),
-        np.int32(signal_length),
-        np.int32(word_count),
-        _last_word_mask(signal_length),
-        out_rows_by_pos,
-        out_ordinals,
-        counters,
+    selected_count = (
+        0
+        if total_count == 0
+        else _collect_prefix_candidates(
+            pos_stack,
+            neg_stack,
+            row_counts,
+            selectivity_order,
+            np.int32(max(int(min_closed_trades), 1)),
+            np.int8(1 if direction_mode == "long_only" else 3 if direction_mode == "short" else 2),
+            np.int32(signal_length),
+            np.int32(word_count),
+            _last_word_mask(signal_length),
+            out_rows_by_pos,
+            out_ordinals,
+            counters,
+        )
     )
     elapsed_s = time.perf_counter() - started
     selected = int(selected_count)
@@ -96,9 +198,7 @@ def collect_compiled_prefix_candidates(
         indicator_id: np.ascontiguousarray(rows[pos], dtype=np.int32)
         for pos, indicator_id in enumerate(ids)
     }
-    traversal_candidates_per_sec = (
-        None if elapsed_s <= 0.0 else float(total_count) / elapsed_s
-    )
+    traversal_candidates_per_sec = None if elapsed_s <= 0.0 else float(total_count) / elapsed_s
     telemetry = {
         "schema": "backtest_compiled_prefix_product_traversal_v1",
         "backend_id": "compiled_prefix_product_traversal_v1",
@@ -114,7 +214,12 @@ def collect_compiled_prefix_candidates(
         "selectivity_order": [int(item) for item in selectivity_order.tolist()],
         "signal_length": int(signal_length),
         "word_count": int(word_count),
-        "compiled_loop_elapsed_s": elapsed_s,
+        "compiled_loop_elapsed_s": elapsed_s if total_count else None,
+        "traversal_status": "ran" if total_count else "not_run_empty_product",
+        "prefix_guard_reason": proof_reason,
+        "prefix_guard_lower_bound": lower_bound,
+        "prefix_guard_proof_elapsed_s": proof_elapsed,
+        "prefix_guard_enumeration_elapsed_s": None,
         "combo_iteration_candidates_per_sec": traversal_candidates_per_sec,
         "first_canonical_ordinal": None if selected == 0 else int(ordinals[0]),
         "last_canonical_ordinal": None if selected == 0 else int(ordinals[-1]),
@@ -123,6 +228,68 @@ def collect_compiled_prefix_candidates(
         rows_by_indicator=rows_by_indicator,
         telemetry=telemetry,
     )
+
+
+def _canonical_product(
+    ids: Sequence[str], counts: Sequence[int], total: int
+) -> dict[str, np.ndarray]:
+    # Function-local scratch is released if enumeration allocation fails.
+    quotient = np.arange(total, dtype=np.int64)
+    rows = {}
+    for pos in range(len(ids) - 1, -1, -1):
+        rows[ids[pos]] = np.asarray(quotient % counts[pos], dtype=np.int32)
+        quotient //= counts[pos]
+    return {name: rows[name] for name in ids}
+
+
+def _activity_lower_bound(
+    packed: Sequence[PackedSignalBitsets], direction: str, max_bytes: int
+) -> tuple[int | None, str]:
+    """Intersection over ALL rows/families is a subset of EVERY selected prefix.
+
+    Keep positive and negative consensus separate (OR-before-intersection is
+    unsound for reversal). Count exactly the same directional bits as traversal.
+    Invalid/unknown metadata or bounded scratch failure preserves traversal.
+    """
+    first = packed[0]
+    length, words = int(first.signal_length), int(first.word_count)
+    if length < 0 or length > 1073741823 or words != (length + 63) // 64:
+        return None, "unsupported_shape"
+    if words * 16 > max_bytes:
+        return None, "proof_byte_limit"
+    for item in packed:
+        if (
+            item.signal_length != length
+            or item.word_count != words
+            or item.pos_bits.ndim != 2
+            or item.neg_bits.shape != item.pos_bits.shape
+            or item.pos_bits.shape[1] != words
+            or item.pos_bits.dtype != np.uint64
+            or item.neg_bits.dtype != np.uint64
+        ):
+            return None, "unsupported_shape"
+        if item.pos_bits.shape[0] == 0:
+            return None, "empty_pool"
+    try:
+        positive = np.full(words, ALL_BITS, dtype=np.uint64)
+        negative = np.full(words, ALL_BITS, dtype=np.uint64)
+        for item in packed:
+            for row in range(item.pos_bits.shape[0]):
+                if direction != "short":
+                    np.bitwise_and(positive, item.pos_bits[row], out=positive)
+                if direction != "long_only":
+                    np.bitwise_and(negative, item.neg_bits[row], out=negative)
+        if words:
+            positive[-1] &= _last_word_mask(length)
+            negative[-1] &= _last_word_mask(length)
+        count = 0
+        if direction != "short":
+            count += sum(int(word).bit_count() for word in positive)
+        if direction != "long_only":
+            count += sum(int(word).bit_count() for word in negative)
+        return count, "computed"
+    except MemoryError:
+        return None, "proof_allocation_failed"
 
 
 def _bitset_stacks(

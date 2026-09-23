@@ -234,8 +234,8 @@ jobs:
       matrix: ${{ fromJSON(needs.changes.outputs.test_matrix) }}
     env:
       POSTGRES_DSN: postgresql://roehub:roehub@127.0.0.1:5432/roehub
-      NUMBA_NUM_THREADS: "1"
-      ROEHUB_NUMBA_NUM_THREADS: "1"
+      NUMBA_NUM_THREADS: ${{ matrix.name == 'backtest-scoring' && '12' || '1' }}
+      ROEHUB_NUMBA_NUM_THREADS: ${{ matrix.name == 'backtest-scoring' && '12' || '1' }}
     defaults:
       run:
         shell: bash
@@ -268,6 +268,10 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends --yes age
+
+      - name: Select workqueue for native backtest ownership checks
+        if: matrix.name == 'backtest-scoring'
+        run: echo "NUMBA_THREADING_LAYER=workqueue" >> "$GITHUB_ENV"
 
       - name: Tests
         run: |

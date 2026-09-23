@@ -135,6 +135,8 @@ def run_observed_subprocess(
             evidence=evidence,
         )
     finally:
+        if process is not None and process.poll() is None:
+            _stop_process(process=process)
         stdout_path.unlink(missing_ok=True)
         stderr_path.unlink(missing_ok=True)
 

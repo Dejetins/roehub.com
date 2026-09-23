@@ -5,7 +5,7 @@ import logging
 import sys
 import tempfile
 import threading
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Mapping
@@ -14,7 +14,6 @@ from uuid import UUID
 from trading.contexts.backtest.application.dto import BacktestPreflightResult
 from trading.contexts.backtest.application.services.v2.job_scheduling import (
     BacktestSchedulingClass,
-    backtest_numba_environ,
 )
 from trading.contexts.backtest.application.use_cases import (
     BacktestJobCancellationRequested,
@@ -24,6 +23,7 @@ from .child_ipc import (
     child_result_from_mapping,
     preflight_to_mapping,
 )
+from .compute_resources import discover_cpu_capacity, full_job_resource_environ
 from .process_observation import run_observed_subprocess
 
 log = logging.getLogger(__name__)
@@ -80,9 +80,10 @@ class BacktestChildProcessExecutor:
                 "--light-max-actual-combinations",
                 str(self.light_max_actual_combinations),
             ]
-            env = backtest_numba_environ(
+            capacity = discover_cpu_capacity(self.environ)
+            env = full_job_resource_environ(
+                capacity=capacity,
                 environ={**self.environ, "PYTHONUNBUFFERED": "1"},
-                scheduling_class=scheduling_class,
             )
             log.info(
                 "starting backtest child process: job_id=%s scheduling_class=%s "
@@ -102,6 +103,7 @@ class BacktestChildProcessExecutor:
                     "job_id": str(job_id),
                     "scheduling_class": scheduling_class,
                     "child_module": self.child_module,
+                    "cpu_capacity": asdict(capacity),
                     "numba_threads": env.get(
                         "ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS"
                     ),

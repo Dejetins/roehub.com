@@ -1,0 +1,136 @@
+{
+  "source_worktree": "/Users/daniildegtyarev/.codex/worktrees/224b/roehub.com",
+  "baseline": "b4f2ddad9b508680fc6d4ad7dbf51b401b8f50b7",
+  "imported": [
+    {
+      "path": "apps/worker/backtest_job_runner/main/full_job_child.py",
+      "source_sha256": "e25941bb0a9bab2e79ba40e25086e2c1672ab01834e60ff4c4a28ac4435c5ae1",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/child_process.py",
+      "source_sha256": "f72090f4703292621ff8c437487f282b16c9124c876844913acda4d10a904f07",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/full_job_compute.py",
+      "source_sha256": "26d69b6f784f187e646796d0b69edd9031b7dd9432554407765430cb723400a3",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/process_observation.py",
+      "source_sha256": "822abe9ca4c69460c5936d8484a3e9afb28469153daf7c9b763dc99bc10cd191",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "configs/installation/runtime-input-inventory.json",
+      "source_sha256": "b021f6932e8170159f3923ba0f249f9ac06387b24e4379f949c7d1318b91199c",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/job_orchestration.py",
+      "source_sha256": "edff7113b54c9bd5953bf87f4c25968fa4220e03a0b4e00b8e94bccfbabca87e",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/job_scheduling.py",
+      "source_sha256": "77602acd3244978f5930cc7ff0a87f069870a361491d3a7a0332ab33b83f3418",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/matrix_backend/prefix_traversal.py",
+      "source_sha256": "405505f07943f31a4baa10d5738fbd0187939611bce869ab5d5d0a4d90b5bdfe",
+      "acceptance_manifest": "S5/final-source-audit-v1.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/no_risk_exact.py",
+      "source_sha256": "9b17a9d77d53cd18a96441458b8fccaea6939cee9e506a70acfecc8d13a26051",
+      "acceptance_manifest": "S5/final-source-audit-v1.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/numba_runtime.py",
+      "source_sha256": "f90eec8e528c70184409d8954e3d334dcfbd4d85b339ab4c9eb336c7e6625f38",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/tp_sl_exact.py",
+      "source_sha256": "b6a04067ca211d938f89d4fa80543c2d41d7a1aaea03e60383c3c025f740879b",
+      "acceptance_manifest": "S4/final-source-audit-v1.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/use_cases/backtest_job_worker.py",
+      "source_sha256": "a07d1d89c5deb0a88bdcfe7d18ded3c0cc1c10e9fe7a582c66ad0253e0102424",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py",
+      "source_sha256": "69ad21e65a610781976cb4be2dae2d13334e37efcf2a052ed6c8f2d99f8bd45e",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/compute_resources.py",
+      "source_sha256": "74496d6b9c65ccc5389f34b3c0116f9ff3f2ea6ac098d47ec3e77dda089afb08",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/compute_policy.py",
+      "source_sha256": "cfc7e1d72ebd9eec8b0904a61b56e2459190ca2562f969ca87dd919aab075230",
+      "acceptance_manifest": "S5/final-source-audit-v1.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/cost_permutation.py",
+      "source_sha256": "da506cda96509e493c3af73d82a80c5cadeb450027259b79d9ae03dc71f018c1",
+      "acceptance_manifest": "S2/final-source-audit-v1.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/integer_trade_tape.py",
+      "source_sha256": "f07e6c70cbd1b4eb31483ee32316f666109cc6e30a5ea4826feba5ad23769bc0",
+      "acceptance_manifest": "S4/final-source-audit-v1.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/job_scratch.py",
+      "source_sha256": "d9ca8476a10e632ea46721d4e64e84191328eaece03c4c8e2a829fb6559beffd",
+      "acceptance_manifest": "S2/final-source-audit-v1.json"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/local_top_k.py",
+      "source_sha256": "2e0d7e607b916337764eb2b8767cb2ff79083615d461e13d29af779e6d72a8b0",
+      "acceptance_manifest": "S3/final-source-audit-v1.json"
+    },
+    {
+      "path": "tests/unit/apps/worker/backtest_job_runner/s1_child.py",
+      "source_sha256": "4c5db48e7ebf969d148a35b6fa763c807cb44d48fe3cf5074d39f179959aa9ce",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "tests/unit/apps/worker/backtest_job_runner/test_s1_policy_lifecycle.py",
+      "source_sha256": "bbd34e7aa5b842af86376ac61303e187f4d2637ae71573bca993fe63d2825426",
+      "acceptance_manifest": "S4/final-source-audit-v1.json"
+    },
+    {
+      "path": "tests/unit/apps/worker/backtest_job_runner/test_s1_resource_discovery.py",
+      "source_sha256": "fabd6a27ff76ccefc4f5ac102e8fcaee07a3cce52f8f6bb143f863704926733f",
+      "acceptance_manifest": "S1/accepted-source.json"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_cost_permutation.py",
+      "source_sha256": "74cf637c5d74e45a271b9ba752b99150965d8184d9ade302a982cd0860eb2a94",
+      "acceptance_manifest": "S5/final-source-audit-v1.json"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_integer_trade_tape.py",
+      "source_sha256": "c583dd77ccaa15efbcdd2be957829bf93cd3f71a881f1c65e14574558d945a00",
+      "acceptance_manifest": "S5/final-source-audit-v1.json"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_local_top_k.py",
+      "source_sha256": "0617b4218d56b45c03502e1bc5f5898c4c3badb8e23c2c130892cae2ed69be09",
+      "acceptance_manifest": "S5/final-source-audit-v1.json"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_prefix_guard.py",
+      "source_sha256": "bbaadc32e36b3b609635e85f31e05b9f07390053234c5e6d2658f8aa0e3f0efc",
+      "acceptance_manifest": "S5/final-source-audit-v1.json"
+    }
+  ]
+}

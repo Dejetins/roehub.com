@@ -1,0 +1,310 @@
+{
+  "status": "passed",
+  "cap_seconds": 600,
+  "cases": [
+    {
+      "case_id": "MONTH_A6_V3_NONE",
+      "comparisons": [
+        {
+          "mode": "compile",
+          "mismatches": 0,
+          "original_sha256": "cf2cdfd41707c9961c71c8913bcf1a6568d639978266cd0a12d2dc9bae402daf",
+          "production_sha256": "cf2cdfd41707c9961c71c8913bcf1a6568d639978266cd0a12d2dc9bae402daf"
+        },
+        {
+          "mode": "compile-warm",
+          "mismatches": 0,
+          "original_sha256": "cf2cdfd41707c9961c71c8913bcf1a6568d639978266cd0a12d2dc9bae402daf",
+          "production_sha256": "cf2cdfd41707c9961c71c8913bcf1a6568d639978266cd0a12d2dc9bae402daf"
+        },
+        {
+          "mode": "load",
+          "mismatches": 0,
+          "original_sha256": "0bdefb8ec405474223a27ec5c8a1952c1b4313f179b2190641b84b9943c8ddfa",
+          "production_sha256": "0bdefb8ec405474223a27ec5c8a1952c1b4313f179b2190641b84b9943c8ddfa"
+        },
+        {
+          "mode": "load-warm",
+          "mismatches": 0,
+          "original_sha256": "0bdefb8ec405474223a27ec5c8a1952c1b4313f179b2190641b84b9943c8ddfa",
+          "production_sha256": "0bdefb8ec405474223a27ec5c8a1952c1b4313f179b2190641b84b9943c8ddfa"
+        }
+      ],
+      "runs": [
+        {
+          "variant": "original",
+          "origin": "compile",
+          "imports_sha256": "baa8b0fd01910d80df9c26bdebb9c835c67552645bb7704239050256d5c3b3cb",
+          "samples": [
+            {
+              "hits": 0,
+              "misses": 13,
+              "top_count": 50
+            },
+            {
+              "hits": 0,
+              "misses": 13,
+              "top_count": 50
+            }
+          ]
+        },
+        {
+          "variant": "original",
+          "origin": "load",
+          "imports_sha256": "baa8b0fd01910d80df9c26bdebb9c835c67552645bb7704239050256d5c3b3cb",
+          "samples": [
+            {
+              "hits": 13,
+              "misses": 0,
+              "top_count": 50
+            },
+            {
+              "hits": 13,
+              "misses": 0,
+              "top_count": 50
+            }
+          ]
+        },
+        {
+          "variant": "production",
+          "origin": "compile",
+          "imports_sha256": "af235377d8563d62bb4baf37dd6a7dbc1235977cc500e01aec86e0e47b7a7e1d",
+          "samples": [
+            {
+              "hits": 0,
+              "misses": 18,
+              "top_count": 50
+            },
+            {
+              "hits": 0,
+              "misses": 18,
+              "top_count": 50
+            }
+          ]
+        },
+        {
+          "variant": "production",
+          "origin": "load",
+          "imports_sha256": "af235377d8563d62bb4baf37dd6a7dbc1235977cc500e01aec86e0e47b7a7e1d",
+          "samples": [
+            {
+              "hits": 17,
+              "misses": 0,
+              "top_count": 50
+            },
+            {
+              "hits": 17,
+              "misses": 0,
+              "top_count": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "MONTH_A4_V6_TP_SL_GRID",
+      "comparisons": [
+        {
+          "mode": "compile",
+          "mismatches": 0,
+          "original_sha256": "a09478c059b140d9038fc20f1af1a90cfb02aa89e11f29a78e2ebaed2d2ecd0f",
+          "production_sha256": "a09478c059b140d9038fc20f1af1a90cfb02aa89e11f29a78e2ebaed2d2ecd0f"
+        },
+        {
+          "mode": "compile-warm",
+          "mismatches": 0,
+          "original_sha256": "a09478c059b140d9038fc20f1af1a90cfb02aa89e11f29a78e2ebaed2d2ecd0f",
+          "production_sha256": "a09478c059b140d9038fc20f1af1a90cfb02aa89e11f29a78e2ebaed2d2ecd0f"
+        },
+        {
+          "mode": "load",
+          "mismatches": 0,
+          "original_sha256": "a09478c059b140d9038fc20f1af1a90cfb02aa89e11f29a78e2ebaed2d2ecd0f",
+          "production_sha256": "a09478c059b140d9038fc20f1af1a90cfb02aa89e11f29a78e2ebaed2d2ecd0f"
+        },
+        {
+          "mode": "load-warm",
+          "mismatches": 0,
+          "original_sha256": "a09478c059b140d9038fc20f1af1a90cfb02aa89e11f29a78e2ebaed2d2ecd0f",
+          "production_sha256": "a09478c059b140d9038fc20f1af1a90cfb02aa89e11f29a78e2ebaed2d2ecd0f"
+        }
+      ],
+      "runs": [
+        {
+          "variant": "original",
+          "origin": "compile",
+          "imports_sha256": "baa8b0fd01910d80df9c26bdebb9c835c67552645bb7704239050256d5c3b3cb",
+          "samples": [
+            {
+              "hits": 0,
+              "misses": 15,
+              "top_count": 50
+            },
+            {
+              "hits": 0,
+              "misses": 15,
+              "top_count": 50
+            }
+          ]
+        },
+        {
+          "variant": "original",
+          "origin": "load",
+          "imports_sha256": "baa8b0fd01910d80df9c26bdebb9c835c67552645bb7704239050256d5c3b3cb",
+          "samples": [
+            {
+              "hits": 15,
+              "misses": 0,
+              "top_count": 50
+            },
+            {
+              "hits": 15,
+              "misses": 0,
+              "top_count": 50
+            }
+          ]
+        },
+        {
+          "variant": "production",
+          "origin": "compile",
+          "imports_sha256": "f8e8e1282ac8303904ae9f7ff6102512c46f4f2cb86524dc259639105a69c0ea",
+          "samples": [
+            {
+              "hits": 0,
+              "misses": 18,
+              "top_count": 50
+            },
+            {
+              "hits": 0,
+              "misses": 18,
+              "top_count": 50
+            }
+          ]
+        },
+        {
+          "variant": "production",
+          "origin": "load",
+          "imports_sha256": "f8e8e1282ac8303904ae9f7ff6102512c46f4f2cb86524dc259639105a69c0ea",
+          "samples": [
+            {
+              "hits": 18,
+              "misses": 0,
+              "top_count": 50
+            },
+            {
+              "hits": 18,
+              "misses": 0,
+              "top_count": 50
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "MONTH_A2_V1_NONE",
+      "comparisons": [
+        {
+          "mode": "compile",
+          "mismatches": 0,
+          "original_sha256": "823ca98ebd23de7afc2d859a8f05dffdf30699c12e2b8ba2fa455ffbc0d99dd9",
+          "production_sha256": "823ca98ebd23de7afc2d859a8f05dffdf30699c12e2b8ba2fa455ffbc0d99dd9"
+        },
+        {
+          "mode": "compile-warm",
+          "mismatches": 0,
+          "original_sha256": "823ca98ebd23de7afc2d859a8f05dffdf30699c12e2b8ba2fa455ffbc0d99dd9",
+          "production_sha256": "823ca98ebd23de7afc2d859a8f05dffdf30699c12e2b8ba2fa455ffbc0d99dd9"
+        },
+        {
+          "mode": "load",
+          "mismatches": 0,
+          "original_sha256": "823ca98ebd23de7afc2d859a8f05dffdf30699c12e2b8ba2fa455ffbc0d99dd9",
+          "production_sha256": "823ca98ebd23de7afc2d859a8f05dffdf30699c12e2b8ba2fa455ffbc0d99dd9"
+        },
+        {
+          "mode": "load-warm",
+          "mismatches": 0,
+          "original_sha256": "823ca98ebd23de7afc2d859a8f05dffdf30699c12e2b8ba2fa455ffbc0d99dd9",
+          "production_sha256": "823ca98ebd23de7afc2d859a8f05dffdf30699c12e2b8ba2fa455ffbc0d99dd9"
+        }
+      ],
+      "runs": [
+        {
+          "variant": "original",
+          "origin": "compile",
+          "imports_sha256": "baa8b0fd01910d80df9c26bdebb9c835c67552645bb7704239050256d5c3b3cb",
+          "samples": [
+            {
+              "hits": 0,
+              "misses": 8,
+              "top_count": 0
+            },
+            {
+              "hits": 0,
+              "misses": 8,
+              "top_count": 0
+            }
+          ]
+        },
+        {
+          "variant": "original",
+          "origin": "load",
+          "imports_sha256": "baa8b0fd01910d80df9c26bdebb9c835c67552645bb7704239050256d5c3b3cb",
+          "samples": [
+            {
+              "hits": 8,
+              "misses": 0,
+              "top_count": 0
+            },
+            {
+              "hits": 8,
+              "misses": 0,
+              "top_count": 0
+            }
+          ]
+        },
+        {
+          "variant": "production",
+          "origin": "compile",
+          "imports_sha256": "f8e8e1282ac8303904ae9f7ff6102512c46f4f2cb86524dc259639105a69c0ea",
+          "samples": [
+            {
+              "hits": 0,
+              "misses": 8,
+              "top_count": 0
+            },
+            {
+              "hits": 0,
+              "misses": 8,
+              "top_count": 0
+            }
+          ]
+        },
+        {
+          "variant": "production",
+          "origin": "load",
+          "imports_sha256": "f8e8e1282ac8303904ae9f7ff6102512c46f4f2cb86524dc259639105a69c0ea",
+          "samples": [
+            {
+              "hits": 8,
+              "misses": 0,
+              "top_count": 0
+            },
+            {
+              "hits": 8,
+              "misses": 0,
+              "top_count": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "failures": [],
+  "scratch": "/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/roehub-production-parity-lpdoymsc",
+  "original_closure_sha256": "83fca97cea9a69724b151a29045779870fe5626dbbf480ea136a0b825f80352c",
+  "scratch_removed": true,
+  "elapsed_seconds": 72.16571237501921,
+  "original_closure_digest_format": "sha256(json.dumps(files,sort_keys=True).encode()), default separators; not canonical S0 closure encoding",
+  "canonical_s0_closure_sha256": "b663a1c1c1ebcfbfc0a44e48be44f8d9dfa5b41009505f92d7435c40e51310c1"
+}
