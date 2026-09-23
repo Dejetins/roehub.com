@@ -56,6 +56,8 @@ def test_selected_budget_survives_child_preimport(budget):
     # The effective envelope is authoritative in the child even if selectors differ.
     parent["ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS"] = "1"
     child = backtest_numba_environ(environ=parent, scheduling_class="heavy", inherited=True)
+    assert child["NUMBA_THREADING_LAYER"] == "workqueue"
+    assert "NUMBA_THREADING_LAYER" not in env
     assert child["NUMBA_NUM_THREADS"] == str(budget)
     assert env["NUMBA_NUM_THREADS"] == "18"
     assert (
@@ -118,6 +120,7 @@ def test_real_child_partial_ipc_cleanup_and_reaping(tmp_path, mode):
         "ROEHUB_BACKTEST_CHILD_EVIDENCE_SAMPLE_INTERVAL_SECONDS": ".01",
     }
     env.pop("ROEHUB_BACKTEST_HEAVY_NUMBA_NUM_THREADS", None)
+    env.pop("NUMBA_THREADING_LAYER", None)
     parent_env = dict(os.environ)
     event = threading.Event()
     thread = None
@@ -167,6 +170,7 @@ def test_real_child_partial_ipc_cleanup_and_reaping(tmp_path, mode):
         if thread:
             thread.join(timeout=6)
     data = json.loads(record.read_text())
+    assert data["threading_layer"] == "workqueue"
     assert Path(data["module"]).is_relative_to(ROOT)
     assert not Path(data["output"]).parent.exists()
     with pytest.raises(ProcessLookupError):
@@ -266,3 +270,19 @@ def test_lease_loss_cancels_real_child_without_partial_persistence(tmp_path):
     with pytest.raises(ProcessLookupError):
         os.kill(data["pid"], 0)
     assert not Path(data["output"]).exists()
+
+
+@pytest.mark.parametrize("layer", ["omp", "tbb"])
+def test_explicit_operator_layer_is_preserved_for_exact_scheduler_fallback(layer):
+    env = {"NUMBA_THREADING_LAYER": layer}
+    child = backtest_numba_environ(environ=env, scheduling_class="heavy")
+    assert child["NUMBA_THREADING_LAYER"] == layer
+    assert env == {"NUMBA_THREADING_LAYER": layer}
+
+
+@pytest.mark.parametrize("layer", ["", "  "])
+def test_empty_operator_layer_uses_default_without_mutating_parent(layer):
+    env = {"NUMBA_THREADING_LAYER": layer}
+    child = backtest_numba_environ(environ=env, scheduling_class="heavy")
+    assert child["NUMBA_THREADING_LAYER"] == "workqueue"
+    assert env == {"NUMBA_THREADING_LAYER": layer}

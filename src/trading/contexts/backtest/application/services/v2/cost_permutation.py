@@ -31,6 +31,7 @@ _KERNELS = frozenset(
 @dataclass(slots=True)
 class CostPermutationState:
     # Strong input references: identity never outlives its owner. Bounded by byte budget.
+    threading_layer: str | None = None
     costs: list[tuple[np.ndarray, np.ndarray]] = field(default_factory=list)
     verified_shapes: set[tuple[int, int]] = field(default_factory=set)
     telemetry: dict[str, dict[str, float]] = field(default_factory=dict)
@@ -153,6 +154,7 @@ def score_with_cost_permutation(
     n = 0
     extra_bytes = 0
     p = nb.get_num_threads()
+    state.threading_layer = getattr(nb, "threading_layer")()
     if p != policy.threads.num_threads:
         raise RuntimeError("cost permutation effective thread budget mismatch")
     if name in _KERNELS:

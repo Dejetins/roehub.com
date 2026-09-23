@@ -27,6 +27,7 @@ from .combo_planning import (
     MATRIX_BITSET_NO_RISK_V1_BACKEND,
 )
 from .compute_policy import BacktestComputePolicy
+from .cost_permutation import CostPermutationState
 from .job_scheduling import (
     DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
     BacktestSchedulingClass,
@@ -284,7 +285,14 @@ class BacktestRuntimeJobOrchestrationService:
                 "worker_recycle_strategy": "disposable child process",
                 "scheduling_class": confirmed_scheduling_class,
             }
+            cost_state = scratch.get("cost_permutation")
             exact_diagnostics = {
+                "cost_permutation": None if not isinstance(cost_state, CostPermutationState) else {
+                    "threading_layer": cost_state.threading_layer,
+                    "calls": {
+                        key: int(value["calls"]) for key, value in cost_state.telemetry.items()
+                    },
+                },
                 "compute_policy": {
                     "schema": "backtest_compute_policy_v1",
                     "num_threads": self.compute_policy.threads.num_threads,

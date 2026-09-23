@@ -176,3 +176,30 @@ PR: https://github.com/Dejetins/roehub.com/pull/37. Initial product commit
 in inventory. That generated-only commit was inspected and fast-forwarded; its
 `[skip ci]` message does not count as green verification. A follow-up evidence commit
 refreshes map hashes and triggers checks on the actual reviewed head.
+
+### GitHub review follow-up: child threading layer
+
+GitHub review identified that proof envelopes selected workqueue explicitly while
+production child envelopes left Numba to choose the platform default. This could
+leave cost permutation inactive on Linux omp/tbb. The child environment helper now
+defaults to workqueue before Numba import, preserving explicit operator selections
+and their exact scheduler fallback. Parent state is unchanged. Fresh-child tests
+remove inherited layer values and assert the actual initialized layer; the real
+standard-child/DB proof is repeated without a proof-script layer preset. Numerical
+kernels and the already verified workqueue arithmetic remain unchanged.
+
+
+Follow-up gates:123 focused lifecycle/orchestration/permutation tests passed (64.33s).
+`runtime-layer-result.json` records an additional real standard child with no input
+threading-layer preset: actual workqueue, one enabled permutation and one small
+fallback, prefix bypass, 5 DB rows/1036 values exact and owned cleanup complete.
+The additive diagnostic map contains only actual layer and integer call counts;
+it retains no scratch arrays. Empty/whitespace layer values select the default;
+explicit omp/tbb are preserved and disable permutation through existing fallback.
+The earlier105-row runtime proof remains valid; this is a targeted extra5-row check.
+GitHub's previous ad0d84f5 checks were green, but publication waits for the new fix SHA.
+
+`layer-parity-result.json`: two additional current-source raw comparisons (compile
+and compile-origin warm) match the corresponding immutable-original digests exactly.
+No new original runs or full campaign; `layer-fix-bindings.json` records all observed
+imports and the equivalent post-runtime getattr/style adjustment. Ruff/Pyright pass.

@@ -80,7 +80,6 @@ env = {
     "PYTHONDONTWRITEBYTECODE": "1",
     "NUMBA_CACHE_DIR": task["cache"],
     "NUMBA_NUM_THREADS": "12",
-    "NUMBA_THREADING_LAYER": "workqueue",
     "OMP_NUM_THREADS": "1",
     "OPENBLAS_NUM_THREADS": "1",
     "MKL_NUM_THREADS": "1",
@@ -96,6 +95,7 @@ env = {
     "TMPDIR": task["scratch"],
 }
 env.pop("ROEHUB_BACKTEST_CHILD_EVIDENCE_DIR", None)
+env.pop("NUMBA_THREADING_LAYER", None)
 Path(task["scratch"]).mkdir(parents=True, exist_ok=True)
 os.environ["TMPDIR"] = task["scratch"]
 __import__("tempfile").tempdir = task["scratch"]
@@ -198,6 +198,9 @@ while remaining:
     )
     parity = compare(encode(expected_rows), encode(rows))
     assert parity["status"] == "pass", parity
+    cost = capture.result.exact_diagnostics["cost_permutation"]
+    assert cost["threading_layer"] == "workqueue", cost
+    assert any(k.endswith(":enabled") and v > 0 for k, v in cost["calls"].items()), cost
     records.append(
         {
             "job": str(jid),
@@ -210,6 +213,7 @@ while remaining:
             "rows": len(rows),
             "parity": parity,
             "readback_digest": digest(encode(rows)),
+            "cost_permutation": cost,
             "prefix": capture.result.exact_diagnostics["telemetry"].get("prefix_traversal"),
         }
     )

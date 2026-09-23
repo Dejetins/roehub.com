@@ -175,6 +175,9 @@ def backtest_numba_environ(
     )
     return {
         **dict(environ),
+        # Select before importing Numba in a disposable child; never mutate the parent.
+        # Explicit operator layers remain supported via unpermuted exact fallback.
+        "NUMBA_THREADING_LAYER": environ.get("NUMBA_THREADING_LAYER", "").strip() or "workqueue",
         NUMBA_NUM_THREADS: str(decision.num_threads),
         ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS: str(decision.num_threads),
         ROEHUB_BACKTEST_EFFECTIVE_NUMBA_THREAD_SOURCE: decision.source,

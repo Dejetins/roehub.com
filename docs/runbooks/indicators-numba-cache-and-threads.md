@@ -113,3 +113,8 @@ First JIT compilation, warm calls, new-process cache loading and load-origin war
 calls are different regimes. Source-specific caches must not be treated as evidence
 of cold compile time or transferred numerical validation. Historical diagnostic
 minimum-1 measurements do not establish performance for the normal minimum-32 policy.
+
+Full-job child envelopes select `NUMBA_THREADING_LAYER=workqueue` by default before
+Numba import. Explicit nonempty operator values are preserved; unsupported schedulers
+use exact unpermuted scoring. The parent environment/runtime is not changed. This
+worker remains single-lane: no nested or concurrent workqueue calls are permitted.

@@ -194,7 +194,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 2256,
+      "file_count": 2260,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -14399,6 +14399,16 @@
     {
       "area": "knowledge",
       "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/layer-fix-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/layer-parity-result.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
       "path": "docs/architecture/backtest/production-integration-20260923/ownership.json"
     },
     {
@@ -14449,6 +14459,11 @@
     {
       "area": "knowledge",
       "kind": "configuration",
+      "path": "docs/architecture/backtest/production-integration-20260923/runtime-layer-result.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
       "path": "docs/architecture/backtest/production-integration-20260923/runtime-prefix-result.json"
     },
     {
@@ -14460,6 +14475,11 @@
       "area": "knowledge",
       "kind": "python",
       "path": "docs/architecture/backtest/production-integration-20260923/runtime_proof.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": "docs/architecture/backtest/production-integration-20260923/verify_layer_followup.py"
     },
     {
       "area": "knowledge",
@@ -22987,7 +23007,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 4155,
+  "inventory_file_count": 4159,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -23185,5 +23205,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "c0afc632c65ea22691fca586077d4b14bd9f138eb96a1f191def8ae9b4ef0ff3"
+  "structural_digest": "17489e1e7ed853c6af0e11f38107ee34ab344d190de46a6d34d7972a647515f3"
 }

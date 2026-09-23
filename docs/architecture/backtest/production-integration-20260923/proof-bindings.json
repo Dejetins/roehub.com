@@ -1,7 +1,44 @@
 {
   "status": "verified",
   "original_canonical_closure": "b663a1c1c1ebcfbfc0a44e48be44f8d9dfa5b41009505f92d7435c40e51310c1",
-  "final_product_imports": {
+  "measured_to_final_changes": {
+    "production_initial": [
+      "src/trading/contexts/backtest/application/services/v2/numba_runtime.py"
+    ],
+    "production_helper_removed": [
+      "src/trading/contexts/backtest/application/services/v2/numba_runtime.py"
+    ],
+    "final": []
+  },
+  "changed_file_explanation": "Only unused sequential_numba_thread_mask and its imports, then trailing newline removed. Financial/scorer/builder files match measured hashes exactly.",
+  "dataset_manifest": {
+    "path": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/ethusdt-binance-usdm-testset-20260920T001656Z/dataset_manifest.json",
+    "sha256": "0917fb4b92a7b63aa166e2599994751c704f30da56a107fb3fc76f9a232c35ae"
+  },
+  "frozen_artifact": {
+    "path": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/ethusdt-binance-usdm-testset-20260920T001656Z/config/frozen_artifact.json",
+    "sha256": "50384f3100d0d3e6fa6c3f44f8372aed5ff59ba4be203b8d829eb4e8351fadbf"
+  },
+  "external_read_only_harness": {
+    "scripts/backtest/cpu_integration/worker_s5.py": "24968ca934e3d1d85c8c3515db1ad5a911fc83971aff001f9a9e746336f1e0b5",
+    "scripts/backtest/cpu_integration/capture_s2.py": "2e7703ff837ab9c24ef9018db7a1b33df05cf480f0b9f4cf759f5ff4d609e516",
+    "scripts/backtest/cpu_integration/exact.py": "125b9e8cf6ae46271137cc6dd343b74d9e3509bc74c059572be891844a1e28d0",
+    "scripts/backtest/cpu_integration/setup.py": "f966fe13bd5eb5c5f66f9bbd4dff8d454abbd84aa986dc090b84038272907d1f"
+  },
+  "cases": {
+    "parity-cases.json": "b30837f3afd4c63bf171ed288c11609460b37aedf813f0744b1792bbfb07688b",
+    "prefix-case.json": "91bc3aa3a1121863be16ad51d67ed45419bfb9a73bd6c8b59845f34df84df295"
+  },
+  "current_reproduction_scripts": {
+    "bootstrap_database.py": "b501cabcdc5e71c05877a75348411b4a4c8e5be21aaebd09c327fdef6db4d5e0",
+    "runtime_proof.py": "51dda4b3ba6151374f89411fe9ff486fc05ef45f7e66f6d9e23c00cffc087fdd",
+    "run_runtime.py": "1a9cb16e0a56ac4ba5245bb3a86399453e29935cef91625909b01726037a3fff",
+    "parity_worker.py": "08eeabb7e646eb05a14a927f8d734bb3b87546b792a2b037c19b9a16d45c88f3",
+    "run_parity.py": "29cfc82d7e641073fd36806a7082dbc9fbafb5fcc7d3b242b66fbaca211023bf",
+    "dispatch_proof.py": "04396686f374b75b0031bf008100caca4e855fc2665db6fd99413511238d1e98"
+  },
+  "script_revision_note": "After successful execution only formatting, explicit type annotations/dynamic resolution of the same external helper imports, compact non-financial timer omission and optional case/output selectors were adjusted. Current reproduction-script hashes are not claimed as pre-execution snapshots. Imported product maps were observed during runs; their complete reconstruction matches every original saved digest. No numerical calls repeated for presentation changes.",
+  "verified_before_layer_fix_product_imports": {
     "apps/__init__.py": "527c668d5ae4f9e34e46c8ad88ce3c5b4a41eb27ec684ace6a4f11621fc42edf",
     "apps/worker/backtest_job_runner/__init__.py": "64ec48ed8974cbb22a8639d03d8b480dd1e36a0720d2dab71b348a667c939e8d",
     "apps/worker/backtest_job_runner/wiring/__init__.py": "fde10eaa7b6b48c99a4a470be5d91807df3157a2aff65bca4425b5a43eba0b19",
@@ -287,41 +324,5 @@
     "src/trading/shared_kernel/primitives/user_id.py": "c30af5061c1fce22757a6da39f8938f822ca7b1532cbfa5cf24c9b37e45b68c6",
     "src/trading/shared_kernel/primitives/utc_timestamp.py": "2306062129b72954749c4655b9c26c05ffd3200377641d754918b5c56776e17f"
   },
-  "measured_to_final_changes": {
-    "production_initial": [
-      "src/trading/contexts/backtest/application/services/v2/numba_runtime.py"
-    ],
-    "production_helper_removed": [
-      "src/trading/contexts/backtest/application/services/v2/numba_runtime.py"
-    ],
-    "final": []
-  },
-  "changed_file_explanation": "Only unused sequential_numba_thread_mask and its imports, then trailing newline removed. Financial/scorer/builder files match measured hashes exactly.",
-  "dataset_manifest": {
-    "path": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/ethusdt-binance-usdm-testset-20260920T001656Z/dataset_manifest.json",
-    "sha256": "0917fb4b92a7b63aa166e2599994751c704f30da56a107fb3fc76f9a232c35ae"
-  },
-  "frozen_artifact": {
-    "path": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/ethusdt-binance-usdm-testset-20260920T001656Z/config/frozen_artifact.json",
-    "sha256": "50384f3100d0d3e6fa6c3f44f8372aed5ff59ba4be203b8d829eb4e8351fadbf"
-  },
-  "external_read_only_harness": {
-    "scripts/backtest/cpu_integration/worker_s5.py": "24968ca934e3d1d85c8c3515db1ad5a911fc83971aff001f9a9e746336f1e0b5",
-    "scripts/backtest/cpu_integration/capture_s2.py": "2e7703ff837ab9c24ef9018db7a1b33df05cf480f0b9f4cf759f5ff4d609e516",
-    "scripts/backtest/cpu_integration/exact.py": "125b9e8cf6ae46271137cc6dd343b74d9e3509bc74c059572be891844a1e28d0",
-    "scripts/backtest/cpu_integration/setup.py": "f966fe13bd5eb5c5f66f9bbd4dff8d454abbd84aa986dc090b84038272907d1f"
-  },
-  "cases": {
-    "parity-cases.json": "b30837f3afd4c63bf171ed288c11609460b37aedf813f0744b1792bbfb07688b",
-    "prefix-case.json": "91bc3aa3a1121863be16ad51d67ed45419bfb9a73bd6c8b59845f34df84df295"
-  },
-  "current_reproduction_scripts": {
-    "bootstrap_database.py": "b501cabcdc5e71c05877a75348411b4a4c8e5be21aaebd09c327fdef6db4d5e0",
-    "runtime_proof.py": "51dda4b3ba6151374f89411fe9ff486fc05ef45f7e66f6d9e23c00cffc087fdd",
-    "run_runtime.py": "1a9cb16e0a56ac4ba5245bb3a86399453e29935cef91625909b01726037a3fff",
-    "parity_worker.py": "08eeabb7e646eb05a14a927f8d734bb3b87546b792a2b037c19b9a16d45c88f3",
-    "run_parity.py": "29cfc82d7e641073fd36806a7082dbc9fbafb5fcc7d3b242b66fbaca211023bf",
-    "dispatch_proof.py": "04396686f374b75b0031bf008100caca4e855fc2665db6fd99413511238d1e98"
-  },
-  "script_revision_note": "After successful execution only formatting, explicit type annotations/dynamic resolution of the same external helper imports, compact non-financial timer omission and optional case/output selectors were adjusted. Current reproduction-script hashes are not claimed as pre-execution snapshots. Imported product maps were observed during runs; their complete reconstruction matches every original saved digest. No numerical calls repeated for presentation changes."
+  "subsequent_change": "Threading-layer review fix is bound separately by layer-fix-bindings.json and layer-parity-result.json. This file remains the pre-fix16-comparison provenance."
 }

@@ -40,6 +40,7 @@ def main() -> int:
         source=os.environ["ROEHUB_BACKTEST_EFFECTIVE_NUMBA_THREAD_SOURCE"],
         numba_preimport=False,
         actual_threads=nb.get_num_threads(),
+        threading_layer=getattr(nb, "threading_layer")(),
     )
     record.write_text(json.dumps(data))
     mode = os.environ["S1_CHILD_MODE"]
