@@ -12,27 +12,35 @@
         "apps/api/dto/",
         "docs/architecture/api/"
       ],
-      "skills": [
-        "root-cause-debugging",
-        "contract-impact-analysis",
-        "backend-quality-gates"
-      ]
+      "skills": []
+    },
+    {
+      "components": [
+        "app:platform-web",
+        "app:api"
+      ],
+      "match": "Current local-platform client UI, routes, locale, loading, charts",
+      "read_first": [
+        "apps/platform-web/src/",
+        "apps/platform-web/package.json",
+        "packages/web-contracts/src/",
+        "docs/architecture/apps/web/roehub-ui-implementation-plan-v1.md"
+      ],
+      "skills": []
     },
     {
       "components": [
         "app:web",
         "app:api"
       ],
-      "match": "Web UI, template, locale, browser flow",
+      "match": "Web server/integration and legacy templates",
       "read_first": [
         "apps/web/main/app.py",
         "apps/web/templates/",
         "apps/web/dist/",
         "docs/architecture/apps/web/"
       ],
-      "skills": [
-        "browser-qa-evidence"
-      ]
+      "skills": []
     },
     {
       "components": [
@@ -47,11 +55,7 @@
         "apps/worker/backtest_job_runner/",
         "docs/architecture/backtest/"
       ],
-      "skills": [
-        "root-cause-debugging",
-        "backend-performance-evidence",
-        "backend-quality-gates"
-      ]
+      "skills": []
     },
     {
       "components": [
@@ -64,10 +68,7 @@
         "apps/worker/market_data_ws/",
         "docs/architecture/market_data/"
       ],
-      "skills": [
-        "root-cause-debugging",
-        "backend-quality-gates"
-      ]
+      "skills": []
     },
     {
       "components": [
@@ -84,11 +85,7 @@
         "apps/exchange_execution/",
         "docs/architecture/live_execution/"
       ],
-      "skills": [
-        "architecture-design",
-        "contract-impact-analysis",
-        "root-cause-debugging"
-      ]
+      "skills": []
     },
     {
       "components": [
@@ -104,11 +101,7 @@
         "apps/worker/rl_trading_inference/",
         "docs/architecture/ml/"
       ],
-      "skills": [
-        "architecture-design",
-        "backend-performance-evidence",
-        "backend-quality-gates"
-      ]
+      "skills": []
     },
     {
       "components": [
@@ -120,11 +113,7 @@
         "infra/",
         "docs/runbooks/"
       ],
-      "skills": [
-        "publish-ci-deploy",
-        "pre-ship-gate",
-        "root-cause-debugging"
-      ]
+      "skills": []
     }
   ],
   "areas": [
@@ -151,7 +140,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 345,
+      "file_count": 437,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -173,7 +162,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 112,
+      "file_count": 116,
       "id": "automation",
       "paths": [
         "tools/",
@@ -194,7 +183,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 2260,
+      "file_count": 2325,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -454,10 +443,26 @@
     },
     {
       "depends_on": [],
-      "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
+      "description": "Navigator candidate prototype; not the accepted platform baseline.",
       "docs": [],
       "entrypoints": [],
-      "file_count": 69,
+      "file_count": 77,
+      "id": "app:navigator-web",
+      "kind": "app",
+      "name": "navigator-web",
+      "roots": [
+        "apps/navigator-web",
+        "apps/navigator-web/src",
+        "apps/navigator-web/src/test-data"
+      ],
+      "used_by": []
+    },
+    {
+      "depends_on": [],
+      "description": "Current accepted local-platform React/TypeScript client.",
+      "docs": [],
+      "entrypoints": [],
+      "file_count": 84,
       "id": "app:platform-web",
       "kind": "app",
       "name": "platform-web",
@@ -563,7 +568,7 @@
       "depends_on": [
         "app:common"
       ],
-      "description": "Server-rendered web UI и same-origin API client.",
+      "description": "Server/integration layer and legacy server-rendered UI.",
       "docs": [],
       "entrypoints": [
         "apps/web/main/app.py",
@@ -3489,6 +3494,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/ROEHUB-NAVIGATOR-2026-09-26.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/2026-09-04-ui-rollback.md"
     },
     {
@@ -3519,7 +3529,17 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-DATA-LOADING-2026-09-26.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-LOCAL-UI-IA-2026-07-20.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-OVERVIEW-2026-09-26.md"
     },
     {
       "area": "knowledge",
@@ -5450,6 +5470,291 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/workspace-tabs.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/backtests-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/backtests-mobile-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/overview-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/overview-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/period-drawdown-week.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/period-equity-week.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/period-manual-equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/period-price-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/strategies-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/strategy-timeframe-buttons-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/strategy-timeframe-buttons.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/timeframe-buttons-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/timeframe-buttons-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/unified-switches-backtests-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/unified-switches-backtests.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/unified-switches-overview.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/unified-switches-strategy-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/backtests-desktop.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/backtests-mobile.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/compact-library-sep27.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/fullscreen-fixed-sep28.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/geometry.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/overview-desktop.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/overview-mobile.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/overview-table-sep27.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/restored-sep28.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/strategy-desktop.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/strategy-mobile.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/strategy-table-sep27.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/backtests-baseline.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/browser-accessibility.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/browser-flows.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/browser-layout.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-reduced-motion.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-final-viewport.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-final.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-first.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/restored-accepted-binance-result.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/restored-backtests.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/restored-strategies.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-error.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-history.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-no-activity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-partial.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-stale.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/strategies-baseline.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/zoom-before.png"
     },
     {
       "area": "knowledge",
@@ -9369,6 +9674,11 @@
     {
       "area": "knowledge",
       "kind": "python",
+      "path": ".codex/hooks/validate_config.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
       "path": ".codex/hooks/validators/__init__.py"
     },
     {
@@ -10758,6 +11068,391 @@
     },
     {
       "area": "delivery",
+      "kind": "documentation",
+      "path": "apps/navigator-web/README.md"
+    },
+    {
+      "area": "delivery",
+      "kind": "documentation",
+      "path": "apps/navigator-web/design-qa.md"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/navigator-web/node_modules"
+    },
+    {
+      "area": "delivery",
+      "kind": "configuration",
+      "path": "apps/navigator-web/package.json"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/api.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/app.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/app.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/backtests-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/builder-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/builder-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/builder-model.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/builder.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/builder.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/chart-display-menu.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/chart-instance.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/chart-period.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/chart-period.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/client-routes.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/delete-history.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/execution.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/execution.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/expandable-overview.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/job-selection.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/library-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/library.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/library.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/loading-data.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/main.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/motion.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/motion.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/navigator-table.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/navigator.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/operation-recovery.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/operations-benchmark.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/operations-benchmark.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/operations-timeframe.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/operations-timeframe.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview-model.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview-model.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview-routing.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/price-chart-conventions.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/price-chart-conventions.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/price-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/query-client.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/query-client.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/read-snapshot.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/read-snapshot.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/recovery.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/report-ui.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/result-read.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/results-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/results-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/results.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/results.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategies-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategies-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategies-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategies.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-insights-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-insights.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-insights.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-operations-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-operations-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-operations-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-operations.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-operations.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-recovery.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/style.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "configuration",
+      "path": "apps/navigator-web/src/test-data/builder-catalog.json"
+    },
+    {
+      "area": "delivery",
+      "kind": "configuration",
+      "path": "apps/navigator-web/tsconfig.json"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/vite.config.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/vitest.config.ts"
+    },
+    {
+      "area": "delivery",
       "kind": "frontend",
       "path": "apps/platform-web/e2e/builder.spec.ts"
     },
@@ -10833,17 +11528,17 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/app.test.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/app.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/backtests-page.tsx"
     },
     {
@@ -10863,18 +11558,33 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/builder.test.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/builder.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/chart-display-menu.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/chart-instance.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/chart-period.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/chart-period.ts"
     },
     {
       "area": "delivery",
@@ -10883,22 +11593,22 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/delete-history.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/execution.test.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/execution.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/expandable-overview.tsx"
     },
     {
@@ -10909,31 +11619,41 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/platform-web/src/job-selection.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/platform-web/src/library-api.ts"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/library.test.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/library.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/loading-data.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/platform-web/src/main.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/motion.test.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/motion.tsx"
     },
     {
@@ -10964,6 +11684,36 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/platform-web/src/overview-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/overview-model.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/overview-model.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/overview-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/overview-routing.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/overview.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/platform-web/src/price-chart-conventions.test.ts"
     },
     {
@@ -10973,8 +11723,13 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/price-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/query-client.test.ts"
     },
     {
       "area": "delivery",
@@ -10984,12 +11739,27 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/platform-web/src/read-snapshot.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/read-snapshot.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/platform-web/src/recovery.ts"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/report-ui.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/result-read.ts"
     },
     {
       "area": "delivery",
@@ -11008,7 +11778,7 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/results.tsx"
     },
     {
@@ -11023,7 +11793,7 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/strategies-page.tsx"
     },
     {
@@ -11043,7 +11813,7 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/strategy-insights.tsx"
     },
     {
@@ -11053,7 +11823,7 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/strategy-operations-chart.tsx"
     },
     {
@@ -11068,7 +11838,7 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/strategy-operations.tsx"
     },
     {
@@ -12638,6 +13408,11 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/roehub-data-loading-contract-v1.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v1.json"
     },
@@ -12650,6 +13425,11 @@
       "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/roehub-overview-requirements-v1.md"
     },
     {
       "area": "knowledge",
@@ -15290,6 +16070,16 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": "docs/architecture/ml/rl-trading-agent-platform-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/ml/roehub-ml-research-platform-requirements-draft-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/ml/roehub-ml-research-product-plan-v1.md"
     },
     {
       "area": "knowledge",
@@ -22729,6 +23519,16 @@
     {
       "area": "automation",
       "kind": "python",
+      "path": "tools/ci/test_agent_policy.py"
+    },
+    {
+      "area": "automation",
+      "kind": "documentation",
+      "path": "tools/codex_quality_benchmark/SKILL_DIAGNOSTICS.md"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
       "path": "tools/codex_quality_benchmark/__init__.py"
     },
     {
@@ -22884,7 +23684,17 @@
     {
       "area": "automation",
       "kind": "python",
+      "path": "tools/qa/navigator_preview.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
       "path": "tools/qa/oidc_browser_app.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/overview_preview.py"
     },
     {
       "area": "automation",
@@ -23007,7 +23817,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 4159,
+  "inventory_file_count": 4320,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -23096,9 +23906,9 @@
       "id": "browser",
       "kind": "client",
       "paths": [
-        "apps/web/"
+        "apps/platform-web/"
       ],
-      "title": "Браузер"
+      "title": "Platform browser client"
     },
     {
       "id": "web",
@@ -23106,7 +23916,7 @@
       "paths": [
         "apps/web/"
       ],
-      "title": "Web UI"
+      "title": "Web server/integration"
     },
     {
       "id": "api",
@@ -23205,5 +24015,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "17489e1e7ed853c6af0e11f38107ee34ab344d190de46a6d34d7972a647515f3"
+  "structural_digest": "667cf3ed912d63fb68a7b7593ab015cba562aeaabd8e899c6e60531a3fb3db96"
 }

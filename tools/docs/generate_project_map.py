@@ -76,7 +76,7 @@ def _kind(path: str) -> str:
         return "documentation"
     if suffix in {".yml", ".yaml", ".toml", ".json"}:
         return "configuration"
-    if suffix in {".html", ".css", ".js", ".ts"}:
+    if suffix in {".html", ".css", ".js", ".jsx", ".ts", ".tsx"}:
         return "frontend"
     if suffix in {".sql"}:
         return "migration"
@@ -410,19 +410,18 @@ def render_agent_guide(data: dict[str, Any]) -> str:
         routes.append(
             f'### {route["match"]}\n\n'
             f'- Компоненты: {_list(route["components"])}\n'
-            f'- Читать сначала: {_list(route["read_first"])}\n'
-            f'- Возможные workflow skills: {_list(route["skills"])}'
+            f'- Читать сначала: {_list(route["read_first"])}'
         )
     return """# Навигация агентов и субагентов по карте Roehub
 
-Этот файл задаёт компактный маршрут чтения. Он не заменяет `AGENTS.md`, `.codex/AGENTS.md`, task prompt, ledger или локальные инструкции.
+Этот файл задаёт компактный маршрут чтения. Он не заменяет `AGENTS.md`, текущий task prompt или локальные инструкции. Skills выбираются по metadata текущей сессии; пустое поле `skills` сохранено только для совместимости schema v1.
 
 ## Обязательный порядок
 
-1. Прочитать применимый `AGENTS.md` и `.codex/AGENTS.md`.
+1. Применить актуальный корневой `AGENTS.md` и относящиеся к задаче scoped instructions.
 2. Для cross-context, repository-wide или неясной задачи открыть `project-map.json` и выбрать только релевантные `areas`, `components`, `entrypoints`, `docs` и `agent_routes`.
 3. Проверить указанные пути в текущем коде: карта — навигационный индекс, а не доказательство runtime-поведения.
-4. Передать субагенту только нужный slice карты, точный outcome, owned paths и proof boundary. Не заставлять субагента читать весь inventory.
+4. При разрешённом делегировании передать субагенту только нужный slice карты, точный outcome, owned paths и proof boundary. Не заставлять субагента читать весь inventory.
 5. После добавления/перемещения компонентов выполнить генератор; generated-файлы вручную не редактировать.
 
 ## Машиночитаемые запросы

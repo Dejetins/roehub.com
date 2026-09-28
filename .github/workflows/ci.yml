@@ -18,6 +18,7 @@ jobs:
     name: changes
     runs-on: ubuntu-latest
     outputs:
+      agent_policy: ${{ steps.filter.outputs.agent_policy }}
       code: ${{ steps.filter.outputs.code }}
       docs: ${{ steps.filter.outputs.docs }}
       run_migrations: ${{ steps.filter.outputs.run_migrations }}
@@ -59,6 +60,23 @@ jobs:
           echo "Changed files:"
           sed 's/^/  /' changed-files.txt
           python -m tools.ci.route_changes ci --changed-files changed-files.txt >> "$GITHUB_OUTPUT"
+
+  agent_policy:
+    name: agent-policy
+    needs: changes
+    if: needs.changes.outputs.agent_policy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+      - name: Policy registration, routing and hook regressions
+        run: |
+          python -m unittest tools.ci.test_agent_policy -v
+          python .codex/hooks/tests/run_tests.py
 
   static:
     name: static
@@ -123,11 +141,6 @@ jobs:
           assert not any("__pycache__" in p or p.endswith(".pyc") for p in names)
           assert "apps/cli/test_backfill_1m_parsing.py" not in names
           PYCODE
-
-      - name: Roehub hook regressions
-        if: needs.changes.outputs.code == 'true'
-        run: |
-          python .codex/hooks/tests/run_tests.py
 
       - name: Type check
         if: needs.changes.outputs.code == 'true'
@@ -335,6 +348,7 @@ jobs:
     name: ci
     needs:
       - changes
+      - agent_policy
       - static
       - oss_metadata
       - migrations
@@ -346,6 +360,7 @@ jobs:
       - name: Summarize CI result
         env:
           CHANGES_RESULT: ${{ needs.changes.result }}
+          AGENT_POLICY_RESULT: ${{ needs.agent_policy.result }}
           STATIC_RESULT: ${{ needs.static.result }}
           OSS_METADATA_RESULT: ${{ needs.oss_metadata.result }}
           MIGRATIONS_RESULT: ${{ needs.migrations.result }}
@@ -354,6 +369,7 @@ jobs:
         run: |
           set -euo pipefail
           printf 'changes=%s\n' "$CHANGES_RESULT"
+          printf 'agent_policy=%s\n' "$AGENT_POLICY_RESULT"
           printf 'static=%s\n' "$STATIC_RESULT"
           printf 'oss_metadata=%s\n' "$OSS_METADATA_RESULT"
           printf 'migrations=%s\n' "$MIGRATIONS_RESULT"
@@ -362,6 +378,7 @@ jobs:
 
           for result in \
             "$CHANGES_RESULT" \
+            "$AGENT_POLICY_RESULT" \
             "$STATIC_RESULT" \
             "$OSS_METADATA_RESULT" \
             "$MIGRATIONS_RESULT" \

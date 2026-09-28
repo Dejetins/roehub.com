@@ -118,26 +118,22 @@ CASES = (
         expected_text="JWT",
     ),
     Case(
-        "mixed-language final report is continued",
+        "technical English in a final report does not force continuation",
         {
             "hook_event_name": "Stop",
             "stop_hook_active": False,
             "last_assistant_message": "Изменения готовы. Verification: passed.",
         },
-        expected_path="decision",
-        expected_value="block",
-        expected_text="Качественно переведи",
+        expected_empty=True,
     ),
     Case(
-        "policy completion requires a review receipt",
+        "policy completion does not require a machine receipt",
         {
             "hook_event_name": "Stop",
             "stop_hook_active": False,
             "last_assistant_message": "Обновил `.codex/AGENTS.md` и завершил документ.",
         },
-        expected_path="decision",
-        expected_value="block",
-        expected_text="Проверка перед финалом",
+        expected_empty=True,
     ),
     Case(
         "russian final with a review receipt is allowed",
@@ -158,6 +154,23 @@ CASES = (
                 "Mac Studio выведен из эксплуатации",
             ),
         },
+        expected_empty=True,
+    ),
+    Case(
+        "read-only architecture audit is allowed",
+        {"hook_event_name": "Stop", "last_assistant_message":
+         "Аудит архитектуры завершен. Файлы не изменялись. Документ содержит findings."},
+        expected_empty=True,
+    ),
+    Case(
+        "honest unavailable review is allowed",
+        {"hook_event_name": "Stop", "last_assistant_message":
+         "Проверка недоступна. review_status: unavailable. Готовность не подтверждена."},
+        expected_empty=True,
+    ),
+    Case(
+        "ordinary final answer is allowed",
+        {"hook_event_name": "Stop", "last_assistant_message": "Готово."},
         expected_empty=True,
     ),
 )

@@ -123,3 +123,18 @@ def test_build_map_validates_catalog_references(tmp_path: Path) -> None:
         assert "unknown agent route component: app:missing" in str(error)
     else:
         raise AssertionError("unknown catalog references must fail project-map analysis")
+
+
+def test_current_platform_navigation_is_distinct_from_server_and_candidate() -> None:
+    import tomllib
+
+    root = Path(__file__).resolve().parents[3]
+    data = tomllib.loads((root / "docs/architecture/project-map/project-map.toml").read_text())
+    routes = data["agent_routes"]
+    current = next(r for r in routes if "app:platform-web" in r["components"])
+    assert current["read_first"][0] == "apps/platform-web/src/"
+    assert "apps/platform-web/package.json" in current["read_first"]
+    assert any("app:web" in r["components"] and "apps/web/main/app.py" in r["read_first"] for r in routes)
+    assert "candidate" in data["descriptions"]["apps"]["navigator-web"]
+    assert all(not r.get("skills") for r in routes)
+    assert all((root / p).exists() for p in current["read_first"])

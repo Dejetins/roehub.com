@@ -25,18 +25,6 @@
           }
         ]
       }
-    ],
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/usr/bin/python3 \"$(git rev-parse --show-toplevel)/.codex/hooks/roehub_hook_router.py\"",
-            "timeout": 20,
-            "statusMessage": "Checking Roehub completion gates"
-          }
-        ]
-      }
     ]
   }
 }

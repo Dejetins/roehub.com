@@ -224,7 +224,22 @@ def _is_docs_path(path: str) -> bool:
     } or path.startswith("docs/")
 
 
+def _is_policy_only_path(path: str) -> bool:
+    return path.startswith(".codex/hooks/") or path == "tools/ci/test_agent_policy.py"
+
+
+def is_agent_policy_path(path: str) -> bool:
+    return _is_policy_only_path(path) or path in {
+        "AGENTS.md", ".codex/AGENTS.md", ".codex/hooks.json", ".codex/config.toml",
+        ".github/workflows/ci.yml", "tools/ci/route_changes.py",
+        "tests/unit/tools/test_ci_route_changes.py", ".python-version", "pyproject.toml",
+        "uv.lock",
+    }
+
+
 def _is_code_path(path: str) -> bool:
+    if _is_policy_only_path(path):
+        return False
     if path in {
         ".python-version",
         "pyproject.toml",
@@ -238,7 +253,6 @@ def _is_code_path(path: str) -> bool:
         path,
         (
             ".github/workflows/",
-            ".codex/hooks/",
             "apps/",
             "src/",
             "tests/",
@@ -395,6 +409,7 @@ def classify_ci(paths: Iterable[str], *, all_changes: bool = False) -> dict[str,
     path_list = [path for path in paths if path]
     if all_changes:
         return {
+            "agent_policy": "true",
             "code": "true",
             "docs": "true",
             "run_migrations": "true",
@@ -409,6 +424,8 @@ def classify_ci(paths: Iterable[str], *, all_changes: bool = False) -> dict[str,
     run_all = False
 
     for path in path_list:
+        if _is_policy_only_path(path):
+            continue
         if path.startswith(".github/workflows/") or path in {
             ".python-version",
             "pyproject.toml",
@@ -519,6 +536,7 @@ def classify_ci(paths: Iterable[str], *, all_changes: bool = False) -> dict[str,
         run_migrations = True
 
     return {
+        "agent_policy": "true" if any(is_agent_policy_path(p) for p in path_list) else "false",
         "code": "true" if code else "false",
         "docs": "true" if docs else "false",
         "run_migrations": "true" if run_migrations else "false",
