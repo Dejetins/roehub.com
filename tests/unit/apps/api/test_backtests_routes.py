@@ -1028,6 +1028,23 @@ def test_get_backtest_variant_trades_is_paginated_and_csv_is_owner_scoped() -> N
         headers={"x-user-id": "00000000-0000-0000-0000-000000000222"},
     )
 
+    full_csv = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}"
+        "/trades.csv?max_rows=1&all_rows=true",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000221"},
+    )
+    assert full_csv.status_code == 200
+    assert full_csv.headers["x-roehub-trades-row-count"] == "12"
+    assert full_csv.headers["x-roehub-trades-truncated"] == "false"
+    xlsx = client.get(
+        f"/backtests/jobs/{created.json()['job_id']}/variants/{top['variant_key']}"
+        "/trades.csv?all_rows=true&format=xlsx",
+        headers={"x-user-id": "00000000-0000-0000-0000-000000000221"},
+    )
+    assert xlsx.status_code == 200
+    assert xlsx.content.startswith(b"PK")
+    assert ".xlsx" in xlsx.headers["content-disposition"]
+
     assert page.status_code == 200
     payload = page.json()
     assert payload["pagination"] == {
@@ -2329,11 +2346,12 @@ class _FakeLazyTradesCache:
         cache_key: Any,
         now: datetime,
         ttl_seconds: int,
-        max_rows: int,
+        max_rows: int | None,
     ) -> "_CacheRead":
         _ = cache_key, now, ttl_seconds
         detail = self._detail()
         rows = sorted(detail.trades, key=lambda item: int(item["trade_index"]))
+        max_rows = len(rows) if max_rows is None else max_rows
         header = "trade_index,entry_timestamp,exit_timestamp\n"
         lines = [
             header,

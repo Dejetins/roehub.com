@@ -22,6 +22,7 @@ from apps.api.routes import (
     build_indicators_router,
     build_operations_router,
 )
+from apps.api.routes.monitoring import build_monitoring_router
 from apps.api.wiring.modules import (
     bind_indicators_runtime_dependencies,
     build_backtests_router,
@@ -113,6 +114,12 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
         environ=effective_environ
     )
     app.include_router(identity_module.router)
+    app.include_router(build_monitoring_router(
+        current_user_dependency=identity_module.current_user_dependency,
+        scope_resolver=research_scope_resolver,
+        organization_service=identity_module.organization_access_service,
+        health=app.state.operational_health_client,
+    ))
     extensions_module = build_extensions_api_module(
         environ=effective_environ,
         current_user_dependency=identity_module.current_user_dependency,

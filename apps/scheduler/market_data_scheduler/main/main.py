@@ -65,6 +65,8 @@ def _build_parser() -> argparse.ArgumentParser:
         default=9202,
         help="Prometheus metrics HTTP port",
     )
+    parser.add_argument("--requests-only", action="store_true",
+                        help="Consume explicit user requests without automatic backfill jobs")
     return parser
 
 
@@ -99,7 +101,7 @@ def _install_signal_handlers(stop_event: asyncio.Event) -> None:
             signal.signal(sig, lambda *_args: _mark_stop())
 
 
-async def _run_async(config_path: str, metrics_port: int) -> int:
+async def _run_async(config_path: str, metrics_port: int, requests_only: bool = False) -> int:
     """
     Build and run scheduler runtime until termination signal.
 
@@ -126,7 +128,10 @@ async def _run_async(config_path: str, metrics_port: int) -> int:
         environ=os.environ,
         metrics_port=metrics_port,
     )
-    await app.run(stop_event)
+    if requests_only:
+        await app.run_work_requests(stop_event)
+    else:
+        await app.run(stop_event)
     return 0
 
 
@@ -156,6 +161,7 @@ def main(argv: list[str] | None = None) -> int:
             _run_async(
                 config_path=args.config,
                 metrics_port=args.metrics_port,
+                requests_only=args.requests_only,
             )
         )
     except Exception:  # noqa: BLE001

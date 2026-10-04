@@ -1,3 +1,4 @@
+import { LoadingData, ReadStatus } from './loading-data';
 import { transitionUI } from './motion';
 import { Results } from './results';
 import { DeleteHistory, deletionIdle, type DeleteState } from './delete-history';
@@ -7,7 +8,7 @@ import { Link } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { ApiError, readSession } from './api';
 import { cancelJob, jobIdSchema, jobLabel, readJob, refreshDeadline, type Job } from './library-api';
-import { ReadError, Refresh, formatDate, isRestricted, JobState } from './library';
+import { ReadError, formatDate, isRestricted, JobState } from './library';
 
 export const terminal = (job: Job) => ['succeeded', 'failed', 'cancelled'].includes(job.state);
 /** A delayed read/command response cannot roll back an observed terminal or newer snapshot. */
@@ -32,9 +33,9 @@ export function JobEntry({ id, subject, now, backLink, active = true }: { id: st
   const commandKey = ['private', subject, 'cancel', id];
   // Query cache retains the pending marker across client-side navigation, and is
   // cleared by the existing subject/logout boundary. Reload always starts with GET.
-  const command = useQuery<CommandState>({ queryKey: commandKey, initialData: idle, enabled: false, staleTime: Infinity });
+  const command = useQuery<CommandState>({ queryKey: commandKey, initialData: idle, gcTime:300_000, enabled: false, staleTime: Infinity });
   const state = command.data!;
-  const deletion = useQuery<DeleteState>({ queryKey: ['private', subject, 'delete', id], initialData: deletionIdle, enabled: false }).data!;
+  const deletion = useQuery<DeleteState>({ queryKey: ['private', subject, 'delete', id], initialData: deletionIdle, gcTime:300_000, enabled: false }).data!;
   const valid = jobIdSchema.safeParse(id).success;
   const restricted = isRestricted(state.error) || isRestricted(deletion.error);
   const query = useQuery({ queryKey: key, enabled: valid && !restricted, refetchOnMount: false, refetchOnReconnect: false,
@@ -96,9 +97,10 @@ export function JobEntry({ id, subject, now, backLink, active = true }: { id: st
   }
   // Rejected 409/429 requires a new authoritative read before another explicit command.
   const needsRead = state.phase === 'rejected' && !restricted;
-  return <><div className="panel-head"><h2 id="selected-job-heading" tabIndex={-1}>{job?jobLabel(job):t('selectedJob')}</h2>{valid && !restricted && <Refresh query={query} deadline={manualDeadline} now={now} />}</div>
-    <div className="job-detail">
-      {!valid ? <p role="alert" className="notice error">{t('invalidJob')}</p> : query.isPending ? <p role="status">{t('loadingJob')}</p> : null}
+  if(valid&&!restricted&&query.isPending)return <div className="job-detail data-pending"><LoadingData /></div>;
+  return <><div className="panel-head"><h2 id="selected-job-heading" tabIndex={-1}>{job?jobLabel(job):t('selectedJob')}</h2><ReadStatus pending={query.isFetching}/></div>
+    <div className="job-detail" data-ready={!!job}>
+      {!valid ? <p role="alert" className="notice error">{t('invalidJob')}</p> : null}
       <ReadError error={query.error} />{restricted && <ReadError error={deletion.error} />}{query.error instanceof ApiError && query.error.status === 404 && deletion.phase === 'unknown' && <p role="status" className="notice">{t('results.absent')}</p>}{!done && <ReadError error={state.error} />}
       {job && <><div className="job-status" ref={status} tabIndex={-1} role="status"><JobState job={job} /></div>
         {job.state!=='succeeded'&&<section className="execution-progress" aria-label={t('execution.progress')}>

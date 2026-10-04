@@ -179,6 +179,25 @@ class PostgresInstrumentSelectionRepository:
             for row in rows
         )
 
+    def strategy_pins(self, *, organization_id: OrganizationId) -> tuple[Mapping, ...]:
+        """Same active pin policy as the collector, with organization-owned labels only."""
+        return self._gateway.fetch_all(
+            query="""
+            SELECT DISTINCT checks.instrument_key, runs.strategy_id, s.name, runs.state
+            FROM strategy_runs runs
+            JOIN strategy_variant_compatibility_checks checks
+              ON checks.organization_id = runs.organization_id
+             AND checks.strategy_id = runs.strategy_id
+            JOIN strategy_strategies s
+              ON s.organization_id = runs.organization_id AND s.strategy_id = runs.strategy_id
+            WHERE runs.organization_id = %(org)s
+              AND runs.state IN ('starting', 'warming_up', 'running', 'stopping')
+              AND checks.compatibility_state = 'launchable'
+            ORDER BY checks.instrument_key, runs.strategy_id
+            """,
+            parameters={"org": str(organization_id)},
+        )
+
     def list_enabled_tradable(self) -> Sequence[InstrumentId]:
         """Expose the global effective collector set through the worker read port."""
         return self.list_global_effective()

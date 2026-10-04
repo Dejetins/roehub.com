@@ -294,7 +294,9 @@ def test_ui_account_profile_limits_integrations_and_notifications_contracts() ->
     notifications = client.get("/ui/account/notifications")
 
     assert profile.status_code == 200
-    assert profile.json()["username"] == "quant_trader"
+    assert profile.json()["username"] is None
+    assert profile.json()["email"] is None
+    assert profile.json()["telegram_discord"] is None
     assert profile.json()["locale"] == "en"
     assert profile.json()["subscription_status"] == "free"
     assert limits.status_code == 200
@@ -1504,6 +1506,15 @@ def test_strategy_exchange_binding_routes_create_list_and_disable_binding() -> N
         binding_payload["binding_id"]
     ]
 
+    dependencies = client.get(f"/ui/account/exchange-connections/{connection_id}/bindings")
+    assert dependencies.status_code == 200
+    assert dependencies.json()["items"][0]["strategy_id"] == str(strategy.strategy_id)
+    assert dependencies.json()["next_cursor"] is None
+    assert client.get(f"/ui/account/exchange-connections/{uuid4()}/bindings").status_code == 404
+    assert client.get(
+        f"/ui/account/exchange-connections/{connection_id}/bindings?limit=51"
+    ).status_code == 422
+
     disabled = client.post(
         f"/ui/strategies/{strategy.strategy_id}/exchange-bindings/"
         f"{binding_payload['binding_id']}/disable",
@@ -1726,3 +1737,44 @@ def _strategy_spec_payload() -> dict[str, object]:
         ],
         "signal_template": "MA(20,50)",
     }
+
+
+def test_account_session_projection_cannot_be_replayed_as_a_session() -> None:
+    client, _repository, _users = _build_test_client()
+    credential = client.cookies.get(_SESSION_COOKIE_NAME)
+    first = client.get('/ui/account/sessions').json()
+    second = client.get('/ui/account/sessions').json()
+    assert first == second
+    assert credential is not None
+    assert credential not in str(first)
+    view_id = first['items'][0]['session_id']
+    client.cookies.clear()
+    client.cookies.set(_SESSION_COOKIE_NAME, view_id)
+    assert client.get('/ui/account/profile').status_code == 401
+
+
+def test_account_profile_rejects_invalid_email_and_timezone_without_writing() -> None:
+    client, _repository, _users = _build_test_client()
+    before = client.get('/ui/account/profile').json()
+    for invalid in ({'email': 'not-an-email'}, {'timezone': '../invalid-zone'}):
+        response = client.put('/ui/account/profile', json=invalid,
+                              headers={'origin': 'http://testserver'})
+        assert response.status_code == 422
+        assert client.get('/ui/account/profile').json() == before
+
+
+def test_scoped_notifications_unconfigured_or_foreign_provider_never_succeeds() -> None:
+    client, _, _ = _build_test_client()
+    unavailable = client.get("/ui/account/notifications/scoped")
+    assert unavailable.status_code == 503
+    assert unavailable.json()["error"]["code"] == "notification_provider_unavailable"
+    binding_service = NotificationTelegramBindingService(
+        store=InMemoryNotificationTelegramBindingStore(),
+        organization_id=OrganizationId(UUID("00000000-0000-4000-8000-000000000099")),
+        provider_instance_id=_TELEGRAM_PROVIDER_INSTANCE_ID,
+    )
+    client, _, _ = _build_test_client(telegram_binding_service=binding_service)
+    denied = client.get("/ui/account/notifications/scoped")
+    assert denied.status_code == 403
+    assert denied.json()["error"]["code"] == "notification_provider_scope_mismatch"
+    assert "telegram_binding" not in denied.json()

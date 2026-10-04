@@ -1,0 +1,6616 @@
+{
+  "started_at": "2026-10-04T11:05:16.947083+00:00",
+  "redis": "not configured; disabled for WS-to-ClickHouse proof",
+  "events": [
+    {
+      "at": "2026-10-04T11:05:17.034545+00:00",
+      "event": "subscription_start",
+      "market_id": 1,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ]
+    },
+    {
+      "at": "2026-10-04T11:05:17.034590+00:00",
+      "event": "connect_attempt",
+      "injected_outage": false
+    },
+    {
+      "at": "2026-10-04T11:05:17.908120+00:00",
+      "event": "connected"
+    },
+    {
+      "at": "2026-10-04T11:08:53.610021+00:00",
+      "event": "storage_fault_armed"
+    },
+    {
+      "at": "2026-10-04T11:09:00.208213+00:00",
+      "event": "storage_fault_injected",
+      "rows": 4
+    },
+    {
+      "at": "2026-10-04T11:09:00.214601+00:00",
+      "event": "log",
+      "logger": "trading.contexts.market_data.application.services.insert_buffer",
+      "level": "ERROR",
+      "error_type": "AssertionError"
+    },
+    {
+      "at": "2026-10-04T11:09:23.984593+00:00",
+      "event": "disconnect_injected"
+    },
+    {
+      "at": "2026-10-04T11:09:31.796503+00:00",
+      "event": "disconnected"
+    },
+    {
+      "at": "2026-10-04T11:09:31.796733+00:00",
+      "event": "log",
+      "logger": "trading.contexts.market_data.adapters.outbound.clients.binance.ws_client",
+      "level": "ERROR",
+      "error_type": "ConnectionClosedError"
+    },
+    {
+      "at": "2026-10-04T11:09:32.377489+00:00",
+      "event": "connect_attempt",
+      "injected_outage": true
+    },
+    {
+      "at": "2026-10-04T11:09:32.377645+00:00",
+      "event": "log",
+      "logger": "trading.contexts.market_data.adapters.outbound.clients.binance.ws_client",
+      "level": "ERROR",
+      "error_type": "ConnectionError"
+    },
+    {
+      "at": "2026-10-04T11:09:33.341569+00:00",
+      "event": "connect_attempt",
+      "injected_outage": true
+    },
+    {
+      "at": "2026-10-04T11:09:33.341760+00:00",
+      "event": "log",
+      "logger": "trading.contexts.market_data.adapters.outbound.clients.binance.ws_client",
+      "level": "ERROR",
+      "error_type": "ConnectionError"
+    },
+    {
+      "at": "2026-10-04T11:09:34.903701+00:00",
+      "event": "connect_attempt",
+      "injected_outage": true
+    },
+    {
+      "at": "2026-10-04T11:09:34.903835+00:00",
+      "event": "log",
+      "logger": "trading.contexts.market_data.adapters.outbound.clients.binance.ws_client",
+      "level": "ERROR",
+      "error_type": "ConnectionError"
+    },
+    {
+      "at": "2026-10-04T11:09:37.361358+00:00",
+      "event": "connect_attempt",
+      "injected_outage": true
+    },
+    {
+      "at": "2026-10-04T11:09:37.361528+00:00",
+      "event": "log",
+      "logger": "trading.contexts.market_data.adapters.outbound.clients.binance.ws_client",
+      "level": "ERROR",
+      "error_type": "ConnectionError"
+    },
+    {
+      "at": "2026-10-04T11:09:41.726563+00:00",
+      "event": "connect_attempt",
+      "injected_outage": true
+    },
+    {
+      "at": "2026-10-04T11:09:41.726744+00:00",
+      "event": "log",
+      "logger": "trading.contexts.market_data.adapters.outbound.clients.binance.ws_client",
+      "level": "ERROR",
+      "error_type": "ConnectionError"
+    },
+    {
+      "at": "2026-10-04T11:09:48.898140+00:00",
+      "event": "connect_attempt",
+      "injected_outage": true
+    },
+    {
+      "at": "2026-10-04T11:09:48.898284+00:00",
+      "event": "log",
+      "logger": "trading.contexts.market_data.adapters.outbound.clients.binance.ws_client",
+      "level": "ERROR",
+      "error_type": "ConnectionError"
+    },
+    {
+      "at": "2026-10-04T11:10:01.009598+00:00",
+      "event": "connect_attempt",
+      "injected_outage": true
+    },
+    {
+      "at": "2026-10-04T11:10:01.009766+00:00",
+      "event": "log",
+      "logger": "trading.contexts.market_data.adapters.outbound.clients.binance.ws_client",
+      "level": "ERROR",
+      "error_type": "ConnectionError"
+    },
+    {
+      "at": "2026-10-04T11:10:21.621550+00:00",
+      "event": "connect_attempt",
+      "injected_outage": false
+    },
+    {
+      "at": "2026-10-04T11:10:22.471049+00:00",
+      "event": "connected"
+    },
+    {
+      "at": "2026-10-04T11:10:32.488505+00:00",
+      "event": "disconnected"
+    },
+    {
+      "at": "2026-10-04T11:10:39.459711+00:00",
+      "event": "subscription_stop",
+      "market_id": 1,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ]
+    },
+    {
+      "at": "2026-10-04T11:10:39.459846+00:00",
+      "event": "subscription_start",
+      "market_id": 1,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ]
+    },
+    {
+      "at": "2026-10-04T11:10:39.459912+00:00",
+      "event": "connect_attempt",
+      "injected_outage": false
+    },
+    {
+      "at": "2026-10-04T11:10:40.318579+00:00",
+      "event": "connected"
+    },
+    {
+      "at": "2026-10-04T11:11:39.539032+00:00",
+      "event": "disconnected"
+    },
+    {
+      "at": "2026-10-04T11:11:49.541665+00:00",
+      "event": "subscription_stop",
+      "market_id": 1,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ]
+    },
+    {
+      "at": "2026-10-04T11:11:49.541852+00:00",
+      "event": "subscription_start",
+      "market_id": 1,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ]
+    },
+    {
+      "at": "2026-10-04T11:11:49.541911+00:00",
+      "event": "connect_attempt",
+      "injected_outage": false
+    },
+    {
+      "at": "2026-10-04T11:11:50.405447+00:00",
+      "event": "connected"
+    },
+    {
+      "at": "2026-10-04T11:13:27.023365+00:00",
+      "event": "log",
+      "logger": "trading.contexts.market_data.application.services.rest_fill_queue",
+      "level": "ERROR",
+      "error_type": "TemporarySourceError"
+    },
+    {
+      "at": "2026-10-04T11:14:21.523351+00:00",
+      "event": "disconnected"
+    },
+    {
+      "at": "2026-10-04T11:14:30.840883+00:00",
+      "event": "subscription_stop",
+      "market_id": 1,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ]
+    }
+  ],
+  "samples": [
+    {
+      "at": "2026-10-04T11:05:17.014124+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 0.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 0.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 0.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:19.035621+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 2.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 2.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:21.057539+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 3.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 3.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:23.085743+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 4.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 4.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:25.109268+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 5.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 5.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:27.134970+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 6.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 6.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:29.159224+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 8.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 8.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:31.181883+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 10.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 10.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:33.205662+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 11.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 11.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:35.231299+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 13.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 13.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:37.257705+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 15.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 15.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:39.287556+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 15.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 15.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:41.312371+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 16.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 16.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:43.336704+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 16.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 16.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:45.361371+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 19.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 19.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:47.384910+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 19.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 19.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:49.410817+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 19.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 19.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:51.428713+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 20.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 20.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:53.451592+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 22.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 22.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:55.474171+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 23.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 23.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:57.498346+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 25.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 25.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:05:59.528793+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 25.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 25.0,
+      "insert_rows_total": 0.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:01.558564+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 29.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 25.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:03.576606+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 33.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 29.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:05.595702+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 34.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 30.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:07.612618+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 35.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 31.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:09.625479+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 36.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 32.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:11.648500+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 37.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 33.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:13.670472+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 38.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 34.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:15.692338+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 40.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 36.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:17.714292+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 41.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 37.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:19.739803+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 42.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 38.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:21.763343+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 44.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 40.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:23.788475+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 45.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 41.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:25.830530+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 46.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 42.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:27.850540+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 47.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 43.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:29.876578+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 47.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 43.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:31.901628+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 48.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 44.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:33.930740+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 49.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 45.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:35.953558+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 49.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 45.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:37.980109+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 50.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 46.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:39.992054+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 50.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 46.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:42.015163+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 50.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 46.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:44.038314+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 50.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 46.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:46.063728+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 51.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 47.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:48.089128+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 51.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 47.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:50.113693+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 53.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 49.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:52.140776+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 54.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 50.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:54.166649+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 55.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 51.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:56.191615+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 56.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 52.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:06:58.215918+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 58.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 54.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:00.239794+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 63.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 55.0,
+      "insert_rows_total": 4.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:02.263351+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 66.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 58.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:04.286519+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 67.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 59.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:06.311575+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 68.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 60.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:08.336440+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 68.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 60.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:10.347917+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 70.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 62.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:12.368530+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 71.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 63.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:14.389626+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 72.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 64.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:16.408382+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 73.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 65.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:18.425984+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 75.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 67.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:20.451088+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 76.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 68.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:22.476495+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 77.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 69.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:24.497135+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 78.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 70.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:26.522163+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 79.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 71.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:28.550769+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 81.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 73.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:30.576386+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 82.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 74.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:32.608683+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 84.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 76.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:34.634196+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 85.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 77.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:36.660246+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 85.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 77.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:38.684607+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 86.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 78.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:40.698593+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 86.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 78.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:42.720823+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 86.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 78.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:44.746153+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 86.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 78.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:46.772501+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 86.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 78.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:48.798265+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 86.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 78.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:50.824934+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 86.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 78.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:52.851625+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 87.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 79.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:54.877866+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 87.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 79.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:56.905349+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 87.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 79.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:07:58.929487+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 88.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 80.0,
+      "insert_rows_total": 8.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:00.956923+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 92.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 80.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:02.990375+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 96.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 84.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:05.020187+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 96.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 84.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:07.044503+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 97.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 85.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:09.071348+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 99.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 87.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:11.087508+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 99.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 87.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:13.110774+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 100.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 88.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:15.138190+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 102.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 90.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:17.162860+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 102.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 90.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:19.187711+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 104.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 92.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:21.214342+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 105.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 93.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:23.240396+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 106.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 94.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:25.266278+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 107.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 95.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:27.288602+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 108.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 96.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:29.310229+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 109.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 97.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:31.338705+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 110.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 98.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:33.368600+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 111.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 99.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:35.395380+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 111.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 99.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:37.419914+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 111.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 99.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:39.444202+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 113.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 101.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:41.465565+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 114.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 102.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:43.488996+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 114.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 102.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:45.513932+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 114.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 102.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:47.540756+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 115.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 103.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:49.575418+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 115.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 103.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:51.606418+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 115.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 103.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:53.619916+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 115.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 103.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:55.641012+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 116.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 104.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:57.671398+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 117.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 105.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:08:59.702418+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 118.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 106.0,
+      "insert_rows_total": 12.0,
+      "insert_errors_total": 0.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:01.729442+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 124.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 108.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:03.744237+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 127.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 111.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:05.764196+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 128.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 112.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:07.787132+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 129.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 113.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:09.820180+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 130.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 114.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:11.842558+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 132.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 116.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:13.877053+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 132.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 116.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:15.901430+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 134.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 118.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:17.925808+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 136.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 120.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:19.956218+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 136.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 120.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:21.980908+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 137.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 121.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:31.793885+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 0.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:33.813065+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 3.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:35.842496+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 4.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:37.881862+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 5.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:39.907772+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 5.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:41.920788+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 6.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:43.945236+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 6.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:45.973380+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 6.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:47.997501+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 6.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:50.023636+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 7.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:52.051095+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 7.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:54.076440+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 7.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:56.105045+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 7.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:09:58.136013+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 7.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:00.160274+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 7.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:02.189592+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:04.216683+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:06.240825+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:08.267690+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:10.294381+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:12.307811+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:14.331780+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:16.359874+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:18.386851+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:20.413160+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:22.443826+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 0.0,
+      "ws_messages_total": 138.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 122.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 4.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:24.458651+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 140.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 124.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:26.482315+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 140.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 124.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:28.510219+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 141.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 125.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:30.537513+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 141.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 125.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:32.563808+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 142.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 126.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:34.591467+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 142.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 126.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:36.619228+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 142.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 126.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:38.647609+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 142.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 126.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:40.674302+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 142.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 126.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:42.698788+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 142.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 126.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:44.722708+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 143.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 127.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:46.747813+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 143.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 127.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:48.769006+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 144.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 128.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:50.791652+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 144.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 128.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:52.812798+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 146.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 130.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:54.825362+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 147.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 131.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:56.847950+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 148.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 132.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:10:58.875039+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 150.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 134.0,
+      "insert_rows_total": 16.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 8.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:00.901608+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 153.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 134.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:02.927643+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 156.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 137.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:04.953639+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 158.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 139.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:06.978234+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 159.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 140.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:09.003595+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 160.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 141.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:11.029935+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 161.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 142.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:13.063078+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 161.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 142.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:15.086411+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 162.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 143.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:17.112361+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 163.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 144.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:19.139892+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 163.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 144.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:21.166646+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 163.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 144.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:23.190016+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 164.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 145.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:25.205683+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 165.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 146.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:27.217940+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 166.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 147.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:29.242636+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 166.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 147.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:31.272336+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 168.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 149.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:33.298194+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 168.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 149.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:35.325381+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 170.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 151.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:37.354257+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 171.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 152.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:39.382433+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 172.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 153.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:41.410274+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 172.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 153.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:43.436140+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 172.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 153.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:45.461589+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 172.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 153.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:47.488823+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 172.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 153.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:49.515748+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 172.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 153.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 11.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:51.544018+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 172.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 153.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 12.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:53.570015+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 173.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 154.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 12.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:55.596281+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 174.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 155.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 12.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:57.612825+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 176.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 157.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 12.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:11:59.636261+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 176.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 157.0,
+      "insert_rows_total": 19.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 12.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:01.661572+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 180.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 157.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:03.683682+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 184.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 161.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:05.707458+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 185.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 162.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:07.729578+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 186.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 163.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:09.758404+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 187.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 164.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:11.785563+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 187.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 164.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:13.811842+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 188.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 165.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:15.837796+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 190.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 167.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:17.866860+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 190.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 167.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:19.897365+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 190.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 167.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:21.926359+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 191.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 168.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:23.956471+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 191.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 168.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:25.984300+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 193.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 170.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:28.008411+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 193.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 170.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:30.033298+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 194.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 171.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:32.063474+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 194.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 171.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:34.090556+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 195.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 172.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:36.113684+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 197.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 174.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:38.137272+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 197.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 174.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:40.164392+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 199.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 176.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:42.191006+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 200.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 177.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:44.218637+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 202.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 179.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:46.244412+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 203.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 180.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:48.270187+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 205.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 182.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:50.296619+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 205.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 182.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:52.324800+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 205.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 182.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:54.352629+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 205.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 182.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:56.381686+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 206.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 183.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:12:58.407176+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 206.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 183.0,
+      "insert_rows_total": 23.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:00.436293+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 210.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 183.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:02.463083+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 211.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 184.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:04.493054+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 214.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 187.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:06.521988+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 214.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 187.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:08.549338+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 215.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 188.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:10.570686+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 215.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 188.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:12.595287+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 216.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 189.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:14.624537+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 218.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 191.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:16.648300+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 219.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 192.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:18.671851+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 221.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 194.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:20.699901+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 222.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 195.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:22.725607+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 223.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 196.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:24.747167+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 224.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 197.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:26.772944+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 224.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 197.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 0.0
+    },
+    {
+      "at": "2026-10-04T11:13:28.806296+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 224.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 197.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:30.832626+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 225.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 198.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:32.860945+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 225.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 198.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:34.890042+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 226.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 199.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:36.921908+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 227.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 200.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:38.951536+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 227.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 200.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:40.980874+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 228.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 201.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:43.011495+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 228.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 201.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:45.028588+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 229.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 202.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:47.054963+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 230.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 203.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:49.084507+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 231.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 204.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:51.114136+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 232.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 205.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:53.144055+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 232.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 205.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:55.173147+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 232.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 205.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:57.200854+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 232.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 205.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:13:59.219346+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 232.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 205.0,
+      "insert_rows_total": 27.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:01.246407+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 238.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 207.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:03.271652+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 241.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 210.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:05.300911+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 241.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 210.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:07.327479+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 243.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 212.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:09.354675+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 244.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 213.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:11.380929+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 244.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 213.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:13.409726+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 244.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 213.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:15.437952+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 246.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 215.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:17.465003+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:19.489604+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:21.516395+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:23.545550+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:25.574807+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:27.602411+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:29.622104+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 1.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:31.649010+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:33.673298+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:35.699082+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:37.716436+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:39.739325+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:41.767140+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:43.785146+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:45.804694+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:47.834879+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:49.863562+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:51.892795+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:53.923323+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:55.967093+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:14:58.002062+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:00.027911+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:02.056904+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:04.085465+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:06.115855+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:08.154273+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:10.180902+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:12.203579+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:14.223963+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:16.256502+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:18.290281+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:20.324651+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:22.356487+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:24.376473+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:26.402899+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:28.427924+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:30.456994+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:32.487324+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:34.521935+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:36.550188+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:38.581668+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:40.610470+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:42.640880+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:44.669345+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:46.699930+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:48.729502+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:50.759927+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:52.797374+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:54.824228+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:56.852146+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:15:58.882667+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:00.917948+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:02.950678+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:04.974381+00:00",
+      "selected": [
+        "AAVEUSDT",
+        "ADAUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:06.996533+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:09.015985+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:11.042405+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:13.069328+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:15.096805+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:17.128192+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:19.157134+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:21.187605+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:23.219338+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:25.249871+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:27.282192+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:29.314706+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:31.349864+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:33.381164+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:35.408609+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:37.434005+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:39.460991+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:41.490255+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:43.518928+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:45.548237+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:47.579105+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:49.606340+00:00",
+      "selected": [
+        "AAVEUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:51.632878+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:53.658366+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:55.684867+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:57.710311+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:16:59.745575+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:01.776357+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:03.803461+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:05.827082+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:07.852715+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:09.880177+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:11.910981+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:13.940189+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:15.972307+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:17.999338+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:20.082288+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:22.109425+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:24.139630+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:26.172752+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:28.199317+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:30.219604+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:32.245278+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    },
+    {
+      "at": "2026-10-04T11:17:34.271035+00:00",
+      "selected": [
+        "BTCUSDT"
+      ],
+      "ws_connected": 0.0,
+      "ws_reconnects_total": 1.0,
+      "ws_messages_total": 248.0,
+      "ws_errors_total": 8.0,
+      "ignored_non_closed_total": 217.0,
+      "insert_rows_total": 31.0,
+      "insert_errors_total": 1.0,
+      "rest_fill_tasks_total": 13.0,
+      "rest_fill_errors_total": 1.0
+    }
+  ],
+  "writes": [
+    {
+      "at": "2026-10-04T11:06:00.320619+00:00",
+      "rows": 4,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "minute": "2026-10-04T11:05:00+00:00"
+    },
+    {
+      "at": "2026-10-04T11:07:00.262369+00:00",
+      "rows": 4,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "minute": "2026-10-04T11:06:00+00:00"
+    },
+    {
+      "at": "2026-10-04T11:08:00.203024+00:00",
+      "rows": 4,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "minute": "2026-10-04T11:07:00+00:00"
+    },
+    {
+      "at": "2026-10-04T11:09:00.490561+00:00",
+      "rows": 4,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "minute": "2026-10-04T11:08:00+00:00"
+    },
+    {
+      "at": "2026-10-04T11:11:00.160733+00:00",
+      "rows": 3,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "minute": "2026-10-04T11:10:00+00:00"
+    },
+    {
+      "at": "2026-10-04T11:12:00.165688+00:00",
+      "rows": 3,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT"
+      ],
+      "minute": "2026-10-04T11:11:00+00:00"
+    },
+    {
+      "at": "2026-10-04T11:12:00.442462+00:00",
+      "rows": 1,
+      "symbols": [
+        "ANKRUSDT"
+      ],
+      "minute": "2026-10-04T11:11:00+00:00"
+    },
+    {
+      "at": "2026-10-04T11:13:00.194983+00:00",
+      "rows": 4,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "minute": "2026-10-04T11:12:00+00:00"
+    },
+    {
+      "at": "2026-10-04T11:14:00.244111+00:00",
+      "rows": 4,
+      "symbols": [
+        "AAVEUSDT",
+        "ADAUSDT",
+        "ALGOUSDT",
+        "ANKRUSDT"
+      ],
+      "minute": "2026-10-04T11:13:00+00:00"
+    }
+  ]
+}

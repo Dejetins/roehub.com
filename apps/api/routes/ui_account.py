@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
+from hashlib import sha256
 from typing import Callable, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel
 
 from apps.api.dto.ui_account import (
     AccountAuditEventResponse,
@@ -90,6 +92,11 @@ TelegramBindingServiceResolver = Callable[
 ]
 _RECENT_AUTH_WINDOW = timedelta(minutes=10)
 ExchangeConnectionStatusFilter = Literal["active", "disabled", "archived", "all"]
+
+
+class ConnectionBindingsResponse(BaseModel):
+    items: list[StrategyExchangeBindingResponse]
+    next_cursor: str | None
 
 
 def build_ui_account_router(
@@ -205,12 +212,16 @@ def build_ui_account_router(
         response_model=ExchangeConnectionsResponse,
     )
     def get_exchange_connections(
-        cursor: str | None = Query(default=None),
-        limit: int = Query(default=20, ge=1, le=50),
+        cursor: str | None = Query(default=None, max_length=12),
+        limit: int | None = Query(default=None, ge=1, le=50),
         status: ExchangeConnectionStatusFilter = Query(default="active"),
+        q: str = Query(default="", max_length=80),
+        environment: Literal["mainnet", "testnet"] | None = Query(default=None),
         principal: CurrentUserPrincipal = Depends(require_account_user),
     ) -> ExchangeConnectionsResponse:
-        _ = cursor, limit
+        if cursor is not None and (not cursor.isascii() or not cursor.isdecimal()):
+            raise HTTPException(status_code=422, detail="Invalid cursor")
+        offset = int(cursor or "0")
         client = _require_exchange_control_client(client=exchange_control_client)
         try:
             rows = client.list_connections(
@@ -219,14 +230,71 @@ def build_ui_account_router(
             )
         except ExchangeControlClientError as error:
             raise _exchange_control_unavailable(error=error) from error
-        filtered_rows = tuple(
+        filtered_rows = [
             row
             for row in rows
             if _matches_connection_status_filter(row=row, status=status)
-        )
+            and (environment is None or row.environment == environment)
+            and q.casefold().strip() in (
+                f"{row.label or ''} {row.exchange_name} {row.market_type}".casefold()
+            )
+        ]
+        # Legacy SSR consumers do not understand cursors. Pagination is opt-in;
+        # Navigator always supplies an explicit bounded limit.
+        size = limit if limit is not None else len(filtered_rows)
+        page = filtered_rows[offset:offset + size]
         return ExchangeConnectionsResponse(
-            items=[_exchange_connection_response(row=row) for row in filtered_rows],
-            next_cursor=None,
+            items=[_exchange_connection_response(row=row) for row in page],
+            next_cursor=str(offset + size) if offset + size < len(filtered_rows) else None,
+        )
+
+    @router.get(
+        "/ui/account/exchange-connections/{connection_id}",
+        response_model=ExchangeConnectionResponse,
+    )
+    def get_exchange_connection(
+        connection_id: UUID,
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> ExchangeConnectionResponse:
+        client = _require_exchange_control_client(client=exchange_control_client)
+        try:
+            rows = client.list_connections(
+                owner_user_id=str(principal.user_id), request_id="apps-api-get-exchange-connection"
+            )
+        except ExchangeControlClientError as error:
+            raise _exchange_control_unavailable(error=error) from error
+        row = next((row for row in rows if row.connection_id == str(connection_id)), None)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Connection not found")
+        return _exchange_connection_response(row=row)
+
+    @router.get(
+        "/ui/account/exchange-connections/{connection_id}/bindings",
+        response_model=ConnectionBindingsResponse,
+    )
+    def get_connection_bindings(
+        connection_id: UUID,
+        cursor: UUID | None = None,
+        limit: int = Query(default=30, ge=1, le=50),
+        principal: CurrentUserPrincipal = Depends(require_account_user),
+    ) -> ConnectionBindingsResponse:
+        # Resolve both the account owner and active organization before exposing
+        # any strategy references. Upstream outages remain 503, never empty data.
+        get_exchange_connection(connection_id=connection_id, principal=principal)
+        service = _require_strategy_binding_service(service=strategy_binding_service)
+        rows = service.list_connection_bindings(
+            organization_id=organization_scope_resolver.resolve(
+                user_id=principal.user_id
+            ).organization_id,
+            owner_user_id=principal.user_id,
+            exchange_connection_id=connection_id,
+            after=cursor,
+            limit=limit + 1,
+        )
+        page = rows[:limit]
+        return ConnectionBindingsResponse(
+            items=[_strategy_exchange_binding_response(row=row) for row in page],
+            next_cursor=str(page[-1].binding_id) if len(rows) > limit else None,
         )
 
     @router.post(
@@ -955,7 +1023,7 @@ def _require_telegram_binding_service(
         raise RoehubError(
             code="notification_provider_unavailable",
             message="Exactly one active Telegram provider instance is required.",
-            details={"reason": str(error)},
+            details={"reason": "provider_unavailable"},
         ) from error
     if resolved.organization_id != organization_id:
         raise RoehubError(
@@ -1371,7 +1439,10 @@ def _masked_chat_ref(*, chat_id_ref: str | None) -> str | None:
 
 def _session_response(*, session: AccountSessionView) -> AccountSessionResponse:
     return AccountSessionResponse(
-        session_id=session.session_id,
+        # A session ID is a bearer credential, not a public table identifier.
+        session_id=sha256(
+            f"account-session-view:{session.owner_user_id}:{session.session_id}".encode()
+        ).hexdigest(),
         created_at=session.created_at,
         last_seen_at=session.last_seen_at,
         idle_expires_at=session.idle_expires_at,

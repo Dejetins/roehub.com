@@ -1,0 +1,72 @@
+{
+  "verified_at": "2026-10-04T11:19:04.136081+00:00",
+  "backend_unit_passed": 43,
+  "frontend_unit_passed": 34,
+  "browser_console_warnings_or_errors": 0,
+  "initial_selection": [],
+  "final_selection": [],
+  "ws_rows": 31,
+  "recent_canonical": [
+    {
+      "symbol": "AAVEUSDT",
+      "rows": 9,
+      "minutes": 9,
+      "first": "2026-10-04 11:05:00",
+      "last": "2026-10-04 11:13:00"
+    },
+    {
+      "symbol": "ADAUSDT",
+      "rows": 9,
+      "minutes": 9,
+      "first": "2026-10-04 11:05:00",
+      "last": "2026-10-04 11:13:00"
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "rows": 9,
+      "minutes": 9,
+      "first": "2026-10-04 11:05:00",
+      "last": "2026-10-04 11:13:00"
+    },
+    {
+      "symbol": "ANKRUSDT",
+      "rows": 9,
+      "minutes": 9,
+      "first": "2026-10-04 11:05:00",
+      "last": "2026-10-04 11:13:00"
+    }
+  ],
+  "august_history": [
+    {
+      "symbol": "AAVEUSDT",
+      "minutes": 44640
+    },
+    {
+      "symbol": "ADAUSDT",
+      "minutes": 44640
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "minutes": 44640
+    },
+    {
+      "symbol": "ANKRUSDT",
+      "minutes": 44640
+    }
+  ],
+  "outage_retry_intervals_s": [
+    0.964,
+    1.562,
+    2.458,
+    4.365,
+    7.172,
+    12.111
+  ],
+  "source_sha256": {
+    "apps/worker/market_data_ws/wiring/modules/market_data_ws.py": "6f3bbc88ed1240a7b21127882a1189e1cbb5a0945267e65bb99f16d95fca4e8b",
+    "src/trading/contexts/market_data/application/services/insert_buffer.py": "5ea0a9edf3f97179a48a03e4bfab995b0bc5c5c8be6fe5dfbbf8e3d41da8b107",
+    "src/trading/contexts/market_data/application/services/rest_fill_queue.py": "c4920d8ede838928336e9324fbd482062f3e24552567976989dcdb627ab3b5cb",
+    "src/trading/contexts/market_data/adapters/outbound/clients/binance/ws_client.py": "2ffbb9a5cb160f5e506bbb6514f06c60a3b1a742db71290055d0df4716b7f28b",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/instrument_selection_repository.py": "fc60e112a0a2910b3ad649d427f052142bd4cf0d530f7fb1e2739541c64fca18"
+  }
+}

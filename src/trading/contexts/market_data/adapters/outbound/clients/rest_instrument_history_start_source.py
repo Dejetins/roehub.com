@@ -40,6 +40,7 @@ class RestInstrumentHistoryStartSource(InstrumentHistoryStartSource):
     cfg: MarketDataRuntimeConfig
     http: HttpClient
     clock: Clock
+    require_confirmed_candle: bool = False
     _instrument_cache: dict[tuple[int, str], UtcTimestamp | None] = field(
         default_factory=dict,
         init=False,
@@ -84,11 +85,13 @@ class RestInstrumentHistoryStartSource(InstrumentHistoryStartSource):
             should_cache = True
         except Exception:  # noqa: BLE001
             log.warning(
-                "history-start resolve failed for market=%s symbol=%s; "
-                "falling back to market earliest",
+                "history-start resolve failed for market=%s symbol=%s; " "%s",
                 market.market_code,
                 instrument_id.symbol,
-                exc_info=True,
+                "no confirmed start"
+                if self.require_confirmed_candle
+                else "falling back to market earliest",
+                exc_info=not self.require_confirmed_candle,
             )
             resolved = None
             should_cache = False
@@ -104,6 +107,8 @@ class RestInstrumentHistoryStartSource(InstrumentHistoryStartSource):
         market: MarketConfig,
         instrument_id: InstrumentId,
     ) -> UtcTimestamp | None:
+        if self.require_confirmed_candle:
+            return self._confirmed_history_start(market, instrument_id)
         if market.exchange == "binance" and market.market_type == "futures":
             return self._resolve_binance_futures_history_start(market, instrument_id)
         if market.exchange == "bybit" and market.market_type == "futures":
@@ -124,6 +129,71 @@ class RestInstrumentHistoryStartSource(InstrumentHistoryStartSource):
             )
         raise ValueError(
             f"unsupported exchange/market_type for history start source: {market.exchange}/{market.market_type}"  # noqa: E501
+        )
+
+    def _confirmed_history_start(
+        self, market: MarketConfig, instrument_id: InstrumentId
+    ) -> UtcTimestamp | None:
+        """Interactive defaults require a returned candle, never a listing-date fallback."""
+        first_minute = _minute_index(market.rest.earliest_available_ts_utc.value)
+        now_minute = _minute_index(self.clock.now().value)
+        if market.exchange == "binance":
+            path = "/api/v3/klines" if market.market_type == "spot" else "/fapi/v1/klines"
+            response = self.http.get_json(
+                url=market.rest.base_url.rstrip("/") + path,
+                params={
+                    "symbol": str(instrument_id.symbol),
+                    "interval": "1m",
+                    "startTime": first_minute * 60_000,
+                    "limit": 1,
+                },
+                timeout_s=market.rest.timeout_s,
+                retries=market.rest.retries,
+                backoff_base_s=market.rest.backoff.base_s,
+                backoff_max_s=market.rest.backoff.max_s,
+                backoff_jitter_s=market.rest.backoff.jitter_s,
+            )
+            first = _first_binance_kline_open_utc(response.body)
+            return (
+                first
+                if first is not None and first_minute <= _minute_index(first.value) < now_minute
+                else None
+            )
+        if market.exchange != "bybit":
+            return None
+
+        def request(m: MarketConfig, instrument: InstrumentId, start: int, end: int):
+            url, params = self._build_bybit_spot_probe_request(m, instrument, start, end)
+            params["category"] = "spot" if m.market_type == "spot" else "linear"
+            return url, params
+
+        first = self._probe_spot_history_start(
+            market=market,
+            instrument_id=instrument_id,
+            request_factory=request,
+            response_has_rows=_bybit_kline_response_has_rows,
+        )
+        if first is None or not first_minute <= _minute_index(first.value) < now_minute:
+            return None
+        # Confirm that the provider honored the searched minute boundary.
+        start_ms = _minute_index(first.value) * 60_000
+        url, params = request(market, instrument_id, start_ms, start_ms + 59_999)
+        response = self.http.get_json(
+            url=url,
+            params=params,
+            timeout_s=market.rest.timeout_s,
+            retries=market.rest.retries,
+            backoff_base_s=market.rest.backoff.base_s,
+            backoff_max_s=market.rest.backoff.max_s,
+            backoff_jitter_s=market.rest.backoff.jitter_s,
+        )
+        if not _bybit_kline_response_has_rows(response.body):
+            return None
+        rows = response.body["result"]["list"]
+        return (
+            first
+            if any(isinstance(row, list) and row and int(row[0]) == start_ms for row in rows)
+            else None
         )
 
     def _resolve_binance_futures_history_start(
@@ -312,8 +382,7 @@ class RestInstrumentHistoryStartSource(InstrumentHistoryStartSource):
         response_has_rows: Callable[[Any], bool],
     ) -> bool:
         start_ms = (
-            _minute_index(floor_to_minute_utc(market.rest.earliest_available_ts_utc.value))
-            * 60_000
+            _minute_index(floor_to_minute_utc(market.rest.earliest_available_ts_utc.value)) * 60_000
         )
         end_ms = (probe_end_minute * 60_000) - 1
         if end_ms < start_ms:

@@ -12,6 +12,7 @@ from apps.monitoring.operational_health import (
     OperationalHealthService,
     OperationalManifest,
     OperationalProbe,
+    OperationalState,
     OperationalStatus,
     build_loki_log_sink,
     create_operational_health_app,
@@ -251,3 +252,18 @@ def test_probe_exception_is_bounded_unknown() -> None:
     assert {status.detail_code for status in snapshot.services} == {
         "probe.internal_error"
     }
+
+
+def test_operational_event_history_is_bounded_and_contains_only_state_changes() -> None:
+    current: list[OperationalState] = ['ready']
+    service = OperationalHealthService(
+        manifest=_manifest(), probe=lambda _spec: (current[0], 'probe.domain_ready'),
+    )
+    for index in range(100):
+        current[0] = 'ready' if index % 2 else 'unknown'
+        service.refresh()
+    events = service.recent_events()
+    assert len(events) == 200
+    service.refresh()
+    assert service.recent_events() == events
+    assert all('target' not in e.model_dump() for e in events)

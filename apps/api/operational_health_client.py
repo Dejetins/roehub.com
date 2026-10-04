@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 import httpx
+from pydantic import TypeAdapter
 
-from apps.monitoring.operational_health import OperationalSnapshot
+from apps.monitoring.operational_health import OperationalSnapshot, OperationalStatus
 
 _BASE_URL_ENV = "ROEHUB_OPERATIONAL_HEALTH_URL"
 _TIMEOUT_ENV = "ROEHUB_OPERATIONAL_HEALTH_TIMEOUT_SECONDS"
@@ -23,6 +24,11 @@ class OperationalHealthClient(Protocol):
     def snapshot(self) -> OperationalSnapshot: ...
 
 
+@runtime_checkable
+class OperationalHistoryClient(Protocol):
+    def events(self) -> tuple[OperationalStatus, ...]: ...
+
+
 @dataclass(frozen=True)
 class HttpOperationalHealthClient:
     base_url: str
@@ -34,6 +40,19 @@ class HttpOperationalHealthClient:
             raise ValueError("operational health URL must use HTTP or HTTPS")
         if self.timeout_seconds <= 0:
             raise ValueError("operational health timeout must be positive")
+
+    def events(self) -> tuple[OperationalStatus, ...]:
+        try:
+            with httpx.Client(base_url=self.base_url.rstrip("/"), timeout=self.timeout_seconds,
+                              transport=self.transport) as client:
+                response = client.get("/api/v1/operational-health/events")
+                response.raise_for_status()
+                parsed = TypeAdapter(tuple[OperationalStatus, ...]).validate_python(response.json())
+                return parsed[:200]
+        except (httpx.HTTPError, ValueError) as error:
+            raise OperationalHealthClientError(
+                "operational event history is unavailable"
+            ) from error
 
     def snapshot(self) -> OperationalSnapshot:
         try:

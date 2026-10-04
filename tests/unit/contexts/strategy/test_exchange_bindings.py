@@ -57,6 +57,22 @@ def test_strategy_exchange_binding_lifecycle_is_owner_scoped() -> None:
     )
 
     assert binding.binding_status == "active"
+    assert service.list_connection_bindings(
+        organization_id=_ORGANIZATION_ID, owner_user_id=owner.user_id,
+        exchange_connection_id=connection_id,
+    ) == (binding,)
+    assert not service.list_connection_bindings(
+        organization_id=_ORGANIZATION_ID, owner_user_id=other_user_id,
+        exchange_connection_id=connection_id,
+    )
+    assert not service.list_connection_bindings(
+        organization_id=OrganizationId(UUID(int=1234)), owner_user_id=owner.user_id,
+        exchange_connection_id=connection_id,
+    )
+    assert not service.list_connection_bindings(
+        organization_id=_ORGANIZATION_ID, owner_user_id=owner.user_id,
+        exchange_connection_id=connection_id, after=binding.binding_id,
+    )
     assert service.list_bindings(
         organization_id=_ORGANIZATION_ID,
         owner_user_id=owner.user_id,

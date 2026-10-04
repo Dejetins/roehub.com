@@ -88,12 +88,33 @@ def demo_fills(strategy_id: str, state: dict) -> list:
 
 
 def apply_execution_demo(payload: dict, strategy_id: str, path: Path | None = None) -> dict:
-    """Overlay only a successfully authorized, selected strategy dashboard."""
-    if payload.get("selected_strategy", {}).get("strategy_id") != strategy_id:
+    """Keep the authorized selector and selected demo runtime consistent."""
+    selected = payload.get("selected_strategy", {}).get("strategy_id") == strategy_id
+    selector = payload.get("strategy_selector", {})
+    demo_row = next(
+        (row for row in selector.get("items", []) if row["strategy_id"] == strategy_id), None
+    )
+    if not selected and demo_row is None:
+        return payload
+    state = demo_state(path)
+    selector_status = "live" if state["running"] else "stopped"
+    run_state = "running" if state["running"] else "stopped"
+    if demo_row is not None:
+        buckets = {"live": "active", "stopped": "stopped", "degraded": "degraded"}
+        totals = selector.get("totals", {})
+        old_bucket = buckets.get(demo_row["status"])
+        new_bucket = buckets[selector_status]
+        if old_bucket != new_bucket:
+            if old_bucket in totals:
+                totals[old_bucket] -= 1
+            if new_bucket in totals:
+                totals[new_bucket] += 1
+        demo_row.update(status=selector_status, run_state=run_state)
+    if not selected:
         return payload
     from apps.api.dto.ui_strategies_dashboard import StrategyDashboardResponse
 
-    state = demo_state(path)
+    payload["selected_strategy"].update(status=selector_status, run_state=run_state)
     rows = demo_fills(strategy_id, state)
     now = datetime.now(UTC)
     operations = project_fills(rows, initial_cash=10000)

@@ -70,6 +70,24 @@ class InMemoryStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
         rows.sort(key=lambda item: (item.created_at, str(item.binding_id)))
         return tuple(rows)
 
+    def list_for_connection(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
+        after: UUID | None,
+        limit: int,
+    ) -> tuple[StrategyExchangeBinding, ...]:
+        rows = sorted(
+            (b for b in self._bindings.values()
+             if b.organization_id == organization_id and b.owner_user_id == owner_user_id
+             and b.exchange_connection_id == exchange_connection_id
+             and (after is None or b.binding_id > after)),
+            key=lambda b: b.binding_id,
+        )
+        return tuple(rows[:limit])
+
     def disable(
         self,
         *,

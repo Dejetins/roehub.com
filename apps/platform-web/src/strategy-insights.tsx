@@ -1,3 +1,5 @@
+import {useReadSnapshot} from './read-snapshot';
+import {ReadStatus} from './loading-data';
 import {z} from 'zod';
 import {type ReactNode} from 'react';
 import {useQuery} from '@tanstack/react-query';
@@ -19,7 +21,7 @@ export function StrategyInsights({strategy,subject,observation,now,children}:{st
  const origin=isRestricted(source.error)?undefined:source.data;
  const tabs=['overview','backtest','execution','specification'];
  return <div className="strategy-insights">
-  <div className="result-tabs" role="tablist" aria-label={t('strategy.workspace')}>{tabs.map((name,index)=><button key={name} id={`strategy-tab-${name}`} role="tab" aria-selected={tab===name} aria-controls="strategy-tab-panel" tabIndex={tab===name?0:-1} onClick={()=>setTab(name)} onKeyDown={event=>{const next=event.key==='ArrowRight'?(index+1)%tabs.length:event.key==='ArrowLeft'?(index+tabs.length-1)%tabs.length:event.key==='Home'?0:event.key==='End'?tabs.length-1:-1;if(next>=0){event.preventDefault();setTab(tabs[next]!);document.getElementById(`strategy-tab-${tabs[next]}`)?.focus();}}}>{t(`strategy.tabs.${name}`)}</button>)}</div>
+  <div className="result-tabs view-switch" role="tablist" aria-label={t('strategy.workspace')}>{tabs.map((name,index)=><button key={name} id={`strategy-tab-${name}`} role="tab" aria-selected={tab===name} aria-controls="strategy-tab-panel" tabIndex={tab===name?0:-1} onClick={()=>setTab(name)} onKeyDown={event=>{const next=event.key==='ArrowRight'?(index+1)%tabs.length:event.key==='ArrowLeft'?(index+tabs.length-1)%tabs.length:event.key==='Home'?0:event.key==='End'?tabs.length-1:-1;if(next>=0){event.preventDefault();setTab(tabs[next]!);document.getElementById(`strategy-tab-${tabs[next]}`)?.focus();}}}>{t(`strategy.tabs.${name}`)}</button>)}</div>
   <div id="strategy-tab-panel" role="tabpanel" aria-labelledby={`strategy-tab-${tab}`} data-motion-content data-motion-style="quiet">
    {tab==='specification'&&children}
    {tab==='execution'&&<Trading observation={observation}/>}
@@ -60,8 +62,8 @@ function Research({subject,job,variant,now,expanded}:{subject:string;job:string;
      <Field label={t('strategy.takeProfit')} value={data.best_tp_pct==null?t('strategy.notSet'):`${num(data.best_tp_pct)}%`}/>
      <Field label={t('strategy.stopLoss')} value={data.best_sl_pct==null?t('strategy.notSet'):`${num(data.best_sl_pct)}%`}/>
     </dl>
-    <div className="chart-switch" role="group" aria-label={t('results.title')}>{['equity','drawdown','trades'].map(name=><button key={name} aria-pressed={view===name} onClick={()=>setView(name)}>{t(`results.${name}`)}</button>)}</div>
-    <ResearchData key={`${view}:${page}`} job={job} variant={variant} subject={subject} now={now} view={view} page={page} setPage={setPage}/>
+    <div className="chart-switch view-switch" role="group" aria-label={t('results.title')}>{['equity','drawdown','trades'].map(name=><button key={name} aria-pressed={view===name} onClick={()=>setView(name)}>{t(`results.${name}`)}</button>)}</div>
+    <ResearchData key={`${subject}:${job}:${variant}`} job={job} variant={variant} subject={subject} now={now} view={view} page={page} setPage={setPage}/>
    </>}
   </>}
  </>;
@@ -73,8 +75,9 @@ function ResearchData({subject,job,variant,now,view,page,setPage}:{subject:strin
   if(view==='trades'){const reply=await readResult(job,variant,suffix,tradesSchema,signal);if('pagination' in reply.data && reply.data.pagination.page!==page)throw new ApiError('invalid-response',200,'failed');return reply;}
   const reply=await readResult(job,variant,suffix,seriesSchema,signal);if('kind' in reply.data && reply.data.kind!==view)throw new ApiError('invalid-response',200,'failed');return reply;
  },now);
- const data=isRestricted(series.error)?undefined:series.data?.status===200?series.data.data:undefined;
- return <div className="strategy-research-data"><ReadError error={series.error}/>{(series.isPending||series.data?.status===202)&&<p role="status">{t('refreshing')}</p>}{data&&'points' in data?<Chart data={data} label={t(`results.${view}`)} group={`${job}:${variant}`}/>:data&&'items' in data?<><DataTable items={data.items} columns={['entry_timestamp','exit_timestamp','side','entry_price','exit_price','net_pnl_quote','return_pct','fee_quote']} label={t('results.trades')}/><nav className="pagination" aria-label={t('results.trades')}><button disabled={!data.pagination.has_previous} onClick={()=>setPage(page-1)}>{t('results.previous')}</button><span>{t('results.page',{page,total:data.pagination.total})}</span><button disabled={!data.pagination.has_next} onClick={()=>setPage(page+1)}>{t('results.next')}</button></nav></>:null}</div>;
+ const snapshot=useReadSnapshot(`${subject}:${job}:${variant}`,suffix,series.data?.status===200&&!series.isFetching?{data:series.data.data,view,page}:undefined,isRestricted(series.error));
+ const data=snapshot.data?.data;
+ return <div className="strategy-research-data"><ReadError error={series.error}/><ReadStatus pending={series.isFetching||series.data?.status===202} retained={snapshot.retained}/>{data&&'points' in data?<Chart data={data} label={t(`results.${snapshot.data?.view??view}`)} group={`${job}:${variant}`}/>:data&&'items' in data?<><DataTable items={data.items} columns={['entry_timestamp','exit_timestamp','side','entry_price','exit_price','net_pnl_quote','return_pct','fee_quote']} label={t('results.trades')}/><nav className="pagination" aria-label={t('results.trades')}><button disabled={!data.pagination.has_previous||snapshot.retained} onClick={()=>setPage(page-1)}>{t('results.previous')}</button><span>{t('results.page',{page,total:data.pagination.total})}</span><button disabled={!data.pagination.has_next||snapshot.retained} onClick={()=>setPage(page+1)}>{t('results.next')}</button></nav></>:null}</div>;
 }
 function Field({label,value}:{label:string;value:ReactNode}){return <div><dt>{label}</dt><dd>{value}</dd></div>}
 function Trading({observation}:{observation:Observation}){

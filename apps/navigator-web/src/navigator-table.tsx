@@ -1,0 +1,10 @@
+import {ExpandableOverview} from './expandable-overview';
+import {useState,type ReactNode} from 'react';
+import {useTranslation} from 'react-i18next';
+/** One table surface contract for all Navigator pages; column schemas stay domain-specific. */
+export function NavigatorTable({tabs,value,onChange,actions,expandable=true}:{expandable?:boolean;actions?:ReactNode;value?:string;onChange?:(id:string)=>void;tabs:{id:string;label:string;tools?:ReactNode;content:ReactNode}[]}) {
+ const {i18n}=useTranslation();
+ const [local,setLocal]=useState(tabs[0]?.id); const selected=value??local; const setSelected=onChange??setLocal;
+ const active=tabs.some(tab=>tab.id===selected)?selected:tabs[0]?.id;
+ return <ExpandableOverview expandable={expandable} className="navigator-table panel" label={i18n.language.startsWith('ru')?'Таблицы':'Tables'} expandLabel={i18n.language.startsWith('ru')?'Развернуть таблицы':'Expand tables'} collapseLabel={i18n.language.startsWith('ru')?'Свернуть таблицы':'Collapse tables'} controls={<div className="navigator-table-header"><div className="view-switch navigator-table-tabs" role="tablist" aria-label={i18n.language.startsWith('ru')?'Подробности':'Details'}>{tabs.map((tab,index)=><button key={tab.id} id={`navigator-tab-${tab.id}`} aria-controls={`navigator-panel-${tab.id}`} role="tab" aria-selected={active===tab.id} tabIndex={active===tab.id?0:-1} onClick={()=>setSelected(tab.id)} onKeyDown={event=>{const next=event.key==='ArrowRight'?(index+1)%tabs.length:event.key==='ArrowLeft'?(index+tabs.length-1)%tabs.length:event.key==='Home'?0:event.key==='End'?tabs.length-1:-1;if(next>=0){event.preventDefault();setSelected(tabs[next]!.id);document.getElementById(`navigator-tab-${tabs[next]!.id}`)?.focus();}}}>{tab.label}</button>)}</div><div className="navigator-table-tools">{tabs.find(tab=>tab.id===active)?.tools}{actions}</div></div>}><div className="navigator-table-body">{tabs.map(tab=><div key={tab.id} id={`navigator-panel-${tab.id}`} role="tabpanel" aria-labelledby={`navigator-tab-${tab.id}`} hidden={active!==tab.id}>{tab.content}</div>)}</div></ExpandableOverview>;
+}

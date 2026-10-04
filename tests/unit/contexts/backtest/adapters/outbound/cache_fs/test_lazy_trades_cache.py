@@ -96,6 +96,17 @@ def test_lazy_trades_cache_views_report_hit_after_materialized_miss(
     assert page.payload["cache"]["status"] == "hit"
     assert monthly.payload["cache"]["status"] == "hit"
 
+    payload["trades"] = tuple({**payload["trades"][0], "trade_index": i} for i in range(3))
+    cache.write(cache_key=cache_key, payload=payload, now=now, ttl_seconds=1_209_600)
+    full = cache.read_csv(cache_key=cache_key, now=now, ttl_seconds=1_209_600, max_rows=None)
+    bounded = cache.read_csv(cache_key=cache_key, now=now, ttl_seconds=1_209_600, max_rows=1)
+    assert full.payload is not None
+    assert bounded.payload is not None
+    assert full.payload["row_count"] == 3
+    assert full.payload["truncated"] is False
+    assert bounded.payload["row_count"] == 1
+    assert bounded.payload["truncated"] is True
+
 
 def test_lazy_trades_cache_key_accounts_for_funding_manifest_hash() -> None:
     base = BacktestLazyTradesCacheKey(

@@ -27,7 +27,7 @@ h3 { font-size:1rem; font-weight:500; overflow-wrap:anywhere; }
 .sidebar nav { display:flex; flex-direction:column; gap:.5rem; }
 .sidebar a,.nav-unavailable { display:flex; gap:.7rem; align-items:center; min-height:3.6rem; padding:.7rem; color:var(--muted); border:1px solid transparent; border-radius:12px; }
 .nav-unavailable { flex-wrap:wrap; color:var(--muted); }.nav-unavailable small { font-size:.75rem; }
-.sidebar a[aria-current] { color:var(--text); border-color:var(--line); border-inline-start-color:var(--violet); background:var(--surface-2); }
+.sidebar a[aria-current] { color:var(--text); background:var(--surface-2); }
 .logout { margin-block-start:auto; }
 .workspace { min-width:0; padding-top:.7rem; }
 .workspace-title { display:flex; gap:1rem; flex-wrap:wrap; align-items:center; margin:0 1rem .8rem; }
@@ -154,7 +154,7 @@ dialog::backdrop { background:#000a; }.filter-fields { display:grid; gap:1.2rem;
 /* Result workbench retains v23 surfaces; wide tables scroll inside their panel. */
 .panes:has(.results) { grid-template-columns:minmax(17rem,.7fr) minmax(0,1.8fr); }
 .results { margin-block:1.5rem; min-width:0; }.results section { min-width:0; }.result-metrics { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }.result-metrics dd { margin-top:.5rem; font-size:1.2rem; }
-.result-chart { height:20rem; width:100%; }.result-chart canvas { max-width:100%; }.result-tabs { display:flex; flex-wrap:wrap; gap:.4rem; margin-block:1.5rem 1rem; }.result-tabs [aria-selected=true] { border-color:var(--violet); background:#262035; }
+.result-chart { height:20rem; width:100%; }.result-chart canvas { max-width:100%; }.result-tabs { display:flex; flex-wrap:wrap; gap:.4rem; margin-block:1.5rem 1rem; }
 .result-command { border-block-start:1px solid var(--line-soft); padding-block:1rem; }.result-command p,.result-export p { overflow-wrap:anywhere; }.result-command a { text-decoration:underline; }
 .result-export { display:flex; align-items:end; gap:.8rem; flex-wrap:wrap; padding-block:1rem; }.result-export label { max-width:15rem; }.result-export p { flex-basis:100%; margin:0; }
 .results .table-scroll { max-height:25rem; }.results td:first-child { width:auto; }.results th,.results td { white-space:nowrap; }.results select { text-overflow:ellipsis; }
@@ -243,14 +243,11 @@ dialog::backdrop { background:#000a; }.filter-fields { display:grid; gap:1.2rem;
 .result-metrics { margin:0 0 10px; gap:8px; }
 .results .result-metrics { padding:0; }
 .result-metrics>div { padding:10px 12px; border:1px solid var(--line-soft); border-radius:10px; background:#20262d; }
-.result-metrics>div:first-child { background:#252137; border-color:#574575; }
 .result-metrics dd { margin:5px 0 0; font-size:1.5rem; font-weight:600; }
 .result-metrics dt { font-size:.74rem; }
 .result-tabs { display:flex; gap:6px; margin:0; padding-bottom:8px; flex-wrap:wrap; }
 .result-tabs button { min-height:30px; padding:3px 10px; }
 .chart-switch { display:flex; gap:6px; padding:4px 0; }
-.chart-switch button { border:0; border-radius:6px; color:var(--muted); background:transparent; min-height:28px; padding:4px 10px; }
-.chart-switch button[aria-pressed=true] { background:#282337; color:#d8cbff; }
 .chart-toolbar { display:flex; align-items:center; gap:12px; justify-content:space-between; }
 .chart-help,.report-explanation { font-size:.76rem; margin:4px 0; }
 .trade-toggle { display:flex; flex-direction:row; align-items:center; white-space:nowrap; font-size:.8rem; }
@@ -268,12 +265,12 @@ dialog::backdrop { background:#000a; }.filter-fields { display:grid; gap:1.2rem;
 .results .report-actions,.report-workspace .job-information { margin:6px 0 0; padding:4px 0 0; font-size:.8rem; }
 .report-workspace .job-information dd { overflow-wrap:anywhere; }
 @media (min-width:75rem) and (min-height:850px) {
- .panes.report-workspace:not(:has([data-expanded=true])):has(#results) { height:calc(100dvh - 146px); min-height:0; }
- .panes.report-workspace:not(:has([data-expanded=true])):has(#results)>.panel { height:100%; min-height:0; }
- .panes.report-workspace:not(:has([data-expanded=true])):has(#results)>.library { overflow:auto; }
- .panes.report-workspace:not(:has([data-expanded=true])):has(#results)>.context { display:flex; flex-direction:column; position:relative; }
- .report-workspace:not(:has([data-expanded=true])):has(#results) .context>.panel-head { flex-shrink:0; padding:10px 18px; }
- .report-workspace:not(:has([data-expanded=true])):has(#results) .job-detail { display:flex; flex-direction:column; flex:1; min-height:0; padding:0 18px 8px; }
+ .panes.report-workspace:not(:has([data-expanded=true])).backtest-detail-workspace { height:calc(100dvh - 146px); min-height:0; }
+ .panes.report-workspace:not(:has([data-expanded=true])).backtest-detail-workspace>.panel { height:100%; min-height:0; }
+ .panes.report-workspace:not(:has([data-expanded=true])).backtest-detail-workspace>.library { overflow:auto; }
+ .panes.report-workspace:not(:has([data-expanded=true])).backtest-detail-workspace>.context { display:flex; flex-direction:column; position:relative; }
+ .report-workspace:not(:has([data-expanded=true])).backtest-detail-workspace .context>.panel-head { flex-shrink:0; padding:10px 18px; }
+ .report-workspace:not(:has([data-expanded=true])).backtest-detail-workspace .job-detail { display:flex; flex-direction:column; flex:1; min-height:0; padding:0 18px 8px; }
  .report-workspace:not(:has([data-expanded=true])) .results { display:flex; flex-direction:column; flex:1; min-height:0; margin:6px 0 0; }
  .report-workspace:not(:has([data-expanded=true])) .results>h3 { margin:0 0 6px; font-size:.85rem; }
  .report-workspace:not(:has([data-expanded=true])) [data-result-variant] { display:flex; flex-direction:column; min-height:0; flex:1; }
@@ -302,7 +299,7 @@ dialog::backdrop { background:#000a; }.filter-fields { display:grid; gap:1.2rem;
 .result-detail-view .pagination { margin:6px 0; }
 @media(max-width:40rem) { .full-metrics tbody { grid-template-columns:1fr; } }
 @media (min-width:75rem) and (min-height:850px) {
- .report-workspace:not(:has([data-expanded=true])):has(#results) .job-status { position:absolute; top:21px; right:125px; padding:0; }
+ .report-workspace:not(:has([data-expanded=true])).backtest-detail-workspace .job-status { position:absolute; top:21px; right:125px; padding:0; }
  .report-workspace:not(:has([data-expanded=true])) .overview-charts>.result-detail-view { position:relative; }
  .report-workspace:not(:has([data-expanded=true])) .overview-charts>.result-detail-view>button { position:absolute; right:0; bottom:0; margin:0; }
  .report-workspace:not(:has([data-expanded=true])) .results .report-actions:not([open]) { position:absolute; bottom:8px; left:18px; width:55%; border:0; margin:0; padding:0; }
@@ -323,7 +320,7 @@ dialog::backdrop { background:#000a; }.filter-fields { display:grid; gap:1.2rem;
 button,a.button-link { transition:background-color var(--motion-duration) ease-out,border-color var(--motion-duration) ease-out,color var(--motion-duration) ease-out; }
 .overview-toolbar { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-shrink:0; }
 .overview-toolbar .chart-switch { flex-wrap:wrap; }
-.overview-expand { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; min-height:28px; padding:0; flex-shrink:0; border-radius:6px; }
+.overview-expand { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; min-height:28px; padding:0; flex-shrink:0; border-radius:50%; }
 .overview-expand svg { width:16px; height:16px; }
 .overview-expanded.overview-charts { position:fixed; inset:0; z-index:1000; box-sizing:border-box; padding:20px; background:var(--panel,#151b21); display:flex; flex-direction:column; width:100%; height:100dvh !important; min-height:0; overflow:auto; }
 .overview-expanded>.result-detail-view { flex:1; display:flex; flex-direction:column; min-height:0; }
@@ -447,6 +444,10 @@ button,a.button-link { transition:background-color var(--motion-duration) ease-o
 .strategies-panes .strategy-context { view-transition-name:none; }
 /* Strategy operations reuse platform surfaces and compact control scale. */
 .operations-workspace { min-width:0; }
+.loading-data { display:flex; align-items:center; gap:7px; width:fit-content; max-width:100%; margin:6px 0; color:var(--muted); font-size:.9rem; }
+.loading-data>svg { width:14px; height:14px; flex:none; }
+@keyframes data-loading-spin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:no-preference) { .loading-data>svg { animation:data-loading-spin .8s linear infinite; } }
 .strategy-detail:has(.operations-workspace) {padding:16px;}
 .operations-header { display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
 .operations-header h2 {font-size:1.1rem;margin:0 0 6px;overflow-wrap:anywhere;}
@@ -641,11 +642,6 @@ button,a.button-link { transition:background-color var(--motion-duration) ease-o
 @media(max-width:640px) {.operations-footer {flex-direction:column;}.operations-metadata {max-width:100%;}}
 
 /* Strategy tabs indicate selection with a filled surface only. */
-.operations-view-tools .result-tabs button {border-color:transparent;background:transparent;}
-.operations-view-tools .result-tabs button[aria-selected=true],
-.operations-view-tools .result-tabs button[aria-selected=true]:hover {border-color:transparent;background:#252c34;color:var(--text);}
-.operations-view-tools .result-tabs button:hover {background:var(--surface-2);}
-.operations-view-tools .result-tabs button:focus-visible {outline:none;box-shadow:none;text-decoration:underline;text-underline-offset:4px;}
 .operations-overview .overview-expand:focus,
 .operations-overview .overview-expand:focus-visible {outline:none;box-shadow:none;}
 .operations-overview .overview-expand:focus-visible {background:var(--surface-2);color:var(--violet);}
@@ -730,3 +726,55 @@ button,a.button-link { transition:background-color var(--motion-duration) ease-o
 .builder .field:has(>select) { --caption-inset:15px; }
 .builder .field:has(>input[type=date]) { --caption-inset:9px; }
 .builder .field>label:not(.sr-only),.builder .field>span:first-child { padding-inline-start:var(--caption-inset); }
+
+/* Keep uncached report navigation in the same workspace geometry. */
+.backtest-detail-workspace:not(:has([data-expanded=true]))>.context { min-height: min(650px, 70dvh); }
+.backtest-detail-workspace .data-pending { display:flex; flex:1; min-height:240px; align-items:center; justify-content:center; }
+.backtest-detail-workspace .data-pending>.loading-data { margin:0; }
+.backtest-detail-workspace .result-detail-view:not([data-ready=true]) { min-height:240px; }
+.backtest-detail-workspace .result-detail-view:not([data-ready=true])>.loading-data { margin:auto; }
+
+
+/* Read updates occupy a reserved local status row, never fade their containing surface. */
+.read-status { min-height:24px; display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12px; }
+.read-status .loading-data { margin:0; }
+.read-status:empty { visibility:hidden; }
+
+/* Status shares existing heading space; retention wrappers preserve the report flex chain. */
+.result-heading,.variant-heading { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-shrink:0; }
+.result-heading>h3 { margin:0 0 6px; font-size:.85rem; }
+.variant-heading .selected-variant-title { margin:4px 0; }
+.result-refresh { align-self:flex-end; min-height:26px; padding:3px 9px; font-size:.75rem; margin-top:4px; }
+.context { position:relative; }
+.read-status-overlay { position:absolute; top:38px; left:18px; right:18px; z-index:2; pointer-events:none; }
+.retained-job { display:contents; }
+@media(min-width:75rem) and (min-height:850px) {
+ .backtest-detail-workspace .retained-job { display:flex; flex-direction:column; flex:1; min-height:0; }
+ .backtest-detail-workspace .retained-job>.panel-head { flex-shrink:0; padding:10px 18px; }
+ .backtest-detail-workspace .result-heading>h3 { margin:0 0 6px; }
+}
+
+.chart-switch { flex-wrap:wrap; }
+.expanded-read-status { display:none; }
+.overview-expanded .expanded-read-status { display:flex; }
+
+/* Timeframe buttons follow Overview's compact segmented period control. */
+
+
+/* Shared switch appearance: accepted Strategy tabs, reused by report views and periods. */
+.view-switch.view-switch {display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:0;background:transparent;border:0;border-radius:0;}
+.view-switch.view-switch>button {height:28px;min-height:28px;padding:3px 10px;border:1px solid transparent;border-radius:999px;background:transparent;color:var(--text);font-size:1rem;white-space:nowrap;}
+.view-switch.view-switch>button:hover:not(:disabled) {background:var(--surface-2);}
+.view-switch.view-switch>button:is([aria-selected=true],[aria-pressed=true]),
+.view-switch.view-switch>button:is([aria-selected=true],[aria-pressed=true]):hover {background:#252c34;border-color:transparent;color:var(--text);}
+.view-switch.view-switch>button:focus-visible {outline:none;box-shadow:none;text-decoration:underline;text-underline-offset:4px;}
+.view-switch.view-switch>button:disabled {opacity:.35;cursor:default;}
+.report-chart-controls {display:flex;flex-direction:column;gap:8px;flex:1;min-width:0;padding-block:4px;}
+.report-chart-ranges {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 20px;}
+.overview-toolbar:has(>.report-chart-controls) {align-items:flex-start;}
+.overview-toolbar:has(>.report-chart-controls)>.overview-expand {margin-top:4px;}
+.operations-view-tools:has(>.view-switch) {flex:1;min-width:0;}
+.operations-view-tools .result-tabs.view-switch {flex-shrink:1;min-width:0;}
+
+.operations-market .operations-mini-toolbar:has(>.view-switch) {width:100%;align-items:flex-start;}
+.operations-mini-toolbar>.view-switch {min-width:0;flex:1;}

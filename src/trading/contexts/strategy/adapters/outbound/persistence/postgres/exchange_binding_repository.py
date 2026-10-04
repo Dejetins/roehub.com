@@ -170,6 +170,38 @@ class PostgresStrategyExchangeBindingRepository(StrategyExchangeBindingRepositor
         )
         return tuple(_map_binding(row=row) for row in rows)
 
+    def list_for_connection(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
+        after: UUID | None,
+        limit: int,
+    ) -> tuple[StrategyExchangeBinding, ...]:
+        rows = self._gateway.fetch_all(
+            query=f"""
+            SELECT binding_id, organization_id, owner_user_id, strategy_id,
+                   exchange_connection_id, usage_mode, binding_status,
+                   created_at, updated_at, disabled_at, archived_at
+            FROM {self._table_name}
+            WHERE organization_id = %(organization_id)s
+              AND owner_user_id = %(owner_user_id)s
+              AND exchange_connection_id = %(exchange_connection_id)s
+              AND (%(after)s::uuid IS NULL OR binding_id > %(after)s::uuid)
+            ORDER BY binding_id ASC
+            LIMIT %(limit)s
+            """,
+            parameters={
+                "organization_id": str(organization_id),
+                "owner_user_id": str(owner_user_id),
+                "exchange_connection_id": str(exchange_connection_id),
+                "after": str(after) if after else None,
+                "limit": limit,
+            },
+        )
+        return tuple(_map_binding(row=row) for row in rows)
+
     def disable(
         self,
         *,

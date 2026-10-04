@@ -154,6 +154,7 @@ class BybitWsClosedCandleStream:
                     self._ws_url,
                     ping_interval=self._ping_interval_s,
                     ping_timeout=self._pong_timeout_s,
+                    close_timeout=2,
                 ) as socket:
                     _emit_connected(self._hooks.on_connected, 1)
                     connected = True

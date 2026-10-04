@@ -1,0 +1,301 @@
+/* Navigator experimental shell. Shared geometry is defined once for all routes.
+   Native DOM ownership is retained, including inert authorization boundaries. */
+.navigator-app{--nav-library:224px;--nav-inspector:240px;--nav-chart-height:430px;--nav-table-height:300px;display:grid;grid-template-columns:56px minmax(0,1fr);grid-template-rows:1fr;gap:0;padding:0;min-height:100dvh;max-width:none;margin:0}
+.navigator-app>.sidebar{grid-column:1;grid-row:1;position:sticky;top:0;height:100dvh;width:56px;padding:12px 6px;display:flex;flex-direction:column;border-right:1px solid var(--line);gap:10px;background:var(--canvas)}
+.navigator-brand{display:grid;place-items:center;height:32px;font-size:20px;font-weight:650}
+.navigator-app .sidebar nav{display:flex;flex-direction:column;gap:8px}
+.navigator-app .sidebar nav>a,.navigator-app .sidebar nav>span,.navigator-app .sidebar>.logout{width:42px;height:42px;min-height:42px;padding:11px;position:relative;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:0}
+.navigator-app .sidebar .nav-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);font-size:12px}
+.navigator-app .sidebar svg{width:18px;height:18px;flex-shrink:0}
+.navigator-app .sidebar>.logout{margin-top:0}
+.navigator-languages{margin-top:auto;position:relative}
+.navigator-languages>summary{list-style:none;display:grid;place-items:center;height:36px;cursor:pointer}
+.navigator-languages[open] nav{position:absolute;left:48px;bottom:0;background:var(--surface);padding:10px;border:1px solid var(--line);border-radius:12px;z-index:80;min-width:120px}
+.navigator-app .navigator-languages nav a{font-size:12px;width:auto;padding:6px}
+.navigator-app>.workspace{grid-column:2;grid-row:1;min-width:0;padding:0 12px 12px;overflow:visible}
+.navigator-app>footer{display:none}
+.navigator-page-label{height:48px;display:flex;align-items:center;gap:12px;font-size:17px;font-weight:550}
+.navigator-page-label>span{font-size:10px;color:var(--muted);font-weight:400;letter-spacing:.05em}
+.navigator-grid{display:grid;grid-template-columns:var(--nav-library) minmax(0,1fr) var(--nav-inspector);grid-template-rows:40px 88px var(--nav-chart-height) var(--nav-table-height) auto;grid-template-areas:'library heading heading' 'library metrics inspector' 'library chart inspector' 'library table table' 'library extra extra';gap:10px;align-items:stretch;min-width:0}
+.navigator-grid :is(.backtests-page,#panel-history,.panes,.context,.retained-job,.job-detail,.results,.navigator-result,.strategies-page,.strategy-detail,.operations-workspace,.overview-page,.navigator-table-wrapper){display:contents}
+.navigator-grid .strategy-context>div{display:contents}
+.navigator-grid .strategy-list-slot,.navigator-grid .strategy-list-clip{display:contents}
+.navigator-grid .navigator-library{grid-area:library;width:auto;min-width:0;max-height:calc(100dvh - 60px);overflow:auto;align-self:stretch;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.navigator-grid .navigator-library .panel-head{padding:14px 12px;gap:6px}
+.navigator-grid .library-body{padding:0 12px 12px}
+.navigator-grid .navigator-library .table-scroll{border:0;border-radius:0}
+.navigator-grid .navigator-library td{white-space:normal}
+.navigator-grid .navigator-library th,.navigator-grid .navigator-library td{padding:10px 6px;font-size:11px}
+.navigator-grid .navigator-library td:nth-child(3),.navigator-grid .navigator-library th:nth-child(3){display:none}
+.navigator-grid .library-pagination{flex-wrap:wrap;justify-content:start;padding:12px 0}
+.navigator-grid .library .freshness,.navigator-grid .library .notice{font-size:10px;line-height:1.5}
+.navigator-grid .history-toggle,.navigator-grid .strategy-list-toggle{display:none}
+.navigator-grid .navigator-heading,.navigator-grid .operations-header{grid-area:heading;display:flex;justify-content:space-between;align-items:center;padding:0 14px;margin:0;border:1px solid var(--line);border-radius:12px;background:var(--surface);gap:12px;min-width:0}
+.navigator-heading h2,.navigator-grid .operations-header h2{font-size:13px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navigator-grid .job-status{grid-area:heading;justify-self:end;align-self:center;margin:0 18px 0 0;pointer-events:none}
+.navigator-grid .navigator-heading:has(#selected-job-heading){padding-right:130px}
+.navigator-grid :is(.result-metrics,.operations-metrics,.overview-summary){grid-area:metrics;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));margin:0;padding:0;gap:8px;border:0;background:none;min-width:0}
+.navigator-grid :is(.result-metrics,.operations-metrics,.overview-summary)>div{padding:12px 10px;border:1px solid var(--line);border-radius:12px;background:#1c2329;min-width:0;display:flex;flex-direction:column;gap:8px;position:relative;justify-content:center}
+.navigator-grid :is(.result-metrics,.operations-metrics,.overview-summary) :is(dt,span){font-size:10px;line-height:1.3;color:var(--muted)}
+.navigator-grid :is(.result-metrics,.operations-metrics,.overview-summary) :is(dd,strong){font-size:20px;line-height:1.2;letter-spacing:-.02em;margin:0;font-weight:550}
+.navigator-grid .overview-summary strong small{font-size:9px}
+.navigator-grid .overview-summary .overview-equity>span:last-child,.navigator-grid .overview-summary .overview-metric>span:last-child:not(:first-child){display:none}
+.navigator-grid .overview-summary details{position:absolute;top:4px;right:6px;font-size:9px}
+.navigator-grid .overview-summary details[open]{background:var(--surface);padding:10px;z-index:5;min-width:210px;border:1px solid var(--line);border-radius:10px}
+.navigator-grid .overview-summary summary{font-size:0;min-height:12px}
+.navigator-grid .overview-summary summary::marker{font-size:9px}
+.navigator-grid .navigator-chart,.navigator-grid .overview-performance{grid-area:chart;height:var(--nav-chart-height);min-height:0;margin:0;padding:12px;border:1px solid var(--line);border-radius:14px;background:var(--surface);display:flex;flex-direction:column;gap:0;overflow:hidden}
+.navigator-grid .navigator-chart>.overview-toolbar,.navigator-grid .overview-performance-tools{height:68px;min-height:68px;margin:0;padding:0;display:flex;align-items:flex-start;gap:8px;position:relative}
+.navigator-grid .report-chart-controls{min-width:0;display:flex;flex-direction:column;gap:8px;flex:1}
+.navigator-grid .report-chart-ranges{display:flex;align-items:center;gap:8px;min-height:28px;flex-wrap:nowrap}
+.navigator-grid .chart-timeframes{gap:1px}
+.navigator-grid .view-switch.view-switch{gap:4px}
+.navigator-grid .view-switch.view-switch>button{height:28px;min-height:28px;padding:3px 9px;font-size:12px;border-radius:999px}
+.navigator-grid :is(.overview-expand,.overview-icon){border-radius:50%;width:28px;min-width:28px;height:28px;min-height:28px}
+.navigator-grid .navigator-chart :is(.result-detail-view,.chart-view){display:contents}
+.navigator-grid .navigator-chart .chart-toolbar,.navigator-grid .overview-chart-context{height:24px;min-height:24px;margin:0;padding:0;font-size:10px;display:flex;align-items:center;gap:8px}
+.navigator-grid .navigator-chart :is(.result-chart,.price-chart,.operations-chart),.navigator-grid .overview-chart{height:292px!important;min-height:292px!important;width:100%;flex:none;aspect-ratio:auto}
+.navigator-grid .chart-data{font-size:10px;max-height:24px;overflow:auto}
+.navigator-grid .chart-data[open]{position:absolute;z-index:10;background:var(--surface);max-height:300px;border:1px solid var(--line);border-radius:10px;padding:12px;width:min(600px,70vw)}
+.navigator-grid .overview-performance-tools{height:32px;min-height:32px}
+.navigator-grid .overview-performance>.overview-context{height:36px;min-height:36px;display:flex;align-items:flex-start}
+.navigator-grid .overview-performance>.overview-legend{font-size:10px;padding:4px}
+.navigator-grid .operations-stage,.navigator-grid .operations-main,.navigator-grid .operations-market{display:contents}
+.navigator-grid .operations-overview>.overview-toolbar{height:32px;min-height:32px}
+.navigator-grid .operations-overview .operations-mini-toolbar{height:60px;min-height:60px;display:flex;align-items:flex-start;padding:4px 0 0;margin:0;gap:8px}
+.navigator-grid .operations-chart-empty{height:350px;display:grid;place-items:center}
+.navigator-grid .navigator-inspector,.navigator-grid .operations-position{grid-area:inspector;padding:16px;margin:0;border:1px solid var(--line);border-radius:14px;background:var(--surface);min-width:0;overflow:auto;display:block}
+.navigator-grid .navigator-inspector h2,.navigator-grid .operations-position h3{font-size:13px;margin:0 0 18px}
+.navigator-grid .navigator-inspector dl{display:grid;gap:8px;margin:20px 0;font-size:11px}
+.navigator-grid .navigator-inspector dt{color:var(--muted)}
+.navigator-grid .navigator-inspector dd{margin:0 0 12px;overflow-wrap:anywhere}
+.navigator-grid .navigator-inspector .overview-caption{padding:12px 0;display:flex;flex-direction:column;align-items:start;gap:8px}
+.navigator-grid .navigator-inspector .overview-caption-end{margin:0}
+.navigator-grid .navigator-inspector .job-information{padding:0;border:0;margin:0;float:none;max-width:none}
+.navigator-grid .navigator-inspector .report-actions{margin-top:18px}
+.navigator-grid .navigator-inspector .result-refresh{margin:12px 0}
+.navigator-grid .navigator-inspector .result-command{border:0;padding:12px 0}
+.navigator-grid .navigator-inspector .result-export{padding:12px 0}
+.navigator-grid .navigator-inspector button{font-size:11px}
+.navigator-grid .operations-position dl{margin:20px 0}
+.navigator-grid .operations-position dl>div{padding:10px 0;gap:8px;font-size:11px}
+.navigator-grid .operations-position>.panel-head{padding:0}
+.navigator-grid .operations-position>button{width:100%;margin:6px 0}
+.navigator-grid .operations-lifecycle{display:flex;gap:8px;margin:16px 0}
+.navigator-grid .navigator-table{grid-area:table;height:var(--nav-table-height);min-height:0;overflow:hidden;border:1px solid var(--line);border-radius:14px;padding:0;background:var(--surface);display:flex;flex-direction:column}
+.navigator-table-header{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:49px;padding:10px 12px;border-bottom:1px solid var(--line);flex-shrink:0;position:relative;z-index:3;flex-wrap:wrap}
+.navigator-table-tabs{padding:0!important;flex-shrink:0;min-height:28px;border:0!important}
+.navigator-table-tools{margin-left:auto;min-width:0;font-size:10px;color:var(--muted)}
+.navigator-table-tools:empty{display:none}
+.navigator-table-tools .operations-trade-tools{margin:0;gap:16px;font-size:10px;min-height:28px}
+.navigator-table-tools .operations-trade-tools>span{white-space:nowrap}
+.navigator-table-body{overflow:auto;min-height:0;flex:1}
+.navigator-table-body>.panel,.navigator-table-body>div>.panel{border:0;border-radius:0;background:none;margin:0;padding:0}
+.navigator-grid .navigator-table :is(.table-scroll,.overview-table-scroll){overflow:auto;border:0;border-radius:0;margin:0}
+.navigator-grid .navigator-table table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap}
+.navigator-grid .navigator-table th{height:32px;font-size:10px;font-weight:400;color:var(--muted);padding:8px 12px;border-bottom:1px solid var(--line)}
+.navigator-grid .navigator-table td{height:44px;padding:7px 12px;border-bottom:1px solid var(--line);font-size:11px}
+.navigator-grid .navigator-table .result-heading{display:none}
+.navigator-grid .navigator-table .panel-head{padding:8px 12px}
+.navigator-grid .navigator-table .panel-head h2{font-size:11px}
+.navigator-grid .navigator-table .job-meta{font-size:10px}
+.navigator-grid .navigator-table th button{font-size:10px}
+.navigator-grid .variant-heading{display:none}
+.navigator-grid .operations-footer,.navigator-grid .overview-demo-tools{grid-area:extra;min-width:0;margin:0;padding:8px 0;font-size:10px}
+.navigator-grid .overview-library .overview-toolbar{padding:0 12px 14px}
+.navigator-grid .overview-library .overview-context{display:flex;flex-wrap:wrap;gap:8px}
+.navigator-portfolio-list{display:flex;flex-direction:column;width:100%;margin-bottom:14px}
+.navigator-portfolio-list>button{height:auto!important;min-height:62px!important;display:flex;flex-direction:column;align-items:start;gap:7px;padding:12px!important;border:0!important;border-radius:8px!important;background:none;text-align:left}
+.navigator-portfolio-list>button[aria-pressed=true]{background:#252c34;border-left:2px solid var(--violet)!important}
+.navigator-portfolio-list span{font-size:10px;color:var(--muted)}
+.navigator-grid .overview-loading,.navigator-grid>.overview-page>.empty{grid-column:2 / 4;grid-row:2 / 5}
+.navigator-grid .context-empty,.navigator-grid .execution-progress{grid-column:2 / 4;grid-row:2 / 4;padding:20px}
+.navigator-grid .navigator-library .config-disclosure{min-width:0}
+.navigator-grid .navigator-library:has(#configuration-body[data-expanded=true]){width:min(650px,calc(100vw - 100px));z-index:20;box-shadow:20px 0 40px #0008;overflow:auto}
+.navigator-grid [hidden]{display:none!important}
+.navigator-grid .overview-expanded{position:fixed;inset:12px;z-index:100;height:auto!important;max-height:none;overflow:auto;background:var(--surface)}
+.navigator-grid .overview-expanded :is(.result-chart,.price-chart,.operations-chart,.overview-chart){height:calc(100dvh - 170px)!important;min-height:280px!important}
+.navigator-grid .notice,.navigator-grid .read-status{font-size:10px}
+.navigator-grid> :is(.read-status,.notice){grid-column:2 / 4}
+@media(max-width:1200px){.navigator-app{--nav-library:188px;--nav-inspector:210px}.navigator-grid .view-switch.view-switch>button{padding:3px 7px;font-size:11px}.navigator-grid .report-chart-ranges{gap:2px}.navigator-grid :is(.result-metrics,.operations-metrics,.overview-summary) :is(dd,strong){font-size:16px}.navigator-grid :is(.result-metrics,.operations-metrics,.overview-summary)>div{padding:10px 6px}}
+@media(max-width:980px){.navigator-app{--nav-library:180px}.navigator-grid{grid-template-columns:var(--nav-library) minmax(0,1fr);grid-template-rows:40px 88px var(--nav-chart-height) var(--nav-table-height) auto auto;grid-template-areas:'library heading' 'library metrics' 'library chart' 'library table' 'library inspector' 'library extra'}.navigator-grid .navigator-inspector,.navigator-grid .operations-position{max-height:420px}.navigator-grid .overview-loading,.navigator-grid>.overview-page>.empty{grid-column:2}}
+@media(max-width:650px){.navigator-app{grid-template-columns:48px minmax(0,1fr)}.navigator-app>.sidebar{width:48px;padding:10px 3px}.navigator-app>.workspace{padding:0 8px 10px}.navigator-page-label{height:44px}.navigator-grid{display:flex;flex-direction:column;gap:8px}.navigator-grid .navigator-library{max-height:210px;order:0;width:100%}.navigator-heading,.operations-header{order:1;min-height:40px}.navigator-grid :is(.result-metrics,.operations-metrics,.overview-summary){order:2;min-height:140px;grid-template-columns:repeat(3,minmax(0,1fr))}.navigator-grid .navigator-chart,.navigator-grid .overview-performance{order:3;padding:10px;height:450px;min-height:450px}.navigator-grid .navigator-table{order:4;height:300px;min-height:300px}.navigator-grid .navigator-inspector,.navigator-grid .operations-position{order:5}.navigator-grid .operations-footer,.navigator-grid .overview-demo-tools{order:6}.navigator-grid .view-switch.view-switch{gap:1px}.navigator-grid .view-switch.view-switch>button{font-size:10px;padding:3px 6px}.navigator-grid .report-chart-ranges{flex-wrap:wrap}.navigator-grid .navigator-chart>.overview-toolbar{height:88px;min-height:88px}.navigator-grid .operations-overview>.overview-toolbar{height:32px;min-height:32px}.navigator-grid .job-status{display:none}.navigator-grid .navigator-library .library-body{max-height:none}.navigator-grid .overview-library .navigator-portfolio-list{display:grid;grid-template-columns:1fr 1fr}.navigator-grid .navigator-heading:has(#selected-job-heading){padding-right:14px}.navigator-grid .overview-performance>.overview-context{min-height:56px;height:56px}.navigator-grid .overview-expanded{height:auto!important}.navigator-grid .table-scroll{max-width:100%}}
+.navigator-app .navigator-inspector .job-information[open],.navigator-app .navigator-inspector .report-actions[open]{position:static;inset:auto;max-height:none;overflow:visible;box-shadow:none;background:transparent;width:auto;border:0;padding:0;margin:0 0 16px}
+.navigator-app .navigator-inspector .job-information:not([open]){width:auto;text-align:left}
+.navigator-app .navigator-inspector .report-actions[open]{margin-top:18px}
+.navigator-app .navigator-grid .job-status{position:static;inset:auto}
+.navigator-app .navigator-inspector .report-actions{position:static;inset:auto;width:auto;max-height:none;box-shadow:none}
+.navigator-app .navigator-table .variant-ranking{max-height:none;height:auto;overflow:visible}
+.navigator-app .navigator-grid .strategy-list-slot .library{width:100%;max-width:100%}
+.navigator-grid .navigator-library .table-scroll table thead{display:none}
+.navigator-grid .navigator-library .table-scroll table tr{display:block;padding:10px 4px;border-bottom:1px solid var(--line)}
+.navigator-grid .navigator-library .table-scroll table td{display:block;padding:3px 6px;border:0;width:auto;text-align:left}
+.navigator-grid .navigator-library .table-scroll table td:nth-child(3){display:none}
+.navigator-grid .navigator-library .table-scroll table td a{font-weight:550;text-decoration:none;font-size:12px}
+.navigator-grid .navigator-library .table-scroll table .job-meta{display:block;margin:5px 0 0;font-size:10px}
+.navigator-grid .navigator-library .table-scroll table td:nth-child(2){font-size:10px}
+.navigator-grid .navigator-library .table-scroll table .selected{box-shadow:inset 2px 0 var(--violet);background:#252c34}
+.navigator-grid .strategy-row[aria-current=true]{background:#252c34;box-shadow:inset 2px 0 var(--violet)}
+.navigator-page-label>button{margin-left:auto;border-radius:50%;width:28px;height:28px;padding:5px}
+.navigator-grid.library-collapsed{grid-template-columns:0 minmax(0,1fr) var(--nav-inspector);column-gap:10px}
+.navigator-grid.library-collapsed .navigator-library{visibility:hidden;overflow:hidden}
+@media(max-width:980px){.navigator-grid.library-collapsed{grid-template-columns:0 minmax(0,1fr)}}
+@media(max-width:650px){.navigator-grid.library-collapsed .navigator-library{display:none}}
+.navigator-grid .operations-position dl{gap:0;margin:12px 0}
+.navigator-grid .operations-position dl>div{padding:8px 0;min-height:36px}
+.navigator-grid .operations-position .panel-head h3{margin:0}
+.navigator-grid .operations-position .panel-head{min-height:28px}
+.navigator-grid .operations-position .operations-lifecycle{margin:8px 0}
+.navigator-app .navigator-grid .overview-expanded{width:auto;max-width:calc(100vw - 24px);min-width:0}
+.navigator-grid .navigator-research-inputs h3{font-size:13px;margin:0}
+.navigator-grid .navigator-inspector .navigator-research-inputs dl{gap:5px;margin:18px 0}
+.navigator-grid .navigator-inspector .navigator-research-inputs dd{margin-bottom:12px}
+.navigator-app .navigator-grid .backtest-detail-workspace .job-detail .job-status{position:static;inset:auto;padding:0}
+.navigator-app .navigator-grid .backtest-detail-workspace .results .navigator-result-actions .report-actions{position:static;inset:auto;width:auto;max-height:none;box-shadow:none}
+@media(min-width:651px){.navigator-grid .navigator-library{height:calc(100dvh - 60px)}}
+/* Compact object navigator: ten records per API page, count is actual returned rows. */
+.navigator-app .navigator-grid .navigator-library .panel-head{gap:4px;padding:12px 10px}
+.navigator-app .navigator-grid .navigator-library .panel-head .actions{gap:4px}
+.navigator-app .navigator-grid .navigator-library .library-body{padding:0 10px 10px}
+.navigator-app .navigator-grid .navigator-library .library-tabs{margin:0;padding:0 10px 10px}
+.navigator-app .navigator-grid .navigator-library .table-scroll table tr{position:relative;padding:8px 22px 8px 4px;min-height:58px}
+.navigator-app .navigator-grid .navigator-library .table-scroll table td{padding:1px 4px}
+.navigator-app .navigator-grid .navigator-library .table-scroll table td a{font-size:11px;line-height:1.35;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.navigator-app .navigator-grid .navigator-library .table-scroll table .job-meta{font-size:10px;margin-top:4px;line-height:1.3}
+.navigator-app .navigator-grid .navigator-library .table-scroll table .navigator-job-state{position:absolute;right:4px;top:10px;padding:0}
+.navigator-status-icon{display:inline-flex;color:var(--muted)}
+.navigator-status-icon svg{width:14px;height:14px}
+.navigator-status-icon.state-succeeded{color:#65d69b}.navigator-status-icon.state-failed{color:#ed958b}.navigator-status-icon.state-running{color:var(--violet)}
+.navigator-app .navigator-grid .library-pagination{display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:8px;padding:12px 0;margin:0}
+.navigator-page-arrows{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.navigator-app .navigator-grid .library-pagination>.navigator-page-count{display:block;width:auto;font-size:11px;color:var(--muted)}
+.navigator-job-search{padding:10px 0;margin-bottom:8px;border-bottom:1px solid var(--line)}
+.navigator-job-search h3{font-size:11px;margin:0 0 10px}.navigator-job-search fieldset{padding:0;border:0;display:grid;gap:8px;min-width:0}.navigator-job-search input{width:100%;min-width:0}.navigator-job-search label{font-size:11px}
+.navigator-app .navigator-grid .strategy-row{padding:9px 6px;gap:4px}.navigator-app .navigator-grid .strategy-row strong{font-size:11px;line-height:1.35}
+
+/* Backtests is the common table density and alignment reference. */
+.navigator-grid .navigator-table :is(th,td){vertical-align:middle;line-height:14px;font-variant-numeric:tabular-nums}
+.navigator-grid .navigator-table td small{font-size:10px;line-height:12px;margin-top:2px}
+.navigator-grid .navigator-table .overview-row-button{min-height:0;gap:2px;line-height:14px;font-size:11px}
+.navigator-grid .navigator-table .overview-row-button>span{line-height:12px}
+.navigator-grid .navigator-table th button{min-height:0;line-height:14px}
+.navigator-grid .navigator-table .overview-contributions :is(th,td):not(:first-child),
+.navigator-grid .navigator-table .operations-trades>thead>tr>th:is(:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(7)),
+.navigator-grid .navigator-table .operations-trades>tbody>tr>td:is(:nth-child(2),:nth-child(3),:nth-child(4),:nth-child(7)),
+.navigator-grid .navigator-table .operations-events :is(th,td):last-child{text-align:right}
+.navigator-grid .navigator-table .operations-trades>tbody>tr>td:first-child>button{padding:0;min-height:0;border:0;background:none;font-size:11px;line-height:14px}
+.navigator-grid .navigator-table :is(.pnl-positive,.pnl-negative){background:none}
+.navigator-grid .navigator-table tbody tr.selected{background:var(--surface-2)}
+
+/* Period and candle/display controls share the existing 60px chart toolbar. */
+.navigator-grid .operations-overview .operations-mini-toolbar{flex-direction:column;gap:2px;width:100%}
+.navigator-grid .operations-mini-toolbar>.view-switch{flex:none;flex-wrap:wrap}
+.operations-settings-row{display:flex;align-items:center;gap:6px;min-height:28px}
+.navigator-grid .report-chart-ranges{flex-wrap:wrap}
+.navigator-grid .operations-overview .operations-mini-toolbar{flex-wrap:nowrap;padding-top:0}
+@media(max-width:650px){.navigator-grid .operations-overview .operations-mini-toolbar{height:88px;min-height:88px}.navigator-grid .operations-settings-row .view-switch{flex-wrap:wrap}}
+
+/* Shared upper workspace: one type scale and control geometry on all routes. */
+.navigator-app{--workspace-title-size:13px;--workspace-control-size:28px;--workspace-control-font:12px;--workspace-inset:12px}
+.navigator-app .navigator-grid .navigator-library>.panel-head{min-height:48px;box-sizing:border-box;padding:10px var(--workspace-inset);display:flex;align-items:center;gap:6px;margin:0}
+.navigator-app .navigator-grid .navigator-library>.panel-head>.actions{margin-inline-start:auto;gap:6px;flex-wrap:nowrap}
+.navigator-app .navigator-grid .navigator-library>.panel-head h2{font-size:var(--workspace-title-size);font-weight:600;line-height:20px;margin:0}
+.navigator-app .navigator-grid .navigator-library>.panel-head .count{font-size:10px;line-height:16px}
+.navigator-app .navigator-grid .navigator-library>.panel-head :is(.library-icon-action,.overview-icon){width:var(--workspace-control-size);height:var(--workspace-control-size);min-height:var(--workspace-control-size);padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;flex:none}
+.navigator-app .navigator-grid .navigator-library>.panel-head svg{width:16px;height:16px}
+.navigator-app .navigator-grid .navigator-library .library-tabs{min-height:38px;box-sizing:border-box;padding:0 var(--workspace-inset) 10px;gap:4px;display:flex;align-items:center;flex-wrap:wrap;margin:0}
+.navigator-app .navigator-grid .navigator-library .library-tabs button{font-size:var(--workspace-control-font);line-height:18px;height:var(--workspace-control-size);min-height:var(--workspace-control-size);padding:4px 8px;border-radius:999px}
+.navigator-app .navigator-grid .navigator-library .library-tabs button:is([aria-selected=true],[aria-pressed=true]){background:#252c34;border-color:transparent}
+.navigator-app .navigator-grid .overview-library>.overview-toolbar{padding:0;margin:0}
+.navigator-app .navigator-grid .overview-library .overview-context{gap:0;width:100%}
+.navigator-app .navigator-grid .overview-library .overview-library-modes{width:100%;justify-content:flex-start;gap:8px}
+.navigator-app .navigator-grid .overview-library .navigator-portfolio-list{padding:0 10px;width:100%;box-sizing:border-box}
+.navigator-app .navigator-grid :is(.navigator-heading,.operations-header){padding-inline:var(--workspace-inset);align-items:center;min-height:40px}
+.navigator-app .navigator-grid :is(.navigator-heading,.operations-header) h2{font-size:var(--workspace-title-size);font-weight:600;line-height:20px;margin:0}
+.navigator-app .navigator-grid .operations-header>div:first-child{min-width:0}
+.navigator-app .navigator-grid :is(.strategy-panel-tools,.operations-actions){display:flex;align-items:center;gap:6px}
+.navigator-app .navigator-grid .strategy-panel-tools button{width:28px;height:28px;min-width:28px;min-height:28px;padding:0;border-radius:50%}
+.navigator-app .navigator-grid :is(.operations-state-badge,.job-status,.overview-demo){font-size:11px;line-height:16px}
+.navigator-app .navigator-grid .operations-state-badge{padding:0 6px;min-height:24px}
+.navigator-app .navigator-grid .strategy-filter-panel{margin:0 0 10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.navigator-app .navigator-grid .strategy-filter-panel .strategy-filters{margin:0;gap:8px;font-size:11px}
+.navigator-app .navigator-grid .navigator-library .library-icon-action[aria-expanded=true]{background:#252c34;color:var(--violet)}
+.navigator-app .navigator-grid :is(.result-metrics,.operations-metrics,.overview-summary)>div{display:grid;grid-template-rows:26px 24px;align-content:center;justify-content:normal;gap:4px}
+.navigator-app .navigator-grid :is(.result-metrics,.operations-metrics,.overview-summary)>div>:first-child{margin:0;line-height:13px;align-self:end}
+.navigator-app .navigator-grid :is(.result-metrics,.operations-metrics,.overview-summary) :is(dd,strong){align-self:start;white-space:nowrap}
+.navigator-app .navigator-grid .overview-page .overview-summary>.overview-metric:last-child{display:grid}
+
+/* A single selector row: candle intervals for price, periods for performance. */
+.navigator-app .navigator-grid .operations-overview .operations-mini-toolbar{flex-direction:row;flex-wrap:nowrap;align-items:flex-start;gap:8px;height:60px;min-height:60px}
+.navigator-app .navigator-grid .operations-mini-toolbar>.view-switch{flex:none;flex-wrap:nowrap}
+.navigator-app .navigator-grid .operations-mini-toolbar>.chart-display-menu{margin-left:0}
+@media(max-width:650px){.navigator-app .navigator-grid .operations-overview .operations-mini-toolbar{height:80px;min-height:80px;overflow-x:auto}.navigator-app .navigator-grid .operations-mini-toolbar>.view-switch{flex:none}}
+
+/* Shared chart chrome: tabs at inset 0, selectors 32px below, plot at 92px. */
+.navigator-app .navigator-grid .report-chart-controls{padding:0;gap:4px}
+.navigator-app .navigator-grid :is(.navigator-chart,.overview-performance) .view-switch{margin:0;padding:0;align-items:center}
+.navigator-app .navigator-grid :is(.navigator-chart,.overview-performance) .view-switch>button{line-height:18px;font-weight:400;letter-spacing:normal}
+.navigator-app .navigator-grid :is(.overview-toolbar,.overview-performance-tools)>:is(.overview-expand,.overview-icon){margin:0;padding:0;align-self:flex-start;flex:none;display:inline-flex;align-items:center;justify-content:center}
+.navigator-app .navigator-grid .overview-performance-tools{width:100%;padding:0;margin:0;justify-content:space-between}
+.navigator-app .navigator-grid .navigator-chart .chart-toolbar .trade-toggle{margin-inline-start:auto}
+.navigator-app .navigator-grid :is(.navigator-chart,.overview-performance) .date-range-control{margin:0}
+/* Equal preset slots keep Date range on the same horizontal axis. */
+@media(min-width:651px){
+.navigator-app .navigator-grid .report-chart-ranges .chart-timeframes>button,
+.navigator-app .navigator-grid .operations-mini-toolbar>.view-switch>button,
+.navigator-app .navigator-grid .overview-performance>.overview-context>.view-switch>button{min-width:50px}
+.navigator-app .navigator-grid .overview-performance>.overview-context{gap:4px}
+}
+
+/* Top-layer filters reuse Backtests menu styling without resizing the library. */
+.navigator-app .strategy-filter-popover{position:fixed;inset:auto;margin:0;width:auto;max-width:calc(100vw - 16px);overflow:auto;overscroll-behavior:contain;color:var(--text)}
+.navigator-app .strategy-filter-popover:not(:popover-open){display:none}
+.navigator-app .strategy-filter-popover .strategy-filters{margin:0;display:grid;grid-template-columns:minmax(0,1fr);gap:10px;font-size:12px}
+.navigator-app .strategy-filter-popover .strategy-filters label{display:grid;gap:6px}
+
+.navigator-app .strategy-filter-popover .chart-display-popup{position:static;margin-top:6px;width:100%;max-width:100%;box-shadow:none}
+.navigator-app .strategy-filter-popover .strategy-filters>*{min-width:0;grid-column:1}
+.navigator-app .strategy-filter-popover .chart-display-option{white-space:normal}
+
+.navigator-app .library-filter-reset{width:100%;min-height:28px;height:28px;padding:3px 9px;font-size:12px;grid-column:1/-1}
+.navigator-app .navigator-grid .navigator-table .full-metrics{border-collapse:collapse}
+.navigator-app .navigator-grid .navigator-table .full-metrics tbody{gap:0 24px;padding:0 12px}
+.navigator-app .navigator-grid .navigator-table .full-metrics tr{min-height:42px;border-bottom:1px solid var(--line-soft)}
+.navigator-app .navigator-grid .navigator-table .full-metrics :is(th,td){border:0;background:none;font-size:13px;line-height:20px;padding:10px 0;height:auto;font-weight:400}
+.navigator-app .navigator-grid .navigator-table .full-metrics th{color:var(--text);text-align:left;flex:1}
+.navigator-app .navigator-grid .navigator-table .full-metrics td{padding-left:16px;font-variant-numeric:tabular-nums}
+.navigator-app .navigator-grid .navigator-table>.overview-toolbar{height:auto;min-height:49px;border-bottom:1px solid var(--line);padding:0 12px 0 0;align-items:center}
+.navigator-app .navigator-grid .navigator-table .navigator-table-header{flex:1;min-width:0;border:0}
+.navigator-app .navigator-grid .navigator-table>.overview-toolbar>.overview-expand{align-self:center;width:28px;height:28px;min-height:28px;min-width:28px;border-radius:50%;padding:0}
+.navigator-app .navigator-grid .navigator-table.overview-expanded{overflow:hidden}
+.navigator-app .navigator-grid .trades-scroll th{position:sticky;top:0;background:var(--surface);z-index:1}
+.navigator-app .navigator-grid .trades-scroll td{height:40px;padding:4px 10px;line-height:20px;white-space:nowrap}
+.navigator-app .navigator-grid .trades-scroll .trade-spacer td{padding:0;border:0}
+.trade-load-status{position:sticky;bottom:0;left:0;padding:4px 12px;background:var(--surface);font-size:12px}
+.navigator-app .navigator-grid .navigator-inspector .report-actions{display:flex;flex-direction:column;gap:10px;margin-top:18px}
+.navigator-app .navigator-grid .navigator-inspector :is(.result-command,.result-export){padding:0;margin:0;border:0}
+.export-controls{display:flex;gap:8px;align-items:center}
+.export-controls select{width:auto;height:28px;padding:3px 10px;border-radius:999px;font-size:12px}
+.export-controls button{width:28px;height:28px;min-height:28px;padding:0;border-radius:50%}
+.result-export>p:empty{display:none}
+
+.navigator-app .navigator-grid .navigator-inspector .report-actions{flex-direction:row;align-items:flex-start;flex-wrap:wrap}
+.export-controls{position:relative}
+.export-format-popup{position:absolute;top:34px;left:0;z-index:5;width:100px;padding:4px;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 8px 24px #0005}
+.export-controls .export-format-popup button{display:block;width:100%;height:30px;border:0;border-radius:6px;text-align:left;padding:0 10px;background:transparent}
+.export-controls .export-format-popup button:hover,.export-controls .export-format-popup button:focus-visible{background:var(--surface-hover,#293139)}
+.navigator-app .navigator-inspector .result-command>button.library-icon-action{width:28px;height:28px;min-height:28px;padding:0;border-radius:50%}
+.export-format-popup{border-color:var(--border,#39424b)}
+
+.navigator-table-tools .result-export{position:relative;margin:0;padding:0;border:0}
+.navigator-table-tools .export-format-popup{left:auto;right:0}
+.navigator-table-tools .result-export>p:not(:empty){position:absolute;right:0;top:32px;width:220px;padding:8px;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+
+/* Two control rows, then the same plot box on all three pages. */
+.navigator-app .navigator-grid .navigator-chart :is(.result-chart,.price-chart,.operations-chart),.navigator-app .navigator-grid .overview-chart{height:316px!important;min-height:316px!important}
+.navigator-app .navigator-grid .operations-overview .operations-mini-toolbar{height:36px;min-height:36px}
+.navigator-app .navigator-grid .overview-chart-context{height:16px;min-height:16px;font-size:10px}
+.navigator-app .navigator-grid .report-chart-ranges .trade-toggle{display:flex;align-items:center;gap:6px;margin:0;font-size:11px;white-space:nowrap;height:28px}
+.navigator-app .navigator-grid .overview-expanded :is(.result-chart,.price-chart,.operations-chart,.overview-chart){height:calc(100dvh - 146px)!important;min-height:280px!important}
+@media(max-width:650px){.navigator-app .navigator-grid .report-chart-ranges{flex-wrap:nowrap;overflow-x:auto}.navigator-app .navigator-grid .navigator-chart>.overview-toolbar{height:68px;min-height:68px}.navigator-app .navigator-grid .operations-overview>.overview-toolbar{height:32px;min-height:32px}.navigator-app .navigator-grid .overview-performance>.overview-context{height:36px;min-height:36px;flex-wrap:nowrap;overflow-x:auto}}
+.navigator-app .navigator-grid .report-chart-ranges{justify-content:flex-start}

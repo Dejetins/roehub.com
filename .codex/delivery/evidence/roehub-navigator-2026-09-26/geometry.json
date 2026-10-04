@@ -1,0 +1,128 @@
+{
+  "strategy": {
+    ".navigator-chart": {
+      "bottom": 626,
+      "height": 430,
+      "left": 302,
+      "right": 1214,
+      "top": 196,
+      "width": 912,
+      "x": 302,
+      "y": 196
+    },
+    ".navigator-library": {
+      "bottom": 947,
+      "height": 899,
+      "left": 68,
+      "right": 292,
+      "top": 48,
+      "width": 224,
+      "x": 68,
+      "y": 48
+    },
+    ".navigator-table": {
+      "bottom": 936,
+      "height": 300,
+      "left": 302,
+      "right": 1464,
+      "top": 636,
+      "width": 1162,
+      "x": 302,
+      "y": 636
+    },
+    ".operations-chart": {
+      "bottom": 593,
+      "height": 292,
+      "left": 315,
+      "right": 1201,
+      "top": 301,
+      "width": 886,
+      "x": 315,
+      "y": 301
+    }
+  },
+  "backtests": {
+    ".navigator-chart": {
+      "bottom": 626,
+      "height": 430,
+      "left": 302,
+      "right": 1214,
+      "top": 196,
+      "width": 912,
+      "x": 302,
+      "y": 196
+    },
+    ".navigator-library": {
+      "bottom": 946,
+      "height": 898,
+      "left": 68,
+      "right": 292,
+      "top": 48,
+      "width": 224,
+      "x": 68,
+      "y": 48
+    },
+    ".navigator-table": {
+      "bottom": 936,
+      "height": 300,
+      "left": 302,
+      "right": 1464,
+      "top": 636,
+      "width": 1162,
+      "x": 302,
+      "y": 636
+    },
+    ".result-chart": {
+      "bottom": 593,
+      "height": 292,
+      "left": 315,
+      "right": 1201,
+      "top": 301,
+      "width": 886,
+      "x": 315,
+      "y": 301
+    }
+  },
+  "overview": {
+    ".navigator-library": {
+      "bottom": 947,
+      "height": 899,
+      "left": 68,
+      "right": 292,
+      "top": 48,
+      "width": 224,
+      "x": 68,
+      "y": 48
+    },
+    ".navigator-table": {
+      "bottom": 936,
+      "height": 300,
+      "left": 302,
+      "right": 1464,
+      "top": 636,
+      "width": 1162,
+      "x": 302,
+      "y": 636
+    },
+    ".overview-chart": {
+      "bottom": 593,
+      "height": 292,
+      "left": 315,
+      "right": 1201,
+      "top": 301,
+      "width": 886,
+      "x": 315,
+      "y": 301
+    },
+    ".overview-performance": {
+      "bottom": 626,
+      "height": 430,
+      "left": 302,
+      "right": 1214,
+      "top": 196,
+      "width": 912,
+      "x": 302,
+      "y": 196
+    }
+  }
+}

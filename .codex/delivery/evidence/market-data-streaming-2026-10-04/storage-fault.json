@@ -1,0 +1,18 @@
+{
+  "events": [
+    {
+      "event": "fault",
+      "type": "DatabaseError",
+      "code": 241,
+      "memory_limit_exceeded": true
+    },
+    {
+      "event": "retry_succeeded",
+      "rows": 1
+    }
+  ],
+  "attempts": 2,
+  "stored_rows": 1,
+  "remaining_buffer": 0,
+  "disposable": true
+}

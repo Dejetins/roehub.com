@@ -1,0 +1,64 @@
+{
+  "observed_at": "2026-10-04T12:00:45.686894+00:00",
+  "range_start": "2026-10-04T11:49:00Z",
+  "range_end_exclusive": "2026-10-04T11:59:00+00:00",
+  "canonical": [
+    {
+      "symbol": "AAVEUSDT",
+      "rows": 10,
+      "minutes": 10,
+      "first": "2026-10-04 11:49:00",
+      "last": "2026-10-04 11:58:00"
+    },
+    {
+      "symbol": "ADAUSDT",
+      "rows": 10,
+      "minutes": 10,
+      "first": "2026-10-04 11:49:00",
+      "last": "2026-10-04 11:58:00"
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "rows": 10,
+      "minutes": 10,
+      "first": "2026-10-04 11:49:00",
+      "last": "2026-10-04 11:58:00"
+    },
+    {
+      "symbol": "ANKRUSDT",
+      "rows": 10,
+      "minutes": 10,
+      "first": "2026-10-04 11:49:00",
+      "last": "2026-10-04 11:58:00"
+    }
+  ],
+  "august_history": [
+    {
+      "symbol": "AAVEUSDT",
+      "minutes": 44640
+    },
+    {
+      "symbol": "ADAUSDT",
+      "minutes": 44640
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "minutes": 44640
+    },
+    {
+      "symbol": "ANKRUSDT",
+      "minutes": 44640
+    }
+  ],
+  "test_tables": [],
+  "selections": [],
+  "recovery_journal": [],
+  "test_schemas": [],
+  "source_sha256": {
+    "apps/worker/market_data_ws/wiring/io_process.py": "68487d1c02009dc20ffdef8d4ccb544aa75fcaf9db7aa0b59435a0295ded263c",
+    "apps/worker/market_data_ws/wiring/modules/market_data_ws.py": "d844ae2104571c9cdb95ea7b6f23111944872df327c0fc490b2da92149e14964",
+    "src/trading/contexts/market_data/application/services/insert_buffer.py": "0f7252881879a2acb9bae3b65122ed1d31a8f7d646e4f647bab2e908284794ec",
+    "src/trading/contexts/market_data/application/services/rest_fill_queue.py": "38a351d659866ff11093dd08352e311946cf38801271344e01d5c65e67f8b347",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/stream_recovery_store.py": "cabbf85148294aa3554872c8969334bda3a3943a985ff08b0f2a721bfd8fcb98"
+  }
+}

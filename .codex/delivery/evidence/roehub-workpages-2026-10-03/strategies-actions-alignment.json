@@ -1,0 +1,128 @@
+[
+  {
+    "buttons": [
+      {
+        "height": 28,
+        "name": "Refresh",
+        "width": 28,
+        "x": 217,
+        "y": 59
+      },
+      {
+        "height": 28,
+        "name": "Filters",
+        "width": 28,
+        "x": 251,
+        "y": 59
+      }
+    ],
+    "documentWidth": 1414,
+    "page": "strategies",
+    "viewport": 1414
+  },
+  {
+    "buttons": [
+      {
+        "height": 28,
+        "name": "Refresh",
+        "width": 28,
+        "x": 217,
+        "y": 59
+      },
+      {
+        "height": 28,
+        "name": "Filters",
+        "width": 28,
+        "x": 251,
+        "y": 59
+      }
+    ],
+    "documentWidth": 1414,
+    "page": "backtests",
+    "viewport": 1414
+  },
+  {
+    "buttons": [
+      {
+        "height": 28,
+        "name": "Refresh",
+        "width": 28,
+        "x": 217,
+        "y": 59
+      },
+      {
+        "height": 28,
+        "name": "Filters",
+        "width": 28,
+        "x": 251,
+        "y": 59
+      }
+    ],
+    "documentWidth": 1414,
+    "page": "data",
+    "viewport": 1414
+  },
+  {
+    "buttons": [
+      {
+        "height": 28,
+        "name": "Refresh",
+        "width": 28,
+        "x": 307,
+        "y": 55
+      },
+      {
+        "height": 28,
+        "name": "Filters",
+        "width": 28,
+        "x": 341,
+        "y": 55
+      }
+    ],
+    "documentWidth": 390,
+    "page": "backtests",
+    "viewport": 390
+  },
+  {
+    "buttons": [
+      {
+        "height": 28,
+        "name": "Refresh",
+        "width": 28,
+        "x": 307,
+        "y": 55
+      },
+      {
+        "height": 28,
+        "name": "Filters",
+        "width": 28,
+        "x": 341,
+        "y": 55
+      }
+    ],
+    "documentWidth": 390,
+    "page": "data",
+    "viewport": 390
+  },
+  {
+    "buttons": [
+      {
+        "height": 28,
+        "name": "Refresh",
+        "width": 28,
+        "x": 307,
+        "y": 55
+      },
+      {
+        "height": 28,
+        "name": "Filters",
+        "width": 28,
+        "x": 341,
+        "y": 55
+      }
+    ],
+    "documentWidth": 390,
+    "page": "strategies",
+    "viewport": 390
+  }
+]

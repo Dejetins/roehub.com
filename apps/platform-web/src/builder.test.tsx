@@ -277,18 +277,13 @@ it('keeps the editor expanded when the visible job receives its result selection
  expect(router.state.location.pathname).toBe(`/backtests/${id}`);
 });
 
-it('persists only an allowlisted animation preference and supports immediate reversals',async()=>{
- localStorage.setItem('roehub.backtests.motion','invalid');renderBuilder();await configure();
- expect(screen.getByLabelText('Animation')).toHaveValue('normal');
- fireEvent.change(screen.getByLabelText('Animation'),{target:{value:'slow'}});
- expect(localStorage.getItem('roehub.backtests.motion')).toBe('slow');
- expect(document.documentElement).toHaveStyle('--motion-duration: 520ms');
+it('supports immediate reversals without a visible animation setting',async()=>{
+ renderBuilder();await configure();
+ expect(screen.queryByLabelText('Animation')).not.toBeInTheDocument();
  fireEvent.click(screen.getByRole('tab',{name:'History'}));
  expect(document.getElementById('configuration-body')).toHaveAttribute('aria-hidden','true');
  fireEvent.click(screen.getByRole('tab',{name:'New backtest'}));
  expect(document.getElementById('configuration-body')).not.toHaveAttribute('inert');
- fireEvent.change(screen.getByLabelText('Animation'),{target:{value:'off'}});
- expect(document.documentElement).toHaveStyle('--motion-duration: 0ms');
  expect(screen.getByLabelText('Start date')).toHaveValue('2026-03-26');
  localStorage.removeItem('roehub.backtests.motion');
 });

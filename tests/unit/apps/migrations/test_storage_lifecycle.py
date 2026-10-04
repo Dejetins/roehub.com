@@ -142,6 +142,11 @@ def test_migration_manifests_match_immutable_sources() -> None:
         "execution-gateway-safety-0020",
         "control-operation-audit-0021",
         "market-data-selections-0022",
+        "market-data-work-requests-0023",
+        "market-data-full-history-0024",
+        "market-data-work-recovery-0025",
+        "market-data-queue-events-0026",
+        "market-data-stream-recovery-0027",
     )
     assert token == "market_data"
     assert [migration.version for migration in clickhouse] == ["0001", "0002"]

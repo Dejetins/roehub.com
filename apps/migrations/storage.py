@@ -26,7 +26,12 @@ from apps.migrations.bootstrap import (
     apply_identity_baseline_sql,
     apply_isolated_job_runtime_sql,
     apply_local_auth_sql,
+    apply_market_data_full_history_sql,
     apply_market_data_instrument_selections_sql,
+    apply_market_data_queue_events_sql,
+    apply_market_data_stream_recovery_sql,
+    apply_market_data_work_recovery_sql,
+    apply_market_data_work_requests_sql,
     apply_notification_provider_instances_sql,
     apply_oidc_provider_sql,
     apply_organizations_rbac_audit_sql,
@@ -416,8 +421,8 @@ def _load_postgres_phases(manifest_path: Path) -> dict[str, tuple[str, tuple[Pat
     if payload.get("schema") != POSTGRES_MANIFEST_SCHEMA:
         raise StorageLifecycleError("unsupported PostgreSQL migration manifest schema")
     raw_phases = payload.get("phases")
-    if not isinstance(raw_phases, list) or len(raw_phases) != 14:
-        raise StorageLifecycleError("PostgreSQL migration manifest must define fourteen phases")
+    if not isinstance(raw_phases, list) or len(raw_phases) != 19:
+        raise StorageLifecycleError("PostgreSQL migration manifest must define nineteen phases")
     phases: dict[str, tuple[str, tuple[Path, ...]]] = {}
     for raw_phase in raw_phases:
         if not isinstance(raw_phase, dict):
@@ -468,6 +473,11 @@ def _load_postgres_phases(manifest_path: Path) -> dict[str, tuple[str, tuple[Pat
         "execution-gateway-safety-0020",
         "control-operation-audit-0021",
         "market-data-selections-0022",
+        "market-data-work-requests-0023",
+        "market-data-full-history-0024",
+        "market-data-work-recovery-0025",
+        "market-data-queue-events-0026",
+        "market-data-stream-recovery-0027",
     }:
         raise StorageLifecycleError("PostgreSQL migration phases are incomplete")
     return phases
@@ -826,6 +836,75 @@ def apply_postgres_migrations(
             store="postgres-sql",
             version=market_data_selections_version,
             checksum=market_data_selections_checksum,
+        )
+
+
+    work_version = "market-data-work-requests-0023"
+    work_checksum, _work_paths = phases[work_version]
+    if ("postgres-sql", work_version) not in markers:
+        try:
+            apply_market_data_work_requests_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
+            )
+        except Exception as error:
+            raise StorageLifecycleError("market data work request migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=work_version, checksum=work_checksum
+        )
+
+
+    history_version = "market-data-full-history-0024"
+    history_checksum, _history_paths = phases[history_version]
+    if ("postgres-sql", history_version) not in markers:
+        try:
+            apply_market_data_full_history_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
+            )
+        except Exception as error:
+            raise StorageLifecycleError("market data full history migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=history_version, checksum=history_checksum
+        )
+
+    recovery_version = "market-data-work-recovery-0025"
+    recovery_checksum, _recovery_paths = phases[recovery_version]
+    if ("postgres-sql", recovery_version) not in markers:
+        try:
+            apply_market_data_work_recovery_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
+            )
+        except Exception as error:
+            raise StorageLifecycleError("market data work recovery migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=recovery_version, checksum=recovery_checksum
+        )
+
+
+    queue_version = "market-data-queue-events-0026"
+    queue_checksum, _queue_paths = phases[queue_version]
+    if ("postgres-sql", queue_version) not in markers:
+        try:
+            apply_market_data_queue_events_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
+            )
+        except Exception as error:
+            raise StorageLifecycleError("market data queue/events migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=queue_version, checksum=queue_checksum
+        )
+
+
+    stream_version = "market-data-stream-recovery-0027"
+    stream_checksum, _stream_paths = phases[stream_version]
+    if ("postgres-sql", stream_version) not in markers:
+        try:
+            apply_market_data_stream_recovery_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent
+            )
+        except Exception as error:
+            raise StorageLifecycleError("market data stream recovery migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=stream_version, checksum=stream_checksum
         )
 
 

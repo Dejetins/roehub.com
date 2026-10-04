@@ -1,0 +1,110 @@
+[
+  {
+    "width": 1476,
+    "path": "settings/security",
+    "element": ".navigator-heading, .operations-header",
+    "css": {
+      "padding": [
+        "10px 130px 10px 12px",
+        "10px 12px"
+      ]
+    },
+    "dimensions": {}
+  },
+  {
+    "width": 1476,
+    "path": "data?market=1&symbol=BTCUSDT&from=2024-01-01T00%3A00&to=2024-01-01T00%3A05",
+    "element": ".navigator-heading, .operations-header",
+    "css": {
+      "padding": [
+        "10px 130px 10px 12px",
+        "10px 12px"
+      ]
+    },
+    "dimensions": {}
+  },
+  {
+    "width": 1476,
+    "path": "monitoring/api",
+    "element": ".navigator-heading, .operations-header",
+    "css": {
+      "padding": [
+        "10px 130px 10px 12px",
+        "10px 12px"
+      ]
+    },
+    "dimensions": {}
+  },
+  {
+    "width": 390,
+    "path": "settings/security",
+    "element": ".navigator-library",
+    "css": {},
+    "dimensions": {
+      "height": [
+        210,
+        142
+      ]
+    }
+  },
+  {
+    "width": 390,
+    "path": "settings/security",
+    "element": ".navigator-table>.overview-toolbar",
+    "css": {},
+    "dimensions": {
+      "height": [
+        89,
+        50
+      ]
+    }
+  },
+  {
+    "width": 390,
+    "path": "settings/security",
+    "element": ".navigator-table td",
+    "css": {},
+    "dimensions": {
+      "height": [
+        46,
+        44
+      ]
+    }
+  },
+  {
+    "width": 390,
+    "path": "data?market=1&symbol=BTCUSDT&from=2024-01-01T00%3A00&to=2024-01-01T00%3A05",
+    "element": ".navigator-table>.overview-toolbar",
+    "css": {},
+    "dimensions": {
+      "height": [
+        89,
+        50
+      ]
+    }
+  },
+  {
+    "width": 390,
+    "path": "monitoring/api",
+    "element": ".navigator-table>.overview-toolbar",
+    "css": {},
+    "dimensions": {
+      "height": [
+        89,
+        50
+      ]
+    }
+  },
+  {
+    "width": 390,
+    "path": "monitoring/api",
+    "element": ".navigator-table td",
+    "css": {},
+    "dimensions": {
+      "height": [
+        46,
+        44
+      ]
+    }
+  }
+]

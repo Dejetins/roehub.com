@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Callable
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from apps.api.dto import (
     BTCUSDTMarketReadinessResponse,
@@ -28,6 +28,7 @@ from trading.contexts.backtest.application.ports import (
     ResearchOrganizationScope,
     ResearchOrganizationScopeResolver,
 )
+from trading.contexts.identity.adapters.inbound.api.csrf import same_origin_rejection_reason
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
 from trading.contexts.market_data.adapters.outbound.persistence.artifact_inventory_reader import (
     FileSystemActiveArtifactInventoryReader,
@@ -273,10 +274,13 @@ def build_market_data_reference_router(
     )
     def select_market_data_instrument(
         *,
+        request: Request,
         market_id: int,
         symbol: str,
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> MarketDataSelectionItemResponse:
+        if same_origin_rejection_reason(request=request, fail_closed_without_origin=False):
+            raise HTTPException(403, "Mutation origin is not allowed")
         scope = _resolve_research_scope(
             resolver=organization_scope_resolver,
             principal=principal,
@@ -308,10 +312,13 @@ def build_market_data_reference_router(
     )
     def unselect_market_data_instrument(
         *,
+        request: Request,
         market_id: int,
         symbol: str,
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> MarketDataSelectionItemResponse:
+        if same_origin_rejection_reason(request=request, fail_closed_without_origin=False):
+            raise HTTPException(403, "Mutation origin is not allowed")
         scope = _resolve_research_scope(
             resolver=organization_scope_resolver,
             principal=principal,

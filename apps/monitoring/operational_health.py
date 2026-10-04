@@ -9,6 +9,7 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from collections import deque
 from collections.abc import AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -112,6 +113,7 @@ class OperationalHealthService:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._statuses: dict[str, OperationalStatus] = {}
+        self._events: deque[OperationalStatus] = deque(maxlen=200)
         self._log_push_success = True
         self._last_refresh_completed_at: datetime | None = None
         self._last_refresh_monotonic: float | None = None
@@ -168,6 +170,7 @@ class OperationalHealthService:
                 ):
                     changed.append(status)
             self._statuses = next_statuses
+            self._events.extend(changed)
             self._last_refresh_completed_at = observed_at
             self._last_refresh_monotonic = time.monotonic()
             self._worker_failed = False
@@ -180,6 +183,11 @@ class OperationalHealthService:
                     batch_success = False
             self._log_push_success = batch_success
         return self.snapshot()
+
+    def recent_events(self) -> tuple[OperationalStatus, ...]:
+        """Bounded redacted transitions since this observer started; no raw logs."""
+        with self._lock:
+            return tuple(reversed(self._events))
 
     def snapshot(self) -> OperationalSnapshot:
         with self._lock:
@@ -413,6 +421,10 @@ def create_operational_health_app(*, service: OperationalHealthService) -> FastA
     @app.get("/api/v1/operational-health", response_model=OperationalSnapshot)
     def operational_health() -> OperationalSnapshot:
         return service.snapshot()
+
+    @app.get("/api/v1/operational-health/events", response_model=list[OperationalStatus])
+    def operational_events() -> list[OperationalStatus]:
+        return list(service.recent_events())
 
     @app.get("/metrics", response_class=PlainTextResponse)
     def metrics() -> PlainTextResponse:

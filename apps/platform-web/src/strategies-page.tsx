@@ -1,3 +1,5 @@
+import {useReadSnapshot} from './read-snapshot';
+import { LoadingData, ReadStatus } from './loading-data';
 import { useEffect, useState, type ReactNode } from 'react';
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { useLocation, useSearchParams } from 'react-router';
@@ -23,12 +25,16 @@ export function StrategiesPage({ subject }: { subject: string }) {
   const [params, setParams] = useSearchParams();
   const id = location.pathname.split('/')[2] || params.getAll('strategy_id').at(-1) || '';
   const [collapsed, setCollapsed] = useState(false);
+  const listCollapsed = !!id && collapsed;
   const [now, setNow] = useState(Date.now);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
   const list = useQuery({ queryKey: ['private', subject, 'strategies'], queryFn: ({signal}) => readStrategies(subject, signal) });
   const validId = z.uuid().safeParse(id).success;
   const detail = useQuery({queryKey:['private',subject,'strategy',id], enabled:validId, queryFn:({signal})=>readStrategy(subject,id,signal)});
   const status = useQuery<Awaited<ReturnType<typeof readStrategyStatus>>>({queryKey:['private',subject,'strategy-status',id], enabled:validId, refetchOnMount:false, refetchInterval:query=>{if(isRestricted(query.state.error)||query.state.errorUpdateCount>=3)return false;return Math.max(15000,(query.state.data?.deadline??0)-Date.now(),query.state.error instanceof ApiError?(query.state.error.retryAfterSeconds??0)*1000:0);}, queryFn:({signal})=>readStrategyStatus(id,signal)});
+  const snapshot=useReadSnapshot(subject,id,validId&&detail.data&&!detail.isFetching&&!status.isFetching&&(status.data||status.error)?{id,detail,status}:undefined,
+    !validId||isRestricted(detail.error)||isRestricted(status.error));
+  const displayed=snapshot.data;
   const reads = [list, ...(validId ? [detail, status] : [])];
   const eligible = reads.filter(read => !read.isFetching && !isRestricted(read.error) && now >= Math.max(read.errorUpdatedAt + (read.error instanceof ApiError ? read.error.retryAfterSeconds ?? 0 : 0)*1000, read === status ? status.data?.deadline ?? 0 : 0) && (read !== status || status.data?.refresh_control.manual_refresh_available !== false));
   const items = isRestricted(list.error) ? undefined : list.data;
@@ -48,13 +54,15 @@ export function StrategiesPage({ subject }: { subject: string }) {
   const toolbar=<div className="strategy-panel-tools"><button className="strategies-refresh" aria-label={t('refresh')} disabled={!eligible.length} onClick={() => {eligible.forEach(read => void read.refetch());}}><RefreshCw aria-hidden="true" /></button><button className="strategy-list-toggle" aria-label={t(collapsed ? 'strategy.showList' : 'strategy.hideList')} title={t(collapsed ? 'strategy.showList' : 'strategy.hideList')} aria-expanded={!collapsed} aria-controls="strategies-library" onClick={() => setCollapsed(value => !value)}><PanelRight aria-hidden="true"/></button></div>;
   return <div className="strategies-page">
     <h1 className="sr-only" id="workspace-heading" tabIndex={-1}>{t('strategies')}</h1>
-    <div className={`panes report-workspace strategies-panes ${collapsed ? 'list-collapsed' : ''}`}>
+    <div className={`panes report-workspace strategies-panes ${listCollapsed ? 'list-collapsed' : ''}`}>
 
       <section className="panel context strategy-context" aria-label={t('strategy.workspace')}>
-        {id ? z.uuid().safeParse(id).success ? <StrategyDetail toolbar={toolbar} key={`${subject}:${id}`} detail={detail} status={status} subject={subject} id={id} now={now} filteredOut={!!items?.some(item => item.strategy_id===id) && !filtered.some(item=>item.strategy_id===id)} /> : <>{toolbar}<p role="alert">{t('strategy.invalid')}</p></> : <>{toolbar}<p className="empty">{t('strategy.inspect')}</p></>}
+        {validId&&<ReadStatus pending={detail.isFetching||status.isFetching} retained={snapshot.retained}/>}
+        {snapshot.retained&&<><StrategyError error={detail.error}/><StrategyError error={status.error}/></>}
+        <div>{snapshot.retained&&(detail.error||status.error)&&<button disabled={!eligible.length} onClick={()=>eligible.forEach(read=>void read.refetch())}>{t('refresh')}</button>}</div><div inert={snapshot.retained&&displayed?.id!==id}>{id ? z.uuid().safeParse(id).success ? <StrategyDetail updating={status.isFetching} toolbar={toolbar} key={`${subject}:${displayed?.id??id}`} detail={displayed?.detail??detail} status={displayed?.status??status} subject={subject} id={displayed?.id??id} now={now} filteredOut={!!items?.some(item => item.strategy_id===id) && !filtered.some(item=>item.strategy_id===id)} /> : <>{toolbar}<p role="alert">{t('strategy.invalid')}</p></> : <p className="empty">{t('strategy.inspect')}</p>}</div>
 
       </section>
-      <div className="strategy-list-slot" inert={collapsed} aria-hidden={collapsed}><div className="strategy-list-clip"><section id="strategies-library" className="panel library" aria-labelledby="strategies-library-heading">
+      <div className="strategy-list-slot" inert={listCollapsed} aria-hidden={listCollapsed}><div className="strategy-list-clip"><section id="strategies-library" className="panel library" aria-labelledby="strategies-library-heading">
         <div className="panel-head"><h2 id="strategies-library-heading">{t('strategy.library')}</h2><span className="count">{items?.length ?? '—'}</span></div>
         <div className="library-body">
           <details className="strategy-filter-panel"><summary>{i18n.language.startsWith('ru')?'Фильтры':'Filters'}{[query,market,timeframe,stateFilter].filter(Boolean).length>0&&` · ${[query,market,timeframe,stateFilter].filter(Boolean).length}`}</summary><div className="strategy-filters"><label>{t('strategy.search')}<input maxLength={200} value={query} onChange={e => filter('q', e.target.value)} /></label>
@@ -63,7 +71,7 @@ export function StrategiesPage({ subject }: { subject: string }) {
             <LibraryFilter label={i18n.language.startsWith('ru')?'Состояние':'State'} all={t('strategy.all')} value={stateFilter} options={['running','stopped','starting','stopping','blocked','unknown'].map(value=>({value,label:t(`strategy.states.${value}`,{defaultValue:value})}))} onChange={value=>filter('state',value)}/>
             {(query || market || timeframe || stateFilter) && <button onClick={() => setParams(old => { const next = new URLSearchParams(old); ['q','market','timeframe','state'].forEach(key => next.delete(key)); return next; }, {replace:true,flushSync:true})}>{t('resetFilters')}</button>}
           </div></details>
-          <p role="status" className="freshness">{list.isPending ? t('strategy.loading') : items ? `${t(list.isError || now-list.dataUpdatedAt>60000 ? 'stale' : 'snapshot')} · ${formatDate(new Date(list.dataUpdatedAt).toISOString(), i18n.language)} UTC` : ''}</p>
+          <ReadStatus pending={list.isFetching}/><p role="status" className="freshness">{items ? `${t(list.isError || now-list.dataUpdatedAt>60000 ? 'stale' : 'snapshot')} · ${formatDate(new Date(list.dataUpdatedAt).toISOString(), i18n.language)} UTC` : ''}</p>
           <StrategyError error={list.error} />
           {items && !filtered.length && <p className="empty">{t(items.length ? 'strategy.noMatches' : 'strategy.empty')}</p>}
           <div className="strategy-rows">{filtered.map(item => <MotionLink key={item.strategy_id} className="strategy-row" aria-current={id === item.strategy_id ? 'true' : undefined} to={selection(item.strategy_id)} preventScrollReset>
@@ -77,19 +85,19 @@ export function StrategiesPage({ subject }: { subject: string }) {
 }
 type DetailQuery = UseQueryResult<Awaited<ReturnType<typeof readStrategy>>, Error>;
 type StatusQuery = UseQueryResult<Awaited<ReturnType<typeof readStrategyStatus>>, Error>;
-function StrategyDetail({toolbar,detail,status,subject,id,now,filteredOut}:{toolbar:ReactNode;subject:string;detail:DetailQuery;status:StatusQuery;id:string;now:number;filteredOut:boolean}) {
+function StrategyDetail({toolbar,detail,status,subject,id,now,filteredOut,updating=false}:{updating?:boolean;toolbar:ReactNode;subject:string;detail:DetailQuery;status:StatusQuery;id:string;now:number;filteredOut:boolean}) {
   const {t,i18n} = useTranslation();
   const data = isRestricted(detail.error) ? undefined : detail.data;
   const observation = isRestricted(detail.error) || isRestricted(status.error) ? undefined : status.data;
   useEffect(() => { document.getElementById('selected-strategy-heading')?.focus({preventScroll:true}); }, [id, !!data]);
   return <>
-    {!data&&toolbar}{!data&&<div className="panel-head"><h2 id="selected-strategy-heading" tabIndex={-1}>{t('strategy.saved')}</h2></div>}
+    {!data&&!detail.isPending&&toolbar}{!data&&!detail.isPending&&<div className="panel-head"><h2 id="selected-strategy-heading" tabIndex={-1}>{t('strategy.saved')}</h2></div>}
     <div className="strategy-detail">
-      {detail.isPending && <p role="status">{t('strategy.loadingDetail')}</p>}<StrategyError error={detail.error} />
+      {detail.isFetching&&!data && <LoadingData />}<StrategyError error={detail.error} />
       {data && <>
         {detail.isError && <p role="status" className="notice">{t('stale')}</p>}
         {filteredOut && <p role="status" className="notice">{t('strategy.filtered')}</p>}
-        <StrategyOperations toolbar={toolbar} strategy={data} subject={subject} observation={observation} now={now} error={status.error}><details><summary>{t('strategy.technical')}</summary><p className="freshness">{t('strategy.immutable')}</p><dl><dt>ID</dt><dd>{id}</dd><dt>{t('createdUtc')}</dt><dd>{formatDate(data.created_at,i18n.language)}</dd><dt>schema_version · spec_kind</dt><dd>{data.spec.schema_version} · {data.spec.spec_kind}</dd><dt>{t('instrument')}</dt><dd>{data.spec.instrument_key}</dd></dl><details><summary>{t('strategy.json')}</summary><pre>{JSON.stringify(data.spec,null,2)}</pre></details></details></StrategyOperations>
+        <StrategyOperations toolbar={toolbar} strategy={data} subject={subject} observation={observation} loading={updating||status.isFetching} now={now} error={status.error}><details><summary>{t('strategy.technical')}</summary><p className="freshness">{t('strategy.immutable')}</p><dl><dt>ID</dt><dd>{id}</dd><dt>{t('createdUtc')}</dt><dd>{formatDate(data.created_at,i18n.language)}</dd><dt>schema_version · spec_kind</dt><dd>{data.spec.schema_version} · {data.spec.spec_kind}</dd><dt>{t('instrument')}</dt><dd>{data.spec.instrument_key}</dd></dl><details><summary>{t('strategy.json')}</summary><pre>{JSON.stringify(data.spec,null,2)}</pre></details></details></StrategyOperations>
       </>}
 
     </div>

@@ -1,0 +1,24 @@
+{
+  "events": [
+    {
+      "event": "insert_failed",
+      "code": "storage_memory_pressure",
+      "retained_receipts": 4,
+      "remaining_failed_generation": []
+    },
+    {
+      "event": "insert_confirmed",
+      "rows": 4,
+      "pid": [
+        38175
+      ]
+    }
+  ],
+  "initial_writer_pid": [
+    38166
+  ],
+  "remaining_receipts": 0,
+  "stored_rows": 4,
+  "children_remaining": 0,
+  "elapsed_s": 1.3466056250035763
+}

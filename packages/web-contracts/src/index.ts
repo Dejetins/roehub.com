@@ -8,7 +8,7 @@ export interface ClientBootstrap {
   locale: Locale;
   subject: string;
   /** Presentation only; absent in older Backtests bootstraps. */
-  client_routes?: ('/backtests' | '/strategies')[];
+  client_routes?: ('/backtests' | '/strategies' | '/dashboard')[];
 }
 export type ApiFailureKind = 'unauthenticated' | 'forbidden' | 'not-found' |
   'validation' | 'conflict' | 'rate-limited' | 'unavailable' | 'transport' | 'invalid-response';

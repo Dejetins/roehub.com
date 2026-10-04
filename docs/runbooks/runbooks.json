@@ -160,6 +160,13 @@
       ]
     },
     {
+      "path": "docs/runbooks/navigator-local-market-data-recovery.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
       "path": "docs/runbooks/offline-release-installation.md",
       "target_stages": [
         "17",

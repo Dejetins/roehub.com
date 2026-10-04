@@ -51,18 +51,39 @@ def preview_identity_environment(environ: Mapping[str, str]) -> dict[str, str]:
 def create_api() -> FastAPI:
     """Use the real composition roots; the optional fault is explicit test injection."""
     from apps.api.common import register_api_error_handlers
+    from apps.api.routes.monitoring import build_monitoring_router
     from apps.api.wiring.modules.backtest import build_backtests_router
     from apps.api.wiring.modules.identity import build_identity_api_module
+    from apps.api.wiring.modules.market_data_reference import build_market_data_reference_router
+    from apps.api.wiring.modules.research_tenancy import build_research_organization_scope_resolver
     from apps.api.wiring.modules.strategy import build_strategy_router
+    from apps.api.wiring.modules.ui_account import build_ui_account_router
     from apps.api.wiring.modules.ui_backtests import build_ui_backtests_router
     from apps.api.wiring.modules.ui_strategies_dashboard import (
         build_ui_strategies_dashboard_router,
     )
+    from tools.qa.workpages_monitoring import PreviewOperationalClient, build_preview_observer
 
     identity = build_identity_api_module(environ=preview_identity_environment(os.environ))
     app = FastAPI()
     register_api_error_handlers(app=app)
     app.include_router(identity.router)
+    if os.environ.get("ROEHUB_MARKET_DATA_WORK_REQUESTS_ENABLED") == "1":
+        observer = build_preview_observer(os.environ)
+        app.add_event_handler("startup", observer.start)
+        app.add_event_handler("shutdown", observer.stop)
+        app.include_router(build_monitoring_router(
+            current_user_dependency=identity.current_user_dependency,
+            scope_resolver=build_research_organization_scope_resolver(environ=os.environ),
+            organization_service=identity.organization_access_service,
+            health=PreviewOperationalClient(observer),
+        ))
+    app.include_router(build_ui_account_router(
+        environ=os.environ, current_user_dependency=identity.current_user_dependency
+    ))
+    app.include_router(build_market_data_reference_router(
+        environ=os.environ, current_user_dependency=identity.current_user_dependency
+    ))
     app.include_router(
         build_ui_strategies_dashboard_router(
             environ=os.environ, current_user_dependency=identity.current_user_dependency
@@ -143,7 +164,7 @@ def create_api() -> FastAPI:
         return response
     @app.get("/health")
     def health():
-        return {"healthy": True}
+        return {"healthy": True, "status": "ok"}
 
     return app
 
@@ -492,7 +513,9 @@ def run_stack():
             ("api", "tools.qa.backtests_client_fixture:create_api", str(PORT + 1), {}),
             (
                 "web",
-                "apps.web.main.app:create_app",
+                ("tools.qa.overview_preview:create_app"
+                 if os.environ.get("ROEHUB_PROOF_OVERVIEW") == "true"
+                 else "apps.web.main.app:create_app"),
                 str(PORT),
                 {
                     "WEB_BACKTESTS_CLIENT_ENABLED": "true",

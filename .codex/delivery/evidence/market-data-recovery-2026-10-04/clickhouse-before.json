@@ -1,0 +1,56 @@
+{
+  "observed_at_utc": "2026-10-04 08:05:12",
+  "version": "25.8.33.6",
+  "log_storage": [
+    {
+      "name": "metric_log",
+      "total_rows": 423890,
+      "total_bytes": 138225653
+    },
+    {
+      "name": "text_log",
+      "total_rows": 45309021,
+      "total_bytes": 2808936052
+    },
+    {
+      "name": "trace_log",
+      "total_rows": 1129552708,
+      "total_bytes": 19158778553
+    }
+  ],
+  "recent_memory": [
+    {
+      "tracked_peak": 3237843698,
+      "merges_peak": 2642609835
+    }
+  ],
+  "incident": {
+    "insert_failure_times_utc": [
+      "2026-10-03T21:46:43Z",
+      "2026-10-03T22:13:07Z"
+    ],
+    "exception_code": 241,
+    "merge_table": "system.metric_log",
+    "merge_peak_gib": 2.41,
+    "metric_log_columns": 1435,
+    "failed_insert_memory_mib": 6.65
+  },
+  "jobs_before": [
+    {
+      "job_id": "3d3b986e-7781-459d-a6db-f54302feda79",
+      "state": "running",
+      "attempt": 2,
+      "completed_units": 226800,
+      "rows_read": 226800,
+      "rows_written": 221520
+    },
+    {
+      "job_id": "85e21d9a-ca42-42b8-91df-8fd1dd88d0cf",
+      "state": "failed",
+      "attempt": 1,
+      "completed_units": 180120,
+      "rows_read": 180120,
+      "rows_written": 180120
+    }
+  ]
+}

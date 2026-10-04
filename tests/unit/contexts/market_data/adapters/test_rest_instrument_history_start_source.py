@@ -5,6 +5,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+import pytest
+
 from trading.contexts.market_data.adapters.outbound.clients import (
     RestInstrumentHistoryStartSource,
 )
@@ -277,3 +279,53 @@ def test_history_start_source_binary_searches_bybit_spot_first_available_minute(
 
 def _raise_unexpected(url: str, params: Mapping[str, Any]) -> None:
     raise AssertionError(f"Unexpected request url={url!r} params={dict(params)!r}")
+
+
+@pytest.mark.parametrize("market_id", [1, 2, 3, 4])
+def test_interactive_bounds_confirm_candles_for_every_market(tmp_path, market_id):
+    cfg = load_market_data_runtime_config(_config(tmp_path))
+    first = datetime(2023, 2, 3, 4, 5, tzinfo=timezone.utc)
+    first_ms = int(first.timestamp() * 1000)
+
+    def handler(url, params):
+        assert "instruments-info" not in url and "exchangeInfo" not in url
+        if market_id in (1, 2):
+            assert params["limit"] == 1 and params["startTime"] < first_ms
+            return [[first_ms]]
+        assert params["category"] == ("spot" if market_id == 3 else "linear")
+        return {
+            "retCode": 0,
+            "result": {"list": [[str(first_ms)]] if params["end"] >= first_ms else []},
+        }
+
+    source = RestInstrumentHistoryStartSource(
+        cfg,
+        _FakeHttp(handler),
+        _FixedClock(UtcTimestamp(datetime(2026, 1, 1, tzinfo=timezone.utc))),
+        require_confirmed_candle=True,
+    )
+    resolved = source.get_history_start(InstrumentId(MarketId(market_id), Symbol("BTCUSDT")))
+    assert resolved is not None and resolved.value == first
+
+
+@pytest.mark.parametrize("market_id", [2, 4])
+def test_interactive_bounds_never_fallback_to_futures_listing_metadata(tmp_path, market_id):
+    cfg = load_market_data_runtime_config(_config(tmp_path))
+    source = RestInstrumentHistoryStartSource(
+        cfg,
+        _FakeHttp(lambda *_: [] if market_id == 2 else {"retCode": 0, "result": {"list": []}}),
+        _FixedClock(UtcTimestamp(datetime(2026, 1, 1, tzinfo=timezone.utc))),
+        require_confirmed_candle=True,
+    )
+    assert source.get_history_start(InstrumentId(MarketId(market_id), Symbol("BTCUSDT"))) is None
+
+
+def test_interactive_bounds_reject_provider_ignoring_historical_boundary(tmp_path):
+    cfg = load_market_data_runtime_config(_config(tmp_path))
+    source = RestInstrumentHistoryStartSource(
+        cfg,
+        _FakeHttp(lambda *_: {"retCode": 0, "result": {"list": [[str(1735689600000)]]}}),
+        _FixedClock(UtcTimestamp(datetime(2026, 1, 1, tzinfo=timezone.utc))),
+        require_confirmed_candle=True,
+    )
+    assert source.get_history_start(InstrumentId(MarketId(3), Symbol("BTCUSDT"))) is None

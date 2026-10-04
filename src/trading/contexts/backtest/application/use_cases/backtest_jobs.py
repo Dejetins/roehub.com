@@ -445,6 +445,7 @@ class BacktestJobsUseCase:
         job_id: UUID,
         variant_key: str,
         max_rows: int | None = None,
+        all_rows: bool = False,
     ) -> BacktestTradesCsvReadModel | BacktestLazyTradesMaterializationReadModel:
         context = self._lazy_trades_cache_context_or_materialization(
             user_id=user_id,
@@ -454,7 +455,7 @@ class BacktestJobsUseCase:
         )
         if isinstance(context, BacktestLazyTradesMaterializationReadModel):
             return context
-        effective_max_rows = normalize_csv_max_rows(max_rows)
+        effective_max_rows = None if all_rows else normalize_csv_max_rows(max_rows)
         cache_read = context.lazy_trades_service.cache.read_csv(
             cache_key=context.probe.cache_key,
             now=datetime.now(UTC),

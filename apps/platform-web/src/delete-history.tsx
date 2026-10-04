@@ -11,7 +11,7 @@ export type DeleteState={phase:'idle'|'sending'|'unknown'|'rejected';error:Error
 export const deletionIdle:DeleteState={phase:'idle',error:null,deadline:0,readAt:0};
 export function DeleteHistory({job,subject,now,backLink,read,canRead,readAt,readError}:{job:Job;subject:string;now:number;backLink:string;read:()=>Promise<unknown>;canRead:boolean;readAt:number;readError:Error|null}){
   const {t}=useTranslation(),client=useQueryClient(),navigate=useNavigate();const key=['private',subject,'delete',job.job_id];
-  const state=useQuery<DeleteState>({queryKey:key,enabled:false,initialData:deletionIdle}).data!;
+  const state=useQuery<DeleteState>({queryKey:key,enabled:false,gcTime:300_000,initialData:deletionIdle}).data!;
   const controller=useRef<AbortController|null>(null),lock=useRef(false);
   useEffect(()=>()=>{controller.current?.abort();if(lock.current&&client.getQueryData(key))client.setQueryData(key,{...deletionIdle,phase:'unknown'});},[]);
   const terminal=['succeeded','failed','cancelled'].includes(job.state);
