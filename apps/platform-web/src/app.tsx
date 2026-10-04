@@ -55,7 +55,12 @@ export function App({ bootstrap }: { bootstrap: ClientBootstrap }) {
   }, [blocked, client]);
   useEffect(() => {
     // Route changes focus the new reading context; filter changes leave focus on the control.
-    if (!location.pathname.startsWith('/backtests')) document.getElementById('workspace-heading')?.focus({preventScroll:true});
+    if (!location.pathname.startsWith('/backtests')) {
+      const heading = location.pathname.startsWith('/strategies/')
+        ? document.getElementById('selected-strategy-heading') ?? document.getElementById('workspace-heading')
+        : document.getElementById('workspace-heading');
+      heading?.focus({preventScroll:true});
+    }
   }, [location.pathname, session.isPending]);
   if (session.isPending) return <main className="session-panel"><LoadingData /></main>;
   if (blocked) return <main className="session-panel"><h1>{t('title')}</h1><p role="alert">{

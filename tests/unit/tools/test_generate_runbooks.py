@@ -31,7 +31,11 @@ def test_runbook_generator_is_deterministic_and_indexed() -> None:
     index = json.loads(outputs[INDEX_PATH])
     assert len(index["runbooks"]) == 9
     assert len(index["problem_index"]) == 20
-    assert len(index["legacy_unmigrated"]) == 23
+    assert len(index["legacy_unmigrated"]) == 24
+    assert any(
+        entry["path"] == "docs/runbooks/navigator-local-market-data-recovery.md"
+        for entry in index["legacy_unmigrated"]
+    )
     assert all(
         problem in index["problem_index"]
         for runbook in index["runbooks"]

@@ -89,7 +89,10 @@ function StrategyDetail({toolbar,detail,status,subject,id,now,filteredOut,updati
   const {t,i18n} = useTranslation();
   const data = isRestricted(detail.error) ? undefined : detail.data;
   const observation = isRestricted(detail.error) || isRestricted(status.error) ? undefined : status.data;
-  useEffect(() => { document.getElementById('selected-strategy-heading')?.focus({preventScroll:true}); }, [id, !!data]);
+  const headingReady = !!data && (!(updating || status.isFetching) || !!observation);
+  useEffect(() => {
+    if (headingReady) document.getElementById('selected-strategy-heading')?.focus({preventScroll:true});
+  }, [id, headingReady]);
   return <>
     {!data&&!detail.isPending&&toolbar}{!data&&!detail.isPending&&<div className="panel-head"><h2 id="selected-strategy-heading" tabIndex={-1}>{t('strategy.saved')}</h2></div>}
     <div className="strategy-detail">
