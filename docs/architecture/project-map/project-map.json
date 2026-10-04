@@ -140,7 +140,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 473,
+      "file_count": 472,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -446,7 +446,7 @@
       "description": "Navigator candidate prototype; not the accepted platform baseline.",
       "docs": [],
       "entrypoints": [],
-      "file_count": 107,
+      "file_count": 106,
       "id": "app:navigator-web",
       "kind": "app",
       "name": "navigator-web",
@@ -11985,11 +11985,6 @@
       "area": "delivery",
       "kind": "documentation",
       "path": "apps/navigator-web/design-qa.md"
-    },
-    {
-      "area": "delivery",
-      "kind": "other",
-      "path": "apps/navigator-web/node_modules"
     },
     {
       "area": "delivery",
@@ -25077,7 +25072,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 4572,
+  "inventory_file_count": 4571,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -25275,5 +25270,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "cd6fb3d809b5adb9f15d560544cd56fa6f85e78bee847f2919e090ec22365549"
+  "structural_digest": "58a4198aa633814eeb37c40b206271c44af80f54b8ad05e85e4a537028237211"
 }
