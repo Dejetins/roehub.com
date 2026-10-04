@@ -1,0 +1,101 @@
+{
+  "scope": "production spawn path and identical app imports, zero rows, no DB I/O, same machine; not full live benchmark",
+  "samples": [
+    {
+      "iteration": 0,
+      "total_ms": 576.3617080519907,
+      "launch_and_imports_ms": 548.8171660108492,
+      "config_and_empty_write_ms": 2.8207090217620134,
+      "poll_and_cleanup_ms": 24.723833019379526,
+      "child_cpu_before_target_ms": 542.408,
+      "child_cpu_at_send_ms": 545.237
+    },
+    {
+      "iteration": 1,
+      "total_ms": 594.469667004887,
+      "launch_and_imports_ms": 569.8188330279663,
+      "config_and_empty_write_ms": 2.9641250148415565,
+      "poll_and_cleanup_ms": 21.686708962079138,
+      "child_cpu_before_target_ms": 565.667,
+      "child_cpu_at_send_ms": 568.6379999999999
+    },
+    {
+      "iteration": 2,
+      "total_ms": 571.8300830340013,
+      "launch_and_imports_ms": 552.9686249792576,
+      "config_and_empty_write_ms": 2.848208008799702,
+      "poll_and_cleanup_ms": 16.013250045944005,
+      "child_cpu_before_target_ms": 549.1089999999999,
+      "child_cpu_at_send_ms": 551.971
+    },
+    {
+      "iteration": 3,
+      "total_ms": 573.7689589732327,
+      "launch_and_imports_ms": 543.2979170000181,
+      "config_and_empty_write_ms": 2.7854579966515303,
+      "poll_and_cleanup_ms": 27.685583976563066,
+      "child_cpu_before_target_ms": 539.256,
+      "child_cpu_at_send_ms": 542.046
+    },
+    {
+      "iteration": 4,
+      "total_ms": 567.1722080442123,
+      "launch_and_imports_ms": 553.1192499911413,
+      "config_and_empty_write_ms": 3.032083041034639,
+      "poll_and_cleanup_ms": 11.020875012036413,
+      "child_cpu_before_target_ms": 547.322,
+      "child_cpu_at_send_ms": 550.36
+    },
+    {
+      "iteration": 5,
+      "total_ms": 589.9241659790277,
+      "launch_and_imports_ms": 568.3026250335388,
+      "config_and_empty_write_ms": 2.8783329762518406,
+      "poll_and_cleanup_ms": 18.74320796923712,
+      "child_cpu_before_target_ms": 564.077,
+      "child_cpu_at_send_ms": 566.964
+    },
+    {
+      "iteration": 6,
+      "total_ms": 567.3455420183018,
+      "launch_and_imports_ms": 555.0777500029653,
+      "config_and_empty_write_ms": 2.791167004033923,
+      "poll_and_cleanup_ms": 9.47662501130253,
+      "child_cpu_before_target_ms": 551.168,
+      "child_cpu_at_send_ms": 553.966
+    }
+  ],
+  "summary": {
+    "total_ms": {
+      "median": 573.7689589732327,
+      "min": 567.1722080442123,
+      "max": 594.469667004887
+    },
+    "launch_and_imports_ms": {
+      "median": 553.1192499911413,
+      "min": 543.2979170000181,
+      "max": 569.8188330279663
+    },
+    "config_and_empty_write_ms": {
+      "median": 2.848208008799702,
+      "min": 2.7854579966515303,
+      "max": 3.032083041034639
+    },
+    "poll_and_cleanup_ms": {
+      "median": 18.74320796923712,
+      "min": 9.47662501130253,
+      "max": 27.685583976563066
+    },
+    "child_cpu_before_target_ms": {
+      "median": 549.1089999999999,
+      "min": 539.256,
+      "max": 565.667
+    },
+    "child_cpu_at_send_ms": {
+      "median": 551.971,
+      "min": 542.046,
+      "max": 568.6379999999999
+    }
+  },
+  "children_remaining": 0
+}

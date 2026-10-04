@@ -7,7 +7,6 @@ persist hook payloads by default because hook inputs may contain secrets.
 
 from __future__ import annotations
 
-import hashlib
 import importlib
 import json
 import sys
@@ -22,7 +21,6 @@ from validators.common import (  # noqa: E402
     FATAL_BLOCK,
     WARN_WITH_CONTEXT,
     Finding,
-    assistant_text,
     format_findings,
     hook_event,
 )
@@ -31,8 +29,6 @@ VALIDATOR_MODULES = [
     "validators.secret_redaction_guard",
     "validators.command_safety_guard",
     "validators.scoped_git_staging_guard",
-    "validators.russian_final_answer_guard",
-    "validators.cold_head_gate",
 ]
 
 
@@ -74,105 +70,7 @@ def compact_reason(findings: list[Finding]) -> str:
     return "Roehub hook policy requires attention:\n" + format_findings(findings)
 
 
-def reason_hash(reason: str) -> str:
-    return hashlib.sha256(reason.encode("utf-8")).hexdigest()[:12]
-
-
-def _truncate_original_answer(text: str, *, limit: int = 80000) -> str:
-    if len(text) <= limit:
-        return text
-    return (
-        text[:limit]
-        + "\n\n[Служебное примечание Roehub hook: исходный ответ был длиннее "
-        "лимита continuation prompt и был обрезан. В следующем ответе явно "
-        "укажи, что восстановлена только видимая часть исходного ответа.]"
-    )
-
-
-def _human_finding_line(finding: Finding) -> str:
-    if finding.validator == "cold_head_gate":
-        return (
-            "- Не хватает понятного блока проверки перед финалом. Нужно вернуть "
-            "исходный ответ полностью и ниже добавить краткую cold-head проверку "
-            "простым языком."
-        )
-    if finding.validator == "russian_final_answer_guard":
-        return (
-            "- Финальный ответ содержит англоязычный пользовательский текст. "
-            "Нужно качественно переписать отчет на русском, сохранив команды, "
-            "пути, имена файлов, хеши, статусы и технические идентификаторы "
-            "в исходном виде."
-        )
-    target = f" ({finding.target})" if finding.target else ""
-    return f"- {finding.title}{target}: {finding.message}"
-
-
-def stop_continuation_reason(
-    findings: list[Finding],
-    payload: dict[str, Any],
-    marker: str,
-) -> str:
-    original_answer = _truncate_original_answer(assistant_text(payload))
-    finding_lines = "\n".join(_human_finding_line(finding) for finding in findings)
-    needs_cold_head = any(finding.validator == "cold_head_gate" for finding in findings)
-    needs_russian = any(
-        finding.validator == "russian_final_answer_guard" for finding in findings
-    )
-    first_action = (
-        "Верни полный исправленный ответ на русском языке без сокращений. "
-        "Качественно переведи пользовательские заголовки, пояснения и статусы; "
-        "технические идентификаторы, команды, пути, хеши и значения в backticks "
-        "сохрани как есть."
-        if needs_russian
-        else "Верни полный исходный ответ модели на русском языке без сокращений."
-    )
-    formatting_action = (
-        "Не оформляй этот раздел как code block и не переходи на английский."
-        if needs_cold_head
-        else "Не переходи на английский в пользовательском тексте."
-    )
-    cold_head_action = (
-        "2. Ниже добавь раздел **Проверка перед финалом** простым языком.\n"
-        if needs_cold_head
-        else "2. Не добавляй cold-head раздел, если он не требуется исходной задачей.\n"
-    )
-    cold_head_template = (
-        """
-Добавь ниже ответа такой человекочитаемый блок:
-
-**Проверка перед финалом**
-- Статус проверки: выполнена | заблокирована
-- Режим: independent subagent | cold self-review fallback
-- Что проверено: ...
-- Итог: Release | Release after fixes | Block
-- Что исправлено/добавлено: ...
-- Остаточные риски: ...
-- Что это значит для следующего шага: ...
-"""
-        if needs_cold_head
-        else ""
-    )
-    return f"""Roehub hook: нужно завершить ответ понятным русским итогом.
-
-Не заменяй исходный ответ техническим receipt и не отвечай только служебным блоком.
-В следующем сообщении:
-1. {first_action}
-{cold_head_action.rstrip()}
-3. {formatting_action}
-
-Исходный ответ модели:
---- НАЧАЛО ИСХОДНОГО ОТВЕТА ---
-{original_answer}
---- КОНЕЦ ИСХОДНОГО ОТВЕТА ---
-{cold_head_template}
-
-Почему hook попросил продолжение:
-{finding_lines}
-
-Технический маркер против зацикливания: {marker}"""
-
-
-def emit_for_event(event: str, groups: dict[str, list[Finding]], payload: dict[str, Any]) -> None:
+def emit_for_event(event: str, groups: dict[str, list[Finding]]) -> None:
     fatal = groups[FATAL_BLOCK]
     cont = groups[CONTINUE_BEFORE_FINAL]
     warn = groups[WARN_WITH_CONTEXT]
@@ -258,32 +156,11 @@ def emit_for_event(event: str, groups: dict[str, list[Finding]], payload: dict[s
             )
             return
 
-    if event == "Stop":
-        if cont:
-            machine_reason = compact_reason(cont)
-            marker = f"ROEHUB_HOOK_REASON:{reason_hash(machine_reason)}"
-            if payload.get("stop_hook_active") or marker in str(
-                payload.get("last_assistant_message", "")
-            ):
-                message = "Roehub Stop hook: повторное continuation подавлено: "
-                emit_json({"systemMessage": message + marker})
-                return
-            emit_json(
-                {
-                    "decision": "block",
-                    "reason": stop_continuation_reason(cont, payload, marker),
-                }
-            )
-            return
-        if warn:
-            emit_json({"systemMessage": compact_reason(warn)})
-            return
-
 
 def main() -> int:
     payload = load_payload()
     findings = run_validators(payload)
-    emit_for_event(hook_event(payload), finding_groups(findings), payload)
+    emit_for_event(hook_event(payload), finding_groups(findings))
     return 0
 
 

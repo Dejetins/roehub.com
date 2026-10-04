@@ -1,0 +1,197 @@
+[
+  {
+    "path": "backtests/new",
+    "fields": [
+      {
+        "selector": ".builder input[name=strategy_name]",
+        "width": 521,
+        "height": 34,
+        "css": {
+          "fontFamily": "-apple-system, \"system-ui\", \"SF Pro Text\", Inter, Geist, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "fontWeight": "400",
+          "lineHeight": "20px",
+          "padding": "6px 10px",
+          "border": "1px solid rgb(53, 61, 69)",
+          "borderRadius": "10px",
+          "backgroundColor": "rgb(11, 14, 17)",
+          "color": "rgb(241, 243, 245)",
+          "outline": "rgb(241, 243, 245) none 3px",
+          "outlineOffset": "0px"
+        }
+      },
+      {
+        "selector": ".builder select[name=\"coordinates.exchange\"]",
+        "width": 252.5,
+        "height": 34,
+        "css": {
+          "fontFamily": "-apple-system, \"system-ui\", \"SF Pro Text\", Inter, Geist, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "fontWeight": "400",
+          "lineHeight": "normal",
+          "padding": "6px 22px 6px 10px",
+          "border": "1px solid rgb(53, 61, 69)",
+          "borderRadius": "10px",
+          "backgroundColor": "rgb(11, 14, 17)",
+          "color": "rgb(241, 243, 245)",
+          "outline": "rgb(241, 243, 245) none 3px",
+          "outlineOffset": "0px"
+        }
+      },
+      {
+        "selector": ".builder .field:has(>input[type=number])>label",
+        "width": 252.5,
+        "height": 28.546875,
+        "css": {
+          "fontFamily": "-apple-system, \"system-ui\", \"SF Pro Text\", Inter, Geist, \"Segoe UI\", sans-serif",
+          "fontSize": "11.9px",
+          "fontWeight": "400",
+          "lineHeight": "14.28px",
+          "padding": "0px 0px 0px 11px",
+          "border": "0px none rgb(177, 184, 192)",
+          "borderRadius": "0px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(177, 184, 192)",
+          "outline": "rgb(177, 184, 192) none 3px",
+          "outlineOffset": "0px"
+        }
+      },
+      {
+        "selector": ".builder button[type=submit]",
+        "width": 151.921875,
+        "height": 33.59375,
+        "css": {
+          "fontFamily": "-apple-system, \"system-ui\", \"SF Pro Text\", Inter, Geist, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "normal",
+          "padding": "5.6px 9.8px",
+          "border": "1px solid rgb(154, 120, 255)",
+          "borderRadius": "16.8px",
+          "backgroundColor": "rgb(104, 64, 221)",
+          "color": "rgb(241, 243, 245)",
+          "outline": "rgb(241, 243, 245) none 3px",
+          "outlineOffset": "0px"
+        }
+      }
+    ]
+  },
+  {
+    "path": "settings/profile",
+    "fields": [
+      {
+        "selector": ".work-form input[name=username]",
+        "width": 310,
+        "height": 34,
+        "css": {
+          "fontFamily": "-apple-system, \"system-ui\", \"SF Pro Text\", Inter, Geist, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "fontWeight": "400",
+          "lineHeight": "20px",
+          "padding": "6px 10px",
+          "border": "1px solid rgb(53, 61, 69)",
+          "borderRadius": "10px",
+          "backgroundColor": "rgb(11, 14, 17)",
+          "color": "rgb(241, 243, 245)",
+          "outline": "rgb(241, 243, 245) none 3px",
+          "outlineOffset": "0px"
+        }
+      },
+      {
+        "selector": ".work-field:has(input[name=username])>label",
+        "width": 310,
+        "height": 14.28125,
+        "css": {
+          "fontFamily": "-apple-system, \"system-ui\", \"SF Pro Text\", Inter, Geist, \"Segoe UI\", sans-serif",
+          "fontSize": "11.9px",
+          "fontWeight": "400",
+          "lineHeight": "14.28px",
+          "padding": "0px 0px 0px 11px",
+          "border": "0px none rgb(177, 184, 192)",
+          "borderRadius": "0px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(177, 184, 192)",
+          "outline": "rgb(177, 184, 192) none 3px",
+          "outlineOffset": "0px"
+        }
+      },
+      {
+        "selector": ".work-form button[type=submit]",
+        "width": 111.234375,
+        "height": 33.59375,
+        "css": {
+          "fontFamily": "-apple-system, \"system-ui\", \"SF Pro Text\", Inter, Geist, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "normal",
+          "padding": "5.6px 9.8px",
+          "border": "1px solid rgb(154, 120, 255)",
+          "borderRadius": "16.8px",
+          "backgroundColor": "rgb(104, 64, 221)",
+          "color": "rgb(177, 184, 192)",
+          "outline": "rgb(177, 184, 192) none 3px",
+          "outlineOffset": "0px"
+        }
+      }
+    ]
+  },
+  {
+    "path": "settings/preferences",
+    "fields": [
+      {
+        "selector": ".work-form select#locale",
+        "width": 310,
+        "height": 34,
+        "css": {
+          "fontFamily": "-apple-system, \"system-ui\", \"SF Pro Text\", Inter, Geist, \"Segoe UI\", sans-serif",
+          "fontSize": "12.6px",
+          "fontWeight": "400",
+          "lineHeight": "normal",
+          "padding": "6px 22px 6px 10px",
+          "border": "1px solid rgb(53, 61, 69)",
+          "borderRadius": "10px",
+          "backgroundColor": "rgb(11, 14, 17)",
+          "color": "rgb(241, 243, 245)",
+          "outline": "rgb(241, 243, 245) none 3px",
+          "outlineOffset": "0px"
+        }
+      },
+      {
+        "selector": ".work-field:has(select#locale)>label",
+        "width": 310,
+        "height": 14.28125,
+        "css": {
+          "fontFamily": "-apple-system, \"system-ui\", \"SF Pro Text\", Inter, Geist, \"Segoe UI\", sans-serif",
+          "fontSize": "11.9px",
+          "fontWeight": "400",
+          "lineHeight": "14.28px",
+          "padding": "0px 0px 0px 15px",
+          "border": "0px none rgb(177, 184, 192)",
+          "borderRadius": "0px",
+          "backgroundColor": "rgba(0, 0, 0, 0)",
+          "color": "rgb(177, 184, 192)",
+          "outline": "rgb(177, 184, 192) none 3px",
+          "outlineOffset": "0px"
+        }
+      },
+      {
+        "selector": ".work-form button[type=submit]",
+        "width": 111.234375,
+        "height": 33.59375,
+        "css": {
+          "fontFamily": "-apple-system, \"system-ui\", \"SF Pro Text\", Inter, Geist, \"Segoe UI\", sans-serif",
+          "fontSize": "14px",
+          "fontWeight": "400",
+          "lineHeight": "normal",
+          "padding": "5.6px 9.8px",
+          "border": "1px solid rgb(154, 120, 255)",
+          "borderRadius": "16.8px",
+          "backgroundColor": "rgb(104, 64, 221)",
+          "color": "rgb(177, 184, 192)",
+          "outline": "rgb(177, 184, 192) none 3px",
+          "outlineOffset": "0px"
+        }
+      }
+    ]
+  }
+]

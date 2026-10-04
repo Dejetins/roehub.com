@@ -40,10 +40,10 @@ class InMemoryAccountSettingsRepository(AccountSettingsRepository):
             return existing
         profile = AccountProfileSettings(
             owner_user_id=owner_user_id,
-            username="quant_trader",
-            email="quant_trader@example.com",
+            username=None,
+            email=None,
             timezone="Europe/Moscow",
-            telegram_discord="@quant_trader / quant_trader#4319",
+            telegram_discord=None,
             updated_at=now,
         )
         self._profiles[key] = profile
@@ -77,7 +77,7 @@ class InMemoryAccountSettingsRepository(AccountSettingsRepository):
             return existing
         preferences = AccountPreferences(
             owner_user_id=owner_user_id,
-            theme="terminal-orange",
+            theme="graphite",
             locale="en",
             density="compact",
             autorefresh_preset="15s",
@@ -199,22 +199,6 @@ class InMemoryAccountSettingsRepository(AccountSettingsRepository):
             for session in self._sessions.values()
             if str(session.owner_user_id) == str(owner_user_id)
         ]
-        if not sessions:
-            sessions = [
-                AccountSessionView(
-                    session_id="current",
-                    owner_user_id=owner_user_id,
-                    created_at=now,
-                    last_seen_at=now,
-                    idle_expires_at=now,
-                    absolute_expires_at=now,
-                    revoked_at=None,
-                    device="Roehub Web / current browser",
-                    ip_address="127.0.0.1",
-                    location="local-dev",
-                    is_current=True,
-                )
-            ]
         ordered = sorted(
             sessions,
             key=lambda item: (item.last_seen_at, item.session_id),

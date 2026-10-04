@@ -1,0 +1,142 @@
+{
+  "observed_at_utc": "2026-10-04T08:39:33.597436+00:00",
+  "load_observation_start_utc": "2026-10-04 08:18:00",
+  "memory": [
+    {
+      "tracked_peak": 676246601
+    }
+  ],
+  "current_memory": [
+    {
+      "metric": "OSMemoryTotal",
+      "value": 4104110080.0
+    },
+    {
+      "metric": "MemoryResident",
+      "value": 1388257280.0
+    },
+    {
+      "metric": "OSMemoryAvailable",
+      "value": 1449320448.0
+    }
+  ],
+  "logs": [
+    {
+      "name": "metric_log",
+      "total_rows": 403,
+      "total_bytes": 974629,
+      "has_ttl": 1
+    },
+    {
+      "name": "metric_log_0",
+      "total_rows": 423912,
+      "total_bytes": 113915810,
+      "has_ttl": 1
+    },
+    {
+      "name": "text_log",
+      "total_rows": 45316700,
+      "total_bytes": 2809415842,
+      "has_ttl": 1
+    },
+    {
+      "name": "trace_log",
+      "total_rows": 4442,
+      "total_bytes": 104385,
+      "has_ttl": 1
+    }
+  ],
+  "exceptions": [
+    {
+      "injected": 1,
+      "exception_code": 241,
+      "count": 3
+    }
+  ],
+  "inserts": [
+    {
+      "inserts": 225,
+      "query_peak_bytes": 8495871,
+      "p95_ms": 14.0,
+      "median_rows_including_materialized_views": 2881.0
+    }
+  ],
+  "batch_jobs": [
+    {
+      "state": "queued",
+      "jobs": 100,
+      "min_completed": 2880,
+      "max_completed": 4320,
+      "completed": 331200,
+      "written": "316800",
+      "started": 100
+    }
+  ],
+  "original_jobs": [
+    {
+      "job_id": "85e21d9a-ca42-42b8-91df-8fd1dd88d0cf",
+      "state": "queued",
+      "completed_units": 181560,
+      "rows_read": 181560,
+      "rows_written": 181500,
+      "attempt": 2,
+      "progress_epoch": 1
+    },
+    {
+      "job_id": "3d3b986e-7781-459d-a6db-f54302feda79",
+      "state": "queued",
+      "completed_units": 265560,
+      "rows_read": 265560,
+      "rows_written": 260280,
+      "attempt": 2,
+      "progress_epoch": 1
+    }
+  ],
+  "failed_or_waiting_batches": [],
+  "selected_job": {
+    "job_id": "1f5675f2-38a2-56b5-a6ee-7f051f98287c"
+  },
+  "dedup_samples": [
+    {
+      "symbol": "0GUSDT",
+      "raw_binance_klines_1m": {
+        "rows": 1440,
+        "unique_minutes": 1440
+      },
+      "canonical_candles_1m": {
+        "rows": 1440,
+        "unique_minutes": 1440
+      }
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "raw_binance_klines_1m": {
+        "rows": 1440,
+        "unique_minutes": 1440
+      },
+      "canonical_candles_1m": {
+        "rows": 1440,
+        "unique_minutes": 1440
+      }
+    },
+    {
+      "symbol": "BTCUSDT",
+      "raw_binance_klines_1m": {
+        "rows": 1440,
+        "unique_minutes": 1440
+      },
+      "canonical_candles_1m": {
+        "rows": 1440,
+        "unique_minutes": 1440
+      }
+    }
+  ],
+  "sampled_concurrency_memory": {
+    "count": 90,
+    "from": "2026-10-04 08:26:29.490342+00:00",
+    "to": "2026-10-04 08:29:30.376143+00:00",
+    "max_global_running": 1,
+    "peak_tracked_bytes": 667438576,
+    "peak_resident_bytes": 1467699200.0
+  }
+}

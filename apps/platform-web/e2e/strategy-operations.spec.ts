@@ -14,7 +14,7 @@ test('operational strategy: executed chart, position, commands, reasons, layouts
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(`/strategies/${strategy.strategy_id}`);await expect(page.getByRole('button',{name:'Stop',exact:true})).toBeEnabled();
  await expect(page.locator('.operations-chart canvas')).toBeVisible();await expect(page.getByRole('tab',{name:'Trades · 7'})).toBeVisible();await expect(page.getByRole('tab',{name:'Backtest',exact:true})).toHaveCount(0);
- const geometry=async()=>page.locator('.operations-technical').evaluate(el=>({top:el.getBoundingClientRect().top,scroll:window.scrollY,height:document.documentElement.scrollHeight}));
+ const geometry=async()=>page.locator('.operations-technical').evaluate(el=>({top:el.getBoundingClientRect().top+window.scrollY,height:document.documentElement.scrollHeight}));
  const baseline=await geometry();
  const eventTabWidth=await page.locator('#operations-events').evaluate(el=>el.getBoundingClientRect().width);
  await page.getByRole('tab',{name:'Equity',exact:true}).click();
@@ -29,6 +29,11 @@ test('operational strategy: executed chart, position, commands, reasons, layouts
   expect(await page.locator('#operations-events').evaluate(el=>el.getBoundingClientRect().width)).toBe(eventTabWidth);
   await expect(page.locator('.operations-position')).toHaveCount(name==='Price & executions'?1:0);
   await expect(page.locator('.operations-lifecycle')).toHaveCount(name==='Price & executions'?1:0);
+  // Playwright may scroll a visible trigger before pointer dispatch. Measure
+  // the activation viewport, so that automation scroll is not blamed on collapse.
+  await page.locator('.overview-expand').scrollIntoViewIfNeeded();
+  const expansionBaseline=await geometry();
+  const expansionScroll=await page.evaluate(()=>window.scrollY);
   await page.locator('.overview-expand').click();
   await expect(page.locator('.overview-expanded')).toBeVisible();
   if(name==='Events'||name==='Trades · 7'){
@@ -41,7 +46,8 @@ test('operational strategy: executed chart, position, commands, reasons, layouts
   await page.keyboard.press('Escape');
   await expect(page.locator('.overview-expanded')).toHaveCount(0);
   await expect(page.locator('.overview-expand')).toBeFocused();
-  await expect.poll(geometry).toEqual(baseline);
+  await expect.poll(geometry).toEqual(expansionBaseline);
+  await expect.poll(()=>page.evaluate(()=>window.scrollY)).toBe(expansionScroll);
  }
 
  for(const expanded of [false,true]){
@@ -98,11 +104,11 @@ test('operational strategy: executed chart, position, commands, reasons, layouts
  await expect(page.getByRole('group',{name:'Chart display'})).toBeVisible();
  await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Chart display',exact:true})).toBeFocused();
  await expect(page.getByRole('group',{name:'Chart display'})).toHaveCount(0);
- const timeframe=page.getByRole('button',{name:'Chart timeframe',exact:true});
- const chooseTimeframe=async(value:string)=>{await timeframe.click();await page.getByRole('radio',{name:value,exact:true}).click();};
- await chooseTimeframe('1h');await expect(timeframe).toHaveText('1h');
+ const timeframe=page.getByRole('group',{name:'Chart timeframe',exact:true});
+ const chooseTimeframe=async(value:string)=>{await timeframe.getByRole('button',{name:value,exact:true}).click();};
+ await chooseTimeframe('1h');await expect(timeframe.getByRole('button',{name:'1h',exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('.operations-chart canvas')).toBeVisible();
- await page.locator('.overview-expand').click();await expect(timeframe).toHaveText('1h');await page.locator('.overview-expand').click();
+ await page.locator('.overview-expand').click();await expect(timeframe.getByRole('button',{name:'1h',exact:true})).toHaveAttribute('aria-pressed','true');await page.locator('.overview-expand').click();
  await chooseTimeframe('15m');
  await page.getByRole('button',{name:'Chart display',exact:true}).click();
  const markerToggle=page.getByRole('checkbox',{name:'Trades',exact:true});

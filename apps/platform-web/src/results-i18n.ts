@@ -1,6 +1,6 @@
 export const resultsEn = {
  fullscreen:'Full screen',exitFullscreen:'Exit full screen',
- chartTimeframe:'Chart timeframe',
+ chartTimeframe:'Chart timeframe', chartPeriod:'Chart period', periods:{'1d':'1D','1w':'1W','1m':'1M','3m':'3M','1y':'1Y',all:'All'},
  price:'Price & trades',entry:'Entry',exit:'Exit',candles:'candles',candleGrouping:'Grouped by {{count}} source bars',priceTrades:'Trade entries / exits',loadingTrades:'Loading trade markers…',tradeLimit:'Showing {{count}} of {{total}} trades',priceLegend:'Blue ▲ entry · Gold ▼ exit · prices in quote currency · Ctrl + scroll to zoom',
  year:'Year', monthlyHelp:'Monthly P&L: % of opening monthly balance / quote currency. Closed trades, net of costs.', tradeClosures:'Trade exits', chartType:'Chart', previousVariants:'Previous variants',nextVariants:'Next variants',drawdownHelp:'Decline from the previous balance peak at trade exits. Open-position drawdown is not included.',
  overview:'Overview',metricsTab:'Metrics',metric:'Metric',value:'Value',actions:'Save strategy / export',jobInformation:'Job information',showHistory:'Show history',hideHistory:'Hide history',chartHint:'Hover for values · drag the slider to zoom · Ctrl + scroll to zoom on the chart',
@@ -14,7 +14,7 @@ export const resultsEn = {
 };
 export const resultsRu = {
  fullscreen:'На весь экран',exitFullscreen:'Свернуть',
- chartTimeframe:'Таймфрейм графика',
+ chartTimeframe:'Таймфрейм графика', chartPeriod:'Период графика', periods:{'1d':'1Д','1w':'1Н','1m':'1М','3m':'3М','1y':'1Г',all:'Всё'},
  price:'Цена и сделки',entry:'Вход',exit:'Выход',candles:'свечей',candleGrouping:'Объединено по {{count}} исходных свечей',priceTrades:'Входы / выходы сделок',loadingTrades:'Загружаем отметки сделок…',tradeLimit:'Показано {{count}} из {{total}} сделок',priceLegend:'Синий ▲ вход · Золотой ▼ выход · цены в валюте котировки · Ctrl + прокрутка для масштаба',
  year:'Год', monthlyHelp:'P&L месяца: % от капитала на начало месяца / валюта котировки. По закрытым сделкам, с учётом издержек.',tradeClosures:'Закрытия сделок',chartType:'График',previousVariants:'Предыдущие варианты',nextVariants:'Следующие варианты',drawdownHelp:'Снижение от предыдущего максимума капитала после закрытия сделок. Просадка открытых позиций не включена.',
  overview:'Обзор',metricsTab:'Метрики',metric:'Показатель',value:'Значение',actions:'Сохранение стратегии / экспорт',jobInformation:'Сведения о запуске',showHistory:'Показать историю',hideHistory:'Свернуть историю',chartHint:'Наведите курсор для значений · двигайте ползунок для масштаба · Ctrl + прокрутка для приближения',

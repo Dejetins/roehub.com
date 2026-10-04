@@ -2,7 +2,7 @@
 
 Этот документ — человекочитаемое представление единой карты проекта. Машиночитаемый источник для агентов — `docs/architecture/project-map/project-map.json`, семантический каталог — `docs/architecture/project-map/project-map.toml`, правила использования — `docs/architecture/project-map/AGENT_GUIDE.md`.
 
-Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `17489e1e7ed853c6af0e11f38107ee34ab344d190de46a6d34d7972a647515f3`; учтено файлов: **4159**.
+Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `2c37a5ef31c308ca23434d82f6498f179d8208525a55da1e74c261b0f7e4b7cc`; учтено файлов: **4572**.
 
 ## Визуальная runtime-карта
 
@@ -11,9 +11,9 @@ flowchart LR
   classDef external fill:#fff3cd,stroke:#b8860b
   classDef store fill:#e8f4ff,stroke:#3178c6
   classDef service fill:#edf7ed,stroke:#2e7d32
-  n_browser["Браузер"]
+  n_browser["Platform browser client"]
   class n_browser service
-  n_web["Web UI"]
+  n_web["Web server/integration"]
   class n_web service
   n_api["FastAPI API"]
   class n_api service
@@ -83,6 +83,8 @@ flowchart TB
   class n_app_migrations app
   n_app_monitoring["app:monitoring"]
   class n_app_monitoring app
+  n_app_navigator_web["app:navigator-web"]
+  class n_app_navigator_web app
   n_app_platform_web["app:platform-web"]
   class n_app_platform_web app
   n_app_plugin_gateway["app:plugin_gateway"]
@@ -290,13 +292,13 @@ flowchart TB
 
 | Область | Название | Ответственность | Файлов | Корни |
 |---|---|---|---:|---|
-| `domain` | Доменные контексты | Бизнес-правила и use cases по bounded contexts. | 682 | `src/trading/contexts/` |
+| `domain` | Доменные контексты | Бизнес-правила и use cases по bounded contexts. | 696 | `src/trading/contexts/` |
 | `shared-core` | Shared kernel и платформа | Общие типы, конфигурация, ошибки, интеграционные и производительные примитивы. | 36 | `src/trading/__init__.py`, `src/trading/shared_kernel/`, `src/trading/platform/`, `src/trading/integration/`, `src/trading/fastpath/` |
-| `delivery` | Приложения и delivery | HTTP, HTML, CLI, workers, schedulers, migrations и composition roots. | 345 | `apps/` |
-| `operations` | Инфраструктура и эксплуатация | Self-hosted Docker Compose, monitoring, конфигурация и миграции данных. | 223 | `infra/`, `configs/`, `migrations/`, `alembic/`, `.github/workflows/` |
-| `automation` | Инструменты и автоматизация | Операторские скрипты, генераторы и CI helpers. | 112 | `tools/`, `scripts/` |
-| `quality` | Проверки и тестовые данные | Unit, integration, notebook и performance-smoke проверки, fixtures и typings. | 443 | `tests/`, `fixtures/`, `typings/` |
-| `knowledge` | Документация и агентные контракты | Архитектура, runbooks, планы, правила агентов и индекс проекта. | 2260 | `docs/`, `.codex/`, `AGENTS.md`, `README.md` |
+| `delivery` | Приложения и delivery | HTTP, HTML, CLI, workers, schedulers, migrations и composition roots. | 473 | `apps/` |
+| `operations` | Инфраструктура и эксплуатация | Self-hosted Docker Compose, monitoring, конфигурация и миграции данных. | 230 | `infra/`, `configs/`, `migrations/`, `alembic/`, `.github/workflows/` |
+| `automation` | Инструменты и автоматизация | Операторские скрипты, генераторы и CI helpers. | 117 | `tools/`, `scripts/` |
+| `quality` | Проверки и тестовые данные | Unit, integration, notebook и performance-smoke проверки, fixtures и typings. | 458 | `tests/`, `fixtures/`, `typings/` |
+| `knowledge` | Документация и агентные контракты | Архитектура, runbooks, планы, правила агентов и индекс проекта. | 2504 | `docs/`, `.codex/`, `AGENTS.md`, `README.md` |
 | `experiments` | Прототипы и локальные результаты | Изолированные прототипы и каталоги воспроизводимых результатов. | 0 | `prototypes/`, `output/`, `local_artifacts/` |
 | `repository-meta` | Корневые контракты репозитория | Build metadata, dependency locks, root configuration and compatibility indexes. | 9 | `.dockerignore`, `.gitignore`, `.python-version`, `LICENSE`, `alembic.ini`, `pyproject.toml`, `pyrightconfig.json`, `repo_tree.md`, `uv.lock` |
 
@@ -306,7 +308,7 @@ flowchart TB
 
 | Компонент | Ответственность | Файлов | Точки входа | Зависит от |
 |---|---|---:|---|---|
-| `app:api` | FastAPI API и UI-oriented DTO/routes. | 50 | `apps/api/main/app.py`, `apps/api/main/main.py` | `app:cli`, `app:common`, `app:control_agent`, `app:migrations`, `app:monitoring`, `context:backtest`, `context:backtest_artifacts`, `context:extensions`, `context:identity`, `context:indicators`, `context:live_execution`, `context:market_data`, `context:notifications`, `context:operations`, `context:rl_trading`, `context:strategy`, `core:integration`, `core:platform`, `core:shared_kernel` |
+| `app:api` | FastAPI API и UI-oriented DTO/routes. | 54 | `apps/api/main/app.py`, `apps/api/main/main.py` | `app:cli`, `app:common`, `app:control_agent`, `app:migrations`, `app:monitoring`, `context:backtest`, `context:backtest_artifacts`, `context:extensions`, `context:identity`, `context:indicators`, `context:live_execution`, `context:market_data`, `context:notifications`, `context:operations`, `context:rl_trading`, `context:strategy`, `core:integration`, `core:platform`, `core:shared_kernel` |
 | `app:cli` | Командная строка для операторских и data workflows. | 22 | `apps/cli/main/main.py` | `app:api`, `context:backtest_artifacts`, `context:extensions`, `context:identity`, `context:indicators`, `context:market_data`, `context:notifications`, `core:platform`, `core:shared_kernel` |
 | `app:common` | Описание выводится из текущей структуры; уточнить при изменении ответственности. | 3 | — | — |
 | `app:control_agent` | Единственная host-side граница управления Docker Engine. | 9 | `apps/control_agent/main/main.py` | `context:operations` |
@@ -314,12 +316,13 @@ flowchart TB
 | `app:exchange_execution` | Изолированный gateway исполнения на бирже. | 8 | `apps/exchange_execution/main/app.py`, `apps/exchange_execution/main/main.py` | `context:exchange_control`, `context:live_execution`, `context:strategy`, `core:shared_kernel` |
 | `app:migrations` | Bootstrap и применение миграций. | 14 | `apps/migrations/main.py` | `context:backtest`, `context:extensions`, `context:identity`, `context:live_execution`, `context:market_data`, `context:notifications`, `context:strategy`, `core:integration`, `core:platform`, `core:shared_kernel` |
 | `app:monitoring` | Экспорт технических метрик. | 3 | — | — |
-| `app:platform-web` | Описание выводится из текущей структуры; уточнить при изменении ответственности. | 69 | — | — |
+| `app:navigator-web` | Navigator candidate prototype; not the accepted platform baseline. | 106 | — | — |
+| `app:platform-web` | Current accepted local-platform React/TypeScript client. | 85 | — | — |
 | `app:plugin_gateway` | Описание выводится из текущей структуры; уточнить при изменении ответственности. | 4 | `apps/plugin_gateway/main/app.py`, `apps/plugin_gateway/main/main.py` | `core:integration` |
 | `app:roehubctl` | Host-side аварийная CLI для диагностики и восстановления. | 3 | `apps/roehubctl/main/main.py` | `app:cli`, `app:control_agent`, `context:operations` |
 | `app:runtime_probe` | Описание выводится из текущей структуры; уточнить при изменении ответственности. | 2 | `apps/runtime_probe/main.py` | — |
 | `app:scheduler` | Планировщики фоновых задач. | 12 | `apps/scheduler/backtest_artifact_publisher/main/main.py`, `apps/scheduler/market_data_scheduler/main/main.py` | `app:api`, `app:cli`, `context:backtest`, `context:backtest_artifacts`, `context:indicators`, `context:market_data`, `core:platform`, `core:shared_kernel` |
-| `app:web` | Server-rendered web UI и same-origin API client. | 79 | `apps/web/main/app.py`, `apps/web/main/main.py` | `app:common` |
+| `app:web` | Server/integration layer and legacy server-rendered UI. | 79 | `apps/web/main/app.py`, `apps/web/main/main.py` | `app:common` |
 | `context:backtest` | Расчёт и оркестрация исторических прогонов. | 96 | — | `context:backtest_artifacts`, `context:indicators`, `context:market_data`, `core:platform`, `core:shared_kernel` |
 | `context:backtest_artifacts` | Публикация и чтение артефактов бектеста. | 39 | — | `context:backtest`, `context:indicators`, `context:market_data`, `core:integration`, `core:platform`, `core:shared_kernel` |
 | `context:exchange_control` | Политики доступности биржевых соединений и ключей. | 17 | `src/trading/contexts/exchange_control/adapters/inbound/http/app.py` | `context:identity`, `core:platform`, `core:shared_kernel` |
@@ -327,7 +330,7 @@ flowchart TB
 | `context:identity` | Пользователь, сессия, владение и доступ. | 75 | — | `core:platform`, `core:shared_kernel` |
 | `context:indicators` | Индикаторы и их вычислительные контракты. | 76 | — | `context:market_data`, `core:platform`, `core:shared_kernel` |
 | `context:live_execution` | Живое исполнение, ордера и reconciliation. | 65 | — | `context:exchange_control`, `context:strategy`, `core:shared_kernel` |
-| `context:market_data` | Получение, нормализация и хранение рыночных данных. | 99 | — | `context:backtest`, `context:backtest_artifacts`, `core:shared_kernel` |
+| `context:market_data` | Получение, нормализация и хранение рыночных данных. | 113 | — | `context:backtest`, `context:backtest_artifacts`, `core:shared_kernel` |
 | `context:ml` | ML-модели и исследовательские контракты. | 1 | — | — |
 | `context:notifications` | События, уведомления и каналы доставки. | 42 | — | `core:platform`, `core:shared_kernel` |
 | `context:operations` | Типизированные host-операции, идемпотентность и аварийный журнал. | 9 | — | — |
@@ -341,7 +344,7 @@ flowchart TB
 | `core:shared_kernel` | Общая техническая основа и кросс-контекстные примитивы. | 15 | — | — |
 | `worker:backtest_job_runner` | Исполнение очереди задач бектеста. | 15 | `apps/worker/backtest_job_runner/main/main.py` | `context:backtest`, `context:backtest_artifacts`, `core:platform`, `core:shared_kernel` |
 | `worker:job_runtime` | Описание выводится из текущей структуры; уточнить при изменении ответственности. | 9 | `apps/worker/job_runtime/main.py` | `app:control_agent`, `context:backtest_artifacts`, `context:extensions`, `context:operations`, `core:integration`, `core:shared_kernel` |
-| `worker:market_data_ws` | WebSocket ingestion рыночных данных. | 6 | `apps/worker/market_data_ws/main/main.py` | `app:cli`, `context:backtest`, `context:market_data`, `core:platform`, `core:shared_kernel` |
+| `worker:market_data_ws` | WebSocket ingestion рыночных данных. | 8 | `apps/worker/market_data_ws/main/main.py` | `app:cli`, `context:backtest`, `context:market_data`, `core:platform`, `core:shared_kernel` |
 | `worker:notification_dispatcher` | Доставка подготовленных уведомлений. | 6 | `apps/worker/notification_dispatcher/main/main.py` | `context:notifications`, `core:platform` |
 | `worker:notification_report_scheduler` | Планирование отчётных уведомлений. | 4 | `apps/worker/notification_report_scheduler/main/main.py` | `app:common`, `context:notifications` |
 | `worker:rl_trading_inference` | Inference RL-политик. | 7 | `apps/worker/rl_trading_inference/main/main.py` | `context:live_execution`, `context:rl_trading`, `context:strategy`, `core:shared_kernel` |

@@ -12,27 +12,35 @@
         "apps/api/dto/",
         "docs/architecture/api/"
       ],
-      "skills": [
-        "root-cause-debugging",
-        "contract-impact-analysis",
-        "backend-quality-gates"
-      ]
+      "skills": []
+    },
+    {
+      "components": [
+        "app:platform-web",
+        "app:api"
+      ],
+      "match": "Current local-platform client UI, routes, locale, loading, charts",
+      "read_first": [
+        "apps/platform-web/src/",
+        "apps/platform-web/package.json",
+        "packages/web-contracts/src/",
+        "docs/architecture/apps/web/roehub-ui-implementation-plan-v1.md"
+      ],
+      "skills": []
     },
     {
       "components": [
         "app:web",
         "app:api"
       ],
-      "match": "Web UI, template, locale, browser flow",
+      "match": "Web server/integration and legacy templates",
       "read_first": [
         "apps/web/main/app.py",
         "apps/web/templates/",
         "apps/web/dist/",
         "docs/architecture/apps/web/"
       ],
-      "skills": [
-        "browser-qa-evidence"
-      ]
+      "skills": []
     },
     {
       "components": [
@@ -47,11 +55,7 @@
         "apps/worker/backtest_job_runner/",
         "docs/architecture/backtest/"
       ],
-      "skills": [
-        "root-cause-debugging",
-        "backend-performance-evidence",
-        "backend-quality-gates"
-      ]
+      "skills": []
     },
     {
       "components": [
@@ -64,10 +68,7 @@
         "apps/worker/market_data_ws/",
         "docs/architecture/market_data/"
       ],
-      "skills": [
-        "root-cause-debugging",
-        "backend-quality-gates"
-      ]
+      "skills": []
     },
     {
       "components": [
@@ -84,11 +85,7 @@
         "apps/exchange_execution/",
         "docs/architecture/live_execution/"
       ],
-      "skills": [
-        "architecture-design",
-        "contract-impact-analysis",
-        "root-cause-debugging"
-      ]
+      "skills": []
     },
     {
       "components": [
@@ -104,11 +101,7 @@
         "apps/worker/rl_trading_inference/",
         "docs/architecture/ml/"
       ],
-      "skills": [
-        "architecture-design",
-        "backend-performance-evidence",
-        "backend-quality-gates"
-      ]
+      "skills": []
     },
     {
       "components": [
@@ -120,16 +113,12 @@
         "infra/",
         "docs/runbooks/"
       ],
-      "skills": [
-        "publish-ci-deploy",
-        "pre-ship-gate",
-        "root-cause-debugging"
-      ]
+      "skills": []
     }
   ],
   "areas": [
     {
-      "file_count": 682,
+      "file_count": 696,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -151,7 +140,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 345,
+      "file_count": 473,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -160,7 +149,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 223,
+      "file_count": 230,
       "id": "operations",
       "paths": [
         "infra/",
@@ -173,7 +162,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 112,
+      "file_count": 117,
       "id": "automation",
       "paths": [
         "tools/",
@@ -183,7 +172,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 443,
+      "file_count": 458,
       "id": "quality",
       "paths": [
         "tests/",
@@ -194,7 +183,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 2260,
+      "file_count": 2504,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -265,7 +254,7 @@
         "apps/api/main/app.py",
         "apps/api/main/main.py"
       ],
-      "file_count": 50,
+      "file_count": 54,
       "id": "app:api",
       "kind": "app",
       "name": "api",
@@ -454,10 +443,26 @@
     },
     {
       "depends_on": [],
-      "description": "Описание выводится из текущей структуры; уточнить при изменении ответственности.",
+      "description": "Navigator candidate prototype; not the accepted platform baseline.",
       "docs": [],
       "entrypoints": [],
-      "file_count": 69,
+      "file_count": 106,
+      "id": "app:navigator-web",
+      "kind": "app",
+      "name": "navigator-web",
+      "roots": [
+        "apps/navigator-web",
+        "apps/navigator-web/src",
+        "apps/navigator-web/src/test-data"
+      ],
+      "used_by": []
+    },
+    {
+      "depends_on": [],
+      "description": "Current accepted local-platform React/TypeScript client.",
+      "docs": [],
+      "entrypoints": [],
+      "file_count": 85,
       "id": "app:platform-web",
       "kind": "app",
       "name": "platform-web",
@@ -563,7 +568,7 @@
       "depends_on": [
         "app:common"
       ],
-      "description": "Server-rendered web UI и same-origin API client.",
+      "description": "Server/integration layer and legacy server-rendered UI.",
       "docs": [],
       "entrypoints": [
         "apps/web/main/app.py",
@@ -957,7 +962,7 @@
         "docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md"
       ],
       "entrypoints": [],
-      "file_count": 99,
+      "file_count": 113,
       "id": "context:market_data",
       "kind": "context",
       "name": "market_data",
@@ -1404,7 +1409,7 @@
       "entrypoints": [
         "apps/worker/market_data_ws/main/main.py"
       ],
-      "file_count": 6,
+      "file_count": 8,
       "id": "worker:market_data_ws",
       "kind": "worker",
       "name": "market_data_ws",
@@ -3489,6 +3494,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/ROEHUB-NAVIGATOR-2026-09-26.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/2026-09-04-ui-rollback.md"
     },
     {
@@ -3519,7 +3529,17 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-DATA-LOADING-2026-09-26.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-LOCAL-UI-IA-2026-07-20.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-OVERVIEW-2026-09-26.md"
     },
     {
       "area": "knowledge",
@@ -3550,6 +3570,276 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-UI-NEXT-STEPS-2026-09-08.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/ROEHUB-WORKPAGES-2026-10-03.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/api-outage-check.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/attempt-in-summary-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/binance-continue-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/clickhouse-before.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/final-load.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/final-queue-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/load-samples.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/parallel-four-completed-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/parallel-four-load.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/parallel-four-progress-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/parallel-four-summary.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/queue-cleared-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/queue-events-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/session-outage-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-recovery-2026-10-04/session-restored-draft-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/coverage.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/edge-cases.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/fixes/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/fixes/ankr-disabled-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/fixes/ankr-reenabled-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/fixes/coverage.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/fixes/migration.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/fixes/outage.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/fixes/recovered.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/fixes/streaming-restored-off-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-warm/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-warm/candles.csv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-warm/fault-recovery.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-warm/measurements.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-warm/ntp-after.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-warm/ntp-check.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-warm/summary.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/candles.csv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/clickhouse-clock.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/clock-check.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/harness-hashes.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/measurements.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/ntp-after.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/ntp-check.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/preflight.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/slowdown-diagnosis.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/spawn-profile.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency/summary.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/rest-pagination.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/runtime.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/shutdown.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/storage-fault.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/streaming-enabled-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/streaming-off-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/summary.json"
     },
     {
       "area": "knowledge",
@@ -5450,6 +5740,441 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/delivery/evidence/roehub-backtests-compact-2026-09-08/workspace-tabs.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/backtests-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/backtests-mobile-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/overview-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/overview-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/period-drawdown-week.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/period-equity-week.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/period-manual-equity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/period-price-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/strategies-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/strategy-timeframe-buttons-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/strategy-timeframe-buttons.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/timeframe-buttons-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/timeframe-buttons-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/unified-switches-backtests-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/unified-switches-backtests.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/unified-switches-overview.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-data-loading-2026-09-26/unified-switches-strategy-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/audit-oct02-backtest-trades.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/audit-oct02-backtests.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/audit-oct02-overview-return.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/audit-oct02-overview.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/audit-oct02-strategies.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/backtests-desktop.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/backtests-mobile.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/backtests-polished-sep30.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/chart-alignment-sep30.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/chart-chrome-unified-sep30.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/chart-settings-inline-sep30.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/compact-library-sep27.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/date-range-compact.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/date-range-overview-sep29.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/default-backtest-sep29.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/default-strategy-sep29.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/delete-visible-sep30.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/drawdown-last-oct02.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/export-menu-sep30.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/export-no-success-label-sep30.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/fullscreen-fixed-sep28.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/geometry.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/library-refresh-oct02.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/overview-desktop.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/overview-mobile.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/overview-table-sep27.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/restored-sep28.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/single-chart-selector-sep30.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/started-sep29.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/strategy-default-filter-sep30.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/strategy-desktop.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/strategy-filter-contained-sep30.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/strategy-mobile.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/strategy-status-fixed-desktop-sep29.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/strategy-status-fixed-sep29.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/strategy-table-sep27.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/table-download-sep30.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/trades-expanded-sep30.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/trades-final-sep30.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/unified-backtests-header.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/unified-overview-header.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-navigator-2026-09-26/unified-strategies-header.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/backtests-baseline.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/browser-accessibility.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/browser-flows.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/browser-layout.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-reduced-motion.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-en-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-final-viewport.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-final.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-first.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-ru-1024.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-ru-1440.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-ru-820.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/overview-ru-zoom200.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/restored-accepted-binance-result.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/restored-backtests.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/restored-strategies.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-empty.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-error.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-history.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-no-activity.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-partial.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/state-stale.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/strategies-baseline.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-overview-2026-09-26/zoom-before.png"
     },
     {
       "area": "knowledge",
@@ -9333,6 +10058,486 @@
     },
     {
       "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/capture-reference.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/capture-russian.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/check-cancel.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/check-connections-client.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/check-controls.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/check-display-localization.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/check-failures.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/check-races-recovery.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/check-recovery-reload.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/check-regression.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/check-settings.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/check-workpages.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/connections-1476.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/connections-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-1476.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-after-ingestion.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-approved-exchange-concept.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-before-ingestion.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-browser-offline-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-bybit-retry-observed-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-cancel-preserved-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-exchange-concepts-reference.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-exchanges-final-1487.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-exchanges-final-390.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-filter-icons-1414.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-filter-icons-398.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-filter-icons-detail.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-filters-390-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-first-history-three-candles.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-full-history-1414.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-full-history-398.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-full-history-final-1414.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-history-unavailable.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-journal-1414.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-journal-398.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-narrow.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-pause-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-progress-brave-0.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-progress-brave-1.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-progress-brave-2.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-progress-brave-desktop.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-progress-brave-devtools-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-progress-brave-inspector.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-retry-conflict-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/data-retry-wait-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/fidelity-differences.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/fidelity.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/form-controls.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/ingestion-1476.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/ingestion-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/ingestion-audit-01-create.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/ingestion-audit-02-completed.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/ingestion-completed.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/ingestion-form-390-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/measure-fidelity.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "frontend",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/measure-form-controls.js"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/monitoring-1476.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/monitoring-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/monitoring-backlog-390-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/monitoring.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/notifications-1476.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/notifications-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/preferences-1476.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/preferences-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/profile-1476.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/profile-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/read-candle-consumer.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/reference-backtests-download.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/reference-backtests-expanded.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/reference-backtests-filters.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/reference-backtests.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/reference-dashboard.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/reference-measurements.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/reference-strategies-filters.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/reference-strategies.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/regression-backtests-1476.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/regression-backtests-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/regression-dashboard-1476.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/regression-dashboard-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/regression-strategies-1476.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/regression-strategies-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/security-1476.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/security-390.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/settings-active-without-border.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/settings-interface-compact-1414.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/settings-interface-compact-390-ru.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/settings-preferences-narrow-ru.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/settings-preferences.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/settings-profile-initial.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/settings-profile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/settings-security-simplified-1414.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/settings-security.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/strategies-actions-aligned-1414.jpg"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/strategies-actions-alignment.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/roehub-workpages-2026-10-03/workpage-measurements.json"
+    },
+    {
+      "area": "knowledge",
       "kind": "other",
       "path": ".codex/delivery/evidence/ui-next-steps-2026-09-08/v23-1672.png"
     },
@@ -9369,12 +10574,12 @@
     {
       "area": "knowledge",
       "kind": "python",
-      "path": ".codex/hooks/validators/__init__.py"
+      "path": ".codex/hooks/validate_config.py"
     },
     {
       "area": "knowledge",
       "kind": "python",
-      "path": ".codex/hooks/validators/cold_head_gate.py"
+      "path": ".codex/hooks/validators/__init__.py"
     },
     {
       "area": "knowledge",
@@ -9385,11 +10590,6 @@
       "area": "knowledge",
       "kind": "python",
       "path": ".codex/hooks/validators/common.py"
-    },
-    {
-      "area": "knowledge",
-      "kind": "python",
-      "path": ".codex/hooks/validators/russian_final_answer_guard.py"
     },
     {
       "area": "knowledge",
@@ -10304,6 +11504,11 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/api/routes/backtest_export.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/api/routes/backtests.py"
     },
     {
@@ -10324,7 +11529,22 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/api/routes/market_data_catalog.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/api/routes/market_data_reference.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/api/routes/market_data_workspace.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/api/routes/monitoring.py"
     },
     {
       "area": "delivery",
@@ -10758,6 +11978,536 @@
     },
     {
       "area": "delivery",
+      "kind": "documentation",
+      "path": "apps/navigator-web/README.md"
+    },
+    {
+      "area": "delivery",
+      "kind": "documentation",
+      "path": "apps/navigator-web/design-qa.md"
+    },
+    {
+      "area": "delivery",
+      "kind": "configuration",
+      "path": "apps/navigator-web/package.json"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/account-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/account-preferences.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/api.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/app.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/app.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/backtests-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/builder-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/builder-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/builder-model.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/builder.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/builder.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/chart-display-menu.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/chart-instance.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/chart-period.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/chart-period.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/client-routes.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/connections-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/connections-page.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/connections-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/data-downloads.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/data-page.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/data-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/data-workspace-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/data-workspace.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/date-range-control.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/date-range-control.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/delete-history.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/download-progress.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/download-progress.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/execution.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/execution.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/expandable-overview.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/job-selection.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/library-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/library-filter-popup.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/library.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/library.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/loading-data.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/main.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/market-data-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/market-data-ui.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/market-data-ui.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/monitoring-page.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/monitoring-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/motion.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/motion.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/navigator-bootstrap.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/navigator-table.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/navigator.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/operation-recovery.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/operations-benchmark.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/operations-benchmark.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/operations-timeframe.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/operations-timeframe.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview-model.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview-model.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview-routing.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/overview.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/price-chart-conventions.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/price-chart-conventions.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/price-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/query-client.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/query-client.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/read-snapshot.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/read-snapshot.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/recent-auth.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/recovery.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/report-ui.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/result-read.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/results-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/results-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/results.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/results.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/session-recovery.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/session-recovery.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/settings-page.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/settings-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategies-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategies-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategies-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategies.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-insights-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-insights.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-insights.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-operations-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-operations-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-operations-i18n.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-operations.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-operations.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/strategy-recovery.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/style.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "configuration",
+      "path": "apps/navigator-web/src/test-data/builder-catalog.json"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/trades-scroll.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/trades-scroll.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/workpages.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/workspace-ui.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "configuration",
+      "path": "apps/navigator-web/tsconfig.json"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/vite.config.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/vitest.config.ts"
+    },
+    {
+      "area": "delivery",
       "kind": "frontend",
       "path": "apps/platform-web/e2e/builder.spec.ts"
     },
@@ -10833,17 +12583,17 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/app.test.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/app.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/backtests-page.tsx"
     },
     {
@@ -10863,18 +12613,33 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/builder.test.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/builder.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/chart-display-menu.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/chart-instance.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/chart-period.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/chart-period.ts"
     },
     {
       "area": "delivery",
@@ -10883,22 +12648,22 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/delete-history.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/execution.test.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/execution.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/expandable-overview.tsx"
     },
     {
@@ -10909,31 +12674,41 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/platform-web/src/job-selection.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/platform-web/src/library-api.ts"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/library.test.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/library.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/loading-data.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/platform-web/src/main.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/motion.test.tsx"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/motion.tsx"
     },
     {
@@ -10964,6 +12739,36 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/platform-web/src/overview-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/overview-model.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/overview-model.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/overview-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/overview-routing.test.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/overview.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/platform-web/src/price-chart-conventions.test.ts"
     },
     {
@@ -10973,8 +12778,13 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/price-chart.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/query-client.test.ts"
     },
     {
       "area": "delivery",
@@ -10984,12 +12794,32 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/platform-web/src/read-snapshot.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/read-snapshot.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/platform-web/src/recovery.ts"
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/report-ui.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/result-read.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/platform-web/src/result-read.ts"
     },
     {
       "area": "delivery",
@@ -11008,7 +12838,7 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/results.tsx"
     },
     {
@@ -11023,7 +12853,7 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/strategies-page.tsx"
     },
     {
@@ -11043,7 +12873,7 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/strategy-insights.tsx"
     },
     {
@@ -11053,7 +12883,7 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/strategy-operations-chart.tsx"
     },
     {
@@ -11068,7 +12898,7 @@
     },
     {
       "area": "delivery",
-      "kind": "other",
+      "kind": "frontend",
       "path": "apps/platform-web/src/strategy-operations.tsx"
     },
     {
@@ -11744,12 +13574,22 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/worker/market_data_ws/wiring/io_process.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/worker/market_data_ws/wiring/modules/__init__.py"
     },
     {
       "area": "delivery",
       "kind": "python",
       "path": "apps/worker/market_data_ws/wiring/modules/market_data_ws.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/market_data_ws/wiring/persistent_writer.py"
     },
     {
       "area": "delivery",
@@ -11920,6 +13760,16 @@
       "area": "operations",
       "kind": "configuration",
       "path": "configs/dev/backtest_artifacts.yaml"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "configs/dev/clickhouse-local-observability.xml"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "configs/dev/clickhouse-local-profiles.xml"
     },
     {
       "area": "operations",
@@ -12638,6 +14488,11 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/roehub-data-loading-contract-v1.md"
+    },
+    {
+      "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-local-platform-access-and-route-contract-v1.json"
     },
@@ -12650,6 +14505,11 @@
       "area": "knowledge",
       "kind": "configuration",
       "path": "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/apps/web/roehub-overview-requirements-v1.md"
     },
     {
       "area": "knowledge",
@@ -15294,6 +17154,16 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/architecture/ml/roehub-ml-research-platform-requirements-draft-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": "docs/architecture/ml/roehub-ml-research-product-plan-v1.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/architecture/notifications/telegram-egress-observability-and-user-counters-v1.md"
     },
     {
@@ -15999,6 +17869,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/runbooks/navigator-local-market-data-recovery.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/runbooks/notifications-admin-alerts.md"
     },
     {
@@ -16395,6 +18270,31 @@
       "area": "operations",
       "kind": "migration",
       "path": "migrations/postgres/0022_market_data_instrument_selections_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0023_market_data_work_requests_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0024_market_data_full_history_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0025_market_data_work_recovery_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0026_market_data_queue_events_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0027_market_data_stream_recovery_v1.sql"
     },
     {
       "area": "operations",
@@ -18839,6 +20739,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/clients/history_probe_http.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/clients/rest_candle_ingest_source.py"
     },
     {
@@ -18929,6 +20834,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/catalog_coverage_reader.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_instrument_reader.py"
     },
     {
@@ -18974,6 +20884,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/work_errors.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/__init__.py"
     },
     {
@@ -18984,12 +20899,32 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/catalog_snapshot_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/gateway.py"
     },
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/history_bounds_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/instrument_selection_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/stream_recovery_store.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py"
     },
     {
       "area": "domain",
@@ -19124,6 +21059,16 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/application/ports/stores/catalog_coverage_reader.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/ports/stores/catalog_snapshot_writer.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/application/ports/stores/enabled_instrument_reader.py"
     },
     {
@@ -19169,6 +21114,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/application/services/__init__.py"
     },
     {
@@ -19180,6 +21130,16 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/market_data/application/services/gap_tracker.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/services/history_bounds.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/services/ingestion_retry.py"
     },
     {
       "area": "domain",
@@ -19205,6 +21165,16 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/market_data/application/services/scheduler_backfill_planner.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/services/source_retry.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/services/work_requests.py"
     },
     {
       "area": "domain",
@@ -20749,6 +22719,16 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/real_infra/market_data/test_stream_recovery_postgres.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/real_infra/market_data/test_work_requests_postgres.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/test_smoke.py"
     },
     {
@@ -20770,6 +22750,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/api/test_app_strategy_router_toggle.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/api/test_backtest_export.py"
     },
     {
       "area": "quality",
@@ -20814,12 +22799,27 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/api/test_market_data_catalog.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/api/test_market_data_reference_routes.py"
     },
     {
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/api/test_market_data_reference_wiring_module.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/api/test_market_data_workspace.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/api/test_monitoring_routes.py"
     },
     {
       "area": "quality",
@@ -21199,6 +23199,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/scheduler/test_market_data_request_concurrency.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/scheduler/test_market_data_scheduler_funding.py"
     },
     {
@@ -21294,7 +23299,17 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/worker/test_market_data_io_process.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/worker/test_notification_dispatcher_wiring.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/worker/test_persistent_writer.py"
     },
     {
       "area": "quality",
@@ -21914,6 +23929,16 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/market_data/adapters/test_history_probe_http.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/market_data/adapters/test_http_source_retry.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/market_data/adapters/test_market_data_runtime_config.py"
     },
     {
@@ -21984,6 +24009,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/market_data/application/services/test_history_bounds.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/market_data/application/services/test_insert_buffer.py"
     },
     {
@@ -22005,6 +24035,16 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/contexts/market_data/application/services/test_scheduler_startup_scan.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/market_data/application/services/test_stream_recovery.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/market_data/application/services/test_work_requests.py"
     },
     {
       "area": "quality",
@@ -22574,6 +24614,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/tools/qa/test_strategy_execution_demo.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/tools/test_backtests_preview_sessions.py"
     },
     {
@@ -22725,6 +24770,16 @@
       "area": "automation",
       "kind": "python",
       "path": "tools/ci/route_changes.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/ci/test_agent_policy.py"
+    },
+    {
+      "area": "automation",
+      "kind": "documentation",
+      "path": "tools/codex_quality_benchmark/SKILL_DIAGNOSTICS.md"
     },
     {
       "area": "automation",
@@ -22884,12 +24939,27 @@
     {
       "area": "automation",
       "kind": "python",
+      "path": "tools/qa/navigator_preview.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
       "path": "tools/qa/oidc_browser_app.py"
     },
     {
       "area": "automation",
       "kind": "python",
+      "path": "tools/qa/overview_preview.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
       "path": "tools/qa/strategy_execution_demo.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/workpages_monitoring.py"
     },
     {
       "area": "automation",
@@ -23007,7 +25077,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 4159,
+  "inventory_file_count": 4572,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -23096,9 +25166,9 @@
       "id": "browser",
       "kind": "client",
       "paths": [
-        "apps/web/"
+        "apps/platform-web/"
       ],
-      "title": "Браузер"
+      "title": "Platform browser client"
     },
     {
       "id": "web",
@@ -23106,7 +25176,7 @@
       "paths": [
         "apps/web/"
       ],
-      "title": "Web UI"
+      "title": "Web server/integration"
     },
     {
       "id": "api",
@@ -23205,5 +25275,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "17489e1e7ed853c6af0e11f38107ee34ab344d190de46a6d34d7972a647515f3"
+  "structural_digest": "2c37a5ef31c308ca23434d82f6498f179d8208525a55da1e74c261b0f7e4b7cc"
 }

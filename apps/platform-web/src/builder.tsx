@@ -1,3 +1,4 @@
+import { LoadingData, ReadStatus } from './loading-data';
 import { useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { useForm, useWatch, type FieldPath } from 'react-hook-form';
@@ -56,7 +57,7 @@ export function Builder({subject,embedded=false,onClose,onCreated,onSummary,demo
   const catalog=useQuery({queryKey:['private',subject,'builder-catalog'],queryFn:({signal})=>readBuilderCatalog(signal),refetchOnMount:false});
   const [recovery]=useState(()=>loadRecovery(subject));
   return <>{!embedded && <div className="workspace-title"><h1 id="workspace-heading" tabIndex={-1}>{t('new')}</h1><span className="scope-label">{t('artifactOnly')}</span></div>}
-    {recovery ? <KnownRecovery record={recovery} onCreated={onCreated}/> : defaults.isPending || catalog.isPending ? <p role="status">{t('builder.loading')}</p> :
+    {recovery ? <KnownRecovery record={recovery} onCreated={onCreated}/> : defaults.isPending || catalog.isPending ? <LoadingData /> :
       defaults.isError || catalog.isError || !defaults.data || !catalog.data ? <section className="notice" role="alert"><p>{t('builder.unavailable')}</p><ReadRetry queries={[defaults,catalog]}/></section> :
       <Configure demoPreset={demoPreset} subject={subject} onSummary={onSummary} embedded={embedded} onClose={onClose} onCreated={onCreated} defaults={defaults.data} catalog={catalog.data}/>}</>;
 }
@@ -164,7 +165,7 @@ function Configure({subject,defaults:d,catalog:initialCatalog,embedded=false,onC
   return <div className={embedded ? "builder settings-workspace" : "builder"}><DiscardGuard dirty={dirty} embedded={embedded}/>
     <section className={embedded ? "builder-form" : "panel builder-form"} aria-labelledby="configure-heading"><div className={embedded ? "sr-only" : "panel-head"}><h2 id="configure-heading">{t('builder.configure')}</h2>{!embedded && <button type="button" onClick={()=>onClose ? onClose() : navigate('/backtests')} aria-label={t('builder.closeSettings')}><X aria-hidden="true"/>{t('builder.closeSettings')}</button>}</div>
       <form noValidate onSubmit={e=>{e.preventDefault();void check();}}>
-        {demoPreset && <p className="notice">{t('builder.syntheticDemo')}</p>}<ReadRetry queries={[catalog,bounds]}/>{(catalog.isFetching || bounds.isFetching) && <p role="status">{t('builder.loading')}</p>}
+        {demoPreset && <p className="notice">{t('builder.syntheticDemo')}</p>}<ReadRetry queries={[catalog,bounds]}/><ReadStatus pending={catalog.isFetching||bounds.isFetching}/>
         {memoryOnly && <p className="notice">{t('builder.storageWarning')}</p>}{storageChanged && <p role="alert" className="notice">{t('builder.storageChanged')}</p>}
         <div ref={summary} tabIndex={-1} className={issues.length || failure?'notice error':''} role={issues.length || failure?'alert':undefined}>
           {failure && <p>{t(`builder.errors.${failure.kind}`)}{failure.code && <> · {failure.code}</>}{failure.kind==='conflict' && <> {t('builder.conflict')}</>}</p>}
@@ -223,7 +224,7 @@ function Configure({subject,defaults:d,catalog:initialCatalog,embedded=false,onC
             <Policies body={b}/>
           </div></section>
         </fieldset>
-        <div className="builder-actions"><span className="check-state" role="status">{pending==='preflight'?t('builder.checking'):validReview?t('builder.checked'):review?t('builder.staleShort'):t('builder.unchecked')}</span><button type="button" disabled={!!record || !!pending} onClick={()=>{revision.current++;form.reset(initial());setIssues([]);setFailure(null);setReview(null);setTooLarge(false);}}>{t('builder.reset')}</button><button className={!validReview?'primary':undefined} type="submit" disabled={!!record || !!pending || wait>0}>{pending==='preflight'?t('builder.checking'):t('builder.preflight')}</button>
+        <div className="builder-actions"><span className="check-state" role="status">{pending==='preflight'?t('builder.checking'):validReview?t('builder.checked'):review?t('builder.staleShort'):t('builder.unchecked')}</span><button type="button" disabled={!!record || !!pending} onClick={()=>{revision.current++;form.reset(initial());setIssues([]);setFailure(null);setReview(null);setTooLarge(false);}}>{t('builder.reset')}</button><button className={!validReview?'primary':undefined} type="submit" disabled={!!record || !!pending || wait>0 || !catalogCurrent || bounds.isFetching || bounds.isError}>{pending==='preflight'?t('builder.checking'):t('builder.preflight')}</button>
           <button className="primary" type="button" disabled={!!record || !!pending || !validReview || wait>0 || !catalogCurrent || bounds.isFetching || bounds.isError} onClick={()=>void submit()}>{pending==='submit'?t('builder.submitting'):t('builder.submit')}</button>
           {wait>0 && <span role="status">{t('wait',{seconds:wait})}</span>}
         </div>

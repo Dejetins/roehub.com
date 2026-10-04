@@ -562,6 +562,24 @@ def apply_market_data_instrument_selections_sql(
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
+def apply_market_data_work_requests_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Add the durable Market Data inbox and immutable catalog projections."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0023_market_data_work_requests_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_market_data_full_history_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Enable full-history requests and scheduler-owned history metadata discovery."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0024_market_data_full_history_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
 def run_alembic_upgrade_head(
     *,
     postgres_dsn: str,
@@ -761,3 +779,30 @@ def _execute_sql_script(
     sql_text = sql_path.read_text(encoding="utf-8")
     with connection.cursor() as cursor:
         cursor.execute(cast(Any, sql_text), prepare=False)
+
+
+def apply_market_data_work_recovery_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Add durable pause/resume and temporary-source recovery to existing requests."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0025_market_data_work_recovery_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_market_data_queue_events_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Allow bounded queues and atomically record sanitized request lifecycle events."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0026_market_data_queue_events_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_market_data_stream_recovery_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Add metadata-only receipts for accepted WS candles and REST repair tasks."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0027_market_data_stream_recovery_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)

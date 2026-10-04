@@ -16,6 +16,8 @@ from fastapi import APIRouter
 from apps.api.routes import (
     build_market_data_reference_router as build_market_data_reference_api_router,
 )
+from apps.api.routes.market_data_catalog import build_catalog_workspace_router
+from apps.api.routes.market_data_workspace import build_market_data_workspace_router
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
 from trading.contexts.backtest.adapters.outbound import (
     PsycopgBacktestPostgresGateway,
@@ -27,13 +29,26 @@ from trading.contexts.market_data.adapters.outbound.persistence.artifact_invento
 )
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
     ClickHouseBTCUSDTMarketReadinessReader,
+    ClickHouseCanonicalCandleIndexReader,
     ClickHouseEnabledMarketReader,
     ClickHouseEnabledTradableInstrumentSearchReader,
     ClickHouseInstrumentCoverageReader,
     ThreadLocalClickHouseConnectGateway,
 )
+from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.catalog_coverage_reader import (  # noqa: E501
+    ClickHouseCatalogCoverageReader,
+)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresInstrumentSelectionRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.catalog_snapshot_repository import (  # noqa: E501
+    PostgresCatalogSnapshotRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_bounds_repository import (  # noqa: E501
+    PostgresHistoryBoundsRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository import (  # noqa: E501
+    PostgresMarketDataWorkRequestRepository,
 )
 from trading.contexts.market_data.application.dto.reference_api import (
     BTCUSDTStreamReadinessSnapshot,
@@ -128,7 +143,7 @@ def build_market_data_reference_router(
 
     use_cases = build_market_data_reference_use_cases(environ=environ)
 
-    return build_market_data_reference_api_router(
+    router = build_market_data_reference_api_router(
         list_enabled_markets_use_case=use_cases.list_enabled_markets,
         search_enabled_tradable_instruments_use_case=use_cases.search_enabled_tradable_instruments,
         btcusdt_market_readiness_use_case=use_cases.btcusdt_market_readiness,
@@ -140,6 +155,39 @@ def build_market_data_reference_router(
         coverage_reader=use_cases.coverage_reader,
         artifact_inventory_reader=_build_artifact_inventory_reader(environ=environ),
     )
+    if environ.get("ROEHUB_MARKET_DATA_WORK_REQUESTS_ENABLED") == "1":
+        selections = _build_instrument_selection_repository(environ=environ)
+        if selections is None:
+            raise ValueError("STRATEGY_PG_DSN is required for market data work requests")
+        gateway = PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
+        settings = ClickHouseSettingsLoader(environ).load()
+        router.include_router(build_catalog_workspace_router(
+            history_bounds=PostgresHistoryBoundsRepository(gateway=gateway),
+            current_user_dependency=current_user_dependency,
+            scope_resolver=build_research_organization_scope_resolver(environ=environ),
+            selections=selections,
+            snapshots=PostgresCatalogSnapshotRepository(gateway=gateway),
+            jobs=PostgresMarketDataWorkRequestRepository(gateway=gateway),
+            markets=use_cases.list_enabled_markets,
+            coverage=ClickHouseCatalogCoverageReader(
+                gateway=ThreadLocalClickHouseConnectGateway(
+                    client_factory=lambda: _clickhouse_client(settings)),
+                database=settings.database),
+        ))
+        router.include_router(build_market_data_workspace_router(
+            current_user_dependency=current_user_dependency,
+            scope_resolver=build_research_organization_scope_resolver(environ=environ),
+            selections=selections,
+            snapshots=PostgresCatalogSnapshotRepository(gateway=gateway),
+            jobs=PostgresMarketDataWorkRequestRepository(gateway=gateway),
+            markets=use_cases.list_enabled_markets,
+            search=use_cases.search_enabled_tradable_instruments,
+            index=ClickHouseCanonicalCandleIndexReader(
+                gateway=ThreadLocalClickHouseConnectGateway(
+                    client_factory=lambda: _clickhouse_client(settings)),
+                database=settings.database),
+        ))
+    return router
 
 
 def _build_instrument_selection_repository(

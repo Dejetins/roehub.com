@@ -5,7 +5,8 @@ __pycache__/
 # Dependencies
 .venv/
 venv/
-node_modules/
+# Ignore dependency directories and local dependency symlinks.
+node_modules
 .npm-cache/
 
 # Logs and temporary files

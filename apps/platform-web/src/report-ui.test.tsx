@@ -7,13 +7,13 @@ import { I18nextProvider } from 'react-i18next';
 import { createI18n } from './i18n';
 import { createQueryClient } from './query-client';
 import { Results, chartDate, monthlyReturns } from './results';
-const charts=vi.hoisted(()=>({options:[] as any[]}));
-vi.mock('echarts/core',()=>({use:vi.fn(),connect:vi.fn(),init:()=>({setOption:(o:unknown)=>charts.options.push(o),resize:vi.fn(),dispose:vi.fn()})}));
+const charts=vi.hoisted(()=>({options:[] as any[],instances:0,disposed:0}));
+vi.mock('echarts/core',()=>({use:vi.fn(),connect:vi.fn(),init:()=>{charts.instances++;let disposed=false;return {getOption:()=>disposed?null:{dataZoom:[{start:0,end:100}]},setOption:(o:unknown)=>charts.options.push(o),resize:vi.fn(),dispose:()=>{disposed=true;charts.disposed++;}};}}));
 const job='10000000-0000-4000-8000-000000000001';
 const variants=[{canonical_variant_params:{execution:{initial_cash_quote:1000}},rank:1,variant_key:'v1',variant_hash:'h1',summary_metrics:{total_return_pct:20,max_drawdown_pct:5,trade_count:40},readable_params:{indicators:[{indicator_id:'ma.ema',window:5}]}},{rank:2,variant_key:'v2',variant_hash:'h2',summary_metrics:{total_return_pct:10,max_drawdown_pct:2,trade_count:80},readable_params:{indicators:[{indicator_id:'ma.ema',window:10}]}}];
 function Location(){return <output aria-label="location">{useLocation().search}</output>;}
 function setup(items=variants){
- charts.options=[];
+ charts.options=[];charts.instances=0;charts.disposed=0;
  vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(900);
  vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(320);
  vi.stubGlobal('ResizeObserver',class {observe(){} disconnect(){}});
@@ -102,7 +102,7 @@ it('paginates ranked variants in groups of ten',async()=>{
 it('requests the selected candle timeframe independently of the backtest',async()=>{
  setup();await screen.findByRole('button',{name:'Price & trades'});
  fireEvent.click(screen.getByRole('button',{name:'Price & trades'}));
- fireEvent.change(screen.getByRole('combobox',{name:'Chart timeframe'}),{target:{value:'1h'}});
+ fireEvent.click(within(screen.getByRole('group',{name:'Chart timeframe'})).getByRole('button',{name:'1h'}));
  await waitFor(()=>expect(vi.mocked(fetch).mock.calls.some(([url])=>String(url).includes('/candles?timeframe=1h&max_bars=60000'))).toBe(true));
  expect(screen.getByLabelText('location')).toHaveTextContent('variant=v1');
 });
@@ -121,13 +121,75 @@ it('expands the mounted overview, switches all charts and restores focus on Esca
  await screen.findByRole('img',{name:'Drawdown · %'});
  fireEvent.click(screen.getByRole('button',{name:'Price & trades'}));
  const price=await screen.findByRole('img',{name:'Price & trades'});
- fireEvent.change(screen.getByLabelText('Chart timeframe'),{target:{value:'1h'}});
+ fireEvent.click(within(screen.getByRole('group',{name:'Chart timeframe'})).getByRole('button',{name:'1h'}));
  await screen.findByText('1h · 2 candles');
  fireEvent.keyDown(screen.getByRole('dialog',{name:'Overview'}),{key:'Escape'});
  expect(screen.queryByRole('dialog',{name:'Overview'})).not.toBeInTheDocument();
  expect(screen.getByRole('img',{name:'Price & trades'})).toBe(price);
- expect(screen.getByLabelText('Chart timeframe')).toHaveValue('1h');
+ expect(within(screen.getByRole('group',{name:'Chart timeframe'})).getByRole('button',{name:'1h'})).toHaveAttribute('aria-pressed','true');
  expect(document.body.style.overflow).not.toBe('hidden');
  expect(screen.getByRole('button',{name:'Full screen'})).toHaveFocus();
  expect(document.querySelector('.result-tabs')).not.toHaveProperty('inert',true);
+});
+
+it('keeps the previous complete variant and canvas until parallel reads finish',async()=>{
+ setup();await waitFor(()=>expect(charts.options).toHaveLength(1));
+ const canvas=screen.getByRole('img',{name:'Equity'});
+ const fetcher=vi.mocked(fetch).getMockImplementation()!;
+ let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+ vi.mocked(fetch).mockImplementation(async(...args)=>{if(String(args[0]).includes('/v2/equity'))await gate;return fetcher(...args);});
+ fireEvent.click(screen.getByRole('link',{name:'EMA 10'}));
+ await waitFor(()=>expect(vi.mocked(fetch).mock.calls.some(([url])=>String(url).includes('/v2/equity'))).toBe(true));
+ expect(document.querySelector('[data-result-variant]')).toHaveAttribute('data-result-variant','v1');
+ expect(screen.getAllByText('Showing previous data')[0]).toBeVisible();expect(screen.getByRole('img',{name:'Equity'})).toBe(canvas);
+ expect(charts.disposed).toBe(0);
+ fireEvent.click(screen.getByRole('button',{name:'Full screen'}));
+ release();await waitFor(()=>expect(document.querySelector('[data-result-variant]')).toHaveAttribute('data-result-variant','v2'));
+ expect(screen.getByRole('img',{name:'Equity'})).toBe(canvas);expect(charts.instances).toBe(1);expect(charts.disposed).toBe(0);
+ fireEvent.keyDown(screen.getByRole('dialog',{name:'Overview'}),{key:'Escape'});
+ expect(document.querySelector('.report-actions')?.closest('[inert]')).toBeNull();
+});
+it('discards an obsolete variant response after switching back',async()=>{
+ setup();await waitFor(()=>expect(charts.options).toHaveLength(1));
+ const fetcher=vi.mocked(fetch).getMockImplementation()!;
+ let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+ vi.mocked(fetch).mockImplementation(async(...args)=>{if(String(args[0]).includes('/v2/equity'))await gate;return fetcher(...args);});
+ fireEvent.click(screen.getByRole('link',{name:'EMA 10'}));
+ await waitFor(()=>expect(vi.mocked(fetch).mock.calls.some(([url])=>String(url).includes('/v2/equity'))).toBe(true));
+ fireEvent.click(screen.getByRole('link',{name:'EMA 5'}));release();
+ await waitFor(()=>expect(screen.queryByText('Showing previous data')).not.toBeInTheDocument());
+ expect(document.querySelector('[data-result-variant]')).toHaveAttribute('data-result-variant','v1');expect(charts.instances).toBe(1);
+});
+it('clears previous candle series on an empty successful timeframe read without replacing the canvas',async()=>{
+ setup();await waitFor(()=>expect(charts.options).toHaveLength(1));
+ fireEvent.click(screen.getByRole('button',{name:'Price & trades'}));
+ await waitFor(()=>expect(charts.options.some(o=>o.series[0].type==='candlestick')).toBe(true));
+ const canvas=screen.getByRole('img',{name:'Price & trades'}),instances=charts.instances;
+ const fetcher=vi.mocked(fetch).getMockImplementation()!;
+ vi.mocked(fetch).mockImplementation(async(...args)=>{
+  if(String(args[0]).includes('/candles?timeframe=1h'))return new Response(JSON.stringify({job_id:job,variant_key:'v1',timeframe:'1h',source_bars:0,group_size:1,candles:[]}),{status:200});
+  return fetcher(...args);
+ });
+ fireEvent.click(within(screen.getByRole('group',{name:'Chart timeframe'})).getByRole('button',{name:'1h'}));
+ await waitFor(()=>expect(charts.options.at(-1).series[0].data).toEqual([]));
+ expect(charts.options.at(-1).xAxis.data).toEqual([]);expect(charts.instances).toBe(instances);expect(screen.getByRole('img',{name:'Price & trades'})).toBe(canvas);
+});
+
+it('shares display periods across all chart views without requesting new data for a zoom',async()=>{
+ setup();await screen.findByRole('img',{name:'Equity'});
+ const periods=screen.getByRole('group',{name:'Chart period'});
+ expect(within(periods).getByRole('button',{name:'1W'})).toBeDisabled();
+ const calls=vi.mocked(fetch).mock.calls.length;
+ fireEvent.click(within(periods).getByRole('button',{name:'1D'}));
+ expect(within(periods).getByRole('button',{name:'1D'})).toHaveAttribute('aria-pressed','true');
+ expect(vi.mocked(fetch).mock.calls.length).toBe(calls);
+ fireEvent.click(screen.getByRole('button',{name:'Drawdown · %'}));
+ await screen.findByRole('img',{name:'Drawdown · %'});
+ expect(within(screen.getByRole('group',{name:'Chart period'})).getByRole('button',{name:'1D'})).toHaveAttribute('aria-pressed','true');
+ fireEvent.click(screen.getByRole('button',{name:'Price & trades'}));
+ await screen.findByRole('img',{name:'Price & trades'});
+ expect(within(screen.getByRole('group',{name:'Chart period'})).getByRole('button',{name:'1D'})).toHaveAttribute('aria-pressed','true');
+ expect(screen.getByRole('group',{name:'Chart timeframe'})).toBeVisible();
+ fireEvent.click(within(screen.getByRole('group',{name:'Chart period'})).getByRole('button',{name:'All'}));
+ expect(charts.options.at(-1).dataZoom[0]).toMatchObject({start:0,end:100,rangeMode:['percent','percent']});
 });

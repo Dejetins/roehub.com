@@ -207,7 +207,7 @@
     {
       "screen_id": "screen.dashboard.overview",
       "kind": "route_screen",
-      "label": "Overview dashboard",
+      "label": "Portfolio Overview",
       "canonical_route": "/dashboard",
       "navigation_group_id": "overview",
       "source_surface_ids": [
@@ -221,14 +221,30 @@
       ],
       "required_states": [
         "loading",
+        "background_refresh",
         "ready",
-        "empty_selection",
+        "empty_portfolio",
+        "no_matching_activity",
+        "unavailable_metric_or_history",
         "degraded_source",
         "stale_source",
         "error_retry",
-        "permission_filtered"
+        "permission_filtered",
+        "portfolio_editing",
+        "portfolio_validation_error",
+        "selection_recovery"
       ],
       "actions": [
+        "select_portfolio",
+        "select_period_currency_and_mode",
+        "filter_and_compare",
+        "create_custom_portfolio",
+        "edit_custom_portfolio",
+        "rename_custom_portfolio",
+        "delete_custom_portfolio",
+        "inspect_positions_and_trades",
+        "navigate_to_strategy",
+        "retry_failed_read",
         "navigate_to_settings_market_data"
       ],
       "capability_refs": [
@@ -236,20 +252,23 @@
       ],
       "authorization_rule": "Existing access contract plus server-owned domain policy; empty capability_refs grants nothing. Missing target API/grants must be specified before operation exposure.",
       "source_refs": [
+        "docs/architecture/apps/web/roehub-overview-requirements-v1.md",
         "docs/architecture/platform/roehub-product-transformation-requirements-v1.md",
         "docs/architecture/apps/web/roehub-local-platform-screen-registry-v1.json#screen.dashboard.overview",
         "git:fd453b5a:docs/architecture/apps/web/roehub-local-platform-screen-registry-v2.json#screen.dashboard.overview",
         "apps/api/dto/ui_dashboard.py"
       ],
-      "implemented_scope": "Dashboard read model and partial source states exist.",
+      "implemented_scope": "Legacy partial strategy/run reads and source states only; portfolio definitions, financial aggregation and new Overview client are not implemented by requirements acceptance.",
       "delivery_status": [
         "implemented",
         "requires_ui",
         "requires_api"
       ],
       "remaining_work": [
-        "Build the target client surface/states in the v23 visual direction; existing SSR is reuse evidence only.",
-        "Target role-filtered projection requires authorization integration."
+        "Implement accepted Overview requirements OV-01 through OV-12 in the current Backtests/Strategies style; v23 is historical only.",
+        "Resolve portfolio persistence, membership-history semantics and shared-account capital attribution before affected implementation.",
+        "Specify financial history, valuation, flows, costs and reconciled return/contribution calculations; implement authorized aggregates and personal definition commands.",
+        "Verify financial scenarios and real browser/API integration separately from synthetic visual fixtures."
       ],
       "disposition": "product"
     },

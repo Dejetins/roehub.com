@@ -83,6 +83,8 @@ _ROEHUB_STATUS_BY_CODE: Mapping[str, int] = {
     "last_owner": 409,
     "membership_conflict": 409,
     "membership_not_found": 404,
+    "notification_provider_unavailable": 503,
+    "notification_provider_scope_mismatch": 403,
     "organization_forbidden": 403,
     "organization_permission_denied": 403,
     "organization_slug_conflict": 409,

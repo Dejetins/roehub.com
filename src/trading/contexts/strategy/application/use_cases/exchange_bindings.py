@@ -55,6 +55,25 @@ class StrategyExchangeBindingService:
             )
         )
 
+    def list_connection_bindings(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
+        after: UUID | None = None,
+        limit: int = 51,
+    ) -> tuple[StrategyExchangeBindingView, ...]:
+        if not 1 <= limit <= 51:
+            raise ValueError("Invalid binding page limit")
+        return tuple(_to_view(binding=b) for b in self.binding_repository.list_for_connection(
+            organization_id=organization_id,
+            owner_user_id=owner_user_id,
+            exchange_connection_id=exchange_connection_id,
+            after=after,
+            limit=limit,
+        ))
+
     def create_binding(
         self,
         *,

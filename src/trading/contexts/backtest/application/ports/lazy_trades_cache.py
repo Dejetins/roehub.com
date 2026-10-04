@@ -123,7 +123,7 @@ class BacktestLazyTradesCache(Protocol):
         cache_key: BacktestLazyTradesCacheKey,
         now: datetime,
         ttl_seconds: int,
-        max_rows: int,
+        max_rows: int | None,
     ) -> BacktestLazyTradesCacheReadResult: ...
 
 

@@ -10,7 +10,7 @@ import { createI18n } from './i18n';
 import { createQueryClient } from './query-client';
 import './style.css';
 
-const bootstrap = z.object({ locale: z.enum(['ru', 'en']), subject: z.string().min(1), client_routes: z.array(z.enum(['/backtests', '/strategies'])).optional() })
+const bootstrap = z.object({ locale: z.enum(['ru', 'en']), subject: z.string().min(1), client_routes: z.array(z.enum(['/backtests', '/strategies', '/dashboard'])).optional() })
   .parse(JSON.parse(document.getElementById('platform-bootstrap')!.textContent!));
 const queryClient = createQueryClient();
 // Pages are fully reloaded for SSR/logout. Do not retain queries in the bfcache.

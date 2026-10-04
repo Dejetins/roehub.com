@@ -282,12 +282,13 @@ class LocalFileBacktestLazyTradesCache(BacktestLazyTradesCache):
         cache_key: BacktestLazyTradesCacheKey,
         now: datetime,
         ttl_seconds: int,
-        max_rows: int,
+        max_rows: int | None,
     ) -> BacktestLazyTradesCacheReadResult:
         metadata = self._read_metadata(cache_key=cache_key, now=now, ttl_seconds=ttl_seconds)
         if not metadata.is_hit or metadata.payload is None:
             return metadata
         total = _trade_count(metadata.payload)
+        max_rows = total if max_rows is None else max_rows
         output = io.StringIO()
         writer = csv.DictWriter(output, fieldnames=_TRADES_FIELDS, extrasaction="ignore")
         writer.writeheader()

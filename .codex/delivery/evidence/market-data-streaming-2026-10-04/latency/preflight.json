@@ -1,0 +1,199 @@
+{
+  "started_at": "2026-10-04T12:06:29.479129+00:00",
+  "target_minutes": 5,
+  "symbols": [
+    "AAVEUSDT",
+    "ADAUSDT",
+    "ALGOUSDT",
+    "ANKRUSDT"
+  ],
+  "selection": "owned reader fixes only four test subscriptions; persisted UI selections unchanged",
+  "redis": "unavailable; disabled only in test configuration",
+  "samples": [
+    {
+      "symbol": "ADAUSDT",
+      "minute_open": "2026-10-04 12:06:00+00:00",
+      "batch": 1,
+      "closed_at": "2026-10-04 12:07:00+00:00",
+      "received_at": "2026-10-04 12:07:00.017827+00:00",
+      "write_started_at": "2026-10-04 12:07:00.287216+00:00",
+      "write_ack_at": "2026-10-04 12:07:00.919143+00:00",
+      "canonical_verified_at": "2026-10-04 12:07:00.930051+00:00",
+      "canonical_present": false,
+      "close_to_receive_ms": 17.826999999999998,
+      "receive_to_write_start_ms": 269.3848750204779,
+      "receive_to_write_ack_ms": 901.3272500014864,
+      "close_to_write_ack_ms": 919.143,
+      "receive_to_canonical_verified_ms": 912.2149579925463,
+      "close_to_canonical_verified_ms": 930.0509999999999
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "minute_open": "2026-10-04 12:06:00+00:00",
+      "batch": 1,
+      "closed_at": "2026-10-04 12:07:00+00:00",
+      "received_at": "2026-10-04 12:07:00.036278+00:00",
+      "write_started_at": "2026-10-04 12:07:00.287216+00:00",
+      "write_ack_at": "2026-10-04 12:07:00.919143+00:00",
+      "canonical_verified_at": "2026-10-04 12:07:00.930051+00:00",
+      "canonical_present": false,
+      "close_to_receive_ms": 36.278,
+      "receive_to_write_start_ms": 250.93383400235325,
+      "receive_to_write_ack_ms": 882.8762089833617,
+      "close_to_write_ack_ms": 919.143,
+      "receive_to_canonical_verified_ms": 893.7639169744216,
+      "close_to_canonical_verified_ms": 930.0509999999999
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "minute_open": "2026-10-04 12:06:00+00:00",
+      "batch": 1,
+      "closed_at": "2026-10-04 12:07:00+00:00",
+      "received_at": "2026-10-04 12:07:00.084296+00:00",
+      "write_started_at": "2026-10-04 12:07:00.287216+00:00",
+      "write_ack_at": "2026-10-04 12:07:00.919143+00:00",
+      "canonical_verified_at": "2026-10-04 12:07:00.930051+00:00",
+      "canonical_present": false,
+      "close_to_receive_ms": 84.29599999999999,
+      "receive_to_write_start_ms": 202.91837502736598,
+      "receive_to_write_ack_ms": 834.8607500083745,
+      "close_to_write_ack_ms": 919.143,
+      "receive_to_canonical_verified_ms": 845.7484579994343,
+      "close_to_canonical_verified_ms": 930.0509999999999
+    },
+    {
+      "symbol": "ANKRUSDT",
+      "minute_open": "2026-10-04 12:06:00+00:00",
+      "batch": 1,
+      "closed_at": "2026-10-04 12:07:00+00:00",
+      "received_at": "2026-10-04 12:07:00.116841+00:00",
+      "write_started_at": "2026-10-04 12:07:00.287216+00:00",
+      "write_ack_at": "2026-10-04 12:07:00.919143+00:00",
+      "canonical_verified_at": "2026-10-04 12:07:00.930051+00:00",
+      "canonical_present": false,
+      "close_to_receive_ms": 116.841,
+      "receive_to_write_start_ms": 170.36720900796354,
+      "receive_to_write_ack_ms": 802.309583988972,
+      "close_to_write_ack_ms": 919.143,
+      "receive_to_canonical_verified_ms": 813.1972919800319,
+      "close_to_canonical_verified_ms": 930.0509999999999
+    }
+  ],
+  "batches": [
+    {
+      "batch": 1,
+      "rows": 4,
+      "write_started_at": "2026-10-04 12:07:00.287216+00:00",
+      "write_ack_at": "2026-10-04 12:07:00.919143+00:00",
+      "write_call_ms": 631.9423749810085,
+      "canonical_verified_at": "2026-10-04 12:07:00.930051+00:00",
+      "verification_ms": 10.88770799105987
+    }
+  ],
+  "events": [],
+  "hardware": {
+    "os": "Darwin",
+    "architecture": "arm64"
+  },
+  "flush_interval_ms": 250,
+  "clock_before": [
+    {
+      "rtt_ms": 417.7312080282718,
+      "server_minus_local_midpoint_ms": 199.97607421875,
+      "offset_lower_ms": -8.89501953125,
+      "offset_upper_ms": 408.84716796875
+    },
+    {
+      "rtt_ms": 412.9986669868231,
+      "server_minus_local_midpoint_ms": 200.572021484375,
+      "offset_lower_ms": -5.93701171875,
+      "offset_upper_ms": 407.0810546875
+    },
+    {
+      "rtt_ms": 682.3690409655683,
+      "server_minus_local_midpoint_ms": 316.861083984375,
+      "offset_lower_ms": -24.3330078125,
+      "offset_upper_ms": 658.054931640625
+    },
+    {
+      "rtt_ms": 415.468790975865,
+      "server_minus_local_midpoint_ms": 199.9052734375,
+      "offset_lower_ms": -7.833984375,
+      "offset_upper_ms": 407.644775390625
+    },
+    {
+      "rtt_ms": 412.6613339758478,
+      "server_minus_local_midpoint_ms": 198.814208984375,
+      "offset_lower_ms": -7.52001953125,
+      "offset_upper_ms": 405.14794921875
+    }
+  ],
+  "clickhouse_insert_settings": [
+    [
+      "materialized_views_ignore_errors",
+      "0"
+    ],
+    [
+      "async_insert",
+      "0"
+    ],
+    [
+      "wait_for_async_insert",
+      "1"
+    ]
+  ],
+  "canonical_mv_present": true,
+  "selection_before": [],
+  "complete_minutes": 0,
+  "elapsed_s": 82.20654879201902,
+  "metrics": {
+    "ws_connected": 1.0,
+    "ws_errors_total": 0.0,
+    "insert_rows_total": 4.0,
+    "insert_errors_total": 0.0,
+    "rest_fill_tasks_total": 4.0,
+    "rest_fill_active": 0.0,
+    "rest_fill_errors_total": 0.0
+  },
+  "finished_at": "2026-10-04T12:07:55.108189+00:00",
+  "clock_after": [
+    {
+      "rtt_ms": 421.3373750098981,
+      "server_minus_local_midpoint_ms": 205.121337890625,
+      "offset_lower_ms": -5.546875,
+      "offset_upper_ms": 415.789794921875
+    },
+    {
+      "rtt_ms": 403.49104098277166,
+      "server_minus_local_midpoint_ms": 191.7080078125,
+      "offset_lower_ms": -10.032958984375,
+      "offset_upper_ms": 393.448974609375
+    },
+    {
+      "rtt_ms": 415.33291595987976,
+      "server_minus_local_midpoint_ms": 200.297607421875,
+      "offset_lower_ms": -7.360107421875,
+      "offset_upper_ms": 407.955078125
+    },
+    {
+      "rtt_ms": 415.2001669863239,
+      "server_minus_local_midpoint_ms": 199.023193359375,
+      "offset_lower_ms": -8.570068359375,
+      "offset_upper_ms": 406.6162109375
+    },
+    {
+      "rtt_ms": 420.41254200739786,
+      "server_minus_local_midpoint_ms": 202.209716796875,
+      "offset_lower_ms": -7.989013671875,
+      "offset_upper_ms": 412.408935546875
+    }
+  ],
+  "selection_after": [],
+  "recovery_remaining": [],
+  "source_sha256": {
+    "apps/worker/market_data_ws/wiring/io_process.py": "68487d1c02009dc20ffdef8d4ccb544aa75fcaf9db7aa0b59435a0295ded263c",
+    "src/trading/contexts/market_data/application/services/insert_buffer.py": "0f7252881879a2acb9bae3b65122ed1d31a8f7d646e4f647bab2e908284794ec",
+    "src/trading/contexts/market_data/adapters/outbound/clients/binance/ws_client.py": "6ff6335bfb96fe06a52d70167efe1c4c7e18fb2202052fe8b3b8262caa604ebb"
+  },
+  "measurement_issue": "Interrupted preflight: ClickHouse returns naive UTC datetime; direct aware/naive comparison incorrectly reported canonical_present=false. Independent read confirmed all four rows."
+}

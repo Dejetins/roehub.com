@@ -1,28 +1,26 @@
 # Roehub Codex hooks
 
-The repository keeps four narrow guardrails. They complement `AGENTS.md` and
-platform skills; they do not route work, create delivery artifacts, or decide
-what evidence a task needs.
+The repository keeps three narrow guards:
 
-| Guardrail | Event | Purpose |
+| Guard | Event | Purpose |
 | --- | --- | --- |
-| `secret_redaction_guard` | pre/post-tool | Prevent obvious raw secret exposure. |
+| `secret_redaction_guard` | pre/post-tool | Detect obvious raw secret exposure. |
 | `command_safety_guard` | pre-tool | Block deterministic destructive shell commands. |
 | `scoped_git_staging_guard` | pre-tool | Block broad or implicit Git staging. |
-| `russian_final_answer_guard` + `cold_head_gate` | stop | Keep Russian final reports and a readable review receipt for changed policy, architecture, or reusable prompt artifacts. |
 
-`PreToolUse`, `PostToolUse`, and `Stop` are the only hooked events. The Stop
-checks are intentionally retained: they do not prescribe a workflow, but make
-the final report reviewable.
+Only `PreToolUse` and `PostToolUse` are registered. `Bash` is the native
+unified-exec matcher. Stop events do not infer edits, authority or review
+completion from final-answer wording. Russian reports and the selected review
+policy belong to `AGENTS.md`; no machine receipt or answer rewrite is required.
 
-Former workflow-specific validators and their fixtures were removed. Recreate a
-guard only for a current, narrowly justified invariant.
-
-Validate the active router after changing it:
+Validate registration and behavior with the narrow CI job:
 
 ```bash
-/usr/bin/python3 .codex/hooks/tests/run_tests.py
+python -m unittest tools.ci.test_agent_policy -v
+python .codex/hooks/tests/run_tests.py
 ```
 
-Hooks are guardrails, not a security boundary. They cannot undo completed tool
-actions or prove that a claimed review took place.
+Registration validation checks the repository's supported hook configuration,
+not every possible host schema. Hooks cannot undo completed actions, prove a
+review occurred, or cover every shell expression. They are not a security
+boundary. These fixtures do not establish native runtime trust/activation.

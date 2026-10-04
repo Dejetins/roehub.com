@@ -5,12 +5,12 @@ import { resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawn, execFileSync } from 'node:child_process';
 const root = resolve(import.meta.dirname, '../../..');
-const evidence = resolve(root, `.codex/delivery/evidence/roehub-backtests-client-v1/browser/${process.env.ROEHUB_PROOF_STAGE === 'S6' ? 'S6-execution-regression' : process.env.ROEHUB_PROOF_STAGE==='S5'?'S5-execution-regression':'S4'}`);
+const evidence = resolve(root, process.env.ROEHUB_PROOF_EVIDENCE??`.codex/delivery/evidence/roehub-backtests-client-v1/browser/${process.env.ROEHUB_PROOF_STAGE === 'S6' ? 'S6-execution-regression' : process.env.ROEHUB_PROOF_STAGE==='S5'?'S5-execution-regression':'S4'}`);
 const terminal = (state: string) => ['succeeded', 'failed', 'cancelled'].includes(state);
 let completed: any;
 async function signIn(page: Page, path = '/backtests/new') {
   await page.goto(path);
-  const c = JSON.parse(readFileSync(resolve(root, '.local_artifacts/backtests-client/credentials.json'), 'utf8'));
+  const c = JSON.parse(readFileSync(resolve(root, process.env.ROEHUB_PROOF_STATE??'.local_artifacts/backtests-client','credentials.json'), 'utf8'));
   const form = page.locator('[data-password-login]'); await form.locator('..').locator('summary').click();
   await form.locator('[name=username]').fill(c.username); await form.locator('[name=password]').fill(c.password); await form.locator('button[type=submit]').click();
   await expect(page.locator('[data-platform-client]')).toBeVisible();
@@ -50,10 +50,10 @@ test('real worker lifecycle and real cancellation, reload and history', async ({
   // interval without bypassing the browser/API's 2s/5s refresh hints.
   const observedStates: string[] = [];
   const observer = spawn(resolve(root, '.venv/bin/python'), ['-u', '-c', `
-import json,time
+import json,time,os
 from pathlib import Path
 import psycopg
-private=json.loads(Path('.local_artifacts/backtests-client/credentials.json').read_text())
+private=json.loads((Path(os.environ.get('ROEHUB_PROOF_STATE','.local_artifacts/backtests-client'))/'credentials.json').read_text())
 with psycopg.connect(private['dsn'],autocommit=True) as db:
     last=None
     for _ in range(1200):
@@ -242,11 +242,11 @@ test('native 200 percent zoom keeps RU EN execution and cancel dialog usable',as
   const directory=mkdtempSync(resolve(tmpdir(),'roehub-s4-zoom-'));const extension=resolve(directory,'extension');mkdirSync(extension);
   writeFileSync(resolve(extension,'manifest.json'),JSON.stringify({manifest_version:3,name:'Local zoom proof',version:'1.0',permissions:['tabs'],background:{service_worker:'worker.js'}}));
   writeFileSync(resolve(extension,'worker.js'),'chrome.runtime.onInstalled.addListener(() => {});');
-  const context=await chromium.launchPersistentContext(resolve(directory,'profile'),{baseURL:'http://localhost:18480',channel:'chromium',headless:true,viewport:null,args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'--window-size=1440,1100']});
+  const context=await chromium.launchPersistentContext(resolve(directory,'profile'),{baseURL:`http://localhost:${process.env.ROEHUB_PROOF_PORT??'18480'}`,channel:'chromium',headless:true,viewport:null,args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`,'--window-size=1440,1100']});
   try{
     const page=await context.newPage();await controlled(page);const worker=context.serviceWorkers()[0]??await context.waitForEvent('serviceworker');
-    await worker.evaluate("chrome.tabs.query({url:'http://localhost:18480/*'}).then(tabs=>Promise.all(tabs.map(tab=>chrome.tabs.setZoom(tab.id,2))))");
-    const zoom=await worker.evaluate("chrome.tabs.query({url:'http://localhost:18480/*'}).then(tabs=>chrome.tabs.getZoom(tabs[0].id))");expect(zoom).toBe(2);
+    await worker.evaluate(`chrome.tabs.query({url:'http://localhost:${process.env.ROEHUB_PROOF_PORT??'18480'}/*'}).then(tabs=>Promise.all(tabs.map(tab=>chrome.tabs.setZoom(tab.id,2))))`);
+    const zoom=await worker.evaluate(`chrome.tabs.query({url:'http://localhost:${process.env.ROEHUB_PROOF_PORT??'18480'}/*'}).then(tabs=>chrome.tabs.getZoom(tabs[0].id))`);expect(zoom).toBe(2);
     const sizes=[];const cdp=await context.newCDPSession(page);
     for(const locale of ['en','ru']){
       if(locale==='ru')await page.getByRole('link',{name:'Русский',exact:true}).click();

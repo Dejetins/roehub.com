@@ -1,0 +1,38 @@
+{
+  "transient_insert": {
+    "attempts": 6,
+    "saved": 10,
+    "remaining_after_close": 0,
+    "max_batch_rows": 3,
+    "configured_max_buffer_rows": 2,
+    "close_returned_normally": true
+  },
+  "persistent_insert_shutdown": {
+    "attempts": 18,
+    "saved": 0,
+    "remaining_after_close": 10,
+    "max_batch_rows": 10,
+    "configured_max_buffer_rows": 2,
+    "close_returned_normally": true
+  },
+  "non_retryable_insert": {
+    "attempts": 18,
+    "saved": 0,
+    "remaining_after_close": 10,
+    "max_batch_rows": 10,
+    "configured_max_buffer_rows": 2,
+    "close_returned_normally": true
+  },
+  "temporary_rest_fill_failure": {
+    "attempts": 1,
+    "pending_keys": 0,
+    "queue_size": 0,
+    "retry_after_seconds": 0.01
+  },
+  "empty_selection_effective": [
+    {
+      "market_id": 2,
+      "symbol": "BTCUSDT"
+    }
+  ]
+}

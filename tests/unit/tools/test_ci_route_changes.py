@@ -68,11 +68,13 @@ def test_web_image_routing_is_explicit() -> None:
     assert classify_web_image(["apps/web/main/app.py"])
 
 
-def test_codex_hook_change_runs_code_gates() -> None:
+def test_codex_hook_change_runs_only_agent_policy_gates() -> None:
     outputs = classify_ci([".codex/hooks/validators/common.py"])
 
-    assert outputs["code"] == "true"
-    assert outputs["has_tests"] == "true"
+    assert outputs["agent_policy"] == "true"
+    assert outputs["code"] == "false"
+    assert outputs["has_tests"] == "false"
+    assert outputs["run_migrations"] == "false"
 
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]

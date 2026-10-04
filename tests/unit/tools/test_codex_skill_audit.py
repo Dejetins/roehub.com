@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from tools.codex_quality_benchmark.cli import main
 
 _HASH_A = "a" * 64
@@ -498,3 +500,125 @@ def _inventory_row(target_id: str, *, managed_cache: bool) -> dict[str, object]:
         "source_path": "/tmp/SKILL.md",
         "managed_cache": managed_cache,
     }
+
+
+# Profile v2 preserves stored v1 evidence while removing ceremony scoring.
+def _diagnose(tmp_path: Path, frontmatter: str, body: str = "Use the supplied input."):
+    from tools.codex_quality_benchmark.skill_audit import audit_skill_file
+
+    path = tmp_path / "SKILL.md"
+    path.write_text("---\n" + frontmatter + "\n---\n" + body)
+    return audit_skill_file(path, "fixture", "short", "live", "workflow_skill")
+
+
+def test_short_sufficient_skill_has_no_ceremony_penalty(tmp_path: Path) -> None:
+    row = _diagnose(tmp_path, "name: concise\ndescription: Convert CSV to JSON.")
+    assert row.audit_score_0_100 == 100
+    assert row.compliance_status == "pass"
+    assert row.as_dict()["standard_status"] == "valid"
+    assert {f.code for f in row.findings}.isdisjoint({
+        "body_too_thin", "missing_section_structure", "missing_executable_steps"
+    })
+    assert all(f.points_lost == 0 and f.severity == "advisory" for f in row.findings)
+
+
+def test_description_limit_and_folded_yaml(tmp_path: Path) -> None:
+    for size in (1024, 1025, 1100):
+        row = _diagnose(tmp_path, "name: concise\ndescription: " + "x" * size)
+        assert ("description_too_long" in {f.code for f in row.findings}) == (size > 1024)
+        assert row.as_dict()["standard_status"] == ("invalid" if size > 1024 else "valid")
+    folded = _diagnose(tmp_path, "name: concise\ndescription: >-\n  Convert CSV\n  to JSON.")
+    assert folded.description_length == len("Convert CSV to JSON.")
+    assert folded.as_dict()["standard_status"] == "valid"
+
+
+def test_invalid_metadata_is_detected(tmp_path: Path) -> None:
+    for metadata in (
+        "name: concise\ndescription: [bad", "name: concise\ndescription: 123",
+        "name: concise\nname: duplicate\ndescription: text", "name: concise",
+        "name: Bad_Name\ndescription: text", "name: a--b\ndescription: text",
+        "name: " + "a" * 65 + "\ndescription: text",
+    ):
+        row = _diagnose(tmp_path, metadata)
+        assert row.as_dict()["standard_status"] == "invalid", metadata
+        assert row.compliance_status in {"blocked", "fail"}
+
+
+def test_profile_mixing_fails_without_rewriting_evidence(tmp_path: Path) -> None:
+    import pytest
+
+    from tools.codex_quality_benchmark.models import BenchmarkError
+    from tools.codex_quality_benchmark.skill_audit import (
+        AUDIT_PROFILE,
+        _require_comparable_profiles,
+        compare_all_skills_ab,
+    )
+
+    before = _audit_row("fixture", "live", audit_score=80)
+    after = {**_audit_row("fixture", "live", audit_score=90), "audit_profile": AUDIT_PROFILE}
+    _write_json(tmp_path / "before.json", [before])
+    _write_json(tmp_path / "after.json", [after])
+    baseline_bytes = (tmp_path / "before.json").read_bytes()
+    with pytest.raises(BenchmarkError, match="incomparable audit profiles"):
+        compare_all_skills_ab(tmp_path / "before.json", tmp_path / "after.json", tmp_path / "out")
+    assert (tmp_path / "before.json").read_bytes() == baseline_bytes
+    _require_comparable_profiles(before, before)  # unversioned v1 still readable
+    with pytest.raises(BenchmarkError, match="incomparable audit profiles"):
+        _require_comparable_profiles({"audit_profile": "future"}, {"audit_profile": "future"})
+
+
+def test_v2_diagnostic_comparison_makes_no_behavioral_claim(tmp_path: Path) -> None:
+    from tools.codex_quality_benchmark.skill_audit import AUDIT_PROFILE, compare_all_skills_ab
+
+    for name, score in (("before", 80), ("after", 90)):
+        row = {**_audit_row("fixture", "live", audit_score=score), "audit_profile": AUDIT_PROFILE}
+        _write_json(tmp_path / f"{name}.json", [row])
+    rows = compare_all_skills_ab(
+        tmp_path / "before.json", tmp_path / "after.json", tmp_path / "out"
+    )
+    result = rows[0].as_dict()
+    assert result["task_contract_preserved"] is None
+    assert result["diagnostic_status_preserved"] is True
+    assert "not evaluated" in str(result["proof_boundary"])
+
+
+
+def test_invalid_v2_metadata_cannot_be_accepted_for_score_gain(tmp_path: Path) -> None:
+    from tools.codex_quality_benchmark.skill_audit import AUDIT_PROFILE, compare_all_skills_ab
+
+    for name, score, status in (("before", 80, "warn"), ("after", 92, "fail")):
+        row = {
+            **_audit_row("fixture", "live", audit_score=score, status=status),
+            "audit_profile": AUDIT_PROFILE,
+        }
+        _write_json(tmp_path / f"{name}.json", [row])
+    rows = compare_all_skills_ab(
+        tmp_path / "before.json", tmp_path / "after.json", tmp_path / "out"
+    )
+    assert rows[0].audit_blocked is True
+    assert rows[0].ab_decision == "reject"
+
+
+@pytest.mark.parametrize("name", ["demo", "документы", "café", "данные-٢", "資料", "é" * 64])
+def test_unicode_lowercase_skill_names_are_standard_valid(tmp_path: Path, name: str) -> None:
+    row = _diagnose(
+        tmp_path, f"name: {json.dumps(name, ensure_ascii=False)}\ndescription: Convert CSV to JSON."
+    )
+    assert row.as_dict()["standard_status"] == "valid"
+    assert row.compliance_status == "pass"
+    assert row.audit_score_0_100 == 100
+    assert "nonportable_name" not in {finding.code for finding in row.findings}
+
+
+@pytest.mark.parametrize("name", [
+    "Документы", "CAFÉ", "ǅemo", "-документы", "café-", "документы--café",
+    "é" * 65, "café_2", "café.2", "café/2", " café", "café ", "café\t", "café\n",
+])
+def test_invalid_unicode_names_and_quoted_whitespace_fail(tmp_path: Path, name: str) -> None:
+    row = _diagnose(
+        tmp_path, f"name: {json.dumps(name, ensure_ascii=False)}\ndescription: Convert CSV to JSON."
+    )
+    finding = next(f for f in row.findings if f.code == "nonportable_name")
+    assert finding.as_dict()["kind"] == "standard"
+    assert row.as_dict()["standard_status"] == "invalid"
+    assert row.compliance_status == "fail"

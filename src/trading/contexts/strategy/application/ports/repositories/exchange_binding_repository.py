@@ -30,6 +30,16 @@ class StrategyExchangeBindingRepository(Protocol):
         strategy_id: UUID,
     ) -> tuple[StrategyExchangeBinding, ...]: ...
 
+    def list_for_connection(
+        self,
+        *,
+        organization_id: OrganizationId,
+        owner_user_id: UserId,
+        exchange_connection_id: UUID,
+        after: UUID | None,
+        limit: int,
+    ) -> tuple[StrategyExchangeBinding, ...]: ...
+
     def disable(
         self,
         *,

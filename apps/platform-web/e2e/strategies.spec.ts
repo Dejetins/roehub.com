@@ -86,7 +86,7 @@ test('real library, independent detail, filters, keyboard, status, return contex
   await firstRow.click();await page.locator(`.strategy-row[href^="/strategies/${second.strategy_id}"]`).click();await expect(heading(page)).toHaveText(second.name);
   await page.getByText('Technical details',{exact:true}).click();await page.getByText('Technical details',{exact:true}).click();
   await page.evaluate(()=>localStorage.setItem('roehub.backtests.motion','off'));await page.reload();await expect(heading(page)).toBeVisible();
-  await page.getByRole('link',{name:'Backtests',exact:true}).click();await expect(page.getByLabel('Animation',{exact:true})).toHaveValue('off');
+  await page.getByRole('link',{name:'Backtests',exact:true}).click();await expect(page.getByLabel('Animation',{exact:true})).toHaveCount(0);
   for(const locale of ['ru','en']) {
     await page.getByRole('link',{name:locale==='ru'?'Русский':'English',exact:true}).click();
     for(const width of [820,1024,1440]) {await page.setViewportSize({width,height:1000});await page.screenshot({path:resolve(evidence,`backtests-${locale}-${width}.png`)});}

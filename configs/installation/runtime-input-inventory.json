@@ -6,7 +6,7 @@
     "user_installation_input": "configs/installation/roehub.yaml"
   },
   "counts": {
-    "explicit_legacy_runtime_handoff": 47,
+    "explicit_legacy_runtime_handoff": 48,
     "installation_generated_runtime": 55,
     "internal_runtime_tuning": 2,
     "openbao_secret_reference": 26,
@@ -1089,6 +1089,15 @@
       ]
     },
     {
+      "classification": "explicit_legacy_runtime_handoff",
+      "key": "ROEHUB_MARKET_DATA_WORK_REQUESTS_ENABLED",
+      "owner_stage": "17",
+      "sources": [
+        "apps/api/wiring/modules/market_data_reference.py",
+        "apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py"
+      ]
+    },
+    {
       "classification": "installation_generated_runtime",
       "key": "ROEHUB_METRICS_BIND_HOST",
       "owner_stage": "03,17",
@@ -1618,5 +1627,5 @@
     "infra"
   ],
   "schema": "io.roehub.runtime-input-inventory/v1alpha1",
-  "total": 161
+  "total": 162
 }

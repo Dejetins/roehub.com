@@ -1,0 +1,48 @@
+{
+  "at": "2026-10-04T12:07:04.450097+00:00",
+  "method": "persistent HTTPS session; index0 includes connection setup",
+  "samples": [
+    {
+      "index": 0,
+      "rtt_ms": 426.9764580531046,
+      "offset_lower_ms": -6.15478515625,
+      "offset_upper_ms": 420.82177734375,
+      "midpoint_offset_ms": 207.33349609375
+    },
+    {
+      "index": 1,
+      "rtt_ms": 268.7890839879401,
+      "offset_lower_ms": -5.948974609375,
+      "offset_upper_ms": 262.841064453125,
+      "midpoint_offset_ms": 128.446044921875
+    },
+    {
+      "index": 2,
+      "rtt_ms": 267.2461250331253,
+      "offset_lower_ms": -5.197998046875,
+      "offset_upper_ms": 262.048095703125,
+      "midpoint_offset_ms": 128.4248046875
+    },
+    {
+      "index": 3,
+      "rtt_ms": 271.42375003313646,
+      "offset_lower_ms": -6.625,
+      "offset_upper_ms": 264.7978515625,
+      "midpoint_offset_ms": 129.08642578125
+    },
+    {
+      "index": 4,
+      "rtt_ms": 269.72037501400337,
+      "offset_lower_ms": -6.35400390625,
+      "offset_upper_ms": 263.365966796875,
+      "midpoint_offset_ms": 128.506103515625
+    },
+    {
+      "index": 5,
+      "rtt_ms": 268.66345800226554,
+      "offset_lower_ms": -6.02197265625,
+      "offset_upper_ms": 262.6396484375,
+      "midpoint_offset_ms": 128.30908203125
+    }
+  ]
+}

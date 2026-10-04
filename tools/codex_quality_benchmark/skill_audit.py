@@ -7,11 +7,17 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from tools.codex_quality_benchmark.manifest import load_json_file, load_manifest
 from tools.codex_quality_benchmark.models import BenchmarkError
 from tools.codex_quality_benchmark.skill_discovery import discover_skill_paths
 
+AUDIT_PROFILE = "agent-skills-structure-v2"
+LEGACY_AUDIT_PROFILE = "legacy-shape-v1"
+
 AUDIT_FIELDS = [
+    "audit_profile",
     "run_id",
     "target_id",
     "version_id",
@@ -99,7 +105,6 @@ METRIC_FIELDS = {
     "safety_score",
 }
 
-_NAME_RE = re.compile(r"^[a-z0-9][a-z0-9._-]*$")
 _ACTION_START_RE = re.compile(
     r"^\s*(use|create|edit|redline|comment|review|research|control|debug|fix|generate|build|"
     r"audit|analyze|read|install|publish|triage)\b",
@@ -110,7 +115,6 @@ _BOUNDARY_RE = re.compile(
     r"not for|except)\b",
     re.IGNORECASE,
 )
-_WORKFLOW_RE = re.compile(r"(^|\n)\s*(\d+\.|- |\* |## .*workflow|## .*contract|step \d+)", re.I)
 _DANGEROUS_SECRET_RE = re.compile(
     r"(ask .*paste.*(api[_ -]?key|token|secret|cookie|credential|xai_api_key)|"
     r"paste .*?(api[_ -]?key|token|secret|cookie|credential|xai_api_key)|"
@@ -136,6 +140,8 @@ class SkillAuditFinding:
 
     def as_dict(self) -> dict[str, object]:
         data: dict[str, object] = {
+            "kind": ("advisory" if self.severity == "advisory" else
+                     "local_policy" if self.category == "safety" else "standard"),
             "category": self.category,
             "severity": self.severity,
             "code": self.code,
@@ -168,6 +174,14 @@ class SkillAuditRow:
 
     def as_dict(self) -> dict[str, object]:
         return {
+            "audit_profile": AUDIT_PROFILE,
+            "proof_boundary": "static diagnostics; no behavioral quality claim",
+            "standard_status": "invalid" if any(
+                f.category in {"format", "description"} and f.severity != "advisory"
+                for f in self.findings
+            ) else "valid",
+            "advisory_findings": [f.as_dict() for f in self.findings if f.severity == "advisory"],
+            "local_policy_findings": [f.as_dict() for f in self.findings if f.category == "safety"],
             "run_id": self.run_id,
             "target_id": self.target_id,
             "version_id": self.version_id,
@@ -318,9 +332,13 @@ class AllSkillsAbDecision:
     after_findings: tuple[str, ...]
     ab_decision: str
     decision_reason: str
+    audit_profile: str = LEGACY_AUDIT_PROFILE
 
     def as_dict(self) -> dict[str, object]:
         return {
+            "audit_profile": self.audit_profile,
+            "proof_boundary": "static diagnostic comparison; task behavior was not evaluated",
+            "diagnostic_status_preserved": self.task_contract_preserved,
             "run_id": self.run_id,
             "target_id": self.target_id,
             "source_path": self.source_path,
@@ -331,7 +349,8 @@ class AllSkillsAbDecision:
             "metric_delta": self.metric_delta,
             "before_status": self.before_status,
             "after_status": self.after_status,
-            "task_contract_preserved": self.task_contract_preserved,
+            "task_contract_preserved": (self.task_contract_preserved
+                                        if self.audit_profile == LEGACY_AUDIT_PROFILE else None),
             "metric_improved": self.metric_improved,
             "audit_blocked": self.audit_blocked,
             "before_findings": list(self.before_findings),
@@ -556,13 +575,14 @@ def compare_ab_results(
                 raise BenchmarkError(
                     f"missing audit row for {target_id} {candidate_task['version_id']}"
                 )
+            _require_comparable_profiles(baseline_audit, candidate_audit)
             candidate_task_score = float(candidate_task["score_0_100"])
             candidate_metric_score = float(candidate_audit[target_metric])
             task_delta = round(candidate_task_score - baseline_task_score, 4)
             metric_delta = round(candidate_metric_score - baseline_metric_score, 4)
             task_preserved = task_delta >= -max_task_regression
             metric_improved = metric_delta >= min_metric_delta
-            audit_blocked = candidate_audit["compliance_status"] == "blocked"
+            audit_blocked = _audit_rejects(candidate_audit)
             if task_preserved and metric_improved and not audit_blocked:
                 decision = "candidate"
                 reason = (
@@ -626,6 +646,7 @@ def compare_focused_ab(
     if before is None or after is None:
         raise BenchmarkError(f"missing live audit rows for {target_id}")
 
+    _require_comparable_profiles(before, after)
     pairwise = _load_pairwise_verdicts(pairwise_path)
     if not pairwise:
         raise BenchmarkError(f"missing pairwise verdicts: {pairwise_path}")
@@ -638,7 +659,7 @@ def compare_focused_ab(
         for verdict in pairwise
     )
     metric_improved = metric_delta >= min_metric_delta
-    audit_blocked = str(after.get("compliance_status")) == "blocked"
+    audit_blocked = _audit_rejects(after)
     if task_contract_preserved and metric_improved and not audit_blocked:
         decision = "candidate"
         reason = (
@@ -702,6 +723,7 @@ def compare_all_skills_ab(
     for target_id in sorted(before_rows):
         before = before_rows[target_id]
         after = after_rows[target_id]
+        _require_comparable_profiles(before, after)
         before_score = float(before[target_metric])
         after_score = float(after[target_metric])
         metric_delta = round(after_score - before_score, 4)
@@ -710,7 +732,7 @@ def compare_all_skills_ab(
         managed_cache = _managed_cache_for(target_id, after, inventory)
         task_contract_preserved = _status_rank(after_status) >= _status_rank(before_status)
         metric_improved = metric_delta >= min_metric_delta
-        audit_blocked = after_status == "blocked"
+        audit_blocked = _audit_rejects(after)
         decision, reason = _all_skills_decision(
             metric_delta=metric_delta,
             task_contract_preserved=task_contract_preserved,
@@ -721,6 +743,7 @@ def compare_all_skills_ab(
         )
         decisions.append(
             AllSkillsAbDecision(
+                audit_profile=str(after.get("audit_profile", LEGACY_AUDIT_PROFILE)),
                 run_id=str(after.get("run_id", "")),
                 target_id=target_id,
                 source_path=str(after.get("source_path") or before.get("source_path") or ""),
@@ -850,6 +873,17 @@ def write_all_skills_ab_artifacts(
     _write_all_skills_ab_summary(out_dir / "all_skills_ab_decisions.md", rows, target_metric)
 
 
+def _valid_skill_name(name: str) -> bool:
+    return (
+        1 <= len(name) <= 64
+        and name == name.lower()
+        and all(char.isalnum() or char == "-" for char in name)
+        and not name.startswith("-")
+        and not name.endswith("-")
+        and "--" not in name
+    )
+
+
 def _audit_format(
     metadata: dict[str, str],
     frontmatter_ok: bool,
@@ -865,7 +899,7 @@ def _audit_format(
                 18,
             )
         )
-    name = metadata.get("name", "").strip()
+    name = metadata.get("name", "")
     description = metadata.get("description", "").strip()
     if not name:
         findings.append(
@@ -877,13 +911,14 @@ def _audit_format(
                 6,
             )
         )
-    elif not _NAME_RE.fullmatch(name):
+    elif not _valid_skill_name(name):
         findings.append(
             SkillAuditFinding(
                 "format",
                 "medium",
                 "nonportable_name",
-                "Skill name should be lowercase and stable for cross-runtime invocation.",
+                "Selected profile requires 1-64 Unicode lowercase alphanumeric characters "
+                "or single interior hyphens; whitespace is not allowed.",
                 3,
             )
         )
@@ -915,13 +950,13 @@ def _audit_description(
             )
         )
         return
-    if len(description) > 1536:
+    if len(description) > 1024:
         findings.append(
             SkillAuditFinding(
                 "description",
                 "medium",
                 "description_too_long",
-                "Description exceeds Claude's 1,536 character skill-listing budget.",
+                "Description exceeds the Agent Skills limit of 1,024 characters.",
                 8,
             )
         )
@@ -929,85 +964,56 @@ def _audit_description(
         findings.append(
             SkillAuditFinding(
                 "description",
-                "low",
+                "advisory",
                 "description_too_short",
-                "Description is too short to carry clear trigger scope.",
-                5,
+                "Check whether this short description conveys the intended trigger; "
+                "brevity is valid.",
+                0,
             )
         )
     if _ACTION_START_RE.search(description) is None:
         findings.append(
             SkillAuditFinding(
                 "description",
-                "medium",
+                "advisory",
                 "key_use_case_not_front_loaded",
                 "Description should front-load the key use case and trigger words.",
-                5,
+                0,
             )
         )
     if _BOUNDARY_RE.search(f"{description}\n{body[:3000]}") is None:
         findings.append(
             SkillAuditFinding(
                 "description",
-                "medium",
+                "advisory",
                 "missing_invocation_boundary",
                 "Skill should state boundaries or adjacent non-use cases.",
-                5,
+                0,
             )
         )
 
 
 def _audit_structure(body: str, line_count: int, findings: list[SkillAuditFinding]) -> None:
-    if len(body.strip()) < 200:
-        findings.append(
-            SkillAuditFinding(
-                "structure",
-                "medium",
-                "body_too_thin",
-                "Skill body is too thin to give a fresh agent executable instructions.",
-                8,
-            )
-        )
-    if "\n## " not in body:
-        findings.append(
-            SkillAuditFinding(
-                "structure",
-                "low",
-                "missing_section_structure",
-                "Skill body should use sections for scanable progressive reading.",
-                4,
-            )
-        )
-    if _WORKFLOW_RE.search(body) is None:
-        findings.append(
-            SkillAuditFinding(
-                "structure",
-                "medium",
-                "missing_executable_steps",
-                "Skill should include imperative workflow steps or explicit input/output contract.",
-                6,
-            )
-        )
     if line_count > 500:
         findings.append(
             SkillAuditFinding(
                 "structure",
-                "high",
+                "advisory",
                 "skill_body_too_long",
                 "Skill body is too long for efficient progressive disclosure; "
                 "move details to references or scripts.",
-                8,
+                0,
             )
         )
     if line_count > 300 and not re.search(r"\b(references?/|scripts?/|assets?/)\b", body, re.I):
         findings.append(
             SkillAuditFinding(
                 "structure",
-                "medium",
+                "advisory",
                 "missing_supporting_files_for_long_skill",
                 "Long skills should point to supporting files instead of keeping "
                 "all reference material inline.",
-                5,
+                0,
             )
         )
 
@@ -1043,21 +1049,29 @@ def _parse_frontmatter(text: str) -> tuple[dict[str, str], str, bool]:
     if closing_index is None:
         return {}, text, False
 
-    metadata: dict[str, str] = {}
-    for line in lines[1:closing_index]:
-        if not line.strip() or line.lstrip().startswith(("#", "-")):
-            continue
-        if line.startswith((" ", "\t")) or ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        metadata[key.strip()] = _strip_yaml_scalar(value.strip())
-    return metadata, "\n".join(lines[closing_index + 1 :]), True
+    class UniqueLoader(yaml.SafeLoader):
+        pass
 
+    def unique_mapping(loader: Any, node: Any) -> dict[str, Any]:
+        result: dict[str, Any] = {}
+        for key_node, value_node in node.value:
+            key = loader.construct_object(key_node)
+            if not isinstance(key, str) or key in result:
+                raise ValueError("Metadata keys must be unique strings")
+            result[key] = loader.construct_object(value_node)
+        return result
 
-def _strip_yaml_scalar(value: str) -> str:
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        return value[1:-1]
-    return value
+    UniqueLoader.add_constructor(yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, unique_mapping)
+    body = "\n".join(lines[closing_index + 1 :])
+    try:
+        parsed = yaml.load("\n".join(lines[1:closing_index]), Loader=UniqueLoader)
+    except (yaml.YAMLError, ValueError):
+        return {}, body, False
+    if not isinstance(parsed, dict):
+        return {}, body, False
+    if any(key in parsed and not isinstance(parsed[key], str) for key in ("name", "description")):
+        return {}, body, False
+    return parsed, body, True
 
 
 def _category_score(category: str, findings: list[SkillAuditFinding]) -> int:
@@ -1080,6 +1094,9 @@ def _row_from_scores(
     if severe_findings:
         total = min(total, 49)
         status = "blocked"
+    elif any(f.category in {"format", "description"} and f.severity != "advisory"
+             for f in findings):
+        status = "fail"
     elif total >= 90:
         status = "pass"
     elif total >= 75:
@@ -1108,10 +1125,11 @@ def _row_from_scores(
 
 def _write_audit_summary(path: Path, rows: list[SkillAuditRow]) -> None:
     lines = [
-        "# Skill Official-Format Audit Summary",
+        "# Skill structure diagnostics",
         "",
-        "Deterministic audit for Codex/Claude skill shape, discovery metadata, "
-        "progressive disclosure, and safety/locality risks.",
+        "Profile: agent-skills-structure-v2. Standard metadata violations, advisory "
+        "heuristics and local safety diagnostics are distinct. Scores are static diagnostics; "
+        "they do not establish agent behavior, routing quality or task success.",
         "",
         "| target_id | version_id | audit | format | description | structure | "
         "safety | status | findings |",
@@ -1178,11 +1196,13 @@ def _write_all_skills_ab_summary(
     accepted = counts.get("candidate", 0)
     baseline_retained = counts.get("baseline_retained", 0)
     lines = [
-        "# All-Skills A/B Decisions",
+        "# All-skills diagnostic comparison",
         "",
         f"Target metric: `{target_metric}`.",
         f"Rows: `{len(rows)}`.",
-        f"Accepted candidates: `{accepted}`.",
+        f"Diagnostic candidates: `{accepted}` (not behavioral acceptance).",
+        "Legacy task_contract_preserved is a diagnostic-status alias for v1 only; "
+        "v2 reports null without task evidence.",
         f"Baseline retained: `{baseline_retained}`.",
         "",
         "| decision | count |",
@@ -1252,6 +1272,19 @@ def _load_results_tsv(path: Path) -> list[dict[str, str]]:
             return list(csv.DictReader(handle, delimiter="\t"))
     except FileNotFoundError as exc:
         raise BenchmarkError(f"missing results TSV: {path}") from exc
+
+
+def _audit_rejects(row: dict[str, Any]) -> bool:
+    rejected = {"blocked", "fail"} if row.get("audit_profile") == AUDIT_PROFILE else {"blocked"}
+    return row.get("compliance_status") in rejected
+
+
+def _require_comparable_profiles(before: dict[str, Any], after: dict[str, Any]) -> None:
+    profiles = [row.get("audit_profile", LEGACY_AUDIT_PROFILE) for row in (before, after)]
+    if profiles[0] != profiles[1] or profiles[0] not in {LEGACY_AUDIT_PROFILE, AUDIT_PROFILE}:
+        raise BenchmarkError(
+            f"incomparable audit profiles: {profiles}; re-audit both saved inputs with one profile"
+        )
 
 
 def _load_audit_json(path: Path) -> list[dict[str, Any]]:

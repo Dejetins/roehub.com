@@ -82,7 +82,9 @@ migrations = "Bootstrap и применение миграций."
 monitoring = "Экспорт технических метрик."
 scheduler = "Планировщики фоновых задач."
 roehubctl = "Host-side аварийная CLI для диагностики и восстановления."
-web = "Server-rendered web UI и same-origin API client."
+web = "Server/integration layer and legacy server-rendered UI."
+platform-web = "Current accepted local-platform React/TypeScript client."
+navigator-web = "Navigator candidate prototype; not the accepted platform baseline."
 worker = "Фоновые consumers и runtime workers."
 
 [descriptions.workers]
@@ -97,13 +99,13 @@ telegram_bot_worker = "Telegram-команды и пользовательски
 
 [[runtime_nodes]]
 id = "browser"
-title = "Браузер"
+title = "Platform browser client"
 kind = "client"
-paths = ["apps/web/"]
+paths = ["apps/platform-web/"]
 
 [[runtime_nodes]]
 id = "web"
-title = "Web UI"
+title = "Web server/integration"
 kind = "service"
 paths = ["apps/web/"]
 
@@ -242,40 +244,46 @@ label = "metrics/logs"
 match = "HTTP API, DTO, auth, UI API"
 components = ["app:api", "context:identity"]
 read_first = ["apps/api/main/app.py", "apps/api/routes/", "apps/api/dto/", "docs/architecture/api/"]
-skills = ["root-cause-debugging", "contract-impact-analysis", "backend-quality-gates"]
+skills = []
 
 [[agent_routes]]
-match = "Web UI, template, locale, browser flow"
+match = "Current local-platform client UI, routes, locale, loading, charts"
+components = ["app:platform-web", "app:api"]
+read_first = ["apps/platform-web/src/", "apps/platform-web/package.json", "packages/web-contracts/src/", "docs/architecture/apps/web/roehub-ui-implementation-plan-v1.md"]
+skills = []
+
+[[agent_routes]]
+match = "Web server/integration and legacy templates"
 components = ["app:web", "app:api"]
 read_first = ["apps/web/main/app.py", "apps/web/templates/", "apps/web/dist/", "docs/architecture/apps/web/"]
-skills = ["browser-qa-evidence"]
+skills = []
 
 [[agent_routes]]
 match = "Backtest, benchmark, optimize"
 components = ["context:backtest", "context:backtest_artifacts", "context:optimize", "worker:backtest_job_runner"]
 read_first = ["src/trading/contexts/backtest/", "apps/worker/backtest_job_runner/", "docs/architecture/backtest/"]
-skills = ["root-cause-debugging", "backend-performance-evidence", "backend-quality-gates"]
+skills = []
 
 [[agent_routes]]
 match = "Market data, candles, ingestion"
 components = ["context:market_data", "worker:market_data_ws"]
 read_first = ["src/trading/contexts/market_data/", "apps/worker/market_data_ws/", "docs/architecture/market_data/"]
-skills = ["root-cause-debugging", "backend-quality-gates"]
+skills = []
 
 [[agent_routes]]
 match = "Live trading, order, exchange, risk"
 components = ["context:live_execution", "context:exchange_control", "context:risk", "app:exchange_execution", "worker:strategy_live_runner"]
 read_first = ["src/trading/contexts/live_execution/", "src/trading/contexts/exchange_control/", "apps/exchange_execution/", "docs/architecture/live_execution/"]
-skills = ["architecture-design", "contract-impact-analysis", "root-cause-debugging"]
+skills = []
 
 [[agent_routes]]
 match = "RL, ML, training, inference"
 components = ["context:rl_trading", "context:ml", "worker:rl_trading_trainer", "worker:rl_trading_inference"]
 read_first = ["src/trading/contexts/rl_trading/", "apps/worker/rl_trading_trainer/", "apps/worker/rl_trading_inference/", "docs/architecture/ml/"]
-skills = ["architecture-design", "backend-performance-evidence", "backend-quality-gates"]
+skills = []
 
 [[agent_routes]]
 match = "Deploy, CI, runtime, monitoring"
 components = ["area:operations"]
 read_first = [".github/workflows/", "infra/", "docs/runbooks/"]
-skills = ["publish-ci-deploy", "pre-ship-gate", "root-cause-debugging"]
+skills = []

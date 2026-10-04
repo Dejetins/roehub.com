@@ -116,7 +116,7 @@ it('aborts an obsolete selection and discards even a late successful response', 
   mockApi((url, init) => url.pathname.endsWith(`/${id}`) ? new Promise(resolve => { resolveOld = resolve; oldSignal = init.signal as AbortSignal; }) :
     url.pathname.endsWith(`/${secondId}`) ? response({ ...job, job_id: secondId, request: { ...job.request, ui_metadata: { strategy_name: 'Second research' } } }) : undefined);
   const client = mount(`/backtests/${id}`);
-  await screen.findByText('Loading selected job…');
+  await waitFor(() => expect(oldSignal).toBeDefined());
   await userEvent.click(screen.getByRole('button', { name: 'Switch job' }));
   expect(await screen.findByRole('heading', { name: 'Second research' })).toBeVisible();
   expect(oldSignal?.aborted).toBe(true);
@@ -153,7 +153,7 @@ it('cancels an in-flight private read on subject change and rejects its late res
   let resolveOld!: (value: Response) => void; let signal: AbortSignal | undefined; let changed = false;
   mockApi((url, init) => url.pathname.endsWith('/jobs') ? new Promise(resolve => { resolveOld = resolve; signal = init.signal as AbortSignal; }) :
     url.pathname.includes('current-user') && changed ? response({ ...session, user_id: 'other' }) : undefined);
-  const client = mount(); await screen.findByText('Loading jobs…'); changed = true;
+  const client = mount(); await waitFor(() => expect(signal).toBeDefined()); changed = true;
   await act(() => client.refetchQueries({ queryKey: ['session'] })); await screen.findByRole('alert');
   expect(signal?.aborted).toBe(true);
   await act(async () => resolveOld(response({ items: [job], next_cursor: null })));

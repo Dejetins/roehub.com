@@ -1,0 +1,1755 @@
+{
+  "started_at": "2026-10-04 10:46:05.402519+00:00",
+  "period_start": "2026-08-01 00:00:00+00:00",
+  "period_end": "2026-09-01 00:00:00+00:00",
+  "symbols": [
+    "AAVEUSDT",
+    "ADAUSDT",
+    "ALGOUSDT",
+    "ANKRUSDT"
+  ],
+  "before_coverage": {
+    "raw_binance_klines_1m": [],
+    "canonical_candles_1m": []
+  },
+  "samples": [
+    {
+      "at": "2026-10-04 10:46:05.449495+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 0,
+      "written": 0,
+      "states": [],
+      "tracked_bytes": 769568060,
+      "rss_bytes": 1766756352.0
+    },
+    {
+      "at": "2026-10-04 10:46:07.473091+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 0,
+      "written": 0,
+      "states": [],
+      "tracked_bytes": 769458376,
+      "rss_bytes": 1763983360.0
+    },
+    {
+      "at": "2026-10-04 10:46:09.505471+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 0,
+      "written": 0,
+      "states": [],
+      "tracked_bytes": 769614913,
+      "rss_bytes": 1794363392.0
+    },
+    {
+      "at": "2026-10-04 10:46:11.539947+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 0,
+      "written": 0,
+      "states": [],
+      "tracked_bytes": 769665873,
+      "rss_bytes": 1795096576.0
+    },
+    {
+      "at": "2026-10-04 10:46:13.575692+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 0,
+      "written": 0,
+      "states": [],
+      "tracked_bytes": 769500501,
+      "rss_bytes": 1750769664.0
+    },
+    {
+      "at": "2026-10-04 10:46:15.607671+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 0,
+      "written": 0,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 774529610,
+      "rss_bytes": 1809203200.0
+    },
+    {
+      "at": "2026-10-04 10:46:17.643249+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 0,
+      "written": 0,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 782476978,
+      "rss_bytes": 1803665408.0
+    },
+    {
+      "at": "2026-10-04 10:46:19.676026+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 4320,
+      "written": 4320,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 783127879,
+      "rss_bytes": 1851912192.0
+    },
+    {
+      "at": "2026-10-04 10:46:21.702825+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 4320,
+      "written": 4320,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 780502051,
+      "rss_bytes": 1852755968.0
+    },
+    {
+      "at": "2026-10-04 10:46:23.738168+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 4320,
+      "written": 4320,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 780709863,
+      "rss_bytes": 1766129664.0
+    },
+    {
+      "at": "2026-10-04 10:46:25.771660+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 4320,
+      "written": 4320,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 780761527,
+      "rss_bytes": 1768267776.0
+    },
+    {
+      "at": "2026-10-04 10:46:27.802710+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 5760,
+      "written": 5760,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 781023292,
+      "rss_bytes": 1773203456.0
+    },
+    {
+      "at": "2026-10-04 10:46:29.841031+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 10080,
+      "written": 10080,
+      "states": [
+        "queued",
+        "queued",
+        "running",
+        "queued"
+      ],
+      "tracked_bytes": 781641594,
+      "rss_bytes": 1815379968.0
+    },
+    {
+      "at": "2026-10-04 10:46:31.871019+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 10080,
+      "written": 10080,
+      "states": [
+        "queued",
+        "queued",
+        "running",
+        "queued"
+      ],
+      "tracked_bytes": 781693482,
+      "rss_bytes": 1843212288.0
+    },
+    {
+      "at": "2026-10-04 10:46:33.899888+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 10080,
+      "written": 10080,
+      "states": [
+        "queued",
+        "queued",
+        "running",
+        "queued"
+      ],
+      "tracked_bytes": 781745210,
+      "rss_bytes": 1775095808.0
+    },
+    {
+      "at": "2026-10-04 10:46:35.933442+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 10080,
+      "written": 10080,
+      "states": [
+        "queued",
+        "queued",
+        "running",
+        "queued"
+      ],
+      "tracked_bytes": 781510094,
+      "rss_bytes": 1777283072.0
+    },
+    {
+      "at": "2026-10-04 10:46:37.970534+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 10080,
+      "written": 10080,
+      "states": [
+        "queued",
+        "queued",
+        "running",
+        "queued"
+      ],
+      "tracked_bytes": 781561502,
+      "rss_bytes": 1770725376.0
+    },
+    {
+      "at": "2026-10-04 10:46:40.007109+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 11520,
+      "written": 11520,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 783961682,
+      "rss_bytes": 1729462272.0
+    },
+    {
+      "at": "2026-10-04 10:46:42.041792+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 11520,
+      "written": 11520,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 784096180,
+      "rss_bytes": 1810673664.0
+    },
+    {
+      "at": "2026-10-04 10:46:44.075387+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 15840,
+      "written": 15840,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 784367266,
+      "rss_bytes": 1818181632.0
+    },
+    {
+      "at": "2026-10-04 10:46:46.102220+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 15840,
+      "written": 15840,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 784278924,
+      "rss_bytes": 1819766784.0
+    },
+    {
+      "at": "2026-10-04 10:46:48.140817+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 15840,
+      "written": 15840,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 786855608,
+      "rss_bytes": 1739522048.0
+    },
+    {
+      "at": "2026-10-04 10:46:50.165211+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 15840,
+      "written": 15840,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 786907400,
+      "rss_bytes": 1739001856.0
+    },
+    {
+      "at": "2026-10-04 10:46:52.199054+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 15840,
+      "written": 15840,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 786840076,
+      "rss_bytes": 1735143424.0
+    },
+    {
+      "at": "2026-10-04 10:46:54.229926+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 17280,
+      "written": 17280,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 787149901,
+      "rss_bytes": 1740509184.0
+    },
+    {
+      "at": "2026-10-04 10:46:56.265209+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 17280,
+      "written": 17280,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 787259825,
+      "rss_bytes": 1812742144.0
+    },
+    {
+      "at": "2026-10-04 10:46:58.302235+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 23040,
+      "written": 23040,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 786847940,
+      "rss_bytes": 1832935424.0
+    },
+    {
+      "at": "2026-10-04 10:47:00.329869+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 23040,
+      "written": 23040,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 787071623,
+      "rss_bytes": 1847279616.0
+    },
+    {
+      "at": "2026-10-04 10:47:02.365506+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 28800,
+      "written": 28800,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 787666953,
+      "rss_bytes": 1853353984.0
+    },
+    {
+      "at": "2026-10-04 10:47:04.404210+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 34560,
+      "written": 34560,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 788592761,
+      "rss_bytes": 1845800960.0
+    },
+    {
+      "at": "2026-10-04 10:47:06.446742+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 34560,
+      "written": 34560,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 788145347,
+      "rss_bytes": 1871245312.0
+    },
+    {
+      "at": "2026-10-04 10:47:08.481651+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 38880,
+      "written": 38880,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 788638595,
+      "rss_bytes": 1834831872.0
+    },
+    {
+      "at": "2026-10-04 10:47:10.518721+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 38880,
+      "written": 38880,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 788690451,
+      "rss_bytes": 1834971136.0
+    },
+    {
+      "at": "2026-10-04 10:47:12.552259+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 38880,
+      "written": 38880,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 788742243,
+      "rss_bytes": 1766793216.0
+    },
+    {
+      "at": "2026-10-04 10:47:14.581272+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 38880,
+      "written": 38880,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 788456471,
+      "rss_bytes": 1726423040.0
+    },
+    {
+      "at": "2026-10-04 10:47:16.618332+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 38880,
+      "written": 38880,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 791036931,
+      "rss_bytes": 1729019904.0
+    },
+    {
+      "at": "2026-10-04 10:47:18.653161+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 40320,
+      "written": 40320,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 791299080,
+      "rss_bytes": 1735254016.0
+    },
+    {
+      "at": "2026-10-04 10:47:20.677945+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 40320,
+      "written": 40320,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 793060205,
+      "rss_bytes": 1799540736.0
+    },
+    {
+      "at": "2026-10-04 10:47:22.711575+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 46080,
+      "written": 46080,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 791685833,
+      "rss_bytes": 1833713664.0
+    },
+    {
+      "at": "2026-10-04 10:47:24.738020+00:00",
+      "running": 2,
+      "global_running": 2,
+      "completed": 48960,
+      "written": 48960,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 792197359,
+      "rss_bytes": 1864302592.0
+    },
+    {
+      "at": "2026-10-04 10:47:26.761185+00:00",
+      "running": 2,
+      "global_running": 2,
+      "completed": 48960,
+      "written": 48960,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 792248927,
+      "rss_bytes": 1872867328.0
+    },
+    {
+      "at": "2026-10-04 10:47:28.778589+00:00",
+      "running": 2,
+      "global_running": 2,
+      "completed": 48960,
+      "written": 48960,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 791796987,
+      "rss_bytes": 1788579840.0
+    },
+    {
+      "at": "2026-10-04 10:47:30.798444+00:00",
+      "running": 2,
+      "global_running": 2,
+      "completed": 48960,
+      "written": 48960,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 791651155,
+      "rss_bytes": 1782779904.0
+    },
+    {
+      "at": "2026-10-04 10:47:32.820474+00:00",
+      "running": 2,
+      "global_running": 2,
+      "completed": 48960,
+      "written": 48960,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 791702627,
+      "rss_bytes": 1758527488.0
+    },
+    {
+      "at": "2026-10-04 10:47:34.841829+00:00",
+      "running": 2,
+      "global_running": 2,
+      "completed": 48960,
+      "written": 48960,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 791956223,
+      "rss_bytes": 1725575168.0
+    },
+    {
+      "at": "2026-10-04 10:47:36.866850+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 51840,
+      "written": 51840,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 791190463,
+      "rss_bytes": 1749483520.0
+    },
+    {
+      "at": "2026-10-04 10:47:38.886885+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 51840,
+      "written": 51840,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 785923079,
+      "rss_bytes": 1820311552.0
+    },
+    {
+      "at": "2026-10-04 10:47:40.904610+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 51840,
+      "written": 51840,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 785929255,
+      "rss_bytes": 1829007360.0
+    },
+    {
+      "at": "2026-10-04 10:47:42.920286+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 51840,
+      "written": 51840,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 785980727,
+      "rss_bytes": 1812680704.0
+    },
+    {
+      "at": "2026-10-04 10:47:44.939510+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 51840,
+      "written": 51840,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 785998967,
+      "rss_bytes": 1771012096.0
+    },
+    {
+      "at": "2026-10-04 10:47:46.955359+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 57600,
+      "written": 57600,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 791984056,
+      "rss_bytes": 1771737088.0
+    },
+    {
+      "at": "2026-10-04 10:47:48.970712+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 57600,
+      "written": 57600,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 792093352,
+      "rss_bytes": 1837539328.0
+    },
+    {
+      "at": "2026-10-04 10:47:50.996213+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 61920,
+      "written": 61920,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 792169169,
+      "rss_bytes": 1900355584.0
+    },
+    {
+      "at": "2026-10-04 10:47:53.021873+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 61920,
+      "written": 61920,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 792216231,
+      "rss_bytes": 1802534912.0
+    },
+    {
+      "at": "2026-10-04 10:47:55.051585+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 61920,
+      "written": 61920,
+      "states": [
+        "queued",
+        "running",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 792268151,
+      "rss_bytes": 1778638848.0
+    },
+    {
+      "at": "2026-10-04 10:47:57.070307+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 63360,
+      "written": 63360,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 792602909,
+      "rss_bytes": 1764024320.0
+    },
+    {
+      "at": "2026-10-04 10:47:59.084465+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 63360,
+      "written": 63360,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 859700831,
+      "rss_bytes": 1733869568.0
+    },
+    {
+      "at": "2026-10-04 10:48:01.117725+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 69120,
+      "written": 69120,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 793154161,
+      "rss_bytes": 1850613760.0
+    },
+    {
+      "at": "2026-10-04 10:48:03.141014+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 69120,
+      "written": 69120,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 793289923,
+      "rss_bytes": 1885753344.0
+    },
+    {
+      "at": "2026-10-04 10:48:05.177803+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 73440,
+      "written": 73440,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 793877183,
+      "rss_bytes": 1858306048.0
+    },
+    {
+      "at": "2026-10-04 10:48:07.210632+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 73440,
+      "written": 73440,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 793392705,
+      "rss_bytes": 1857835008.0
+    },
+    {
+      "at": "2026-10-04 10:48:09.241367+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 73440,
+      "written": 73440,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 793207104,
+      "rss_bytes": 1780072448.0
+    },
+    {
+      "at": "2026-10-04 10:48:11.271098+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 74880,
+      "written": 74880,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 793517617,
+      "rss_bytes": 1749262336.0
+    },
+    {
+      "at": "2026-10-04 10:48:13.299011+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 74880,
+      "written": 74880,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 792617537,
+      "rss_bytes": 1747841024.0
+    },
+    {
+      "at": "2026-10-04 10:48:15.329758+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 80640,
+      "written": 80640,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 793221492,
+      "rss_bytes": 1858048000.0
+    },
+    {
+      "at": "2026-10-04 10:48:17.350984+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 80640,
+      "written": 80640,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 780462081,
+      "rss_bytes": 1890353152.0
+    },
+    {
+      "at": "2026-10-04 10:48:19.387400+00:00",
+      "running": 3,
+      "global_running": 3,
+      "completed": 82080,
+      "written": 82080,
+      "states": [
+        "running",
+        "queued",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 780513873,
+      "rss_bytes": 1822748672.0
+    },
+    {
+      "at": "2026-10-04 10:48:21.417728+00:00",
+      "running": 3,
+      "global_running": 3,
+      "completed": 82080,
+      "written": 82080,
+      "states": [
+        "running",
+        "queued",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 780257345,
+      "rss_bytes": 1830309888.0
+    },
+    {
+      "at": "2026-10-04 10:48:23.439157+00:00",
+      "running": 3,
+      "global_running": 3,
+      "completed": 82080,
+      "written": 82080,
+      "states": [
+        "running",
+        "queued",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 780145327,
+      "rss_bytes": 1778307072.0
+    },
+    {
+      "at": "2026-10-04 10:48:25.474481+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 86400,
+      "written": 86400,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 780835299,
+      "rss_bytes": 1755402240.0
+    },
+    {
+      "at": "2026-10-04 10:48:27.499869+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 86400,
+      "written": 86400,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 780923633,
+      "rss_bytes": 1760583680.0
+    },
+    {
+      "at": "2026-10-04 10:48:29.532122+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 92160,
+      "written": 92160,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 781510392,
+      "rss_bytes": 1836982272.0
+    },
+    {
+      "at": "2026-10-04 10:48:31.565053+00:00",
+      "running": 3,
+      "global_running": 3,
+      "completed": 93600,
+      "written": 93600,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "queued"
+      ],
+      "tracked_bytes": 781840511,
+      "rss_bytes": 1903546368.0
+    },
+    {
+      "at": "2026-10-04 10:48:33.595246+00:00",
+      "running": 2,
+      "global_running": 2,
+      "completed": 95040,
+      "written": 95040,
+      "states": [
+        "running",
+        "queued",
+        "running",
+        "queued"
+      ],
+      "tracked_bytes": 782069990,
+      "rss_bytes": 1844248576.0
+    },
+    {
+      "at": "2026-10-04 10:48:35.630315+00:00",
+      "running": 2,
+      "global_running": 2,
+      "completed": 95040,
+      "written": 95040,
+      "states": [
+        "running",
+        "queued",
+        "running",
+        "queued"
+      ],
+      "tracked_bytes": 782121910,
+      "rss_bytes": 1805737984.0
+    },
+    {
+      "at": "2026-10-04 10:48:37.672226+00:00",
+      "running": 2,
+      "global_running": 2,
+      "completed": 95040,
+      "written": 95040,
+      "states": [
+        "running",
+        "queued",
+        "running",
+        "queued"
+      ],
+      "tracked_bytes": 781404010,
+      "rss_bytes": 1741471744.0
+    },
+    {
+      "at": "2026-10-04 10:48:39.710196+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 96480,
+      "written": 96480,
+      "states": [
+        "queued",
+        "queued",
+        "running",
+        "queued"
+      ],
+      "tracked_bytes": 781473069,
+      "rss_bytes": 1711771648.0
+    },
+    {
+      "at": "2026-10-04 10:48:41.743334+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 96480,
+      "written": 96480,
+      "states": [
+        "queued",
+        "queued",
+        "running",
+        "queued"
+      ],
+      "tracked_bytes": 781524861,
+      "rss_bytes": 1727639552.0
+    },
+    {
+      "at": "2026-10-04 10:48:43.774343+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 97920,
+      "written": 97920,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 781662622,
+      "rss_bytes": 1721032704.0
+    },
+    {
+      "at": "2026-10-04 10:48:45.809982+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 103680,
+      "written": 103680,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 782719875,
+      "rss_bytes": 1799802880.0
+    },
+    {
+      "at": "2026-10-04 10:48:47.843447+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 103680,
+      "written": 103680,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 785336853,
+      "rss_bytes": 1804222464.0
+    },
+    {
+      "at": "2026-10-04 10:48:49.882624+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 109440,
+      "written": 109440,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 786133694,
+      "rss_bytes": 1837613056.0
+    },
+    {
+      "at": "2026-10-04 10:48:51.913189+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 109440,
+      "written": 109440,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 788957158,
+      "rss_bytes": 1843322880.0
+    },
+    {
+      "at": "2026-10-04 10:48:53.947965+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 115200,
+      "written": 115200,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 785600447,
+      "rss_bytes": 1832984576.0
+    },
+    {
+      "at": "2026-10-04 10:48:55.979253+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 120960,
+      "written": 120960,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 786505144,
+      "rss_bytes": 1852166144.0
+    },
+    {
+      "at": "2026-10-04 10:48:58.017142+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 120960,
+      "written": 120960,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 786593000,
+      "rss_bytes": 1838018560.0
+    },
+    {
+      "at": "2026-10-04 10:49:00.043962+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 126720,
+      "written": 126720,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 786133794,
+      "rss_bytes": 1849036800.0
+    },
+    {
+      "at": "2026-10-04 10:49:02.075693+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 132480,
+      "written": 132480,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 787107161,
+      "rss_bytes": 1851215872.0
+    },
+    {
+      "at": "2026-10-04 10:49:04.109476+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 132480,
+      "written": 132480,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 787192450,
+      "rss_bytes": 1864642560.0
+    },
+    {
+      "at": "2026-10-04 10:49:06.146421+00:00",
+      "running": 3,
+      "global_running": 3,
+      "completed": 133920,
+      "written": 133920,
+      "states": [
+        "running",
+        "queued",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 786721293,
+      "rss_bytes": 1836871680.0
+    },
+    {
+      "at": "2026-10-04 10:49:08.183393+00:00",
+      "running": 3,
+      "global_running": 3,
+      "completed": 133920,
+      "written": 133920,
+      "states": [
+        "running",
+        "queued",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 788728259,
+      "rss_bytes": 1770663936.0
+    },
+    {
+      "at": "2026-10-04 10:49:10.205646+00:00",
+      "running": 3,
+      "global_running": 3,
+      "completed": 133920,
+      "written": 133920,
+      "states": [
+        "running",
+        "queued",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 788619917,
+      "rss_bytes": 1765416960.0
+    },
+    {
+      "at": "2026-10-04 10:49:12.229252+00:00",
+      "running": 3,
+      "global_running": 3,
+      "completed": 133920,
+      "written": 133920,
+      "states": [
+        "running",
+        "queued",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 788671517,
+      "rss_bytes": 1737273344.0
+    },
+    {
+      "at": "2026-10-04 10:49:14.252467+00:00",
+      "running": 3,
+      "global_running": 3,
+      "completed": 133920,
+      "written": 133920,
+      "states": [
+        "running",
+        "queued",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 788659881,
+      "rss_bytes": 1711271936.0
+    },
+    {
+      "at": "2026-10-04 10:49:16.276184+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 138240,
+      "written": 138240,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 786884017,
+      "rss_bytes": 1738317824.0
+    },
+    {
+      "at": "2026-10-04 10:49:18.312507+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 138240,
+      "written": 138240,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 789990417,
+      "rss_bytes": 1796857856.0
+    },
+    {
+      "at": "2026-10-04 10:49:20.346826+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 144000,
+      "written": 144000,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 790852270,
+      "rss_bytes": 1813991424.0
+    },
+    {
+      "at": "2026-10-04 10:49:22.373288+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 149760,
+      "written": 149760,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 790769452,
+      "rss_bytes": 1811472384.0
+    },
+    {
+      "at": "2026-10-04 10:49:24.423577+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 149760,
+      "written": 149760,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 790880280,
+      "rss_bytes": 1805897728.0
+    },
+    {
+      "at": "2026-10-04 10:49:26.461851+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 155520,
+      "written": 155520,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 791700775,
+      "rss_bytes": 1846001664.0
+    },
+    {
+      "at": "2026-10-04 10:49:28.488957+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 155520,
+      "written": 155520,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 790221797,
+      "rss_bytes": 1815859200.0
+    },
+    {
+      "at": "2026-10-04 10:49:30.524861+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 159840,
+      "written": 159840,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 790537145,
+      "rss_bytes": 1802317824.0
+    },
+    {
+      "at": "2026-10-04 10:49:32.565328+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 159840,
+      "written": 159840,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 790586433,
+      "rss_bytes": 1771479040.0
+    },
+    {
+      "at": "2026-10-04 10:49:34.599782+00:00",
+      "running": 1,
+      "global_running": 1,
+      "completed": 159840,
+      "written": 159840,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "running"
+      ],
+      "tracked_bytes": 790638225,
+      "rss_bytes": 1730125824.0
+    },
+    {
+      "at": "2026-10-04 10:49:36.636398+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 161280,
+      "written": 161280,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 790857826,
+      "rss_bytes": 1728405504.0
+    },
+    {
+      "at": "2026-10-04 10:49:38.664517+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 161280,
+      "written": 161280,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 790517251,
+      "rss_bytes": 1720614912.0
+    },
+    {
+      "at": "2026-10-04 10:49:40.698561+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 167040,
+      "written": 167040,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 791360768,
+      "rss_bytes": 1823899648.0
+    },
+    {
+      "at": "2026-10-04 10:49:42.728164+00:00",
+      "running": 4,
+      "global_running": 4,
+      "completed": 167040,
+      "written": 167040,
+      "states": [
+        "running",
+        "running",
+        "running",
+        "running"
+      ],
+      "tracked_bytes": 791496884,
+      "rss_bytes": 1860476928.0
+    },
+    {
+      "at": "2026-10-04 10:49:44.752060+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 172800,
+      "written": 172800,
+      "states": [
+        "queued",
+        "queued",
+        "queued",
+        "queued"
+      ],
+      "tracked_bytes": 791550045,
+      "rss_bytes": 1851277312.0
+    },
+    {
+      "at": "2026-10-04 10:49:46.772356+00:00",
+      "running": 0,
+      "global_running": 0,
+      "completed": 178560,
+      "written": 178560,
+      "states": [
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded"
+      ],
+      "tracked_bytes": 794999425,
+      "rss_bytes": 1865940992.0
+    }
+  ],
+  "jobs": [
+    {
+      "job_id": "52bd572a-0b2d-54bd-8170-f82b13f2927a",
+      "batch_key": "20293bda-6f98-48ba-aa34-88c286595350",
+      "symbols": [
+        "AAVEUSDT"
+      ],
+      "state": "succeeded",
+      "completed_units": 44640,
+      "total_units": 44640,
+      "rows_written": 44640,
+      "rows_read": 44640,
+      "error_code": null,
+      "retry_count": 0,
+      "created_at": "2026-10-04 10:46:14.630985+00:00",
+      "finished_at": "2026-10-04 10:49:46.005522+00:00"
+    },
+    {
+      "job_id": "62b9d120-98a9-5941-bfc4-2877f2f58e94",
+      "batch_key": "20293bda-6f98-48ba-aa34-88c286595350",
+      "symbols": [
+        "ADAUSDT"
+      ],
+      "state": "succeeded",
+      "completed_units": 44640,
+      "total_units": 44640,
+      "rows_written": 44640,
+      "rows_read": 44640,
+      "error_code": null,
+      "retry_count": 0,
+      "created_at": "2026-10-04 10:46:14.630985+00:00",
+      "finished_at": "2026-10-04 10:49:46.003825+00:00"
+    },
+    {
+      "job_id": "79c01bb9-e0a6-5099-87e4-c99fa12576b3",
+      "batch_key": "20293bda-6f98-48ba-aa34-88c286595350",
+      "symbols": [
+        "ALGOUSDT"
+      ],
+      "state": "succeeded",
+      "completed_units": 44640,
+      "total_units": 44640,
+      "rows_written": 44640,
+      "rows_read": 44640,
+      "error_code": null,
+      "retry_count": 0,
+      "created_at": "2026-10-04 10:46:14.630985+00:00",
+      "finished_at": "2026-10-04 10:49:46.004760+00:00"
+    },
+    {
+      "job_id": "4335959d-c4d5-559e-80ae-f52e45892a71",
+      "batch_key": "20293bda-6f98-48ba-aa34-88c286595350",
+      "symbols": [
+        "ANKRUSDT"
+      ],
+      "state": "succeeded",
+      "completed_units": 44640,
+      "total_units": 44640,
+      "rows_written": 44640,
+      "rows_read": 44640,
+      "error_code": null,
+      "retry_count": 0,
+      "created_at": "2026-10-04 10:46:14.630985+00:00",
+      "finished_at": "2026-10-04 10:49:45.986348+00:00"
+    }
+  ],
+  "finished_at": "2026-10-04 10:49:46.773144+00:00",
+  "after_coverage": {
+    "raw_binance_klines_1m": [
+      {
+        "symbol": "AAVEUSDT",
+        "rows": 44640,
+        "unique_minutes": 44640
+      },
+      {
+        "symbol": "ADAUSDT",
+        "rows": 44640,
+        "unique_minutes": 44640
+      },
+      {
+        "symbol": "ALGOUSDT",
+        "rows": 44640,
+        "unique_minutes": 44640
+      },
+      {
+        "symbol": "ANKRUSDT",
+        "rows": 44640,
+        "unique_minutes": 44640
+      }
+    ],
+    "canonical_candles_1m": [
+      {
+        "symbol": "AAVEUSDT",
+        "rows": 44640,
+        "unique_minutes": 44640
+      },
+      {
+        "symbol": "ADAUSDT",
+        "rows": 44640,
+        "unique_minutes": 44640
+      },
+      {
+        "symbol": "ALGOUSDT",
+        "rows": 44640,
+        "unique_minutes": 44640
+      },
+      {
+        "symbol": "ANKRUSDT",
+        "rows": 44640,
+        "unique_minutes": 44640
+      }
+    ]
+  }
+}

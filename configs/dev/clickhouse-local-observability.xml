@@ -1,0 +1,26 @@
+<clickhouse>
+    <!-- Local Navigator profile. No change to container/server memory budgets. -->
+    <logger><level>information</level></logger>
+    <!-- Allocation tracing is opt-in during a bounded investigation, not continuous. -->
+    <total_memory_profiler_step>0</total_memory_profiler_step>
+    <metric_log>
+        <collect_interval_milliseconds>5000</collect_interval_milliseconds>
+        <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+        <ttl>event_date + INTERVAL 7 DAY DELETE</ttl>
+        <settings>merge_max_block_size=1024, max_compress_block_size=65536, min_compress_block_size=8192</settings>
+    </metric_log>
+    <asynchronous_metric_log>
+        <flush_interval_milliseconds>30000</flush_interval_milliseconds>
+        <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
+    </asynchronous_metric_log>
+    <trace_log><ttl>event_date + INTERVAL 1 DAY DELETE</ttl></trace_log>
+    <text_log>
+        <level>warning</level>
+        <ttl>event_date + INTERVAL 3 DAY DELETE</ttl>
+    </text_log>
+    <query_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></query_log>
+    <part_log><ttl>event_date + INTERVAL 3 DAY DELETE</ttl></part_log>
+    <query_views_log><ttl>event_date + INTERVAL 3 DAY DELETE</ttl></query_views_log>
+    <processors_profile_log><ttl>event_date + INTERVAL 1 DAY DELETE</ttl></processors_profile_log>
+    <error_log><ttl>event_date + INTERVAL 7 DAY DELETE</ttl></error_log>
+</clickhouse>

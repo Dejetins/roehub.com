@@ -1,0 +1,96 @@
+{
+  "observed_at": "2026-10-04T11:18:07.173205+00:00",
+  "columns": [
+    {
+      "name": "market_id",
+      "type": "UInt16"
+    },
+    {
+      "name": "symbol",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "instrument_key",
+      "type": "String"
+    },
+    {
+      "name": "open_time",
+      "type": "DateTime64(3, 'UTC')"
+    },
+    {
+      "name": "source",
+      "type": "LowCardinality(String)"
+    },
+    {
+      "name": "ingested_at",
+      "type": "DateTime64(3, 'UTC')"
+    }
+  ],
+  "recent": [
+    {
+      "instrument_key": "binance:spot:AAVEUSDT",
+      "source": "rest",
+      "rows": 1,
+      "minutes": 1,
+      "first": "2026-10-04 11:09:00",
+      "last": "2026-10-04 11:09:00"
+    },
+    {
+      "instrument_key": "binance:spot:AAVEUSDT",
+      "source": "ws",
+      "rows": 8,
+      "minutes": 8,
+      "first": "2026-10-04 11:05:00",
+      "last": "2026-10-04 11:13:00"
+    },
+    {
+      "instrument_key": "binance:spot:ADAUSDT",
+      "source": "rest",
+      "rows": 1,
+      "minutes": 1,
+      "first": "2026-10-04 11:09:00",
+      "last": "2026-10-04 11:09:00"
+    },
+    {
+      "instrument_key": "binance:spot:ADAUSDT",
+      "source": "ws",
+      "rows": 8,
+      "minutes": 8,
+      "first": "2026-10-04 11:05:00",
+      "last": "2026-10-04 11:13:00"
+    },
+    {
+      "instrument_key": "binance:spot:ALGOUSDT",
+      "source": "rest",
+      "rows": 1,
+      "minutes": 1,
+      "first": "2026-10-04 11:09:00",
+      "last": "2026-10-04 11:09:00"
+    },
+    {
+      "instrument_key": "binance:spot:ALGOUSDT",
+      "source": "ws",
+      "rows": 8,
+      "minutes": 8,
+      "first": "2026-10-04 11:05:00",
+      "last": "2026-10-04 11:13:00"
+    },
+    {
+      "instrument_key": "binance:spot:ANKRUSDT",
+      "source": "rest",
+      "rows": 2,
+      "minutes": 2,
+      "first": "2026-10-04 11:09:00",
+      "last": "2026-10-04 11:10:00"
+    },
+    {
+      "instrument_key": "binance:spot:ANKRUSDT",
+      "source": "ws",
+      "rows": 7,
+      "minutes": 7,
+      "first": "2026-10-04 11:05:00",
+      "last": "2026-10-04 11:13:00"
+    }
+  ],
+  "selections": []
+}

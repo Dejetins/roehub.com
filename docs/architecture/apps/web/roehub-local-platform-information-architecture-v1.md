@@ -76,6 +76,16 @@ roles, or redirects; it makes those dependencies explicit.
 
 ## Product structure
 
+Implementation note, 2026-10-03: the selected Navigator preview serves
+`/settings/profile`, `/settings/preferences`, `/settings/notifications`,
+`/settings/security`, `/connections`, `/data`, `/data/ingestion`, `/monitoring`
+and `/monitoring/{service_id}` through the existing protected Web page/proxy gate.
+Its `/settings?tab=...` compatibility redirect sends market-data tabs to `/data`,
+API/integrations to `/connections`, and account categories to their canonical
+settings paths. The preview reuses existing `/runbooks/{id}` for actual instructions;
+the wider Docs target is not implemented. Candidate phone-width checks do not
+change this document's accepted platform responsive scope or role matrix.
+
 ### Navigation model
 
 The authenticated shell uses a stable grouped navigation rather than one flat
@@ -84,7 +94,7 @@ compact, but the group and route semantics do not change.
 
 | Group | Canonical destinations | Purpose |
 |---|---|---|
-| Overview | `/dashboard` | Installation and organization summary, readiness, recent work, and guided next actions. |
+| Overview | `/dashboard` | Portfolio capital, performance, strategy contributions, exchange/instrument allocation, risk and trading activity. |
 | Research | `/data`, `/strategies`, `/backtests`, `/models` | Data selection, strategy creation, experiments, backtests, and models. |
 | Operations | `/live`, `/monitoring`, `/connections` | Runtime observation, safe operational action, service health, and exchange connectivity. |
 | System | `/docs`, `/settings/*`, `/admin/*` | Local documentation, personal preferences, organization administration, resources, extensions, updates, and recovery. |
@@ -108,9 +118,15 @@ grant capabilities; the server filters every destination and action.
 
 #### Overview and research
 
-- `/dashboard` contains the overview and truthful onboarding/empty state.
+- `/dashboard` follows the [Overview portfolio requirements](roehub-overview-requirements-v1.md)
+  accepted on 2026-09-26: Total, exchange, instrument and custom strategy portfolios.
+  This supersedes its former installation-readiness purpose; empty financial states
+  remain truthful without making setup the primary page composition.
 - `/data` becomes the canonical market-data catalog and organization selection
-  workspace; market data no longer hides inside general settings.
+  workspace; market data no longer hides inside general settings. In the selected
+  Navigator candidate, its library selects Binance/Bybit, the main table combines
+  market segments, and the right inspector owns historical downloads and the sole
+  streaming toggle. Request history remains at `/data/ingestion`.
 - `/strategies`, `/strategies/new`, and `/strategies/{strategy_id}` separate the
   library, editor, and controlled runtime detail.
 - `/backtests`, `/backtests/new`, and `/backtests/{job_id}` separate history,
@@ -162,7 +178,8 @@ rules govern their design:
 1. **Sign in and continue:** preserve a sanitized `next`; never redirect to an
    external origin; distinguish invalid session from identity-service failure.
 2. **First launch:** setup is resumable, selection is skippable, and an empty
-   dashboard explains the next safe action.
+   dashboard explains absent portfolio data and a relevant recovery action without
+   becoming a technical setup checklist.
 3. **Select instruments:** show catalog snapshot identity, provider segment,
    coverage, resource impact, and strategy pinning before mutation.
 4. **Manage connections:** separate status, binding, credential input, rotation,

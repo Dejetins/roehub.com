@@ -47,10 +47,10 @@ class PostgresAccountSettingsRepository(AccountSettingsRepository):
         if row is None:
             return AccountProfileSettings(
                 owner_user_id=owner_user_id,
-                username="quant_trader",
-                email="quant_trader@example.com",
+                username=None,
+                email=None,
                 timezone="Europe/Moscow",
-                telegram_discord="@quant_trader / quant_trader#4319",
+                telegram_discord=None,
                 updated_at=now,
             )
         return _map_profile(row=row)
@@ -106,7 +106,7 @@ class PostgresAccountSettingsRepository(AccountSettingsRepository):
         if row is None:
             return AccountPreferences(
                 owner_user_id=owner_user_id,
-                theme="terminal-orange",
+                theme="graphite",
                 locale="en",
                 density="compact",
                 autorefresh_preset="15s",
@@ -321,21 +321,6 @@ class PostgresAccountSettingsRepository(AccountSettingsRepository):
                 "offset": offset,
             },
         )
-        if not rows:
-            item = AccountSessionView(
-                session_id="current",
-                owner_user_id=owner_user_id,
-                created_at=now,
-                last_seen_at=now,
-                idle_expires_at=now,
-                absolute_expires_at=now,
-                revoked_at=None,
-                device="Roehub Web / current browser",
-                ip_address="127.0.0.1",
-                location="local-dev",
-                is_current=True,
-            )
-            return CursorPage(items=(item,), next_cursor=None)
         mapped = tuple(_map_session(row=row) for row in rows)
         next_cursor = str(offset + limit) if len(mapped) > limit else None
         return CursorPage(items=mapped[:limit], next_cursor=next_cursor)

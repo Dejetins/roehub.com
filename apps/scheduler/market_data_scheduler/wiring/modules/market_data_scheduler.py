@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Mapping
+from typing import Callable, Mapping
 from uuid import uuid4
 
+import psycopg
 from prometheus_client import (
     REGISTRY,
     CollectorRegistry,
@@ -25,6 +27,9 @@ from trading.contexts.backtest.adapters.outbound import PsycopgBacktestPostgresG
 from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
 from trading.contexts.market_data.adapters.outbound.clients.funding_rate_history_source import (
     RestFundingRateHistorySource,
+)
+from trading.contexts.market_data.adapters.outbound.clients.history_probe_http import (
+    HistoryProbeHttpClient,
 )
 from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_source import (
     RestCandleIngestSource,
@@ -47,8 +52,20 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
     ClickHouseRawKlineWriter,
     ThreadLocalClickHouseConnectGateway,
 )
+from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
+    transient_clickhouse_error,
+)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresInstrumentSelectionRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.catalog_snapshot_repository import (  # noqa: E501
+    PostgresCatalogSnapshotRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_bounds_repository import (  # noqa: E501
+    PostgresHistoryBoundsRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository import (  # noqa: E501
+    PostgresMarketDataWorkRequestRepository,
 )
 from trading.contexts.market_data.application.dto import RestFillTask
 from trading.contexts.market_data.application.ports.clock.clock import Clock
@@ -65,7 +82,11 @@ from trading.contexts.market_data.application.services import (
     AsyncRestFillQueue,
     SchedulerBackfillPlanner,
 )
+from trading.contexts.market_data.application.services.history_bounds import HistoryBoundsRunner
 from trading.contexts.market_data.application.services.minute_utils import floor_to_minute_utc
+from trading.contexts.market_data.application.services.work_requests import (
+    MarketDataWorkRequestRunner,
+)
 from trading.contexts.market_data.application.use_cases import (
     BackfillFundingRatesUseCase,
     EnrichRefInstrumentsFromExchangeUseCase,
@@ -300,6 +321,33 @@ class MarketDataSchedulerApp:
         self._metrics_port = metrics_port
         self._clock: Clock = SystemClock()
         self._funding_last_universe_refresh_monotonic: float | None = None
+        self.work_request_runner: MarketDataWorkRequestRunner | None = None
+        self.history_bounds_runner: HistoryBoundsRunner | None = None
+
+    async def run_work_requests(self, stop_event: asyncio.Event) -> None:
+        """Consume the durable user inbox without scheduling automatic history scans."""
+        if self.work_request_runner is None:
+            raise ValueError("market data work requests are not enabled")
+        concurrency = self._config.ingestion.rest_concurrency_instruments
+        with ThreadPoolExecutor(
+            max_workers=concurrency, thread_name_prefix="market-data-work"
+        ) as pool:
+            while not stop_event.is_set():
+                try:
+                    if self.history_bounds_runner is not None:
+                        await asyncio.to_thread(self.history_bounds_runner.run_once)
+                    if not stop_event.is_set():
+                        await asyncio.to_thread(
+                            self.work_request_runner.run_batch,
+                            executor=pool, concurrency=concurrency,
+                        )
+                except Exception:
+                    # No provider/DB exception text in process logs.
+                    log.error("market data work request storage is unavailable")
+                try:
+                    await asyncio.wait_for(stop_event.wait(), timeout=2)
+                except TimeoutError:
+                    pass
 
     async def run(self, stop_event: asyncio.Event) -> None:
         """
@@ -361,6 +409,8 @@ class MarketDataSchedulerApp:
             )
             for job in jobs
         ]
+        if self.work_request_runner is not None:
+            periodic_tasks.append(asyncio.create_task(self.run_work_requests(stop_event)))
         await stop_event.wait()
         await asyncio.gather(*periodic_tasks, return_exceptions=True)
         await self._rest_fill_queue.close()
@@ -1140,6 +1190,9 @@ def build_market_data_scheduler_app(
         metadata_source=metadata_source,
         writer=instrument_writer,
         clock=SystemClock(),
+        snapshot_writer=(PostgresCatalogSnapshotRepository(
+            gateway=PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
+        ) if environ.get("ROEHUB_MARKET_DATA_WORK_REQUESTS_ENABLED") == "1" else None),
     )
     history_start_source = RestInstrumentHistoryStartSource(
         cfg=config,
@@ -1161,7 +1214,7 @@ def build_market_data_scheduler_app(
         bootstrap_history_lookback_minutes=config.ingestion.bootstrap_history_lookback_minutes,
     )
 
-    return MarketDataSchedulerApp(
+    app = MarketDataSchedulerApp(
         config=config,
         seed_use_case=seed_use_case,
         catalog_refresh_use_case=catalog_refresh_use_case,
@@ -1178,6 +1231,47 @@ def build_market_data_scheduler_app(
         metrics=MarketDataSchedulerMetrics(),
         metrics_port=metrics_port,
     )
+    if environ.get("ROEHUB_MARKET_DATA_WORK_REQUESTS_ENABLED") == "1":
+        def refresh_market(market_id: int, check: Callable[[], None]) -> None:
+            market = MarketId(market_id)
+            config.market_by_id(market)
+            try:
+                replace(catalog_refresh_use_case, market_ids=(market,), before_write=check).run()
+            except Exception:
+                check()
+                instrument_reader.mark_catalog_failed(market_ids=(market,), now=datetime.now(UTC))
+                raise
+            check()
+            instrument_reader.mark_catalog_fresh(market_ids=(market,), now=datetime.now(UTC))
+
+        app.work_request_runner = MarketDataWorkRequestRunner(
+            store=PostgresMarketDataWorkRequestRepository(
+                gateway=PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"]),
+                execution_dsn=environ["STRATEGY_PG_DSN"],
+            ), fill=rest_fill_use_case, refresh_catalog=refresh_market,
+            retryable_storage_error=_retryable_work_storage_error,
+            window_minutes=1440, max_windows=1,
+        )
+        app.history_bounds_runner = HistoryBoundsRunner(
+            store=PostgresHistoryBoundsRepository(
+                gateway=PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
+            ),
+            coordinator=app.work_request_runner.store,
+            source_factory=lambda: RestInstrumentHistoryStartSource(
+                cfg=config, http=HistoryProbeHttpClient(RequestsHttpClient()), clock=SystemClock(),
+                require_confirmed_candle=True
+            ),
+        )
+    return app
+
+
+def _retryable_work_storage_error(error: Exception) -> bool | str:
+    """Driver/network failures only; SQL, credentials and validation remain terminal."""
+    if isinstance(error, psycopg.OperationalError):
+        return error.sqlstate is None or error.sqlstate.startswith("08") or error.sqlstate in {
+            "57P01", "57P02", "57P03"
+        }
+    return transient_clickhouse_error(error) or isinstance(error, (ConnectionError, TimeoutError))
 
 
 def _effective_instrument_reader(

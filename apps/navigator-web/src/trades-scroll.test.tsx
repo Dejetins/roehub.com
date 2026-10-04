@@ -1,0 +1,26 @@
+import '@testing-library/jest-dom/vitest';
+import {afterEach,expect,it,vi} from 'vitest';
+import {cleanup,fireEvent,render,screen,waitFor} from '@testing-library/react';
+import {QueryClientProvider} from '@tanstack/react-query';
+import {I18nextProvider} from 'react-i18next';
+import {createQueryClient} from './query-client';
+import {createI18n} from './i18n';
+import {TradesScroll} from './trades-scroll';
+const job='10000000-0000-4000-8000-000000000001';
+afterEach(()=>{cleanup();vi.restoreAllMocks();vi.unstubAllGlobals();});
+it('loads bounded windows on scroll, restores previous pages and isolates variants',async()=>{
+ const requested:string[]=[];
+ vi.stubGlobal('fetch',vi.fn(async(input:string)=>{const url=new URL(input,'http://localhost'),page=Number(url.searchParams.get('page')),variant=url.pathname.split('/')[6];requested.push(`${variant}:${page}`);return new Response(JSON.stringify({job_id:job,variant_key:variant,items:Array.from({length:Math.min(100,305-(page-1)*100)},(_,i)=>({trade_index:(page-1)*100+i,entry_timestamp:`${variant}-entry-${(page-1)*100+i}`,exit_timestamp:'exit',side:'long'})),pagination:{page,page_size:100,total:305,has_previous:page>1,has_next:page<4}}),{headers:{'Content-Type':'application/json'}});}));
+ const client=createQueryClient();
+ const view=(variant:string)=><QueryClientProvider client={client}><I18nextProvider i18n={createI18n('en')}><div className="navigator-table-body"><TradesScroll key={variant} subject="owner" job={job} variant={variant} now={Date.now()}/></div></I18nextProvider></QueryClientProvider>;
+ const rendered=render(view('v1'));
+ await screen.findByText('v1-entry-199');expect(requested).not.toContain('v1:3');
+ const body=rendered.container.querySelector('.navigator-table-body')!;
+ fireEvent.scroll(body,{target:{scrollTop:8032}});
+ await screen.findByText('v1-entry-304');expect(screen.queryByText('v1-entry-0')).not.toBeInTheDocument();
+ expect(rendered.container.querySelectorAll('tbody tr[aria-rowindex]').length).toBeLessThanOrEqual(200);
+ fireEvent.scroll(body,{target:{scrollTop:0}});await screen.findByText('v1-entry-0');
+ rendered.rerender(view('v2'));await screen.findByText('v2-entry-0');
+ expect(screen.queryByText('v1-entry-0')).not.toBeInTheDocument();
+ await waitFor(()=>expect(body.scrollTop).toBe(0));client.clear();
+});

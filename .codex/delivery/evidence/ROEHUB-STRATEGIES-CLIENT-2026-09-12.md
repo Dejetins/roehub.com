@@ -985,3 +985,21 @@ on original :20110 preview with original session/data retained. No publication.
 - Compatibility: compatible-change for the current dashboard consumer; no persistence/request identity changes. Oversized histories intentionally withhold trades and P&L until a correctly seeded bounded projection exists.
 - Regression coverage adds nullable parsing, failed-versus-unknown recovery, oversized history and a real-browser reconciliation 409 followed by reload. Updated remaining library zoom/session-expiry selectors for the accepted nonmodal filter popup.
 - Review-fix checks passed: 193 frontend tests, typecheck/build, Ruff/Pyright, 8 projection tests, and isolated Operations browser regression including rejection/reload recovery (1 passed). Updated Results navigation assertion to check strategy identity while retaining the intentional `from_job` return context.
+
+### 2026-09-24 — Hide tools without a selected strategy
+- Removed Refresh and library-toggle tools from the unselected Strategies state in `apps/platform-web/src/strategies-page.tsx`. The library remains visible whenever no strategy is selected, including return from a collapsed detail view.
+- `pnpm --filter @roehub/platform-web typecheck`, `pnpm --filter @roehub/platform-web build`, and `git diff --check` passed; build retains the existing bundle-size warning.
+- In-app Browser on localhost:20110 verified absent tools at /strategies, available tools after selecting the demo strategy, successful library collapse, and visible library/no tools after returning to /strategies. Focused local synthetic-data evidence; full e2e and console/network checks not run. No API/persistence changes or publication.
+
+### 2026-09-24 — Compact accepted-command feedback
+- `strategy-operations.tsx` and `style.css`: accepted command feedback is content-width yellow text without a border/background/padding, with compact vertical spacing. Uncertain/pending/rejected notices retain existing treatment and reconciliation controls.
+- Removed the redundant Backtests topbar title in `app.tsx`.
+- Typecheck/build and `git diff --check` passed (existing bundle-size warning). In-app Browser on localhost:20110 verified the accepted message after simulated Stop, then restored the demo to Running with Start. Screenshot inspected at 1480x969. Backtests header verified without its duplicate title. No production actions or API changes. Full e2e/responsive/console/network checks not run for this presentation-only correction.
+
+### 2026-09-24 — Unified data-loading feedback
+- Owner superseded the accepted-command caption with a shared spinner/loading
+  label during actual reads. Strategy library/detail/status now use LoadingData;
+  accepted captions are suppressed, while uncertain/rejected command feedback
+  and recovery controls remain. Initial execution loading avoids unavailable
+  placeholders. Shared validation and browser observations are recorded in
+  `docs/architecture/apps/web/backtests-ui-iteration-log.md`, Shared loading indicator.

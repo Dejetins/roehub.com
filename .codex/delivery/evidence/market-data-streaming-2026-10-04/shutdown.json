@@ -1,0 +1,18 @@
+{
+  "at": "2026-10-04T11:17:36.008524+00:00",
+  "websocket_stop_observed_at": "2026-10-04T11:14:21.523351+00:00",
+  "seconds_since_ws_stop": 194.485173,
+  "metrics": {
+    "ws_connected": 0.0,
+    "insert_rows_total": 31.0,
+    "insert_errors_total": 1.0,
+    "rest_fill_tasks_total": 13.0,
+    "rest_fill_active": 3.0,
+    "rest_fill_errors_total": 1.0,
+    "rest_fill_duration_seconds_count": 10.0
+  },
+  "graceful_exit_observed": false,
+  "owned_test_process_force_stopped": true,
+  "reason": "REST queue still draining; bounded test cleanup",
+  "owned_fault_tables_remaining": []
+}

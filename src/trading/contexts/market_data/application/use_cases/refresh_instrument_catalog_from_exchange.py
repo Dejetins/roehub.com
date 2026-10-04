@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Callable, Sequence
 
 from trading.contexts.market_data.application.dto import InstrumentRefEnrichmentUpsert
 from trading.contexts.market_data.application.ports.clock.clock import Clock
 from trading.contexts.market_data.application.ports.sources.instrument_metadata_source import (
     InstrumentMetadataSource,
+)
+from trading.contexts.market_data.application.ports.stores.catalog_snapshot_writer import (
+    CatalogSnapshotWriter,
 )
 from trading.contexts.market_data.application.ports.stores.instrument_ref_writer import (
     InstrumentRefWriter,
@@ -29,6 +32,8 @@ class RefreshInstrumentCatalogFromExchangeUseCase:
     metadata_source: InstrumentMetadataSource
     writer: InstrumentRefWriter
     clock: Clock
+    snapshot_writer: CatalogSnapshotWriter | None = None
+    before_write: Callable[[], None] | None = None
 
     def __post_init__(self) -> None:
         if not self.market_ids:
@@ -55,7 +60,15 @@ class RefreshInstrumentCatalogFromExchangeUseCase:
                         updated_at=now,
                     )
                 )
+        if self.before_write is not None:
+            self.before_write()
         self.writer.upsert_enrichment(payload)
+        if self.snapshot_writer is not None:
+            if self.before_write is not None:
+                self.before_write()
+            self.snapshot_writer.publish(
+                market_ids=self.market_ids, rows=payload, refreshed_at=now.value
+            )
         return CatalogRefreshReport(
             markets_total=len(self.market_ids),
             instruments_total=len(payload),

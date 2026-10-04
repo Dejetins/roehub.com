@@ -29,6 +29,15 @@ not a source of fictional users, tiers, service status, permissions or API behav
 The former staged design program remains retired; this contract selects no
 prompt pack, ledger, separate atlas ceremony or mandatory prototype series.
 
+## Accepted Overview requirements
+
+By the owner decision of 2026-09-26, [Overview requirements](roehub-overview-requirements-v1.md)
+own `/dashboard`: portfolio analytics with Total, exchange, instrument and custom
+strategy portfolios. They replace the old installation-readiness/next-action
+dashboard purpose. Shell and technical monitoring remain separate requirements.
+This acceptance covers requirements only; financial projections and client delivery
+remain unimplemented target work.
+
 ## Accepted Backtests implementation
 
 The current Backtests UI iteration was accepted by the product owner on
@@ -63,6 +72,90 @@ acceptance for the entire platform.
 | Stored secrets | Never reveal, echo, cache in UI state journals, or include in evidence |
 | Current implementation | Source evidence only until the implementing task obtains real browser/API proof |
 
+## Navigator candidate work pages — 2026-10-03
+
+The user-selected local candidate `apps/navigator-web` implements the four settings
+categories, private connections/public sources, instrument catalog, bounded candle
+requests and configured-service monitoring. This is a candidate implementation,
+not accepted target-platform completion. The [requirement matrix and real-provider
+proof](../../../../.codex/delivery/evidence/ROEHUB-WORKPAGES-2026-10-03.md) own current
+verification status. Private testnet lifecycle and configured notification-provider
+proof remain external gaps; an unavailable provider is displayed as unavailable.
+
+Settings labels `/settings/preferences` as **Interface / Интерфейс** and presents
+its display/language controls in a compact form; the existing URL and persistence
+contract are unchanged. Settings categories have no routine Refresh control.
+Read failures expose an explicit retry, and an unknown save outcome exposes a
+read-only **Check saved state** action without automatically replaying the write.
+Security keeps its Sessions/Activity tabs and bounded loading without table expansion.
+
+Market Data adds organization-scoped `/market-data/workspace/catalog`, `/coverage`
+and `/backlog` reads (the latter two under the same `workspace` prefix), plus
+`/market-data/work-requests` submission/history, `/lookup`, detail, cancel and
+explicit retry. Migrations 0023 and 0024 precede the opt-in
+`ROEHUB_MARKET_DATA_WORK_REQUESTS_ENABLED=1` on API and the existing Market Data
+scheduler. The scheduler invokes its existing REST-fill/raw/canonical pipeline;
+API/Web gain no exchange client. Downloads accept the full closed history since
+2017, with 1m candles and 1–8 symbols (positive int32 total instrument-minutes).
+There is one unfinished request per organization, 60-minute work windows and at
+most five explicit attempts. Each worker turn yields after ten windows, retaining
+its checkpoint and original attempt; subsequent turns resume without replaying
+completed windows. An active retry takes precedence over newer terminal requests
+in the overlapping-period catalog projection. Cancellation is worker-confirmed; prior writes
+remain. Coverage reads canonical minutes independently of completed work units.
+The scheduler's `--requests-only` mode omits automatic startup/periodic backfills.
+Disabling the feature preserves requests, projections and candle data.
+
+The accepted Data layout uses Binance/Bybit as the library entries, a compact
+multi-market catalog and an instrument inspector. `/market-data/workspace/instruments`
+adds a server-filtered/sorted, 50-row default projection across the exchange's
+markets; immutable catalog IDs stabilize metadata pagination. Coverage is for an
+explicit closed period (at most seven days), distinct from work-request progress.
+`/market-data/workspace/collection` adds organization-scoped selection/strategy
+reasons and the last observed canonical candle. The table shows passive streaming
+status; its only toggle is in the inspector and is locked while active strategy
+pins require the instrument. This reuses existing selection commands and collector
+pin policy. Enabled intent is not proof of collector health. A single page-owned
+submission/recovery controller prevents duplicate command recovery controls;
+unknown outcomes reconcile by reading the existing idempotency key.
+
+Table download actions are native icon buttons with instrument/market accessible
+names. Inspector defaults come from `/market-data/workspace/history-bounds`,
+independently of the table coverage period. The authenticated, organization-authorized
+read warms a public metadata inbox; only the trusted scheduler calls the exchange.
+Binance defaults require an actual first kline; Bybit probes and confirms its first
+minute. Listing dates never substitute for confirmed candle history in this path.
+The end is the current closed-minute boundary. A batch starts at the earliest
+confirmed bound among its instruments. Explicit edits survive refreshes.
+
+Discovery admits at most 64 queued/running probes under an atomic PostgreSQL lock.
+A probe has a 25-second request budget, at most five seconds per HTTP attempt, and
+one retry of a failed metadata GET within the remaining budget. Ready metadata is
+cached; unavailable probes have a 30-second re-admission cooldown. Queue-full is
+503 with Retry-After, rather than fictitious admission. Missing bounds are displayed
+honestly and manual input remains available while discovery is pending/unavailable.
+Any batch 401/403 hides protected catalog/inspector data. Full-history commands do
+not expand the bounded coverage read; history-detail links inspect the final day.
+
+`/ui/account/exchange-connections/{id}/bindings` provides owner- and organization-
+scoped cursor pages using existing strategy bindings. Existing connection commands
+retain same-origin, recent-auth, secret handling and dependency checks. Navigator
+can invoke the existing passkey step-up with double-submit CSRF; it never repeats
+the original command after verification. An explicit existing logout/login fallback
+returns to the same local page when passkey verification cannot complete; the
+preview does not widen the shared API WebAuthn origin allowlist. Account session view IDs are non-bearer
+hashes; absent profile/contact/session values are no longer fabricated. Missing
+notification providers return the existing error code with HTTP503; a provider
+from another organization returns HTTP403 without resolver exception text.
+
+`/ui/monitoring` and `/ui/monitoring/{id}` use the existing operational observer
+behind `operations.execute`. The optional observer events endpoint exposes at most
+200 redacted state changes from this observer lifetime (50 for a selected service).
+TCP reachability remains unknown readiness; observations older than 30 seconds are
+stale. The Market Data backlog is explicitly current-organization work, including
+catalog refresh, and does not establish worker or database readiness. No service
+commands, shell execution, invented metrics or unconfigured service rows are added.
+
 ## Reading delivery status
 
 The four tags are independent and may coexist on one record:
@@ -84,7 +177,8 @@ screens. The registry contains 44 records, 43 source surfaces and 18 journeys.
 | Area / route | Required functionality | Remaining boundary |
 |---|---|---|
 | Login / setup | Local passkey, approved fallback/recovery, safe return, owner/organization bootstrap, selection skip and resumable setup | Target UI; complete setup routing and catalog protocol |
-| Shell / dashboard | Organization context, navigation, search, notifications, preferences, session state, summary/readiness and next action | Target UI; target role-filtered projections |
+| Shell | Organization context, navigation, search, notifications, preferences and session state | Target UI; target role-filtered projections |
+| Overview `/dashboard` | Total/exchange/instrument/custom strategy portfolios; Equity, return, drawdown, contributions, allocation/risk, positions and trades; [page requirements](roehub-overview-requirements-v1.md) | Portfolio definitions, financial history/attribution and authorized aggregate APIs; current-style client |
 | `/data`, `/data/ingestion` | Catalog/selection, provider segment, history, pinned instruments, coverage, gaps, backfill, freshness and permitted retry | Target UI; snapshot/cursor and ingestion projection/action API |
 | `/artifacts`, `/artifacts/{bundle_id}/{version}` | Search/filter, manifest, provenance, compatibility, storage/quota impact and consumer links | Existing ArtifactStore is reusable; browser catalog/detail API and UI required |
 | Strategies | Library, builder, clone, archive, immutable spec detail, launch profile, run/stop/restart and risk/unknown state | Target UI and role integration; durable editor draft policy needs clarification |
@@ -201,3 +295,11 @@ consolidation; existing docs tests remain checks of the preserved baseline.
 Implementation evidence must subsequently include real API-backed browser
 journeys, affected roles, failure/recovery, localization, keyboard/zoom and
 820/1024/1440. Static registry validity never proves application completion.
+
+## Shared data update behavior — 2026-09-26
+
+All current and future asynchronous local-platform interfaces must follow the
+[shared data loading contract](roehub-data-loading-contract-v1.md): stable report
+shells, explicitly retained coherent views, local pending/error feedback, preserved
+access and command boundaries, persistent chart instances and bounded read caching.
+This user-approved rule supersedes routine content/loaded-data fades.

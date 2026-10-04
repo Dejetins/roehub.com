@@ -1,3 +1,6 @@
+import {useReadSnapshot} from './read-snapshot';
+import {JobSelection} from './job-selection';
+import { LoadingData, ReadStatus } from './loading-data';
 import {ChartDisplayMenu} from './chart-display-menu';
 import { MotionLink as Link, useMotionState } from './motion';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -6,7 +9,6 @@ import { useParams, useSearchParams } from 'react-router';
 import { useTranslation } from 'react-i18next';
 import { ChevronsLeft, ArrowRight, Filter, Plus, RefreshCw } from 'lucide-react';
 import { useLocation } from 'react-router';
-import { JobEntry } from './execution';
 import { ApiError } from './api';
 import { jobLabel, jobStates, libraryParams, readJobs, readWorkstation, refreshDeadline, type Job } from './library-api';
 
@@ -64,7 +66,8 @@ export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, a
   useEffect(()=>{if(!filtersOpen)return;const dismiss=(event:PointerEvent)=>{if(event.target instanceof Node&&!filterRoot.current?.contains(event.target))setFiltersOpen(false);};document.addEventListener('pointerdown',dismiss);return()=>document.removeEventListener('pointerdown',dismiss);},[filtersOpen]);
   const filterTrigger = useRef<HTMLButtonElement>(null);
   const hasFilters = !!listQuery;
-  const data = isRestricted(jobs.error) ? undefined : jobs.data;
+  const listSnapshot=useReadSnapshot(subject,listQuery,jobs.data&&!jobs.isFetching?{data:jobs.data,received:jobs.dataUpdatedAt}:undefined,isRestricted(jobs.error));
+  const data = listSnapshot.data?.data;
   const stale = !!data && (jobs.isError || now - jobs.dataUpdatedAt > 60_000 || data.items.some(job => now - Date.parse(job.generated_at) > 60_000));
   const deadline = Math.max(0, ...(data?.items.map(job => refreshDeadline(job, jobs.dataUpdatedAt)) ?? []));
   function change(key: string, value: string) {
@@ -78,7 +81,7 @@ export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, a
   return <>
     {!embedded && <div className="workspace-title"><h1 id="workspace-heading" tabIndex={-1}>{t(mode === 'detail' ? 'detail' : mode === 'new' ? 'new' : 'title')}</h1>
       <span className="scope-label">{t('research')}</span></div>}
-    <div className={`${configuration ? "panes with-configuration" : "panes"} ${mode==='detail'?'report-workspace':''} ${historyCollapsed?'history-collapsed':''}`}>
+    <div className={`${configuration ? "panes with-configuration" : "panes"} ${mode==='detail'?'report-workspace backtest-detail-workspace':''} ${historyCollapsed?'history-collapsed':''}`}>
       {mode==='detail'&&<button className="history-toggle" aria-expanded={!historyCollapsed} onClick={()=>setHistoryCollapsed(v=>!v)}>{t(historyCollapsed?'results.showHistory':'results.hideHistory')}</button>}
       <section className="panel library" aria-labelledby="jobs-heading">
         <div className="panel-head"><h2 id="jobs-heading">{t('jobs')}</h2>
@@ -103,8 +106,8 @@ export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, a
 
           <p className="filter-summary">{t('filterSummary', { state: params.get('state') ? t(`states.${params.get('state')}`) : t('allStates'),
             risk: params.get('risk_mode') ? t(`risks.${params.get('risk_mode')}`) : t('allRisk') })}</p>
-          <div role="status" className={stale ? 'notice' : 'freshness'}>{jobs.isPending ? t('loadingJobs') : data ?
-            `${t(stale ? 'stale' : 'snapshot')} · ${formatDate(new Date(jobs.dataUpdatedAt).toISOString(), i18n.language)} UTC` : ''}</div>
+          {<ReadStatus pending={jobs.isFetching} retained={listSnapshot.retained}/>}<div role="status" className={stale ? 'notice' : 'freshness'}>{data ?
+            `${t(stale ? 'stale' : 'snapshot')} · ${formatDate(new Date(listSnapshot.data?.received??jobs.dataUpdatedAt).toISOString(), i18n.language)} UTC` : ''}</div>
           <ReadError error={jobs.error} />
           {data && data.items.length === 0 && <div className="empty"><h3>{t(data.next_cursor ? 'emptyPage' : hasFilters ? 'noMatches' : 'empty')}</h3>
             <p>{t(data.next_cursor ? 'emptyPageHelp' : hasFilters ? 'noMatchesHelp' : 'emptyHelp')}</p></div>}
@@ -121,12 +124,12 @@ export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, a
             <label>{i18n.language.startsWith('ru')?'Строк на странице':'Rows per page'}<select aria-label={t('pageSize')} value={params.get('limit')??'50'} onChange={event=>change('limit',event.target.value)}>{[...new Set([5,10,25,50,100,250,Number(params.get('limit')??50)])].sort((a,b)=>a-b).map(size=><option key={size} value={size}>{size}</option>)}</select></label>
             <span>{t('pageCount')}: {data?.items.length??'—'}</span>
             <button title={t('firstPage')} aria-label={t('firstPage')} disabled={!params.has('cursor')} onClick={() => change('cursor', '')}><ChevronsLeft aria-hidden="true" /></button>
-            <button title={t('nextPage')} aria-label={t('nextPage')} disabled={!data?.next_cursor || jobs.isFetching || !!jobs.error} onClick={() => change('cursor', data!.next_cursor!)}><ArrowRight aria-hidden="true" /></button>
+            <button title={t('nextPage')} aria-label={t('nextPage')} disabled={!data?.next_cursor || jobs.isFetching || listSnapshot.retained || !!jobs.error} onClick={() => change('cursor', data!.next_cursor!)}><ArrowRight aria-hidden="true" /></button>
           </nav>
           <p className="muted compact">{t('riskPagination')}</p>
           <details className="projection"><summary>{t('extendedFilters')}</summary>
-            <p className="notice">{t(workstation.isPending ? 'loadingProjection' : workstation.error ? 'projectionError' :
-              workstation.data?.job_table.state === 'unavailable' ? 'projectionUnavailable' : 'projectionNotBound')}</p>
+            {workstation.isFetching ? <LoadingData /> : <p className="notice">{t(workstation.error ? 'projectionError' :
+              workstation.data?.job_table.state === 'unavailable' ? 'projectionUnavailable' : 'projectionNotBound')}</p>}
             <ReadError error={workstation.error} />
             <fieldset disabled aria-label={t('extendedFilters')}><label>{t('search')}<input type="search" /></label>
               <label>{t('instrument')}<input /></label><label>{t('from')}<input type="date" /></label><label>{t('to')}<input type="date" /></label></fieldset>
@@ -134,7 +137,7 @@ export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, a
         </div>
       </section>
       <section className="panel context" aria-label={t(mode === 'detail' ? 'detail' : mode === 'new' ? 'new' : 'selection')}>
-        {mode === 'detail' ? <JobEntry active={active} key={jobId} id={jobId ?? ''} subject={subject} now={now} backLink={backLink} /> :
+        {mode === 'detail' ? <JobSelection active={active} id={jobId ?? ''} subject={subject} now={now} backLink={backLink} /> :
           <div className="context-empty"><h2>{t(mode === 'new' ? 'new' : 'selection')}</h2>
             <p>{t(mode === 'new' ? 'futureBuilder' : 'selectHelp')}</p>
             {mode === 'new' && <Link to={backLink}>{t('backToList')}</Link>}

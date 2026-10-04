@@ -80,7 +80,8 @@
     {
       "screen_id": "screen.dashboard.overview",
       "kind": "route_screen",
-      "label": "Overview dashboard",
+      "label": "Portfolio Overview",
+      "requirements_ref": "docs/architecture/apps/web/roehub-overview-requirements-v1.md",
       "canonical_route": "/dashboard",
       "navigation_group_id": "overview",
       "target_status": "target_not_implemented",

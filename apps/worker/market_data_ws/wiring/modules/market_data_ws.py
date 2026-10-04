@@ -2,17 +2,21 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Awaitable, Callable, Mapping, Sequence
 from uuid import UUID, uuid4
 
 from prometheus_client import Counter, Gauge, Histogram, start_http_server
+from psycopg.conninfo import make_conninfo
 
 from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
     ClickHouseSettingsLoader,
     _clickhouse_client,
 )
+from apps.worker.market_data_ws.wiring.io_process import MarketDataIoProcess, classify_io_error
+from apps.worker.market_data_ws.wiring.persistent_writer import PersistentRawWriterProcess
 from trading.contexts.backtest.adapters.outbound import PsycopgBacktestPostgresGateway
 from trading.contexts.market_data.adapters.outbound.clients.binance import (
     BinanceWsClosedCandleStream,
@@ -21,10 +25,6 @@ from trading.contexts.market_data.adapters.outbound.clients.binance import (
 from trading.contexts.market_data.adapters.outbound.clients.bybit import (
     BybitWsClosedCandleStream,
     BybitWsHooks,
-)
-from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
-from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_source import (
-    RestCandleIngestSource,
 )
 from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
     MarketConfig,
@@ -48,6 +48,9 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresInstrumentSelectionRepository,
 )
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.stream_recovery_store import (  # noqa: E501
+    PostgresStreamRecoveryStore,
+)
 from trading.contexts.market_data.application.dto import CandleWithMeta, RestFillTask
 from trading.contexts.market_data.application.ports.feeds import LiveCandlePublisher
 from trading.contexts.market_data.application.ports.stores.enabled_instrument_reader import (
@@ -61,7 +64,6 @@ from trading.contexts.market_data.application.services import (
     RestFillQueueHooks,
     WsMinuteGapTracker,
 )
-from trading.contexts.market_data.application.use_cases import RestFillRange1mUseCase
 from trading.platform.time.system_clock import SystemClock
 from trading.shared_kernel.primitives import InstrumentId, MarketId
 
@@ -406,6 +408,10 @@ class MarketDataWsApp:
         metrics: MarketDataWsMetrics,
         metrics_port: int,
         subscription_refresh_seconds: float = 15.0,
+        plan_recovery: Callable[..., Awaitable[list[RestFillTask]]] | None = None,
+        recovery_lease: Callable[[], AbstractContextManager] = nullcontext,
+        start_io: Callable[[], Awaitable[None]] | None = None,
+        close_io: Callable[[], Awaitable[None]] | None = None,
     ) -> None:
         """
         Validate and store worker runtime dependencies.
@@ -443,8 +449,41 @@ class MarketDataWsApp:
         self._metrics = metrics
         self._metrics_port = metrics_port
         self._subscription_refresh_seconds = subscription_refresh_seconds
+        self._plan_recovery = plan_recovery
+        self._recovery_lease = recovery_lease
+        self._ingestion_failure: Exception | None = None
+        self._start_io = start_io
+        self._close_io = close_io
 
     async def run(self, stop_event: asyncio.Event) -> None:
+        with self._recovery_lease():
+            try:
+                if self._start_io is not None:
+                    warmup = asyncio.ensure_future(self._start_io())
+                    stopped = asyncio.create_task(stop_event.wait())
+                    try:
+                        await asyncio.wait((warmup, stopped), return_when=asyncio.FIRST_COMPLETED)
+                        if stop_event.is_set():
+                            return
+                        try:
+                            await warmup
+                        except Exception as exc:
+                            code = classify_io_error(exc)
+                            if code is None:
+                                raise
+                            # A temporary startup outage is retried by the durable buffer.
+                            log.warning("writer warmup deferred code=%s", code)
+                    finally:
+                        for task in (warmup, stopped):
+                            if not task.done():
+                                task.cancel()
+                        await asyncio.gather(warmup, stopped, return_exceptions=True)
+                await self._run(stop_event)
+            finally:
+                if self._close_io is not None:
+                    await self._close_io()
+
+    async def _run(self, stop_event: asyncio.Event) -> None:
         """
         Start worker runtime and serve until stop event is set.
 
@@ -468,12 +507,16 @@ class MarketDataWsApp:
         start_http_server(self._metrics_port)
         log.info("metrics server started on port %s", self._metrics_port)
 
-        await self._insert_buffer.start()
-        await self._rest_fill_queue.start()
-
         ws_tasks: dict[tuple[int, tuple[str, ...]], asyncio.Task[None]] = {}
         try:
+            await self._insert_buffer.start()
+            await self._rest_fill_queue.start()
             while not stop_event.is_set():
+                if self._ingestion_failure is not None:
+                    raise RuntimeError("stream ingestion failed") from self._ingestion_failure
+                for component in (self._insert_buffer, self._rest_fill_queue):
+                    if getattr(component, "failure", None) is not None:
+                        raise RuntimeError("stream ingestion failed; recovery receipts retained")
                 plans = self._build_connection_plans(
                     self._instrument_reader.list_enabled_tradable()
                 )
@@ -512,8 +555,12 @@ class MarketDataWsApp:
                 plans={},
                 stop_event=stop_event,
             )
-            await self._insert_buffer.close()
-            await self._rest_fill_queue.close()
+            results = await asyncio.gather(
+                self._insert_buffer.close(), self._rest_fill_queue.close(), return_exceptions=True
+            )
+            for result in results:
+                if isinstance(result, BaseException):
+                    raise result
 
     @staticmethod
     def _plan_key(plan: WorkerConnectionPlan) -> tuple[int, tuple[str, ...]]:
@@ -672,9 +719,19 @@ class MarketDataWsApp:
         - Schedules gap-based rest fill task when minute sequence has gaps.
         """
         try:
-            self._insert_buffer.submit(row)
-        except RuntimeError:
-            return
+            submit_wait = getattr(self._insert_buffer, "submit_wait", None)
+            if submit_wait is not None:
+                await submit_wait(row)
+            else:
+                self._insert_buffer.submit(row)
+        except RuntimeError as exc:
+            # Only a stopping buffer may reject intake quietly. Persistence/capacity
+            # failures must break the connection and leave the receipt recoverable.
+            if getattr(self._insert_buffer, "_stopping", False):
+                return
+            if classify_io_error(exc) is None:
+                self._ingestion_failure = exc
+            raise
 
         try:
             self._live_candle_publisher.publish_1m_closed(row)
@@ -707,9 +764,15 @@ class MarketDataWsApp:
         Side effects:
         - Enqueues reconnect/bootstrap rest fill tasks.
         """
-        tasks = self._reconnect_planner.plan(instruments)
-        for task in tasks:
-            await self._rest_fill_queue.enqueue(task)
+        try:
+            tasks = (await self._plan_recovery(instruments) if self._plan_recovery is not None
+                     else self._reconnect_planner.plan(instruments))
+            for task in tasks:
+                await self._rest_fill_queue.enqueue(task)
+        except Exception as exc:
+            if classify_io_error(exc) is None:
+                self._ingestion_failure = exc
+            raise
 
 
 def build_market_data_ws_app(
@@ -796,23 +859,18 @@ def build_market_data_ws_app(
     else:
         live_candle_publisher = FanoutLiveCandlePublisher(publishers)
 
-    rest_source = RestCandleIngestSource(
-        cfg=config,
-        clock=clock,
-        http=RequestsHttpClient(),
-        ingest_id=ingest_id,
-    )
-    rest_fill_use_case = RestFillRange1mUseCase(
-        source=rest_source,
-        writer=raw_writer,
-        clock=clock,
-        max_days_per_insert=config.backfill.max_days_per_insert,
-        batch_size=10_000,
-        index_reader=index_reader,
-    )
+    recovery_store = PostgresStreamRecoveryStore(environ.get("STRATEGY_PG_DSN", ""))
+    io = MarketDataIoProcess(config_path=config_path, environ=environ)
+    live_writer = PersistentRawWriterProcess(environ=environ)
+    async def defer_received(entry) -> None:
+        await rest_queue.enqueue(entry.task)
 
     insert_buffer = AsyncRawInsertBuffer(
         writer=raw_writer,
+        async_writer=live_writer.write,
+        on_deferred=defer_received,
+        store=recovery_store,
+        classify_error=classify_io_error,
         clock=clock,
         flush_interval_ms=config.raw_write.flush_interval_ms,
         max_buffer_rows=config.raw_write.max_buffer_rows,
@@ -824,13 +882,17 @@ def build_market_data_ws_app(
         ),
     )
     rest_queue = AsyncRestFillQueue(
-        executor=rest_fill_use_case.run,
+        async_executor=io.fill,
+        window_minutes=60,
+        store=recovery_store,
+        classify_error=classify_io_error,
         worker_count=config.ingestion.rest_concurrency_instruments,
         hooks=RestFillQueueHooks(
             on_task_enqueued=lambda task: _on_rest_task_enqueued(task, metrics),
             on_task_started=metrics.on_rest_fill_started,
             on_task_succeeded=metrics.on_rest_fill_succeeded,
             on_task_failed=metrics.on_rest_fill_failed,
+            on_task_cancelled=lambda _: metrics.rest_fill_active.dec(),
         ),
     )
     gap_tracker = WsMinuteGapTracker(
@@ -859,6 +921,10 @@ def build_market_data_ws_app(
         ingest_id=ingest_id,
         metrics=metrics,
         metrics_port=metrics_port,
+        plan_recovery=io.plan,
+        recovery_lease=recovery_store.lease,
+        start_io=live_writer.start,
+        close_io=live_writer.close,
     )
 
 
@@ -869,7 +935,9 @@ def _effective_instrument_reader(
     if not dsn:
         raise ValueError("STRATEGY_PG_DSN is required for effective instrument selections")
     return PostgresInstrumentSelectionRepository(
-        gateway=PsycopgBacktestPostgresGateway(dsn=dsn)
+        gateway=PsycopgBacktestPostgresGateway(dsn=make_conninfo(
+            dsn, connect_timeout=2, options="-c statement_timeout=2000 -c lock_timeout=1000"
+        ))
     )
 
 

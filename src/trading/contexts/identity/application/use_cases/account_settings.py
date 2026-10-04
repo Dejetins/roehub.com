@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Literal, Mapping
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from trading.contexts.identity.application.ports.account_settings_repository import (
     AccountAuditEvent,
@@ -66,7 +68,7 @@ class AccountSettingsUseCase:
         profile = self.repository.save_profile(
             owner_user_id=owner_user_id,
             username=_optional_trim(username),
-            email=_optional_trim(email),
+            email=_normalize_email(email),
             timezone=_normalize_timezone(timezone),
             telegram_discord=_optional_trim(telegram_discord),
             updated_at=now,
@@ -441,7 +443,23 @@ def _optional_trim(value: str | None) -> str | None:
 
 def _normalize_timezone(value: str | None) -> str:
     normalized = _optional_trim(value)
-    return normalized or "Europe/Moscow"
+    timezone = normalized or "Europe/Moscow"
+    try:
+        ZoneInfo(timezone)
+    except (ValueError, ZoneInfoNotFoundError) as error:
+        raise AccountSettingsValidationError(
+            code="invalid_timezone", message="Enter a valid IANA time zone.", field="timezone"
+        ) from error
+    return timezone
+
+
+def _normalize_email(value: str | None) -> str | None:
+    email = _optional_trim(value)
+    if email is not None and re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email) is None:
+        raise AccountSettingsValidationError(
+            code="invalid_email", message="Enter a valid email address.", field="email"
+        )
+    return email
 
 
 def _normalize_theme(value: str) -> ThemePreference:

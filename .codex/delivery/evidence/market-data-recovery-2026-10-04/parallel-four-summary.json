@@ -1,0 +1,49 @@
+{
+  "observed_at": "2026-10-04T10:50:24.521566+00:00",
+  "load_start": "2026-10-04 10:46:14.630985+00:00",
+  "load_finish": "2026-10-04 10:49:46.005522+00:00",
+  "elapsed_seconds": 211.374537,
+  "completed_jobs": 4,
+  "new_candles": 178560,
+  "samples": 110,
+  "max_running": 4,
+  "peak_tracked_bytes": 859700831,
+  "peak_rss_bytes": 1903546368.0,
+  "non_monotonic_progress": false,
+  "exceptions": [
+    {
+      "injected": 1,
+      "exception_code": 241,
+      "count": 1
+    }
+  ],
+  "candle_inserts": [
+    {
+      "inserts": 124,
+      "query_peak_bytes": 6566903,
+      "p95_ms": 20.69999999999999
+    }
+  ],
+  "events": [
+    {
+      "event_type": "queued",
+      "count": 4
+    },
+    {
+      "event_type": "started",
+      "count": 4
+    },
+    {
+      "event_type": "succeeded",
+      "count": 4
+    }
+  ],
+  "global_active": [],
+  "source_sha256": {
+    "src/trading/contexts/market_data/application/services/work_requests.py": "7accdab4269447dd6342f271814ed20db24301810890aad2c9ca6843952f4233",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py": "0102e75492ef6f9384c219c2ac064d09a3f3d522a32eb1e140d74ca4b7426e28",
+    "apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py": "e0723c22f022055aa999710bb5708572fa9dd2acd4571f8fd221970e9d284101",
+    "apps/navigator-web/src/data-downloads.tsx": "d3349b21a065b1381d0894df7590ba6984dd5521727725aa81a88a23b0d49766",
+    "configs/dev/market_data.yaml": "058402c7cecc52da37c9fb8171aed3111c4a699374c0f96d9d9929fc38ff92ac"
+  }
+}

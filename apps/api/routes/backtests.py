@@ -38,6 +38,7 @@ from apps.api.monitoring import (
     record_strategy_variant_compatibility,
     record_strategy_variant_launch,
 )
+from apps.api.routes.backtest_export import XLSX_TYPE, trades_xlsx
 from trading.contexts.backtest.application.dto import (
     BacktestLazyTradesMaterializationReadModel,
 )
@@ -685,6 +686,8 @@ def build_backtests_router(
             ge=1,
             le=MAX_BACKTEST_TRADES_CSV_MAX_ROWS,
         ),
+        all_rows: bool = Query(default=False),
+        format: Literal["csv", "xlsx"] = Query(default="csv"),
         principal: CurrentUserPrincipal = Depends(require_backtest_user),
         use_case: BacktestJobsUseCase = Depends(require_jobs_use_case),
     ) -> Response:
@@ -694,6 +697,7 @@ def build_backtests_router(
             job_id=job_id,
             variant_key=variant_key,
             max_rows=max_rows,
+            all_rows=all_rows,
         )
         if isinstance(content, BacktestLazyTradesMaterializationReadModel):
             return JSONResponse(
@@ -703,11 +707,11 @@ def build_backtests_router(
                 ).model_dump(mode="json"),
             )
         return Response(
-            content=content.content,
-            media_type="text/csv; charset=utf-8",
+            content=trades_xlsx(content.content) if format == "xlsx" else content.content,
+            media_type=XLSX_TYPE if format == "xlsx" else "text/csv; charset=utf-8",
             headers={
                 "content-disposition": (
-                    f'attachment; filename="backtest-{job_id}-{variant_key}-trades.csv"'
+                    f'attachment; filename="backtest-{job_id}-{variant_key}-trades.{format}"'
                 ),
                 "x-roehub-trades-row-count": str(content.row_count),
                 "x-roehub-trades-total-rows": str(content.total_rows),
