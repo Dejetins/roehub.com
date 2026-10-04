@@ -145,7 +145,7 @@ function Variant({job,variant,subject,now,onCommit,timeRange}:{timeRange?:{start
       <div id="result-panel" role="tabpanel" aria-labelledby={`tab-${shown?.tab??tab}`}>
         {shown?.tab==='overview'?<ExpandableOverview controls={chartControls}>{content}</ExpandableOverview>:shown?.tab==='metrics'?<table className="full-metrics"><thead><tr><th>{t('results.metric')}</th><th>{t('results.value')}</th></tr></thead><tbody>{Object.entries(shown.detail.summary_metrics).map(([k,v])=><tr key={k}><th scope="row">{t(`results.metrics.${k}`)}</th><td>{v==null?'—':v.toLocaleString(i18n.language,{maximumFractionDigits:3})}</td></tr>)}</tbody></table>:content}
       </div>
-      <button className="result-refresh" disabled={!reads.some(read=>read.canRefresh)} onClick={refresh}>{t('results.refresh')}</button>
+      <button className="result-refresh" disabled={!reads.every(read=>read.canRefresh)} onClick={refresh}>{t('results.refresh')}</button>
       {shown&&<div><div inert={snapshot.retained}><details className="report-actions"><summary>{t('results.actions')}</summary><SaveStrategy key={`save:${shown.variant}`} job={job} variant={shown.variant} subject={subject} now={now}/><Export key={`export:${shown.variant}`} job={job} variant={shown.variant} now={now}/></details></div></div>}
     </>}
   </section>;

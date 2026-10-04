@@ -140,7 +140,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 472,
+      "file_count": 473,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -462,7 +462,7 @@
       "description": "Current accepted local-platform React/TypeScript client.",
       "docs": [],
       "entrypoints": [],
-      "file_count": 84,
+      "file_count": 85,
       "id": "app:platform-web",
       "kind": "app",
       "name": "platform-web",
@@ -12814,6 +12814,11 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/platform-web/src/result-read.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/platform-web/src/result-read.ts"
     },
     {
@@ -25072,7 +25077,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 4571,
+  "inventory_file_count": 4572,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -25270,5 +25275,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "58a4198aa633814eeb37c40b206271c44af80f54b8ad05e85e4a537028237211"
+  "structural_digest": "2c37a5ef31c308ca23434d82f6498f179d8208525a55da1e74c261b0f7e4b7cc"
 }

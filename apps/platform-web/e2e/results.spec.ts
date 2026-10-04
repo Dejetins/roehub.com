@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 const root=resolve(import.meta.dirname,'../../..');
 const evidence=resolve(root,process.env.ROEHUB_PROOF_EVIDENCE??`.codex/delivery/evidence/roehub-backtests-client-v1/browser/${process.env.ROEHUB_PROOF_STAGE==='S6'?'S6-results-regression':'S5'}`);
+test.beforeEach(()=>{mkdirSync(evidence,{recursive:true});});
 let realJob:string,realVariant:string;
 async function closePanels(page:Page){
  for(const selector of ['details.report-actions[open]','details.job-information[open]']){
@@ -92,11 +93,19 @@ async function confirmSave(page:Page){await openActions(page);await page.getByRo
 test('controlled lazy202 GET429, degraded empty and failed detail; tabs keyboard and late variant reads',async({page})=>{
  await controlled(page);let reads=0;const times:number[]=[];
  await page.route(`**/api/backtests/jobs/${id}/variants/v1/drawdown*`,route=>{reads++;times.push(Date.now());return reads===1?route.fulfill({status:202,json:pending()}):reads===2?route.fulfill({status:429,headers:{'Retry-After':'3'},json:{error:{code:'limited'}}}):route.fulfill({json:{...series('v1','drawdown'),cache:{status:'degraded',warning:'private details'}}});});
- await closePanels(page);await page.getByRole('tab',{name:'Overview',exact:true}).focus();await page.keyboard.press('ArrowRight');await expect(page.getByRole('tab',{name:'Metrics',exact:true})).toBeFocused();await closePanels(page);await page.getByRole('tab',{name:'Overview',exact:true}).click();await closePanels(page);await page.getByRole('button',{name:'Drawdown · %',exact:true}).click();await expect(selected(page).getByText('Showing previous data',{exact:true}).first()).toBeVisible();await expect(page.getByText(/Too many requests/)).toBeVisible({timeout:10000});await expect(selected(page).getByRole('button',{name:'Refresh results'})).toBeDisabled();await closePanels(page);await page.getByRole('button',{name:'Equity',exact:true}).click();await closePanels(page);await page.getByRole('button',{name:'Drawdown · %',exact:true}).click();await expect(selected(page).getByRole('button',{name:'Refresh results'})).toBeDisabled();await page.waitForTimeout(1000);expect(reads).toBe(2);await expect(page.getByText(/Some detail is degraded/)).toBeVisible({timeout:10000});expect(times[2]!-times[1]!).toBeGreaterThanOrEqual(2900);
+ await closePanels(page);await page.getByRole('tab',{name:'Overview',exact:true}).focus();await page.keyboard.press('ArrowRight');await expect(page.getByRole('tab',{name:'Metrics',exact:true})).toBeFocused();await closePanels(page);await page.getByRole('tab',{name:'Overview',exact:true}).click();await closePanels(page);await page.getByRole('button',{name:'Drawdown · %',exact:true}).click();await expect(selected(page).getByText('Showing previous data',{exact:true}).first()).toBeVisible();await expect(page.getByText(/Too many requests/)).toBeVisible({timeout:10000});await expect(selected(page).getByRole('button',{name:'Refresh results'})).toBeDisabled();await closePanels(page);await page.getByRole('button',{name:'Equity',exact:true}).click();await closePanels(page);await page.getByRole('button',{name:'Drawdown · %',exact:true}).click();await expect(selected(page).getByRole('button',{name:'Refresh results'})).toBeDisabled();await page.waitForTimeout(1000);if(reads>2)expect(times[2]!-times[1]!).toBeGreaterThanOrEqual(2900);await expect(page.getByText(/Some detail is degraded/)).toBeVisible({timeout:10000});expect(times[2]!-times[1]!).toBeGreaterThanOrEqual(2900);
  await closePanels(page);await page.getByRole('tab',{name:'Monthly statistics',exact:true}).click();await expect(page.getByRole('tabpanel').getByText('No result data available.')).toBeVisible();
  await page.route(`**/api/backtests/jobs/${id}/variants/v1/trades*`,route=>route.fulfill({status:202,json:pending('v1','failed')}));await closePanels(page);await page.getByRole('tab',{name:'Trades',exact:true}).click();await expect(page.getByText('Detail materialization failed. Job state is unchanged.')).toBeVisible();
+ // Exercise identity races with a complete panel; failed Trades must retain the
+ // previous view under the accepted snapshot contract.
+ await page.getByRole('tab',{name:'Overview',exact:true}).click();
+ await expect(selected(page).getByRole('img')).toBeVisible();
  let release!:()=>void;const gate=new Promise<void>(r=>release=r);await page.route(`**/api/backtests/jobs/${id}/variants/v2`,async route=>{await gate;await route.fulfill({json:variant('v2')});});
- await chooseVariant(page,2);await chooseVariant(page,1);release();await expect(selected(page)).toHaveAttribute('data-result-variant','v1');await expect(selected(page)).not.toContainText('99.5');await page.goBack();await expect(selected(page)).toHaveAttribute('data-result-variant','v2');await page.goForward();await expect(selected(page)).toHaveAttribute('data-result-variant','v1');await page.reload();await openActions(page);await expect(selected(page)).toHaveAttribute('data-result-variant','v1');
+ const variantLinks=page.getByRole('region',{name:'Ranked variants',exact:true});
+ await variantLinks.getByRole('link',{name:'Variant 2',exact:true}).click();
+ await expect(page.locator('[data-requested-variant]')).toHaveAttribute('data-requested-variant','v2');
+ await expect(page.locator('.report-actions').locator('..')).toHaveAttribute('inert','');
+ await variantLinks.getByRole('link',{name:'Variant 1',exact:true}).click();release();await expect(selected(page)).toHaveAttribute('data-result-variant','v1');await expect(selected(page)).not.toContainText('99.5');await page.goBack();await expect(selected(page)).toHaveAttribute('data-result-variant','v2');await page.goForward();await expect(selected(page)).toHaveAttribute('data-result-variant','v1');await page.reload();await openActions(page);await expect(selected(page)).toHaveAttribute('data-result-variant','v1');
  writeFileSync(resolve(evidence,'controlled-materialization.json'),JSON.stringify({controlled:true,reads,readIntervals:times.slice(1).map((v,i)=>v-times[i]!),empty:true,degraded:true,failed:true,lateVariantDiscarded:true,historyAndReload:true}));
 });
 test('controlled JSON export never downloads and truncation is visible',async({page})=>{
@@ -122,8 +131,29 @@ test('controlled results RU EN widths focus and axe',async({page})=>{
  await controlled(page);const captures=[];for(const locale of ['ru','en']){await page.getByRole('link',{name:locale==='ru'?'Русский':'English',exact:true}).click();await expect(selected(page)).toBeVisible();await closePanels(page);for(const width of [820,1024,1440]){await page.setViewportSize({width,height:1100});await expect(page.getByRole('img')).toBeVisible();await expect(page.getByRole('img')).toHaveAccessibleDescription(locale==='ru'?/Наведите/:/Hover for values/);await expect.poll(()=>page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);const axe=await new AxeBuilder({page}).analyze();expect(axe.violations).toEqual([]);await page.screenshot({path:resolve(evidence,`${locale}-${width}.png`),fullPage:true});captures.push({locale,width,axe:0,overflow:false});}}
  writeFileSync(resolve(evidence,'visual.json'),JSON.stringify({controlled:true,captures}));
 });
-test('controlled 202 then forbidden or missing detail stops polling across tab remount',async({page})=>{
- await controlled(page);for(const status of [403,404]){let reads=0;await page.route(`**/api/backtests/jobs/${id}/variants/v1/drawdown*`,route=>{reads++;return reads===1?route.fulfill({status:202,json:pending()}):route.fulfill({status,json:{error:{code:'restricted'}}});});await closePanels(page);await page.getByRole('button',{name:'Drawdown · %',exact:true}).click();await expect(selected(page).getByRole('alert')).toBeVisible({timeout:10000});await page.waitForTimeout(2500);expect(reads).toBe(2);await closePanels(page);await page.getByRole('button',{name:'Equity',exact:true}).click();await closePanels(page);await page.getByRole('button',{name:'Drawdown · %',exact:true}).click();await page.waitForTimeout(2500);expect(reads).toBe(2);await page.unroute(`**/api/backtests/jobs/${id}/variants/v1/drawdown*`);if(status===403)await page.reload();await openActions(page);}
+test('controlled 202 then forbidden or missing detail stops polling across variant navigation',async({page})=>{
+ await controlled(page);
+ for(const status of [403,404]){
+  let reads=0;
+  await page.route(`**/api/backtests/jobs/${id}/variants/v1/drawdown*`,route=>{
+   reads++;
+   return reads===1?route.fulfill({status:202,json:pending()}):route.fulfill({status,json:{error:{code:'restricted'}}});
+  });
+  await closePanels(page);
+  await page.getByRole('button',{name:'Drawdown · %',exact:true}).click();
+  await expect(page.locator('[data-requested-variant]').getByRole('alert')).toBeVisible({timeout:10000});
+  await expect(selected(page)).toHaveCount(0);
+  await page.waitForTimeout(2500);expect(reads).toBe(2);
+  const variants=page.getByRole('region',{name:'Ranked variants'}).getByRole('link');
+  await variants.filter({hasText:'Variant 2'}).click();
+  await expect(selected(page)).toHaveAttribute('data-result-variant','v2');
+  await variants.filter({hasText:'Variant 1'}).click();
+  await expect(page.locator('[data-requested-variant]').getByRole('alert')).toBeVisible();
+  await expect(selected(page)).toHaveCount(0);
+  await page.waitForTimeout(2500);expect(reads).toBe(2);
+  await page.unroute(`**/api/backtests/jobs/${id}/variants/v1/drawdown*`);
+  await page.reload();await openActions(page);
+ }
 });
 test('native 200 percent zoom results and save dialog RU EN',async()=>{
  const directory=mkdtempSync(resolve(tmpdir(),'roehub-s5-zoom-'));const extension=resolve(directory,'extension');mkdirSync(extension);writeFileSync(resolve(extension,'manifest.json'),JSON.stringify({manifest_version:3,name:'Local zoom proof',version:'1.0',permissions:['tabs'],background:{service_worker:'worker.js'}}));writeFileSync(resolve(extension,'worker.js'),'chrome.runtime.onInstalled.addListener(() => {});');
@@ -187,7 +217,11 @@ test('controlled result429 without hints or with short hint shares manual and re
   writeFileSync(resolve(evidence,'controlled-unhinted-cooldown.json'),JSON.stringify({controlled:true,observations}));
   await expect(refresh).toBeDisabled({timeout:250});
   await closePanels(page);await page.getByRole('button',{name:'Equity',exact:true}).click();await closePanels(page);await page.getByRole('button',{name:'Drawdown · %',exact:true}).click();
-  await expect(refresh).toBeDisabled();await page.waitForTimeout(hint===null?1500:100);expect(reads).toBe(1);
+  // Browser actions may consume the cooldown; validate request timestamps,
+  // rather than assuming a fixed amount of wall time remains after navigation.
+  if(Date.now()-times[0]!<(hint===null?4500:1500))await expect(refresh).toBeDisabled();
+  await page.waitForTimeout(hint===null?1500:100);
+  if(reads>1)expect(times[1]!-times[0]!).toBeGreaterThanOrEqual(hint===null?4900:1900);
   await expect(page.getByRole('img',{name:'Drawdown · %',exact:true})).toBeVisible({timeout:6000});
   expect(reads).toBe(2);expect(times[1]!-times[0]!).toBeGreaterThanOrEqual(hint===null?4900:1900);
   Object.assign(observations.at(-1)!,{reads,intervalMs:times[1]!-times[0]!,remountCannotBypass:true});

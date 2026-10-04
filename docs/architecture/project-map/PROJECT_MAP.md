@@ -2,7 +2,7 @@
 
 Этот документ — человекочитаемое представление единой карты проекта. Машиночитаемый источник для агентов — `docs/architecture/project-map/project-map.json`, семантический каталог — `docs/architecture/project-map/project-map.toml`, правила использования — `docs/architecture/project-map/AGENT_GUIDE.md`.
 
-Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `58a4198aa633814eeb37c40b206271c44af80f54b8ad05e85e4a537028237211`; учтено файлов: **4571**.
+Карта построена детерминированно из каталога и фактического набора файлов/импортов. Generated-артефакты самой карты исключены из самоссылочного inventory. Текущий структурный digest: `2c37a5ef31c308ca23434d82f6498f179d8208525a55da1e74c261b0f7e4b7cc`; учтено файлов: **4572**.
 
 ## Визуальная runtime-карта
 
@@ -294,7 +294,7 @@ flowchart TB
 |---|---|---|---:|---|
 | `domain` | Доменные контексты | Бизнес-правила и use cases по bounded contexts. | 696 | `src/trading/contexts/` |
 | `shared-core` | Shared kernel и платформа | Общие типы, конфигурация, ошибки, интеграционные и производительные примитивы. | 36 | `src/trading/__init__.py`, `src/trading/shared_kernel/`, `src/trading/platform/`, `src/trading/integration/`, `src/trading/fastpath/` |
-| `delivery` | Приложения и delivery | HTTP, HTML, CLI, workers, schedulers, migrations и composition roots. | 472 | `apps/` |
+| `delivery` | Приложения и delivery | HTTP, HTML, CLI, workers, schedulers, migrations и composition roots. | 473 | `apps/` |
 | `operations` | Инфраструктура и эксплуатация | Self-hosted Docker Compose, monitoring, конфигурация и миграции данных. | 230 | `infra/`, `configs/`, `migrations/`, `alembic/`, `.github/workflows/` |
 | `automation` | Инструменты и автоматизация | Операторские скрипты, генераторы и CI helpers. | 117 | `tools/`, `scripts/` |
 | `quality` | Проверки и тестовые данные | Unit, integration, notebook и performance-smoke проверки, fixtures и typings. | 458 | `tests/`, `fixtures/`, `typings/` |
@@ -317,7 +317,7 @@ flowchart TB
 | `app:migrations` | Bootstrap и применение миграций. | 14 | `apps/migrations/main.py` | `context:backtest`, `context:extensions`, `context:identity`, `context:live_execution`, `context:market_data`, `context:notifications`, `context:strategy`, `core:integration`, `core:platform`, `core:shared_kernel` |
 | `app:monitoring` | Экспорт технических метрик. | 3 | — | — |
 | `app:navigator-web` | Navigator candidate prototype; not the accepted platform baseline. | 106 | — | — |
-| `app:platform-web` | Current accepted local-platform React/TypeScript client. | 84 | — | — |
+| `app:platform-web` | Current accepted local-platform React/TypeScript client. | 85 | — | — |
 | `app:plugin_gateway` | Описание выводится из текущей структуры; уточнить при изменении ответственности. | 4 | `apps/plugin_gateway/main/app.py`, `apps/plugin_gateway/main/main.py` | `core:integration` |
 | `app:roehubctl` | Host-side аварийная CLI для диагностики и восстановления. | 3 | `apps/roehubctl/main/main.py` | `app:cli`, `app:control_agent`, `context:operations` |
 | `app:runtime_probe` | Описание выводится из текущей структуры; уточнить при изменении ответственности. | 2 | `apps/runtime_probe/main.py` | — |

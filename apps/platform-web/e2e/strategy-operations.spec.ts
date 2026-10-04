@@ -104,11 +104,11 @@ test('operational strategy: executed chart, position, commands, reasons, layouts
  await expect(page.getByRole('group',{name:'Chart display'})).toBeVisible();
  await page.keyboard.press('Escape');await expect(page.getByRole('button',{name:'Chart display',exact:true})).toBeFocused();
  await expect(page.getByRole('group',{name:'Chart display'})).toHaveCount(0);
- const timeframe=page.getByRole('button',{name:'Chart timeframe',exact:true});
- const chooseTimeframe=async(value:string)=>{await timeframe.click();await page.getByRole('radio',{name:value,exact:true}).click();};
- await chooseTimeframe('1h');await expect(timeframe).toHaveText('1h');
+ const timeframe=page.getByRole('group',{name:'Chart timeframe',exact:true});
+ const chooseTimeframe=async(value:string)=>{await timeframe.getByRole('button',{name:value,exact:true}).click();};
+ await chooseTimeframe('1h');await expect(timeframe.getByRole('button',{name:'1h',exact:true})).toHaveAttribute('aria-pressed','true');
  await expect(page.locator('.operations-chart canvas')).toBeVisible();
- await page.locator('.overview-expand').click();await expect(timeframe).toHaveText('1h');await page.locator('.overview-expand').click();
+ await page.locator('.overview-expand').click();await expect(timeframe.getByRole('button',{name:'1h',exact:true})).toHaveAttribute('aria-pressed','true');await page.locator('.overview-expand').click();
  await chooseTimeframe('15m');
  await page.getByRole('button',{name:'Chart display',exact:true}).click();
  const markerToggle=page.getByRole('checkbox',{name:'Trades',exact:true});
