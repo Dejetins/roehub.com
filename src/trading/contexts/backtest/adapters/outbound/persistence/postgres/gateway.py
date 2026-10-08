@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+import asyncio
+import threading
+from collections.abc import Iterator
+from contextlib import AbstractContextManager, contextmanager
+from contextvars import ContextVar
 from typing import Any, Mapping, Protocol, cast
 
 import psycopg
@@ -21,6 +26,10 @@ class BacktestPostgresGateway(Protocol):
       - src/trading/contexts/backtest/adapters/outbound/persistence/postgres/
         backtest_job_results_repository.py
     """
+
+    def transaction(self) -> AbstractContextManager[BacktestPostgresGateway]:
+        """Bind all operations in this execution context to one transaction/connection."""
+        ...
 
     def fetch_one(self, *, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any] | None:
         """
@@ -115,6 +124,48 @@ class PsycopgBacktestPostgresGateway(BacktestPostgresGateway):
         if not normalized_dsn:
             raise ValueError("PsycopgBacktestPostgresGateway requires non-empty dsn")
         self._dsn = normalized_dsn
+        self._connection: ContextVar[tuple[object, object, psycopg.Connection[Any]] | None] = (
+            ContextVar(f"backtest_transaction_{id(self)}", default=None)
+        )
+
+    @staticmethod
+    def _execution_owner() -> tuple[object, object]:
+        try:
+            task = asyncio.current_task()
+        except RuntimeError:
+            task = None
+        return threading.current_thread(), task
+
+    def _owned_connection(self) -> psycopg.Connection[Any] | None:
+        binding = self._connection.get()
+        if binding is None or binding[:2] != self._execution_owner():
+            return None
+        return binding[2]
+
+    @contextmanager
+    def transaction(self) -> Iterator[BacktestPostgresGateway]:
+        """Commit together; nested callers use savepoints, threads have separate owners."""
+        existing = self._owned_connection()
+        if existing is not None:
+            with existing.transaction():
+                yield self
+            return
+        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+            token = self._connection.set((*self._execution_owner(), connection))
+            try:
+                with connection.transaction():
+                    yield self
+            finally:
+                self._connection.reset(token)
+
+    @contextmanager
+    def _session(self) -> Iterator[psycopg.Connection[Any]]:
+        existing = self._owned_connection()
+        if existing is not None:
+            yield existing
+        else:
+            with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+                yield connection
 
     def fetch_one(self, *, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any] | None:
         """
@@ -132,7 +183,7 @@ class PsycopgBacktestPostgresGateway(BacktestPostgresGateway):
         Side Effects:
             Opens one database connection and executes one query.
         """
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with self._session() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, query), parameters)
                 row = cursor.fetchone()
@@ -161,7 +212,7 @@ class PsycopgBacktestPostgresGateway(BacktestPostgresGateway):
         Side Effects:
             Opens one database connection and executes one query.
         """
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with self._session() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, query), parameters)
                 rows = cursor.fetchall()
@@ -183,7 +234,7 @@ class PsycopgBacktestPostgresGateway(BacktestPostgresGateway):
         Side Effects:
             Opens one database connection and executes one query.
         """
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with self._session() as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, query), parameters)
 

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, replace
+from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -31,12 +33,16 @@ from .contracts import (
     HIT_TIMES_TIMEFRAME_LITERAL_V2,
     SIGNAL_FEATURE_NAMES_V2,
     ArtifactArrayMetadataV2,
+    ArtifactCandleSnapshot,
     ArtifactCoordinatesV2,
+    ArtifactDerivativeBuildRequest,
     ArtifactFundingManifestV2,
     ArtifactHitTimesManifestDocumentV2,
     ArtifactHitTimesTableManifestV2,
+    ArtifactInputFileReference,
     ArtifactManifestDocumentV2,
     ArtifactMappingTimeframeManifestV2,
+    ArtifactPrefixProof,
     ArtifactPriceTimeframeManifestV2,
     ArtifactSignalCatalogEntryV2,
     ArtifactSignalFeaturesManifestDocumentV2,
@@ -47,6 +53,8 @@ from .contracts import (
     ArtifactTimelineCoverageV2,
     ArtifactValidationDiagnosticV2,
     BacktestArtifactLoaderV2,
+    BacktestPreparedArtifactSet,
+    validate_artifact_slot_v2,
 )
 
 
@@ -64,6 +72,345 @@ class BacktestArtifactManifestValidatorV2:
     """
 
     artifact_loader: BacktestArtifactLoaderV2
+
+    def validate_prepared_inputs(
+        self,
+        *,
+        prepared: BacktestPreparedArtifactSet,
+        request: ArtifactDerivativeBuildRequest,
+        trusted_roots: Mapping[str, Path],
+    ) -> None:
+        """Validate a complete logical run, without acknowledging worker persistence.
+
+        Roots are supplied by trusted composition under the source reservation. Every
+        declared file is checked, including unused rows. Missing or corrupt coverage
+        raises ValueError; this method never computes replacements or writes files.
+        """
+        if (request.rule_version, request.compute_version, request.precision_version) != (
+            "signals/v1", "numba/v1", "f32-f64/v1",
+        ):
+            raise ValueError("unsupported derivative computation version")
+        if (prepared.owner_token, prepared.attempt, prepared.output_root_id) != (
+            request.owner_token, request.attempt, request.output_root_id,
+        ):
+            raise ValueError("prepared attempt ownership differs from request")
+        if (request.snapshot.prefix_proof.state == "verified"
+                and request.snapshot.prefix_proof != prepared.snapshot.prefix_proof):
+            raise ValueError("prepared prefix proof differs from requested proof")
+        expected_snapshot = replace(request.snapshot, prefix_proof=prepared.snapshot.prefix_proof)
+        if expected_snapshot != prepared.snapshot:
+            raise ValueError("prepared snapshot differs from request")
+        if prepared.snapshot.prefix_proof.state != "verified":
+            raise ValueError("prepared source prefix proof must be verified")
+        source = self.validate_source_snapshot(
+            snapshot=prepared.snapshot, trusted_roots=trusted_roots,
+        )
+        base_id = prepared.snapshot.source_file_identities[0].root_id
+        if prepared.output_root_id in trusted_roots:
+            base = trusted_roots[base_id].resolve()
+            attempt = trusted_roots[prepared.output_root_id].resolve()
+            if base == attempt or base in attempt.parents or attempt in base.parents:
+                raise ValueError("attempt and published roots must not overlap")
+        coverage = self._validated_derivative_coverage(
+            snapshot=prepared.snapshot, references=prepared.derivatives,
+            trusted_roots=trusted_roots,
+        )
+        for row in request.rows:
+            if row.row_id not in coverage.get(f"signals.{row.indicator_id}", {}):
+                raise ValueError("prepared inputs missing requested canonical row")
+        for family, levels in (("tp", request.tp_levels_pct), ("sl", request.sl_levels_pct)):
+            for suffix in (f"{family}_values", f"long_{family}", f"short_{family}"):
+                entries = coverage.get(f"hit_times.{suffix}", {})
+                available = np.asarray(tuple(entries), dtype=np.float64) / 100.0
+                available = available.astype(np.float32)
+                for level in levels:
+                    matches = np.isclose(
+                        np.float32(level / 100.0), available, rtol=0.0, atol=1e-7,
+                    )
+                    if np.count_nonzero(matches) != 1:
+                        raise ValueError("requested risk level is missing or ambiguous")
+        if request.tp_levels_pct or request.sl_levels_pct:
+            prices = source[f"prices.{prepared.snapshot.signal_timeframe}.ohlcv"]
+            if not np.isfinite(prices[:, :3]).all():
+                raise ValueError("hit-times ohlcv open/high/low values must be finite")
+
+    def attest_snapshot(
+        self, *, snapshot: ArtifactCandleSnapshot, trusted_roots: Mapping[str, Path],
+    ) -> ArtifactCandleSnapshot:
+        """Validate pinned files and attest exactly their recorded consumed slices."""
+        arrays = self.validate_source_snapshot(snapshot=snapshot, trusted_roots=trusted_roots)
+        domains = tuple(sorted(snapshot.consumed_domains, key=lambda item: item.role))
+        digests = tuple(domain.payload_digest(arrays[domain.role]) for domain in domains)
+        proof = ArtifactPrefixProof(
+            "verified", domains, digests, ArtifactPrefixProof.combined_digest(domains, digests),
+        )
+        return replace(snapshot, prefix_proof=proof)
+
+    def validate_declared_files(
+        self, *, snapshot: ArtifactCandleSnapshot,
+        references: tuple[ArtifactInputFileReference, ...], trusted_roots: Mapping[str, Path],
+    ) -> None:
+        """Reject corrupt declared derivatives before allocating missing outputs.
+
+        This is intentionally independent of request completeness. The caller first
+        attests the source and verifies calculation/default versions.
+        """
+        self._validated_derivative_coverage(
+            snapshot=snapshot, references=references, trusted_roots=trusted_roots,
+        )
+
+    def _validated_derivative_coverage(
+        self, *, snapshot: ArtifactCandleSnapshot,
+        references: tuple[ArtifactInputFileReference, ...], trusted_roots: Mapping[str, Path],
+    ) -> dict[str, dict[int | float, np.ndarray]]:
+        timeframe = snapshot.signal_timeframe
+        timeline = next((d for d in snapshot.consumed_domains
+                         if d.role == f"prices.{timeframe}.open_time"), None)
+        if timeline is None:
+            raise ValueError("source snapshot missing signal timeline")
+        bars = timeline.shape[0]
+        coverage: dict[str, dict[int | float, np.ndarray]] = {}
+        for ref in references:
+            domain = ref.domain
+            if (domain.timeframe, domain.origin_utc, domain.end_utc, domain.index_origin) != (
+                timeframe, timeline.origin_utc, timeline.end_utc, timeline.index_origin,
+            ):
+                raise ValueError("derivative timeline differs from consumed source")
+            array = self.load_validated_reference(reference=ref, trusted_roots=trusted_roots)
+            role = domain.role
+            if role.startswith("signals."):
+                axes, dtype, shape = ("variant", "time"), "int8", (len(ref.row_ids), bars)
+                identities = ref.row_ids
+                if not np.isin(array, ARTIFACT_SIGNAL_VALUE_SET_V2).all():
+                    raise ValueError("signal encoding must be -1, 0 or 1")
+            elif role.startswith("signal_features."):
+                axes, dtype = ("variant", "feature"), "float32"
+                shape, identities = (len(ref.row_ids), len(SIGNAL_FEATURE_NAMES_V2)), ref.row_ids
+                if not np.isfinite(array).all():
+                    raise ValueError("signal features must be finite")
+            elif role in {f"hit_times.{name}" for name in (
+                "tp_values", "sl_values", "long_tp", "short_tp", "long_sl", "short_sl",
+            )}:
+                if timeframe != HIT_TIMES_TIMEFRAME_LITERAL_V2:
+                    raise ValueError("hit-times require the 15m source timeline")
+                identities = ref.risk_values
+                if role.endswith("values"):
+                    axes, dtype, shape = ("level",), "float32", (len(identities),)
+                    expected = (np.asarray(identities, dtype=np.float64) / 100).astype(np.float32)
+                    if not np.array_equal(array, expected):
+                        raise ValueError("risk grid differs from declared percentage levels")
+                else:
+                    axes, dtype, shape = ("level", "time"), "uint32", (len(identities), bars)
+                    if np.any(array > bars):
+                        raise ValueError("hit-time sentinel exceeds original timeline")
+            else:
+                raise ValueError(f"unsupported derivative role: {role}")
+            if domain.axis_order != axes or array.dtype != np.dtype(dtype) or array.shape != shape:
+                raise ValueError("derivative semantic dtype/shape/axis mismatch")
+            entries = coverage.setdefault(role, {})
+            for index, identity in enumerate(identities):
+                if identity in entries:
+                    raise ValueError("ambiguous duplicate logical derivative coverage")
+                entries[identity] = array[index]
+        for role, entries in coverage.items():
+            if role.startswith("hit_times.") and not role.endswith("values"):
+                ordered = [entries[level] for level in sorted(entries)]
+                if any(np.any(right < left) for left, right in zip(ordered, ordered[1:])):
+                    raise ValueError("hit-times must be monotone across mixed risk levels")
+        for family in ("tp", "sl"):
+            level_sets = [set(coverage.get(f"hit_times.{name}", {})) for name in (
+                f"{family}_values", f"long_{family}", f"short_{family}",
+            )]
+            if any(levels != level_sets[0] for levels in level_sets[1:]):
+                raise ValueError("declared risk family coverage is incoherent")
+        return coverage
+
+    def load_validated_reference(
+        self, *, reference: ArtifactInputFileReference, trusted_roots: Mapping[str, Path],
+    ) -> np.ndarray:
+        """Open an explicit trusted file read-only, checking its physical identity."""
+        try:
+            root = trusted_roots.get(reference.root_id)
+            if root is None:
+                raise ValueError("untrusted artifact root")
+            root = root.resolve(strict=True)
+            path = (root / reference.relative_path).resolve(strict=True)
+            if root not in path.parents:
+                raise ValueError("artifact reference escapes trusted root")
+            if _file_sha256_hex_v2(path) != reference.sha256:
+                raise ValueError("artifact file checksum mismatch")
+            array = np.load(path, mmap_mode="r", allow_pickle=False)
+            if array.dtype.str != reference.domain.dtype or array.shape != reference.domain.shape:
+                raise ValueError("artifact file shape/dtype mismatch")
+            return array
+        except (OSError, EOFError) as error:
+            raise ValueError("artifact file is missing or unreadable") from error
+
+    def validate_source_snapshot(
+        self, *, snapshot: ArtifactCandleSnapshot, trusted_roots: Mapping[str, Path],
+    ) -> dict[str, np.ndarray]:
+        """Validate pinned published source and return original consumed views by role.
+
+        Pending proof is permitted for preparation; verified proof is rehashed per
+        original descriptor. Full-file SHA and prefix payload identity are distinct.
+        """
+        root_id = snapshot.source_file_identities[0].root_id
+        root = trusted_roots.get(root_id)
+        if root is None:
+            raise ValueError("untrusted source root")
+        try:
+            root = root.resolve(strict=True)
+            pinned_root = self.artifact_loader.resolve_slot_manifest_path(
+                snapshot.coordinates, validate_artifact_slot_v2(snapshot.slot),
+            ).parent.resolve(strict=True)
+            if root != pinned_root:
+                raise ValueError("source root differs from pinned published slot")
+            path = (root / "manifest.yaml").resolve(strict=True)
+            if root not in path.parents:
+                raise ValueError("source manifest escapes trusted root")
+            if _file_sha256_hex_v2(path) != snapshot.manifest_sha256:
+                raise ValueError("source manifest checksum mismatch")
+            manifest = self.artifact_loader.load_manifest_from_path(
+                path, slot=validate_artifact_slot_v2(snapshot.slot),
+            )
+        except OSError as error:
+            raise ValueError("source manifest is missing or unreadable") from error
+        actual_identity = (
+            manifest.identity, manifest.schema_version, manifest.slot_generation, manifest.slot,
+        )
+        if actual_identity != (
+            snapshot.coordinates, snapshot.source_schema, snapshot.generation, snapshot.slot,
+        ):
+            raise ValueError("source manifest identity differs from snapshot")
+        metadata: dict[str, tuple[ArtifactArrayMetadataV2, str]] = {}
+        expected: dict[str, tuple[str, tuple[str, ...], tuple[int, ...]]] = {}
+        for price in manifest.prices:
+            for name in ("open_time", "close_time", "ohlcv"):
+                role = f"prices.{price.timeframe}.{name}"
+                metadata[role] = (getattr(price, name), price.timeframe)
+                expected[role] = (
+                    (ARTIFACT_PRICE_OHLCV_DTYPE_LITERAL_V2, ARTIFACT_PRICE_OHLCV_AXIS_ORDER_V2,
+                     (price.coverage.bar_count, 5)) if name == "ohlcv"
+                    else ("int64", ("time",), (price.coverage.bar_count,))
+                )
+        for mapping in manifest.mappings:
+            for name in ("bar_open_1m_idx", "bar_close_1m_idx"):
+                role = f"mappings.{mapping.timeframe}.{name}"
+                metadata[role] = (getattr(mapping, name), mapping.timeframe)
+                price = next((p for p in manifest.prices if p.timeframe == mapping.timeframe), None)
+                if price is None:
+                    raise ValueError("mapping requires a declared price timeframe")
+                expected[role] = ("uint32", ("time",), (price.coverage.bar_count,))
+        if manifest.funding is not None:
+            for name in ("funding_time", "funding_rate", "mark_price",
+                         "funding_interval_minutes", "data_quality"):
+                item = getattr(manifest.funding, name)
+                if item is not None:
+                    role = f"funding.{name}"
+                    metadata[role] = (item, snapshot.execution_timeframe)
+                    dtype = {"funding_time": "int64", "funding_rate": "float64",
+                             "mark_price": "float64", "funding_interval_minutes": "uint16",
+                             "data_quality": "uint8"}[name]
+                    expected[role] = (dtype, ("funding_event",), (manifest.funding.rows_count,))
+        domains = {domain.role: domain for domain in snapshot.consumed_domains}
+        arrays: dict[str, np.ndarray] = {}
+        for ref in snapshot.source_file_identities:
+            entry = metadata.get(ref.domain.role)
+            if entry is None:
+                raise ValueError("source role is not declared by published manifest")
+            item, timeframe = entry
+            if (item.dtype, item.axis_order, item.shape) != expected[ref.domain.role]:
+                raise ValueError("source semantic dtype/shape/axis mismatch")
+            if (ref.relative_path != item.path or ref.sha256 != item.sha256
+                    or ref.domain.shape != item.shape or ref.domain.axis_order != item.axis_order
+                    or np.dtype(ref.domain.dtype) != np.dtype(item.dtype)
+                    or ref.domain.timeframe != timeframe or ref.domain.index_origin != 0):
+                raise ValueError("source reference differs from published metadata")
+            price = next((p for p in manifest.prices if p.timeframe == timeframe), None)
+            if price is not None and "time" in ref.domain.axis_order:
+                if (_domain_millis(ref.domain.origin_utc) != price.coverage.open_time_start
+                        or _domain_millis(ref.domain.end_utc) != price.coverage.close_time_end):
+                    raise ValueError("source full domain differs from published coverage")
+            array = self.load_validated_reference(reference=ref, trusted_roots=trusted_roots)
+            domain = domains[ref.domain.role]
+            view = array[tuple(slice(0, size) for size in domain.shape)]
+            if snapshot.prefix_proof.state == "verified":
+                index = snapshot.prefix_proof.domains.index(domain)
+                if domain.payload_digest(view) != snapshot.prefix_proof.role_digests[index]:
+                    raise ValueError("source prefix proof mismatch")
+            arrays[domain.role] = view
+        required = {f"prices.{tf}.{name}" for tf in (
+            snapshot.signal_timeframe, snapshot.execution_timeframe,
+        ) for name in ("open_time", "close_time", "ohlcv")}
+        required.update(f"mappings.{snapshot.signal_timeframe}.{name}" for name in (
+            "bar_open_1m_idx", "bar_close_1m_idx",
+        ))
+        if any(role.startswith("funding.") for role in arrays):
+            required.update(role for role in metadata if role.startswith("funding."))
+        if not required.issubset(arrays):
+            raise ValueError("source snapshot missing required price/mapping/funding role")
+        for price in manifest.prices:
+            role = f"prices.{price.timeframe}.open_time"
+            if role not in arrays:
+                continue
+            opened = arrays[role]
+            closed = arrays.get(f"prices.{price.timeframe}.close_time")
+            ohlcv = arrays.get(f"prices.{price.timeframe}.ohlcv")
+            if (opened.size == 0 or closed is None or ohlcv is None
+                    or opened.shape != closed.shape or ohlcv.shape != (opened.size, 5)
+                    or np.any(opened[1:] <= opened[:-1])
+                    or np.any(closed[1:] <= closed[:-1]) or np.any(closed <= opened)):
+                raise ValueError("source price timeline mismatch")
+            for domain in domains.values():
+                if domain.timeframe != price.timeframe or "time" not in domain.axis_order:
+                    continue
+                if (domain.shape[domain.axis_order.index("time")] != opened.size
+                        or _domain_millis(domain.origin_utc) != int(opened[0])
+                        or _domain_millis(domain.end_utc) != int(closed[-1])):
+                    raise ValueError("source recorded domain differs from timestamps")
+        minute_open = arrays["prices.1m.open_time"]
+        minute_close = arrays["prices.1m.close_time"]
+        for mapping in manifest.mappings:
+            prefix = f"mappings.{mapping.timeframe}"
+            if f"{prefix}.bar_open_1m_idx" not in arrays:
+                continue
+            for name, minutes, target in (
+                ("bar_open_1m_idx", minute_open, "open_time"),
+                ("bar_close_1m_idx", minute_close, "close_time"),
+            ):
+                values = arrays[f"{prefix}.{name}"]
+                if (np.any(values >= len(minutes)) or np.any(values[1:] < values[:-1])
+                        or not np.array_equal(minutes[values],
+                                              arrays[f"prices.{mapping.timeframe}.{target}"])):
+                    raise ValueError("source mapping timeline correspondence mismatch")
+        funding_time = arrays.get("funding.funding_time")
+        if funding_time is not None:
+            event_domain = domains["funding.funding_time"]
+            # Prove absence too: appended events inside the original half-open domain
+            # change the consumed history even when its previously stored prefix is equal.
+            time_ref = next(ref for ref in snapshot.source_file_identities
+                            if ref.domain.role == "funding.funding_time")
+            full_funding_time = self.load_validated_reference(
+                reference=time_ref, trusted_roots=trusted_roots,
+            )
+            if (int(np.searchsorted(full_funding_time, _domain_millis(event_domain.end_utc),
+                                    side="left")) != event_domain.row_count
+                    or np.any(funding_time < _domain_millis(event_domain.origin_utc))):
+                raise ValueError("funding original event domain changed")
+            if np.any(funding_time[1:] <= funding_time[:-1]):
+                raise ValueError("funding timestamps must be strictly increasing")
+            for role, values in arrays.items():
+                if not role.startswith("funding."):
+                    continue
+                domain = domains[role]
+                if (values.shape != funding_time.shape
+                        or domain.origin_utc != event_domain.origin_utc
+                        or domain.end_utc != event_domain.end_utc
+                        or domain.index_origin != event_domain.index_origin):
+                    raise ValueError("funding recorded event domains disagree")
+            # Missing mark price is intentionally NaN: the financial reader falls back
+            # to the execution candle. Do not normalize these bytes during attestation.
+        return arrays
 
     def validate_slot(
         self,
@@ -1454,6 +1801,14 @@ class BacktestArtifactManifestValidatorV2:
             slot,
         )
         expected_relative_path = _relative_slot_path_v2(slot_root, hit_times_manifest_path)
+        if slot_manifest.hit_times is None:
+            diagnostics.append(ArtifactValidationDiagnosticV2(
+                code="hit_times_manifest_reference_missing",
+                manifest_path=slot_manifest.path,
+                message="validation policy requires a declared hit-times reference",
+                location="hit_times",
+            ))
+            return
         if slot_manifest.hit_times.manifest_path != expected_relative_path:
             diagnostics.append(
                 ArtifactValidationDiagnosticV2(
@@ -2162,3 +2517,7 @@ def _relative_slot_path_v2(slot_root: Path, artifact_path: Path) -> str:
       - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
     """
     return artifact_path.relative_to(slot_root).as_posix()
+
+
+def _domain_millis(value: str) -> int:
+    return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp() * 1000)

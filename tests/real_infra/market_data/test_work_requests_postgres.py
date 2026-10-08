@@ -59,6 +59,9 @@ def store():
         )
 
     class Gateway:
+        def transaction(self):
+            raise AssertionError("transactions are outside this fixture's query-only boundary")
+
         def connect(self):
             conn = psycopg.Connection[dict[str, Any]].connect(DSN, row_factory=dict_row)
             conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(schema)))

@@ -2099,7 +2099,7 @@ class ArtifactManifestDocumentV2:
     prices: tuple[ArtifactPriceTimeframeManifestV2, ...]
     mappings: tuple[ArtifactMappingTimeframeManifestV2, ...]
     signals: ArtifactSignalCatalogV2
-    hit_times: ArtifactHitTimesReferenceV2
+    hit_times: ArtifactHitTimesReferenceV2 | None
     funding: ArtifactFundingManifestV2 | None
     signal_encoding: ArtifactSignalEncodingContractV2
     provenance: ArtifactManifestProvenanceV2
@@ -2127,10 +2127,23 @@ class ArtifactManifestDocumentV2:
         """
         _validate_exact_mapping_keys_with_optional_v2(
             payload=self.raw_payload,
-            required_keys=ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
-            optional_keys=ROOT_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2,
+            required_keys=root_manifest_required_keys_v2(self.schema_version),
+            optional_keys=root_manifest_optional_keys_v2(self.schema_version),
             path=self.path,
         )
+        if self.schema_version == 1 and self.hit_times is None:
+            raise ValueError("schema-1 root requires hit_times")
+        for name in ("schema_version", "manifest_kind", "slot", "slot_generation", "asof_date"):
+            if self.raw_payload[name] != getattr(self, name):
+                raise ValueError(f"root manifest typed/raw {name} mismatch")
+        if ("hit_times" in self.raw_payload) != (self.hit_times is not None):
+            raise ValueError("root manifest typed/raw hit_times mismatch")
+        if self.raw_payload["identity"] != {
+            "exchange": self.identity.exchange,
+            "market_type": self.identity.market_type,
+            "symbol": self.identity.symbol,
+        }:
+            raise ValueError("root manifest typed/raw identity mismatch")
         object.__setattr__(self, "slot", validate_artifact_slot_v2(self.slot))
         object.__setattr__(
             self,
@@ -2138,7 +2151,7 @@ class ArtifactManifestDocumentV2:
             validate_manifest_schema_version_v2(
                 self.schema_version,
                 field_name="root manifest schema_version",
-                expected_schema_version=ROOT_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
+                expected_schema_version=self.schema_version,
             ),
         )
         object.__setattr__(
@@ -4413,6 +4426,8 @@ class ArtifactPrecomputeRuntimeSettingsV2:
     mapping_timeframes: tuple[str, ...]
     config_sha256: str
     execution_policy: ArtifactPrecomputeExecutionPolicyV2
+    partial_publication: bool = False
+    precompute_hit_times: bool = True
     signal_artifacts: tuple[ArtifactSignalValidationSpecV2, ...] = ()
     max_signal_rows_per_artifact: int = 1_000_000
     max_hit_times_cells: int = 1_000_000
@@ -4607,6 +4622,16 @@ class BacktestArtifactPathResolverV2(Protocol):
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
 
+    def with_private_slot(
+        self,
+        *,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        root: Path,
+    ) -> BacktestArtifactPathResolverV2:
+        """Trusted private candidate root; pointer and reuse source stay canonical."""
+        ...
+
     def ordered_slots(self) -> tuple[ArtifactSlotLiteralV2, ...]:
         """Return the fixed slot order used by runtime-facing callers."""
         ...
@@ -4696,6 +4721,16 @@ class BacktestArtifactLoaderV2(Protocol):
     Related:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
+
+    def with_private_slot(
+        self,
+        *,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        root: Path,
+    ) -> BacktestArtifactLoaderV2:
+        """Trusted private candidate root; pointer and reuse source stay canonical."""
+        ...
 
     def load_current_pointer(self, coordinates: ArtifactCoordinatesV2) -> ArtifactCurrentPointerV2:
         """Read one `current.yaml` document by deterministic coordinates."""
@@ -5639,3 +5674,745 @@ def _sorted_signal_validation_specs_v2(
         key=lambda item: (timeframe_order[item.timeframe], item.indicator_id),
     )
     return tuple(ordered_values)
+
+
+# Input preparation contracts. These descriptors perform no filesystem IO and grant
+# no path/organization access. Trusted roots are supplied by internal composition.
+@dataclass(frozen=True, slots=True)
+class ArtifactPrefixDomain:
+    """Original consumed array domain; indices never rebase during replay."""
+
+    role: str
+    timeframe: str
+    dtype: str
+    axis_order: tuple[str, ...]
+    origin_utc: str
+    end_utc: str
+    row_count: int
+    shape: tuple[int, ...]
+    index_origin: int = 0
+    schema: str = "artifact-prefix-payload/v1"
+
+    def __post_init__(self) -> None:
+        if self.schema != "artifact-prefix-payload/v1":
+            raise ValueError("unsupported prefix domain schema")
+        _input_token(self.role)
+        validate_price_timeframe_v2(self.timeframe)
+        if self.dtype not in ("|i1", "|u1", "<i8", "<u2", "<u4", "<f4", "<f8"):
+            raise ValueError("prefix dtype must have canonical little-endian byte order")
+        if not self.shape or len(self.shape) != len(self.axis_order):
+            raise ValueError("prefix axes/shape mismatch")
+        if len(set(self.axis_order)) != len(self.axis_order):
+            raise ValueError("duplicate prefix axes")
+        for axis in self.axis_order:
+            _input_token(axis)
+        for size in (*self.shape, self.row_count, self.index_origin):
+            _input_uint(size)
+        if self.row_count != self.shape[0]:
+            raise ValueError("recorded row count must equal first array dimension")
+        _input_interval(self.origin_utc, self.end_utc)
+        object.__setattr__(self, "shape", tuple(self.shape))
+        object.__setattr__(self, "axis_order", tuple(self.axis_order))
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "schema": self.schema,
+            "role": self.role,
+            "timeframe": self.timeframe,
+            "dtype": self.dtype,
+            "axis_order": list(self.axis_order),
+            "origin_utc": self.origin_utc,
+            "end_utc": self.end_utc,
+            "row_count": self.row_count,
+            "shape": list(self.shape),
+            "index_origin": self.index_origin,
+        }
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> ArtifactPrefixDomain:
+        _input_keys(
+            payload,
+            (
+                "schema",
+                "role",
+                "timeframe",
+                "dtype",
+                "axis_order",
+                "origin_utc",
+                "end_utc",
+                "row_count",
+                "shape",
+                "index_origin",
+            ),
+        )
+        return cls(
+            **{
+                **payload,
+                "axis_order": _input_tuple(payload["axis_order"]),
+                "shape": _input_tuple(payload["shape"]),
+            }
+        )
+
+    def payload_digest(self, recorded_slice: np.ndarray) -> str:
+        """Hash only an explicitly supplied original slice; never called by preflight.
+
+        Wire format: uint64 LE descriptor-byte length, canonical JSON descriptor,
+        then C-order payload normalized to LE without changing numeric/NaN bits.
+        """
+        import hashlib
+        import json
+
+        if tuple(recorded_slice.shape) != self.shape:
+            raise ValueError("prefix payload shape mismatch")
+        if recorded_slice.dtype.newbyteorder("<") != np.dtype(self.dtype):
+            raise ValueError("prefix payload dtype mismatch")
+        descriptor = json.dumps(
+            self.as_mapping(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        digest = hashlib.sha256(len(descriptor).to_bytes(8, "little") + descriptor)
+        # Bounded C-order iteration also handles strided prefix views. Byte swapping is
+        # per buffer (never in place), preserving source bytes and NaN payload bits.
+        for buffer in np.nditer(
+            recorded_slice, flags=["external_loop", "buffered", "zerosize_ok"],
+            op_flags=[["readonly"]], order="C", buffersize=131072,
+        ):
+            chunk = np.asarray(buffer)
+            if chunk.dtype.itemsize > 1 and (
+                chunk.dtype.byteorder == ">"
+                or (chunk.dtype.byteorder == "=" and not np.little_endian)
+            ):
+                chunk = chunk.byteswap().view(chunk.dtype.newbyteorder("<"))
+            digest.update(chunk.tobytes(order="C"))
+        return digest.hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactInputFileReference:
+    """Manifest-derived file identity; row_ids[i] names physical matrix row i."""
+
+    root_id: str
+    relative_path: str
+    sha256: str
+    domain: ArtifactPrefixDomain
+    row_ids: tuple[int, ...] = ()
+    risk_values: tuple[float, ...] = ()
+
+    def __post_init__(self) -> None:
+        _input_root_id(self.root_id)
+        path = self.relative_path
+        if (
+            not isinstance(path, str)
+            or not path
+            or path.startswith("/")
+            or "\\" in path
+            or any(part in ("", ".", "..") for part in path.split("/"))
+        ):
+            raise ValueError("input file path must be normalized and relative")
+        _input_sha(self.sha256)
+        if not isinstance(self.domain, ArtifactPrefixDomain):
+            raise ValueError("input file requires a typed domain")
+        for row in self.row_ids:
+            _input_uint(row)
+        if len(set(self.row_ids)) != len(self.row_ids):
+            raise ValueError("duplicate canonical row IDs")
+        if self.row_ids and (
+            self.domain.axis_order[0] != "variant" or len(self.row_ids) != self.domain.shape[0]
+        ):
+            raise ValueError("row-ID mapping does not cover physical variant rows")
+        if self.domain.axis_order[0] == "variant" and not self.row_ids:
+            raise ValueError("variant arrays require exact row IDs")
+        _input_levels(self.risk_values)
+        if self.risk_values and (
+            self.domain.axis_order[0] != "level" or len(self.risk_values) != self.domain.shape[0]
+        ):
+            raise ValueError("risk-axis values do not cover physical level rows")
+        if self.domain.axis_order[0] == "level" and not self.risk_values:
+            raise ValueError("level arrays require exact risk values")
+        object.__setattr__(self, "row_ids", tuple(self.row_ids))
+        object.__setattr__(self, "risk_values", tuple(self.risk_values))
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "root_id": self.root_id,
+            "relative_path": self.relative_path,
+            "sha256": self.sha256,
+            "domain": self.domain.as_mapping(),
+            "row_ids": list(self.row_ids),
+            "risk_values": list(self.risk_values),
+        }
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> ArtifactInputFileReference:
+        _input_keys(
+            payload, ("root_id", "relative_path", "sha256", "domain", "row_ids", "risk_values")
+        )
+        return cls(
+            **{
+                **payload,
+                "domain": ArtifactPrefixDomain.from_mapping(payload["domain"]),
+                "row_ids": _input_tuple(payload["row_ids"]),
+                "risk_values": _input_tuple(payload["risk_values"]),
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPrefixProof:
+    """Pending metadata has no invented digest; verified proof is explicit per role."""
+
+    state: str = "pending"
+    domains: tuple[ArtifactPrefixDomain, ...] = ()
+    role_digests: tuple[str, ...] = ()
+    source_domain_sha256: str | None = None
+    schema: str = "artifact-prefix-proof/v1"
+
+    def __post_init__(self) -> None:
+        if self.schema != "artifact-prefix-proof/v1" or self.state not in ("pending", "verified"):
+            raise ValueError("unsupported prefix proof state/version")
+        if self.state == "pending":
+            if self.domains or self.role_digests or self.source_domain_sha256 is not None:
+                raise ValueError("pending prefix proof cannot contain payload attestations")
+            return
+        if not self.domains or len(self.domains) != len(self.role_digests):
+            raise ValueError("verified prefix proof requires every role digest")
+        roles = tuple(domain.role for domain in self.domains)
+        if roles != tuple(sorted(set(roles))):
+            raise ValueError("prefix proof roles must be unique and sorted")
+        for digest in self.role_digests:
+            _input_sha(digest)
+        if self.source_domain_sha256 != self.combined_digest(self.domains, self.role_digests):
+            raise ValueError("source-domain identity mismatch")
+        object.__setattr__(self, "domains", tuple(self.domains))
+        object.__setattr__(self, "role_digests", tuple(self.role_digests))
+
+    @staticmethod
+    def combined_digest(domains: tuple[ArtifactPrefixDomain, ...], digests: tuple[str, ...]) -> str:
+        import hashlib
+        import json
+
+        if len(domains) != len(digests):
+            raise ValueError("prefix proof role/digest count mismatch")
+        payload = {
+            "schema": "artifact-source-domain/v1",
+            "roles": [
+                {"descriptor": domain.as_mapping(), "payload_sha256": digest}
+                for domain, digest in zip(domains, digests, strict=True)
+            ],
+        }
+        return hashlib.sha256(
+            json.dumps(
+                payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False
+            ).encode()
+        ).hexdigest()
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "schema": self.schema,
+            "state": self.state,
+            "domains": [item.as_mapping() for item in self.domains],
+            "role_digests": list(self.role_digests),
+            "source_domain_sha256": self.source_domain_sha256,
+        }
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> ArtifactPrefixProof:
+        _input_keys(payload, ("schema", "state", "domains", "role_digests", "source_domain_sha256"))
+        return cls(
+            **{
+                **payload,
+                "domains": tuple(
+                    ArtifactPrefixDomain.from_mapping(item)
+                    for item in _input_tuple(payload["domains"])
+                ),
+                "role_digests": _input_tuple(payload["role_digests"]),
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactCandleSnapshot:
+    """Actual published source, protected by a reservation at preparation time."""
+
+    coordinates: ArtifactCoordinatesV2
+    source_schema: int
+    slot: str
+    generation: int
+    manifest_sha256: str
+    signal_timeframe: str
+    execution_timeframe: str
+    source_file_identities: tuple[ArtifactInputFileReference, ...]
+    consumed_domains: tuple[ArtifactPrefixDomain, ...]
+    prefix_proof: ArtifactPrefixProof = field(default_factory=ArtifactPrefixProof)
+
+    def __post_init__(self) -> None:
+        if type(self.source_schema) is not int or self.source_schema not in (1, 2):
+            raise ValueError("unsupported source schema")
+        if not isinstance(self.coordinates, ArtifactCoordinatesV2):
+            raise ValueError("snapshot requires coordinates")
+        validate_artifact_slot_v2(self.slot)
+        validate_positive_manifest_int_v2(self.generation)
+        _input_sha(self.manifest_sha256)
+        validate_signal_timeframe_v2(self.signal_timeframe)
+        if self.execution_timeframe != "1m":
+            raise ValueError("execution timeframe must be 1m")
+        roles = tuple(ref.domain.role for ref in self.source_file_identities)
+        if not roles or len(set(roles)) != len(roles):
+            raise ValueError("snapshot file roles must be nonempty and unique")
+        if len({ref.root_id for ref in self.source_file_identities}) != 1:
+            raise ValueError("snapshot files must share the actual published root")
+        if not isinstance(self.prefix_proof, ArtifactPrefixProof):
+            raise ValueError("snapshot requires typed prefix proof")
+        originals = {ref.domain.role: ref.domain for ref in self.source_file_identities}
+        consumed = {domain.role: domain for domain in self.consumed_domains}
+        if set(consumed) != set(originals) or len(consumed) != len(self.consumed_domains):
+            raise ValueError("consumed domains must cover each source role exactly once")
+        for role, domain in consumed.items():
+            original = originals[role]
+            if (
+                domain.timeframe != original.timeframe
+                or domain.dtype != original.dtype
+                or domain.axis_order != original.axis_order
+                or domain.origin_utc != original.origin_utc
+                or domain.index_origin != original.index_origin
+                or datetime.fromisoformat(domain.end_utc.replace("Z", "+00:00"))
+                > datetime.fromisoformat(original.end_utc.replace("Z", "+00:00"))
+            ):
+                raise ValueError("consumed prefix changes original domain identity")
+            for axis, size, full in zip(
+                domain.axis_order, domain.shape, original.shape, strict=True
+            ):
+                if size > full or (axis not in ("time", "funding_event") and size != full):
+                    raise ValueError("consumed prefix shape exceeds original domain")
+        if self.prefix_proof.state == "verified":
+            if {d.role: d for d in self.prefix_proof.domains} != consumed:
+                raise ValueError("proof does not cover recorded consumed domains")
+        object.__setattr__(self, "consumed_domains", tuple(self.consumed_domains))
+        object.__setattr__(self, "source_file_identities", tuple(self.source_file_identities))
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "coordinates": {
+                "exchange": self.coordinates.exchange,
+                "market_type": self.coordinates.market_type,
+                "symbol": self.coordinates.symbol,
+            },
+            "source_schema": self.source_schema,
+            "slot": self.slot,
+            "generation": self.generation,
+            "manifest_sha256": self.manifest_sha256,
+            "signal_timeframe": self.signal_timeframe,
+            "execution_timeframe": self.execution_timeframe,
+            "source_file_identities": [ref.as_mapping() for ref in self.source_file_identities],
+            "consumed_domains": [domain.as_mapping() for domain in self.consumed_domains],
+            "prefix_proof": self.prefix_proof.as_mapping(),
+        }
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> ArtifactCandleSnapshot:
+        _input_keys(
+            payload,
+            (
+                "coordinates",
+                "source_schema",
+                "slot",
+                "generation",
+                "manifest_sha256",
+                "signal_timeframe",
+                "execution_timeframe",
+                "source_file_identities",
+                "consumed_domains",
+                "prefix_proof",
+            ),
+        )
+        _input_keys(payload["coordinates"], ("exchange", "market_type", "symbol"))
+        return cls(
+            **{
+                **payload,
+                "coordinates": ArtifactCoordinatesV2(**payload["coordinates"]),
+                "source_file_identities": tuple(
+                    ArtifactInputFileReference.from_mapping(ref)
+                    for ref in _input_tuple(payload["source_file_identities"])
+                ),
+                "consumed_domains": tuple(
+                    ArtifactPrefixDomain.from_mapping(domain)
+                    for domain in _input_tuple(payload["consumed_domains"])
+                ),
+                "prefix_proof": ArtifactPrefixProof.from_mapping(payload["prefix_proof"]),
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactRequestedRow:
+    """Canonical row identity independent of its compact physical position."""
+
+    indicator_id: str
+    source: str
+    row_id: int
+    parameters: tuple[tuple[str, int | float | str], ...]
+
+    def __post_init__(self) -> None:
+        import math
+
+        validate_indicator_id_v2(self.indicator_id)
+        validate_signal_input_source_v2(self.source)
+        _input_uint(self.row_id)
+        names = []
+        for name, value in self.parameters:
+            _input_token(name)
+            names.append(name)
+            if type(value) not in (int, float, str) or (
+                isinstance(value, float) and not math.isfinite(value)
+            ):
+                raise ValueError("invalid indicator parameter")
+        if names != sorted(set(names)):
+            raise ValueError("parameters must have unique sorted names")
+        object.__setattr__(self, "parameters", tuple(tuple(p) for p in self.parameters))
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "indicator_id": self.indicator_id,
+            "source": self.source,
+            "row_id": self.row_id,
+            "parameters": [list(item) for item in self.parameters],
+        }
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> ArtifactRequestedRow:
+        _input_keys(payload, ("indicator_id", "source", "row_id", "parameters"))
+        return cls(
+            **{
+                **payload,
+                "parameters": tuple(_input_tuple(p) for p in _input_tuple(payload["parameters"])),
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactDerivativeBuildRequest:
+    """Complete selected computation and allocation ownership, with no HTTP request."""
+
+    snapshot: ArtifactCandleSnapshot
+    rows: tuple[ArtifactRequestedRow, ...]
+    rule_version: str
+    defaults_sha256: str
+    compute_version: str
+    precision_version: str
+    tp_levels_pct: tuple[float, ...]
+    sl_levels_pct: tuple[float, ...]
+    output_root_id: str
+    owner_token: str
+    attempt: int
+    max_generated_bytes: int
+    max_compute_bytes: int
+    schema: str = "artifact-derivative-build/v1"
+
+    def __post_init__(self) -> None:
+        if self.schema != "artifact-derivative-build/v1":
+            raise ValueError("unsupported derivative build schema")
+        if not isinstance(self.snapshot, ArtifactCandleSnapshot):
+            raise ValueError("build requires typed snapshot")
+        keys = [(row.indicator_id, row.row_id) for row in self.rows]
+        if len(set(keys)) != len(keys):
+            raise ValueError("build requires unique requested rows")
+        for value in (
+            self.rule_version,
+            self.compute_version,
+            self.precision_version,
+            self.output_root_id,
+            self.owner_token,
+        ):
+            _input_token(value)
+        _input_root_id(self.output_root_id)
+        _input_sha(self.defaults_sha256)
+        for value in (self.attempt, self.max_generated_bytes, self.max_compute_bytes):
+            validate_positive_manifest_int_v2(value)
+        _input_levels(self.tp_levels_pct)
+        _input_levels(self.sl_levels_pct)
+        if self.output_root_id in {ref.root_id for ref in self.snapshot.source_file_identities}:
+            raise ValueError("generated outputs cannot own the published source root")
+        object.__setattr__(self, "rows", tuple(self.rows))
+        object.__setattr__(self, "tp_levels_pct", tuple(self.tp_levels_pct))
+        object.__setattr__(self, "sl_levels_pct", tuple(self.sl_levels_pct))
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "schema": self.schema,
+            "snapshot": self.snapshot.as_mapping(),
+            "rows": [row.as_mapping() for row in self.rows],
+            "rule_version": self.rule_version,
+            "defaults_sha256": self.defaults_sha256,
+            "compute_version": self.compute_version,
+            "precision_version": self.precision_version,
+            "tp_levels_pct": list(self.tp_levels_pct),
+            "sl_levels_pct": list(self.sl_levels_pct),
+            "output_root_id": self.output_root_id,
+            "owner_token": self.owner_token,
+            "attempt": self.attempt,
+            "max_generated_bytes": self.max_generated_bytes,
+            "max_compute_bytes": self.max_compute_bytes,
+        }
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> ArtifactDerivativeBuildRequest:
+        _input_keys(
+            payload,
+            (
+                "schema",
+                "snapshot",
+                "rows",
+                "rule_version",
+                "defaults_sha256",
+                "compute_version",
+                "precision_version",
+                "tp_levels_pct",
+                "sl_levels_pct",
+                "output_root_id",
+                "owner_token",
+                "attempt",
+                "max_generated_bytes",
+                "max_compute_bytes",
+            ),
+        )
+        return cls(
+            **{
+                **payload,
+                "snapshot": ArtifactCandleSnapshot.from_mapping(payload["snapshot"]),
+                "rows": tuple(
+                    ArtifactRequestedRow.from_mapping(row) for row in _input_tuple(payload["rows"])
+                ),
+                "tp_levels_pct": _input_tuple(payload["tp_levels_pct"]),
+                "sl_levels_pct": _input_tuple(payload["sl_levels_pct"]),
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactDerivativeBuildResult:
+    """Closed generated files; final validation and durable proof acknowledgement are separate."""
+
+    output_root_id: str
+    owner_token: str
+    attempt: int
+    files: tuple[ArtifactInputFileReference, ...]
+    generated_bytes: int
+
+    def __post_init__(self) -> None:
+        _input_root_id(self.output_root_id)
+        _input_token(self.owner_token)
+        validate_positive_manifest_int_v2(self.attempt)
+        _input_uint(self.generated_bytes)
+        if any(ref.root_id != self.output_root_id for ref in self.files):
+            raise ValueError("generated file root differs from attempt ownership")
+        if len({ref.relative_path for ref in self.files}) != len(self.files):
+            raise ValueError("duplicate generated file path")
+        object.__setattr__(self, "files", tuple(self.files))
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "output_root_id": self.output_root_id,
+            "owner_token": self.owner_token,
+            "attempt": self.attempt,
+            "files": [ref.as_mapping() for ref in self.files],
+            "generated_bytes": self.generated_bytes,
+        }
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> ArtifactDerivativeBuildResult:
+        _input_keys(
+            payload, ("output_root_id", "owner_token", "attempt", "files", "generated_bytes")
+        )
+        return cls(
+            **{
+                **payload,
+                "files": tuple(
+                    ArtifactInputFileReference.from_mapping(ref)
+                    for ref in _input_tuple(payload["files"])
+                ),
+            }
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class BacktestPreparedArtifactSet:
+    """Distinct job manifest. Structural validity does not acknowledge durable worker proof."""
+
+    snapshot: ArtifactCandleSnapshot
+    recipe_sha256: str
+    organization_id: str
+    job_id: str
+    owner_token: str
+    attempt: int
+    output_root_id: str
+    derivatives: tuple[ArtifactInputFileReference, ...]
+    provenance: tuple[str, ...]
+    schema_version: int = 1
+    manifest_kind: str = "job_prepared_inputs"
+
+    def __post_init__(self) -> None:
+        from uuid import UUID
+
+        if type(self.schema_version) is not int or self.schema_version != 1:
+            raise ValueError("unsupported job-prepared schema version")
+        if self.manifest_kind != "job_prepared_inputs":
+            raise ValueError("job-prepared manifest kind required")
+        if not isinstance(self.snapshot, ArtifactCandleSnapshot):
+            raise ValueError("prepared inputs require typed snapshot")
+        if self.snapshot.prefix_proof.state != "verified":
+            raise ValueError("prepared manifest requires verified payload prefix proof")
+        _input_sha(self.recipe_sha256)
+        for identifier in (self.organization_id, self.job_id):
+            if not isinstance(identifier, str) or str(UUID(identifier)) != identifier:
+                raise ValueError("prepared ownership requires canonical UUIDs")
+        _input_token(self.owner_token)
+        _input_root_id(self.output_root_id)
+        validate_positive_manifest_int_v2(self.attempt)
+        if len(self.derivatives) != len(self.provenance):
+            raise ValueError("every derivative requires physical provenance")
+        source_roots = {ref.root_id for ref in self.snapshot.source_file_identities}
+        if self.output_root_id in source_roots:
+            raise ValueError("attempt output root cannot equal source root")
+        paths = set()
+        for ref, origin in zip(self.derivatives, self.provenance, strict=True):
+            if origin not in ("reused", "generated"):
+                raise ValueError("invalid preparation provenance")
+            expected = source_roots if origin == "reused" else {self.output_root_id}
+            if ref.root_id not in expected:
+                raise ValueError("file root violates preparation ownership")
+            key = (ref.root_id, ref.relative_path)
+            if key in paths:
+                raise ValueError("duplicate prepared file")
+            paths.add(key)
+        object.__setattr__(self, "derivatives", tuple(self.derivatives))
+        object.__setattr__(self, "provenance", tuple(self.provenance))
+
+    @property
+    def content_sha256(self) -> str:
+        """Bind acknowledgement to this owner, attempt, attestation and complete file set."""
+        import hashlib
+        import json
+
+        return hashlib.sha256(json.dumps(
+            self.as_mapping(), sort_keys=True, separators=(",", ":"),
+            ensure_ascii=False, allow_nan=False,
+        ).encode("utf-8")).hexdigest()
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "schema_version": self.schema_version,
+            "manifest_kind": self.manifest_kind,
+            "snapshot": self.snapshot.as_mapping(),
+            "recipe_sha256": self.recipe_sha256,
+            "organization_id": self.organization_id,
+            "job_id": self.job_id,
+            "owner_token": self.owner_token,
+            "attempt": self.attempt,
+            "output_root_id": self.output_root_id,
+            "derivatives": [ref.as_mapping() for ref in self.derivatives],
+            "provenance": list(self.provenance),
+        }
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any]) -> BacktestPreparedArtifactSet:
+        _input_keys(
+            payload,
+            (
+                "schema_version",
+                "manifest_kind",
+                "snapshot",
+                "recipe_sha256",
+                "organization_id",
+                "job_id",
+                "owner_token",
+                "attempt",
+                "output_root_id",
+                "derivatives",
+                "provenance",
+            ),
+        )
+        return cls(
+            **{
+                **payload,
+                "snapshot": ArtifactCandleSnapshot.from_mapping(payload["snapshot"]),
+                "derivatives": tuple(
+                    ArtifactInputFileReference.from_mapping(ref)
+                    for ref in _input_tuple(payload["derivatives"])
+                ),
+                "provenance": _input_tuple(payload["provenance"]),
+            }
+        )
+
+
+def _input_keys(payload: Mapping[str, Any], keys: tuple[str, ...]) -> None:
+    if not isinstance(payload, Mapping) or set(payload) != set(keys):
+        raise ValueError(f"input contract requires exact keys: {keys}")
+
+
+def _input_tuple(value: Any) -> tuple[Any, ...]:
+    if not isinstance(value, (list, tuple)):
+        raise ValueError("input contract requires an array")
+    return tuple(value)
+
+
+def _input_token(value: str) -> None:
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_.:/-]+", value):
+        raise ValueError("invalid input identity token")
+
+
+def _input_sha(value: str) -> None:
+    if not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}", value):
+        raise ValueError("input identity must be lowercase SHA-256")
+
+
+def _input_uint(value: int) -> None:
+    if type(value) is not int or value < 0:
+        raise ValueError("input dimension/index must be a nonnegative integer")
+
+
+def _input_interval(start: str, end: str) -> None:
+    # Payload domains preserve millisecond candle boundaries. Pointer publication
+    # timestamps retain their separate, strict whole-second serialization contract.
+    for value in (start, end):
+        if not isinstance(value, str) or not re.fullmatch(
+            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z", value,
+        ):
+            raise ValueError("input domain requires an explicit UTC timestamp")
+        datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if datetime.fromisoformat(start.replace("Z", "+00:00")) >= datetime.fromisoformat(
+        end.replace("Z", "+00:00")
+    ):
+        raise ValueError("input UTC domain must be a nonempty half-open interval")
+
+
+def _input_levels(values: tuple[float, ...]) -> None:
+    import math
+
+    if any(
+        type(value) not in (float, int) or not math.isfinite(value) or value <= 0
+        for value in values
+    ):
+        raise ValueError("risk levels must be finite positive numbers")
+    if tuple(values) != tuple(sorted(set(values))):
+        raise ValueError("risk levels must be unique and increasing")
+
+
+def root_manifest_required_keys_v2(schema_version: int) -> tuple[str, ...]:
+    if type(schema_version) is not int or schema_version not in (1, 2):
+        raise ValueError("root manifest schema_version must be 1 or 2")
+    if schema_version == 1:
+        return ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2
+    return tuple(key for key in ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2 if key != "hit_times")
+
+
+def root_manifest_optional_keys_v2(schema_version: int) -> tuple[str, ...]:
+    root_manifest_required_keys_v2(schema_version)
+    return ROOT_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2 + (("hit_times",) if schema_version == 2 else ())
+
+
+def _input_root_id(value: str) -> None:
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9_-]+", value):
+        raise ValueError("trusted root must be an opaque identity, not a path")

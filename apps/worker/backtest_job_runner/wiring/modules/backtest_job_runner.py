@@ -166,8 +166,19 @@ class BacktestRunnerTaskScheduler:
     lazy_detail_worker: BacktestLazyTradesMaterializationWorkerUseCase
     heavy_concurrency: int = 1
     lazy_detail_anti_starvation_limit: int = 5
+    recover_attempts: Callable[[], object] | None = None
     _lazy_detail_streak: int = 0
     _full_empty_rounds: int = 0
+
+    def _run_full(self) -> object:
+        if self.recover_attempts is not None:
+            self.recover_attempts()
+        return self.heavy_full_job_worker.run_next()
+
+    def _run_lazy(self) -> object:
+        if self.recover_attempts is not None:
+            self.recover_attempts()
+        return self.lazy_detail_worker.run_next()
 
     def next_launch(
         self,
@@ -187,12 +198,12 @@ class BacktestRunnerTaskScheduler:
             return BacktestRunnerTaskLaunch(
                 task_kind=_TASK_KIND_LAZY_DETAIL,
                 scheduling_class="none",
-                run=self.lazy_detail_worker.run_next,
+                run=self._run_lazy,
             )
         return BacktestRunnerTaskLaunch(
             task_kind=_TASK_KIND_FULL_JOB,
             scheduling_class=_SCHEDULING_CLASS_HEAVY,
-            run=self.heavy_full_job_worker.run_next,
+            run=self._run_full,
         )
 
     def record_result(
@@ -583,6 +594,22 @@ def build_backtest_job_runner_app(
     )
     postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
     job_repository = PostgresBacktestJobRepository(gateway=postgres_gateway)
+    import tempfile
+
+    from .compute_resources import recover_attempt_directories
+
+    def recover_attempts() -> int:
+        return recover_attempt_directories(
+            root=Path(
+                effective_environ.get(
+                    "ROEHUB_BACKTEST_SCRATCH_ROOT",
+                    str(Path(tempfile.gettempdir()) / "roehub-backtest-attempts"),
+                )
+            ),
+            reconcile_owner=job_repository.recover_attempt_reader,
+        )
+
+    recover_attempts()
     lease_repository = PostgresBacktestJobLeaseRepository(gateway=postgres_gateway)
     materialization_repository = PostgresBacktestLazyTradesMaterializationRepository(
         gateway=postgres_gateway
@@ -601,6 +628,7 @@ def build_backtest_job_runner_app(
         base_guardrails=backtest_runtime_config.guardrails,
     )
     heavy_executor = BacktestChildProcessExecutor(
+        job_repository=job_repository,
         environ=effective_environ,
         scheduling_class=_SCHEDULING_CLASS_HEAVY,
         light_max_actual_combinations=(effective_runtime_config.light_max_actual_combinations),
@@ -648,11 +676,13 @@ def build_backtest_job_runner_app(
         heartbeat_interval_seconds=effective_runtime_config.heartbeat_interval_seconds,
         locked_by=_build_locked_by(),
         executor=BacktestLazyTradesChildProcessExecutor(
+            job_repository=job_repository,
             environ=effective_environ,
             timeout_seconds=effective_runtime_config.child_timeout_seconds,
         ),
     )
     scheduler = BacktestRunnerTaskScheduler(
+        recover_attempts=recover_attempts,
         heavy_full_job_worker=heavy_full_job_worker,
         lazy_detail_worker=lazy_detail_worker,
         heavy_concurrency=effective_runtime_config.heavy_concurrency,
@@ -717,6 +747,12 @@ def _full_job_task_result(
     scheduling_class: str = "none",
 ) -> BacktestRunnerTaskResult:
     job = result.job
+    if result.stage_timings:
+        log.info(
+            "full-job attempt timing: job_id=%s stage_timings=%s",
+            None if job is None else job.job_id,
+            dict(result.stage_timings),
+        )
     return BacktestRunnerTaskResult(
         task_kind=_TASK_KIND_FULL_JOB,
         claimed=result.claimed,

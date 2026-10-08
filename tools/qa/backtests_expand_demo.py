@@ -57,7 +57,7 @@ def expand_artifacts(env: dict[str, str], dsn: str, *, canonical_rows=None) -> P
     from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 import (
         build_artifact_precompute_fixture_v2,
     )
-    from tests.unit.contexts.backtest.application.services.v2.test_artifact_precompute_runner_v2 import (  # noqa: E501
+    from tests.unit.contexts.backtest.application.services.v2.test_artifact_precompute_runner_v2 import (  # noqa: E501  # noqa: E501
         _build_canonical_rows_v2,
         _FakeCanonicalCandleReader,
         _request_v2,
@@ -70,10 +70,10 @@ def expand_artifacts(env: dict[str, str], dsn: str, *, canonical_rows=None) -> P
     from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
         AtomicArtifactCurrentPointerWriterV2,
     )
-    from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (  # noqa: E501
+    from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (  # noqa: E501  # noqa: E501
         BacktestArtifactPrecomputeRunnerV2,
     )
-    from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_publisher import (  # noqa: E501
+    from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_publisher import (  # noqa: E501  # noqa: E501
         BacktestArtifactSlotPublisherV2,
     )
     from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
@@ -102,7 +102,7 @@ def expand_artifacts(env: dict[str, str], dsn: str, *, canonical_rows=None) -> P
         build_backtest_artifacts_runtime_config_hash,
         load_backtest_artifacts_runtime_config,
     )
-    from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_loader import (  # noqa: E501
+    from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_loader import (  # noqa: E501  # noqa: E501
         YamlBacktestArtifactLoaderV2,
     )
 
@@ -142,25 +142,28 @@ def expand_artifacts(env: dict[str, str], dsn: str, *, canonical_rows=None) -> P
         now_provider=lambda: datetime(2026, 3, 29, 3, 0, tzinfo=UTC),
     )
     precheck = publisher.precheck_publish(fixture.coordinates)
-    runner.export_canonical_price_1m(
-        replace(
-            _request_v2(
-                fixture=fixture,
-                end_minute=4320,
-                asof_date="2026-03-29",
-                generated_at_utc="2026-03-29T03:00:00Z",
-            ),
-            time_range=TimeRange(
-                start=UtcTimestamp(datetime(2026, 2, 27, tzinfo=UTC)),
-                end=UtcTimestamp(datetime(2026, 3, 29, tzinfo=UTC)),
-            ),
-            force_full_rebuild=True,
-        )
+    build_request = replace(
+        _request_v2(
+            fixture=fixture,
+            end_minute=4320,
+            asof_date="2026-03-29",
+            generated_at_utc="2026-03-29T03:00:00Z",
+        ),
+        time_range=TimeRange(
+            start=UtcTimestamp(datetime(2026, 2, 27, tzinfo=UTC)),
+            end=UtcTimestamp(datetime(2026, 3, 29, tzinfo=UTC)),
+        ),
+        force_full_rebuild=True,
     )
-    publisher.publish(
+    publisher.build_and_publish(
+        request=replace(
+            build_request,
+            target_slot=precheck.inactive_slot,
+            target_slot_generation=precheck.target_slot_generation,
+        ),
         precheck=precheck,
+        precompute_runner=runner,
         validation_spec=fixture.runtime_config.to_validation_spec(),
-        asof_date="2026-03-29",
     )
     print(
         ("Synthetic" if canonical_rows is None else "Supplied canonical")

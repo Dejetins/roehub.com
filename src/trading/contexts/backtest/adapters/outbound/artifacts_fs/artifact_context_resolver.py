@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
+from typing import cast
 
 from trading.contexts.backtest.application.dto import (
     BacktestArtifactMetadata,
@@ -9,6 +11,7 @@ from trading.contexts.backtest.application.dto import (
 from trading.contexts.backtest.application.ports import BacktestArtifactContextUnavailable
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ArtifactCoordinatesV2,
+    ArtifactSlotLiteralV2,
     BacktestArtifactLoaderV2,
 )
 
@@ -31,6 +34,7 @@ class FilesystemBacktestArtifactContextResolver:
         self,
         *,
         coordinates: BacktestCoordinates,
+        preferred: BacktestArtifactMetadata | None = None,
     ) -> BacktestArtifactMetadata:
         """
         Resolve the currently published artifact metadata for normalized coordinates.
@@ -52,18 +56,32 @@ class FilesystemBacktestArtifactContextResolver:
             market_type=coordinates.market_type,
             symbol=coordinates.symbol,
         )
+        if preferred is not None:
+            path = self.artifact_loader.resolve_slot_manifest_path(
+                artifact_coordinates, cast(ArtifactSlotLiteralV2, preferred.artifact_slot),
+            )
+            try:
+                same = hashlib.sha256(path.read_bytes()).hexdigest() == (
+                    preferred.artifact_manifest_hash
+                )
+            except FileNotFoundError:
+                same = False
+            if same:
+                return preferred
         try:
             current_pointer = self.artifact_loader.load_current_pointer(artifact_coordinates)
             root_manifest = self.artifact_loader.load_slot_manifest(
                 artifact_coordinates,
                 current_pointer.active_slot,
             )
-            hit_times_manifest_hash = root_manifest.hit_times.manifest_sha256
+            hit_times_manifest_hash = (None if root_manifest.hit_times is None
+                                       else root_manifest.hit_times.manifest_sha256)
             funding_manifest = root_manifest.funding
-            self.artifact_loader.load_hit_times_manifest(
-                artifact_coordinates,
-                current_pointer.active_slot,
-            )
+            if root_manifest.hit_times is not None:
+                self.artifact_loader.load_hit_times_manifest(
+                    artifact_coordinates,
+                    current_pointer.active_slot,
+                )
         except (FileNotFoundError, ValueError) as error:
             raise BacktestArtifactContextUnavailable(str(error)) from error
 

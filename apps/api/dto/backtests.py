@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 from trading.contexts.backtest.application.dto import (
     BacktestJobCreateResult,
@@ -16,6 +16,39 @@ from trading.contexts.backtest.application.dto import (
     BacktestPreflightResult,
     BacktestRuntimeDefaults,
 )
+
+
+def _public_cache_metadata(value: Any) -> dict[str, Any]:
+    """Expose cache status/identity/TTL without filesystem paths or raw IO errors."""
+    if not isinstance(value, dict):
+        raise ValueError("cache metadata must be an object")
+    return {key: value[key] for key in ("status", "cache_key", "ttl_seconds", "ttl_hours")
+            if key in value}
+
+
+PublicBacktestCacheMetadata = Annotated[
+    dict[str, Any], BeforeValidator(_public_cache_metadata),
+]
+
+
+def _public_materialization_metadata(value: Any) -> dict[str, Any]:
+    """Keep task state public while retaining raw failure diagnostics internally."""
+    if not isinstance(value, dict):
+        raise ValueError("materialization metadata must be an object")
+    public = {key: value[key] for key in (
+        "task_id", "correlation_id", "status", "retryable", "retry_after_seconds",
+        "priority_class", "created_at", "updated_at", "started_at", "finished_at",
+        "attempt", "request_identity",
+    ) if key in value}
+    failed = value.get("status") == "failed"
+    public["last_error"] = "Result preparation failed." if failed else None
+    public["last_error_json"] = {"code": "backtest.materialization_failed"} if failed else None
+    return public
+
+
+PublicBacktestMaterializationMetadata = Annotated[
+    dict[str, Any], BeforeValidator(_public_materialization_metadata),
+]
 
 
 class BacktestRuntimeDefaultsResponse(BaseModel):
@@ -41,11 +74,24 @@ class BacktestRuntimeDefaultsResponse(BaseModel):
     links: dict[str, Any]
 
 
+class BacktestInputReadinessResponse(BaseModel):
+    """Bounded metadata assessment; checksum verification still precedes worker execution."""
+
+    status: Literal["ready", "requires_materialization"]
+    requested_signal_rows: int = Field(ge=0)
+    missing_signal_rows: int = Field(ge=0)
+    requested_risk_levels: int = Field(ge=0)
+    risk_coverage: Literal["not_required", "worker_verification_required", "covered"]
+    estimated_generated_bytes_upper_bound: int = Field(ge=0)
+    payload_validation: Literal["pending"]
+
+
 class BacktestPreflightResponse(BaseModel):
     """
     API response model for `POST /backtests/preflight`.
     """
 
+    input_readiness: BacktestInputReadinessResponse | None = None
     normalized_request: dict[str, Any]
     request_hash: str
     result_config_hash: str
@@ -131,7 +177,7 @@ class BacktestLazyTradesDetailResponse(BaseModel):
     readable_params: dict[str, Any]
     trades: list[dict[str, Any]]
     chart_overlay: dict[str, Any]
-    cache: dict[str, Any]
+    cache: PublicBacktestCacheMetadata
     timing: dict[str, Any]
     funding_manifest_hash: str | None = None
     funding: dict[str, Any] = Field(default_factory=dict)
@@ -143,8 +189,8 @@ class BacktestLazyTradesMaterializationResponse(BaseModel):
     variant_hash: str
     request_hash: str
     status: str
-    materialization: dict[str, Any]
-    cache: dict[str, Any]
+    materialization: PublicBacktestMaterializationMetadata
+    cache: PublicBacktestCacheMetadata
     timing: dict[str, Any]
     pagination: dict[str, Any]
 
@@ -174,7 +220,7 @@ class BacktestResultSeriesResponse(BaseModel):
     returned_points: int
     source_points: int
     downsampled: bool
-    cache: dict[str, Any]
+    cache: PublicBacktestCacheMetadata
     timing: dict[str, Any]
 
 
@@ -185,7 +231,7 @@ class BacktestResultStatsResponse(BaseModel):
     kind: str
     items: list[dict[str, Any]]
     bounds: dict[str, Any]
-    cache: dict[str, Any]
+    cache: PublicBacktestCacheMetadata
     timing: dict[str, Any]
 
 
@@ -196,7 +242,7 @@ class BacktestPaginatedTradesResponse(BaseModel):
     items: list[dict[str, Any]]
     pagination: dict[str, Any]
     summary_metrics: dict[str, Any]
-    cache: dict[str, Any]
+    cache: PublicBacktestCacheMetadata
     timing: dict[str, Any]
 
 

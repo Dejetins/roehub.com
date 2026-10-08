@@ -99,6 +99,12 @@ extend-exclude = [
 [tool.ruff.lint]
 select = ["E", "F", "I"]
 
+# Preserve the exact source bytes bound by this completed pack's ledger/receipts.
+# Only historical layout is exempt; functional lint checks remain enabled.
+[tool.ruff.lint.per-file-ignores]
+".codex/agents/generated/backtest-npy-input-materialization-v1/ledger_update.py" = ["E501"]
+".codex/agents/generated/backtest-npy-input-materialization-v1/test_ledger_update.py" = ["E501", "I001"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/trading", "apps"]
 

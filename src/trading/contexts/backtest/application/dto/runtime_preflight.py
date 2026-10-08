@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
+
+if TYPE_CHECKING:
+    from .input_recipe import BacktestInputRecipe
 
 JsonMapping = Mapping[str, Any]
 
@@ -269,9 +272,13 @@ class BacktestPreflightResult:
     errors: tuple[BacktestValidationIssue, ...] = ()
     funding_readiness: JsonMapping = field(default_factory=dict)
     direction_market_compatibility: JsonMapping = field(default_factory=dict)
+    input_recipe: BacktestInputRecipe | None = None
+    input_readiness: JsonMapping | None = None
 
     def as_mapping(self) -> dict[str, Any]:
         return {
+            "input_readiness": (None if self.input_readiness is None
+                                else dict(self.input_readiness)),
             "normalized_request": dict(self.normalized_request),
             "request_hash": self.request_hash,
             "result_config_hash": self.result_config_hash,

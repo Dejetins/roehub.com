@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import inspect
+import os
+import subprocess
+import sys
 from dataclasses import dataclass
 from typing import cast
 
@@ -146,3 +149,59 @@ def _scheduler(
         heavy_concurrency=1,
         lazy_detail_anti_starvation_limit=lazy_detail_anti_starvation_limit,
     )
+
+
+def test_child_derivative_warmup_preserves_admitted_scoring_thread_budget(tmp_path) -> None:
+    # A fresh interpreter proves both the pre-import ceiling and warmup thread mask.
+    result = subprocess.run(
+        [sys.executable, "-c", """
+import os
+import numba
+from apps.worker.backtest_job_runner.wiring.modules.full_job_compute import (
+    build_full_job_compute_executor,
+)
+executor = build_full_job_compute_executor(environ=os.environ)
+assert executor.compute_policy.threads.num_threads == 2
+assert numba.get_num_threads() == 2, "derivative warmup changed the admitted child budget"
+assert os.environ["ROEHUB_NUMBA_NUM_THREADS"] == "1"
+"""],
+        env={
+            **os.environ,
+            "ROEHUB_ENV": "test",
+            "ROEHUB_BACKTEST_ARTIFACTS_CONFIG": "configs/test/backtest_artifacts.yaml",
+            "ROEHUB_INDICATORS_CONFIG": "configs/test/indicators.yaml",
+            "NUMBA_NUM_THREADS": "2",
+            "NUMBA_THREADING_LAYER": "workqueue",
+            "ROEHUB_BACKTEST_EFFECTIVE_NUMBA_NUM_THREADS": "2",
+            "ROEHUB_BACKTEST_EFFECTIVE_NUMBA_THREAD_SOURCE": "test_admitted_budget",
+            "ROEHUB_NUMBA_NUM_THREADS": "1",
+            "ROEHUB_NUMBA_CACHE_DIR": str(tmp_path / "numba-cache"),
+        },
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_lazy_parent_metadata_composition_does_not_warm_indicator_compute(monkeypatch) -> None:
+    from apps.worker.backtest_job_runner.wiring.modules.lazy_trades_compute import (
+        build_lazy_trades_compute_service,
+    )
+    from trading.contexts.indicators.adapters.outbound import NumbaIndicatorCompute
+
+    def forbidden_warmup(self):
+        raise AssertionError("metadata-only parent must not initialize compute")
+
+    monkeypatch.setattr(NumbaIndicatorCompute, "warmup", forbidden_warmup)
+    service = build_lazy_trades_compute_service(
+        environ={
+            "ROEHUB_ENV": "test",
+            "ROEHUB_BACKTEST_ARTIFACTS_CONFIG": "configs/test/backtest_artifacts.yaml",
+            "ROEHUB_INDICATORS_CONFIG": "configs/test/indicators.yaml",
+        },
+        prepare_derivatives=False,
+    )
+    assert service.derivative_builder is None
+    assert service.source_resolver is not None

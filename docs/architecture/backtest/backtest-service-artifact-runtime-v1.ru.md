@@ -7,9 +7,195 @@ config keys, metric names, timer names, backend ids, file paths и значен�
 контрактных полей сохраняются в исходном написании, чтобы не разорвать связь с
 кодом, notebook и benchmark evidence.
 
+## Версионированные NPY-входы (2026-10-08)
+
+Runtime готовит полный проверенный набор `.npy` перед scoring: пригодные
+производные переиспользуются, недостающие строки и risk levels строятся тем же
+`BacktestArtifactPrecomputeRunnerV2`, который обслуживает publication. Подготовка
+не читает canonical candle reader/ClickHouse и не меняет `current.yaml`.
+`BacktestPreparePoolsService.prepare_artifact_inputs` выполняется один раз на
+attempt; warmup и основной расчёт используют тот же ready set. Loader открывает
+явные validated references через `np.load(mmap_mode="r", allow_pickle=False)`.
+Повреждённый объявленный файл не маскируется пересчётом.
+
+`ArtifactManifestDocumentV2` строго читает schema-1 и schema-2. В schema-1
+обязательна ссылка `hit_times`; в schema-2 она может отсутствовать, но явный
+`null` недопустим. `signals` — явный пустой/частичный/полный inventory. Prices,
+mappings и требуемый funding остаются обязательными. Publication с on-demand
+policy пишет schema-2; старый полный формат остаётся читаемым. Prepared job
+manifest — отдельный тип, без вымышленных slots или hit-time hashes.
+
+`ArtifactCandleSnapshot` хранит реальные coordinates, slot/generation и manifest
+SHA, `signal_timeframe`, `execution_timeframe=1m`, исходные `source_file_identities`
+и отдельно `consumed_domains`. Первые фиксируют полный исходный dtype/shape/domain
+и SHA файла; вторые задают потребляемый префикс без изменения начала глобальных
+индексов. `ArtifactInputFileReference.root_id` — непрозрачный идентификатор
+доверенного корня из внутреннего composition, `relative_path` не допускает
+абсолютного пути, `..`, пустых сегментов и обратных слешей. Сам descriptor не
+предоставляет доступ: проверка корня, symlink containment, файловых hashes и
+организации остаётся обязанностью loader/reservation перед использованием.
+
+`row_ids[i]` — канонический ID физической строки `i`, а не новый ID после
+компактизации. `risk_values` содержит значения физической оси level в единицах
+хранимого массива; запрос `tp_levels_pct/sl_levels_pct` использует проценты.
+Индексный контракт `source-global-u32-sentinel-length/v1` сохраняет исходное
+начало и sentinel исходной длины. Временные диапазоны UTC полуоткрытые. Для
+производных первоначально сохраняется весь исходный timeline, включая историю
+инициализации EMA; вычисления, dtype, правила funding и ranking сохранены.
+
+`ArtifactDerivativeBuildRequest` задаёт snapshot, точные indicator/source/params/
+row IDs, версии rule/default/compute/precision, требуемые risk levels и внутренние
+owner/attempt/root/budgets до выделения памяти. Пустые risk grids не требуют
+hit-time файлов. `ArtifactDerivativeBuildResult` описывает закрытые созданные
+файлы; это ещё не подтверждение пригодности для scoring.
+
+`BacktestInputRecipe`, schema `backtest-input-recipe/v1`, сериализуется в JSON и
+отделяет effective funding policy/fingerprint, вычислительные версии и исходные
+file/domain identities от физической подготовки. `semantic_sha256` использует
+namespace `backtest-semantic-input/v1`, UTF-8 canonical JSON с сортировкой ключей,
+компактными separators и запретом NaN/Infinity. В hash входят requested interval,
+canonical rows, source content/domain, consumed domains, timeframe, rule/default/
+compute/precision, funding и risk/index contract. Не входят slot/generation,
+manifest hash, root/path, retention/quota, время создания, reused/generated и
+переход proof pending→verified. Исходные file identities recipe не переписываются
+при replay по более новому файлу. `request_hash`, `variant_hash` и старые config
+hashes не переопределяются; отсутствие recipe означает прежнюю семантику.
+
+### Двухфазное доказательство префикса
+
+Preflight использует ограниченную manifest metadata и `prefix_proof=pending`
+без digest и чтения ndarray payload. В reserved worker перед scoring проверяются
+исходные файлы и рассчитывается `artifact-prefix-payload/v1`:
+
+1. Descriptor содержит schema, role, timeframe, явный little-endian dtype,
+   axis_order, исходные UTC origin/end, row_count, shape и index_origin.
+   `row_count` равен первой размерности записанного среза; ось времени явно названа.
+2. SHA-256 получает uint64 little-endian длину descriptor в байтах, затем sorted
+   compact UTF-8 JSON descriptor, затем C-order bytes записанного среза. Меняется
+   только endian; значения и биты NaN не нормализуются. Заголовок `.npy`, путь,
+   текущая полная shape и дописанные строки не входят в payload proof.
+3. Role digests в уникальном лексикографическом порядке вместе с descriptors
+   хешируются как canonical JSON `{schema: artifact-source-domain/v1, roles: ...}`.
+   Каждый элемент roles содержит `descriptor` и `payload_sha256`.
+4. `ArtifactPrefixProof`, schema `artifact-prefix-proof/v1`, проверяет aggregate
+   digest и покрытие consumed domains. Empty funding series имеет явный domain и
+   digest; `not_applicable`/`disabled` не выдают себя за доказанную пустую серию.
+
+Полный file SHA и payload-prefix SHA различны. Replay использует исходные
+recorded slices, поэтому изменение header после append допустимо, а изменение
+потреблённого payload — нет. Стоимость сканирования относится к preparation.
+Worker передаёт prepared event через socket IPC; parent в transaction проверяет
+точный lease/attempt/recipe, CAS-сохраняет proof/provenance и только после commit
+выдаёт ACK. До ACK scoring запрещён. Cancellation, потеря parent и bounded
+30-second ACK timeout завершают попытку без разрешения scoring.
+
+`BacktestPreparedArtifactSet` имеет отдельные `manifest_kind=job_prepared_inputs`
+и `schema_version=1`; его нельзя прочитать как publication root. Он содержит
+snapshot с verified proof, recipe SHA, organization/job/owner/attempt и provenance
+для каждого derivative. Generated root отличается от source root. Repository
+сверяет provenance с job/organization/attempt, recipe SHA и исходным snapshot;
+worker CAS и filesystem validation дополняют эту проверку. Ready manifest
+устанавливается атомарно после закрытия и проверки файлов; частичный набор
+не становится consumable. Внутренние paths не входят в публичный DTO.
+
+### Additive persistence и ownership
+
+Миграция `0028_backtest_input_recipe_v1.sql` добавляет nullable JSONB
+`input_recipe_json` и `preparation_provenance_json` в `backtest_jobs`, не выполняя
+backfill или пересчёт прежних hashes. Она зарегистрирована в ordered manifest и
+bootstrap/storage lifecycle. Job creation сохраняет recipe, parent сохраняет
+verified provenance до scoring. Recipe-aware job не может успешно завершиться
+без proof текущего attempt; reclaim очищает старый proof и требует новый ACK.
+
+`backtest_artifact_slot_ownership` имеет единственный физический ключ
+`(exchange, market_type, symbol, slot)`. Generation/hash — проверяемые данные,
+не часть mutex. Состояния: available, writing, quarantined. Writer хранит точные
+owner_token, owner_attempt, parent_incarnation и возрастающий writer_epoch.
+`backtest_artifact_slot_readers` хранит owner kind job/lazy/publisher_source,
+organization/owner ID, token, attempt, parent incarnation, expected generation/
+manifest, ownership_epoch и queued/active/quarantined. Organization обязательна
+для job/lazy; publisher_source — внутреннее reservation без organization.
+Эти записи не являются публичным межорганизационным inventory.
+
+Reserve/release/write/complete используют `BacktestPostgresGateway.transaction()`
+с одним connection и `SELECT ... FOR UPDATE`. Reader допускается только при
+совпадении generation/manifest и отсутствии writer/quarantine; writer — без
+readers. Создание queued job и reader pin атомарно; worker переносит queued pin
+на свой attempt через CAS. Lazy replay и синхронный API candle-read резервируют
+source до payload hashing/mmap и освобождают после закрытия mmap.
+
+Publisher блокирует `slot_a`, затем `slot_b` одной координаты, исключая второго
+publication/cleanup writer. В той же transaction регистрируется
+`publisher_source` reader для incremental reuse. Под ownership заново читаются
+pointer и target generation; перед установкой результата они проверяются снова.
+Устаревший precheck не разрешает ни rebuild, ни удаление теперь активного slot.
+Build идёт в private staging; previous-slot cleanup требует writer reservation
+и повторного подтверждения, что target не current.
+
+Reader primary key — `(exchange, market_type, symbol, slot, owner_token)`;
+поиск owner дополнительно scoped organization/kind/id/attempt. Нормализованный
+physical key ownership не содержит generation. Epoch/CAS защищают DB commits,
+но сами по себе не останавливают filesystem writer. При потере DB/lease или
+неизвестной liveness reservation остаётся quarantined. TTL/PID/возраст директории
+не доказывают безопасность. Recovery требует доказанной смерти точной owner
+incarnation либо terminate+reap ребёнка, проверки pointer/staged/final manifest
+и удаления только принадлежащего этому owner incomplete staging.
+
+Parent-owned attempt имеет durable ownership marker и inherited lifetime flock;
+parent сначала reap, затем cleanup и освобождение capacity/pin. Retry использует
+новую директорию. Неясное состояние сохраняется fail-closed. API candle-read
+не имеет worker child lifetime lock: crash API или неуверенный release оставляет
+pin; требуется ручная сверка точного owner, смерти процесса и закрытия mmap через
+существующие repository reconciliation операции. Автоматического TTL reclaim нет.
+
+### Policy, preflight и replay
+
+`backtest_artifacts.retention_policy.version=1` задаёт `coordinates` с
+`exchange`, `market_type`, `symbol`, `signals` и `hit_times`; значения policy —
+`precompute`/`on_demand`. При отсутствии policy действует прежний precompute.
+On-demand прекращает proactive build при следующей publication и допускает
+reuse уже пригодных derivatives; не удаляет существующие файлы и не меняет
+семантику queued job. Возврат precompute использует тот же native builder.
+
+Preflight читает bounded metadata, не сканирует ndarray payload, не строит
+индикаторы, не пишет derivatives и не создаёт pin. `input_readiness` содержит
+`ready`/`requires_materialization`, requested/missing signal counts,
+requested risk count, `risk_coverage`, `estimated_generated_bytes_upper_bound`
+и `payload_validation=pending`. Это оценка admission, не доказательство payload.
+Для старого risk manifest без значений оси окончательный reuse решает worker.
+Поддерживаемая сетка определяется config/catalog, а не наличием derivative.
+
+Точные неравномерные TP/SL `levels_pct` сохраняются в normalized request,
+recipe, job и worker. Прежние равномерные range hashes сохранены. Старый reader,
+понимающий только range, несовместим с новым sparse payload. Уже сохранённый
+исторический expanded range не позволяет восстановить потерянный sparse intent.
+
+Lazy replay после cleanup восстанавливает только selected rows и TP/SL pair.
+Более новый snapshot допускается после проверки полного recorded prefix,
+включая funding event domain; исходные длины/индексы/sentinels сохраняются.
+Append разрешён, изменение consumed history, отсутствующий proof или другая
+math version — явный отказ. Funding entry-exclusive/exit-inclusive сохраняется;
+пустая доказанная серия отлична от disabled/not_applicable. Recipe-less jobs
+используют legacy путь. Cache namespace `research-cache/recipe-v1` включает
+organization/job/variant/request/semantic recipe; paths, retention и attempt
+в financial identity не входят. Series/CSV используют существующие projections.
+
+### Совместимость и rollback
+
+Новые readers со schema-1/recipe-less jobs — `compatible-change`; прежние hashes
+сохраняются. Старые readers с schema-2/job manifests — `breaking-change`.
+Nullable expansion совместима со старыми строками после применения миграции;
+новый repository требует новых столбцов. Сначала migration/readers, затем полный
+worker/loader/publisher protocol, drain несовместимых workers и только потом
+новые writers/policy. COUNT-only publishers нельзя смешивать с активными новыми
+reservations. До новых writes возможен возврат старого кода; после появления
+partial roots/new jobs старый бинарник без drain/rebuild небезопасен. Колонки,
+provenance и прежние артефакты автоматически не удаляются. Локальные проверки
+не означают production migration, replay или успешный rollout.
+
 ## Статус
 
-Контракт artifact-backed runtime и история его реализации. Сверено 2026-09-06:
+Контракт artifact-backed runtime и история его реализации. Сверено 2026-10-08:
 API jobs, runtime services, job worker и lazy trades materialization присутствуют
 в текущем коде; ссылки на entrypoints и installation manifest собраны в [индексе](README.md).
 Формулировки будущих итераций ниже описывают исходный план и сохранённые records,
@@ -56,7 +242,7 @@ compatibility-входы: адаптеры могут транслировать
 Построить продакшн-сервис бектестов для сайта и публичного API, который:
 
 - всегда запускает backtest как persisted job;
-- читает precomputed `.npy` artifacts (`prices`, `signals`, `mappings`, `hit_times/15m`);
+- читает полный prepared `.npy` набор: published prices/mappings/funding и reused/generated derivatives;
 - принимает координаты рынка, расчетный период, timeframe и набор индикаторов с `source` и `window` grid;
 - поддерживает `no-risk` и `tp/sl grid` режимы;
 - возвращает persisted top N summary;
@@ -72,7 +258,7 @@ Artifact publisher/precompute, manifests, `.npy` layout, signal rules, hit-times
 
 Действующий сервис работает поверх artifacts. Наличие API routes, Web pages и worker wiring является частью текущей реализации; старый словарь сам по себе не означает, что модуль нужно удалить.
 
-Целевая модель `hit_times`: `hit_times/15m`. Семантически таблицы обслуживают риск-исполнение через precomputed hit-time data, а request выбирает подмножество из заранее опубликованного достаточно широкого TP/SL grid.
+Целевая модель `hit_times`: `hit_times/15m`. Семантически таблицы обслуживают риск-исполнение через precomputed hit-time data, а request выбирает поддерживаемые TP/SL levels, которые переиспользуются или достраиваются до scoring.
 
 ## Охват
 
@@ -598,7 +784,7 @@ warmup не добавляется в `total_without_warmup`.
 
 Эта stage:
 
-- читает `hit_times/15m/manifest.yaml`;
+- использует validated hit-time references prepared set (legacy: `hit_times/15m/manifest.yaml`);
 - читает `tp_values.f32.npy`, `sl_values.f32.npy`;
 - сопоставляет requested TP/SL percentages с artifact indexes;
 - загружает selected rows из `long_tp.u32.npy`, `long_sl.u32.npy`,
@@ -614,10 +800,10 @@ warmup не добавляется в `total_without_warmup`.
 Валидация:
 
 - request values интерпретируются как проценты и переводятся в decimal levels;
-- каждый requested TP и SL level должен совпадать ровно с одним published artifact value
+- каждый requested TP и SL level должен совпадать ровно с одним prepared value
   с bounded float tolerance;
-- missing levels детерминированно падают до compute с
-  `422 backtest.tp_sl_grid_not_covered`;
+- отсутствующие поддерживаемые levels материализуются до scoring; unsupported
+  grid сохраняет `422 backtest.tp_sl_grid_not_covered`;
 - target benchmark grid: `2.0..25.0` inclusive, step `0.5`.
 
 ### Измеряемые стадии бенчмарка: artifact подготовка и `prepare_pools_core`
@@ -2129,3 +2315,22 @@ candles/trades overlay будет спроектирована в UI iteration.
 guardrails` выше. Перед production rollout эти значения должны попасть в runtime
 config и быть видимы через `GET /backtests/runtime-defaults` и
 `POST /backtests/preflight`.
+
+## Ресурсная граница NPY preparation (2026-10-08)
+
+Текущие defaults: generated attempt 2 GiB, total worker scratch 8 GiB, free-space
+reserve 1 GiB, preparation compute 512 MiB. Полное admission учитывает 64 MiB
+ограниченного metadata/IPC overhead на attempt, включая native. Prepared marker
+ограничен 8 MiB; derivative marker имеет 8 MiB reservation внутри generated cap.
+Оба проверяются до записи. Логи имеют bounded pipe tails. Перед payload validation
+оцениваются resident source/reused arrays и временные validation buffers; builder
+получает оставшийся compute budget. Это conservative allocation guard, не OS RSS
+ceiling. Подробности конфигурации, v1/v2 scratch marker и recovery — в
+[installation runbook](../../runbooks/offline-release-installation.md).
+
+S08 измерял предыдущую derivative-only reservation и не доказывал enforcement
+всего scratch. Его 81 warm/27 fresh/3 W4 измерения остаются свидетельством именно
+замороженных S08 bytes. S09 усиливает admission/accounting и ограничивает логи;
+новые guards проверяются отдельно. Числа S08 не выдаются за повторное измерение
+этого изменения или production SLO. Financial kernels и исходная parity reference
+сохранены; окончательные результаты и границы проверок перечислены в S09 report.

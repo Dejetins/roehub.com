@@ -37,6 +37,7 @@ class BacktestLazyTradesMaterializationExecutor(Protocol):
         self,
         *,
         task: BacktestLazyTradesMaterializationTask,
+        cancel_event: threading.Event | None = None,
     ) -> BacktestLazyTradesMaterializationExecutionResult: ...
 
 
@@ -61,6 +62,7 @@ class BacktestLazyTradesMaterializationWorkerUseCase:
         if task is None:
             return BacktestLazyTradesMaterializationWorkerResult(task=None, claimed=False)
 
+        cancel_event = threading.Event()
         try:
             with _LazyTradesMaterializationHeartbeat(
                 materialization_repository=self.materialization_repository,
@@ -68,9 +70,13 @@ class BacktestLazyTradesMaterializationWorkerUseCase:
                 locked_by=owner,
                 lease_seconds=self.lease_seconds,
                 interval_seconds=self.heartbeat_interval_seconds,
+                cancel_event=cancel_event,
             ) as heartbeat:
-                execution = self._execute(task=task)
+                execution = self._execute(task=task, cancel_event=cancel_event)
+            if cancel_event.is_set():
+                raise RuntimeError("lazy child lost its materialization lease")
             finished = self.materialization_repository.finish_completed(
+                attempt=task.attempt,
                 task_id=task.task_id,
                 owner_user_id=task.owner_user_id,
                 now=datetime.now(UTC),
@@ -87,6 +93,7 @@ class BacktestLazyTradesMaterializationWorkerUseCase:
         except Exception as error:  # noqa: BLE001
             error_payload = _error_payload(error=error, task=task)
             failed = self.materialization_repository.finish_failed(
+                attempt=task.attempt,
                 task_id=task.task_id,
                 owner_user_id=task.owner_user_id,
                 now=datetime.now(UTC),
@@ -105,9 +112,10 @@ class BacktestLazyTradesMaterializationWorkerUseCase:
         self,
         *,
         task: BacktestLazyTradesMaterializationTask,
+        cancel_event: threading.Event | None = None,
     ) -> BacktestLazyTradesMaterializationExecutionResult:
         if self.executor is not None:
-            return self.executor.execute(task=task)
+            return self.executor.execute(task=task, cancel_event=cancel_event)
         detail = self._execute_in_process_for_tests(task=task)
         return BacktestLazyTradesMaterializationExecutionResult(
             cache_status=str(detail.cache.get("status", "unknown")),
@@ -171,6 +179,7 @@ class _LazyTradesMaterializationHeartbeat:
         locked_by: str,
         lease_seconds: int,
         interval_seconds: float,
+        cancel_event: threading.Event,
     ) -> None:
         if interval_seconds <= 0:
             raise ValueError("heartbeat_interval_seconds must be > 0")
@@ -179,6 +188,7 @@ class _LazyTradesMaterializationHeartbeat:
         self._locked_by = locked_by
         self._lease_seconds = lease_seconds
         self._interval_seconds = interval_seconds
+        self._cancel_event = cancel_event
         self._stop = threading.Event()
         self._lease_lost = False
         self._thread = threading.Thread(
@@ -202,13 +212,19 @@ class _LazyTradesMaterializationHeartbeat:
     def _run(self) -> None:
         next_heartbeat = monotonic() + self._interval_seconds
         while not self._stop.wait(max(next_heartbeat - monotonic(), 0.0)):
-            updated = self._materialization_repository.heartbeat(
-                task_id=self._task_id,
-                now=datetime.now(UTC),
-                locked_by=self._locked_by,
-                lease_seconds=self._lease_seconds,
-            )
+            try:
+                updated = self._materialization_repository.heartbeat(
+                    task_id=self._task_id,
+                    now=datetime.now(UTC),
+                    locked_by=self._locked_by,
+                    lease_seconds=self._lease_seconds,
+                )
+            except Exception:
+                self._lease_lost = True
+                self._cancel_event.set()
+                return
             if updated is None:
+                self._cancel_event.set()
                 self._lease_lost = True
                 return
             next_heartbeat = monotonic() + self._interval_seconds

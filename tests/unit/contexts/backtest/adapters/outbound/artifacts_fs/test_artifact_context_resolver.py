@@ -50,3 +50,26 @@ def test_filesystem_artifact_context_resolver_reports_artifacts_unavailable(
                 symbol="ETHUSDT",
             )
         )
+
+
+def test_resolver_accepts_schema2_without_risk_manifest(tmp_path: Path) -> None:
+    import hashlib
+
+    import yaml
+
+    store = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    manifest_path = store.builder.slot_manifest_path(store.coordinates, store.active_slot)
+    payload = yaml.safe_load(manifest_path.read_text())
+    payload["schema_version"] = 2
+    payload.pop("hit_times")
+    manifest_path.write_text(yaml.safe_dump(payload))
+    pointer_path = store.builder.current_pointer_path(store.coordinates)
+    pointer = yaml.safe_load(pointer_path.read_text())
+    pointer["manifest_sha256"] = hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+    pointer_path.write_text(yaml.safe_dump(pointer))
+    # The old file may be absent: no-risk source resolution must never open it.
+    store.builder.hit_times_paths(store.coordinates, store.active_slot).manifest.unlink()
+    metadata = FilesystemBacktestArtifactContextResolver(store.loader).resolve_context(
+        coordinates=BacktestCoordinates(exchange="binance", market_type="spot", symbol="BTCUSDT"),
+    )
+    assert metadata.hit_times_manifest_hash is None

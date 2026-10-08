@@ -6,7 +6,8 @@ import math
 import time
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from typing import Any, Mapping, Sequence
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 
 import numba as nb
 import numpy as np
@@ -22,18 +23,32 @@ from trading.contexts.backtest.application.dto import (
     PreparedSignalSegments,
     PreparePoolsTiming,
 )
+from trading.contexts.backtest.application.dto.artifact_inputs import (
+    BacktestArtifactRuntimeContext,
+    BacktestSignalMatrix,
+)
+from trading.contexts.backtest.application.dto.input_recipe import BacktestInputRecipe
 from trading.contexts.backtest.application.ports import BacktestGridDefaultsProvider
 from trading.contexts.backtest.application.ports.artifact_arrays import (
     BacktestArtifactArrayLoader,
 )
+from trading.contexts.backtest_artifacts.application.services.v2 import artifact_manifest_validator
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
+    SIGNAL_FEATURE_NAMES_V2,
+    ArtifactDerivativeBuildRequest,
     ArtifactMappingArraysV2,
+    ArtifactPrefixProof,
     ArtifactPriceArraysV2,
-    ArtifactSignalMatrixV2,
-    ArtifactSlotPinnedRuntimeContextV2,
+    ArtifactRequestedRow,
+    BacktestPreparedArtifactSet,
 )
 from trading.contexts.indicators.domain.specifications.grid_param_spec import GridValue
+
+if TYPE_CHECKING:
+    from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (  # noqa: E501
+        BacktestArtifactPrecomputeRunnerV2,
+    )
 
 PREPARE_POOLS_CORE_STAGE_NAME = "prepare_pools_core"
 PREPARE_POOLS_TOTAL_STAGE_NAME = "prepare_pools_total"
@@ -64,12 +79,12 @@ class BacktestPreparePoolsRuntimeArrays:
     Resolved artifact context and opened mmap handles for one normalized request.
     """
 
-    context: ArtifactSlotPinnedRuntimeContextV2
+    context: BacktestArtifactRuntimeContext
     timeframe: str
     price_arrays_15m: ArtifactPriceArraysV2
     price_arrays_1m: ArtifactPriceArraysV2
     mapping_arrays: ArtifactMappingArraysV2
-    signal_matrices: Mapping[str, ArtifactSignalMatrixV2]
+    signal_matrices: Mapping[str, BacktestSignalMatrix]
 
 
 @dataclass(frozen=True, slots=True)
@@ -93,11 +108,167 @@ class BacktestPreparePoolsService:
     defaults_provider: BacktestGridDefaultsProvider
     config: BacktestPreparePoolsConfig = BacktestPreparePoolsConfig()
 
+    def prepare_artifact_inputs(
+        self, *, recipe: BacktestInputRecipe, context: BacktestArtifactRuntimeContext,
+        builder: BacktestArtifactPrecomputeRunnerV2,
+        validator: artifact_manifest_validator.BacktestArtifactManifestValidatorV2,
+        output_directory: Path, organization_id: str, job_id: str,
+        owner_token: str, attempt: int, output_root_id: str,
+        max_generated_bytes: int, max_compute_bytes: int,
+    ) -> BacktestPreparedArtifactSet:
+        """Resolve complete run inputs; compute only absent selected rows and levels.
+
+        Composition supplies a pinned source and private attempt directory. This
+        returns attested files, not a durable parent acknowledgement to start scoring.
+        Corrupt declared inventory fails before any missing derivative is built.
+        """
+        request = ArtifactDerivativeBuildRequest(
+            snapshot=recipe.snapshot, rows=recipe.rows, rule_version=recipe.rule_version,
+            defaults_sha256=recipe.defaults_sha256, compute_version=recipe.compute_version,
+            precision_version=recipe.precision_version, tp_levels_pct=recipe.tp_levels_pct,
+            sl_levels_pct=recipe.sl_levels_pct, output_root_id=output_root_id,
+            owner_token=owner_token, attempt=attempt, max_generated_bytes=max_generated_bytes,
+            max_compute_bytes=max_compute_bytes,
+        )
+        builder.validate_derivative_request(request)
+        source = context.source
+        if (source.coordinates, source.artifact_slot, source.slot_generation,
+                source.artifact_manifest_hash) != (
+            recipe.snapshot.coordinates, recipe.snapshot.slot, recipe.snapshot.generation,
+            recipe.snapshot.manifest_sha256,
+        ):
+            raise BacktestPreparePoolsRejected("recipe source differs from pinned inventory")
+        if recipe.funding_policy in ("strict", "degraded_with_warning"):
+            funding = source.slot_manifest.funding
+            required_funding = {f"funding.{name}" for name in (
+                "funding_time", "funding_rate", "mark_price",
+                "funding_interval_minutes", "data_quality",
+            )}
+            roles = {ref.domain.role for ref in recipe.snapshot.source_file_identities}
+            if (funding is None or funding.coverage_status not in ("ready", "degraded")
+                    or not required_funding.issubset(roles)):
+                raise BacktestPreparePoolsRejected(
+                    "effective funding requires complete source files"
+                )
+            if (recipe.snapshot.prefix_proof.state != "verified"
+                    and recipe.funding_fingerprint != funding.funding_manifest_hash):
+                raise BacktestPreparePoolsRejected("funding fingerprint differs from pinned source")
+        # Eight payload copies cover full-array validation masks, endian/hash buffers
+        # and resident mmap pages; generated workspace receives only the remainder.
+        # This is a conservative preparation estimate, not an OS RSS ceiling.
+        from math import prod
+
+        inventory_bytes = sum(
+            prod(ref.domain.shape) * np.dtype(ref.domain.dtype).itemsize
+            for ref in context.references
+        )
+        bars = next(domain.shape[0] for domain in recipe.snapshot.consumed_domains
+                    if domain.role == f"prices.{recipe.snapshot.signal_timeframe}.open_time")
+        # Include outputs before they exist: final validation must fit too, even
+        # when the builder writes a large memmap in small chunks.
+        output_bytes = (len(recipe.rows) * (bars + 4 * len(SIGNAL_FEATURE_NAMES_V2))
+                        + 8 * (len(recipe.tp_levels_pct) + len(recipe.sl_levels_pct)) * bars)
+        validation_bytes = 8 * (inventory_bytes + output_bytes) + 1024**2
+        if validation_bytes >= max_compute_bytes:
+            raise BacktestPreparePoolsRejected("input validation exceeds max_compute_bytes")
+        request = replace(request, max_compute_bytes=max_compute_bytes - validation_bytes)
+        roots = dict(context.trusted_roots)
+        if output_root_id in roots:
+            raise BacktestPreparePoolsRejected("attempt root identity overlaps source inventory")
+        roots[output_root_id] = output_directory
+        snapshot = validator.attest_snapshot(snapshot=recipe.snapshot, trusted_roots=roots)
+        replay_domain = any(
+            ref.domain != domain
+            for ref, domain in zip(snapshot.source_file_identities,
+                                   snapshot.consumed_domains, strict=True)
+        )
+        references = tuple(ref for ref in context.references
+                           if ref.domain.role.startswith(("signals.", "signal_features.",
+                                                          "hit_times."))
+                           and ref.domain.timeframe == snapshot.signal_timeframe)
+        inventory_snapshot = (replace(
+            snapshot, consumed_domains=tuple(ref.domain for ref in snapshot.source_file_identities),
+            prefix_proof=ArtifactPrefixProof(),
+        ) if replay_domain else snapshot)
+        validator.validate_declared_files(
+            snapshot=inventory_snapshot, references=references, trusted_roots=roots,
+        )
+        if replay_domain:
+            # Current derivatives use a different sentinel horizon. Validate their
+            # declared bytes above, then rebuild only the selected original-domain rows.
+            references = ()
+        for manifest in context.signal_manifests.values():
+            if replay_domain or manifest.timeframe != snapshot.signal_timeframe:
+                continue
+            reference = next(ref for ref in references
+                             if ref.domain.role == f"signals.{manifest.indicator_id}")
+            builder.validate_reused_signal(
+                request=request, manifest=manifest, row_ids=reference.row_ids,
+            )
+        requested_rows = {(row.indicator_id, row.row_id) for row in recipe.rows}
+        covered_rows = {(ref.domain.role.removeprefix("signals."), row)
+                        for ref in references if ref.domain.role.startswith("signals.")
+                        for row in ref.row_ids}
+        missing_rows = tuple(row for row in recipe.rows
+                             if (row.indicator_id, row.row_id) not in covered_rows)
+
+        def missing_levels(family: str, levels: tuple[float, ...]) -> tuple[float, ...]:
+            covered = []
+            for suffix in (f"{family}_values", f"long_{family}", f"short_{family}"):
+                covered.append({level for ref in references
+                                if ref.domain.role == f"hit_times.{suffix}"
+                                for level in ref.risk_values})
+            missing = []
+            for level in levels:
+                counts = [sum(_risk_level_matches(level, value) for value in side)
+                          for side in covered]
+                if any(count > 1 for count in counts):
+                    raise BacktestPreparePoolsRejected("ambiguous declared risk coverage")
+                if any(count == 0 for count in counts):
+                    missing.append(level)
+            return tuple(missing)
+
+        missing_tp = missing_levels("tp", recipe.tp_levels_pct)
+        missing_sl = missing_levels("sl", recipe.sl_levels_pct)
+        # Keep complete physical references, including additional rows sharing a file.
+        reused = tuple(ref for ref in references if (
+            (ref.domain.role.startswith(("signals.", "signal_features."))
+             and any((ref.domain.role.split(".", 1)[1], row) in requested_rows
+                     for row in ref.row_ids))
+            or (ref.domain.role.startswith("hit_times.") and any(
+                _risk_level_matches(level, requested)
+                for level in ref.risk_values
+                for requested in (recipe.tp_levels_pct if "tp" in ref.domain.role
+                                  else recipe.sl_levels_pct)))
+        ))
+        generated = ()
+        if missing_rows or missing_tp or missing_sl:
+            missing = replace(
+                request, snapshot=snapshot, rows=missing_rows,
+                defaults_sha256=builder.derivative_defaults_sha256(missing_rows),
+                tp_levels_pct=missing_tp, sl_levels_pct=missing_sl,
+            )
+            result = builder.materialize_derived(missing, output_directory=output_directory)
+            generated = result.files
+        prepared = BacktestPreparedArtifactSet(
+            snapshot=snapshot, recipe_sha256=recipe.semantic_sha256,
+            organization_id=organization_id, job_id=job_id, owner_token=owner_token,
+            attempt=attempt, output_root_id=output_root_id,
+            derivatives=reused + generated,
+            provenance=("reused",) * len(reused) + ("generated",) * len(generated),
+        )
+        validator.validate_prepared_inputs(prepared=prepared, request=request, trusted_roots=roots)
+        self.artifact_array_loader.write_prepared_manifest(
+            prepared=prepared, output_directory=output_directory,
+        )
+        return prepared
+
     def execute(
         self,
         *,
         normalized_request: Mapping[str, Any],
         artifact_metadata: BacktestArtifactMetadata,
+        context: BacktestArtifactRuntimeContext | None = None,
     ) -> BacktestPreparePoolsResult:
         """
         Compatibility facade that measures aggregate service telemetry.
@@ -113,7 +284,7 @@ class BacktestPreparePoolsService:
         total_subsegments: dict[str, float] = {}
 
         segment_start = time.perf_counter()
-        context = self.resolve_artifact_context(
+        context = context or self.resolve_artifact_context(
             coordinates=coordinates,
             artifact_metadata=artifact_metadata,
         )
@@ -170,7 +341,7 @@ class BacktestPreparePoolsService:
         *,
         coordinates: BacktestCoordinates,
         artifact_metadata: BacktestArtifactMetadata,
-    ) -> ArtifactSlotPinnedRuntimeContextV2:
+    ) -> BacktestArtifactRuntimeContext:
         return self.artifact_array_loader.resolve_context(
             coordinates=coordinates,
             artifact_metadata=artifact_metadata,
@@ -180,7 +351,7 @@ class BacktestPreparePoolsService:
         self,
         *,
         normalized_request: Mapping[str, Any],
-        context: ArtifactSlotPinnedRuntimeContextV2,
+        context: BacktestArtifactRuntimeContext,
         timeframe: str | None = None,
     ) -> BacktestPreparePoolsRuntimeArrays:
         opened_timeframe = (
@@ -189,24 +360,27 @@ class BacktestPreparePoolsService:
             else timeframe
         )
         indicator_requests = _indicator_requests_from_normalized(normalized_request)
-        price_arrays_15m = self.artifact_array_loader.load_price_arrays(
-            context=context,
-            timeframe=opened_timeframe,
-        )
-        price_arrays_1m = self.artifact_array_loader.load_price_arrays(
-            context=context,
-            timeframe=CANONICAL_EXECUTION_TIMEFRAME_V1,
-        )
-        mapping_arrays = self.artifact_array_loader.load_mapping_arrays(
-            context=context,
-            timeframe=opened_timeframe,
-        )
-        signal_matrices = _load_signal_matrices(
-            artifact_array_loader=self.artifact_array_loader,
-            context=context,
-            timeframe=opened_timeframe,
-            indicator_requests=indicator_requests,
-        )
+        try:
+            price_arrays_15m = self.artifact_array_loader.load_price_arrays(
+                context=context,
+                timeframe=opened_timeframe,
+            )
+            price_arrays_1m = self.artifact_array_loader.load_price_arrays(
+                context=context,
+                timeframe=CANONICAL_EXECUTION_TIMEFRAME_V1,
+            )
+            mapping_arrays = self.artifact_array_loader.load_mapping_arrays(
+                context=context,
+                timeframe=opened_timeframe,
+            )
+            signal_matrices = _load_signal_matrices(
+                artifact_array_loader=self.artifact_array_loader,
+                context=context,
+                timeframe=opened_timeframe,
+                indicator_requests=indicator_requests,
+            )
+        except (ValueError, OSError) as error:
+            raise BacktestPreparePoolsRejected(str(error)) from error
         return BacktestPreparePoolsRuntimeArrays(
             context=context,
             timeframe=opened_timeframe,
@@ -348,6 +522,12 @@ class BacktestPreparePoolsService:
             ),
         )
         return result
+
+
+def _risk_level_matches(requested_pct: float, available_pct: float) -> bool:
+    """Use the existing TP/SL grid fraction tolerance during missing-level resolution."""
+    return bool(np.isclose(np.float32(requested_pct / 100), np.float32(available_pct / 100),
+                           rtol=0.0, atol=1e-7))
 
 
 @dataclass(frozen=True, slots=True)
@@ -731,11 +911,11 @@ def notebook_compatible_prepare_pools_core_s(timing: PreparePoolsTiming) -> floa
 def _load_signal_matrices(
     *,
     artifact_array_loader: BacktestArtifactArrayLoader,
-    context: ArtifactSlotPinnedRuntimeContextV2,
+    context: BacktestArtifactRuntimeContext,
     timeframe: str,
     indicator_requests: Sequence[Mapping[str, Any]],
-) -> dict[str, ArtifactSignalMatrixV2]:
-    matrices: dict[str, ArtifactSignalMatrixV2] = {}
+) -> dict[str, BacktestSignalMatrix]:
+    matrices: dict[str, BacktestSignalMatrix] = {}
     for indicator_request in indicator_requests:
         indicator_id = str(indicator_request["indicator_id"])
         if indicator_id in matrices:
@@ -748,10 +928,32 @@ def _load_signal_matrices(
     return matrices
 
 
+def requested_artifact_rows(
+    *, defaults_provider: BacktestGridDefaultsProvider,
+    indicators: Sequence[Mapping[str, Any]],
+) -> tuple[ArtifactRequestedRow, ...]:
+    """Resolve request rows using the same canonical axes as pool selection."""
+    rows = {}
+    for item in indicators:
+        indicator = str(item["indicator_id"])
+        count = len(_artifact_source_values(defaults_provider=defaults_provider,
+                                            indicator_id=indicator)) * len(
+            _artifact_window_values(defaults_provider=defaults_provider, indicator_id=indicator)
+        )
+        _, metadata = _resolve_signal_row_ids(
+            defaults_provider=defaults_provider, indicator_request=item, artifact_rows_count=count,
+        )
+        for row in metadata:
+            rows[(indicator, row.row_id)] = ArtifactRequestedRow(
+                indicator, row.source or "close", row.row_id, (("window", row.window),),
+            )
+    return tuple(rows[key] for key in sorted(rows))
+
+
 def _select_indicator_rows(
     *,
     defaults_provider: BacktestGridDefaultsProvider,
-    signal_matrix: ArtifactSignalMatrixV2,
+    signal_matrix: BacktestSignalMatrix,
     indicator_request: Mapping[str, Any],
     time_slice: slice,
 ) -> _SelectedSignalRows:
@@ -759,14 +961,23 @@ def _select_indicator_rows(
     row_ids, metadata = _resolve_signal_row_ids(
         defaults_provider=defaults_provider,
         indicator_request=indicator_request,
-        artifact_rows_count=int(signal_matrix.manifest.rows_count),
+        artifact_rows_count=(
+            len(_artifact_source_values(defaults_provider=defaults_provider,
+                                        indicator_id=indicator_id))
+            * len(_artifact_window_values(defaults_provider=defaults_provider,
+                                          indicator_id=indicator_id))
+        ),
     )
+    positions = {row_id: position for position, row_id in enumerate(signal_matrix.row_ids)}
+    if any(int(row_id) not in positions for row_id in row_ids):
+        raise BacktestPreparePoolsRejected("prepared signal matrix lacks requested canonical rows")
+    physical_rows = np.asarray([positions[int(row_id)] for row_id in row_ids], dtype=np.int32)
     return _SelectedSignalRows(
         indicator_id=indicator_id,
         row_ids=row_ids,
         trade_T=extract_signal_rows(
             signal_matrix.matrix,
-            row_ids=row_ids,
+            row_ids=physical_rows,
             time_slice=time_slice,
         ),
         metadata=metadata,

@@ -1,6 +1,6 @@
 # Бектест: текущая реализация и контракты
 
-Статус: active; сверено с репозиторием 2026-09-06.
+Статус: active; сверено с репозиторием 2026-10-08.
 
 Artifact-backed runtime реализован: API создаёт persisted jobs, отдельный worker
 исполняет расчёт и lazy trades materialization, Web UI показывает результаты.
@@ -164,3 +164,53 @@ execution defaults are `none`; additive bounded child evidence is
 `breaking-change` within the F03/F04 correction: legacy partial references and
 invalid totals cannot satisfy v2 acceptance. Consumers must inspect schema/status
 and supply a complete compatible oracle; old records remain historical evidence.
+
+## NPY input materialization: local evidence (2026-10-08)
+
+The production full/lazy child composition uses a single prepared-set path:
+published candle/mapping/funding references plus reused or selectively generated
+derivatives. Native builder, validator and mmap loader retain canonical row IDs,
+precision and financial algorithms. See the normative Russian contract for
+ownership, prefix proof, readiness, sparse risk levels and rollout order.
+
+[The S07 report](../../../.codex/agents/generated/backtest-npy-input-materialization-v1/reports/S07.md)
+records C01–C14, independent original-source and handwritten financial proof,
+48 real PostgreSQL/subprocess cases and the accepted client suite.
+[The S08 report](../../../.codex/agents/generated/backtest-npy-input-materialization-v1/reports/S08.md)
+and its aggregate evidence record W1–W4, 81 warm samples, 27 fresh-process samples,
+3 ordinary API/worker cycles and 77 final strict parity comparisons. The source
+is BTCUSDT spot, December 2024 seed plus the full 2025 year; spot does not prove
+futures funding. Genuine small funding fixtures are covered separately by S07.
+
+W1 (531,441 combinations, no risk) warm runtime medians: native 5.416661083 s,
+generated 5.910503125 s, mixed 5.700622166 s. Paired generated/native median ratio
+is 1.086064562, delta +0.471232542 s. This interval includes preparation, payload
+attestation, real persisted ACK, scoring/assembly and runtime cleanup, excluding
+outer queue/HTTP/parent persistence. W4 API→top is 7.120808/7.568686/7.562814 s
+(N/G/M), one sample each. No SLO, cold-cache or production latency claim follows.
+Fresh processes share populated JIT cache; OS cache is uncontrolled. Sampled
+memory/IO peaks are lower bounds. Nested timers and profiling runs are not summed
+or substituted for uninstrumented elapsed samples.
+
+`backtest_full_top_reference_v2` is opt-in and requires
+`backtest_recipe_reference_context_v1`: independently verified request, actual
+production engine/runtime config, semantic recipe and verified source-prefix
+identity. V1 still requires physical manifest equality. Production currently
+persists both engine/runtime identity fields as `result_config_hash`; evidence
+must use those actual fields, not invented hashes. The ordinary API benchmark
+runner does not automatically emit the v2 companion. Early S08 frozen `parity.py`
+outputs establish internal consistency only; final `*-strict-parity.json` from
+corrected `analyze.py` supplies authoritative context and full top-10/all selected
+lazy pages. The original S01 scorer supplies the independent oracle.
+
+Large source snapshots, archives, NPY fixtures and benchmark harnesses remain
+outside Git. Reports retain hashes and reproducible boundaries; temporary evidence
+is not permanent storage. S09 reconciles local closure; full-checkout CI and any
+production delivery require their own evidence and are not inferred here.
+
+S09 strengthens resource admission after those measurements: total scratch now
+includes bounded metadata/IPC; preparation includes source/reused/output validation
+memory. Financial kernels remain unchanged. S08 numbers refer to its frozen
+candidate, not a rerun of the S09 guards/log transport. Current local closure and
+regressions are recorded in
+[the S09 report](../../../.codex/agents/generated/backtest-npy-input-materialization-v1/reports/S09.md).

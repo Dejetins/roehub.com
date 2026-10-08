@@ -11,10 +11,14 @@ from trading.contexts.backtest.application.dto import (
     BacktestPreflightResult,
     BacktestValidationIssue,
 )
+from trading.contexts.backtest.application.dto.input_recipe import BacktestInputRecipe
 from trading.contexts.backtest.application.services.v2.job_scheduling import (
     BacktestJobHeavyPromotion,
 )
 from trading.contexts.backtest.domain.entities import BacktestJobTopVariant
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    BacktestPreparedArtifactSet,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,7 +32,23 @@ class BacktestChildSuccessResult:
 
 
 def preflight_to_mapping(*, preflight: BacktestPreflightResult) -> dict[str, Any]:
-    return preflight.as_mapping()
+    cost = preflight.cost_estimate
+    return {
+        **preflight.as_mapping(),
+        "cost_estimate": {
+            **cost.as_mapping(),
+            "estimated_combinations": cost.estimated_combinations,
+            "estimated_combinations_upper_bound": cost.estimated_combinations_upper_bound,
+            "row_count_upper_bounds_by_indicator": (
+                None
+                if cost.row_count_upper_bounds_by_indicator is None
+                else dict(cost.row_count_upper_bounds_by_indicator)
+            ),
+        },
+        "input_recipe": (
+            None if preflight.input_recipe is None else preflight.input_recipe.as_mapping()
+        ),
+    }
 
 
 def preflight_from_mapping(*, payload: Mapping[str, Any]) -> BacktestPreflightResult:
@@ -53,20 +73,48 @@ def preflight_from_mapping(*, payload: Mapping[str, Any]) -> BacktestPreflightRe
                 else str(artifact_metadata["hit_times_manifest_hash"])
             ),
             published_at_utc=str(artifact_metadata["published_at_utc"]),
+            funding_manifest_hash=artifact_metadata.get("funding_manifest_hash"),
+            funding_coverage_status=artifact_metadata.get("funding_coverage_status"),
+            funding_coverage_policy=artifact_metadata.get("funding_coverage_policy"),
+            funding_rows_count=artifact_metadata.get("funding_rows_count"),
+            funding_expected_event_count=artifact_metadata.get("funding_expected_event_count"),
+            funding_missing_event_count=artifact_metadata.get("funding_missing_event_count"),
+            funding_reason_codes=tuple(artifact_metadata.get("funding_reason_codes", ())),
         ),
         cost_estimate=BacktestCostEstimate(
             indicator_rows=int(cost_estimate["indicator_rows"]),
             candidate_combinations=int(cost_estimate["candidate_combinations"]),
             tp_sl_cells=int(cost_estimate["tp_sl_cells"]),
             cost_class=str(cost_estimate["cost_class"]),
+            **{
+                key: cost_estimate[key]
+                for key in (
+                    "estimated_combinations_upper_bound",
+                    "estimated_combinations",
+                    "arity",
+                    "row_count_upper_bounds_by_indicator",
+                    "risk_mode",
+                    "requested_range",
+                    "requested_top_n",
+                    "scheduling_class",
+                )
+                if key in cost_estimate
+            },
+        ),
+        input_recipe=(
+            None
+            if payload.get("input_recipe") is None
+            else BacktestInputRecipe.from_mapping(_mapping(payload["input_recipe"]))
+        ),
+        funding_readiness=dict(_mapping(payload.get("funding_readiness", {}))),
+        direction_market_compatibility=dict(
+            _mapping(payload.get("direction_market_compatibility", {}))
         ),
         warnings=tuple(
-            _validation_issue_from_mapping(item)
-            for item in _sequence(payload.get("warnings"))
+            _validation_issue_from_mapping(item) for item in _sequence(payload.get("warnings"))
         ),
         errors=tuple(
-            _validation_issue_from_mapping(item)
-            for item in _sequence(payload.get("errors"))
+            _validation_issue_from_mapping(item) for item in _sequence(payload.get("errors"))
         ),
     )
 
@@ -191,3 +239,62 @@ def _sequence(value: Any) -> tuple[Any, ...]:
 def _parse_utc_datetime(*, value: str) -> datetime:
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     return parsed.astimezone(UTC)
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedInputEvent:
+    """Versioned child attestation; acknowledgement binds the complete prepared content."""
+
+    prepared: BacktestPreparedArtifactSet
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "schema": "backtest-prepared-input-event/v1",
+            "prepared": self.prepared.as_mapping(),
+        }
+
+    @classmethod
+    def from_mapping(cls, value: Mapping[str, Any]) -> PreparedInputEvent:
+        if (
+            set(value) != {"schema", "prepared"}
+            or value["schema"] != "backtest-prepared-input-event/v1"
+        ):
+            raise ValueError("unsupported prepared input event")
+        return cls(BacktestPreparedArtifactSet.from_mapping(_mapping(value["prepared"])))
+
+
+def acknowledge_prepared_over_socket(
+    *,
+    fd: int,
+    prepared: BacktestPreparedArtifactSet,
+    timeout_seconds: float,
+) -> str:
+    """EOF is parent loss, never consent. Child cannot score without a bounded exact ack."""
+    import json
+    import socket
+
+    if timeout_seconds <= 0:
+        raise ValueError("prepared acknowledgement timeout must be positive")
+    with socket.socket(fileno=fd) as channel:
+        channel.settimeout(timeout_seconds)
+        message = (
+            json.dumps(
+                PreparedInputEvent(prepared).as_mapping(), allow_nan=False, separators=(",", ":")
+            ).encode()
+            + b"\n"
+        )
+        if len(message) > 16 * 1024**2:
+            raise ValueError("prepared input event exceeds bounded IPC size")
+        channel.sendall(message)
+        response = bytearray()
+        while not response.endswith(b"\n"):
+            data = channel.recv(128)
+            if not data:
+                raise RuntimeError("parent lost before prepared acknowledgement")
+            response.extend(data)
+            if len(response) > 128:
+                raise ValueError("invalid prepared acknowledgement size")
+        digest = response.decode().strip()
+        if digest != prepared.content_sha256:
+            raise ValueError("parent rejected prepared inputs")
+        return digest

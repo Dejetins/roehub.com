@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import math
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from uuid import uuid4
 
 import numpy as np
 
@@ -19,6 +20,16 @@ from trading.contexts.backtest.application.dto import (
     BacktestTpSlExactConfig,
     build_backtest_funding_read_model,
 )
+from trading.contexts.backtest.application.dto.artifact_inputs import (
+    BacktestArtifactRuntimeContext,
+    BacktestAttemptInputs,
+)
+from trading.contexts.backtest.application.dto.input_recipe import BacktestInputRecipe
+from trading.contexts.backtest.application.ports import BacktestArtifactContextResolver
+from trading.contexts.backtest.application.ports.backtest_job_repositories import (
+    ArtifactReaderReservation,
+    BacktestJobRepository,
+)
 from trading.contexts.backtest.application.ports.lazy_trades_cache import (
     BacktestLazyTradesCache,
     BacktestLazyTradesCacheKey,
@@ -32,6 +43,7 @@ from trading.contexts.backtest.application.services.v2.execution_sizing import (
 )
 from trading.contexts.backtest.application.services.v2.prepare_pools import (
     BacktestPreparePoolsService,
+    _risk_level_matches,
 )
 from trading.contexts.backtest.application.services.v2.tp_sl_funding import (
     resolve_tp_sl_selected_exit,
@@ -40,7 +52,19 @@ from trading.contexts.backtest.application.services.v2.tp_sl_hit_times import (
     BacktestTpSlHitTimesService,
 )
 from trading.contexts.backtest.domain.entities import BacktestJob, BacktestJobTopVariant
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_validator import (  # noqa: E501
+    BacktestArtifactManifestValidatorV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactCandleSnapshot,
+    BacktestPreparedArtifactSet,
+)
 from trading.platform.errors import RoehubError
+
+if TYPE_CHECKING:
+    from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (  # noqa: E501
+        BacktestArtifactPrecomputeRunnerV2,
+    )
 
 LAZY_TRADES_COMPUTE_STAGE_NAME = "lazy_trades_compute"
 LAZY_TRADES_CACHE_HIT_STAGE_NAME = "lazy_trades_cache_hit"
@@ -86,19 +110,111 @@ class BacktestLazyTradesDetailService:
     tp_sl_hit_times: BacktestTpSlHitTimesService
     cache: BacktestLazyTradesCache
     config: BacktestLazyTradesDetailConfig = BacktestLazyTradesDetailConfig()
+    derivative_builder: BacktestArtifactPrecomputeRunnerV2 | None = None
+    input_validator: BacktestArtifactManifestValidatorV2 | None = None
+    attempt_inputs: BacktestAttemptInputs | None = None
+    source_resolver: BacktestArtifactContextResolver | None = None
+    replay_metadata: BacktestArtifactMetadata | None = None
+    source_repository: BacktestJobRepository | None = None
+
+    def select_replay_metadata(self, *, job: BacktestJob) -> BacktestArtifactMetadata:
+        """Bounded metadata selection only; no NPY is opened before parent reservation."""
+        if self.replay_metadata is not None:
+            return self.replay_metadata
+        original = _artifact_metadata_from_job(job=job)
+        if job.input_recipe_json is None or self.source_resolver is None:
+            return original
+        return self.source_resolver.resolve_context(
+            coordinates=_coordinates_from_request(job.request_json), preferred=original,
+        )
+
+    def resolve_replay_source(self, *, job: BacktestJob) -> BacktestArtifactRuntimeContext:
+        return self.prepare_pools.resolve_artifact_context(
+            coordinates=_coordinates_from_request(job.request_json),
+            artifact_metadata=self.select_replay_metadata(job=job),
+        )
+
+    def replay_recipe(self, *, job: BacktestJob,
+                      context: BacktestArtifactRuntimeContext) -> BacktestInputRecipe:
+        """Bind current physical references to the durable original payload attestation."""
+        if job.input_recipe_json is None or job.preparation_provenance_json is None:
+            raise ValueError("recipe replay requires durable prepared provenance")
+        recipe = BacktestInputRecipe.from_mapping(job.input_recipe_json)
+        prepared = BacktestPreparedArtifactSet.from_mapping(job.preparation_provenance_json)
+        original = recipe.snapshot.as_mapping()
+        proven = prepared.snapshot.as_mapping()
+        original.pop("prefix_proof")
+        proven.pop("prefix_proof")
+        if (original != proven or prepared.recipe_sha256 != recipe.semantic_sha256
+                or prepared.job_id != str(job.job_id)
+                or prepared.organization_id != str(job.organization_id)
+                or prepared.attempt != job.attempt):
+            raise ValueError("durable provenance does not match job recipe")
+        by_role = {ref.domain.role: ref for ref in context.references}
+        source = context.source
+        if source.coordinates != recipe.snapshot.coordinates:
+            raise ValueError("replay candidate changes the stored instrument")
+        snapshot = ArtifactCandleSnapshot(
+            coordinates=source.coordinates, source_schema=source.slot_manifest.schema_version,
+            slot=source.artifact_slot, generation=source.slot_generation,
+            manifest_sha256=source.artifact_manifest_hash,
+            signal_timeframe=recipe.snapshot.signal_timeframe,
+            execution_timeframe=recipe.snapshot.execution_timeframe,
+            source_file_identities=tuple(by_role[ref.domain.role]
+                                         for ref in recipe.snapshot.source_file_identities),
+            consumed_domains=recipe.snapshot.consumed_domains,
+            prefix_proof=prepared.snapshot.prefix_proof,
+        )
+        return replace(recipe, snapshot=snapshot)
+
 
     def price_candles(
+        self, *, job: BacktestJob, max_bars: int, timeframe: str | None = None,
+    ) -> dict[str, Any]:
+        repo = self.source_repository
+        if repo is None:
+            return self._price_candles(job=job, max_bars=max_bars, timeframe=timeframe)
+        metadata = self.select_replay_metadata(job=job)
+        coordinates = _coordinates_from_request(job.request_json)
+        reader = None
+        try:
+            with repo.transaction():
+                reader = repo.reserve_artifact_reader(reader=ArtifactReaderReservation(
+                    coordinates.exchange, coordinates.market_type, coordinates.symbol,
+                    metadata.artifact_slot, metadata.artifact_slot_generation,
+                    metadata.artifact_manifest_hash, "lazy", job.organization_id.value,
+                    uuid4(), uuid4(), 1, uuid4(),
+                ))
+                # Commit durable ownership before payload IO; a DB/session loss cannot
+                # release an in-flight synchronous reader. Uncertain owners remain pinned.
+                context = replace(self, replay_metadata=metadata).resolve_replay_source(job=job)
+                context.close_mmaps()
+            return replace(self, replay_metadata=metadata)._price_candles(
+                job=job, max_bars=max_bars, timeframe=timeframe,
+            )
+        finally:
+            if reader is not None:
+                repo.release_artifact_reader(reader=reader)
+
+    def _price_candles(
         self, *, job: BacktestJob, max_bars: int, timeframe: str | None = None
     ) -> dict[str, Any]:
         """Read price bars from the same pinned artifact as the selected job."""
         from .result_candles import project_result_candles
 
         request = dict(job.request_json)
+        context = None
         try:
-            context = self.prepare_pools.resolve_artifact_context(
-                coordinates=_coordinates_from_request(request),
-                artifact_metadata=_artifact_metadata_from_job(job=job),
-            )
+            context = self.resolve_replay_source(job=job)
+            if job.input_recipe_json is not None:
+                if self.input_validator is None:
+                    raise ValueError("recipe candles require source attestation")
+                recipe = self.replay_recipe(job=job, context=context)
+                snapshot = self.input_validator.attest_snapshot(
+                    snapshot=recipe.snapshot, trusted_roots=context.trusted_roots,
+                )
+                context = replace(context, source_snapshot=snapshot,
+                                  references=snapshot.source_file_identities)
             prices = self.prepare_pools.artifact_array_loader.load_price_arrays(
                 context=context, timeframe="1m",
             )
@@ -115,6 +231,9 @@ class BacktestLazyTradesDetailService:
                 message="Pinned price candles are unavailable",
                 details={"job_id": str(job.job_id)},
             ) from error
+        finally:
+            if isinstance(context, BacktestArtifactRuntimeContext):
+                context.close_mmaps()
 
     def read_cached(
         self,
@@ -136,6 +255,7 @@ class BacktestLazyTradesDetailService:
             engine_params_hash=_engine_params_hash(job=job),
             artifact_manifest_hash=artifact_metadata.artifact_manifest_hash,
             funding_manifest_hash=artifact_metadata.funding_manifest_hash,
+            recipe_sha256=_recipe_cache_identity(job),
         )
 
         lookup_start = time.perf_counter()
@@ -195,6 +315,7 @@ class BacktestLazyTradesDetailService:
             engine_params_hash=_engine_params_hash(job=job),
             artifact_manifest_hash=artifact_metadata.artifact_manifest_hash,
             funding_manifest_hash=artifact_metadata.funding_manifest_hash,
+            recipe_sha256=_recipe_cache_identity(job),
         )
 
         lookup_start = time.perf_counter()
@@ -260,111 +381,161 @@ class BacktestLazyTradesDetailService:
         artifact_metadata: BacktestArtifactMetadata,
         cache_key: BacktestLazyTradesCacheKey,
     ) -> dict[str, Any]:
-        normalized_request = dict(job.request_json)
-        coordinates = _coordinates_from_request(normalized_request)
-        required_row_ids_by_indicator = _row_ids_by_indicator_from_top_variant(row=row)
+        context = None
         try:
-            context = self.prepare_pools.resolve_artifact_context(
-                coordinates=coordinates,
-                artifact_metadata=artifact_metadata,
-            )
-            runtime_arrays = self.prepare_pools.open_artifact_arrays(
-                normalized_request=normalized_request,
-                context=context,
-            )
-            request_slice = self.prepare_pools.prepare_request_slice(
-                normalized_request=normalized_request,
-                runtime_arrays=runtime_arrays,
-            )
-            prepared = self.prepare_pools.prepare_pools_core(
-                normalized_request=normalized_request,
-                runtime_arrays=runtime_arrays,
-                request_slice=request_slice,
-                required_row_ids_by_indicator=required_row_ids_by_indicator,
-            )
-        except RoehubError:
-            raise
-        except Exception as error:  # noqa: BLE001
-            raise RoehubError(
-                code="backtest.artifacts_unavailable",
-                message="Backtest artifacts are unavailable for lazy trades recompute",
-                details={"job_id": str(job.job_id), "reason": str(error), "retryable": True},
-            ) from error
+            normalized_request = dict(job.request_json)
+            required_row_ids_by_indicator = _row_ids_by_indicator_from_top_variant(row=row)
+            try:
+                context = self.resolve_replay_source(job=job)
+                if job.input_recipe_json is not None:
+                    ownership, builder, validator = (
+                        self.attempt_inputs, self.derivative_builder, self.input_validator,
+                    )
+                    if ownership is None or builder is None or validator is None:
+                        raise ValueError("lazy replay requires parent-owned preparation")
+                    if (ownership.job_id != str(job.job_id)
+                            or ownership.organization_id != str(job.organization_id)):
+                        raise ValueError("lazy attempt belongs to a different job")
+                    recipe = self.replay_recipe(job=job, context=context)
+                    selected = tuple(item for item in recipe.rows
+                                     if item.row_id in required_row_ids_by_indicator.get(
+                                         item.indicator_id, ()))
+                    if len(selected) != sum(
+                        len(ids) for ids in required_row_ids_by_indicator.values()
+                    ):
+                        raise ValueError("selected variant is outside the saved recipe")
+                    tp = _canonical_selected_level(row.best_tp_pct, recipe.tp_levels_pct)
+                    sl = _canonical_selected_level(row.best_sl_pct, recipe.sl_levels_pct)
+                    # Validate the original defaults before selecting a subset of its rows.
+                    if builder.derivative_defaults_sha256(recipe.rows) != recipe.defaults_sha256:
+                        raise ValueError("stored computation defaults are unavailable")
+                    recipe = replace(recipe, rows=selected, tp_levels_pct=tp, sl_levels_pct=sl,
+                                     defaults_sha256=builder.derivative_defaults_sha256(selected))
+                    normalized_request["indicators"] = [
+                        {"indicator_id": item.indicator_id, "sources": [item.source],
+                         "window": {"start": dict(item.parameters)["window"],
+                                    "stop": dict(item.parameters)["window"], "step": 1}}
+                        for item in selected
+                    ]
+                    ready = self.prepare_pools.prepare_artifact_inputs(
+                        recipe=recipe, context=context, builder=builder, validator=validator,
+                        output_directory=ownership.directory,
+                        organization_id=ownership.organization_id, job_id=ownership.job_id,
+                        owner_token=ownership.owner_token, attempt=ownership.attempt,
+                        output_root_id=f"attempt-{ownership.owner_token}",
+                        max_generated_bytes=ownership.max_generated_bytes,
+                        max_compute_bytes=ownership.max_compute_bytes,
+                    )
+                    context = self.prepare_pools.artifact_array_loader.with_prepared_inputs(
+                        context=context, prepared=ready, output_directory=ownership.directory,
+                        acknowledged_prepared_sha256=ownership.acknowledge(ready),
+                    )
+                    if _risk_mode(normalized_request) == "tp_sl_grid":
+                        normalized_request["risk"] = {
+                            "mode": "tp_sl_grid",
+                            "tp": _selected_risk_range(tp),
+                            "sl": _selected_risk_range(sl),
+                        }
+                runtime_arrays = self.prepare_pools.open_artifact_arrays(
+                    normalized_request=normalized_request,
+                    context=context,
+                )
+                request_slice = self.prepare_pools.prepare_request_slice(
+                    normalized_request=normalized_request,
+                    runtime_arrays=runtime_arrays,
+                )
+                prepared = self.prepare_pools.prepare_pools_core(
+                    normalized_request=normalized_request,
+                    runtime_arrays=runtime_arrays,
+                    request_slice=request_slice,
+                    required_row_ids_by_indicator=required_row_ids_by_indicator,
+                )
+            except RoehubError:
+                raise
+            except Exception as error:  # noqa: BLE001
+                raise RoehubError(
+                    code="backtest.artifacts_unavailable",
+                    message="Backtest artifacts are unavailable for lazy trades recompute",
+                    details={"job_id": str(job.job_id), "reason": str(error), "retryable": True},
+                ) from error
 
-        local_indices = _local_indices_from_row(row=row, prepared=prepared)
-        risk_mode = _risk_mode(normalized_request)
-        if risk_mode == "tp_sl_grid":
-            summary_metrics, trades, detail_metadata = self._tp_sl_detail(
+            local_indices = _local_indices_from_row(row=row, prepared=prepared)
+            risk_mode = _risk_mode(normalized_request)
+            if risk_mode == "tp_sl_grid":
+                summary_metrics, trades, detail_metadata = self._tp_sl_detail(
+                    normalized_request=normalized_request,
+                    prepared=prepared,
+                    local_indices=local_indices,
+                    runtime_arrays=runtime_arrays,
+                    row=row,
+                    context=context,
+                )
+            elif risk_mode == "none":
+                summary_metrics, trades, detail_metadata = self._no_risk_detail(
+                    normalized_request=normalized_request,
+                    prepared=prepared,
+                    local_indices=local_indices,
+                    runtime_arrays=runtime_arrays,
+                )
+            else:
+                raise RoehubError(
+                    code="backtest.invalid_request",
+                    message="Unsupported risk mode for lazy trades detail",
+                    details={"risk_mode": risk_mode},
+                )
+            summary_metrics = _merge_top_funding_summary(
+                recomputed_summary=summary_metrics,
+                row_summary=row.summary_metrics_json,
+            )
+            chart_overlay = _chart_overlay(trades=trades)
+            funding_events, overlay_status, overlay_warning_code = self._funding_overlay(
                 normalized_request=normalized_request,
-                prepared=prepared,
-                local_indices=local_indices,
-                runtime_arrays=runtime_arrays,
-                row=row,
                 context=context,
+                artifact_metadata=artifact_metadata,
+                trades=trades,
             )
-        elif risk_mode == "none":
-            summary_metrics, trades, detail_metadata = self._no_risk_detail(
-                normalized_request=normalized_request,
-                prepared=prepared,
-                local_indices=local_indices,
-                runtime_arrays=runtime_arrays,
+            if funding_events:
+                chart_overlay["funding_events"] = funding_events
+                chart_overlay["funding_events_count"] = len(funding_events)
+                chart_overlay["funding_events_truncated"] = (
+                    len(funding_events) >= MAX_FUNDING_OVERLAY_EVENTS
+                )
+            if artifact_metadata.funding_manifest_hash is not None:
+                chart_overlay["funding_manifest_hash"] = artifact_metadata.funding_manifest_hash
+            funding = build_backtest_funding_read_model(
+                summary_metrics=summary_metrics,
+                payload=row.payload_json,
+                artifact_metadata=artifact_metadata.as_mapping(),
+                funding_events_count=len(funding_events) if funding_events else None,
+                overlay_status=overlay_status,
+                overlay_warning_code=overlay_warning_code,
             )
-        else:
-            raise RoehubError(
-                code="backtest.invalid_request",
-                message="Unsupported risk mode for lazy trades detail",
-                details={"risk_mode": risk_mode},
-            )
-        summary_metrics = _merge_top_funding_summary(
-            recomputed_summary=summary_metrics,
-            row_summary=row.summary_metrics_json,
-        )
-        chart_overlay = _chart_overlay(trades=trades)
-        funding_events, overlay_status, overlay_warning_code = self._funding_overlay(
-            normalized_request=normalized_request,
-            context=context,
-            artifact_metadata=artifact_metadata,
-            trades=trades,
-        )
-        if funding_events:
-            chart_overlay["funding_events"] = funding_events
-            chart_overlay["funding_events_count"] = len(funding_events)
-            chart_overlay["funding_events_truncated"] = (
-                len(funding_events) >= MAX_FUNDING_OVERLAY_EVENTS
-            )
-        if artifact_metadata.funding_manifest_hash is not None:
-            chart_overlay["funding_manifest_hash"] = artifact_metadata.funding_manifest_hash
-        funding = build_backtest_funding_read_model(
-            summary_metrics=summary_metrics,
-            payload=row.payload_json,
-            artifact_metadata=artifact_metadata.as_mapping(),
-            funding_events_count=len(funding_events) if funding_events else None,
-            overlay_status=overlay_status,
-            overlay_warning_code=overlay_warning_code,
-        )
-        payload = {
-            "job_id": str(job.job_id),
-            "variant_key": checked.public_variant_key,
-            "variant_hash": checked.variant_hash,
-            "request_hash": job.request_hash,
-            "engine_params_hash": _engine_params_hash(job=job),
-            "artifact_manifest_hash": artifact_metadata.artifact_manifest_hash,
-            "funding_manifest_hash": artifact_metadata.funding_manifest_hash,
-            "summary_metrics": summary_metrics,
-            "canonical_variant_params": checked.canonical_variant_params,
-            "readable_params": checked.readable_params,
-            "trades": trades,
-            "chart_overlay": chart_overlay,
-            "funding": funding,
-            "cache": _cache_payload(
-                status="miss",
-                cache_key=cache_key,
-                ttl_seconds=self.config.cache_ttl_seconds,
-            ),
-            "timing": {},
-            "detail_metadata": detail_metadata,
-        }
-        return normalize_json_payload(payload)
+            payload = {
+                "job_id": str(job.job_id),
+                "variant_key": checked.public_variant_key,
+                "variant_hash": checked.variant_hash,
+                "request_hash": job.request_hash,
+                "engine_params_hash": _engine_params_hash(job=job),
+                "artifact_manifest_hash": artifact_metadata.artifact_manifest_hash,
+                "funding_manifest_hash": artifact_metadata.funding_manifest_hash,
+                "summary_metrics": summary_metrics,
+                "canonical_variant_params": checked.canonical_variant_params,
+                "readable_params": checked.readable_params,
+                "trades": trades,
+                "chart_overlay": chart_overlay,
+                "funding": funding,
+                "cache": _cache_payload(
+                    status="miss",
+                    cache_key=cache_key,
+                    ttl_seconds=self.config.cache_ttl_seconds,
+                ),
+                "timing": {},
+                "detail_metadata": detail_metadata,
+            }
+            return normalize_json_payload(payload)
+        finally:
+            if isinstance(context, BacktestArtifactRuntimeContext):
+                context.close_mmaps()
 
     def _funding_overlay(
         self,
@@ -453,6 +624,8 @@ class BacktestLazyTradesDetailService:
             normalized_request=normalized_request,
             context=context,
         )
+        if hit_times_result is None:
+            raise ValueError("TP/SL scoring requires risk mode tp_sl_grid")
         execution_settings = execution_settings_from_normalized(
             normalized_request,
             expected_direction_mode=_direction_mode(normalized_request),
@@ -520,6 +693,7 @@ class BacktestLazyTradesDetailService:
                 "risk_mode": "tp_sl_grid",
                 "timeframe": prepared.timeframe,
                 "hit_times_manifest_hash": hit_times_result.hit_times_manifest_hash,
+                "hit_times_input_sha256": hit_times_result.hit_times_input_sha256,
                 "hit_times_path": "hit_times/15m",
                 "best_tp_idx": best_tp_idx,
                 "best_sl_idx": best_sl_idx,
@@ -1287,3 +1461,30 @@ __all__ = [
     "BacktestLazyTradesDetailService",
     "BacktestLazyTradesCacheProbeResult",
 ]
+
+
+def _recipe_cache_identity(job: BacktestJob) -> str | None:
+    if job.input_recipe_json is None:
+        return None
+    recipe = BacktestInputRecipe.from_mapping(job.input_recipe_json)
+    if job.preparation_provenance_json is None:
+        raise ValueError("successful recipe job has no durable attestation")
+    prepared = BacktestPreparedArtifactSet.from_mapping(job.preparation_provenance_json)
+    if prepared.recipe_sha256 != recipe.semantic_sha256:
+        raise ValueError("cache recipe differs from durable attestation")
+    return recipe.semantic_sha256
+
+
+def _selected_risk_range(levels: tuple[float, ...]) -> dict[str, Any]:
+    if not levels:
+        return {"enabled": False}
+    return {"enabled": True, "start_pct": levels[0], "stop_pct": levels[0], "step_pct": 1.0}
+
+
+def _canonical_selected_level(value: float | None, levels: tuple[float, ...]) -> tuple[float, ...]:
+    if value is None:
+        return ()
+    matches = tuple(level for level in levels if _risk_level_matches(float(value), level))
+    if len(matches) != 1:
+        raise ValueError("selected risk pair is outside the saved recipe or ambiguous")
+    return matches

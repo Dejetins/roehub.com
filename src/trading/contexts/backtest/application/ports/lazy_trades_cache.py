@@ -27,6 +27,7 @@ class BacktestLazyTradesCacheKey:
     artifact_manifest_hash: str
     funding_manifest_hash: str | None = None
     namespace: str = "research-cache/v1"
+    recipe_sha256: str | None = None
 
     def as_mapping(self) -> dict[str, str | None]:
         payload: dict[str, str | None] = {
@@ -40,10 +41,15 @@ class BacktestLazyTradesCacheKey:
             "artifact_manifest_hash": self.artifact_manifest_hash,
             "funding_manifest_hash": self.funding_manifest_hash,
         }
+        if self.recipe_sha256 is not None:
+            payload["recipe_sha256"] = self.recipe_sha256
         return payload
 
     def identity_mapping(self) -> dict[str, str]:
         payload = {key: value for key, value in self.as_mapping().items() if value is not None}
+        if self.recipe_sha256 is not None:
+            for key in ("artifact_manifest_hash", "funding_manifest_hash", "engine_params_hash"):
+                payload.pop(key, None)
         return {key: str(value) for key, value in payload.items()}
 
     @property
@@ -137,6 +143,7 @@ def build_lazy_trades_cache_key(
     engine_params_hash: str,
     artifact_manifest_hash: str,
     funding_manifest_hash: str | None = None,
+    recipe_sha256: str | None = None,
 ) -> BacktestLazyTradesCacheKey:
     return BacktestLazyTradesCacheKey(
         organization_id=organization_id,
@@ -147,6 +154,8 @@ def build_lazy_trades_cache_key(
         engine_params_hash=engine_params_hash,
         artifact_manifest_hash=artifact_manifest_hash,
         funding_manifest_hash=funding_manifest_hash,
+        recipe_sha256=recipe_sha256,
+        namespace="research-cache/recipe-v1" if recipe_sha256 else "research-cache/v1",
     )
 
 

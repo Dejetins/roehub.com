@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
+import fcntl
+import json
+import os
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from hashlib import sha256
 from pathlib import Path
 from typing import Callable
+from uuid import UUID, uuid4
 
 from trading.contexts.backtest.application.ports import BacktestJobRepository
+from trading.contexts.backtest.application.ports.backtest_job_repositories import (
+    ArtifactOwnershipConflict,
+    ArtifactReaderReservation,
+    ArtifactWriterReservation,
+)
 
 from .artifact_manifest_validator import BacktestArtifactManifestValidatorV2
 from .artifact_precompute_runner import BacktestArtifactPrecomputeRunnerV2
@@ -18,6 +27,7 @@ from .contracts import (
     ARTIFACT_SLOT_A_LITERAL_V2,
     CURRENT_ARTIFACT_POINTER_SCHEMA_VERSION_V2,
     ArtifactCanonicalPriceExportRequestV2,
+    ArtifactCanonicalPriceExportResultV2,
     ArtifactCoordinatesV2,
     ArtifactCurrentPointerV2,
     ArtifactPricesMappingsPublishResultV2,
@@ -30,6 +40,7 @@ from .contracts import (
     BacktestArtifactLoaderV2,
     artifact_market_id_from_coordinates_v2,
     inactive_artifact_slot_v2,
+    validate_artifact_slot_v2,
     validate_current_pointer_asof_date_v2,
     validate_current_pointer_published_at_utc_v2,
 )
@@ -227,6 +238,378 @@ class BacktestArtifactSlotPublisherV2:
             ready=True,
         )
 
+    def recover_publications(
+        self,
+        *,
+        coordinates: ArtifactCoordinatesV2,
+        validation_spec: ArtifactSlotValidationSpecV2,
+    ) -> int:
+        """Reconcile dead local owners; live flock holders and uncertain state remain protected."""
+        symbol_root = self.artifact_loader.resolve_current_pointer_path(coordinates).parent
+        recovered = 0
+        if not symbol_root.exists():
+            return recovered
+        if symbol_root.is_symlink():
+            raise ValueError("untrusted publication recovery root")
+        for record in sorted(symbol_root.glob(".publication-*")):
+            if record.is_symlink() or not record.is_dir():
+                continue
+            lifetime, marker = record / "lifetime.lock", record / "ownership.json"
+            if lifetime.is_symlink() or marker.is_symlink() or not marker.is_file():
+                continue
+            fd = os.open(lifetime, os.O_RDWR | os.O_NOFOLLOW)
+            try:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    continue
+                try:
+                    payload = json.loads(marker.read_text())
+                except (ValueError, OSError):
+                    # An unrecognized journal cannot prove ownership. Preserve it.
+                    continue
+                if (
+                    not isinstance(payload, dict)
+                    or payload.get("schema") != "artifact-publication-owner/v1"
+                ):
+                    continue
+                value = payload["writer"]
+                writer = ArtifactWriterReservation(
+                    value["exchange"],
+                    value["market_type"],
+                    value["symbol"],
+                    value["slot"],
+                    UUID(value["owner_token"]),
+                    int(value["attempt"]),
+                    UUID(value["parent_incarnation"]),
+                    int(value["epoch"]),
+                )
+                if (writer.exchange, writer.market_type, writer.symbol) != (
+                    coordinates.exchange,
+                    coordinates.market_type,
+                    coordinates.symbol,
+                ):
+                    raise ValueError("publication recovery owner coordinates differ")
+                source_reader = None
+                value = payload["source_reader"]
+                if value is not None:
+                    source_reader = ArtifactReaderReservation(
+                        value["exchange"],
+                        value["market_type"],
+                        value["symbol"],
+                        value["slot"],
+                        int(value["generation"]),
+                        value["manifest_sha256"],
+                        value["owner_kind"],
+                        None,
+                        UUID(value["owner_id"]),
+                        UUID(value["owner_token"]),
+                        int(value["attempt"]),
+                        UUID(value["parent_incarnation"]),
+                        int(value["epoch"]),
+                    )
+                    if (
+                        source_reader.owner_token,
+                        source_reader.owner_kind,
+                        source_reader.parent_incarnation,
+                    ) != (
+                        writer.owner_token,
+                        "publisher_source",
+                        writer.parent_incarnation,
+                    ):
+                        raise ValueError("publication source owner mismatch")
+                with self.job_repository.transaction():
+                    if self.job_repository.owns_artifact_writer(writer=writer):
+                        self.job_repository.quarantine_artifact_writer(writer=writer)
+                        path = self.artifact_loader.resolve_slot_manifest_path(
+                            coordinates, writer.slot
+                        )
+                        target = path.parent
+                        try:
+                            current = self.artifact_loader.load_current_pointer(coordinates)
+                        except FileNotFoundError:
+                            current = None
+                        if target.is_symlink():
+                            raise ValueError("untrusted recovered target")
+                        if payload["operation"] == "cleanup":
+                            if current is None or current.active_slot == writer.slot:
+                                raise ArtifactOwnershipConflict("cannot_recover_active_cleanup")
+                            if target.exists():
+                                shutil.rmtree(target)
+                                _fsync_directory(symbol_root)
+                        elif payload["operation"] == "build":
+                            previous = record / "previous-target"
+                            if (
+                                current is None
+                                and payload.get("bootstrap") is True
+                                and target.exists()
+                            ):
+                                # No pointer ever committed: return bootstrap to its
+                                # empty state while exact dead writer ownership is held.
+                                shutil.rmtree(target)
+                                _fsync_directory(symbol_root)
+                            if not target.exists() and previous.exists():
+                                if current is not None and current.active_slot == writer.slot:
+                                    raise ArtifactOwnershipConflict(
+                                        "active_target_missing_during_recovery"
+                                    )
+                                os.rename(previous, target)
+                                _fsync_directory(record)
+                                _fsync_directory(symbol_root)
+                        else:
+                            raise ValueError("unknown publication recovery operation")
+                        generation, digest = None, None
+                        if path.exists():
+                            manifest = self.artifact_loader.load_slot_manifest(
+                                coordinates, writer.slot
+                            )
+                            generation, digest = manifest.slot_generation, _file_sha256_hex_v2(path)
+                            validation = BacktestArtifactManifestValidatorV2(
+                                artifact_loader=self.artifact_loader
+                            ).validate_slot(
+                                coordinates=coordinates,
+                                slot=validate_artifact_slot_v2(writer.slot),
+                                validation_spec=validation_spec,
+                                expected_slot_generation=generation,
+                            )
+                            if validation.diagnostics:
+                                raise ArtifactOwnershipConflict("recovered_manifest_invalid")
+                        if (
+                            current is not None
+                            and current.active_slot == writer.slot
+                            and (current.slot_generation, current.manifest_sha256)
+                            != (generation, digest)
+                        ):
+                            raise ArtifactOwnershipConflict("recovered_pointer_manifest_mismatch")
+
+                        def confirm_dead_owner() -> None:
+                            if os.fstat(fd).st_ino != lifetime.stat(follow_symlinks=False).st_ino:
+                                raise ValueError("recovery lifetime lock replaced")
+
+                        if target.exists():
+                            _fsync_candidate(target)
+                        pointer_path = self.artifact_loader.resolve_current_pointer_path(
+                            coordinates
+                        )
+                        if pointer_path.exists():
+                            with pointer_path.open("rb") as pointer_file:
+                                os.fsync(pointer_file.fileno())
+                        _fsync_directory(record)
+                        _fsync_directory(symbol_root)
+                        self.job_repository.recover_artifact_writer(
+                            writer=writer,
+                            generation=generation,
+                            manifest_sha256=digest,
+                            reconcile_dead_owner=confirm_dead_owner,
+                        )
+                    if source_reader is not None:
+                        self.job_repository.release_artifact_reader(reader=source_reader)
+                shutil.rmtree(record)
+                _fsync_directory(symbol_root)
+                recovered += 1
+            finally:
+                os.close(fd)
+        return recovered
+
+    def build_and_publish(
+        self,
+        *,
+        request: ArtifactCanonicalPriceExportRequestV2,
+        precheck: ArtifactPublishPrecheckV2,
+        precompute_runner: BacktestArtifactPrecomputeRunnerV2,
+        validation_spec: ArtifactSlotValidationSpecV2,
+    ) -> tuple[ArtifactCanonicalPriceExportResultV2, ArtifactPublishResultV2]:
+        """Build privately under durable coordinate ownership and pin incremental source reads."""
+        self._ensure_precheck_ready(precheck)
+        coordinates = precheck.coordinates
+        token, incarnation = uuid4(), uuid4()
+        symbol_root = precheck.current_pointer_path.parent
+        record = symbol_root / f".publication-{token}"
+        source_reader = None
+        writer = None
+        lock_fd = -1
+        target = precheck.inactive_manifest_path.parent
+        candidate = record / "candidate"
+        original_generation = None
+        failed = False
+        try:
+            with self.job_repository.transaction():
+                # Reservation itself locks BOTH rows. Expected physical metadata is
+                # revalidated while the outer transaction retains those row locks.
+                if precheck.inactive_manifest_hash is not None:
+                    original_generation = self.artifact_loader.load_slot_manifest(
+                        coordinates, precheck.inactive_slot
+                    ).slot_generation
+                writer = self.job_repository.reserve_artifact_writer(
+                    exchange=coordinates.exchange,
+                    market_type=coordinates.market_type,
+                    symbol=coordinates.symbol,
+                    slot=precheck.inactive_slot,
+                    expected_generation=original_generation,
+                    expected_manifest_sha256=precheck.inactive_manifest_hash,
+                    owner_token=token,
+                    attempt=1,
+                    parent_incarnation=incarnation,
+                )
+                self._revalidate_precheck(precheck=precheck, check_target=True)
+                if request.coordinates != coordinates or (
+                    request.target_slot != precheck.inactive_slot
+                    or request.target_slot_generation != precheck.target_slot_generation
+                ):
+                    raise ArtifactOwnershipConflict("builder_target_mismatch")
+                incremental_source = (
+                    None
+                    if request.force_full_rebuild or precheck.current_pointer is None
+                    else precheck.current_pointer.active_slot
+                )
+                if request.reuse_source_slot not in (None, incremental_source):
+                    raise ArtifactOwnershipConflict("stale_incremental_source")
+                request = replace(request, reuse_source_slot=incremental_source)
+                if request.reuse_source_slot is not None:
+                    source = precheck.current_pointer
+                    if source is None or request.reuse_source_slot != source.active_slot:
+                        raise ArtifactOwnershipConflict("unprotected_incremental_source")
+                    source_reader = self.job_repository.reserve_artifact_reader(
+                        reader=ArtifactReaderReservation(
+                            coordinates.exchange,
+                            coordinates.market_type,
+                            coordinates.symbol,
+                            source.active_slot,
+                            source.slot_generation,
+                            source.manifest_sha256,
+                            "publisher_source",
+                            None,
+                            token,
+                            token,
+                            1,
+                            incarnation,
+                        )
+                    )
+                symbol_root.mkdir(parents=True, exist_ok=True)
+                if symbol_root.is_symlink() or target.is_symlink():
+                    raise ValueError("untrusted publication root")
+                record.mkdir()
+                lock_fd = os.open(
+                    record / "lifetime.lock", os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600
+                )
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                _write_publication_journal(
+                    record,
+                    {
+                        "schema": "artifact-publication-owner/v1",
+                        "operation": "build",
+                        "bootstrap": precheck.current_pointer is None,
+                        "writer": {key: str(value) for key, value in writer.parameters().items()},
+                        "source_reader": (
+                            None
+                            if source_reader is None
+                            else {
+                                key: None if value is None else str(value)
+                                for key, value in source_reader.parameters().items()
+                            }
+                        ),
+                    },
+                )
+            if precheck.bootstrap:
+                # Preserve the existing two-root bootstrap layout, now only after
+                # durable coordinate reservation instead of before admission.
+                for slot in ("slot_a", "slot_b"):
+                    self.artifact_loader.resolve_slot_manifest_path(coordinates, slot).parent.mkdir(
+                        parents=True, exist_ok=True
+                    )
+                _fsync_directory(symbol_root)
+            # No detached writer child may outlive this lifetime lock. Native
+            # computation/chunking remains shared; this publication uses one process.
+            runner = replace(
+                precompute_runner,
+                runtime_settings=replace(
+                    precompute_runner.runtime_settings,
+                    execution_policy=replace(
+                        precompute_runner.runtime_settings.execution_policy,
+                        signal_worker_processes=1,
+                    ),
+                ),
+            )
+            build = runner.export_canonical_price_1m(request, output_directory=candidate)
+            private_loader = self.artifact_loader.with_private_slot(
+                coordinates=coordinates,
+                slot=precheck.inactive_slot,
+                root=candidate,
+            )
+            private_publisher = replace(self, artifact_loader=private_loader)
+            private_publisher.validate_inactive_slot(
+                precheck=precheck,
+                validation_spec=validation_spec,
+                expected_asof_date=request.asof_date,
+            )
+            _fsync_candidate(candidate)
+            with self.job_repository.transaction():
+                self.job_repository.verify_artifact_writer(writer=writer)
+                self._revalidate_precheck(precheck=precheck, check_target=True)
+                if target.exists():
+                    os.rename(target, record / "previous-target")
+                os.rename(candidate, target)
+                _fsync_directory(record)
+                _fsync_directory(symbol_root)
+                published = self.publish(
+                    precheck=precheck,
+                    validation_spec=validation_spec,
+                    asof_date=request.asof_date,
+                    writer=writer,
+                )
+                self.job_repository.complete_artifact_writer(
+                    writer=writer,
+                    generation=published.published_pointer.slot_generation,
+                    manifest_sha256=published.published_pointer.manifest_sha256,
+                )
+                if source_reader is not None:
+                    self.job_repository.release_artifact_reader(reader=source_reader)
+            shutil.rmtree(record)
+            _fsync_directory(symbol_root)
+            self._cleanup_previous_slot_after_publish(
+                precheck=precheck, published_pointer=published.published_pointer
+            )
+            self.recover_publications(coordinates=coordinates, validation_spec=validation_spec)
+            return replace(
+                build,
+                manifest_path=precheck.inactive_manifest_path,
+                price_paths=self.artifact_loader.resolve_price_paths(
+                    coordinates, precheck.inactive_slot, "1m"
+                ),
+            ), published
+        except BaseException:
+            failed = True
+            if writer is not None:
+                # Keep both source pin and record if filesystem/DB reconciliation
+                # cannot prove a safe release. Expiration is never reclamation.
+                self.job_repository.quarantine_artifact_writer(writer=writer)
+            raise
+        finally:
+            if lock_fd >= 0:
+                os.close(lock_fd)
+            if failed and record.exists():
+                self.recover_publications(coordinates=coordinates, validation_spec=validation_spec)
+
+    def _revalidate_precheck(
+        self,
+        *,
+        precheck: ArtifactPublishPrecheckV2,
+        check_target: bool,
+    ) -> None:
+        try:
+            current = self.artifact_loader.load_current_pointer(precheck.coordinates)
+        except FileNotFoundError:
+            current = None
+        if current != precheck.current_pointer:
+            raise ArtifactOwnershipConflict("artifact_stale_current_pointer")
+        if current is not None and current.active_slot == precheck.inactive_slot:
+            raise ArtifactOwnershipConflict("artifact_target_is_active")
+        if check_target:
+            path = precheck.inactive_manifest_path
+            digest = _file_sha256_hex_v2(path) if path.is_file() else None
+            if digest != precheck.inactive_manifest_hash:
+                raise ArtifactOwnershipConflict("artifact_stale_target_manifest")
+
     def build_publish_prices_mappings_slot(
         self,
         *,
@@ -276,26 +659,21 @@ class BacktestArtifactSlotPublisherV2:
         stage_validation_spec = _ensure_prices_mappings_publish_validation_spec_v2(validation_spec)
         precheck = self.precheck_publish(request.coordinates)
         self._ensure_precheck_ready(precheck)
-        build_result = precompute_runner.export_canonical_price_1m(
-            ArtifactCanonicalPriceExportRequestV2(
-                coordinates=request.coordinates,
-                time_range=request.time_range,
-                asof_date=request.asof_date,
-                generated_at_utc=request.generated_at_utc,
-                target_slot=precheck.inactive_slot,
-                target_slot_generation=precheck.target_slot_generation,
-                reuse_source_slot=(
-                    None
-                    if precheck.current_pointer is None or request.force_full_rebuild
-                    else precheck.current_pointer.active_slot
-                ),
-                force_full_rebuild=request.force_full_rebuild,
-            )
+        build_request = replace(
+            request,
+            target_slot=precheck.inactive_slot,
+            target_slot_generation=precheck.target_slot_generation,
+            reuse_source_slot=(
+                None
+                if precheck.current_pointer is None or request.force_full_rebuild
+                else precheck.current_pointer.active_slot
+            ),
         )
-        publish_result = self.publish(
+        build_result, publish_result = self.build_and_publish(
+            request=build_request,
             precheck=precheck,
+            precompute_runner=precompute_runner,
             validation_spec=stage_validation_spec,
-            asof_date=request.asof_date,
         )
         return ArtifactPricesMappingsPublishResultV2(
             validation_spec=stage_validation_spec,
@@ -360,6 +738,7 @@ class BacktestArtifactSlotPublisherV2:
         precheck: ArtifactPublishPrecheckV2,
         validation_spec: ArtifactSlotValidationSpecV2,
         asof_date: str,
+        writer: ArtifactWriterReservation,
     ) -> ArtifactPublishResultV2:
         """
         Validate the inactive slot and atomically switch `current.yaml` to the new identity.
@@ -386,6 +765,15 @@ class BacktestArtifactSlotPublisherV2:
         Related:
           - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/current_pointer_writer.py
         """
+        if (writer.exchange, writer.market_type, writer.symbol, writer.slot) != (
+            precheck.coordinates.exchange,
+            precheck.coordinates.market_type,
+            precheck.coordinates.symbol,
+            precheck.inactive_slot,
+        ):
+            raise ArtifactOwnershipConflict("writer_target_mismatch")
+        self.job_repository.verify_artifact_writer(writer=writer)
+        self._revalidate_precheck(precheck=precheck, check_target=False)
         validated_asof_date = validate_current_pointer_asof_date_v2(asof_date)
         validation = self.validate_inactive_slot(
             precheck=precheck,
@@ -422,7 +810,7 @@ class BacktestArtifactSlotPublisherV2:
             precheck.coordinates,
             published_pointer,
         )
-        self._cleanup_previous_slot_after_publish(precheck=precheck)
+        _fsync_directory(precheck.current_pointer_path.parent)
         return ArtifactPublishResultV2(
             coordinates=precheck.coordinates,
             previous_pointer=precheck.current_pointer,
@@ -431,62 +819,85 @@ class BacktestArtifactSlotPublisherV2:
             validation=validation,
         )
 
-    def _cleanup_previous_slot_after_publish(self, *, precheck: ArtifactPublishPrecheckV2) -> None:
-        """
-        Remove previous slot tree after publish when identity checks and pin guard allow cleanup.
-
-        Args:
-            precheck: Publish readiness snapshot holding the pre-switch pointer identity.
-        Returns:
-            None.
-        Assumptions:
-            Cleanup is best-effort and must never fail a publish after `current.yaml` switched.
-        Raises:
-            None.
-        Side Effects:
-            May delete one previous slot directory tree from disk.
-        Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/README.md
-          - docs/runbooks/backtest-artifacts-rebuild.md
-        Related:
-          - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
-          - src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py
-        """
-        previous_pointer = precheck.current_pointer
-        if previous_pointer is None:
+    def _cleanup_previous_slot_after_publish(
+        self,
+        *,
+        precheck: ArtifactPublishPrecheckV2,
+        published_pointer: ArtifactCurrentPointerV2,
+    ) -> None:
+        previous = precheck.current_pointer
+        if previous is None:
             return
-        previous_manifest_path = self.artifact_loader.resolve_slot_manifest_path(
-            precheck.coordinates,
-            previous_pointer.active_slot,
+        path = self.artifact_loader.resolve_slot_manifest_path(
+            precheck.coordinates, previous.active_slot
         )
-        if not previous_manifest_path.is_file():
-            return
-        previous_manifest_hash = _file_sha256_hex_v2(previous_manifest_path)
-        if previous_manifest_hash != previous_pointer.manifest_sha256:
-            return
-        blocking_active_run_count = self.job_repository.count_active_for_artifact_manifest(
-            market_id=artifact_market_id_from_coordinates_v2(precheck.coordinates),
-            symbol=precheck.coordinates.symbol,
-            artifact_slot=previous_pointer.active_slot,
-            artifact_manifest_hash=previous_manifest_hash,
-        )
-        if blocking_active_run_count > 0:
-            return
-        symbol_root = self.artifact_loader.resolve_current_pointer_path(precheck.coordinates).parent
-        previous_slot_root = previous_manifest_path.parent
-        if previous_slot_root.name != previous_pointer.active_slot:
-            return
-        if previous_slot_root.parent != symbol_root:
-            return
-        if symbol_root.is_symlink() or previous_slot_root.is_symlink():
-            return
-        if not previous_slot_root.is_dir():
-            return
+        coordinates = precheck.coordinates
+        writer = None
+        lock_fd = -1
+        record = published_pointer.path.parent / f".publication-{uuid4()}"
         try:
-            shutil.rmtree(previous_slot_root)
-        except OSError:
+            with self.job_repository.transaction():
+                writer = self.job_repository.reserve_artifact_writer(
+                    exchange=coordinates.exchange,
+                    market_type=coordinates.market_type,
+                    symbol=coordinates.symbol,
+                    slot=previous.active_slot,
+                    expected_generation=previous.slot_generation,
+                    expected_manifest_sha256=previous.manifest_sha256,
+                    owner_token=uuid4(),
+                    attempt=1,
+                    parent_incarnation=uuid4(),
+                )
+                current = self.artifact_loader.load_current_pointer(coordinates)
+                if current != published_pointer or current.active_slot == previous.active_slot:
+                    raise ArtifactOwnershipConflict("artifact_stale_cleanup_pointer")
+                if path.is_file() and _file_sha256_hex_v2(path) != previous.manifest_sha256:
+                    raise ArtifactOwnershipConflict("artifact_stale_cleanup_manifest")
+                root = path.parent
+                if root.parent != published_pointer.path.parent or root.is_symlink():
+                    raise ValueError("untrusted previous slot root")
+                record.mkdir()
+                lock_fd = os.open(
+                    record / "lifetime.lock", os.O_CREAT | os.O_EXCL | os.O_RDWR, 0o600
+                )
+                fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                _write_publication_journal(
+                    record,
+                    {
+                        "schema": "artifact-publication-owner/v1",
+                        "operation": "cleanup",
+                        "writer": {key: str(value) for key, value in writer.parameters().items()},
+                        "source_reader": None,
+                    },
+                )
+            # Reservation is durable BEFORE destructive IO. Losing this transaction
+            # cannot expose a live cleanup process to a successor writer.
+            with self.job_repository.transaction():
+                self.job_repository.verify_artifact_writer(writer=writer)
+                current = self.artifact_loader.load_current_pointer(coordinates)
+                if current != published_pointer or current.active_slot == previous.active_slot:
+                    raise ArtifactOwnershipConflict("artifact_stale_cleanup_pointer")
+                if root.exists():
+                    shutil.rmtree(root)
+                    _fsync_directory(root.parent)
+                self.job_repository.complete_artifact_writer(
+                    writer=writer,
+                    generation=None,
+                    manifest_sha256=None,
+                )
+            shutil.rmtree(record)
+            _fsync_directory(record.parent)
+        except ArtifactOwnershipConflict:
+            if writer is not None:
+                self.job_repository.quarantine_artifact_writer(writer=writer)
             return
+        except BaseException:
+            if writer is not None:
+                self.job_repository.quarantine_artifact_writer(writer=writer)
+            raise
+        finally:
+            if lock_fd >= 0:
+                os.close(lock_fd)
 
     def _ensure_precheck_ready(self, precheck: ArtifactPublishPrecheckV2) -> None:
         """
@@ -605,3 +1016,37 @@ def _utc_now_literal_v2(value: datetime) -> str:
     return validate_current_pointer_published_at_utc_v2(
         value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     )
+
+
+def _fsync_directory(path: Path) -> None:
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _write_publication_journal(record: Path, payload: dict[str, object]) -> None:
+    temporary = record / "ownership.pending"
+    with temporary.open("x") as handle:
+        json.dump(payload, handle)
+        handle.flush()
+        os.fsync(handle.fileno())
+    os.replace(temporary, record / "ownership.json")
+    _fsync_directory(record)
+    _fsync_directory(record.parent)
+
+
+def _fsync_candidate(root: Path) -> None:
+    # Files and directory entries must outlive DB completion and backup deletion.
+    directories = [root]
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            raise ValueError("candidate contains a symlink")
+        if path.is_dir():
+            directories.append(path)
+        else:
+            with path.open("rb") as handle:
+                os.fsync(handle.fileno())
+    for path in reversed(directories):
+        _fsync_directory(path)

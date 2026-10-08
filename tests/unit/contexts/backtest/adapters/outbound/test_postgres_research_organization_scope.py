@@ -13,6 +13,9 @@ from trading.shared_kernel.primitives import UserId
 
 
 class _CapturingGateway:
+    def transaction(self):
+        raise AssertionError("transactions are outside this fixture's query-only boundary")
+
     def __init__(self, rows: tuple[Mapping[str, Any], ...]) -> None:
         self.rows = rows
         self.query = ""

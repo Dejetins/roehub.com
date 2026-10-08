@@ -15,6 +15,10 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
     ArtifactPrecomputeFixtureV2,
     build_artifact_precompute_fixture_v2,
 )
+from tests.unit.contexts.backtest.application.services.v2.test_artifact_slot_publisher_v2 import (
+    _FakeJobRepository,
+    _publish_prebuilt,
+)
 from trading.contexts.backtest.adapters.outbound import YamlBacktestGridDefaultsProvider
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     AtomicArtifactCurrentPointerWriterV2,
@@ -26,10 +30,10 @@ from trading.contexts.backtest.application.services.signals_from_indicators_v1 i
 from trading.contexts.backtest_artifacts.application.services.v2 import (
     artifact_precompute_runner as artifact_precompute_runner_module,
 )
-from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_validator import (  # noqa: E501
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_validator import (  # noqa: E501  # noqa: E501
     BacktestArtifactManifestValidatorV2,
 )
-from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_coordinator import (  # noqa: E501
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_coordinator import (  # noqa: E501  # noqa: E501
     ArtifactPrecomputeCoordinatorV2,
 )
 from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (
@@ -866,7 +870,7 @@ class _FakeCanonicalCandleReader:
         )
 
 
-class _ZeroBlockingRepositoryV2:
+class _ZeroBlockingRepositoryV2(_FakeJobRepository):
     """
     Fake job repository returning zero blocking pins for the R3-04 publish integration tests.
     """
@@ -1467,6 +1471,7 @@ def test_backtest_artifact_precompute_runner_v2_builds_initial_canonical_1m_expo
     assert manifest.signals.supported_timeframes == ()
     assert manifest.signals.supported_indicator_ids == ()
     assert manifest.signals.manifests == ()
+    assert manifest.hit_times is not None
     assert (
         manifest.hit_times.manifest_path
         == f"hit_times/{HIT_TIMES_TIMEFRAME_LITERAL_V2}/manifest.yaml"
@@ -2516,9 +2521,11 @@ def test_backtest_artifact_precompute_runner_v2_chunked_signal_output_matches_si
     assert chunked_manifest.signals.axis_order == ("variant", "time")
 
 
+@pytest.mark.parametrize("signal_workers", [1, 2])
 def test_backtest_artifact_precompute_runner_v2_reports_chunk_progress_and_session_totals(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
+    signal_workers: int,
 ) -> None:
     """
     Verify chunked signal execution exposes structured per-chunk progress and session totals.
@@ -2549,7 +2556,7 @@ def test_backtest_artifact_precompute_runner_v2_reports_chunk_progress_and_sessi
         validation_signal_artifacts=signal_targets,
         precompute_signal_artifacts=signal_targets,
         require_hit_times_manifest=False,
-        signal_worker_processes=2,
+        signal_worker_processes=signal_workers,
         signal_chunk_rows_min=2,
         signal_chunk_rows_max=2,
     )
@@ -2672,6 +2679,7 @@ def test_backtest_artifact_precompute_runner_v2_reuses_one_timeframe_price_load_
         timeframe: str,
         manifest_section: Any,
         location_prefix: str,
+        slot_root: Path | None = None,
     ) -> object:
         """
         Record one price-array load call before delegating to the real helper.
@@ -2709,6 +2717,7 @@ def test_backtest_artifact_precompute_runner_v2_reuses_one_timeframe_price_load_
             timeframe=timeframe,
             manifest_section=manifest_section,
             location_prefix=location_prefix,
+            slot_root=slot_root,
         )
 
     monkeypatch.setattr(
@@ -4131,7 +4140,8 @@ def test_backtest_artifact_precompute_runner_v2_full_validation_spec_still_rejec
     precheck = publisher.precheck_publish(fixture.coordinates)
 
     with pytest.raises(ArtifactSlotPublishErrorV2) as error_info:
-        publisher.publish(
+        _publish_prebuilt(
+            publisher=publisher,
             precheck=precheck,
             validation_spec=fixture.runtime_config.to_validation_spec(),
             asof_date="2026-03-26",

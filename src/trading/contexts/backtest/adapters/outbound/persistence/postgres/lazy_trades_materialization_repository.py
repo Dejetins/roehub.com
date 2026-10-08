@@ -359,6 +359,12 @@ class PostgresBacktestLazyTradesMaterializationRepository(
             FROM {self._table}
             WHERE status = 'running'
               AND lease_expires_at <= %(now)s
+              AND NOT EXISTS (
+                  SELECT 1 FROM backtest_artifact_slot_readers AS reader
+                  WHERE reader.owner_kind='lazy' AND reader.owner_id={self._table}.task_id
+                    AND reader.organization_id={self._table}.organization_id
+                    AND reader.state IN ('active','quarantined')
+              )
             ORDER BY lease_expires_at ASC, created_at ASC, task_id ASC
             LIMIT 1
             FOR UPDATE SKIP LOCKED
@@ -448,6 +454,7 @@ class PostgresBacktestLazyTradesMaterializationRepository(
         owner_user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         cache_status: str,
         cache_path: str | None,
     ) -> BacktestLazyTradesMaterializationTask | None:
@@ -469,7 +476,8 @@ class PostgresBacktestLazyTradesMaterializationRepository(
           AND owner_user_id = %(owner_user_id)s
           AND status = 'running'
           AND locked_by = %(locked_by)s
-          AND lease_expires_at > %(now)s
+          AND attempt = %(attempt)s
+          AND lease_expires_at > clock_timestamp()
         RETURNING
             {_BACKTEST_LAZY_TRADES_MATERIALIZATION_SELECT_COLUMNS}
         """
@@ -480,6 +488,7 @@ class PostgresBacktestLazyTradesMaterializationRepository(
                 "owner_user_id": str(owner_user_id),
                 "now": now,
                 "locked_by": _normalize_locked_by(value=locked_by),
+                "attempt": attempt,
                 "cache_status": _normalize_cache_status(value=cache_status),
                 "cache_path": cache_path,
             },
@@ -495,6 +504,7 @@ class PostgresBacktestLazyTradesMaterializationRepository(
         owner_user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         last_error: str,
         last_error_json: Mapping[str, Any],
     ) -> BacktestLazyTradesMaterializationTask | None:
@@ -514,7 +524,8 @@ class PostgresBacktestLazyTradesMaterializationRepository(
           AND owner_user_id = %(owner_user_id)s
           AND status = 'running'
           AND locked_by = %(locked_by)s
-          AND lease_expires_at > %(now)s
+          AND attempt = %(attempt)s
+          AND lease_expires_at > clock_timestamp()
         RETURNING
             {_BACKTEST_LAZY_TRADES_MATERIALIZATION_SELECT_COLUMNS}
         """
@@ -525,6 +536,7 @@ class PostgresBacktestLazyTradesMaterializationRepository(
                 "owner_user_id": str(owner_user_id),
                 "now": now,
                 "locked_by": _normalize_locked_by(value=locked_by),
+                "attempt": attempt,
                 "last_error": last_error[:2000],
                 "last_error_json": json.dumps(
                     dict(last_error_json),

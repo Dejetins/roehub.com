@@ -305,3 +305,10 @@ it('prefills the explicit synthetic preset and checks once without creating a jo
  expect(screen.getByRole('button',{name:'Submit backtest'})).toBeDisabled();
  expect(fetch.mock.calls.filter(([u])=>new URL(u).pathname.endsWith('/preflight'))).toHaveLength(1);
 });
+
+it.each(['ready','requires_materialization'])('accepts additive input readiness: %s',(status)=>{
+ const legacy=result();
+ expect(preflightSchema.parse({...legacy,input_readiness:{status,requested_signal_rows:1,
+  missing_signal_rows:status==='ready'?0:1,estimated_generated_bytes_upper_bound:4096,
+  payload_validation:'pending'}})).toEqual(preflightSchema.parse(legacy));
+});

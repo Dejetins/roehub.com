@@ -23,6 +23,7 @@ class BacktestArtifactContextResolver(Protocol):
         self,
         *,
         coordinates: BacktestCoordinates,
+        preferred: BacktestArtifactMetadata | None = None,
     ) -> BacktestArtifactMetadata:
         """
         Resolve trusted artifact metadata for normalized coordinates.

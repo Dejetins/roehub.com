@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
@@ -66,6 +66,16 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
     """
 
     root: Path = Path(ARTIFACT_STORE_V2_ROOT_LITERAL)
+    private_slot: tuple[ArtifactCoordinatesV2, str, Path] | None = None
+
+    def with_private_slot(
+        self,
+        *,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        root: Path,
+    ) -> BacktestArtifactPathBuilderV2:
+        return replace(self, private_slot=(coordinates, validate_artifact_slot_v2(slot), root))
 
     def ordered_slots(self) -> tuple[ArtifactSlotLiteralV2, ...]:
         """
@@ -155,6 +165,8 @@ class BacktestArtifactPathBuilderV2(BacktestArtifactPathResolverV2):
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
         """
         validated_slot = validate_artifact_slot_v2(slot)
+        if self.private_slot is not None and self.private_slot[:2] == (coordinates, validated_slot):
+            return self.private_slot[2]
         return self.symbol_root(coordinates) / validated_slot
 
     def slot_manifest_path(self, coordinates: ArtifactCoordinatesV2, slot: str) -> Path:

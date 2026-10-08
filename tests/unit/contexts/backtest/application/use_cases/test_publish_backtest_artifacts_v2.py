@@ -15,6 +15,9 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
     ArtifactPrecomputeFixtureV2,
     build_artifact_precompute_fixture_v2,
 )
+from tests.unit.contexts.backtest.application.services.v2.test_artifact_slot_publisher_v2 import (
+    _FakeJobRepository,
+)
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     AtomicArtifactCurrentPointerWriterV2,
 )
@@ -233,7 +236,7 @@ class _FixedCanonicalCandleIndexReader:
         )
 
 
-class _ZeroBlockingJobRepository:
+class _ZeroBlockingJobRepository(_FakeJobRepository):
     """
     Fake publish-guard repository that never reports active pins for inactive manifests.
 
@@ -661,3 +664,38 @@ def _build_publish_use_case_fixture_v2(
         index_reader=index_reader,
         use_case=use_case,
     )
+
+
+@pytest.mark.parametrize("signals,hit_times", [
+    ("on_demand", "on_demand"), ("on_demand", "precompute"), ("precompute", "on_demand"),
+])
+def test_coordinate_policy_controls_actual_publication(tmp_path, signals, hit_times):
+    from dataclasses import replace
+
+    from trading.contexts.backtest_artifacts.adapters.outbound.config.backtest_artifacts_runtime_config import (  # noqa: E501
+        BacktestArtifactRetentionPolicy,
+        build_backtest_artifacts_runtime_config_hash,
+    )
+
+    bundle = _build_publish_use_case_fixture_v2(tmp_path=tmp_path)
+    coordinates = bundle.fixture.coordinates
+    bundle.fixture.builder.current_pointer_path(coordinates).unlink()
+    config = replace(bundle.fixture.runtime_config, retention_policy=(
+        BacktestArtifactRetentionPolicy(coordinates.exchange, coordinates.market_type,
+                                       coordinates.symbol, signals, hit_times),
+    ))
+    config_hash = build_backtest_artifacts_runtime_config_hash(config=config)
+    use_case = replace(
+        bundle.use_case, coordinate_validation=config.to_validation_spec,
+        coordinate_settings=lambda target: config.to_precompute_runtime_settings(
+            config_sha256=config_hash, coordinates=target,
+        ),
+    )
+    result = use_case.run(PublishBacktestArtifactsV2Request(coordinates=coordinates))
+    pointer = bundle.fixture.loader.load_current_pointer(coordinates)
+    manifest = bundle.fixture.loader.load_slot_manifest(coordinates, pointer.active_slot)
+    assert result.status == "succeeded"
+    assert manifest.schema_version == 2
+    assert bool(manifest.signals.manifests) == (signals == "precompute")
+    assert (manifest.hit_times is not None) == (hit_times == "precompute")
+    assert manifest.prices and manifest.mappings

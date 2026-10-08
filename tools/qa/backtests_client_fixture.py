@@ -259,6 +259,7 @@ def _preview_candles(rows):
 
 def _artifacts(env: dict[str, str], dsn: str) -> Path:
     """Build real artifact files from deterministic, disposable canonical input candles."""
+    from dataclasses import replace
     from datetime import UTC, datetime
 
     from apps.api.wiring.modules.indicators import (
@@ -268,7 +269,7 @@ def _artifacts(env: dict[str, str], dsn: str) -> Path:
     from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 import (
         build_artifact_precompute_fixture_v2,
     )
-    from tests.unit.contexts.backtest.application.services.v2.test_artifact_precompute_runner_v2 import (  # noqa: E501
+    from tests.unit.contexts.backtest.application.services.v2.test_artifact_precompute_runner_v2 import (  # noqa: E501  # noqa: E501
         _build_canonical_rows_v2,
         _FakeCanonicalCandleReader,
         _request_v2,
@@ -281,10 +282,10 @@ def _artifacts(env: dict[str, str], dsn: str) -> Path:
     from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
         AtomicArtifactCurrentPointerWriterV2,
     )
-    from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (  # noqa: E501
+    from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (  # noqa: E501  # noqa: E501
         BacktestArtifactPrecomputeRunnerV2,
     )
-    from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_publisher import (  # noqa: E501
+    from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_publisher import (  # noqa: E501  # noqa: E501
         BacktestArtifactSlotPublisherV2,
     )
     from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
@@ -326,18 +327,21 @@ def _artifacts(env: dict[str, str], dsn: str) -> Path:
         now_provider=lambda: datetime(2026, 3, 29, 3, 0, tzinfo=UTC),
     )
     precheck = publisher.precheck_publish(fixture.coordinates)
-    runner.export_canonical_price_1m(
-        _request_v2(
-            fixture=fixture,
-            end_minute=4320,
-            asof_date="2026-03-29",
-            generated_at_utc="2026-03-29T03:00:00Z",
-        )
-    )
-    publisher.publish(
-        precheck=precheck,
-        validation_spec=fixture.runtime_config.to_validation_spec(),
+    build_request = _request_v2(
+        fixture=fixture,
+        end_minute=4320,
         asof_date="2026-03-29",
+        generated_at_utc="2026-03-29T03:00:00Z",
+    )
+    publisher.build_and_publish(
+        request=replace(
+            build_request,
+            target_slot=precheck.inactive_slot,
+            target_slot_generation=precheck.target_slot_generation,
+        ),
+        precheck=precheck,
+        precompute_runner=runner,
+        validation_spec=fixture.runtime_config.to_validation_spec(),
     )
     print(
         "Synthetic 4320 candles -> production precompute/validate/local publish: passed", flush=True
