@@ -135,3 +135,16 @@ cache is not cold cache. The orchestration wall excludes final parent cleanup,
 IPC serialization and HTTP; outer benchmark envelopes must state their own
 boundaries. See the [backtest index](../architecture/backtest/README.md) for S08
 sample counts, hardware and the original-source parity reference.
+
+### Full-job derivative preparation
+
+The full-job child passes its admitted `BacktestComputePolicy.threads` budget to
+indicator-builder warmup. Preparation and scoring share the same Numba thread
+mask; an ambient `ROEHUB_NUMBA_NUM_THREADS` intended for the indicators API must
+not override that child budget. The pre-import maximum and inherited budget
+validation remain unchanged. Standalone artifact publishers keep their own
+indicator configuration.
+
+The lazy-detail supervisor composes metadata selection without derivative compute
+or JIT warmup. Only its disposable child enables the derivative builder after
+parent-owned reader and scratch admission.

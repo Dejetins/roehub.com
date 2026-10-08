@@ -94,7 +94,9 @@ def main(argv: list[str] | None = None) -> int:
                     "retryable": False,
                 },
             )
-        service = build_lazy_trades_compute_service(environ=os.environ)
+        service = build_lazy_trades_compute_service(
+            environ=os.environ, prepare_derivatives=True
+        )
         if args.input_context_json:
             from trading.contexts.backtest.application.dto import BacktestArtifactMetadata
             from trading.contexts.backtest.application.dto.artifact_inputs import (

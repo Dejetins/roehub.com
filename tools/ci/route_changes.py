@@ -51,6 +51,8 @@ TEST_SHARDS: dict[str, TestShard] = {
             "test_artifact_slot_publisher_v2.py",
             "tests/unit/contexts/backtest/application/services/v2/"
             "test_yaml_backtest_artifact_loader_v2.py",
+            "tests/unit/contexts/backtest/application/services/v2/"
+            "test_derived_artifact_materialization.py",
             "tests/unit/contexts/backtest/application/use_cases/"
             "test_publish_backtest_artifacts_v2.py",
             "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py",
@@ -112,6 +114,8 @@ TEST_SHARDS: dict[str, TestShard] = {
             "tests/unit/contexts/backtest/application/services/test_research_identity.py",
             "tests/unit/contexts/backtest/application/test_backtest_errors.py",
             "tests/unit/contexts/backtest/application/services/v2/test_admission.py",
+            "tests/unit/contexts/backtest/application/services/v2/test_input_recipe_contracts.py",
+            "tests/unit/contexts/backtest/application/services/v2/test_input_recipe_replay.py",
             "tests/unit/contexts/backtest/application/services/v2/"
             "test_backtest_preflight_service.py",
             "tests/unit/contexts/backtest/domain",

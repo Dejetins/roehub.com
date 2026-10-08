@@ -49,7 +49,9 @@ from trading.contexts.indicators.application.services import GridBuilder
 def build_lazy_trades_compute_service(
     *,
     environ: Mapping[str, str],
+    prepare_derivatives: bool,
 ) -> BacktestLazyTradesDetailService:
+    """Enable derivative compute only in the disposable child, never its supervisor."""
     artifact_config_path = resolve_backtest_artifacts_config_path(environ=environ)
     artifact_config = load_backtest_artifacts_runtime_config(Path(artifact_config_path))
     defaults_provider = YamlBacktestGridDefaultsProvider.from_environ(
@@ -83,7 +85,7 @@ def build_lazy_trades_compute_service(
                     artifact_config_path=Path(artifact_config_path),
                 )
             ),
-        ),
+        ) if prepare_derivatives else None,
         prepare_pools=prepare_pools,
         tp_sl_hit_times=BacktestTpSlHitTimesService(artifact_array_loader=artifact_array_loader),
         cache=LocalFileBacktestLazyTradesCache(

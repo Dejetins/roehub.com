@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Mapping
 
@@ -55,6 +56,7 @@ from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_en
     BacktestSignalRulesEngineV2,
 )
 from trading.contexts.indicators.application.services import GridBuilder
+from trading.platform.config import load_indicators_compute_numba_config
 
 
 def build_full_job_compute_executor(
@@ -102,6 +104,14 @@ def build_full_job_compute_executor(
             signal_rules_engine=BacktestSignalRulesEngineV2(defaults_provider=defaults_provider),
             indicator_compute=build_artifact_precompute_indicators_compute(
                 environ=environ,
+                config=replace(
+                    load_indicators_compute_numba_config(
+                        environ=environ, artifact_config_path=Path(artifact_config_path)
+                    ),
+                    # Builder warmup shares this child with scoring; the admitted
+                    # job budget owns its thread mask, not the indicators API setting.
+                    numba_num_threads=policy.threads.num_threads,
+                ),
                 artifact_config_path=Path(artifact_config_path),
             ),
             indicator_grid_builder=GridBuilder(

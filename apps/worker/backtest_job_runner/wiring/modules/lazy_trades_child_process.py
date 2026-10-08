@@ -61,7 +61,9 @@ class BacktestLazyTradesChildProcessExecutor:
         coordinates = job.request_json["coordinates"]
         from .lazy_trades_compute import build_lazy_trades_compute_service
 
-        service = build_lazy_trades_compute_service(environ=self.environ)
+        service = build_lazy_trades_compute_service(
+            environ=self.environ, prepare_derivatives=False
+        )
         metadata = service.select_replay_metadata(job=job)
         estimated = 0
         if job.input_recipe_json is not None:
