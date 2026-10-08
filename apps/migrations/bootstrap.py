@@ -806,3 +806,12 @@ def apply_market_data_stream_recovery_sql(*, identity_dsn: str, migrations_dir: 
     )[0]
     with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_backtest_input_recipe_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Expand nullable recipe persistence and physical slot ownership metadata."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0028_backtest_input_recipe_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)

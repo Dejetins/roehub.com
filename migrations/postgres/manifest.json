@@ -222,6 +222,16 @@
           "sha256": "a50fa21ced963af9e68e0ef42b25cd050eac47280c6f9ef255c93982446bce66"
         }
       ]
+    },
+    {
+      "version": "backtest-input-recipe-0028",
+      "sha256": "2db7dbb293fddec61fcb0506702659c704d7c7fb05fbc638e83433aa8b4545b7",
+      "files": [
+        {
+          "path": "0028_backtest_input_recipe_v1.sql",
+          "sha256": "338c9be2f943f429a2b85f00e3fb566b2538e655286e8c8e3ba4f0e0702e01a0"
+        }
+      ]
     }
   ]
 }

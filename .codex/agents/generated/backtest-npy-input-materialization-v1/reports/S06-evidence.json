@@ -1,0 +1,274 @@
+{
+  "schema": "roehub-s06-evidence/v1",
+  "executor": "codex-s06-20261008-4ef098bc",
+  "baseline": "S06 entry working tree, including accepted S01-S05 and unrelated dirty work",
+  "baseline_inventory": {
+    "path": "/tmp/roehub-npy-s06-4ef098bc/baseline.json",
+    "sha256": "badc0e2296a1b457324ec99f1a3c2e56c4eb202ec70c9a8ed83e676c173da775"
+  },
+  "owned_changes": [
+    {
+      "path": "tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+      "operation": "modified",
+      "before_sha256": "fd249fb63350c7e99c998aee08fa1feba75c12e3c4d3253fd0c417003f2f84d3",
+      "after_sha256": "c6c374d67e708507e77b64a08c69d91e17644628f6a740aa61cfe6774589ed08"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py",
+      "operation": "modified",
+      "before_sha256": "00f48c30d78c1660b755661ce2c5f137be27eb88358d3961332bc8da35c3503c",
+      "after_sha256": "f2582e4b5321a8dc743e22f24be658097b7a9e46f7128e2209d211620b83f286"
+    },
+    {
+      "path": "apps/api/dto/backtests.py",
+      "operation": "modified",
+      "before_sha256": "96270d54602deae8b5118d7cd0fdcce612949f41aeb5ec4c38afac8b058d8a24",
+      "after_sha256": "e7119eafa9f18c3692e373ebc55ca9b843c41d72ec6c2c45e2c0336998668d46"
+    },
+    {
+      "path": "apps/api/wiring/modules/backtest.py",
+      "operation": "modified",
+      "before_sha256": "0acc0575a9567439e5e01719cf2ce8042d9421986d13e224477f448cb8772dbd",
+      "after_sha256": "4cf9b8450400eb6f42493071a028104a2891455e246e005586c8b55ddca46a50"
+    },
+    {
+      "path": "apps/cli/commands/backtest_artifact_publish.py",
+      "operation": "modified",
+      "before_sha256": "9eb97bfae84ac3b16ccfdbb1815fd06b543a60e7098ebfcbc47b3bd8baf2d622",
+      "after_sha256": "1ebef8c2aab2a659354dacd636fac6afd3383994623770f9f367f513e2135f20"
+    },
+    {
+      "path": "apps/platform-web/src/builder.test.tsx",
+      "operation": "modified",
+      "before_sha256": "5b095913428d3c521b8a904f7465079bcac66cfe3058bdaf0833c83af6dc0f92",
+      "after_sha256": "301bd4571b84524706256c2c8a6613a5f28ab3283913c8c69471a5fd170dedd0"
+    },
+    {
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
+      "operation": "modified",
+      "before_sha256": "0d04ff578a95c11f7ceb0a272d9a7a970092b1fa8c73a012263f9ade2b8f5228",
+      "after_sha256": "d725d9cfb90b0f3913c5cf5df6a5374589173dc4ad547a041987332f0409347c"
+    },
+    {
+      "path": "configs/dev/backtest_artifacts.yaml",
+      "operation": "modified",
+      "before_sha256": "555e657d9de4a0e86cd2d30911c4e01a00ea0e76c9efa8b82a8e485ed31db5cb",
+      "after_sha256": "f0a6da1b9260b67307cdcb6d6519f9fe7f042f2108c58d1560b76626956cfa24"
+    },
+    {
+      "path": "configs/prod/backtest_artifacts.yaml",
+      "operation": "modified",
+      "before_sha256": "14aab7aacf14ce460b045eddac18ce2a98c04062af062d7e71db1415d85cf945",
+      "after_sha256": "d783c76d8faa0e3b6c1495d518ceacbe3804be14dd6177f35ccd5a51cf5e98be"
+    },
+    {
+      "path": "configs/test/backtest_artifacts.yaml",
+      "operation": "modified",
+      "before_sha256": "555e657d9de4a0e86cd2d30911c4e01a00ea0e76c9efa8b82a8e485ed31db5cb",
+      "after_sha256": "f0a6da1b9260b67307cdcb6d6519f9fe7f042f2108c58d1560b76626956cfa24"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py",
+      "operation": "modified",
+      "before_sha256": "6f2dbaf2d9f611c6a597c199eb49dc341e173d13a19d59e18e44be02915f26bf",
+      "after_sha256": "75f252f38523f6cb03d172e66d85f0a7b3418d8cfec3bca26f48c5892591b1b2"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/dto/runtime_preflight.py",
+      "operation": "modified",
+      "before_sha256": "9e5c3b5fe3a9f2af36fa328b5ccc3008d34b9e7f751268e13289a742197af233",
+      "after_sha256": "78dba405930991501baf1939da760ad0c9cf4545e49114b2e154d58b0cfe2864"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/ports/artifact_arrays.py",
+      "operation": "modified",
+      "before_sha256": "76019b8ebff2f90b0d31a01c4fe9136dc81b4b50f583aa79cbc53d820ddb10eb",
+      "after_sha256": "02fbae28f70d09f5a07fe67f333bdb5a6fd980d40c5404a76c7740e2a54e9275"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/preflight.py",
+      "operation": "modified",
+      "before_sha256": "79a1eb228a2b6559b4c0cb7d09adc918db18360e7447f643d900071ae89f4a52",
+      "after_sha256": "5eacdb08c655dbee21f8e7d3de9d0932402690456cfcee89e51ab3dc66be66b2"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/prepare_pools.py",
+      "operation": "modified",
+      "before_sha256": "a0974f2ff3de5c07278b1ffac1ad557a0ec38a8465ec6a76ffe17bbb5cbddd11",
+      "after_sha256": "5ce60180164149c624d2e2818a3b010b1344728a1410dd8544c351762af43e5d"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/config/backtest_artifacts_runtime_config.py",
+      "operation": "modified",
+      "before_sha256": "b69d783288c8fb9a961752bab208ffc20acd1247f550b3737450b6f03bc518a2",
+      "after_sha256": "cd0791b72ae61d77e07228b8598c49bffb286c07da24e0760a52403567d96782"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py",
+      "operation": "modified",
+      "before_sha256": "f3cf61539df460f1b6300eda3eaae56ee5a8d069565256f9353f0c43fb5f09fb",
+      "after_sha256": "34687aeb69a541b03e3999fb1d2007c67dd4aa1cf673195ddcd0f96829ae5755"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/v2/contracts.py",
+      "operation": "modified",
+      "before_sha256": "0df47e05ce76d9c16c50e3e450acc0c670953a9f6896a739b40c10c630a6b4f4",
+      "after_sha256": "f5c12634c0295f11445635e70e0713c9d4b56d3d3ed6414be6d21ba23614a347"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py",
+      "operation": "modified",
+      "before_sha256": "2685cb060b126ace22d3b1590238a72262b6831a22e7f7169b2fae976a1c26e8",
+      "after_sha256": "87bb8ebec763a8f2db398a0f94fa9b68c678d88cc782c14b33fe7a845218174a"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/adapters/test_backtest_artifacts_runtime_config.py",
+      "operation": "modified",
+      "before_sha256": "40a7cf982a4eaf09a41742d1fd36498f684ba14dd4dadd258868b37f4802a0a4",
+      "after_sha256": "287868c65b1fe0c623965c589b2f7d159553c4e1533c4aab88feb7cd59d17338"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py",
+      "operation": "modified",
+      "before_sha256": "6bc4a9aa04cb3afa0faaabe288fa8536dbb20142e7c65713aea6ced6a924bcfc",
+      "after_sha256": "8632f2b58a83dcb320513e55559efc532afb3b788462576b0d690fdeb32f1d83"
+    }
+  ],
+  "created_stage_artifacts": [
+    "reports/S06.md",
+    "reports/S06-evidence.json"
+  ],
+  "deleted_paths": [],
+  "checks": [
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/unit-initial.log",
+      "sha256": "8edf89983f73b5577dd57ec2dda11c079bb0caf9f71ebc064051ce602c4df250",
+      "observed_result": "61 passed; mandatory targets; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/unit-final.log",
+      "sha256": "d41f2733999de6109d46662159495e9ce1148d95a69502b90acd397d22c323a8",
+      "observed_result": "327 passed; exit 0; later additions separately verified"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/preflight-estimate-final.log",
+      "sha256": "6a07b643b22b81ca1e8fad7f738ab04848d362e1303cf28674a16d3c4c699775",
+      "observed_result": "4 passed, 20 deselected; final preflight/header/risk/identity checks; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/publish-policy-final.log",
+      "sha256": "328c3d8ecc2a706ffe2230c8ec63d8b8cfd1c8f66ce5568d3fc5d0e8d801c6ea",
+      "observed_result": "9 passed; three partial-policy combinations; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/postgres-final.log",
+      "sha256": "7a2956d22960085bec370047c7e4a9ded673046da27a6b597363155c4ae979a9",
+      "observed_result": "40 passed; exit 0; later risk additions separately verified"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/api-estimate-final.log",
+      "sha256": "e32a76992a7bf3b1b866d90303a82d120751a962c5d5e3c57a881f9b0137abe3",
+      "observed_result": "4 passed, 38 deselected; final HTTP/persistence/ACK/top10/byte-bound checks; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/client.log",
+      "sha256": "a3226616fa58b54d5595af21314cb1ee6f4383e6076682f78ee6a3b5addd861e",
+      "observed_result": "20 files, 216 tests passed; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/ruff-complete.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "observed_result": "All checks passed; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/pyright-complete.log",
+      "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+      "observed_result": "0 errors, 0 warnings, 0 informations; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/generate.log",
+      "sha256": "545548b8908399a43270e22b1bd044e471bac70533b0c4d0f38eb3ad2c043efb",
+      "observed_result": "runtime topology --write passed; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/generated-final.log",
+      "sha256": "435e28ce8aa4a86fc264a8faeb548a4cf1a443ae3c3663e674a1ccf9e0a30d9d",
+      "observed_result": "runtime topology --check passed; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/diff-check.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "observed_result": "no diagnostics; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/ci-route.log",
+      "sha256": "4a26ab1afb9e8ec838b28ba9181fb85917445e340e732a5660385c4f3b588087",
+      "observed_result": "routing completed; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/old-reader.log",
+      "sha256": "22f90b8f93efbe5b00f2345fbf73dfa29cc03b26f54d764fe2b53025cb24b0fd",
+      "observed_result": "saved pre-S01 reader: full/omitted accepted; partial/explicit policy rejected; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/new-reader.log",
+      "sha256": "3aef620e5f6ae30c6c943d6b71a69ec2e42134f876f2d50ea73c5f24b45af3e2",
+      "observed_result": "current reader: both root versions and both config directions accepted; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/cleanup-check.log",
+      "sha256": "52f96c26a39ed25108a6db43d6e11c6051eba8a498a5baab1891adfa7ac7c262",
+      "observed_result": "0 test DBs; 0 ownership schemas; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/cleanup-stop.log",
+      "sha256": "1196c3fc11814179621494461d7bd5cd5051da6f9dc3a090d2ac352d373783b7",
+      "observed_result": "owned disposable container stopped; exit 0"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/cleanup-remaining.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "observed_result": "no remaining owned container; exit 0"
+    }
+  ],
+  "supporting_files": [
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/reader-rehearsal.py",
+      "sha256": "9b699adc7bccb4e157429c7265911c6380ee6ceea516a9e1cd7d807ca61fc616"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/full-root.yaml",
+      "sha256": "a0bf1a8abae5304be316a67d0d688fdcc7a041cad3178f928a7a4ed5f12b0a4d"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/partial-root.yaml",
+      "sha256": "49efb49315d0bdbab09fbb01b52fb0181bb5a3073155373a9edf6e7773fe6025"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/owned.txt",
+      "sha256": "ddd2daeb5defde2dc61178e908cf1131dadc21b37f35973215cf7b1c7ef0e3d1"
+    },
+    {
+      "path": "/tmp/roehub-npy-s06-4ef098bc/owned-python.txt",
+      "sha256": "3d67a77afe9f8ecdb7e8a93d99b05cc08adc655bb99af7d63c7d9b60fac48a94"
+    }
+  ],
+  "review": {
+    "mode": "focused self-review plus independent read-only review",
+    "reviewer": "Schrodinger",
+    "agent_id": "01a11893-f343-7190-89bc-96096b6edf23",
+    "closed_findings": [
+      "Bound NPY header body before NumPy reads it",
+      "Validate per-role semantic dtype/shape/axes independent of manifest/header agreement"
+    ],
+    "limit": "Reviewer inspected code/tests/logs without independently rerunning suites; no production-readiness certification"
+  },
+  "proof_limits": [
+    "No production installation activated",
+    "No live provider/ClickHouse proof",
+    "New HTTP-to-runtime test uses real PostgreSQL ACK callback rather than new subprocess IPC coverage",
+    "Legacy risk-axis values require conservative readiness when original config provenance differs",
+    "No performance or year benchmark claim",
+    "No browser interaction change or browser-flow claim"
+  ]
+}

@@ -20,6 +20,7 @@ from redis import Redis
 from alembic.script import ScriptDirectory
 from apps.migrations.bootstrap import (
     apply_artifact_store_sql,
+    apply_backtest_input_recipe_sql,
     apply_control_operation_audit_sql,
     apply_execution_gateway_mainnet_safety_sql,
     apply_extensions_plugin_platform_sql,
@@ -421,8 +422,8 @@ def _load_postgres_phases(manifest_path: Path) -> dict[str, tuple[str, tuple[Pat
     if payload.get("schema") != POSTGRES_MANIFEST_SCHEMA:
         raise StorageLifecycleError("unsupported PostgreSQL migration manifest schema")
     raw_phases = payload.get("phases")
-    if not isinstance(raw_phases, list) or len(raw_phases) != 19:
-        raise StorageLifecycleError("PostgreSQL migration manifest must define nineteen phases")
+    if not isinstance(raw_phases, list) or len(raw_phases) != 20:
+        raise StorageLifecycleError("PostgreSQL migration manifest must define twenty phases")
     phases: dict[str, tuple[str, tuple[Path, ...]]] = {}
     for raw_phase in raw_phases:
         if not isinstance(raw_phase, dict):
@@ -478,6 +479,7 @@ def _load_postgres_phases(manifest_path: Path) -> dict[str, tuple[str, tuple[Pat
         "market-data-work-recovery-0025",
         "market-data-queue-events-0026",
         "market-data-stream-recovery-0027",
+        "backtest-input-recipe-0028",
     }:
         raise StorageLifecycleError("PostgreSQL migration phases are incomplete")
     return phases
@@ -905,6 +907,18 @@ def apply_postgres_migrations(
             raise StorageLifecycleError("market data stream recovery migration failed") from error
         _record_postgres_marker(
             dsn, store="postgres-sql", version=stream_version, checksum=stream_checksum
+        )
+
+
+    recipe_version = "backtest-input-recipe-0028"
+    recipe_checksum, _recipe_paths = phases[recipe_version]
+    if ("postgres-sql", recipe_version) not in markers:
+        try:
+            apply_backtest_input_recipe_sql(identity_dsn=dsn, migrations_dir=manifest_path.parent)
+        except Exception as error:
+            raise StorageLifecycleError("backtest input recipe migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=recipe_version, checksum=recipe_checksum
         )
 
 

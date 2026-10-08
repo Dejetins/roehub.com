@@ -1,0 +1,65 @@
+{
+  "schema": "backtest-npy-s09-post-transition-verification/v1",
+  "stage_status": "accepted",
+  "ledger_status": "completed",
+  "receipt": "receipts/S09/receipt-5af9af812d9f4e599c6e1b0a319c5acb.md",
+  "receipt_sha256": "bb79e52eb43590d750f1c3261a4c15d5e724590d2017e7bf1d0fabaca7520898",
+  "next_stage": null,
+  "next_stage_allowed": false,
+  "checks": [
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "tools.docs.generate_project_map",
+        "--check"
+      ],
+      "exit_code": 0,
+      "output": "OK: project map up-to-date (5 artifacts)",
+      "log": "/tmp/roehub-npy-s09-6947/post-map-check.log",
+      "sha256": "a5b0d36c3de1bb75f8df3058cad1f15075d594ffbb87dcb9db9b3dd2589a68bf"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "tools.docs.generate_docs_index",
+        "--check"
+      ],
+      "exit_code": 0,
+      "output": "OK: /Users/daniildegtyarev/Projects/roehub.com/docs/architecture/README.md is up-to-date.",
+      "log": "/tmp/roehub-npy-s09-6947/post-docs-check.log",
+      "sha256": "401ab7824560aed6da162e0f88076ac89f8ca62bb69b00b739e0ae679b23326f"
+    },
+    {
+      "command": [
+        "python3",
+        "/Users/daniildegtyarev/.codex/skills/prompt-manager/scripts/validate_pack.py",
+        "--root",
+        "/Users/daniildegtyarev/Projects/roehub.com",
+        "--ledger",
+        "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/backtest-npy-input-materialization-v1/iteration-ledger.md",
+        "--check",
+        "receipt",
+        "--receipt",
+        "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/backtest-npy-input-materialization-v1/receipts/S09/receipt-5af9af812d9f4e599c6e1b0a319c5acb.md"
+      ],
+      "exit_code": 0,
+      "output": "{\"status\": \"pass\", \"check\": \"receipt\", \"errors\": [], \"proof_boundary\": \"artifact-structure-and-file-binding\"}",
+      "log": "/tmp/roehub-npy-s09-6947/post-receipt-valid.log",
+      "sha256": "9906224acc6120fdd56a9f8e4a3a83432b3987f566df6e98db74b65cc41ce270"
+    }
+  ],
+  "failed_invocation": "First standalone receipt validation incorrectly supplied --stage, which is valid only for entry; rejected invocation retained in post-receipt-check.log. Corrected --receipt-only validation above passes. Updater internal validation had already passed before transition.",
+  "final_generated_map_sha256": {
+    "docs/architecture/project-map/AGENT_GUIDE.md": "84444805811ca062045fda5cbac7acd06169c007e918d3d172c1820097e8003f",
+    "docs/architecture/project-map/PROJECT_MAP.md": "d50f0211c8cc81a49899b897d10b1e8274b5ba3a61a52bbcf9138db3666e272d",
+    "docs/architecture/project-map/project-map.json": "88bcc8459184032ec0fe7b105413523c4e62b2c5917282e336a4b923f104f0ed",
+    "docs/architecture/project-map/component-map.mmd": "d95a84f21df72cf0e33383074e5e4a74a3f2b3295af0bb994e8c574dad668ae5",
+    "docs/architecture/project-map/project-map.mmd": "5d5e38a394231df3397d551b48a4bfa3742cf360d705e0901974127ec01005f0"
+  }
+}

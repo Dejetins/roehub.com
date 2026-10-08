@@ -21,13 +21,23 @@ class BacktestTpSlHitTimesGridArrays:
     Small `hit_times/15m` grid payload loaded before table materialization.
     """
 
-    manifest: ArtifactHitTimesManifestDocumentV2
-    manifest_hash: str
+    manifest: ArtifactHitTimesManifestDocumentV2 | None
+    manifest_hash: str | None
+    input_identity_sha256: str
     tp_values: np.ndarray
     sl_values: np.ndarray
+    timeframe: str
+    sentinel_index: int
+    index_origin: int
+    origin_utc: str
+    end_utc: str
 
     def __post_init__(self) -> None:
-        _ensure_sha256(self.manifest_hash, field_name="manifest_hash")
+        if (self.manifest is None) != (self.manifest_hash is None):
+            raise ValueError("manifest hash requires an actual publication manifest")
+        if self.manifest_hash is not None:
+            _ensure_sha256(self.manifest_hash, field_name="manifest_hash")
+        _ensure_sha256(self.input_identity_sha256, field_name="input_identity_sha256")
         _ensure_f32_vector(self.tp_values, field_name="tp_values")
         _ensure_f32_vector(self.sl_values, field_name="sl_values")
 
@@ -38,15 +48,25 @@ class BacktestTpSlHitTimesTableArrays:
     Heavy `hit_times/15m` table mmaps loaded only after grid coverage passes.
     """
 
-    manifest: ArtifactHitTimesManifestDocumentV2
-    manifest_hash: str
+    manifest: ArtifactHitTimesManifestDocumentV2 | None
+    manifest_hash: str | None
+    input_identity_sha256: str
     long_tp: np.ndarray
     long_sl: np.ndarray
     short_tp: np.ndarray
     short_sl: np.ndarray
+    timeframe: str
+    sentinel_index: int
+    index_origin: int
+    origin_utc: str
+    end_utc: str
 
     def __post_init__(self) -> None:
-        _ensure_sha256(self.manifest_hash, field_name="manifest_hash")
+        if (self.manifest is None) != (self.manifest_hash is None):
+            raise ValueError("manifest hash requires an actual publication manifest")
+        if self.manifest_hash is not None:
+            _ensure_sha256(self.manifest_hash, field_name="manifest_hash")
+        _ensure_sha256(self.input_identity_sha256, field_name="input_identity_sha256")
         _ensure_u32_matrix(self.long_tp, field_name="long_tp")
         _ensure_u32_matrix(self.long_sl, field_name="long_sl")
         _ensure_u32_matrix(self.short_tp, field_name="short_tp")
@@ -207,18 +227,22 @@ class BacktestTpSlHitTimesCleanupEvidence:
 
 @dataclass(frozen=True, slots=True)
 class BacktestTpSlHitTimesResult:
-    hit_times_manifest_hash: str
+    hit_times_manifest_hash: str | None
+    hit_times_input_sha256: str
     resolution: BacktestTpSlGridResolution
     hit_times: BacktestTpSlHitTimesSubset
     timing: BacktestTpSlHitTimesTiming
     cleanup_evidence: BacktestTpSlHitTimesCleanupEvidence
 
     def __post_init__(self) -> None:
-        _ensure_sha256(self.hit_times_manifest_hash, field_name="hit_times_manifest_hash")
+        if self.hit_times_manifest_hash is not None:
+            _ensure_sha256(self.hit_times_manifest_hash, field_name="hit_times_manifest_hash")
+        _ensure_sha256(self.hit_times_input_sha256, field_name="hit_times_input_sha256")
 
     def compact_mapping(self) -> dict[str, Any]:
         return {
             "hit_times_manifest_hash": self.hit_times_manifest_hash,
+            "hit_times_input_sha256": self.hit_times_input_sha256,
             "grid_evidence": self.resolution.evidence.as_mapping(),
             "hit_times_subset": self.hit_times.compact_mapping(),
             "timing": self.timing.as_mapping(),

@@ -1,0 +1,824 @@
+{
+  "additional_tests": [
+    {
+      "command": "NUMBA_NUM_THREADS=12 NUMBA_THREADING_LAYER=workqueue NUMBA_CACHE_DIR=/tmp/roehub-npy-s09-6947/jit uv run pytest -q tests/unit/apps/worker/backtest_job_runner tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py tests/unit/contexts/backtest/application/services/v2/test_input_recipe_replay.py",
+      "log": "unit-final.log",
+      "result": "214 passed"
+    },
+    {
+      "command": "uv run pytest -q tests/unit/apps/worker/backtest_job_runner/test_materialization_lifecycle.py tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py",
+      "environment": "same Numba resource settings",
+      "log": "limits-final.log",
+      "result": "63 passed"
+    },
+    {
+      "command": "uv run pytest -q tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py -k 'budget or manifest_slot' tests/unit/apps/worker/backtest_job_runner/test_materialization_lifecycle.py",
+      "environment": "same Numba resource settings",
+      "log": "limit-final.log",
+      "result": "3 passed, 111 deselected"
+    },
+    {
+      "command": "ROEHUB_BACKTEST_TEST_DSN='host=127.0.0.1 port=51402 dbname=postgres user=postgres' uv run pytest -q tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+      "environment": "same Numba resource settings",
+      "log": "pg-final.log",
+      "result": "48 passed, zero skips"
+    }
+  ],
+  "checks": [
+    {
+      "command": [
+        "uv",
+        "run",
+        "ruff",
+        "check",
+        "tests/unit/apps/worker/backtest_job_runner/test_materialization_lifecycle.py",
+        "apps/worker/backtest_job_runner/main/full_job_child.py",
+        "apps/worker/backtest_job_runner/main/lazy_trades_child.py",
+        "apps/worker/backtest_job_runner/wiring/modules/child_process.py",
+        "apps/worker/backtest_job_runner/wiring/modules/compute_resources.py",
+        "apps/worker/backtest_job_runner/wiring/modules/lazy_trades_child_process.py",
+        "apps/worker/backtest_job_runner/wiring/modules/process_observation.py",
+        "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py",
+        "src/trading/contexts/backtest/application/services/v2/prepare_pools.py",
+        "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py"
+      ],
+      "exit_code": 0,
+      "log": "ruff-final.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "pyright"
+      ],
+      "exit_code": 0,
+      "log": "pyright-final.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "tools.docs.generate_docs_index"
+      ],
+      "exit_code": 0,
+      "log": "docs-write.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "tools.docs.generate_docs_index",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "docs-check.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "tools.docs.generate_runbooks",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "runbooks.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "tools.artifacts.generate_schemas",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "artifact-schema.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "tools.backup.generate_schemas",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "backup-schema.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "tools/release/generate_runtime_topology.py",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "topology.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "tools.jobs.generate_schemas",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "jobs-schema.log"
+    },
+    {
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "diff-check.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "python",
+        "-m",
+        "tools.docs.generate_project_map",
+        "--check"
+      ],
+      "exit_code": 0,
+      "log": "map-check.log"
+    },
+    {
+      "command": [
+        "python3",
+        "/Users/daniildegtyarev/.codex/skills/prompt-manager/scripts/validate_pack.py",
+        "--root",
+        "/Users/daniildegtyarev/Projects/roehub.com",
+        "--ledger",
+        "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/backtest-npy-input-materialization-v1/iteration-ledger.md",
+        "--check",
+        "entry",
+        "--stage",
+        "S09",
+        "--executor",
+        "codex-s09-20261008-6947"
+      ],
+      "exit_code": 0,
+      "log": "entry-check.log"
+    }
+  ],
+  "cleanup": {
+    "first_disposable_pg_removed": true,
+    "s01_preserved": true,
+    "s08_inherited_top_level_hashes_verified_unchanged": true,
+    "year_disposable_pg_removed": true
+  },
+  "compatibility": {
+    "external_custom_output_and_production_latency": "unknown",
+    "financial_semantics": "none",
+    "new_readers_old_manifests_jobs": "compatible-change",
+    "old_readers_partial_sparse_payloads": "breaking-change",
+    "scratch_v2_tighter_resource_admission": "breaking-change"
+  },
+  "created_artifacts": [
+    "reports/S09.md",
+    "reports/S09-evidence.json",
+    "reports/S09-post-transition.json",
+    "updater-generated receipts/S09/*"
+  ],
+  "executor": "codex-s09-20261008-6947",
+  "external_evidence": {
+    "raw_index": "/tmp/roehub-npy-s09-6947/raw-index.json",
+    "root": "/tmp/roehub-npy-s09-6947",
+    "sha256": "453ce192ee5d8abb68794210181e709d518c8d01581b14f4524a646950c8b214"
+  },
+  "failed_live_global_checks": {
+    "no_waiver": true,
+    "oss_metadata": "foreign unclassified assets/screenshots, inherited S07 baseline",
+    "runtime_inventory": "foreign navigator binance.ico UTF-8 decoding, inherited S07 baseline"
+  },
+  "generated_maps_before_transition": [
+    {
+      "before_sha256": "3f0a1138cb2eb0b503aaa555307ae89e463e9b4ff268cf263034257edbc98d01",
+      "path": "docs/architecture/project-map/PROJECT_MAP.md",
+      "sha256": "b8a568f2a5663ff3c4308a7de4adf0d66d74cb4d38a9e8c543a7011ac9581ade"
+    },
+    {
+      "before_sha256": "9ae2ff87cd71cf58155186ccb20abe8196855b57e61360f7aa50c569647e3d1c",
+      "path": "docs/architecture/project-map/component-map.mmd",
+      "sha256": "d95a84f21df72cf0e33383074e5e4a74a3f2b3295af0bb994e8c574dad668ae5"
+    },
+    {
+      "before_sha256": "654e0d83258160ca240d2154f6f173b61d522ca459ea92d631eb60e9aa40ff9f",
+      "path": "docs/architecture/project-map/project-map.json",
+      "sha256": "94840a3b4e916342a7d8159a8296669c851314d7cfffa52b585e6f02f502c385"
+    }
+  ],
+  "head": "6d7f0a31fa7225f34df816a917ca93a57fb564c3",
+  "inherited_reports": {
+    "S01": {
+      "path": "reports/S01.md",
+      "sha256": "2344b8795b4a75bcb1773048150d40311c22b3369ce73f517b84ecb562702f4f"
+    },
+    "S02": {
+      "path": "reports/S02.md",
+      "sha256": "6c2084001454291cb7d22dda5ffda9b14556119b66b46dfe1a62f0beb139fc69"
+    },
+    "S03": {
+      "path": "reports/S03.md",
+      "sha256": "a6201e7581960e12d3f95ccaa7395070b06690c7f82f939da0e68f79fdc59024"
+    },
+    "S04": {
+      "path": "reports/S04.md",
+      "sha256": "168700d2ec168584411f8fdb17da3b308db454d3dde9e41e22aaa35d4a49aeb9"
+    },
+    "S05": {
+      "path": "reports/S05.md",
+      "sha256": "efbec5bacf0db550093fe6db710b96c2e8ed0396f1c012dd1cfd11679a032c9e"
+    },
+    "S06": {
+      "path": "reports/S06.md",
+      "sha256": "41bcc96bcd20ddd48eb577cdfb5361ead6567ac450a3c4fefd58f049bfa91732"
+    },
+    "S07": {
+      "path": "reports/S07.md",
+      "sha256": "26b9b36f130aaf87f8156f81c232a8be794a1aa567f555e6f9bec3a2261a6797"
+    },
+    "S08": {
+      "path": "reports/S08.md",
+      "sha256": "732a45ea2123932f4421b806c471b7e7f28a6ec2d3f8b8a5a01d1d9eb53fa671"
+    }
+  },
+  "map_transition_note": "Receipt adds a Git-visible path. Post-transition mechanical regeneration and final map hashes are recorded in already-created S09-post-transition.json; this receipt binds the pre-transition proof and stable implementation, not its own inventory path.",
+  "next_stage": null,
+  "next_stage_allowed": false,
+  "owned_changes": [
+    {
+      "before_sha256": "137056a2bd80f09f444ab93219b2dcd067cb5faf6e94dea933836b2a6c77e464",
+      "path": "tests/unit/apps/worker/backtest_job_runner/test_materialization_lifecycle.py",
+      "sha256": "94da03facd5722e51892e67c8e1a05f734d4d9a36d6260833a44a6f5a8882e69"
+    },
+    {
+      "before_sha256": "91ad540ee724e4e211d85e3406028752c04178df4a70074b665afcffea60dba3",
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py",
+      "sha256": "4891d66eaa6574be793d180910bdc5dca1c02c99c5a6e1962105e8436d492698"
+    },
+    {
+      "before_sha256": "82a5f552ad383f3ba6d51b936517c2b4cd4b18d70da67321ebd2e3fe68825b46",
+      "path": "apps/worker/backtest_job_runner/main/full_job_child.py",
+      "sha256": "b04a95c5ad64d1c158e11d6cd4a43fc8c83f56baef5c8cecb27fda5569f58216"
+    },
+    {
+      "before_sha256": "264712a5050cd1e0499b62a7787df7676454927655ec8954ce2b6a553dbd82bf",
+      "path": "apps/worker/backtest_job_runner/main/lazy_trades_child.py",
+      "sha256": "1871845104dcfe73c8df7bacf35cc895dd346c8c41d83cfbe5538e3bcd395fde"
+    },
+    {
+      "before_sha256": "21eff4e988c8ab0e9521444131264e7ff8fb025fd43e075da91e7558880e0e7b",
+      "path": "apps/worker/backtest_job_runner/wiring/modules/child_process.py",
+      "sha256": "708bf2b29fe748e1cc0509c5425ae86d958b68c03489f7505003cd9503f81a2a"
+    },
+    {
+      "before_sha256": "b696225271ad7a0e44df702b97b51db7a015fd8cf6cc10e097ef52794ff18c63",
+      "path": "apps/worker/backtest_job_runner/wiring/modules/compute_resources.py",
+      "sha256": "850c27ec29752511cb80c0837e84d9ef6730e5998fc74a24dd787e98df789a08"
+    },
+    {
+      "before_sha256": "baf96a466fa57d4016cf49bccdd08e85c6299e3473f26d090447b540641b7705",
+      "path": "apps/worker/backtest_job_runner/wiring/modules/lazy_trades_child_process.py",
+      "sha256": "df147f9d72be51ae2136666b0aa1a04892378a8b048b859902eed521215fffa2"
+    },
+    {
+      "before_sha256": "551df785ad6786e8465b6a48f3cf9bcd84f7c7968ee1fff93249c7d2635fd4f3",
+      "path": "apps/worker/backtest_job_runner/wiring/modules/process_observation.py",
+      "sha256": "40aac92b234d08084607e8d623ce20412166cf9cd5b4ae3388b882a14bd30670"
+    },
+    {
+      "before_sha256": "f985082d3b8c70f688230d12721cd629b017a6bf63e8ae189e1209e3cb2693e9",
+      "path": "configs/installation/runtime-input-inventory.json",
+      "sha256": "2587ebfa380af5e27c1094110db3195f06041737d47a679b500396b96fa3e8c4"
+    },
+    {
+      "before_sha256": "2c135535d2f2687e00d0f5b082a9a94bbfa6a9079e6ad148adf1f6c21f054f75",
+      "path": "docs/architecture/README.md",
+      "sha256": "f9db0fbf3c6a7098ac0b4b581065e919d92ecd1eae8698b9bae193a3f84ffa86"
+    },
+    {
+      "before_sha256": "7eb17ec4f432a2eef4ee7a8c15aa7dc012951d9f01c67baac5f9755c23dcd130",
+      "path": "docs/architecture/api/api-errors-and-422-payload-v1.md",
+      "sha256": "030234d88069d7ad36d08cc9b0ed765ed2293d7154fd388d6dd1a9d5608188f0"
+    },
+    {
+      "before_sha256": "7fd1b7372ec1740f5c16210487ef836977b79ca86e0d42293e806f760263c207",
+      "path": "docs/architecture/backtest/README.md",
+      "sha256": "6ebcb23f1baa62cb45361b967d298dd2b6b833b4b341dbec5512afa26adb02e7"
+    },
+    {
+      "before_sha256": "4a5832e8f3811ab8b565b94694535a3607ce5d980f9f342d7118b0694c0d4477",
+      "path": "docs/architecture/backtest/backtest-service-artifact-runtime-v1.md",
+      "sha256": "33bc30bc2aa9a66024abf7e3261d62870b09eb38eac5b82efcdcb2a7795b6bdf"
+    },
+    {
+      "before_sha256": "9f2a4e47133ff2ca6987a55ed4fe64b0846977fcf5bd72bc2a1a530a3fab97fe",
+      "path": "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "sha256": "89c772d8cdf30ae572c272e715abce3c36c319f2f4e87203353130aab92066f3"
+    },
+    {
+      "before_sha256": "48e888dae0a97029e1c60de6706da1df33cd6a56aedcf47345b11b0de2fcaa14",
+      "path": "docs/runbooks/indicators-numba-cache-and-threads.md",
+      "sha256": "51ff0f7f8f4d40f3a85a259c9bc45052ea226ca92dcafbf21f8b078ef5a41f52"
+    },
+    {
+      "before_sha256": "ed829a38c144647dd213addbeba351d11de53924607eba4eabe7836af3ce4101",
+      "path": "docs/runbooks/offline-release-installation.md",
+      "sha256": "bd0a46482b3af9efc6415514ccf9ceab0c9c68a42331ed03afb85d3605987ab4"
+    },
+    {
+      "before_sha256": "75f252f38523f6cb03d172e66d85f0a7b3418d8cfec3bca26f48c5892591b1b2",
+      "path": "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py",
+      "sha256": "8193744006a3b80fd97985a6d7f4e618d70239305138cfd6fb19d879e0f76932"
+    },
+    {
+      "before_sha256": "91d476921d91fd7c9192ff8079c767fffaa2b7e0a4f7484692593e2921990e46",
+      "path": "src/trading/contexts/backtest/application/services/v2/prepare_pools.py",
+      "sha256": "2412fc34de99b0eb30da5d4a5bde64dcdf3709230acb4e74e24920eb769e33ae"
+    },
+    {
+      "before_sha256": "34687aeb69a541b03e3999fb1d2007c67dd4aa1cf673195ddcd0f96829ae5755",
+      "path": "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py",
+      "sha256": "346bdf220796e70101ef8171c921c6f3d7fc24a2bc9664d7aeeb0787da196d85"
+    },
+    {
+      "before_sha256": "127773bc0d8281750d5e20536fcd4aa49131c724001904ff7ca6586a2a122d29",
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py",
+      "sha256": "e8b4a6f63888650dd9fc39ea5f99eabf17a6ec396a1ec09a27aa3a568f2e8f20"
+    }
+  ],
+  "review": {
+    "final_verdict": "no remaining material blocker in reviewed resource boundary; conservative8x guard accepted",
+    "initial_findings": "total scratch excluded metadata/IPC/logs; native validation bypassed builder budget; manifest estimate missing",
+    "mode": "focused self-review and one independent resource reviewer; inherited security reviews retained",
+    "residual_note": "hypothetical descendant holding diagnostic pipe may leave stream.close waiting; current production path has no established such descendant; not claimed fixed",
+    "review_limit": "read-only code review, no independent test rerun",
+    "reviewer": "Dewey/01a118de-35cc-7963-9f71-949be83d4885"
+  },
+  "routed_shards": [
+    {
+      "command": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "tests/unit/contexts/backtest_artifacts",
+        "tests/unit/contexts/backtest/adapters/outbound/cache_fs",
+        "tests/unit/contexts/backtest/adapters/outbound/artifacts_fs",
+        "tests/unit/contexts/backtest/adapters/test_backtest_artifacts_runtime_config.py",
+        "tests/unit/contexts/backtest/adapters/test_indicators_yaml_defaults_provider.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_yaml_backtest_artifact_loader_v2.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py",
+        "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py",
+        "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+        "tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py"
+      ],
+      "exit_code": 0,
+      "log": "backtest-artifacts.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "tests/unit/contexts/backtest/application/services/v2/test_cost_permutation.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_local_top_k.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_integer_trade_tape.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_prefix_guard.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_bitsets.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_row_signatures.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_result_candles.py",
+        "tests/unit/contexts/backtest/application/services/test_signals_from_indicators_v1.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py",
+        "tests/unit/scripts/backtest",
+        "tests/unit/contexts/backtest/application/services/v2/test_combo_planning_service.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_hit_times_compute_v2.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_lazy_trades_detail_service.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_short_and_tp_sl_ranking.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_signal_rules_engine_v2.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_top_result_assembly.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_tp_sl_exact_scoring_service.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_tp_sl_hit_times_service.py"
+      ],
+      "exit_code": 0,
+      "log": "backtest-scoring.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_lazy_trades_materialization_worker_use_case.py",
+        "tests/unit/apps/api/test_backtests_routes.py",
+        "tests/unit/apps/api/test_ui_backtests_routes.py",
+        "tests/unit/apps/worker/backtest_job_runner",
+        "tests/unit/apps/worker/test_backtest_job_runner.py"
+      ],
+      "exit_code": 0,
+      "log": "backtest-use-cases.log"
+    },
+    {
+      "command": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "tests/unit/contexts/backtest/adapters/outbound/test_postgres_research_organization_scope.py",
+        "tests/unit/contexts/backtest/application/services/test_organization_scoped_market_data.py",
+        "tests/unit/contexts/backtest/application/services/test_research_identity.py",
+        "tests/unit/contexts/backtest/application/test_backtest_errors.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_admission.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_backtest_preflight_service.py",
+        "tests/unit/contexts/backtest/domain"
+      ],
+      "exit_code": 0,
+      "log": "backtest-domain.log"
+    }
+  ],
+  "runtime_inventory": {
+    "check_log": "runtime input inventory passed: mode=check, total=167",
+    "delivered_path": "configs/installation/runtime-input-inventory.json",
+    "generator": "uv run python tools/release/runtime_input_inventory.py --write; --check",
+    "scope": "HEAD plus104 owned overlays/deltas; six explicit mixed test prerequisites",
+    "sha256": "2587ebfa380af5e27c1094110db3195f06041737d47a679b500396b96fa3e8c4",
+    "snapshot_manifest_sha256": "7f02c1ce605df52d29a81a348e55024e9c1d755666f5bf3258b7aa421fdc5fd4"
+  },
+  "s08_static_applicability": {
+    "boundary": "Static admission calculation on frozen S08 metadata, not timing or execution on final S09 code. Full N W2 inventory is an upper bound for N/G/M initial inventory; builder retains its own guards. S08 measurements remain frozen-code evidence only.",
+    "records": [
+      {
+        "all_native_inventory_upper_bound_bytes": 33573988,
+        "prepared_yaml_json_proxy_bytes": 14451,
+        "remaining_builder_budget_bytes": 193280672,
+        "source_log_sha256": "f807aaff9d2cd8d0160fa48b8edfbf204b663bf3d66f4af556b17943c02a43c5",
+        "validation_and_outputs_estimate_bytes": 343590240,
+        "workload": "W1"
+      },
+      {
+        "all_native_inventory_upper_bound_bytes": 33573988,
+        "prepared_yaml_json_proxy_bytes": 17430,
+        "remaining_builder_budget_bytes": 176249504,
+        "source_log_sha256": "948f2de5ac2c53c5839766592d4ac94d7e16d94ca43613b0aea61103bc216d96",
+        "validation_and_outputs_estimate_bytes": 360621408,
+        "workload": "W2"
+      },
+      {
+        "all_native_inventory_upper_bound_bytes": 33573988,
+        "prepared_yaml_json_proxy_bytes": 17430,
+        "remaining_builder_budget_bytes": 247460384,
+        "source_log_sha256": "850cf8de52f901adae35c8e5cc4f378124b25e151dc507726ef1866b828b39c3",
+        "validation_and_outputs_estimate_bytes": 289410528,
+        "workload": "W3"
+      }
+    ]
+  },
+  "schema": "backtest-npy-s09-evidence/v1",
+  "scope": "S09 local closure, no publication/deployment",
+  "year_supplement": {
+    "cleanup": {
+      "database_removed": true,
+      "paths": [
+        {
+          "absent": true,
+          "bytes_removed": 35327008,
+          "path": "/tmp/roehub-npy-s09-6947/year/N/store"
+        },
+        {
+          "absent": true,
+          "bytes_removed": 23944435,
+          "path": "/tmp/roehub-npy-s09-6947/year/G/store"
+        },
+        {
+          "absent": true,
+          "bytes_removed": 28247376,
+          "path": "/tmp/roehub-npy-s09-6947/year/M/store"
+        },
+        {
+          "absent": true,
+          "bytes_removed": 3794912,
+          "path": "/tmp/roehub-npy-s09-6947/year/cache"
+        },
+        {
+          "absent": true,
+          "bytes_removed": 4360192,
+          "path": "/tmp/roehub-npy-s09-6947/year/jit"
+        },
+        {
+          "absent": true,
+          "bytes_removed": 2,
+          "path": "/tmp/roehub-npy-s09-6947/year/attempts"
+        }
+      ]
+    },
+    "command": "NUMBA_NUM_THREADS=12 NUMBA_THREADING_LAYER=workqueue NUMBA_CACHE_DIR=/tmp/roehub-npy-s09-6947/year/jit uv run python /tmp/roehub-npy-s09-6947/year/smoke.py",
+    "database": "disposable roehub-npy-s09-6947-year-pg loopback60340, removed",
+    "first_attempt_failure": "SQL identity queried after fixture cleanup; fixed harness to capture before deletion; initial smoke.log/final-N-W1.json preserved",
+    "runs": [
+      {
+        "attempt_removed": true,
+        "diagnostic_single_run_runtime_s": 5.001697416999377,
+        "generated_allowance_bytes": 0,
+        "mode": "N",
+        "prepared_bytes": 16441,
+        "proof": {
+          "all_selected_lazy_trades": 864,
+          "array_roles_exact": 6,
+          "production_context": {
+            "backtest_runtime_config_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "engine_params_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "input_recipe_semantic_sha256": "26b504164f9e75a10649029942b24b997975acdf443d8a598211daaf9ef5839d",
+            "request_hash": "66c7408be3540473556ae329869e2f189c1c6b4421b04c76236d84425e2f10b5",
+            "schema": "backtest_recipe_reference_context_v1",
+            "source_prefix_sha256": "a873432197395906facf10a7597afcc67635b6038a9702f72883163d2ddce4d8"
+          },
+          "top": {
+            "absolute_tolerance": 1e-05,
+            "available_count": 10,
+            "boundary": "persisted_api_top",
+            "compared_count": 10,
+            "complete": true,
+            "expected_count": 10,
+            "mismatches": [],
+            "pass": true,
+            "reasons": [],
+            "requested_top_n": 10,
+            "retrieved_count": 10,
+            "status": "passed"
+          }
+        },
+        "total_reserved_bytes": 67108864,
+        "workload": "W1"
+      },
+      {
+        "attempt_removed": true,
+        "diagnostic_single_run_runtime_s": 6.118454499999643,
+        "generated_allowance_bytes": 28005760,
+        "mode": "G",
+        "prepared_bytes": 9304159,
+        "proof": {
+          "all_selected_lazy_trades": 864,
+          "array_roles_exact": 6,
+          "production_context": {
+            "backtest_runtime_config_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "engine_params_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "input_recipe_semantic_sha256": "26b504164f9e75a10649029942b24b997975acdf443d8a598211daaf9ef5839d",
+            "request_hash": "66c7408be3540473556ae329869e2f189c1c6b4421b04c76236d84425e2f10b5",
+            "schema": "backtest_recipe_reference_context_v1",
+            "source_prefix_sha256": "a873432197395906facf10a7597afcc67635b6038a9702f72883163d2ddce4d8"
+          },
+          "top": {
+            "absolute_tolerance": 1e-05,
+            "available_count": 10,
+            "boundary": "persisted_api_top",
+            "compared_count": 10,
+            "complete": true,
+            "expected_count": 10,
+            "mismatches": [],
+            "pass": true,
+            "reasons": [],
+            "requested_top_n": 10,
+            "retrieved_count": 10,
+            "status": "passed"
+          }
+        },
+        "total_reserved_bytes": 95114624,
+        "workload": "W1"
+      },
+      {
+        "attempt_removed": true,
+        "diagnostic_single_run_runtime_s": 5.540056375000859,
+        "generated_allowance_bytes": 24262912,
+        "mode": "M",
+        "prepared_bytes": 6211979,
+        "proof": {
+          "all_selected_lazy_trades": 864,
+          "array_roles_exact": 6,
+          "production_context": {
+            "backtest_runtime_config_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "engine_params_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "input_recipe_semantic_sha256": "26b504164f9e75a10649029942b24b997975acdf443d8a598211daaf9ef5839d",
+            "request_hash": "66c7408be3540473556ae329869e2f189c1c6b4421b04c76236d84425e2f10b5",
+            "schema": "backtest_recipe_reference_context_v1",
+            "source_prefix_sha256": "a873432197395906facf10a7597afcc67635b6038a9702f72883163d2ddce4d8"
+          },
+          "top": {
+            "absolute_tolerance": 1e-05,
+            "available_count": 10,
+            "boundary": "persisted_api_top",
+            "compared_count": 10,
+            "complete": true,
+            "expected_count": 10,
+            "mismatches": [],
+            "pass": true,
+            "reasons": [],
+            "requested_top_n": 10,
+            "retrieved_count": 10,
+            "status": "passed"
+          }
+        },
+        "total_reserved_bytes": 91371776,
+        "workload": "W1"
+      },
+      {
+        "attempt_removed": true,
+        "diagnostic_single_run_runtime_s": 0.17010341699642595,
+        "generated_allowance_bytes": 0,
+        "mode": "N",
+        "prepared_bytes": 19461,
+        "proof": {
+          "array_roles_exact": 12
+        },
+        "total_reserved_bytes": 67108864,
+        "workload": "W2"
+      },
+      {
+        "attempt_removed": true,
+        "diagnostic_single_run_runtime_s": 1.4715438330022153,
+        "generated_allowance_bytes": 30192000,
+        "mode": "G",
+        "prepared_bytes": 11440516,
+        "proof": {
+          "array_roles_exact": 12
+        },
+        "total_reserved_bytes": 97300864,
+        "workload": "W2"
+      },
+      {
+        "attempt_removed": true,
+        "diagnostic_single_run_runtime_s": 0.5251607079990208,
+        "generated_allowance_bytes": 25199872,
+        "mode": "M",
+        "prepared_bytes": 7134507,
+        "proof": {
+          "array_roles_exact": 18
+        },
+        "total_reserved_bytes": 92308736,
+        "workload": "W2"
+      },
+      {
+        "attempt_removed": true,
+        "diagnostic_single_run_runtime_s": 6.730160249993787,
+        "generated_allowance_bytes": 0,
+        "mode": "N",
+        "prepared_bytes": 19461,
+        "proof": {
+          "all_selected_lazy_trades": 1150,
+          "array_roles_exact": 12,
+          "production_context": {
+            "backtest_runtime_config_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "engine_params_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "input_recipe_semantic_sha256": "3c0ce6fd5a3cbcc88d9baeb883b751792eb8af9d3091fa6ad067661821bd7e68",
+            "request_hash": "847c27b5307db813a1db240d7e22e978969f052eb07328bc6d23e166a4ad1a69",
+            "schema": "backtest_recipe_reference_context_v1",
+            "source_prefix_sha256": "a873432197395906facf10a7597afcc67635b6038a9702f72883163d2ddce4d8"
+          },
+          "top": {
+            "absolute_tolerance": 1e-05,
+            "available_count": 10,
+            "boundary": "persisted_api_top",
+            "compared_count": 10,
+            "complete": true,
+            "expected_count": 10,
+            "mismatches": [],
+            "pass": true,
+            "reasons": [],
+            "requested_top_n": 10,
+            "retrieved_count": 10,
+            "status": "passed"
+          }
+        },
+        "total_reserved_bytes": 67108864,
+        "workload": "W3"
+      },
+      {
+        "attempt_removed": true,
+        "diagnostic_single_run_runtime_s": 0.5710848750022706,
+        "generated_allowance_bytes": 19379328,
+        "mode": "G",
+        "prepared_bytes": 2508378,
+        "proof": {
+          "all_selected_lazy_trades": 1150,
+          "array_roles_exact": 12,
+          "production_context": {
+            "backtest_runtime_config_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "engine_params_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "input_recipe_semantic_sha256": "3c0ce6fd5a3cbcc88d9baeb883b751792eb8af9d3091fa6ad067661821bd7e68",
+            "request_hash": "847c27b5307db813a1db240d7e22e978969f052eb07328bc6d23e166a4ad1a69",
+            "schema": "backtest_recipe_reference_context_v1",
+            "source_prefix_sha256": "a873432197395906facf10a7597afcc67635b6038a9702f72883163d2ddce4d8"
+          },
+          "top": {
+            "absolute_tolerance": 1e-05,
+            "available_count": 10,
+            "boundary": "persisted_api_top",
+            "compared_count": 10,
+            "complete": true,
+            "expected_count": 10,
+            "mismatches": [],
+            "pass": true,
+            "reasons": [],
+            "requested_top_n": 10,
+            "retrieved_count": 10,
+            "status": "passed"
+          }
+        },
+        "total_reserved_bytes": 86488192,
+        "workload": "W3"
+      },
+      {
+        "attempt_removed": true,
+        "diagnostic_single_run_runtime_s": 0.5731554590020096,
+        "generated_allowance_bytes": 17991424,
+        "mode": "M",
+        "prepared_bytes": 1179749,
+        "proof": {
+          "all_selected_lazy_trades": 1150,
+          "array_roles_exact": 18,
+          "production_context": {
+            "backtest_runtime_config_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "engine_params_hash": "13fb7e883c736cac56d7109ada474ed01a1f295fe16fb9335bcbc648280c22f6",
+            "input_recipe_semantic_sha256": "3c0ce6fd5a3cbcc88d9baeb883b751792eb8af9d3091fa6ad067661821bd7e68",
+            "request_hash": "847c27b5307db813a1db240d7e22e978969f052eb07328bc6d23e166a4ad1a69",
+            "schema": "backtest_recipe_reference_context_v1",
+            "source_prefix_sha256": "a873432197395906facf10a7597afcc67635b6038a9702f72883163d2ddce4d8"
+          },
+          "top": {
+            "absolute_tolerance": 1e-05,
+            "available_count": 10,
+            "boundary": "persisted_api_top",
+            "compared_count": 10,
+            "complete": true,
+            "expected_count": 10,
+            "mismatches": [],
+            "pass": true,
+            "reasons": [],
+            "requested_top_n": 10,
+            "retrieved_count": 10,
+            "status": "passed"
+          }
+        },
+        "total_reserved_bytes": 85100288,
+        "workload": "W3"
+      }
+    ],
+    "scope": "9 final-code runs, six independent top10 references/all selected lazy pages, exact derivative arrays and real persisted PG ACK; full production service in-process, ordinary lazy subprocess. Diagnostic single-run times only; S08 medians unchanged.",
+    "source_binding": {
+      "apps/worker/backtest_job_runner/main/full_job_child.py": "b04a95c5ad64d1c158e11d6cd4a43fc8c83f56baef5c8cecb27fda5569f58216",
+      "apps/worker/backtest_job_runner/main/lazy_trades_child.py": "1871845104dcfe73c8df7bacf35cc895dd346c8c41d83cfbe5538e3bcd395fde",
+      "apps/worker/backtest_job_runner/wiring/modules/child_process.py": "708bf2b29fe748e1cc0509c5425ae86d958b68c03489f7505003cd9503f81a2a",
+      "apps/worker/backtest_job_runner/wiring/modules/compute_resources.py": "850c27ec29752511cb80c0837e84d9ef6730e5998fc74a24dd787e98df789a08",
+      "apps/worker/backtest_job_runner/wiring/modules/lazy_trades_child_process.py": "df147f9d72be51ae2136666b0aa1a04892378a8b048b859902eed521215fffa2",
+      "apps/worker/backtest_job_runner/wiring/modules/process_observation.py": "40aac92b234d08084607e8d623ce20412166cf9cd5b4ae3388b882a14bd30670",
+      "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py": "8193744006a3b80fd97985a6d7f4e618d70239305138cfd6fb19d879e0f76932",
+      "src/trading/contexts/backtest/application/services/v2/prepare_pools.py": "2412fc34de99b0eb30da5d4a5bde64dcdf3709230acb4e74e24920eb769e33ae",
+      "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py": "346bdf220796e70101ef8171c921c6f3d7fc24a2bc9664d7aeeb0787da196d85",
+      "tests/unit/apps/worker/backtest_job_runner/test_materialization_lifecycle.py": "94da03facd5722e51892e67c8e1a05f734d4d9a36d6260833a44a6f5a8882e69",
+      "tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py": "e8b4a6f63888650dd9fc39ea5f99eabf17a6ec396a1ec09a27aa3a568f2e8f20"
+    },
+    "trusted_source": {
+      "baseline-files.json": {
+        "count": 1328,
+        "sha256": "b143caee0113650f4d579dc1c424ae4f7324022a0c8a269f770b2847227a8b7a",
+        "verified": true
+      },
+      "native-output-hashes.json": {
+        "count": 82,
+        "sha256": "51422090315612b056f8e4d287c324fa4230f1002f940d9247711b9a4db9880d",
+        "verified": true
+      },
+      "year-native-hashes.json": {
+        "count": 75,
+        "sha256": "9409e6ee512ebc489d0752596e3ff60f6264eb33d0e605314913003b77055841",
+        "verified": true
+      }
+    }
+  }
+}

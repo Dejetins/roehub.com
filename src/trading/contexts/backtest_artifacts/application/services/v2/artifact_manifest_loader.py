@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -14,8 +14,6 @@ from .contracts import (
     ARTIFACT_PRICE_TIMEFRAMES_V2,
     CURRENT_ARTIFACT_POINTER_FILENAME_V2,
     HIT_TIMES_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
-    ROOT_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2,
-    ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
     SIGNAL_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2,
     SIGNAL_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
     SIGNAL_FEATURES_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
@@ -47,7 +45,10 @@ from .contracts import (
     ArtifactTimelineCoverageV2,
     BacktestArtifactLoaderV2,
     BacktestArtifactPathResolverV2,
+    BacktestPreparedArtifactSet,
     freeze_artifact_payload_mapping_v2,
+    root_manifest_optional_keys_v2,
+    root_manifest_required_keys_v2,
     validate_artifact_slot_v2,
     validate_funding_coverage_status_v2,
     validate_indicator_id_v2,
@@ -70,6 +71,22 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
     """
 
     path_resolver: BacktestArtifactPathResolverV2
+
+    def with_private_slot(
+        self,
+        *,
+        coordinates: ArtifactCoordinatesV2,
+        slot: str,
+        root: Path,
+    ) -> YamlBacktestArtifactLoaderV2:
+        return replace(
+            self,
+            path_resolver=self.path_resolver.with_private_slot(
+                coordinates=coordinates,
+                slot=slot,
+                root=root,
+            ),
+        )
 
     def load_current_pointer(self, coordinates: ArtifactCoordinatesV2) -> ArtifactCurrentPointerV2:
         """
@@ -698,6 +715,11 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
     ) -> ArtifactFundingPathsV2:
         return self.path_resolver.funding_paths(coordinates, slot)
 
+    def load_prepared_manifest_from_path(self, path: Path) -> BacktestPreparedArtifactSet:
+        """Read the distinct job manifest; root trust is established by the caller."""
+        payload = self._load_yaml_mapping(path=path, document_label="job prepared manifest")
+        return BacktestPreparedArtifactSet.from_mapping(payload)
+
     def _parse_root_manifest_document(
         self,
         *,
@@ -728,8 +750,12 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         """
         self._require_exact_yaml_keys_with_optional(
             payload=payload,
-            required_keys=ROOT_ARTIFACT_MANIFEST_REQUIRED_KEYS_V2,
-            optional_keys=ROOT_ARTIFACT_MANIFEST_OPTIONAL_KEYS_V2,
+            required_keys=root_manifest_required_keys_v2(
+                self._required_yaml_field(payload=payload, key="schema_version", path=path)
+            ),
+            optional_keys=root_manifest_optional_keys_v2(
+                self._required_yaml_field(payload=payload, key="schema_version", path=path)
+            ),
             path=path,
         )
         manifest_slot = validate_artifact_slot_v2(
@@ -775,7 +801,7 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
             hit_times=self._parse_hit_times_reference(
                 path=path,
                 payload=self._required_mapping_field(payload=payload, key="hit_times", path=path),
-            ),
+            ) if "hit_times" in payload else None,
             funding=self._parse_optional_funding_manifest(path=path, payload=payload),
             signal_encoding=self._parse_signal_encoding(
                 path=path,

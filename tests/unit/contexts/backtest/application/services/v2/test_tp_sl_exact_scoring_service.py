@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Any, Mapping, Sequence
 
 import numpy as np
@@ -995,7 +996,20 @@ def _hit_times_result(
         ),
     )
     return BacktestTpSlHitTimesResult(
-        hit_times_manifest_hash="a" * 64,
+        hit_times_manifest_hash=None,
+        hit_times_input_sha256=hashlib.sha256(
+            b"".join(
+                array.tobytes()
+                for array in (
+                    tp_array,
+                    sl_array,
+                    subset.long_tp,
+                    subset.long_sl,
+                    subset.short_tp,
+                    subset.short_sl,
+                )
+            )
+        ).hexdigest(),
         resolution=resolution,
         hit_times=subset,
         timing=BacktestTpSlHitTimesTiming(wall_time_s=0.0, subsegments={}),

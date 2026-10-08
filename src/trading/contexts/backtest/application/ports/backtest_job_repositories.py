@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 from uuid import UUID
 
 from trading.contexts.backtest.domain.entities import (
@@ -80,6 +82,49 @@ class BacktestJobListPage:
     next_cursor: BacktestJobListCursor | None
 
 
+@dataclass(frozen=True, slots=True)
+class ArtifactReaderReservation:
+    exchange: str
+    market_type: str
+    symbol: str
+    slot: str
+    generation: int
+    manifest_sha256: str
+    owner_kind: str
+    organization_id: UUID | None
+    owner_id: UUID
+    owner_token: UUID
+    attempt: int
+    parent_incarnation: UUID | None
+    epoch: int = 0
+
+    def parameters(self) -> dict[str, Any]:
+        from dataclasses import asdict
+
+        return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactWriterReservation:
+    exchange: str
+    market_type: str
+    symbol: str
+    slot: str
+    owner_token: UUID
+    attempt: int
+    parent_incarnation: UUID
+    epoch: int
+
+    def parameters(self) -> dict[str, Any]:
+        from dataclasses import asdict
+
+        return asdict(self)
+
+
+class ArtifactOwnershipConflict(RuntimeError):
+    """Ownership or metadata changed; do not mutate files or substitute a new recipe."""
+
+
 class BacktestJobRepository(Protocol):
     """
     Backtest job core storage port for create/get/list/cancel/quota operations.
@@ -93,6 +138,55 @@ class BacktestJobRepository(Protocol):
         backtest_job_repository.py
       - alembic/versions/20260222_0003_backtest_jobs_v1.py
     """
+
+    def transaction(self) -> AbstractContextManager[BacktestJobRepository]: ...
+
+    def reserve_artifact_reader(
+        self,
+        *,
+        reader: ArtifactReaderReservation,
+    ) -> ArtifactReaderReservation: ...
+
+    def release_artifact_reader(self, *, reader: ArtifactReaderReservation) -> bool: ...
+
+    def reserve_artifact_writer(
+        self,
+        *,
+        exchange: str,
+        market_type: str,
+        symbol: str,
+        slot: str,
+        expected_generation: int | None,
+        expected_manifest_sha256: str | None,
+        owner_token: UUID,
+        attempt: int,
+        parent_incarnation: UUID,
+    ) -> ArtifactWriterReservation: ...
+
+    def owns_artifact_writer(self, *, writer: ArtifactWriterReservation) -> bool: ...
+
+    def recover_artifact_writer(
+        self,
+        *,
+        writer: ArtifactWriterReservation,
+        generation: int | None,
+        manifest_sha256: str | None,
+        reconcile_dead_owner: Callable[[], None],
+    ) -> None: ...
+
+    def verify_artifact_writer(self, *, writer: ArtifactWriterReservation) -> None: ...
+
+    def complete_artifact_writer(
+        self,
+        *,
+        writer: ArtifactWriterReservation,
+        generation: int | None,
+        manifest_sha256: str | None,
+    ) -> None: ...
+
+    def quarantine_artifact_reader(self, *, reader: ArtifactReaderReservation) -> None: ...
+
+    def quarantine_artifact_writer(self, *, writer: ArtifactWriterReservation) -> None: ...
 
     def create(self, *, job: BacktestJob) -> BacktestJob:
         """
@@ -215,6 +309,7 @@ class BacktestJobRepository(Protocol):
         user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         next_state: BacktestJobState,
         top_variants: tuple[BacktestJobTopVariant, ...],
         last_error: str | None = None,

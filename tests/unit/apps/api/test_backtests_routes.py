@@ -2,7 +2,7 @@ import inspect
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import pytest
@@ -1774,7 +1774,10 @@ class _FakeArtifactResolver:
     funding_missing_event_count: int | None = None
     funding_reason_codes: tuple[str, ...] = ()
 
-    def resolve_context(self, *, coordinates: BacktestCoordinates) -> BacktestArtifactMetadata:
+    def resolve_context(
+        self, *, coordinates: BacktestCoordinates,
+        preferred: BacktestArtifactMetadata | None = None,
+    ) -> BacktestArtifactMetadata:
         self.coordinates = (*self.coordinates, coordinates)
         return BacktestArtifactMetadata(
             artifact_slot="slot_a",
@@ -1794,7 +1797,10 @@ class _FakeArtifactResolver:
 
 
 class _UnavailableArtifactResolver:
-    def resolve_context(self, *, coordinates: BacktestCoordinates) -> BacktestArtifactMetadata:
+    def resolve_context(
+        self, *, coordinates: BacktestCoordinates,
+        preferred: BacktestArtifactMetadata | None = None,
+    ) -> BacktestArtifactMetadata:
         raise BacktestArtifactContextUnavailable("current pointer missing")
 
 
@@ -1933,7 +1939,7 @@ def _build_jobs_use_case(
         artifact_config_hash="a" * 64,
     )
     return BacktestJobsUseCase(
-        job_repository=repository,
+        job_repository=cast(Any, repository),
         preflight_service=BacktestPreflightService(
             defaults_provider=defaults_provider,
             artifact_context_resolver=_FakeArtifactResolver(),
@@ -2019,6 +2025,7 @@ def _complete_job(
         updated_at=now,
     )
     finished = repository.finish_with_top_variants(
+        attempt=job.attempt,
         job_id=job_id,
         organization_id=job.organization_id,
         user_id=job.user_id,
@@ -2556,6 +2563,14 @@ class _FakeExecutionTrigger:
 
 @dataclass
 class _FakeJobRepository:
+    def transaction(self):
+        from contextlib import nullcontext
+
+        return nullcontext(self)
+
+    def reserve_artifact_reader(self, *, reader):
+        return reader
+
     jobs: dict[UUID, BacktestJob] | None = None
     top_rows: dict[UUID, tuple[BacktestJobTopVariant, ...]] | None = None
 
@@ -2639,6 +2654,7 @@ class _FakeJobRepository:
         user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         next_state: BacktestJobState,
         top_variants: tuple[BacktestJobTopVariant, ...],
         last_error: str | None = None,

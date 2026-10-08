@@ -326,6 +326,7 @@ def _run_matrix(
                 normalized_request=request,
                 context=services.context,
             )
+            assert hit_times_result is not None
             prepared_full = prepared_cache.get(arity)
             if prepared_full is None:
                 prepared_full = services.prepare_pools.execute(
@@ -557,6 +558,7 @@ def _run_smokes(
                 normalized_request=request,
                 context=services.context,
             )
+            assert hit_times_result is not None
             prepared = services.prepare_pools.execute(
                 normalized_request=request,
                 artifact_metadata=services.artifact_metadata,

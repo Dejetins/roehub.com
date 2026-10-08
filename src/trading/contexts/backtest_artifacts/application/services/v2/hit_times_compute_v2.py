@@ -1,4 +1,4 @@
-"""Deterministic `1m` hit-times compute kernels for the backtest artifact pipeline v2."""
+"""Deterministic source-timeline hit-times compute kernels for the backtest artifact pipeline v2."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from .contracts import (
 @dataclass(frozen=True, slots=True)
 class HitTimesArraysV2:
     """
-    Immutable in-memory `1m` hit-times arrays ready for strict artifact serialization.
+    Immutable in-memory source-timeline hit-times arrays ready for strict artifact serialization.
 
     Docs:
       - docs/architecture/backtest/README.md
@@ -45,7 +45,7 @@ def hit_times_table_cell_count_v2(
     Count total strict hit-times table cells across all four TP/SL table families.
 
     Args:
-        timeline_bar_count: Canonical `1m` timeline length.
+        timeline_bar_count: Source timeline length (publisher uses 15m).
         tp_level_count: Number of TP levels carried by `tp_values`.
         sl_level_count: Number of SL levels carried by `sl_values`.
     Returns:
@@ -78,15 +78,17 @@ def materialize_hit_times_from_ohlcv_v2(
     tp_levels_pct: tuple[float, ...],
     sl_levels_pct: tuple[float, ...],
     max_hit_times_cells: int,
+    allow_empty_levels: bool = False,
 ) -> HitTimesArraysV2:
     """
-    Build strict `1m` hit-times arrays from canonical `prices/1m.ohlcv`.
+    Build hit-times on the original source timeline (publisher uses 15m).
 
     Args:
-        ohlcv: Canonical `prices/1m` OHLCV matrix with shape `[T, 5]`.
+        ohlcv: Source-timeline OHLCV matrix with shape `[T, 5]`.
         tp_levels_pct: Positive ascending TP percentage levels in human-percent units.
         sl_levels_pct: Positive ascending SL percentage levels in human-percent units.
         max_hit_times_cells: Fail-fast upper bound for all emitted table cells.
+        allow_empty_levels: Permit a missing TP or SL family for selected materialization.
     Returns:
         HitTimesArraysV2: Fresh strict grids and lookup tables with `sentinel_index == T`.
     Assumptions:
@@ -107,10 +109,12 @@ def materialize_hit_times_from_ohlcv_v2(
     tp_values = _normalize_hit_times_level_grid_v2(
         levels_pct=tp_levels_pct,
         field_name="tp_levels_pct",
+        allow_empty=allow_empty_levels,
     )
     sl_values = _normalize_hit_times_level_grid_v2(
         levels_pct=sl_levels_pct,
         field_name="sl_levels_pct",
+        allow_empty=allow_empty_levels,
     )
     timeline_bar_count = int(normalized_ohlcv.shape[0])
     table_cell_count = hit_times_table_cell_count_v2(
@@ -143,7 +147,7 @@ def materialize_hit_times_from_ohlcv_v2(
         short_sl=short_sl,
         sentinel_index=timeline_bar_count,
     )
-    _validate_materialized_hit_times_v2(hit_times=result)
+    _validate_materialized_hit_times_v2(hit_times=result, allow_empty_levels=allow_empty_levels)
     return result
 
 
@@ -255,7 +259,7 @@ def merge_hit_times_prefix_with_rebuilt_tail_v2(
 
 def _normalize_hit_times_ohlcv_v2(*, ohlcv: np.ndarray) -> np.ndarray:
     """
-    Normalize the canonical `prices/1m.ohlcv` matrix for hit-times kernels.
+    Normalize source OHLCV without rebasing its timeline for hit-times kernels.
 
     Args:
         ohlcv: Candidate OHLCV matrix.
@@ -290,6 +294,7 @@ def _normalize_hit_times_level_grid_v2(
     *,
     levels_pct: tuple[float, ...],
     field_name: str,
+    allow_empty: bool = False,
 ) -> np.ndarray:
     """
     Normalize one deterministic TP/SL level grid into canonical `float32` fractions.
@@ -312,6 +317,8 @@ def _normalize_hit_times_level_grid_v2(
     Related:
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
     """
+    if len(levels_pct) == 0 and allow_empty:
+        return np.empty(0, dtype=np.float32)
     if len(levels_pct) == 0:
         raise ValueError(f"{field_name} must contain at least one level")
     normalized_pct = tuple(sorted(float(value) for value in levels_pct))
@@ -432,7 +439,7 @@ def _hit_times_1level_v2(
     heap_indexes: np.ndarray,
 ) -> None:
     """
-    Compute the first hit index for one TP/SL level across the entire `1m` timeline.
+    Compute the first hit index for one TP/SL level across the entire original source timeline.
 
     Args:
         open_f32: Entry-price series interpreted as `open[t]`.
@@ -574,7 +581,9 @@ def _compute_hit_times_tables_v2(
     return long_tp, long_sl, short_tp, short_sl
 
 
-def _validate_materialized_hit_times_v2(*, hit_times: HitTimesArraysV2) -> None:
+def _validate_materialized_hit_times_v2(
+    *, hit_times: HitTimesArraysV2, allow_empty_levels: bool = False,
+) -> None:
     """
     Validate deterministic dtype, shape, bounds, and monotonicity invariants in memory.
 
@@ -599,10 +608,12 @@ def _validate_materialized_hit_times_v2(*, hit_times: HitTimesArraysV2) -> None:
     _validate_hit_times_level_grid_v2(
         values=hit_times.tp_values,
         field_name="tp_values",
+        allow_empty=allow_empty_levels,
     )
     _validate_hit_times_level_grid_v2(
         values=hit_times.sl_values,
         field_name="sl_values",
+        allow_empty=allow_empty_levels,
     )
     _validate_hit_times_table_v2(
         values=hit_times.long_tp,
@@ -702,7 +713,9 @@ def _require_matching_hit_times_grids_v2(
         raise ValueError("hit-times prefix sl_values must match rebuilt tail sl_values")
 
 
-def _validate_hit_times_level_grid_v2(*, values: np.ndarray, field_name: str) -> None:
+def _validate_hit_times_level_grid_v2(
+    *, values: np.ndarray, field_name: str, allow_empty: bool = False,
+) -> None:
     """
     Validate one in-memory strict TP/SL level grid.
 
@@ -729,7 +742,7 @@ def _validate_hit_times_level_grid_v2(*, values: np.ndarray, field_name: str) ->
         )
     if values.ndim != 1:
         raise ValueError(f"{field_name} must have shape [N_levels]; got {values.shape!r}")
-    if values.shape[0] <= 0:
+    if values.shape[0] <= 0 and not allow_empty:
         raise ValueError(f"{field_name} must contain at least one level")
     if not np.all(np.diff(values) > 0):
         raise ValueError(f"{field_name} must be strictly increasing")

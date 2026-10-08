@@ -118,7 +118,7 @@
   ],
   "areas": [
     {
-      "file_count": 696,
+      "file_count": 698,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -149,7 +149,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 230,
+      "file_count": 231,
       "id": "operations",
       "paths": [
         "infra/",
@@ -172,7 +172,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 458,
+      "file_count": 465,
       "id": "quality",
       "paths": [
         "tests/",
@@ -183,7 +183,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 2504,
+      "file_count": 2543,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -269,7 +269,8 @@
       ],
       "used_by": [
         "app:cli",
-        "app:scheduler"
+        "app:scheduler",
+        "worker:backtest_job_runner"
       ]
     },
     {
@@ -631,7 +632,7 @@
         "docs/architecture/backtest/benchmark_iterations/2026-05-01_iteration_4_1_no_risk_boundary/README.md"
       ],
       "entrypoints": [],
-      "file_count": 96,
+      "file_count": 98,
       "id": "context:backtest",
       "kind": "context",
       "name": "backtest",
@@ -868,7 +869,8 @@
         "app:cli",
         "app:scheduler",
         "context:backtest",
-        "context:backtest_artifacts"
+        "context:backtest_artifacts",
+        "worker:backtest_job_runner"
       ]
     },
     {
@@ -1351,8 +1353,10 @@
     },
     {
       "depends_on": [
+        "app:api",
         "context:backtest",
         "context:backtest_artifacts",
+        "context:indicators",
         "core:platform",
         "core:shared_kernel"
       ],
@@ -2050,12 +2054,22 @@
     {
       "kind": "python-import",
       "source": "worker:backtest_job_runner",
+      "target": "app:api"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:backtest_job_runner",
       "target": "context:backtest"
     },
     {
       "kind": "python-import",
       "source": "worker:backtest_job_runner",
       "target": "context:backtest_artifacts"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:backtest_job_runner",
+      "target": "context:indicators"
     },
     {
       "kind": "python-import",
@@ -2235,6 +2249,201 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/agents/generated/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/01-contracts-and-baseline.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/02-shared-derivative-builder.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/03-prepared-input-loading.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/04-worker-lifecycle-and-resources.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/05-durable-replay-and-lazy-details.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/06-policy-readiness-and-rollout.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/07-production-correctness-proof.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/08-year-native-generated-benchmark.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/09-documentation-and-local-closure.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/implementation-plan.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/iteration-ledger.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/ledger_update.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/receipts/S01/receipt-35716927862542b08992d3f44f9a7b82.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/receipts/S02/receipt-f18397d4168143fcbf0ae2a731f586f5.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/receipts/S03/receipt-b61a0495cfc84569bd826daff82f5255.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/receipts/S04/receipt-36b1bd154e4148a79277f592810f1b08.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/receipts/S05/receipt-0743c7a656704f4eb0cd9a129a1acdd5.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/receipts/S06/receipt-0f9c2b0b055641bfb3a934faff1e888f.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/receipts/S07/receipt-dbf7758dc5f14098bdf276cc53d5ac43.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/receipts/S08/receipt-f8be7bfe2eef48648b5c839022d329b2.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/receipts/S09/receipt-5af9af812d9f4e599c6e1b0a319c5acb.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S01-resolution.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S01.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S02.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S03.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S04-evidence.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S04.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S05-evidence.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S05.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S06-evidence.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S06.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S07-evidence.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S07.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S08-evidence.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S08.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S09-evidence.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S09-post-transition.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/reports/S09.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": ".codex/agents/generated/backtest-npy-input-materialization-v1/test_ledger_update.py"
     },
     {
       "area": "knowledge",
@@ -18298,6 +18507,11 @@
     },
     {
       "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0028_backtest_input_recipe_v1.sql"
+    },
+    {
+      "area": "operations",
       "kind": "configuration",
       "path": "migrations/postgres/manifest.json"
     },
@@ -18894,12 +19108,22 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest/application/dto/artifact_inputs.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest/application/dto/backtest_jobs.py"
     },
     {
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/backtest/application/dto/combo_planning.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest/application/dto/input_recipe.py"
     },
     {
       "area": "domain",
@@ -22719,6 +22943,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/real_infra/backtest/test_artifact_input_lifecycle.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/real_infra/market_data/test_stream_recovery_postgres.py"
     },
     {
@@ -22955,6 +23184,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/migrations/test_artifact_store_sql.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/migrations/test_backtest_input_recipe_sql.py"
     },
     {
       "area": "quality",
@@ -23264,6 +23498,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/worker/backtest_job_runner/materialization_drill_child.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/worker/backtest_job_runner/s1_child.py"
     },
     {
@@ -23275,6 +23514,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/worker/backtest_job_runner/test_job_scheduling.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/worker/backtest_job_runner/test_materialization_lifecycle.py"
     },
     {
       "area": "quality",
@@ -23454,7 +23698,22 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/backtest/application/services/v2/test_hit_times_compute_v2.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_input_recipe_contracts.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_input_recipe_replay.py"
     },
     {
       "area": "quality",
@@ -25077,7 +25336,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 4572,
+  "inventory_file_count": 4621,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -25275,5 +25534,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "2c37a5ef31c308ca23434d82f6498f179d8208525a55da1e74c261b0f7e4b7cc"
+  "structural_digest": "792b5163cc59cc55dff380b8ec5ffa210e8bef43f6583c68d6cd842f16136e91"
 }

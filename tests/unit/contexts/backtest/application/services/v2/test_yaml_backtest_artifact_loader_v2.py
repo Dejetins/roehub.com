@@ -13,6 +13,9 @@ from tests.unit.contexts.backtest.application.services.v2.artifact_testkit_v2 im
     build_artifact_precompute_fixture_v2,
     build_synthetic_artifact_store_v2,
 )
+from tests.unit.contexts.backtest.application.services.v2.test_artifact_slot_publisher_v2 import (
+    _FakeJobRepository,
+)
 from trading.contexts.backtest.adapters.outbound import (
     AtomicArtifactCurrentPointerWriterV2,
     BacktestArtifactPathBuilderV2,
@@ -166,45 +169,6 @@ class _PrecomputeCanonicalReaderForLoaderTest:
                 dtype=np.float32,
             ),
         )
-
-
-class _ZeroBlockingRepositoryForLoaderTest:
-    """
-    Fake job repository returning zero inactive-slot pins for loader+publisher smoke coverage.
-    """
-
-    def count_active_for_artifact_manifest(
-        self,
-        *,
-        market_id: int,
-        symbol: str,
-        artifact_slot: str,
-        artifact_manifest_hash: str,
-    ) -> int:
-        """
-        Return zero blocking jobs for the explicit publish-guard query.
-
-        Args:
-            market_id: Canonical market id for the symbol under publish.
-            symbol: Instrument symbol under publish.
-            artifact_slot: Candidate inactive slot literal.
-            artifact_manifest_hash: SHA-256 hash of the inactive slot root manifest.
-        Returns:
-            int: Always `0`.
-        Assumptions:
-            Loader smoke coverage exercises successful publish flow rather than pin-guard failure.
-        Raises:
-            None.
-        Side Effects:
-            None.
-        Docs:
-          - docs/architecture/backtest/README.md
-          - docs/architecture/backtest/backtest-service-artifact-runtime-v1.md
-        Related:
-          - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
-        """
-        del market_id, symbol, artifact_slot, artifact_manifest_hash
-        return 0
 
 
 @pytest.fixture()
@@ -682,7 +646,7 @@ def test_yaml_backtest_artifact_loader_v2_reads_runner_built_published_prices_ma
     publisher = BacktestArtifactSlotPublisherV2(
         artifact_loader=fixture.loader,
         current_pointer_writer=AtomicArtifactCurrentPointerWriterV2(path_resolver=fixture.builder),
-        job_repository=cast(BacktestJobRepository, _ZeroBlockingRepositoryForLoaderTest()),
+        job_repository=cast(BacktestJobRepository, _FakeJobRepository()),
         now_provider=lambda: datetime(2026, 3, 26, 3, 4, 5, tzinfo=timezone.utc),
     )
 
@@ -922,3 +886,66 @@ def _forbid_directory_scan(*_args: object, **_kwargs: object) -> None:
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_loader.py
     """
     raise AssertionError("directory scanning is forbidden in artifact loader v2")
+
+
+@pytest.mark.parametrize("version", [1, 2])
+def test_root_versioned_inventory_round_trip(tmp_path: Path, version: int) -> None:
+    import yaml
+
+    fixture = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    path = fixture.loader.resolve_slot_manifest_path(fixture.coordinates, fixture.active_slot)
+    payload = yaml.safe_load(path.read_text())
+    payload["schema_version"] = version
+    if version == 2:
+        del payload["hit_times"]
+        payload["signals"] = {
+            "supported_timeframes": [],
+            "supported_indicator_ids": [],
+            "manifests": [],
+        }
+    path.write_text(yaml.safe_dump(payload))
+    parsed = fixture.loader.load_slot_manifest(fixture.coordinates, fixture.active_slot)
+    assert parsed.schema_version == version
+    assert (parsed.hit_times is None) == (version == 2)
+    assert dict(parsed.raw_payload) == payload
+    path.write_text(yaml.safe_dump(dict(parsed.raw_payload)))
+    assert fixture.loader.load_slot_manifest(fixture.coordinates, fixture.active_slot) == parsed
+
+
+@pytest.mark.parametrize(
+    "mutation", ["legacy_missing", "null", "extra", "boolean", "future", "kind"]
+)
+def test_root_versions_reject_malformed_inventory(tmp_path: Path, mutation: str) -> None:
+    import yaml
+
+    fixture = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    path = fixture.loader.resolve_slot_manifest_path(fixture.coordinates, fixture.active_slot)
+    payload = yaml.safe_load(path.read_text())
+    if mutation == "legacy_missing":
+        del payload["hit_times"]
+    else:
+        payload["schema_version"] = 2
+        if mutation == "null":
+            payload["hit_times"] = None
+        elif mutation == "extra":
+            payload["retention"] = "anything"
+        elif mutation == "boolean":
+            payload["schema_version"] = True
+        elif mutation == "future":
+            payload["schema_version"] = 3
+        elif mutation == "kind":
+            payload["manifest_kind"] = "job_prepared_inputs"
+    path.write_text(yaml.safe_dump(payload))
+    with pytest.raises(ValueError):
+        fixture.loader.load_slot_manifest(fixture.coordinates, fixture.active_slot)
+
+
+def test_root_dataclass_rejects_contradictory_raw_identity(tmp_path: Path) -> None:
+    from dataclasses import replace
+
+    fixture = build_synthetic_artifact_store_v2(tmp_path=tmp_path)
+    manifest = fixture.loader.load_slot_manifest(fixture.coordinates, fixture.active_slot)
+    for fields in ({"schema_version": 2}, {"slot_generation": 99},
+                   {"identity": ArtifactCoordinatesV2("binance", "spot", "ETHUSDT")}):
+        with pytest.raises(ValueError, match="typed/raw"):
+            replace(manifest, **fields)

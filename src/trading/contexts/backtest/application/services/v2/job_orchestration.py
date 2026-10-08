@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 from uuid import UUID
 
 import numpy as np
@@ -20,7 +20,14 @@ from trading.contexts.backtest.application.dto import (
     BacktestPreparePoolsResult,
     PreparedIndicatorPool,
 )
+from trading.contexts.backtest.application.dto.artifact_inputs import (
+    BacktestArtifactRuntimeContext,
+    BacktestAttemptInputs,
+)
 from trading.contexts.backtest.domain.entities import BacktestJobTopVariant
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_validator import (  # noqa: E501
+    BacktestArtifactManifestValidatorV2,
+)
 
 from .combo_planning import (
     COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND,
@@ -45,6 +52,11 @@ from .top_result_assembly import (
     BacktestTopResultAssemblyService,
 )
 from .tp_sl_exact import BacktestTpSlExactScoringService
+
+if TYPE_CHECKING:
+    from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (  # noqa: E501
+        BacktestArtifactPrecomputeRunnerV2,
+    )
 
 PERSIST_TOP_N_IO_STAGE_NAME = "persist_top_n_io"
 SAMPLE_WARMUP_STAGE_NAME = "sample_warmup"
@@ -100,6 +112,9 @@ class BacktestRuntimeJobOrchestrationService:
     top_result_assembly: BacktestTopResultAssemblyService = BacktestTopResultAssemblyService()
     compute_policy: BacktestComputePolicy = BacktestComputePolicy()
     scratch_factory: Callable[[UUID], BacktestJobScratch] = BacktestJobScratch
+    attempt_inputs: BacktestAttemptInputs | None = None
+    derivative_builder: BacktestArtifactPrecomputeRunnerV2 | None = None
+    input_validator: BacktestArtifactManifestValidatorV2 | None = None
 
     def execute(
         self,
@@ -110,8 +125,52 @@ class BacktestRuntimeJobOrchestrationService:
         scheduling_class: BacktestSchedulingClass = "heavy",
         light_max_actual_combinations: int = DEFAULT_LIGHT_ACTUAL_COMBINATIONS,
     ) -> BacktestJobExecutionResult:
+        attempt_started = time.perf_counter()
         scratch = self.scratch_factory(job_id)
+        prepared_context = None
+        source = None
+        preparation_elapsed = 0.0
+        acknowledgement_elapsed = 0.0
         try:
+            if preflight.input_recipe is not None:
+                ownership = self.attempt_inputs
+                if (
+                    ownership is None
+                    or self.derivative_builder is None
+                    or self.input_validator is None
+                ):
+                    raise ValueError("recipe execution requires trusted attempt preparation")
+                if ownership.job_id != str(job_id):
+                    raise ValueError("attempt belongs to a different job")
+                preparation_started = time.perf_counter()
+                source = self.prepare_pools.resolve_artifact_context(
+                    coordinates=_coordinates_from_preflight(preflight=preflight),
+                    artifact_metadata=preflight.artifact_metadata,
+                )
+                prepared = self.prepare_pools.prepare_artifact_inputs(
+                    recipe=preflight.input_recipe,
+                    context=source,
+                    builder=self.derivative_builder,
+                    validator=self.input_validator,
+                    output_directory=ownership.directory,
+                    organization_id=ownership.organization_id,
+                    job_id=str(job_id),
+                    owner_token=ownership.owner_token,
+                    attempt=ownership.attempt,
+                    output_root_id=f"attempt-{ownership.owner_token}",
+                    max_generated_bytes=ownership.max_generated_bytes,
+                    max_compute_bytes=ownership.max_compute_bytes,
+                )
+                preparation_elapsed = time.perf_counter() - preparation_started
+                acknowledgement_started = time.perf_counter()
+                acknowledgement = ownership.acknowledge(prepared)
+                acknowledgement_elapsed = time.perf_counter() - acknowledgement_started
+                prepared_context = self.artifact_array_loader.with_prepared_inputs(
+                    context=source,
+                    prepared=prepared,
+                    output_directory=ownership.directory,
+                    acknowledged_prepared_sha256=acknowledgement,
+                )
             scoped = replace(
                 self,
                 no_risk_exact=replace(self.no_risk_exact, compute_policy=self.compute_policy,
@@ -123,18 +182,42 @@ class BacktestRuntimeJobOrchestrationService:
                 if isinstance(self.tp_sl_exact, BacktestTpSlExactScoringService)
                 else self.tp_sl_exact,
             )
-            return scoped._execute(
-                job_id=job_id, preflight=preflight, updated_at=updated_at,
+            result = scoped._execute(
+                job_id=job_id,
+                preflight=preflight,
+                updated_at=updated_at,
                 scheduling_class=scheduling_class,
-                light_max_actual_combinations=light_max_actual_combinations, scratch=scratch,
+                light_max_actual_combinations=light_max_actual_combinations,
+                scratch=scratch,
+                prepared_context=prepared_context,
             )
         finally:
             scratch.clear()
+            if prepared_context is not None:
+                prepared_context.close_mmaps()
+            if source is not None:
+                source.close_mmaps()
+        return replace(
+            result,
+            stage_timings={
+                **result.stage_timings,
+                "input_materialization_including_attestation": preparation_elapsed,
+                "prepared_input_parent_acknowledgement": acknowledgement_elapsed,
+                "child_attempt_including_preparation_and_cleanup": time.perf_counter()
+                - attempt_started,
+            },
+        )
 
     def _execute(
-        self, *, job_id: UUID, preflight: BacktestPreflightResult, updated_at: datetime,
-        scheduling_class: BacktestSchedulingClass, light_max_actual_combinations: int,
+        self,
+        *,
+        job_id: UUID,
+        preflight: BacktestPreflightResult,
+        updated_at: datetime,
+        scheduling_class: BacktestSchedulingClass,
+        light_max_actual_combinations: int,
         scratch: BacktestJobScratch,
+        prepared_context: BacktestArtifactRuntimeContext | None = None,
     ) -> BacktestJobExecutionResult:
         normalized_request = preflight.normalized_request
         risk = normalized_request.get("risk")
@@ -157,6 +240,7 @@ class BacktestRuntimeJobOrchestrationService:
             prepared_result = self.prepare_pools.execute(
                 normalized_request=normalized_request,
                 artifact_metadata=preflight.artifact_metadata,
+                **({"context": prepared_context} if prepared_context is not None else {}),
             )
             scratch.retain("prepared_inputs", prepared_result)
             row_signature_started = time.perf_counter()
@@ -196,7 +280,7 @@ class BacktestRuntimeJobOrchestrationService:
                     normalized_request=normalized_request,
                     preflight=preflight,
                 ):
-                    context = self.artifact_array_loader.resolve_context(
+                    context = prepared_context or self.artifact_array_loader.resolve_context(
                         coordinates=_coordinates_from_preflight(preflight=preflight),
                         artifact_metadata=preflight.artifact_metadata,
                     )
@@ -212,7 +296,7 @@ class BacktestRuntimeJobOrchestrationService:
                     exact_kwargs["funding_arrays"] = funding_arrays
                 exact_result = self.no_risk_exact.execute(**exact_kwargs)
             elif risk_mode == "tp_sl_grid":
-                context = self.artifact_array_loader.resolve_context(
+                context = prepared_context or self.artifact_array_loader.resolve_context(
                     coordinates=_coordinates_from_preflight(preflight=preflight),
                     artifact_metadata=preflight.artifact_metadata,
                 )
@@ -220,6 +304,8 @@ class BacktestRuntimeJobOrchestrationService:
                     normalized_request=normalized_request,
                     context=context,
                 )
+                if hit_times_result is None:
+                    raise ValueError("TP/SL scoring requires risk mode tp_sl_grid")
                 warmup_elapsed_s = self._run_tp_sl_sample_warmup(
                     job_id=job_id,
                     prepared_result=prepared_result,

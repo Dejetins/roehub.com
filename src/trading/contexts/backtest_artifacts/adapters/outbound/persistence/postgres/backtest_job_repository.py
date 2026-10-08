@@ -2,15 +2,24 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from dataclasses import replace
 from datetime import datetime, timezone
 from numbers import Real
 from typing import Any, Mapping, cast
 from uuid import UUID
 
+from trading.contexts.backtest.application.dto.input_recipe import BacktestInputRecipe
 from trading.contexts.backtest.application.ports import (
     BacktestJobListPage,
     BacktestJobListQuery,
     BacktestJobRepository,
+)
+from trading.contexts.backtest.application.ports.backtest_job_repositories import (
+    ArtifactOwnershipConflict,
+    ArtifactReaderReservation,
+    ArtifactWriterReservation,
 )
 from trading.contexts.backtest.domain.entities import (
     BacktestArtifactSlotLiteral,
@@ -29,6 +38,9 @@ from trading.contexts.backtest.domain.errors import BacktestStorageError
 from trading.contexts.backtest.domain.value_objects import BacktestJobListCursor
 from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.gateway import (
     BacktestPostgresGateway,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    BacktestPreparedArtifactSet,
 )
 from trading.shared_kernel.primitives import OrganizationId, UserId
 
@@ -147,6 +159,571 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         self._jobs_table = normalized_table
         self._top_variants_table = normalized_top_variants_table
         self._stage_a_shortlist_table = normalized_stage_a_shortlist_table
+
+    @contextmanager
+    def transaction(self) -> Iterator[PostgresBacktestJobRepository]:
+        """Admission, filesystem revalidation and job/recipe insert share this transaction."""
+        with self._gateway.transaction():
+            yield self
+
+    def _lock_artifact_coordinate(
+        self,
+        *,
+        exchange: str,
+        market_type: str,
+        symbol: str,
+    ) -> tuple[Mapping[str, Any], ...]:
+        # All participants lock both physical slots in the same order. Generation
+        # is deliberately not part of the key, including on first admission.
+        values = dict(exchange=exchange, market_type=market_type, symbol=symbol)
+        self._gateway.execute(
+            query="""
+            INSERT INTO backtest_artifact_slot_ownership(exchange,market_type,symbol,slot)
+            VALUES (%(exchange)s,%(market_type)s,%(symbol)s,'slot_a'),
+                   (%(exchange)s,%(market_type)s,%(symbol)s,'slot_b')
+            ON CONFLICT DO NOTHING
+        """,
+            parameters=values,
+        )
+        return self._gateway.fetch_all(
+            query="""
+            SELECT * FROM backtest_artifact_slot_ownership
+            WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s
+            ORDER BY slot FOR UPDATE
+        """,
+            parameters=values,
+        )
+
+    def validate_attempt_lease(
+        self,
+        *,
+        owner_kind: str,
+        organization_id: UUID,
+        owner_id: UUID,
+        attempt: int,
+        locked_by: str,
+    ) -> None:
+        """Fence child admission before binding filesystem ownership to this attempt."""
+        if owner_kind == "job":
+            table, key, state = self._jobs_table, "job_id", "state"
+            cancellation = "AND cancel_requested_at IS NULL"
+        elif owner_kind == "lazy":
+            table, key, state = "backtest_lazy_trades_materializations", "task_id", "status"
+            cancellation = ""
+        else:
+            raise ValueError("unsupported attempt owner")
+        row = self._gateway.fetch_one(
+            query=f"""
+            SELECT {key} FROM {table}
+            WHERE {key}=%(id)s AND organization_id=%(organization)s
+              AND attempt=%(attempt)s AND locked_by=%(locked_by)s
+              AND {state}='running' AND lease_expires_at>clock_timestamp() {cancellation}
+            FOR UPDATE
+        """,
+            parameters=dict(
+                id=owner_id, organization=organization_id, attempt=attempt, locked_by=locked_by
+            ),
+        )
+        if row is None:
+            raise ArtifactOwnershipConflict("attempt_admission_lease_lost")
+
+    def reserve_artifact_reader(
+        self,
+        *,
+        reader: ArtifactReaderReservation,
+    ) -> ArtifactReaderReservation:
+        """Caller revalidates files under transaction(); no TTL ever releases a pin."""
+        with self.transaction():
+            rows = self._lock_artifact_coordinate(
+                exchange=reader.exchange,
+                market_type=reader.market_type,
+                symbol=reader.symbol,
+            )
+            row = next(row for row in rows if row["slot"] == reader.slot)
+            if row["state"] != "available":
+                raise ArtifactOwnershipConflict("artifact_source_reserved")
+            reader = replace(reader, epoch=int(row["writer_epoch"]))
+            values = reader.parameters()
+            if row["generation"] is None:
+                self._gateway.execute(
+                    query="""
+                    UPDATE backtest_artifact_slot_ownership
+                    SET generation=%(generation)s,manifest_sha256=%(manifest_sha256)s
+                    WHERE exchange=%(exchange)s AND market_type=%(market_type)s
+                      AND symbol=%(symbol)s AND slot=%(slot)s
+                """,
+                    parameters=values,
+                )
+            elif (row["generation"], row["manifest_sha256"]) != (
+                reader.generation,
+                reader.manifest_sha256,
+            ):
+                raise ArtifactOwnershipConflict("artifact_stale_preflight")
+            self._gateway.execute(
+                query="""
+                INSERT INTO backtest_artifact_slot_readers(
+                    exchange,market_type,symbol,slot,owner_kind,organization_id,owner_id,
+                    owner_token,attempt,parent_incarnation,expected_generation,
+                    expected_manifest_sha256,ownership_epoch,state)
+                VALUES (%(exchange)s,%(market_type)s,%(symbol)s,%(slot)s,%(owner_kind)s,
+                    %(organization_id)s,%(owner_id)s,%(owner_token)s,%(attempt)s,
+                    %(parent_incarnation)s,%(generation)s,%(manifest_sha256)s,%(epoch)s,
+                    CASE WHEN %(attempt)s=0 THEN 'queued' ELSE 'active' END)
+            """,
+                parameters=values,
+            )
+            return reader
+
+    def release_artifact_reader(self, *, reader: ArtifactReaderReservation) -> bool:
+        """Exact-owner release after child reap; heartbeat expiry is not a predicate."""
+        with self.transaction():
+            self._lock_artifact_coordinate(
+                exchange=reader.exchange,
+                market_type=reader.market_type,
+                symbol=reader.symbol,
+            )
+            row = self._gateway.fetch_one(
+                query="""
+                DELETE FROM backtest_artifact_slot_readers
+                WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s
+                  AND slot=%(slot)s AND owner_token=%(owner_token)s AND owner_id=%(owner_id)s
+                  AND owner_kind=%(owner_kind)s AND attempt=%(attempt)s
+                  AND organization_id IS NOT DISTINCT FROM %(organization_id)s
+                  AND parent_incarnation IS NOT DISTINCT FROM %(parent_incarnation)s
+                  AND ownership_epoch=%(epoch)s AND expected_generation=%(generation)s
+                  AND expected_manifest_sha256=%(manifest_sha256)s
+                RETURNING owner_token
+            """,
+                parameters=reader.parameters(),
+            )
+            return row is not None
+
+    def recover_attempt_reader(self, owner: Mapping[str, object]) -> bool:
+        """Called only while holding the abandoned attempt's exclusive lifetime lock."""
+        reader = ArtifactReaderReservation(
+            exchange=str(owner["exchange"]),
+            market_type=str(owner["market_type"]),
+            symbol=str(owner["symbol"]),
+            slot=str(owner["slot"]),
+            generation=int(str(owner["generation"])),
+            manifest_sha256=str(owner["manifest_sha256"]),
+            owner_kind=str(owner["owner_kind"]),
+            organization_id=UUID(str(owner["organization_id"])),
+            owner_id=UUID(str(owner["owner_id"])),
+            owner_token=UUID(str(owner["owner_token"])),
+            attempt=int(str(owner["attempt"])),
+            parent_incarnation=UUID(str(owner["parent_incarnation"])),
+            epoch=int(str(owner["epoch"])),
+        )
+        with self.transaction():
+            self._lock_artifact_coordinate(
+                exchange=reader.exchange,
+                market_type=reader.market_type,
+                symbol=reader.symbol,
+            )
+            if reader.owner_kind == "job":
+                table, key, status = self._jobs_table, "job_id", "state"
+            elif reader.owner_kind == "lazy":
+                table, key, status = "backtest_lazy_trades_materializations", "task_id", "status"
+            else:
+                return False
+            row = self._gateway.fetch_one(
+                query=f"""
+                SELECT 1 FROM {table}
+                WHERE {key}=%(owner_id)s AND organization_id=%(organization_id)s
+                  AND attempt=%(attempt)s AND {status}='running'
+                  AND lease_expires_at>clock_timestamp()
+            """,
+                parameters=reader.parameters(),
+            )
+            if row is not None:
+                return False
+            self.release_artifact_reader(reader=reader)
+            return True
+
+    def get_artifact_reader(
+        self,
+        *,
+        organization_id: UUID,
+        owner_id: UUID,
+        owner_kind: str,
+    ) -> ArtifactReaderReservation | None:
+        row = self._gateway.fetch_one(
+            query="""
+            SELECT * FROM backtest_artifact_slot_readers
+            WHERE organization_id=%(organization_id)s AND owner_id=%(owner_id)s
+              AND owner_kind=%(owner_kind)s
+        """,
+            parameters=dict(
+                organization_id=organization_id, owner_id=owner_id, owner_kind=owner_kind
+            ),
+        )
+        if row is None:
+            return None
+        return ArtifactReaderReservation(
+            exchange=str(row["exchange"]),
+            market_type=str(row["market_type"]),
+            symbol=str(row["symbol"]),
+            slot=str(row["slot"]),
+            generation=int(row["expected_generation"]),
+            manifest_sha256=str(row["expected_manifest_sha256"]),
+            owner_kind=str(row["owner_kind"]),
+            organization_id=UUID(str(row["organization_id"])),
+            owner_id=UUID(str(row["owner_id"])),
+            owner_token=UUID(str(row["owner_token"])),
+            attempt=int(row["attempt"]),
+            parent_incarnation=(
+                None if row["parent_incarnation"] is None else UUID(str(row["parent_incarnation"]))
+            ),
+            epoch=int(row["ownership_epoch"]),
+        )
+
+    def acknowledge_prepared_inputs(
+        self,
+        *,
+        job: BacktestJob,
+        reader: ArtifactReaderReservation,
+        locked_by: str,
+        prepared: BacktestPreparedArtifactSet,
+    ) -> str:
+        """Commit attestation before ack, fenced by exact attempt, owner and recipe."""
+        if job.input_recipe_json is None:
+            raise ArtifactOwnershipConflict("prepared_recipe_missing")
+        recipe = BacktestInputRecipe.from_mapping(job.input_recipe_json)
+        if (
+            prepared.organization_id,
+            prepared.job_id,
+            prepared.owner_token,
+            prepared.attempt,
+            prepared.recipe_sha256,
+        ) != (
+            str(job.organization_id),
+            str(job.job_id),
+            str(reader.owner_token),
+            reader.attempt,
+            recipe.semantic_sha256,
+        ):
+            raise ArtifactOwnershipConflict("prepared_owner_or_recipe_mismatch")
+        original = recipe.snapshot.as_mapping()
+        attested = prepared.snapshot.as_mapping()
+        original.pop("prefix_proof")
+        attested.pop("prefix_proof")
+        if original != attested:
+            raise ArtifactOwnershipConflict("prepared_source_mismatch")
+        values = {
+            **reader.parameters(),
+            "locked_by": locked_by,
+            "recipe": _json_dumps(payload=job.input_recipe_json),
+            "provenance": _json_dumps(payload=prepared.as_mapping()),
+        }
+        with self.transaction():
+            self._lock_artifact_coordinate(
+                exchange=reader.exchange,
+                market_type=reader.market_type,
+                symbol=reader.symbol,
+            )
+            row = self._gateway.fetch_one(
+                query=f"""
+                UPDATE {self._jobs_table} AS job
+                SET preparation_provenance_json=%(provenance)s::jsonb
+                WHERE job_id=%(owner_id)s AND organization_id=%(organization_id)s
+                  AND state='running' AND attempt=%(attempt)s AND locked_by=%(locked_by)s
+                  AND lease_expires_at>clock_timestamp() AND cancel_requested_at IS NULL
+                  AND input_recipe_json=%(recipe)s::jsonb
+                  AND EXISTS (SELECT 1 FROM backtest_artifact_slot_readers AS reader
+                              WHERE reader.owner_id=job.job_id
+                                AND reader.organization_id=job.organization_id
+                                AND reader.owner_token=%(owner_token)s
+                                AND reader.attempt=%(attempt)s
+                                AND reader.parent_incarnation=%(parent_incarnation)s
+                                AND reader.ownership_epoch=%(epoch)s AND reader.state='active')
+                RETURNING job_id
+            """,
+                parameters=values,
+            )
+            if row is None:
+                raise ArtifactOwnershipConflict("prepared_acknowledgement_lease_lost")
+        return prepared.content_sha256
+
+    def transfer_artifact_reader(
+        self,
+        *,
+        previous: ArtifactReaderReservation,
+        attempt: int,
+        parent_incarnation: UUID,
+        owner_token: UUID,
+        locked_by: str,
+    ) -> ArtifactReaderReservation:
+        """CAS queued ownership under the same transaction as the job lease claim."""
+        with self.transaction():
+            self._lock_artifact_coordinate(
+                exchange=previous.exchange,
+                market_type=previous.market_type,
+                symbol=previous.symbol,
+            )
+            values = {
+                **previous.parameters(),
+                "next_attempt": attempt,
+                "next_parent": parent_incarnation,
+                "next_token": owner_token,
+                "locked_by": locked_by,
+            }
+            row = self._gateway.fetch_one(
+                query=f"""
+                UPDATE backtest_artifact_slot_readers AS reader
+                SET attempt=%(next_attempt)s,parent_incarnation=%(next_parent)s,
+                    owner_token=%(next_token)s,state='active'
+                WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s
+                  AND slot=%(slot)s AND owner_token=%(owner_token)s AND owner_id=%(owner_id)s
+                  AND owner_kind='job' AND organization_id=%(organization_id)s
+                  AND attempt=%(attempt)s AND state='queued' AND ownership_epoch=%(epoch)s
+                  AND parent_incarnation IS NOT DISTINCT FROM %(parent_incarnation)s
+                  AND expected_generation=%(generation)s
+                  AND expected_manifest_sha256=%(manifest_sha256)s
+                  AND EXISTS (SELECT 1 FROM {self._jobs_table} AS job
+                              WHERE job.job_id=reader.owner_id
+                                AND job.organization_id=reader.organization_id
+                                AND job.attempt=%(next_attempt)s AND job.locked_by=%(locked_by)s
+                                AND job.state='running' AND job.lease_expires_at>clock_timestamp())
+                RETURNING owner_token
+            """,
+                parameters=values,
+            )
+            if row is None:
+                raise ArtifactOwnershipConflict("artifact_reader_transfer_lost")
+            return replace(
+                previous,
+                attempt=attempt,
+                parent_incarnation=parent_incarnation,
+                owner_token=owner_token,
+            )
+
+    def recover_artifact_writer(
+        self,
+        *,
+        writer: ArtifactWriterReservation,
+        generation: int | None,
+        manifest_sha256: str | None,
+        reconcile_dead_owner: Callable[[], None],
+    ) -> None:
+        """Recovery owns the filesystem lifetime lock and reconciles before this CAS.
+
+        The callback must fail unless the exact owner is proven dead and the pointer
+        and final manifests are consistent. No heartbeat/TTL test can replace it.
+        """
+        with self.transaction():
+            rows = self._lock_artifact_coordinate(
+                exchange=writer.exchange,
+                market_type=writer.market_type,
+                symbol=writer.symbol,
+            )
+            row = next(row for row in rows if row["slot"] == writer.slot)
+            if (
+                row["state"],
+                row["owner_token"],
+                row["owner_attempt"],
+                row["parent_incarnation"],
+                row["writer_epoch"],
+            ) != (
+                "quarantined",
+                writer.owner_token,
+                writer.attempt,
+                writer.parent_incarnation,
+                writer.epoch,
+            ):
+                raise ArtifactOwnershipConflict("artifact_recovery_ownership_lost")
+            reconcile_dead_owner()
+            self._gateway.execute(
+                query="""
+                UPDATE backtest_artifact_slot_ownership SET state='available',
+                    owner_token=NULL,owner_attempt=NULL,parent_incarnation=NULL,
+                    generation=%(generation)s,manifest_sha256=%(manifest_sha256)s,updated_at=now()
+                WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s
+                  AND slot=%(slot)s AND owner_token=%(owner_token)s
+                  AND owner_attempt=%(attempt)s AND parent_incarnation=%(parent_incarnation)s
+                  AND writer_epoch=%(epoch)s AND state='quarantined'
+            """,
+                parameters={
+                    **writer.parameters(),
+                    "generation": generation,
+                    "manifest_sha256": manifest_sha256,
+                },
+            )
+
+    def reserve_artifact_writer(
+        self,
+        *,
+        exchange: str,
+        market_type: str,
+        symbol: str,
+        slot: str,
+        expected_generation: int | None,
+        expected_manifest_sha256: str | None,
+        owner_token: UUID,
+        attempt: int,
+        parent_incarnation: UUID,
+    ) -> ArtifactWriterReservation:
+        """Durable coordinate-wide exclusion; caller checks pointer while transaction is held."""
+        with self.transaction():
+            rows = self._lock_artifact_coordinate(
+                exchange=exchange,
+                market_type=market_type,
+                symbol=symbol,
+            )
+            if any(row["state"] != "available" for row in rows):
+                raise ArtifactOwnershipConflict("artifact_coordinate_reserved")
+            row = next(row for row in rows if row["slot"] == slot)
+            # First use adopts revalidated on-disk metadata. Subsequent uses must
+            # match the durable generation; physical path reuse cannot bypass pins.
+            if row["generation"] is not None and (row["generation"], row["manifest_sha256"]) != (
+                expected_generation,
+                expected_manifest_sha256,
+            ):
+                raise ArtifactOwnershipConflict("artifact_stale_preflight")
+            writer = ArtifactWriterReservation(
+                exchange,
+                market_type,
+                symbol,
+                slot,
+                owner_token,
+                attempt,
+                parent_incarnation,
+                int(row["writer_epoch"]) + 1,
+            )
+            values = {
+                **writer.parameters(),
+                "generation": expected_generation,
+                "manifest_sha256": expected_manifest_sha256,
+            }
+            reader = self._gateway.fetch_one(
+                query="""
+                SELECT owner_token FROM backtest_artifact_slot_readers
+                WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s
+                  AND slot=%(slot)s LIMIT 1
+            """,
+                parameters=values,
+            )
+            if reader is not None:
+                raise ArtifactOwnershipConflict("artifact_source_pinned")
+            self._gateway.execute(
+                query="""
+                UPDATE backtest_artifact_slot_ownership SET state='writing',
+                    owner_token=%(owner_token)s, owner_attempt=%(attempt)s,
+                    parent_incarnation=%(parent_incarnation)s,writer_epoch=%(epoch)s,
+                    generation=%(generation)s,manifest_sha256=%(manifest_sha256)s,updated_at=now()
+                WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s
+                  AND slot=%(slot)s
+            """,
+                parameters=values,
+            )
+            return writer
+
+    def owns_artifact_writer(self, *, writer: ArtifactWriterReservation) -> bool:
+        row = self._gateway.fetch_one(
+            query="""
+            SELECT 1 FROM backtest_artifact_slot_ownership
+            WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s
+              AND slot=%(slot)s AND owner_token=%(owner_token)s
+              AND owner_attempt=%(attempt)s AND parent_incarnation=%(parent_incarnation)s
+              AND writer_epoch=%(epoch)s AND state IN ('writing','quarantined')
+        """,
+            parameters=writer.parameters(),
+        )
+        return row is not None
+
+    def verify_artifact_writer(self, *, writer: ArtifactWriterReservation) -> None:
+        with self.transaction():
+            rows = self._lock_artifact_coordinate(
+                exchange=writer.exchange,
+                market_type=writer.market_type,
+                symbol=writer.symbol,
+            )
+            row = next(row for row in rows if row["slot"] == writer.slot)
+            if (
+                row["state"],
+                row["owner_token"],
+                row["owner_attempt"],
+                row["parent_incarnation"],
+                row["writer_epoch"],
+            ) != (
+                "writing",
+                writer.owner_token,
+                writer.attempt,
+                writer.parent_incarnation,
+                writer.epoch,
+            ):
+                raise ArtifactOwnershipConflict("artifact_writer_ownership_lost")
+
+    def complete_artifact_writer(
+        self,
+        *,
+        writer: ArtifactWriterReservation,
+        generation: int | None,
+        manifest_sha256: str | None,
+    ) -> None:
+        """Release a live writer only after final filesystem reconciliation completes."""
+        with self.transaction():
+            self._lock_artifact_coordinate(
+                exchange=writer.exchange,
+                market_type=writer.market_type,
+                symbol=writer.symbol,
+            )
+            row = self._gateway.fetch_one(
+                query="""
+                UPDATE backtest_artifact_slot_ownership SET state='available',
+                    owner_token=NULL,owner_attempt=NULL,parent_incarnation=NULL,
+                    generation=%(generation)s,manifest_sha256=%(manifest_sha256)s,updated_at=now()
+                WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s
+                  AND slot=%(slot)s AND owner_token=%(owner_token)s
+                  AND owner_attempt=%(attempt)s AND parent_incarnation=%(parent_incarnation)s
+                  AND writer_epoch=%(epoch)s AND state='writing'
+                RETURNING slot
+            """,
+                parameters={
+                    **writer.parameters(),
+                    "generation": generation,
+                    "manifest_sha256": manifest_sha256,
+                },
+            )
+            if row is None:
+                raise ArtifactOwnershipConflict("artifact_writer_ownership_lost")
+
+    def quarantine_artifact_writer(self, *, writer: ArtifactWriterReservation) -> None:
+        with self.transaction():
+            self._lock_artifact_coordinate(
+                exchange=writer.exchange,
+                market_type=writer.market_type,
+                symbol=writer.symbol,
+            )
+            self._gateway.execute(
+                query="""
+                UPDATE backtest_artifact_slot_ownership SET state='quarantined',updated_at=now()
+                WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s
+                  AND slot=%(slot)s AND owner_token=%(owner_token)s
+                  AND owner_attempt=%(attempt)s AND parent_incarnation=%(parent_incarnation)s
+                  AND writer_epoch=%(epoch)s AND state='writing'
+            """,
+                parameters=writer.parameters(),
+            )
+
+    def quarantine_artifact_reader(self, *, reader: ArtifactReaderReservation) -> None:
+        with self.transaction():
+            self._lock_artifact_coordinate(
+                exchange=reader.exchange,
+                market_type=reader.market_type,
+                symbol=reader.symbol,
+            )
+            self._gateway.execute(
+                query="""
+                UPDATE backtest_artifact_slot_readers SET state='quarantined'
+                WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s
+                  AND slot=%(slot)s AND owner_token=%(owner_token)s AND owner_id=%(owner_id)s
+                  AND organization_id IS NOT DISTINCT FROM %(organization_id)s
+                  AND attempt=%(attempt)s AND parent_incarnation=%(parent_incarnation)s
+                  AND ownership_epoch=%(epoch)s AND state='active'
+            """,
+                parameters=reader.parameters(),
+            )
 
     def create(self, *, job: BacktestJob) -> BacktestJob:
         """
@@ -625,6 +1202,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
         user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         next_state: BacktestJobState,
         top_variants: tuple[BacktestJobTopVariant, ...],
         last_error: str | None = None,
@@ -702,9 +1280,17 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
               AND user_id = %(user_id)s
               AND state = 'running'
               AND locked_by = %(locked_by)s
-              AND lease_expires_at > %(now)s
+              AND attempt = %(attempt)s
+              AND lease_expires_at > clock_timestamp()
+              AND (%(next_state)s <> 'succeeded' OR cancel_requested_at IS NULL)
             RETURNING
                 {_BACKTEST_JOB_SELECT_COLUMNS}
+        ),
+        released_queued_inputs AS (
+            DELETE FROM backtest_artifact_slot_readers
+            WHERE owner_kind='job' AND owner_id=%(job_id)s
+              AND organization_id=%(organization_id)s AND attempt=0 AND state='queued'
+              AND EXISTS (SELECT 1 FROM updated_job)
         ),
         deleted_rows AS (
             DELETE FROM {self._top_variants_table}
@@ -767,6 +1353,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
                 "user_id": str(user_id),
                 "now": now,
                 "locked_by": normalized_owner,
+                "attempt": attempt,
                 "next_state": normalized_state,
                 "last_error": normalized_last_error,
                 "last_error_json": _json_dumps(payload=normalized_error_json)
@@ -930,6 +1517,7 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
             Executes one SQL update and optional fallback select.
         """
         update_sql = f"""
+        WITH cancelled_job AS (
         UPDATE {self._jobs_table}
         SET
             state = CASE
@@ -956,6 +1544,13 @@ class PostgresBacktestJobRepository(BacktestJobRepository):
           AND state IN ('queued', 'running')
         RETURNING
             {_BACKTEST_JOB_SELECT_COLUMNS}
+        ), released_queued_inputs AS (
+            DELETE FROM backtest_artifact_slot_readers
+            WHERE owner_kind='job' AND owner_id=%(job_id)s
+              AND organization_id=%(organization_id)s AND attempt=0 AND state='queued'
+              AND EXISTS (SELECT 1 FROM cancelled_job WHERE state='cancelled')
+        )
+        SELECT {_BACKTEST_JOB_SELECT_COLUMNS} FROM cancelled_job
         """
         row = self._gateway.fetch_one(
             query=update_sql,

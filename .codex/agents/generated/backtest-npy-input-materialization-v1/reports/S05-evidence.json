@@ -1,0 +1,282 @@
+{
+  "schema": "roehub-stage-evidence/v1",
+  "stage": "S05",
+  "executor": "codex-s05-20261008-a8136f20",
+  "proof_boundary": "Tested local native NPY snapshots, actual subprocesses, production API composition and disposable PostgreSQL; no production deployment, browser-flow, arbitrary historical recovery or performance proof.",
+  "checks": [
+    {
+      "command": "uv run pytest -q tests/unit/contexts/backtest/application/services/v2/test_lazy_trades_detail_service.py tests/unit/contexts/backtest/adapters/outbound/cache_fs/test_lazy_trades_cache.py tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py tests/unit/contexts/backtest/application/use_cases/test_lazy_trades_materialization_worker_use_case.py tests/unit/contexts/backtest/application/services/v2/test_input_recipe_replay.py tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py tests/unit/contexts/backtest/application/services/v2/test_backtest_preflight_service.py tests/unit/contexts/backtest/adapters/outbound/artifacts_fs tests/unit/apps/worker/backtest_job_runner tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py tests/unit/contexts/backtest/adapters/outbound/test_postgres_research_organization_scope.py tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py tests/unit/contexts/backtest/application/services/v2/test_yaml_backtest_artifact_loader_v2.py tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py tests/unit/apps/api/test_backtests_routes.py tests/unit/apps/api/test_ui_backtests_routes.py",
+      "result": "414 passed in 35.93s",
+      "exit_code": 0,
+      "log": "/tmp/roehub-npy-s05-a8136f20/unit-final.log"
+    },
+    {
+      "command": "ROEHUB_BACKTEST_TEST_DSN='host=127.0.0.1 port=54400 dbname=s05 user=postgres' uv run pytest -q tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+      "result": "37 passed in 39.05s",
+      "exit_code": 0,
+      "log": "/tmp/roehub-npy-s05-a8136f20/postgres-top10-final.log"
+    },
+    {
+      "command": "ROEHUB_BACKTEST_TEST_DSN='host=127.0.0.1 port=54400 dbname=s05 user=postgres' uv run pytest -q tests/real_infra/backtest/test_artifact_input_lifecycle.py -k migration_preserves",
+      "result": "1 passed, 37 deselected in 1.63s",
+      "exit_code": 0,
+      "log": "/tmp/roehub-npy-s05-a8136f20/legacy-migration-second.log"
+    },
+    {
+      "command": "xargs uv run ruff check < /tmp/roehub-npy-s05-a8136f20/owned-python.txt",
+      "argv_paths": [
+        "apps/api/wiring/modules/backtest.py",
+        "apps/worker/backtest_job_runner/main/lazy_trades_child.py",
+        "apps/worker/backtest_job_runner/wiring/modules/lazy_trades_child_process.py",
+        "apps/worker/backtest_job_runner/wiring/modules/lazy_trades_compute.py",
+        "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py",
+        "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_context_resolver.py",
+        "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_lease_repository.py",
+        "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_repository.py",
+        "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/lazy_trades_materialization_repository.py",
+        "src/trading/contexts/backtest/application/dto/artifact_inputs.py",
+        "src/trading/contexts/backtest/application/ports/artifact_context.py",
+        "src/trading/contexts/backtest/application/ports/backtest_job_repositories.py",
+        "src/trading/contexts/backtest/application/ports/lazy_trades_cache.py",
+        "src/trading/contexts/backtest/application/ports/lazy_trades_materializations.py",
+        "src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py",
+        "src/trading/contexts/backtest/application/services/v2/preflight.py",
+        "src/trading/contexts/backtest/application/services/v2/prepare_pools.py",
+        "src/trading/contexts/backtest/application/use_cases/backtest_job_worker.py",
+        "src/trading/contexts/backtest/application/use_cases/lazy_trades_materialization_worker.py",
+        "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/backtest_job_repository.py",
+        "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_validator.py",
+        "tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+        "tests/unit/apps/api/test_backtests_routes.py",
+        "tests/unit/apps/api/test_ui_backtests_routes.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_backtest_preflight_service.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_input_recipe_replay.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_yaml_backtest_artifact_loader_v2.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_lazy_trades_materialization_worker_use_case.py"
+      ],
+      "result": "All checks passed!",
+      "exit_code": 0,
+      "log": "/tmp/roehub-npy-s05-a8136f20/ruff-final.log"
+    },
+    {
+      "command": "uv run pyright",
+      "result": "0 errors, 0 warnings, 0 informations",
+      "exit_code": 0,
+      "log": "/tmp/roehub-npy-s05-a8136f20/pyright-final-current.log"
+    },
+    {
+      "command": "git diff --check",
+      "result": "no output",
+      "exit_code": 0,
+      "log": "/tmp/roehub-npy-s05-a8136f20/diff-check.log"
+    }
+  ],
+  "owned_files": [
+    {
+      "path": "apps/api/wiring/modules/backtest.py",
+      "disposition": "modified",
+      "before_sha256": "f7fee0a4bbf10f0046fd94b995f90cf71e7922c20665994483cc0454f32aaa12",
+      "after_sha256": "0acc0575a9567439e5e01719cf2ce8042d9421986d13e224477f448cb8772dbd"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/main/lazy_trades_child.py",
+      "disposition": "modified",
+      "before_sha256": "1aa0bec93442cf2e4362071b83f2b610b49b7d2a32f916966d22775f3e6a8e24",
+      "after_sha256": "264712a5050cd1e0499b62a7787df7676454927655ec8954ce2b6a553dbd82bf"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/lazy_trades_child_process.py",
+      "disposition": "modified",
+      "before_sha256": "a976669699f2ae9999aa085bb989db8cb6e33e95ea65818048d374a4a056a2c1",
+      "after_sha256": "baf96a466fa57d4016cf49bccdd08e85c6299e3473f26d090447b540641b7705"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/lazy_trades_compute.py",
+      "disposition": "modified",
+      "before_sha256": "04e04d2aa2f5a8787b2852801429f94a1ec827c352fd94afb09d3c44cdbffb85",
+      "after_sha256": "bd8030134fcd1d706396280e2da78e7998e88f6cad96c497222551e5cbdfdbbc"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py",
+      "disposition": "modified",
+      "before_sha256": "6876e06a644fd190c0ad3a137b5f98a7cd39a49f50902992c36e0d9aacfac02d",
+      "after_sha256": "6f2dbaf2d9f611c6a597c199eb49dc341e173d13a19d59e18e44be02915f26bf"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_context_resolver.py",
+      "disposition": "modified",
+      "before_sha256": "8eea55062a663d6e08c6808e7d31f812edf0667477062d7738a943417e16fec2",
+      "after_sha256": "47245e4dc6ec6a522f986088170accaaf20f6d92edc32025d14c314b01c71738"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_lease_repository.py",
+      "disposition": "modified",
+      "before_sha256": "b1375b3ec6c20279fc939179377bd8dd9e506c3230db86bbd67d97add34fb0f8",
+      "after_sha256": "6250dd88c63f21e2287447aa09b1812b4cc5563accf0ad33c6189844cbd39cda"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_repository.py",
+      "disposition": "modified",
+      "before_sha256": "e5cb490cf6eb2ccb175418c047f31e717b0e10051ee1cb8241641f99b538f99a",
+      "after_sha256": "8ad9bc791ddd6caa2e8142b867a78be7972c07721fd584022837cc6c3b6f3ea1"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/lazy_trades_materialization_repository.py",
+      "disposition": "modified",
+      "before_sha256": "b3c4dfafb07066b1b43da48a3512b9576f5eb7a0a5120edd3e83a7a29193c830",
+      "after_sha256": "b161b3d3accb16bfbac9a15aeb8c6652881bf2741acbcffb568aaa7a07593150"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/dto/artifact_inputs.py",
+      "disposition": "modified",
+      "before_sha256": "f0b10252f74a1f55a0d61c06debd52612dabc16f2fe11e2afa3afe2fe77cb591",
+      "after_sha256": "f745dd0fed07ef6be4f71cb75b0c034dd90403cee5e4fe960ed8c898260e7161"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/ports/artifact_context.py",
+      "disposition": "modified",
+      "before_sha256": "760e249454061436ce6bff00bf64be422e952f571a853282fdcaee3eab56ec32",
+      "after_sha256": "290e638854ff250eaa59f6cb432f2a9f5f90f8cef90befdf07326a4207d5808b"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/ports/backtest_job_repositories.py",
+      "disposition": "modified",
+      "before_sha256": "bafb6e37c1201bdb2136d8d6f0f21c9fc631dd3fb284a34c12ce667008539aeb",
+      "after_sha256": "a2e576a5573ec21add8144964f130b94219892c8cf0abc6892eba90fc4e8b32d"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/ports/lazy_trades_cache.py",
+      "disposition": "modified",
+      "before_sha256": "34786b38178fdabdfc33662a654f499c4883a2a91e58cf1980520b6f4ba2abe0",
+      "after_sha256": "30b48f3e52b375a47ebf61c81f1232848ebb65c7800b90a7abdb5cda35b9a33e"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/ports/lazy_trades_materializations.py",
+      "disposition": "modified",
+      "before_sha256": "91609aed3a6bd61e6fea411853e3ddbdde5ff0699828e00c2c9af1f202d38344",
+      "after_sha256": "09609d4f71ce7a84abdd17236209ef6da04d661a1676052a944c026ac2091271"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py",
+      "disposition": "modified",
+      "before_sha256": "1da00e5fd742f07f1fe907e92e7fe7c9c4f2b3c9c27d56abb5ed451bb9bcfba0",
+      "after_sha256": "d0c810f23242492423cae2490cc9625226a7867c9c9c2bf879f733e22074edb0"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/preflight.py",
+      "disposition": "modified",
+      "before_sha256": "f58083ae8541ef45d0c56002bddf4d3d50628485fbf4fccdb541c18bc8f3fb1e",
+      "after_sha256": "79a1eb228a2b6559b4c0cb7d09adc918db18360e7447f643d900071ae89f4a52"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/prepare_pools.py",
+      "disposition": "modified",
+      "before_sha256": "0546e03b1fe0a3723fd7900128b01714c4aa721da299cc1f4732e3227ba94f75",
+      "after_sha256": "a0974f2ff3de5c07278b1ffac1ad557a0ec38a8465ec6a76ffe17bbb5cbddd11"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/use_cases/backtest_job_worker.py",
+      "disposition": "modified",
+      "before_sha256": "64074c98fa248a94b68265846eac9d369045b781dffefd6e5037a15286021a60",
+      "after_sha256": "5b415c91bb2c08ff94b376d6ce2283258f03fc23ba86d8b62c5ba80982af983a"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/use_cases/lazy_trades_materialization_worker.py",
+      "disposition": "modified",
+      "before_sha256": "23e71fefe4498c1ffff32fd322b0c13595b96479423165b78629427ca67460d3",
+      "after_sha256": "b20e815f134152d3217522bb58d329c1659e5992210366f45c5e34ab6081e351"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/backtest_job_repository.py",
+      "disposition": "modified",
+      "before_sha256": "484676fd2449c022e839ef3b42d0540718a2c53f874f105c4aaf070630c012d3",
+      "after_sha256": "c2cef2f2233a016dc761812998d388e08b2a5fb47d2a0216361bfe9b3d3aac1f"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_validator.py",
+      "disposition": "modified",
+      "before_sha256": "14934dff99a5ec93c92f1fdbe97fd5b849c42c674baa8a2640b195ed87c2b71c",
+      "after_sha256": "0b90657f96bc6e8f9074234013cbb0317e2d5deac841831972de84b7ca1cf454"
+    },
+    {
+      "path": "tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+      "disposition": "modified",
+      "before_sha256": "76008cb2e4052fe43b72c2dbaab8ca217d5e446f0a7cedb44cde1c200d54df4f",
+      "after_sha256": "fd249fb63350c7e99c998aee08fa1feba75c12e3c4d3253fd0c417003f2f84d3"
+    },
+    {
+      "path": "tests/unit/apps/api/test_backtests_routes.py",
+      "disposition": "modified",
+      "before_sha256": "29f03637f55891681c98b027e4e12567dc4556902219b57523e67aeb56548fd5",
+      "after_sha256": "48ff2c22c8834a30654a55f42527aa8d07b2c4ff0c9f15ca412b6d99e26869f0"
+    },
+    {
+      "path": "tests/unit/apps/api/test_ui_backtests_routes.py",
+      "disposition": "modified",
+      "before_sha256": "8c658da34d9e738f396f5eb1e292352c925524377b5a86cbbbb1751dc28f1e2e",
+      "after_sha256": "202e8bafcb29604f5f660a4b33dd4f0734eb5fd35cae5887149eb3da6bb3d9d0"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_backtest_preflight_service.py",
+      "disposition": "modified",
+      "before_sha256": "8ee44dd00d117dbfbe4d521b273a8cdb4d0d32923203e597d8fd530d36579eb5",
+      "after_sha256": "00e4d22c748b0b4987b1c5e1d73355bcd1fb25a0575b47f0f3b4b343bd5172a1"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_input_recipe_replay.py",
+      "disposition": "created",
+      "before_sha256": null,
+      "after_sha256": "e00391282255bb0293fd56292584c76124d89e49c0c07806790356e772e1b6a8"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_yaml_backtest_artifact_loader_v2.py",
+      "disposition": "modified",
+      "before_sha256": "d45b24bab955ed9fe4eb0cf38ba965111b5859a431e17de612b94b601cf67e4e",
+      "after_sha256": "f18d7703a2d1b32f12d9103a1e017117ef64ff21c6c0ef23c9d03b9010827d58"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py",
+      "disposition": "modified",
+      "before_sha256": "f491f23e9d13aaea7f170632cf4adef9b19583ed5038c68972c1896104912b79",
+      "after_sha256": "f8d6f167a4b7838d31a05e46b24ee898d763660230af7dd857dfdb9863ab2413"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py",
+      "disposition": "modified",
+      "before_sha256": "5198575f9ebe20901e209805592ee5e16f4aeaa577b97317f6fa41325b27b1e8",
+      "after_sha256": "c6bab749da36d6158d8c78fb229e6635f0a3c6595683d16c41b5daac22adb467"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/use_cases/test_lazy_trades_materialization_worker_use_case.py",
+      "disposition": "modified",
+      "before_sha256": "acbf78b02af6dcbdf4826440b2c641765690ae88773f29178a49cd4b786ed67f",
+      "after_sha256": "f9b46053726274be1a17fc8480c4d0b9ff1833cf6a2124ad1198f286de7620c8"
+    }
+  ],
+  "disposable_postgres": {
+    "container": "roehub-npy-s05-a8136f20-pg",
+    "image": "sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685",
+    "loopback_port": 54400,
+    "storage": "tmpfs",
+    "remaining_test_databases": [],
+    "remaining_test_schemas": [],
+    "stopped": true,
+    "remaining_container": false
+  },
+  "review": {
+    "mode": "focused self-review plus one independent read-only reviewer",
+    "reviewer": "Euler",
+    "agent_id": "01a11870-c8fb-7cc1-b371-06b277ec87cb",
+    "closed_findings": [
+      "float32 selected TP/SL canonical matching",
+      "API candles durable source reservation",
+      "API source resolver/validator wiring",
+      "clear old attempt provenance on reclaim"
+    ],
+    "remaining_material_findings": [],
+    "limit": "Reviewer read code and tests; did not independently run PostgreSQL or certify top10 tests."
+  },
+  "later_stage_boundary": "Normal API preflight recipe construction/policy activation remains S06; existing S04 creation/IPC persistence seams are reused. S06 not executed."
+}

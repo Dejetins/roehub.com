@@ -145,6 +145,12 @@ class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
             FROM {self._jobs_table}
             WHERE state = 'running'
               AND lease_expires_at <= %(now)s
+              AND NOT EXISTS (
+                  SELECT 1 FROM backtest_artifact_slot_readers AS reader
+                  WHERE reader.owner_kind='job' AND reader.owner_id={self._jobs_table}.job_id
+                    AND reader.organization_id={self._jobs_table}.organization_id
+                    AND reader.state IN ('active','quarantined')
+              )
               {scheduling_filter_sql}
             ORDER BY lease_expires_at ASC, created_at ASC, job_id ASC
             LIMIT 1
@@ -174,6 +180,7 @@ class PostgresBacktestJobLeaseRepository(BacktestJobLeaseRepository):
                 locked_at = %(now)s,
                 lease_expires_at = %(lease_expires_at)s,
                 heartbeat_at = %(now)s,
+                preparation_provenance_json = NULL,
                 attempt = jobs.attempt + 1
             FROM candidate
             WHERE jobs.job_id = candidate.job_id

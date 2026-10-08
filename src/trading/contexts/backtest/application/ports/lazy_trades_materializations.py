@@ -160,6 +160,7 @@ class BacktestLazyTradesMaterializationRepository(Protocol):
         owner_user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         cache_status: str,
         cache_path: str | None,
     ) -> BacktestLazyTradesMaterializationTask | None:
@@ -175,6 +176,7 @@ class BacktestLazyTradesMaterializationRepository(Protocol):
         owner_user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         last_error: str,
         last_error_json: Mapping[str, Any],
     ) -> BacktestLazyTradesMaterializationTask | None:

@@ -209,3 +209,11 @@ backtest_artifacts:
     signal_worker_memory_budget_bytes: 805306368
     signal_chunk_rows_min: 32
     signal_chunk_rows_max: 256
+
+# Optional backtest_artifacts.retention_policy (omitted means precompute):
+#   version: 1
+#   coordinates:
+#     - {exchange: binance, market_type: spot, symbol: BTCUSDT,
+#        signals: on_demand, hit_times: on_demand}
+# Enable only after schema-aware readers and ownership-aware workers/publishers/cleanup.
+# This controls proactive publication; valid existing derivatives remain reusable.

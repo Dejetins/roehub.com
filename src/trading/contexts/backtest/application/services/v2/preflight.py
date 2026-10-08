@@ -3,10 +3,13 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
+
+if TYPE_CHECKING:
+    from trading.contexts.backtest.domain.entities import BacktestJob
 
 from trading.contexts.backtest.application.dto import (
     BacktestArtifactMetadata,
@@ -18,22 +21,31 @@ from trading.contexts.backtest.application.dto import (
     BacktestRuntimeGuardrails,
     BacktestValidationIssue,
 )
+from trading.contexts.backtest.application.dto.input_recipe import BacktestInputRecipe
 from trading.contexts.backtest.application.ports import (
     BacktestArtifactContextResolver,
     BacktestArtifactContextUnavailable,
     BacktestGridDefaultsProvider,
 )
+from trading.contexts.backtest.application.ports.artifact_arrays import BacktestArtifactArrayLoader
 from trading.contexts.backtest.application.ports.staged_runner import (
     BACKTEST_RANKING_DIRECTION_BY_METRIC_LITERAL_V1,
 )
 from trading.contexts.backtest.application.services.research_identity import (
     build_research_content_hash,
 )
+from trading.contexts.backtest.application.services.v2.prepare_pools import requested_artifact_rows
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     ARTIFACT_MAPPING_TIMEFRAMES_V2,
+    SIGNAL_FEATURE_NAMES_V2,
+    ArtifactCandleSnapshot,
     ArtifactCoordinatesV2,
     artifact_market_id_from_coordinates_v2,
 )
+from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
+    BacktestSignalRulesEngineV2,
+)
+from trading.contexts.indicators.application.services import GridBuilder
 from trading.contexts.indicators.domain.specifications import (
     ExplicitValuesSpec,
     RangeValuesSpec,
@@ -219,12 +231,15 @@ class BacktestPreflightService:
     defaults_provider: BacktestGridDefaultsProvider
     artifact_context_resolver: BacktestArtifactContextResolver
     runtime_config: BacktestRuntimeConfig
+    artifact_array_loader: BacktestArtifactArrayLoader | None = None
+    indicator_grid_builder: GridBuilder | None = None
 
     def execute(
         self,
         payload: Mapping[str, Any],
         *,
         validation_guardrails: BacktestRuntimeGuardrails | None = None,
+        stored_artifact_metadata: BacktestArtifactMetadata | None = None,
     ) -> BacktestPreflightResult:
         guardrails = validation_guardrails or self.runtime_config.guardrails
         if not isinstance(payload, Mapping):
@@ -295,7 +310,9 @@ class BacktestPreflightService:
         }
         request_hash = build_research_content_hash(payload=normalized_request)
         result_config_hash = self._result_config_hash()
-        artifact_metadata = self._resolve_artifact_metadata(coordinates=coordinates)
+        artifact_metadata = stored_artifact_metadata or self._resolve_artifact_metadata(
+            coordinates=coordinates
+        )
         self._validate_time_range_against_artifacts(
             time_range=time_range,
             artifact_metadata=artifact_metadata,
@@ -328,7 +345,28 @@ class BacktestPreflightService:
             guardrails=guardrails,
         )
         warnings = (*warnings, *_funding_readiness_warnings(funding_readiness))
+        recipe = None
+        input_readiness = None
+        if self.artifact_array_loader is not None and stored_artifact_metadata is None:
+            try:
+                recipe, input_readiness = self._build_input_recipe(
+                    coordinates=coordinates, metadata=artifact_metadata,
+                    request=normalized_request,
+                )
+            except (ValueError, FileNotFoundError, OSError) as error:
+                raise BacktestPreflightRejected(
+                    error_code=BACKTEST_ERROR_ARTIFACTS_UNAVAILABLE,
+                    message="Required backtest input metadata is unavailable", issues=(),
+                    retryable=True,
+                ) from error
+            result_config_hash = _canonical_json_sha256({
+                "schema": "backtest-semantic-config/v1",
+                "rule_version": recipe.rule_version, "defaults_sha256": recipe.defaults_sha256,
+                "compute_version": recipe.compute_version,
+                "precision_version": recipe.precision_version,
+            })
         return BacktestPreflightResult(
+            input_recipe=recipe, input_readiness=input_readiness,
             normalized_request=normalized_request,
             request_hash=request_hash,
             result_config_hash=result_config_hash,
@@ -342,6 +380,144 @@ class BacktestPreflightService:
                 direction_mode=str(execution["direction_mode"]),
             ),
         )
+
+    def _build_input_recipe(
+        self, *, coordinates: BacktestCoordinates, metadata: BacktestArtifactMetadata,
+        request: Mapping[str, Any],
+    ) -> tuple[BacktestInputRecipe, Mapping[str, Any]]:
+        """Freeze bounded manifest/header metadata; payload attestation belongs to the worker."""
+        assert self.artifact_array_loader is not None
+        context = self.artifact_array_loader.resolve_context(
+            coordinates=coordinates, artifact_metadata=metadata, metadata_only=True,
+        )
+        timeframe = request["timeframe"]
+        source = context.source
+        refs = tuple(ref for ref in context.references if (
+            ref.domain.role.startswith("prices.") and ref.domain.timeframe in ("1m", timeframe)
+            or ref.domain.role.startswith("mappings.") and ref.domain.timeframe == timeframe
+            or ref.domain.role.startswith("funding.")
+        ))
+        required = {f"prices.{tf}.{name}" for tf in ("1m", timeframe)
+                    for name in ("open_time", "close_time", "ohlcv")}
+        required.update(f"mappings.{timeframe}.{name}"
+                        for name in ("bar_open_1m_idx", "bar_close_1m_idx"))
+        if not required.issubset({ref.domain.role for ref in refs}):
+            raise ValueError("mandatory NPY source metadata is missing")
+        snapshot = ArtifactCandleSnapshot(
+            coordinates=source.coordinates, source_schema=source.slot_manifest.schema_version,
+            slot=source.artifact_slot, generation=source.slot_generation,
+            manifest_sha256=source.artifact_manifest_hash,
+            signal_timeframe=timeframe, execution_timeframe="1m",
+            source_file_identities=refs, consumed_domains=tuple(ref.domain for ref in refs),
+        )
+        rows = requested_artifact_rows(defaults_provider=self.defaults_provider,
+                                       indicators=request["indicators"])
+        from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (  # noqa: E501
+            derivative_defaults_sha256,
+        )
+
+        defaults_hash = derivative_defaults_sha256(
+            rows=rows, defaults_provider=self.defaults_provider,
+            signal_rules_engine=BacktestSignalRulesEngineV2(defaults_provider=self.defaults_provider),
+            indicator_grid_builder=self.indicator_grid_builder,
+        )
+        funding = request["execution"]["funding"]
+        funding_policy = ("not_applicable" if coordinates.market_type == "spot" else
+                          "disabled" if funding["mode"] == "off" else funding["coverage_policy"])
+        funding_hash = None if funding_policy in ("not_applicable", "disabled") else (
+            metadata.funding_manifest_hash
+        )
+        risk = request["risk"]
+        tp = (_normalize_risk_percent_side(risk["tp"], path="risk.tp")[1]
+              if risk["mode"] != "none" else ())
+        sl = (_normalize_risk_percent_side(risk["sl"], path="risk.sl")[1]
+              if risk["mode"] != "none" else ())
+        recipe = BacktestInputRecipe(
+            snapshot=snapshot, requested_start_utc=request["time_range"]["start"],
+            requested_end_utc=request["time_range"]["end"], rows=rows,
+            rule_version="signals/v1", defaults_sha256=defaults_hash,
+            compute_version="numba/v1", precision_version="f32-f64/v1",
+            funding_policy=funding_policy, funding_fingerprint=funding_hash,
+            tp_levels_pct=tp, sl_levels_pct=sl,
+        )
+        missing_rows = tuple(row for row in rows if not any(
+            ref.domain.role == f"signals.{row.indicator_id}"
+            and ref.domain.timeframe == timeframe and row.row_id in ref.row_ids
+            for ref in context.references
+        ))
+        missing = len(missing_rows)
+        bars = next(ref.domain.shape[0] for ref in refs
+                    if ref.domain.role == f"prices.{timeframe}.open_time")
+        # Old hit-time manifests do not encode axis values. Never scan NPY payload in preflight;
+        # give a conservative preparation estimate and let the worker prove possible reuse.
+        risk_levels = len(tp) + len(sl)
+        hit = context.hit_times_manifest
+        risk_covered = bool(
+            hit is not None and hit.timeframe == timeframe
+            and hit.provenance.config_sha256 == self.runtime_config.artifact_config_hash
+            and hit.tp_values.shape == (len(self.runtime_config.hit_times_tp_levels_pct),)
+            and hit.sl_values.shape == (len(self.runtime_config.hit_times_sl_levels_pct),)
+        )
+        missing_risk_levels = 0 if risk_covered else risk_levels
+        needs_preparation = bool(missing or missing_risk_levels)
+        file_count = 2 * len({row.indicator_id for row in missing_rows})
+        if missing_risk_levels:
+            file_count += 6
+        estimate = (missing * (bars + 4 * len(SIGNAL_FEATURE_NAMES_V2))
+                    + 8 * missing_risk_levels * bars + 4 * missing_risk_levels
+                    + 256 * file_count + 4096)
+        return recipe, {
+            "status": "requires_materialization" if needs_preparation else "ready",
+            "requested_signal_rows": len(rows), "missing_signal_rows": missing,
+            "requested_risk_levels": risk_levels,
+            "risk_coverage": ("not_required" if not risk_levels else
+                              "covered" if risk_covered else "worker_verification_required"),
+            "estimated_generated_bytes_upper_bound": estimate if needs_preparation else 0,
+            "payload_validation": "pending",
+        }
+
+    def validate_stored_recipe(
+        self, *, job: "BacktestJob",
+        validation_guardrails: BacktestRuntimeGuardrails | None = None,
+    ) -> BacktestPreflightResult:
+        """Recheck admission without resolving today's pointer or replacing financial identity."""
+        from trading.contexts.backtest.application.dto.input_recipe import BacktestInputRecipe
+
+        from .lazy_trades_detail import _artifact_metadata_from_job
+
+        if job.input_recipe_json is None:
+            raise ValueError("stored recipe validation requires a recipe")
+        recipe = BacktestInputRecipe.from_mapping(job.input_recipe_json)
+        metadata = _artifact_metadata_from_job(job=job)
+        request = job.request_json
+        if (
+            (metadata.artifact_slot, metadata.artifact_slot_generation,
+             metadata.artifact_manifest_hash)
+            != (recipe.snapshot.slot, recipe.snapshot.generation, recipe.snapshot.manifest_sha256)
+            or request["coordinates"] != asdict(recipe.snapshot.coordinates)
+            or request["timeframe"] != recipe.snapshot.signal_timeframe
+            or request["time_range"] != {
+                "start": recipe.requested_start_utc, "end": recipe.requested_end_utc,
+            }
+            or (recipe.rule_version, recipe.compute_version, recipe.precision_version)
+            != ("signals/v1", "numba/v1", "f32-f64/v1")
+        ):
+            raise BacktestPreflightRejected(
+                error_code=BACKTEST_ERROR_ARTIFACTS_UNAVAILABLE,
+                message="Stored source or computation version is unavailable",
+                issues=(),
+            )
+        result = self.execute(
+            request, validation_guardrails=validation_guardrails,
+            stored_artifact_metadata=metadata,
+        )
+        if result.request_hash != job.request_hash:
+            raise BacktestPreflightRejected(
+                error_code=BACKTEST_ERROR_ARTIFACTS_UNAVAILABLE,
+                message="Stored financial request cannot be reproduced", issues=(),
+            )
+        return replace(result, input_recipe=recipe,
+                       result_config_hash=job.backtest_runtime_config_hash)
 
     def _normalize_coordinates(self, *, payload: Mapping[str, Any]) -> BacktestCoordinates:
         raw_coordinates = payload.get("coordinates")
@@ -981,6 +1157,30 @@ class BacktestPreflightService:
         }
         return _canonical_json_sha256(payload)
 
+    def revalidate_preflight_source(self, *, preflight: BacktestPreflightResult) -> None:
+        """Read bounded metadata under caller's ownership transaction; never substitute it."""
+        coordinates = preflight.normalized_request["coordinates"]
+        actual = self._resolve_artifact_metadata(
+            coordinates=BacktestCoordinates(
+                exchange=coordinates["exchange"],
+                market_type=coordinates["market_type"],
+                symbol=coordinates["symbol"],
+            )
+        )
+        if actual != preflight.artifact_metadata:
+            raise BacktestPreflightRejected(
+                error_code=BACKTEST_ERROR_ARTIFACTS_UNAVAILABLE,
+                message="Artifact source changed after preflight",
+                issues=(
+                    BacktestValidationIssue(
+                        path="artifacts",
+                        code="stale_preflight",
+                        message="Retry preflight against the current source",
+                    ),
+                ),
+                retryable=True,
+            )
+
     def _resolve_artifact_metadata(
         self,
         *,
@@ -996,7 +1196,7 @@ class BacktestPreflightService:
                     BacktestValidationIssue(
                         path="artifacts",
                         code="artifacts_unavailable",
-                        message=str(error),
+                        message="Required backtest artifact metadata could not be validated",
                     ),
                 ),
                 retryable=True,
@@ -1423,6 +1623,18 @@ def _normalize_profit_lock(value: Any) -> dict[str, bool | float]:
 
 def _normalize_percent_levels(value: Any, *, path: str) -> tuple[float, ...]:
     if isinstance(value, Mapping):
+        if "levels_pct" in value:
+            if any(key in value for key in ("start_pct", "stop_pct", "step_pct")):
+                raise _invalid_request(
+                    path=path, code="invalid_type",
+                    message=f"{path} must not combine explicit levels and a range",
+                )
+            explicit = value["levels_pct"]
+            if not isinstance(explicit, (list, tuple)):
+                raise _invalid_request(
+                    path=path, code="invalid_type", message=f"{path}.levels_pct must be a list",
+                )
+            return _normalize_percent_levels(explicit, path=f"{path}.levels_pct")
         start = _positive_decimal(value.get("start_pct"), path=f"{path}.start_pct")
         stop = _positive_decimal(value.get("stop_pct"), path=f"{path}.stop_pct")
         step = _positive_decimal(value.get("step_pct"), path=f"{path}.step_pct")
@@ -1473,6 +1685,12 @@ def _normalize_risk_percent_side(value: Any, *, path: str) -> tuple[bool, tuple[
 def _risk_side_payload(*, enabled: bool, levels: Sequence[float]) -> dict[str, Any]:
     if not enabled:
         return {"enabled": False}
+    decimals = tuple(Decimal(str(level)) for level in levels)
+    if len(decimals) > 2 and any(
+        decimals[index] - decimals[index - 1] != decimals[1] - decimals[0]
+        for index in range(2, len(decimals))
+    ):
+        return {"enabled": True, "levels_pct": list(levels)}
     payload = _level_range_from_values(levels)
     payload["enabled"] = True
     return payload

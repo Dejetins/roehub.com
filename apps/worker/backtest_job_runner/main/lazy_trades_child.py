@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 import os
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from uuid import UUID
@@ -37,6 +38,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--owner-user-id", required=True)
     parser.add_argument("--variant-key", required=True)
     parser.add_argument("--output-json", required=True)
+    parser.add_argument("--input-context-json")
     return parser
 
 
@@ -92,7 +94,29 @@ def main(argv: list[str] | None = None) -> int:
                     "retryable": False,
                 },
             )
-        detail = build_lazy_trades_compute_service(environ=os.environ).execute(
+        service = build_lazy_trades_compute_service(environ=os.environ)
+        if args.input_context_json:
+            from trading.contexts.backtest.application.dto import BacktestArtifactMetadata
+            from trading.contexts.backtest.application.dto.artifact_inputs import (
+                BacktestAttemptInputs,
+            )
+
+            composition = json.loads(Path(args.input_context_json).read_text())
+            owner = composition["owner"]
+            # Replay attestation is already durable on the completed job. This validates
+            # the new selected set locally and never replaces that original provenance.
+            service = replace(
+                service, replay_metadata=BacktestArtifactMetadata(**composition["metadata"]),
+                attempt_inputs=BacktestAttemptInputs(
+                    directory=output_path.parent / "inputs",
+                    organization_id=str(organization_id), job_id=str(job_id),
+                    owner_token=owner["owner_token"], attempt=int(owner["attempt"]),
+                    max_generated_bytes=composition["max_generated_bytes"],
+                    max_compute_bytes=composition["max_compute_bytes"],
+                    acknowledge=lambda prepared: prepared.content_sha256,
+                ),
+            )
+        detail = service.execute(
             job=job,
             row=row,
             public_variant_key=args.variant_key,
@@ -106,8 +130,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    from apps.worker.backtest_job_runner.wiring.modules.compute_resources import (
+        write_attempt_json,
+    )
+
+    write_attempt_json(output_path, payload)
     elapsed = (datetime.now(UTC) - started_at).total_seconds()
     log.info(
         "lazy trades child process finished: task_id=%s cache_status=%s " "elapsed_seconds=%.3f",

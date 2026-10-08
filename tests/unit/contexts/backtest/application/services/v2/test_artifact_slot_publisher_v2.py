@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
+from uuid import uuid4
 
 import pytest
 
@@ -16,6 +18,10 @@ from trading.contexts.backtest.adapters.outbound.config import (
     load_backtest_artifacts_runtime_config,
 )
 from trading.contexts.backtest.application.ports import BacktestJobRepository
+from trading.contexts.backtest.application.ports.backtest_job_repositories import (
+    ArtifactOwnershipConflict,
+    ArtifactWriterReservation,
+)
 from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (
     ArtifactCanonicalPriceExportRequestV2,
     BacktestArtifactPrecomputeRunnerV2,
@@ -62,6 +68,40 @@ class _FakeJobRepository:
         self.blocked_by_slot = {} if blocked_by_slot is None else dict(blocked_by_slot)
         self.last_call: dict[str, object] | None = None
         self.calls: list[dict[str, object]] = []
+        self.writer_slots: list[str] = []
+
+    def transaction(self):
+        return nullcontext(self)
+
+    def verify_artifact_writer(self, *, writer):
+        assert writer.owner_token
+
+    def reserve_artifact_writer(self, **kwargs):
+        self.writer_slots.append(kwargs["slot"])
+        if self.blocked_by_slot.get(kwargs["slot"], self.blocked_total):
+            raise ArtifactOwnershipConflict("artifact_source_pinned")
+        return ArtifactWriterReservation(
+            kwargs["exchange"],
+            kwargs["market_type"],
+            kwargs["symbol"],
+            kwargs["slot"],
+            kwargs["owner_token"],
+            kwargs["attempt"],
+            kwargs["parent_incarnation"],
+            1,
+        )
+
+    def reserve_artifact_reader(self, *, reader):
+        return reader
+
+    def release_artifact_reader(self, *, reader):
+        return True
+
+    def complete_artifact_writer(self, **kwargs):
+        assert kwargs["writer"]
+
+    def quarantine_artifact_writer(self, **kwargs):
+        assert kwargs["writer"]
 
     def count_active_for_artifact_manifest(
         self,
@@ -251,7 +291,8 @@ def test_backtest_artifact_slot_publisher_v2_switches_current_yaml_after_strict_
     )
 
     precheck = publisher.precheck_publish(store.coordinates)
-    result = publisher.publish(
+    result = _publish_prebuilt(
+        publisher=publisher,
         precheck=precheck,
         validation_spec=validation_spec,
         asof_date="2026-03-26",
@@ -321,14 +362,16 @@ def test_backtest_artifact_slot_publisher_v2_skips_previous_slot_cleanup_when_sl
     )
 
     precheck = publisher.precheck_publish(store.coordinates)
-    publisher.publish(
+    _publish_prebuilt(
+        publisher=publisher,
         precheck=precheck,
         validation_spec=validation_spec,
         asof_date="2026-03-26",
     )
 
     queried_slots = tuple(str(call["artifact_slot"]) for call in repository.calls)
-    assert queried_slots == (store.inactive_slot, store.active_slot)
+    assert queried_slots == (store.inactive_slot,)
+    assert repository.writer_slots == [store.active_slot]
     assert previous_slot_manifest_path.is_file()
     assert previous_slot_manifest_path.parent.is_dir()
 
@@ -370,7 +413,8 @@ def test_backtest_artifact_slot_publisher_v2_blocks_publish_when_inactive_slot_i
     assert precheck.ready is False
     assert precheck.failure_code == ARTIFACT_PUBLISH_FAILURE_CODE_INACTIVE_SLOT_PINNED_V2
     with pytest.raises(ArtifactSlotPublishErrorV2, match="slot_b"):
-        publisher.publish(
+        _publish_prebuilt(
+            publisher=publisher,
             precheck=precheck,
             validation_spec=validation_spec,
             asof_date="2026-03-26",
@@ -415,7 +459,8 @@ def test_backtest_artifact_slot_publisher_v2_rejects_missing_strict_artifact_fil
     precheck = publisher.precheck_publish(store.coordinates)
 
     with pytest.raises(ArtifactSlotPublishErrorV2) as error_info:
-        publisher.publish(
+        _publish_prebuilt(
+            publisher=publisher,
             precheck=precheck,
             validation_spec=validation_spec,
             asof_date="2026-03-26",
@@ -548,3 +593,25 @@ def _prices_mappings_request_v2(
         asof_date="2026-03-26",
         generated_at_utc="2026-03-26T03:04:05Z",
     )
+
+
+def _publish_prebuilt(*, publisher, precheck, validation_spec, asof_date):
+    """Unit-only finalization fixture; real pin concurrency is tested in PostgreSQL."""
+    publisher._ensure_precheck_ready(precheck)
+    writer = ArtifactWriterReservation(
+        precheck.coordinates.exchange,
+        precheck.coordinates.market_type,
+        precheck.coordinates.symbol,
+        precheck.inactive_slot,
+        uuid4(),
+        1,
+        uuid4(),
+        1,
+    )
+    result = publisher.publish(
+        precheck=precheck, validation_spec=validation_spec, asof_date=asof_date, writer=writer
+    )
+    publisher._cleanup_previous_slot_after_publish(
+        precheck=precheck, published_pointer=result.published_pointer
+    )
+    return result

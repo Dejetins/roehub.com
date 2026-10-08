@@ -3,15 +3,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping
 
+from apps.api.wiring.modules.indicators import (
+    build_artifact_precompute_indicators_compute,
+    build_indicators_registry,
+)
 from trading.contexts.backtest.adapters.outbound import (
     BacktestArtifactPathBuilderV2,
     YamlBacktestGridDefaultsProvider,
+    build_backtest_artifacts_runtime_config_hash,
     load_backtest_artifacts_runtime_config,
     resolve_backtest_artifacts_config_path,
 )
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
 )
+from trading.contexts.backtest.application.dto.artifact_inputs import BacktestAttemptInputs
 from trading.contexts.backtest.application.services.v2.combo_planning import (
     BacktestComboPlanningConfig,
     BacktestComboPlanningService,
@@ -39,12 +45,23 @@ from trading.contexts.backtest.application.services.v2.tp_sl_hit_times import (
 from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_loader import (
     YamlBacktestArtifactLoaderV2,
 )
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_validator import (  # noqa: E501
+    BacktestArtifactManifestValidatorV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (
+    BacktestArtifactPrecomputeRunnerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
+    BacktestSignalRulesEngineV2,
+)
+from trading.contexts.indicators.application.services import GridBuilder
 
 
 def build_full_job_compute_executor(
     *,
     environ: Mapping[str, str],
     compute_policy: BacktestComputePolicy | None = None,
+    attempt_inputs: BacktestAttemptInputs | None = None,
 ) -> BacktestRuntimeJobOrchestrationService:
     policy = compute_policy or BacktestComputePolicy(
         threads=resolve_backtest_numba_thread_decision(
@@ -74,6 +91,26 @@ def build_full_job_compute_executor(
     )
     return BacktestRuntimeJobOrchestrationService(
         prepare_pools=prepare_pools,
+        attempt_inputs=attempt_inputs,
+        input_validator=BacktestArtifactManifestValidatorV2(artifact_loader=artifact_loader),
+        derivative_builder=BacktestArtifactPrecomputeRunnerV2(
+            runtime_settings=artifact_config.to_precompute_runtime_settings(
+                config_sha256=build_backtest_artifacts_runtime_config_hash(config=artifact_config)
+            ),
+            artifact_loader=artifact_loader,
+            defaults_provider=defaults_provider,
+            signal_rules_engine=BacktestSignalRulesEngineV2(defaults_provider=defaults_provider),
+            indicator_compute=build_artifact_precompute_indicators_compute(
+                environ=environ,
+                artifact_config_path=Path(artifact_config_path),
+            ),
+            indicator_grid_builder=GridBuilder(
+                registry=build_indicators_registry(
+                    environ=environ,
+                    artifact_config_path=Path(artifact_config_path),
+                )
+            ),
+        ),
         compute_policy=policy,
         combo_planning=BacktestComboPlanningService(
             config=BacktestComboPlanningConfig(
@@ -82,9 +119,7 @@ def build_full_job_compute_executor(
             ),
         ),
         no_risk_exact=BacktestNoRiskExactScoringService(),
-        tp_sl_hit_times=BacktestTpSlHitTimesService(
-            artifact_array_loader=artifact_array_loader
-        ),
+        tp_sl_hit_times=BacktestTpSlHitTimesService(artifact_array_loader=artifact_array_loader),
         tp_sl_exact=BacktestTpSlExactScoringService(),
         artifact_array_loader=artifact_array_loader,
     )

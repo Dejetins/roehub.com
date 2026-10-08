@@ -21,6 +21,13 @@ CONTEXT_KEYS = (
     "backtest_runtime_config_hash",
     "artifact_manifest_hash",
 )
+RECIPE_CONTEXT_KEYS = (
+    "request_hash",
+    "engine_params_hash",
+    "backtest_runtime_config_hash",
+    "input_recipe_semantic_sha256",
+    "source_prefix_sha256",
+)
 ROW_FIELDS = (
     "rank",
     "variant_hash",
@@ -126,7 +133,8 @@ def assess_full_parity(
     # The current /top contract is unpaginated. Fail closed on an unfamiliar partial response.
     if api_top.get("next_cursor") or api_top.get("has_more") or api_top.get("pagination"):
         reasons.append("incomplete_or_unsupported_pagination")
-    if reference.get("schema") != "backtest_full_top_reference_v1":
+    schema = reference.get("schema")
+    if schema not in ("backtest_full_top_reference_v1", "backtest_full_top_reference_v2"):
         reasons.append("complete_reference_schema_missing")
     provenance = reference.get("provenance", {})
     if not isinstance(provenance, Mapping) or (
@@ -136,8 +144,16 @@ def assess_full_parity(
     ):
         reasons.append("trusted_reference_provenance_missing")
     ref_context = reference.get("context", {})
+    context_keys = CONTEXT_KEYS
+    if schema == "backtest_full_top_reference_v2":
+        context_keys = RECIPE_CONTEXT_KEYS
+        if context.get("schema") != "backtest_recipe_reference_context_v1" or (
+            not isinstance(ref_context, Mapping)
+            or ref_context.get("schema") != "backtest_recipe_reference_context_v1"
+        ):
+            reasons.append("versioned_recipe_context_missing")
     if not isinstance(ref_context, Mapping) or any(
-        not context.get(k) or context.get(k) != ref_context.get(k) for k in CONTEXT_KEYS
+        not context.get(k) or context.get(k) != ref_context.get(k) for k in context_keys
     ):
         reasons.append("reference_semantics_or_artifact_identity_unavailable_or_incompatible")
     count = reference.get("expected_count")

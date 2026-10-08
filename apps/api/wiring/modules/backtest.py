@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from apps.api.routes import build_backtests_router as build_backtests_api_router
+from apps.api.wiring.modules.indicators import build_indicators_registry
 from trading.contexts.backtest.adapters.outbound import (
     DEFAULT_LAZY_TRADES_CACHE_ROOT,
     BacktestArtifactPathBuilderV2,
@@ -45,7 +46,11 @@ from trading.contexts.backtest.application.use_cases import BacktestJobsUseCase
 from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_loader import (
     YamlBacktestArtifactLoaderV2,
 )
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_validator import (  # noqa: E501
+    BacktestArtifactManifestValidatorV2,
+)
 from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUserDependency
+from trading.contexts.indicators.application.services import GridBuilder
 from trading.contexts.strategy.adapters.outbound import (
     PostgresStrategyBacktestVariantProvenanceRepository,
     PostgresStrategyCompatibilityReadinessRepository,
@@ -115,6 +120,10 @@ def build_backtests_router(
         defaults_provider=defaults_provider,
         artifact_context_resolver=artifact_context_resolver,
         runtime_config=runtime_config,
+        artifact_array_loader=artifact_array_loader,
+        indicator_grid_builder=GridBuilder(registry=build_indicators_registry(
+            environ=effective_environ, artifact_config_path=Path(artifact_config_path),
+        )),
     )
     job_repository = _build_job_repository(environ=effective_environ)
     organization_scope_resolver = build_required_organization_scope_resolver(
@@ -195,6 +204,7 @@ def _build_jobs_use_case(
         return None
     postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
     postgres_gateway = PsycopgBacktestPostgresGateway(dsn=postgres_dsn)
+    artifact_loader = artifact_array_loader.artifact_loader
     prepare_pools = BacktestPreparePoolsService(
         artifact_array_loader=artifact_array_loader,
         defaults_provider=defaults_provider,
@@ -217,6 +227,9 @@ def _build_jobs_use_case(
             PostgresBacktestLazyTradesMaterializationRepository(gateway=postgres_gateway)
         ),
         lazy_trades_service=BacktestLazyTradesDetailService(
+            source_repository=job_repository,
+            source_resolver=FilesystemBacktestArtifactContextResolver(artifact_loader=artifact_loader),
+            input_validator=BacktestArtifactManifestValidatorV2(artifact_loader=artifact_loader),
             prepare_pools=prepare_pools,
             tp_sl_hit_times=tp_sl_hit_times,
             cache=LocalFileBacktestLazyTradesCache(

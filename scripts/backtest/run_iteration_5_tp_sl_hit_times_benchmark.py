@@ -184,6 +184,7 @@ def _run_warmup(*, canonical: Mapping[str, Any], services: _Services) -> dict[st
         normalized_request=request,
         context=services.context,
     )
+    assert result is not None
     warmup = {
         "wall_time_s": time.perf_counter() - start,
         "timing": result.timing.as_mapping(),
@@ -208,6 +209,7 @@ def _run_matrix(*, canonical: Mapping[str, Any], services: _Services) -> list[di
             normalized_request=request,
             context=services.context,
         )
+        assert result is not None
         cpu_s = time.process_time() - cpu_start
         rss_after = _maxrss_raw()
         timers = dict(result.timing.subsegments)
@@ -309,6 +311,12 @@ def _run_failed_load_probe(
 class _FailingTableLoader:
     def __init__(self, inner: FilesystemBacktestArtifactArrayLoader) -> None:
         self._inner = inner
+
+    def with_prepared_inputs(self, **kwargs: Any) -> Any:
+        return self._inner.with_prepared_inputs(**kwargs)
+
+    def write_prepared_manifest(self, **kwargs: Any) -> Any:
+        return self._inner.write_prepared_manifest(**kwargs)
 
     def resolve_context(self, **kwargs: Any) -> Any:
         return self._inner.resolve_context(**kwargs)

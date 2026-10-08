@@ -9,8 +9,7 @@ import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from tempfile import NamedTemporaryFile
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence, TextIO
 
 _EVIDENCE_DIR_KEY = "ROEHUB_BACKTEST_CHILD_EVIDENCE_DIR"
 _SAMPLE_INTERVAL_KEY = "ROEHUB_BACKTEST_CHILD_EVIDENCE_SAMPLE_INTERVAL_SECONDS"
@@ -35,6 +34,12 @@ def run_observed_subprocess(
     evidence_prefix: str,
     metadata: Mapping[str, Any],
     cancel_event: threading.Event | None = None,
+    pass_fds: tuple[int, ...] = (),
+    output_directory: Path | None = None,
+    on_poll: Callable[[], None] | None = None,
+    on_started: Callable[[], None] | None = None,
+    before_start: Callable[[], None] | None = None,
+    on_reaped: Callable[[], None] | None = None,
 ) -> ObservedProcessResult:
     started_at = datetime.now(UTC)
     parent_pid = os.getpid()
@@ -46,50 +51,70 @@ def run_observed_subprocess(
     parent_footprint_before = (
         _physical_footprint_bytes(parent_pid) if collect_vmmap else None
     )
-    stdout_file = NamedTemporaryFile("w+", encoding="utf-8", delete=False)
-    stderr_file = NamedTemporaryFile("w+", encoding="utf-8", delete=False)
-    stdout_path = Path(stdout_file.name)
-    stderr_path = Path(stderr_file.name)
+    # Drain pipes continuously but retain only bounded diagnostic tails. Child logs
+    # never grow an attempt file or an unbounded in-memory communicate() result.
+    tails = ["", ""]
+    readers: list[threading.Thread] = []
+
+    def drain(stream: TextIO, index: int) -> None:
+        while chunk := stream.read(16384):
+            tails[index] = (tails[index] + chunk)[-1_048_576:]
+
     process: subprocess.Popen[str] | None = None
     peak_rss_bytes: int | None = None
     peak_physical_footprint_bytes: int | None = None
     timed_out = False
     cancelled = False
     try:
-        with stdout_file, stderr_file:
-            process = subprocess.Popen(  # noqa: S603
-                list(cmd),
-                env=dict(env),
-                stdout=stdout_file,
-                stderr=stderr_file,
-                text=True,
-            )
-            deadline = time.monotonic() + timeout_seconds
-            while process.poll() is None:
-                if collect_rss:
-                    rss_bytes = _rss_bytes(process.pid)
-                    if rss_bytes is not None:
-                        peak_rss_bytes = max(peak_rss_bytes or 0, rss_bytes)
-                if collect_vmmap:
-                    footprint_bytes = _physical_footprint_bytes(process.pid)
-                    if footprint_bytes is not None:
-                        peak_physical_footprint_bytes = max(
-                            peak_physical_footprint_bytes or 0,
-                            footprint_bytes,
-                        )
-                if time.monotonic() >= deadline:
-                    timed_out = True
-                    process.kill()
-                    process.wait(timeout=10)
-                    break
-                if cancel_event is not None and cancel_event.is_set():
-                    cancelled = True
-                    _stop_process(process=process)
-                    break
-                time.sleep(sample_interval)
-            returncode = process.returncode
-        stdout = _read_text(path=stdout_path)
-        stderr = _read_text(path=stderr_path)
+        if before_start is not None:
+            before_start()
+        process = subprocess.Popen(  # noqa: S603
+            list(cmd),
+            env=dict(env),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            errors="replace",
+            pass_fds=pass_fds,
+        )
+        assert process.stdout is not None and process.stderr is not None
+        for index, stream in enumerate((process.stdout, process.stderr)):
+            reader = threading.Thread(target=drain, args=(stream, index), daemon=True)
+            readers.append(reader)
+            reader.start()
+        if on_started is not None:
+            on_started()
+        deadline = time.monotonic() + timeout_seconds
+        while process.poll() is None:
+            if collect_rss:
+                rss_bytes = _rss_bytes(process.pid)
+                if rss_bytes is not None:
+                    peak_rss_bytes = max(peak_rss_bytes or 0, rss_bytes)
+            if collect_vmmap:
+                footprint_bytes = _physical_footprint_bytes(process.pid)
+                if footprint_bytes is not None:
+                    peak_physical_footprint_bytes = max(
+                        peak_physical_footprint_bytes or 0,
+                        footprint_bytes,
+                    )
+            if time.monotonic() >= deadline:
+                timed_out = True
+                process.kill()
+                process.wait(timeout=10)
+                break
+            if cancel_event is not None and cancel_event.is_set():
+                cancelled = True
+                _stop_process(process=process)
+                break
+            if on_poll is not None:
+                on_poll()
+            time.sleep(sample_interval)
+        returncode = process.returncode
+        for reader in readers:
+            reader.join(timeout=5)
+        if any(reader.is_alive() for reader in readers):
+            raise RuntimeError("child diagnostic pipe remains open after reap")
+        stdout, stderr = tails
         finished_at = datetime.now(UTC)
         parent_rss_after = _rss_bytes(parent_pid) if collect_rss else None
         parent_footprint_after = (
@@ -137,8 +162,14 @@ def run_observed_subprocess(
     finally:
         if process is not None and process.poll() is None:
             _stop_process(process=process)
-        stdout_path.unlink(missing_ok=True)
-        stderr_path.unlink(missing_ok=True)
+        if process is not None and process.poll() is not None and on_reaped is not None:
+            on_reaped()
+        for reader in readers:
+            reader.join(timeout=5)
+        if process is not None:
+            for stream in (process.stdout, process.stderr):
+                if stream is not None:
+                    stream.close()
 
 
 def _evidence_dir(*, env: Mapping[str, str]) -> Path | None:
@@ -248,13 +279,6 @@ def _stop_process(*, process: subprocess.Popen[str]) -> None:
     except subprocess.TimeoutExpired:
         process.kill()
         process.wait(timeout=10)
-
-
-def _read_text(*, path: Path) -> str:
-    try:
-        return path.read_text(encoding="utf-8", errors="replace")
-    except FileNotFoundError:
-        return ""
 
 
 def _bounded_tail(*, value: str | None, limit: int) -> str:

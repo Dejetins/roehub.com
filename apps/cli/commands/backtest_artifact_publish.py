@@ -399,6 +399,12 @@ def _build_publish_use_case_v2(
         precompute_runner=precompute_runner,
         slot_publisher=slot_publisher,
         validation_spec=artifact_runtime_config.to_validation_spec(),
+        coordinate_validation=artifact_runtime_config.to_validation_spec,
+        coordinate_settings=lambda coordinates: (
+            artifact_runtime_config.to_precompute_runtime_settings(
+                config_sha256=artifact_config_hash, coordinates=coordinates,
+            )
+        ),
     )
 
 

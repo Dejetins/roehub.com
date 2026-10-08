@@ -19,6 +19,7 @@ from trading.contexts.backtest.application.dto import (
     BacktestTpSlRequestedGrid,
     BacktestValidationIssue,
 )
+from trading.contexts.backtest.application.dto.artifact_inputs import BacktestArtifactRuntimeContext
 from trading.contexts.backtest.application.ports.artifact_arrays import (
     BacktestArtifactArrayLoader,
 )
@@ -29,7 +30,6 @@ from trading.contexts.backtest.application.services.v2.preflight import (
 )
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
     HIT_TIMES_TIMEFRAME_LITERAL_V2,
-    ArtifactSlotPinnedRuntimeContextV2,
 )
 
 LOAD_HIT_TIMES_STAGE_NAME = "load_hit_times"
@@ -93,8 +93,12 @@ class BacktestTpSlHitTimesService:
         self,
         *,
         normalized_request: Mapping[str, Any],
-        context: ArtifactSlotPinnedRuntimeContextV2,
-    ) -> BacktestTpSlHitTimesResult:
+        context: BacktestArtifactRuntimeContext,
+    ) -> BacktestTpSlHitTimesResult | None:
+        risk = normalized_request.get("risk")
+        if isinstance(risk, Mapping) and risk.get("mode") == "none":
+            return None
+        _requested_grid_from_normalized(normalized_request)
         subsegments: dict[str, float] = {}
         load_wall_s = 0.0
         total_start = time.perf_counter()
@@ -124,9 +128,7 @@ class BacktestTpSlHitTimesService:
                 grid_arrays=grid_arrays,
             )
         except BacktestTpSlHitTimesRejected as error:
-            subsegments[TP_SL_GRID_VALIDATION_STAGE_NAME] = (
-                time.perf_counter() - validation_start
-            )
+            subsegments[TP_SL_GRID_VALIDATION_STAGE_NAME] = time.perf_counter() - validation_start
             subsegments[LOAD_HIT_TIMES_STAGE_NAME] = load_wall_s
             raise BacktestTpSlHitTimesRejected(
                 error_code=error.error_code,
@@ -146,7 +148,6 @@ class BacktestTpSlHitTimesService:
         try:
             table_arrays = self.artifact_array_loader.load_hit_times_table_arrays(
                 context=context,
-                manifest=grid_arrays.manifest,
             )
             hit_times = self.materialize_subset(
                 grid_arrays=grid_arrays,
@@ -170,6 +171,7 @@ class BacktestTpSlHitTimesService:
 
         return BacktestTpSlHitTimesResult(
             hit_times_manifest_hash=grid_arrays.manifest_hash,
+            hit_times_input_sha256=grid_arrays.input_identity_sha256,
             resolution=resolution,
             hit_times=hit_times,
             timing=BacktestTpSlHitTimesTiming(
@@ -255,14 +257,17 @@ class BacktestTpSlHitTimesService:
         table_arrays: BacktestTpSlHitTimesTableArrays,
         resolution: BacktestTpSlGridResolution,
     ) -> BacktestTpSlHitTimesSubset:
-        if table_arrays.manifest_hash != grid_arrays.manifest_hash:
-            raise ValueError("hit-times table manifest hash does not match grid manifest hash")
-        if table_arrays.manifest.path != grid_arrays.manifest.path:
-            raise ValueError("hit-times table manifest path does not match grid manifest path")
+        if table_arrays.input_identity_sha256 != grid_arrays.input_identity_sha256:
+            raise ValueError("hit-times table input identity does not match grid input identity")
+        for field in ("timeframe", "sentinel_index", "index_origin", "origin_utc", "end_utc"):
+            if getattr(table_arrays, field) != getattr(grid_arrays, field):
+                raise ValueError("hit-times grid/table logical domains differ")
+        if grid_arrays.index_origin != 0:
+            raise ValueError("hit-time indexes must retain the original zero origin")
         _validate_table_shapes(grid_arrays=grid_arrays, table_arrays=table_arrays)
         tp_indexes = resolution.tp_indexes
         sl_indexes = resolution.sl_indexes
-        sentinel_index = int(grid_arrays.manifest.sentinel_index)
+        sentinel_index = int(grid_arrays.sentinel_index)
         disabled_row = np.full((1, sentinel_index), sentinel_index, dtype=np.uint32)
         if resolution.requested_grid.tp_enabled:
             tp_values = np.ascontiguousarray(resolution.tp_values, dtype=np.float32)
@@ -364,6 +369,16 @@ def _percent_levels_from_range(value: Any, *, path: str) -> tuple[bool, tuple[fl
         raise _invalid_request(path, f"{path} must be a normalized range mapping")
     if value.get("enabled") is False:
         return False, (0.0,)
+    if "levels_pct" in value:
+        if any(key in value for key in ("start_pct", "stop_pct", "step_pct")):
+            raise _invalid_request(path, f"{path} must not combine explicit levels and a range")
+        raw = value["levels_pct"]
+        if not isinstance(raw, (list, tuple)) or not raw:
+            raise _invalid_request(path, f"{path}.levels_pct must be a nonempty list")
+        explicit_levels = tuple(float(_positive_decimal(item, path=path)) for item in raw)
+        if explicit_levels != tuple(sorted(set(explicit_levels))):
+            raise _invalid_request(path, f"{path}.levels_pct must be sorted and unique")
+        return True, explicit_levels
     start = _positive_decimal(value.get("start_pct"), path=f"{path}.start_pct")
     stop = _positive_decimal(value.get("stop_pct"), path=f"{path}.stop_pct")
     step = _positive_decimal(value.get("step_pct"), path=f"{path}.step_pct")
@@ -464,7 +479,7 @@ def _grid_evidence(
 ) -> BacktestTpSlGridEvidence:
     return BacktestTpSlGridEvidence(
         artifact_path=HIT_TIMES_ARTIFACT_PATH_V2,
-        timeframe=grid_arrays.manifest.timeframe,
+        timeframe=grid_arrays.timeframe,
         target_grid={
             "start_pct": TARGET_TP_SL_GRID_START_PCT,
             "stop_pct": TARGET_TP_SL_GRID_STOP_PCT,
@@ -520,16 +535,19 @@ def _has_exact_one_match(
     tolerance: float,
 ) -> bool:
     decimal_level = np.float32(float(Decimal(str(pct)) / Decimal("100")))
-    return int(
-        np.flatnonzero(
-            np.isclose(
-                np.asarray(artifact_levels, dtype=np.float32),
-                decimal_level,
-                rtol=0.0,
-                atol=tolerance,
-            )
-        ).size
-    ) == 1
+    return (
+        int(
+            np.flatnonzero(
+                np.isclose(
+                    np.asarray(artifact_levels, dtype=np.float32),
+                    decimal_level,
+                    rtol=0.0,
+                    atol=tolerance,
+                )
+            ).size
+        )
+        == 1
+    )
 
 
 def _artifact_axis_evidence(values: np.ndarray) -> dict[str, Any]:
@@ -553,7 +571,7 @@ def _validate_table_shapes(
     grid_arrays: BacktestTpSlHitTimesGridArrays,
     table_arrays: BacktestTpSlHitTimesTableArrays,
 ) -> None:
-    sentinel = int(grid_arrays.manifest.sentinel_index)
+    sentinel = int(grid_arrays.sentinel_index)
     expected_tp = (int(grid_arrays.tp_values.shape[0]), sentinel)
     expected_sl = (int(grid_arrays.sl_values.shape[0]), sentinel)
     if tuple(int(value) for value in table_arrays.long_tp.shape) != expected_tp:

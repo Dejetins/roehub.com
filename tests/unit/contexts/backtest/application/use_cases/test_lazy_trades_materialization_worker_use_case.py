@@ -150,6 +150,7 @@ class _MaterializationRepository:
         owner_user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         cache_status: str,
         cache_path: str | None,
     ) -> BacktestLazyTradesMaterializationTask | None:
@@ -175,6 +176,7 @@ class _MaterializationRepository:
         owner_user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         last_error: str,
         last_error_json: Mapping[str, Any],
     ) -> BacktestLazyTradesMaterializationTask | None:
@@ -272,6 +274,7 @@ class _LazyTradesChildExecutor:
         self,
         *,
         task: BacktestLazyTradesMaterializationTask,
+        cancel_event: Any = None,
     ) -> BacktestLazyTradesMaterializationExecutionResult:
         self.calls = (*self.calls, task.task_id)
         if self.raise_error is not None:

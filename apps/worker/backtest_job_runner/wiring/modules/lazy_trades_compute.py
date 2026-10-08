@@ -3,16 +3,22 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Mapping
 
+from apps.api.wiring.modules.indicators import (
+    build_artifact_precompute_indicators_compute,
+    build_indicators_registry,
+)
 from trading.contexts.backtest.adapters.outbound import (
     DEFAULT_LAZY_TRADES_CACHE_ROOT,
     BacktestArtifactPathBuilderV2,
     LocalFileBacktestLazyTradesCache,
     YamlBacktestGridDefaultsProvider,
+    build_backtest_artifacts_runtime_config_hash,
     load_backtest_artifacts_runtime_config,
     resolve_backtest_artifacts_config_path,
 )
 from trading.contexts.backtest.adapters.outbound.artifacts_fs import (
     FilesystemBacktestArtifactArrayLoader,
+    FilesystemBacktestArtifactContextResolver,
 )
 from trading.contexts.backtest.application.services.v2.lazy_trades_detail import (
     DEFAULT_LAZY_TRADES_CACHE_TTL_SECONDS,
@@ -28,6 +34,16 @@ from trading.contexts.backtest.application.services.v2.tp_sl_hit_times import (
 from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_loader import (
     YamlBacktestArtifactLoaderV2,
 )
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_validator import (  # noqa: E501
+    BacktestArtifactManifestValidatorV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_precompute_runner import (
+    BacktestArtifactPrecomputeRunnerV2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.signal_rules_engine_v2 import (
+    BacktestSignalRulesEngineV2,
+)
+from trading.contexts.indicators.application.services import GridBuilder
 
 
 def build_lazy_trades_compute_service(
@@ -48,6 +64,26 @@ def build_lazy_trades_compute_service(
         defaults_provider=defaults_provider,
     )
     return BacktestLazyTradesDetailService(
+        source_resolver=FilesystemBacktestArtifactContextResolver(artifact_loader=artifact_loader),
+        input_validator=BacktestArtifactManifestValidatorV2(artifact_loader=artifact_loader),
+        derivative_builder=BacktestArtifactPrecomputeRunnerV2(
+            runtime_settings=artifact_config.to_precompute_runtime_settings(
+                config_sha256=build_backtest_artifacts_runtime_config_hash(config=artifact_config)
+            ),
+            artifact_loader=artifact_loader,
+            defaults_provider=defaults_provider,
+            signal_rules_engine=BacktestSignalRulesEngineV2(defaults_provider=defaults_provider),
+            indicator_compute=build_artifact_precompute_indicators_compute(
+                environ=environ,
+                artifact_config_path=Path(artifact_config_path),
+            ),
+            indicator_grid_builder=GridBuilder(
+                registry=build_indicators_registry(
+                    environ=environ,
+                    artifact_config_path=Path(artifact_config_path),
+                )
+            ),
+        ),
         prepare_pools=prepare_pools,
         tp_sl_hit_times=BacktestTpSlHitTimesService(artifact_array_loader=artifact_array_loader),
         cache=LocalFileBacktestLazyTradesCache(

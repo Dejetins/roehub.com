@@ -1,0 +1,1179 @@
+{
+  "schema_version": "s07-production-proof/v1",
+  "stage": "S07",
+  "executor": "codex-s07-20261008-c742ab91",
+  "head": "6d7f0a31fa7225f34df816a917ca93a57fb564c3",
+  "proof_boundary": "Local actual HTTP/server, production subprocess, NPY/native numerical, disposable PostgreSQL correctness and ownership. No deployment/performance/full mixed-checkout green CI claim.",
+  "owned_sources": [
+    {
+      "path": "apps/api/dto/backtests.py",
+      "before_sha256": "e7119eafa9f18c3692e373ebc55ca9b843c41d72ec6c2c45e2c0336998668d46",
+      "after_sha256": "7a5ae28406bf71af5004219be1a533a4cf7507434346b5702b16d7a6eda5b879"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/prepare_pools.py",
+      "before_sha256": "5ce60180164149c624d2e2818a3b010b1344728a1410dd8544c351762af43e5d",
+      "after_sha256": "91d476921d91fd7c9192ff8079c767fffaa2b7e0a4f7484692593e2921990e46"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/job_orchestration.py",
+      "before_sha256": "71b5ed07738888c846141482327545b594ed96bf43918fd0a639161a7e5ff877",
+      "after_sha256": "b1fba472b2f0def9e7e41c4556c4d925b005be6b5e583015c4ca69e6f5acedd2"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py",
+      "before_sha256": "d0c810f23242492423cae2490cc9625226a7867c9c9c2bf879f733e22074edb0",
+      "after_sha256": "d760527ac8c4b298bcbec1a9db0faf54cba1cdda86979f002c5a5647483b924c"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/preflight.py",
+      "before_sha256": "5eacdb08c655dbee21f8e7d3de9d0932402690456cfcee89e51ab3dc66be66b2",
+      "after_sha256": "1dd00751bec0409b717896342a184a803f2cb3de31f920aa4ea189e03c9727e3"
+    },
+    {
+      "path": "tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+      "before_sha256": "c6c374d67e708507e77b64a08c69d91e17644628f6a740aa61cfe6774589ed08",
+      "after_sha256": "b4de5ebfcfe04043f84f494e486c57e2d383679114b652b6041ba9bfe0401770"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py",
+      "before_sha256": "f2582e4b5321a8dc743e22f24be658097b7a9e46f7128e2209d211620b83f286",
+      "after_sha256": "91ad540ee724e4e211d85e3406028752c04178df4a70074b665afcffea60dba3"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/adapters/outbound/artifacts_fs/test_artifact_array_loader.py",
+      "before_sha256": "9fee2fa472fbbec0d27385a57b8e96e9eb38ec1d3ca91c9cea51e4a5eb108317",
+      "after_sha256": "f619a3822104981abad107190a63d1b3e8b74201012261ad1d54e1e25ab44af6"
+    }
+  ],
+  "source_comparison": {
+    "stage_entry_inventory": {
+      "path": "/tmp/roehub-npy-s07-c742ab91/initial-hashes.json",
+      "sha256": "de45d4be59b183bf4632923fe68da9ee4e8d28d890088fd472aa1531d27c089a",
+      "bytes": 762378
+    },
+    "changed_non_cache_paths": [
+      "apps/api/dto/backtests.py",
+      "src/trading/contexts/backtest/application/services/v2/job_orchestration.py",
+      "src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py",
+      "src/trading/contexts/backtest/application/services/v2/preflight.py",
+      "src/trading/contexts/backtest/application/services/v2/prepare_pools.py",
+      "tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+      "tests/unit/contexts/backtest/adapters/outbound/artifacts_fs/test_artifact_array_loader.py",
+      "tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py"
+    ],
+    "foreign_changes_since_entry": [],
+    "excludes": "regenerated .cache files; updater-owned pack state and this stage report/evidence"
+  },
+  "checks": [
+    {
+      "name": "backtest-artifacts",
+      "command": "uv run --no-sync pytest -q -ra tests/unit/contexts/backtest_artifacts tests/unit/contexts/backtest/adapters/outbound/cache_fs tests/unit/contexts/backtest/adapters/outbound/artifacts_fs tests/unit/contexts/backtest/adapters/test_backtest_artifacts_runtime_config.py tests/unit/contexts/backtest/adapters/test_indicators_yaml_defaults_provider.py tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py tests/unit/contexts/backtest/application/services/v2/test_yaml_backtest_artifact_loader_v2.py tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py tests/unit/apps/cli/test_backtest_artifact_publish_cli.py tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py",
+      "threads": "1",
+      "exit_code": 0,
+      "scope": "live affected CI shard",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/backtest-artifacts-final.log",
+        "sha256": "48eee81cf1309e6276b0b07fce3f39601bef939ff7f94402c112f8f7b9190856",
+        "bytes": 261
+      }
+    },
+    {
+      "name": "backtest-scoring",
+      "command": "uv run --no-sync pytest -q -ra tests/unit/contexts/backtest/application/services/v2/test_cost_permutation.py tests/unit/contexts/backtest/application/services/v2/test_local_top_k.py tests/unit/contexts/backtest/application/services/v2/test_integer_trade_tape.py tests/unit/contexts/backtest/application/services/v2/test_prefix_guard.py tests/unit/contexts/backtest/application/services/v2/test_bitsets.py tests/unit/contexts/backtest/application/services/v2/test_row_signatures.py tests/unit/contexts/backtest/application/services/v2/test_result_candles.py tests/unit/contexts/backtest/application/services/test_signals_from_indicators_v1.py tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py tests/unit/scripts/backtest tests/unit/contexts/backtest/application/services/v2/test_combo_planning_service.py tests/unit/contexts/backtest/application/services/v2/test_hit_times_compute_v2.py tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py tests/unit/contexts/backtest/application/services/v2/test_lazy_trades_detail_service.py tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py tests/unit/contexts/backtest/application/services/v2/test_short_and_tp_sl_ranking.py tests/unit/contexts/backtest/application/services/v2/test_signal_rules_engine_v2.py tests/unit/contexts/backtest/application/services/v2/test_top_result_assembly.py tests/unit/contexts/backtest/application/services/v2/test_tp_sl_exact_scoring_service.py tests/unit/contexts/backtest/application/services/v2/test_tp_sl_hit_times_service.py",
+      "threads": "12",
+      "exit_code": 0,
+      "scope": "live affected CI shard",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/backtest-scoring-final.log",
+        "sha256": "280375ea05fcbc2df91b1fc8471727dae09f254986f74d7d9004b13d02e83c37",
+        "bytes": 1462
+      }
+    },
+    {
+      "name": "backtest-use-cases",
+      "command": "uv run --no-sync pytest -q -ra tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py tests/unit/contexts/backtest/application/use_cases/test_lazy_trades_materialization_worker_use_case.py tests/unit/apps/api/test_backtests_routes.py tests/unit/apps/api/test_ui_backtests_routes.py tests/unit/apps/worker/backtest_job_runner tests/unit/apps/worker/test_backtest_job_runner.py",
+      "threads": "1",
+      "exit_code": 0,
+      "scope": "live affected CI shard",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/backtest-use-cases-final.log",
+        "sha256": "8ec2349be9115235e069f3adc0c2e3d20805e5d5576942365ac16ba99731c502",
+        "bytes": 261
+      }
+    },
+    {
+      "name": "backtest-domain",
+      "command": "uv run --no-sync pytest -q -ra tests/unit/contexts/backtest/adapters/outbound/test_postgres_research_organization_scope.py tests/unit/contexts/backtest/application/services/test_organization_scoped_market_data.py tests/unit/contexts/backtest/application/services/test_research_identity.py tests/unit/contexts/backtest/application/test_backtest_errors.py tests/unit/contexts/backtest/application/services/v2/test_admission.py tests/unit/contexts/backtest/application/services/v2/test_backtest_preflight_service.py tests/unit/contexts/backtest/domain",
+      "threads": "1",
+      "exit_code": 0,
+      "scope": "live affected CI shard",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/backtest-domain-final.log",
+        "sha256": "069633302dc1c6eea26076fe57ef6679b67edd49c56ff8e4e29b53c3068805d7",
+        "bytes": 99
+      }
+    },
+    {
+      "name": "ruff",
+      "command": "uv run ruff check apps/api/dto/backtests.py src/trading/contexts/backtest/application/services/v2/prepare_pools.py src/trading/contexts/backtest/application/services/v2/job_orchestration.py src/trading/contexts/backtest/application/services/v2/lazy_trades_detail.py src/trading/contexts/backtest/application/services/v2/preflight.py tests/real_infra/backtest/test_artifact_input_lifecycle.py tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py",
+      "exit_code": 1,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/ruff.log",
+        "sha256": "48daba8cc04d9804c6665786f94aaccf6cbe0193e37f7ba67c183675a2ac4e69",
+        "bytes": 688
+      }
+    },
+    {
+      "name": "pyright",
+      "command": "uv run pyright",
+      "exit_code": 1,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/pyright.log",
+        "sha256": "428bf193359e62adaedaae58f0e226aabd32aeebb118ce5ed60636312b972017",
+        "bytes": 1390
+      }
+    },
+    {
+      "name": "tools.docs.generate_docs_index",
+      "command": "uv run python -m tools.docs.generate_docs_index --check",
+      "exit_code": 0,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/tools.docs.generate_docs_index.log",
+        "sha256": "401ab7824560aed6da162e0f88076ac89f8ca62bb69b00b739e0ae679b23326f",
+        "bytes": 90
+      }
+    },
+    {
+      "name": "tools.docs.generate_project_map",
+      "command": "uv run python -m tools.docs.generate_project_map --check",
+      "exit_code": 1,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/tools.docs.generate_project_map.log",
+        "sha256": "8292b259bfd8e3759e85e5150285af600608e1ee9c0902a70758a51f7b939f5e",
+        "bytes": 170
+      }
+    },
+    {
+      "name": "tools.docs.generate_runbooks",
+      "command": "uv run python -m tools.docs.generate_runbooks --check",
+      "exit_code": 0,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/tools.docs.generate_runbooks.log",
+        "sha256": "81897f702a64f6f2c6e6ec82b5b51bd328092a1bb03a0ca3877e022d709f7984",
+        "bytes": 54
+      }
+    },
+    {
+      "name": "tools.artifacts.generate_schemas",
+      "command": "uv run python -m tools.artifacts.generate_schemas --check",
+      "exit_code": 0,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/tools.artifacts.generate_schemas.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    {
+      "name": "tools.backup.generate_schemas",
+      "command": "uv run python -m tools.backup.generate_schemas --check",
+      "exit_code": 0,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/tools.backup.generate_schemas.log",
+        "sha256": "64745fcc631a9a26268a4d1b4f3a1157a5b3a3d9d937bea8f34ead3c82e7db27",
+        "bytes": 34
+      }
+    },
+    {
+      "name": "tools.jobs.generate_schemas",
+      "command": "uv run python -m tools.jobs.generate_schemas --check",
+      "exit_code": 0,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/tools.jobs.generate_schemas.log",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "bytes": 0
+      }
+    },
+    {
+      "name": "generate_runtime_topology",
+      "command": "uv run python tools/release/generate_runtime_topology.py --check",
+      "exit_code": 0,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/generate_runtime_topology.log",
+        "sha256": "435e28ce8aa4a86fc264a8faeb548a4cf1a443ae3c3663e674a1ccf9e0a30d9d",
+        "bytes": 73
+      }
+    },
+    {
+      "name": "runtime_input_inventory",
+      "command": "uv run python tools/release/runtime_input_inventory.py --check",
+      "exit_code": 1,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/runtime_input_inventory.log",
+        "sha256": "2a713bd02875e920b36e12b0ff43fc7ddbb7c7380708925f7de7d828642308e4",
+        "bytes": 226
+      }
+    },
+    {
+      "name": "oss_metadata",
+      "command": "uv run python tools/release/oss_metadata.py --check",
+      "exit_code": 1,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/oss_metadata.log",
+        "sha256": "5eb031a68bfa648ab9d44955b3005fd978adf1e36b60981bcd96794e8e23d707",
+        "bytes": 3156
+      }
+    },
+    {
+      "name": "client",
+      "command": "pnpm --filter @roehub/platform-web test",
+      "exit_code": 0,
+      "scope": "live initial static/client run; final ruff/pyright supersede initial failures",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/client.log",
+        "sha256": "ebf3982e514cb798806e14a67186d8eb3dad52d16209d0f619b7ebab751e8365",
+        "bytes": 245
+      }
+    },
+    {
+      "name": "backtest-use-cases",
+      "command": "uv run --no-sync pytest -q -ra tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py tests/unit/contexts/backtest/application/use_cases/test_lazy_trades_materialization_worker_use_case.py tests/unit/apps/api/test_backtests_routes.py tests/unit/apps/api/test_ui_backtests_routes.py tests/unit/apps/worker/backtest_job_runner tests/unit/apps/worker/test_backtest_job_runner.py",
+      "threads": "1",
+      "exit_code": 0,
+      "scope": "live final API/use-case shard"
+    },
+    {
+      "label": "runtime",
+      "argv": [
+        "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python",
+        "tools/release/runtime_input_inventory.py",
+        "--check"
+      ],
+      "cwd": "/tmp/roehub-npy-s07-c742ab91/scoped-source",
+      "exit_code": 0,
+      "scope": "external HEAD plus scoped pack and explicit mixed test prerequisites"
+    },
+    {
+      "label": "oss",
+      "argv": [
+        "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python",
+        "tools/release/oss_metadata.py",
+        "--check"
+      ],
+      "cwd": "/tmp/roehub-npy-s07-c742ab91/scoped-source",
+      "exit_code": 0,
+      "scope": "external HEAD plus scoped pack and explicit mixed test prerequisites"
+    },
+    {
+      "label": "map",
+      "argv": [
+        "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python",
+        "-m",
+        "tools.docs.generate_project_map",
+        "--check"
+      ],
+      "cwd": "/tmp/roehub-npy-s07-c742ab91/scoped-source",
+      "exit_code": 0,
+      "scope": "external HEAD plus scoped pack and explicit mixed test prerequisites"
+    },
+    {
+      "label": "topology",
+      "argv": [
+        "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python",
+        "tools/release/generate_runtime_topology.py",
+        "--check"
+      ],
+      "cwd": "/tmp/roehub-npy-s07-c742ab91/scoped-source",
+      "exit_code": 0,
+      "scope": "external HEAD plus scoped pack and explicit mixed test prerequisites"
+    },
+    {
+      "name": "runtime-inventory",
+      "command": "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python tools/release/runtime_input_inventory.py --check",
+      "exit_code": 0,
+      "scope": "external exact HEAD"
+    },
+    {
+      "name": "oss",
+      "command": "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python tools/release/oss_metadata.py --check",
+      "exit_code": 0,
+      "scope": "external exact HEAD"
+    },
+    {
+      "name": "map",
+      "command": "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python -m tools.docs.generate_project_map --check",
+      "exit_code": 0,
+      "scope": "external exact HEAD"
+    },
+    {
+      "verified_source_files": 4690,
+      "cache_bytes": "current regenerated bytes; original filenames preserved; non-source cache excluded from hash equivalence",
+      "checks": [
+        {
+          "name": "runtime-inventory",
+          "command": "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python tools/release/runtime_input_inventory.py --check",
+          "exit_code": 1
+        },
+        {
+          "name": "oss",
+          "command": "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python tools/release/oss_metadata.py --check",
+          "exit_code": 1
+        },
+        {
+          "name": "map",
+          "command": "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python -m tools.docs.generate_project_map --check",
+          "exit_code": 1
+        }
+      ],
+      "scope": "reconstructed pre-S07 source"
+    },
+    {
+      "command": "ROEHUB_BACKTEST_TEST_DSN='host=127.0.0.1 port=54407 dbname=s07 user=postgres' uv run pytest -q tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "48 passed; zero skips",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/postgres-security-final.log",
+        "sha256": "d402e2f3db4d9cc3d6ca94ca4e25a94aaf308487928868a6cdad0f131965c659",
+        "bytes": 110
+      }
+    },
+    {
+      "command": "uv run pytest -q tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py -k independent_financial --maxfail=1",
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "72 passed, 24 deselected",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/c03-final-second.log",
+        "sha256": "1bcdeb4e88946c54a699fb896f3c3b3f7062a2736b2efd1c2f8a817714aac373",
+        "bytes": 115
+      }
+    },
+    {
+      "command": "uv run pytest -q tests/unit/contexts/backtest/adapters/outbound/artifacts_fs/test_artifact_array_loader.py",
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "27 passed",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/sparse-final.log",
+        "sha256": "6f96b201a151d5fe51b402c583e801e0bec559e6849a7fe7088bba46e9fd279c",
+        "bytes": 99
+      }
+    },
+    {
+      "command": "uv run pytest -q tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py tests/unit/contexts/backtest/application/services/v2/test_input_recipe_contracts.py tests/unit/contexts/backtest/application/services/v2/test_input_recipe_replay.py tests/unit/apps/migrations tests/unit/tools/test_generate_installation_config.py tests/unit/tools/test_generate_runtime_topology.py",
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "216 passed; prior60 financial cases; final72 supersedes",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/extra-focused.log",
+        "sha256": "5ef4c847dcb0526323eadd3c802f3796e371a5f577749c0105497204681117bd",
+        "bytes": 261
+      }
+    },
+    {
+      "command": "xargs uv run ruff check < /tmp/roehub-npy-s07-c742ab91/owned.txt",
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "All checks passed",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/ruff-security-final.log",
+        "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+        "bytes": 19
+      }
+    },
+    {
+      "command": "uv run pyright",
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "0 errors, 0 warnings",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/pyright-security-final.log",
+        "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+        "bytes": 191
+      }
+    },
+    {
+      "command": "PYTHONPATH=/tmp/roehub-npy-s01-8ea794cf/baseline/src:/tmp/roehub-npy-s01-8ea794cf/baseline uv run python /tmp/roehub-npy-s07-c742ab91/baseline-financial.py",
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "independent frozen source top8 and selfcheck",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/baseline-financial.log",
+        "sha256": "22d83eb00607041ba3c4bf4720a168f06a79dc126ef6819288eb8fe6cac34f0f",
+        "bytes": 31
+      }
+    },
+    {
+      "command": "uv run python /tmp/roehub-npy-s07-c742ab91/c01-financial-proof.py",
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "N/G/M exact input arrays and full top8 subsets within existing1e-5",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/c01-financial-final.log",
+        "sha256": "f3d3995f28a55ea4aea5fa107a93fcb3b8d4dabeac08a160abb37e2c003186c3",
+        "bytes": 1477
+      }
+    },
+    {
+      "command": "uv run python -m tools.ci.route_changes ci --changed-files /tmp/roehub-npy-s07-c742ab91/owned.txt",
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "four shards and migrations",
+      "log": {
+        "path": "/tmp/roehub-npy-s07-c742ab91/ci-route-final-current.log",
+        "sha256": "1d600690232f92f5e6e297e611aa42374390eb25b68123d8ff635f29d0af88b5",
+        "bytes": 3853
+      }
+    }
+  ],
+  "external_artifacts": [
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/api-dto-before.py",
+      "sha256": "e7119eafa9f18c3692e373ebc55ca9b843c41d72ec6c2c45e2c0336998668d46",
+      "bytes": 10241
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/api-first.log",
+      "sha256": "e8bf522a07be48f68d5ea6c46e0eeaa06cf34f156b1ec131b7837837440e7cdd",
+      "bytes": 114
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/api-race-final.log",
+      "sha256": "d9717b9c3940147a2611c9a050c056e0620d1774236e159e117938a84779cf85",
+      "bytes": 84766
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/api-race-fourth.log",
+      "sha256": "2daf124b009fb8e540adaef32aa83b1385643085f795f1228478204514300c6a",
+      "bytes": 115
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/api-race.log",
+      "sha256": "a17da8110536122822883cc25509ae63e918ba590aa9f2166ad39665aa8e35d8",
+      "bytes": 21462
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/api-second.log",
+      "sha256": "859acda1eda0a51b9bfc13ef9e1ecbb82febfe49c2846dea9c35077aabad3a1c",
+      "bytes": 71527
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/api-third.log",
+      "sha256": "184ff00f08cbfff1b790b5104ebc8de14f72a5a3694e6ef6cb0f39658b63846a",
+      "bytes": 69578
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/array-loader-test-before.py",
+      "sha256": "9fee2fa472fbbec0d27385a57b8e96e9eb38ec1d3ca91c9cea51e4a5eb108317",
+      "bytes": 25952
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/backtest-artifacts-final.log",
+      "sha256": "48eee81cf1309e6276b0b07fce3f39601bef939ff7f94402c112f8f7b9190856",
+      "bytes": 261
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/backtest-artifacts.log",
+      "sha256": "46f561af771947cfb00b8e70331aa542b9b8e5dd6283ef5b1b188626113592ad",
+      "bytes": 31867
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/backtest-domain-final.log",
+      "sha256": "069633302dc1c6eea26076fe57ef6679b67edd49c56ff8e4e29b53c3068805d7",
+      "bytes": 99
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/backtest-domain.log",
+      "sha256": "93e827ced81853a505f1e7657abb02597957db7cbd9ee0126ca1189418d3e291",
+      "bytes": 99
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/backtest-scoring-final.log",
+      "sha256": "280375ea05fcbc2df91b1fc8471727dae09f254986f74d7d9004b13d02e83c37",
+      "bytes": 1462
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/backtest-scoring.log",
+      "sha256": "905d56bc1d72ba92d1e4b9a2de0b4de44a46d3ff806d913f921e65ec5562539d",
+      "bytes": 1462
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/backtest-use-cases-final.log",
+      "sha256": "8ec2349be9115235e069f3adc0c2e3d20805e5d5576942365ac16ba99731c502",
+      "bytes": 261
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/backtest-use-cases-security.log",
+      "sha256": "9deec8d20f85918addfb3692898b1cd92590ac87e028b2d926237f46eea77bd8",
+      "bytes": 261
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/backtest-use-cases.log",
+      "sha256": "bd499e9052c147f03285f9580712413b59c99899f437b138cf3417eb8b902262",
+      "bytes": 261
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/baseline-financial.json",
+      "sha256": "c440ccc574120a487b770bae8e27d5c83f28804099031911a0f1d368f6c7fe28",
+      "bytes": 15667
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/baseline-financial.log",
+      "sha256": "22d83eb00607041ba3c4bf4720a168f06a79dc126ef6819288eb8fe6cac34f0f",
+      "bytes": 31
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/baseline-financial.py",
+      "sha256": "d437b51b728af3f0222ee2223c423b2febed22d5154e8cdeb62a9bdea8ada6ec",
+      "bytes": 3568
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/baseline-gates.py",
+      "sha256": "c5663f124dd09fb348606892d800b23b682c8ebd845ca611b677406b8edd536a",
+      "bytes": 1667
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/build-snapshot.py",
+      "sha256": "4a4fe2224a4e1627edf4eb1d0bff098b3378a5af47dbcc8afe2b2398f750f3b6",
+      "bytes": 2607
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c01-financial-debug.log",
+      "sha256": "53c8e9cc1091272a52b4a230cf17322fc894669a82fe3ffbb4a724f44000d5c3",
+      "bytes": 3283
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c01-financial-final.log",
+      "sha256": "f3d3995f28a55ea4aea5fa107a93fcb3b8d4dabeac08a160abb37e2c003186c3",
+      "bytes": 1477
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c01-financial-proof.py",
+      "sha256": "4a65c73de5bce98f69906d774a851bdc8529744907f1d31c0ae265a5ba107252",
+      "bytes": 8107
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c01-financial.log",
+      "sha256": "e977ba90d51d1666ff80f13d89e81f31d862e7ab41f2693c5cb9e53a8ff42772",
+      "bytes": 365
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c01-first.log",
+      "sha256": "d46e1ed3b6e619f25b13d184f6049b8bef718d7f7bac6a352daa72cb826c701b",
+      "bytes": 2066
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c01-proof.py",
+      "sha256": "43de4cd7232931868f6ae27d5aa08d0acca89e0bbf9bb4b1d4987a8d85e0e099",
+      "bytes": 6661
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c01-second.log",
+      "sha256": "08b7f884b7a6663f75d5f5e46229ec8094bc97ea7a3bfd18cd1a322f2f3b22a7",
+      "bytes": 700
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c01-third.log",
+      "sha256": "234d2bb7aadf6e6b245005b8672832e90ba4965c3f7ffc9333ff7cffde31d054",
+      "bytes": 663
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c03-final-second.log",
+      "sha256": "1bcdeb4e88946c54a699fb896f3c3b3f7062a2736b2efd1c2f8a817714aac373",
+      "bytes": 115
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c03-final.log",
+      "sha256": "daaaa74aea4cb53de1649fe3adbd69144bb26defc625c45b6ca3a2ecdebd9d06",
+      "bytes": 9054
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c03-first.log",
+      "sha256": "2df81dc8bd218917fe5c3bb7b8d71d15a1217c57a33f40843acae87de6d1ea7d",
+      "bytes": 5933
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c03-frozen.log",
+      "sha256": "32021c1b2ba8310e9310e84c070f7c02699b3e744b18838d3f0680532a9bedd0",
+      "bytes": 174
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c03-funding.log",
+      "sha256": "9a68ae2c9359e4b5bcda74386e12133d65149ed0b47e8155340e32f51f3f0157",
+      "bytes": 115
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c03-second.log",
+      "sha256": "a89ecb84143f75951345de51b414c16951a75eeb9d63be4d69cd63f75fcfbb48",
+      "bytes": 6387
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c03-third.log",
+      "sha256": "b176c5a83d6af01e286207e03a489477fb671753710efbc1e1107e85f7c156c2",
+      "bytes": 115
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/ci-route-final-current.log",
+      "sha256": "1d600690232f92f5e6e297e611aa42374390eb25b68123d8ff635f29d0af88b5",
+      "bytes": 3853
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/ci-route-final.log",
+      "sha256": "1d600690232f92f5e6e297e611aa42374390eb25b68123d8ff635f29d0af88b5",
+      "bytes": 3853
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/ci-route.log",
+      "sha256": "598a2b336ceccb4f3fad31afb6d4e8819fe03f11e9ebccfa25edfa11487a0710",
+      "bytes": 3854
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/cleanup-final.json",
+      "sha256": "5eeb0553a4ae72f645a5760d82dd35d7d9d66d8d7ba53c8c6e968f7c384cf48a",
+      "bytes": 1051
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/client.log",
+      "sha256": "ebf3982e514cb798806e14a67186d8eb3dad52d16209d0f619b7ebab751e8365",
+      "bytes": 245
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/derived-before.py",
+      "sha256": "f2582e4b5321a8dc743e22f24be658097b7a9e46f7128e2209d211620b83f286",
+      "bytes": 26205
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/extra-focused.log",
+      "sha256": "5ef4c847dcb0526323eadd3c802f3796e371a5f577749c0105497204681117bd",
+      "bytes": 261
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/generate_runtime_topology.log",
+      "sha256": "435e28ce8aa4a86fc264a8faeb548a4cf1a443ae3c3663e674a1ccf9e0a30d9d",
+      "bytes": 73
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/head-map.log",
+      "sha256": "a5b0d36c3de1bb75f8df3058cad1f15075d594ffbb87dcb9db9b3dd2589a68bf",
+      "bytes": 41
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/head-oss.log",
+      "sha256": "42dde38e6d6a3ff43f1b2fb5ded385a4d2f5e4b6b3a513e91f7dc88061af96e9",
+      "bytes": 56
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/head-results.json",
+      "sha256": "92f4d0368d62714bd4e1d8957926c3169260a9ecaf1a4f854694030a30aca273",
+      "bytes": 521
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/head-runtime-inventory.log",
+      "sha256": "7972f6be5edc28f1f4df6c376b3670fc3ce5d5795f08350744e4b12190bddc40",
+      "bytes": 54
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/import-after.log",
+      "sha256": "3cab9a51aa4562b407ffe8c1f0fb492b3a9fa99944839ab3ec83ca309671d3bd",
+      "bytes": 3629
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/import-after2.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/import-before.log",
+      "sha256": "2e8554e31518fc414acd300d2a2d1fa0b573b7de54a636050546f5e17921071b",
+      "bytes": 2988
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/initial-hashes.json",
+      "sha256": "de45d4be59b183bf4632923fe68da9ee4e8d28d890088fd472aa1531d27c089a",
+      "bytes": 762378
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/initial-status.txt",
+      "sha256": "a32b54fc04a0bcb18a830ca6819df292dd829f97ef1ceb5cf1d392061e102466",
+      "bytes": 10955
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/job_orchestration-before.py",
+      "sha256": "71b5ed07738888c846141482327545b594ed96bf43918fd0a639161a7e5ff877",
+      "bytes": 41354
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/lazy_trades_detail-before.py",
+      "sha256": "d0c810f23242492423cae2490cc9625226a7867c9c9c2bf879f733e22074edb0",
+      "bytes": 61268
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/lifecycle-before.py",
+      "sha256": "c6c374d67e708507e77b64a08c69d91e17644628f6a740aa61cfe6774589ed08",
+      "bytes": 80936
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/oss_metadata.log",
+      "sha256": "5eb031a68bfa648ab9d44955b3005fd978adf1e36b60981bcd96794e8e23d707",
+      "bytes": 3156
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/owned.txt",
+      "sha256": "c28772a77a79412c455cf7ab46504b98e74e73949e83d2a448b141db62f23f70",
+      "bytes": 558
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pack-owned.txt",
+      "sha256": "121191a205ad7c508e8ca38c33904c32342bb66e5f2eae151237c40d31eb0cd4",
+      "bytes": 6543
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/postgres-final.log",
+      "sha256": "445161c781014d3f06814afb2434cea24e80c56269cf5a9b70c6868585d44471",
+      "bytes": 110
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/postgres-security-final.log",
+      "sha256": "d402e2f3db4d9cc3d6ca94ca4e25a94aaf308487928868a6cdad0f131965c659",
+      "bytes": 110
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/postgres-security.log",
+      "sha256": "96bfa025f3fc9648a829bd45e0a67710258be577efcf466515701657c6ddd281",
+      "bytes": 345740
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pre-s07-gates.py",
+      "sha256": "8cf9f930cc080fba3fcbb80fa34f11b6227f0a682d36c04ce0469d7afbb67ab2",
+      "bytes": 2109
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pre-s07-map.log",
+      "sha256": "8292b259bfd8e3759e85e5150285af600608e1ee9c0902a70758a51f7b939f5e",
+      "bytes": 170
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pre-s07-oss.log",
+      "sha256": "5eb031a68bfa648ab9d44955b3005fd978adf1e36b60981bcd96794e8e23d707",
+      "bytes": 3156
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pre-s07-results.json",
+      "sha256": "79c9acb454e12b5bcc7276cda151a7dc12c40d69fc7d296b7472e667d9a07f04",
+      "bytes": 727
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pre-s07-runtime-inventory.log",
+      "sha256": "dd64a596fe3f1776ca134b96d30b88a1bfe3a33c44b3094e84476ca6ed7077d8",
+      "bytes": 235
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/preflight-before.py",
+      "sha256": "5eacdb08c655dbee21f8e7d3de9d0932402690456cfcee89e51ab3dc66be66b2",
+      "bytes": 72493
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/prepare_pools-before.py",
+      "sha256": "5ce60180164149c624d2e2818a3b010b1344728a1410dd8544c351762af43e5d",
+      "bytes": 50266
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pyright-delivery.log",
+      "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+      "bytes": 191
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pyright-final-current.log",
+      "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+      "bytes": 191
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pyright-final.log",
+      "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+      "bytes": 191
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pyright-security-final.log",
+      "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+      "bytes": 191
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pyright-security.log",
+      "sha256": "3ad2d843353727d542e7367b203d155ef69e68c7e533e1a57e7c5f8a2337fa84",
+      "bytes": 191
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/pyright.log",
+      "sha256": "428bf193359e62adaedaae58f0e226aabd32aeebb118ce5ed60636312b972017",
+      "bytes": 1390
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/race-second.log",
+      "sha256": "8f5dc2d49ac88f105d36427934a52bfbdcf3b4786e6ff2a6cff63432dcc080c0",
+      "bytes": 11157
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/review-final.json",
+      "sha256": "1e9e1c52d7261648037d0fd9ed324a9b63e6200b81cc9131fd5ea40e3ee71855",
+      "bytes": 1328
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/ruff-delivery.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "bytes": 19
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/ruff-final-current.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "bytes": 19
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/ruff-final.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "bytes": 19
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/ruff-first.log",
+      "sha256": "c5ac32dc9c727a86766b7f951ac99f48b4bcedec71f61f68f1f111d5e4d043a4",
+      "bytes": 3697
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/ruff-security-final.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "bytes": 19
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/ruff-security.log",
+      "sha256": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+      "bytes": 19
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/ruff.log",
+      "sha256": "48daba8cc04d9804c6665786f94aaccf6cbe0193e37f7ba67c183675a2ac4e69",
+      "bytes": 688
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/run-gates-final.py",
+      "sha256": "39c07b5e82c07c99394cfe4fdc6ce9783322d9b65344c9e02fa11f61baca1d8a",
+      "bytes": 883
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/run-gates.py",
+      "sha256": "f927e0162149475345512385157a089e622c22888f0af664db1888faa7c5cd4d",
+      "bytes": 865
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/runtime_input_inventory.log",
+      "sha256": "2a713bd02875e920b36e12b0ff43fc7ddbb7c7380708925f7de7d828642308e4",
+      "bytes": 226
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/security-shard-result.json",
+      "sha256": "4d3974ca9da8aa4a9e86239d23eba35b8fb323226af44e1802142bc132c2588a",
+      "bytes": 577
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/shard-results-final.json",
+      "sha256": "d503ec0b71cc734a090841a19a9e5a4f30fde1a8ef2e19d43be9cb11c4b5b5f4",
+      "bytes": 4115
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/shard-results.json",
+      "sha256": "bc8c7f9b105306d3a9c1800ff17c9dd056c7d5100b1e0a97d7a6f2d6784666db",
+      "bytes": 4115
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-env.json",
+      "sha256": "13efd72aef011779cf2ddfe43c61a6ef1fc7ad7a237e99a1438ab4833dfb9ddc",
+      "bytes": 198
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-final-map.log",
+      "sha256": "a5b0d36c3de1bb75f8df3058cad1f15075d594ffbb87dcb9db9b3dd2589a68bf",
+      "bytes": 41
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-final-oss.log",
+      "sha256": "42dde38e6d6a3ff43f1b2fb5ded385a4d2f5e4b6b3a513e91f7dc88061af96e9",
+      "bytes": 56
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-final-results.json",
+      "sha256": "b8a1199cabcef397e88bddb281ea954d44e6df0750d5eaa0a24e09eeab19e5b2",
+      "bytes": 1049
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-final-runtime.log",
+      "sha256": "7a2539c55990c2e1118cb014ca0b6d6108e95b5f48e4951155830e74fe190dae",
+      "bytes": 54
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-final-topology.log",
+      "sha256": "435e28ce8aa4a86fc264a8faeb548a4cf1a443ae3c3663e674a1ccf9e0a30d9d",
+      "bytes": 73
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-gates.py",
+      "sha256": "5fbf547522aa6e7875f5be86d6ece8d859a597cba9959515fa98c33009b8bdde",
+      "bytes": 1069
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-generated.json",
+      "sha256": "ef3e7903c21420dbf82b547576dcaa11384404b93eb7d95863758c058766c0b4",
+      "bytes": 484
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-manifest.json",
+      "sha256": "f1fc250c9fb52cc09ab5459d67a110182fcf2b47deee68e54d705d3574119e3d",
+      "bytes": 23830
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-map-after.log",
+      "sha256": "a5b0d36c3de1bb75f8df3058cad1f15075d594ffbb87dcb9db9b3dd2589a68bf",
+      "bytes": 41
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-map-before.log",
+      "sha256": "8292b259bfd8e3759e85e5150285af600608e1ee9c0902a70758a51f7b939f5e",
+      "bytes": 170
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-map-write.log",
+      "sha256": "01ebc26631c2d26fcc6a02b1e9cd8e68c8c735c8072f43b5246a99ba966af623",
+      "bytes": 40
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-oss.log",
+      "sha256": "42dde38e6d6a3ff43f1b2fb5ded385a4d2f5e4b6b3a513e91f7dc88061af96e9",
+      "bytes": 56
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-results.json",
+      "sha256": "090362876b70f2240d9235a54f1a285261108fd4ff3b84179cdfe868458694bf",
+      "bytes": 1391
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-runtime-check.log",
+      "sha256": "7a2539c55990c2e1118cb014ca0b6d6108e95b5f48e4951155830e74fe190dae",
+      "bytes": 54
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-runtime-inventory.log",
+      "sha256": "f86593c6c47377088da6aaf769a574fded7e38403bb63d052bdf9ca6882dee09",
+      "bytes": 127
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-runtime-write.log",
+      "sha256": "7b7fb849b65e827631eb2abfcfd2642f3495ab3b1fc8334400d611839c4c4721",
+      "bytes": 54
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-topology.log",
+      "sha256": "435e28ce8aa4a86fc264a8faeb548a4cf1a443ae3c3663e674a1ccf9e0a30d9d",
+      "bytes": 73
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/sparse-final.log",
+      "sha256": "6f96b201a151d5fe51b402c583e801e0bec559e6849a7fe7088bba46e9fd279c",
+      "bytes": 99
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/static-gates.py",
+      "sha256": "ecd9c5eaac4aff62c09a2c98fce457d5be48f079e5ed3815f3ebc4db6344f64b",
+      "bytes": 1050
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/static-results.json",
+      "sha256": "8479a35b7992003610f16176e0e1487ab18e063f2189d4b715e46571a7da2391",
+      "bytes": 2054
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/tools.artifacts.generate_schemas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/tools.backup.generate_schemas.log",
+      "sha256": "64745fcc631a9a26268a4d1b4f3a1157a5b3a3d9d937bea8f34ead3c82e7db27",
+      "bytes": 34
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/tools.docs.generate_docs_index.log",
+      "sha256": "401ab7824560aed6da162e0f88076ac89f8ca62bb69b00b739e0ae679b23326f",
+      "bytes": 90
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/tools.docs.generate_project_map.log",
+      "sha256": "8292b259bfd8e3759e85e5150285af600608e1ee9c0902a70758a51f7b939f5e",
+      "bytes": 170
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/tools.docs.generate_runbooks.log",
+      "sha256": "81897f702a64f6f2c6e6ec82b5b51bd328092a1bb03a0ca3877e022d709f7984",
+      "bytes": 54
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/tools.jobs.generate_schemas.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c01-financial-final/c01-results.json",
+      "sha256": "5f22b9fcfcd6ab917a79fd33b076d4aa8ab1cc0e64ec23edd31104ec3fbe8996",
+      "bytes": 650
+    },
+    {
+      "path": "/tmp/roehub-npy-s07-c742ab91/c01-complete/c01-results.json",
+      "sha256": "5f22b9fcfcd6ab917a79fd33b076d4aa8ab1cc0e64ec23edd31104ec3fbe8996",
+      "bytes": 650
+    }
+  ],
+  "oracle": {
+    "root": "/tmp/roehub-npy-s01-8ea794cf",
+    "manifests": [
+      {
+        "path": "/tmp/roehub-npy-s01-8ea794cf/baseline-files.json",
+        "sha256": "b143caee0113650f4d579dc1c424ae4f7324022a0c8a269f770b2847227a8b7a",
+        "bytes": 189258
+      },
+      {
+        "path": "/tmp/roehub-npy-s01-8ea794cf/native-output-hashes.json",
+        "sha256": "51422090315612b056f8e4d287c324fa4230f1002f940d9247711b9a4db9880d",
+        "bytes": 12449
+      },
+      {
+        "path": "/tmp/roehub-npy-s01-8ea794cf/year-native-hashes.json",
+        "sha256": "9409e6ee512ebc489d0752596e3ff60f6264eb33d0e605314913003b77055841",
+        "bytes": 12422
+      }
+    ],
+    "maximum_financial_absolute_delta": 3.282707439211663e-12,
+    "existing_tolerance": 1e-05,
+    "tolerance_changed": false,
+    "native_array_equality": "exact",
+    "baseline_engine": "original saved pre-S01 sources; module path assertion in harness",
+    "C03_frozen": "six computed arrays matched frozen arrays; original command was inline, not retained as script; log bound, independent financial regression is repository test"
+  },
+  "shared_checkout": {
+    "live_failed": [
+      "runtime_input_inventory",
+      "oss_metadata",
+      "generate_project_map"
+    ],
+    "preexisting_attribution": "4690 non-cache initial hashes verified; all three reproduced in pre-S07 snapshot. Exact HEAD passes.",
+    "snapshot_manifest": {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-manifest.json",
+      "sha256": "f1fc250c9fb52cc09ab5459d67a110182fcf2b47deee68e54d705d3574119e3d",
+      "bytes": 23830
+    },
+    "generated_outputs": {
+      "path": "/tmp/roehub-npy-s07-c742ab91/snapshot-generated.json",
+      "sha256": "ef3e7903c21420dbf82b547576dcaa11384404b93eb7d95863758c058766c0b4",
+      "bytes": 484
+    },
+    "generated_outputs_delivered": false,
+    "mixed_test_prerequisites": "six exact paths/reasons/hashes in snapshot manifest; release checks do not execute these tests",
+    "S09_required": [
+      "Regenerate live configs/installation/runtime-input-inventory.json",
+      "Reconcile/regenerate live project-map outputs",
+      "Recheck live gates after foreign icon/OSS attribution resolution"
+    ],
+    "coordinator_scope": "Explicitly directed isolated proof boundary, not blanket CI waiver"
+  },
+  "review": {
+    "agent": "01a118a1-7fd1-7941-b969-b52b77f2f936",
+    "mode": "independent read-only code/security/proof review; no recursive review",
+    "result": "No remaining blockers identified in reviewed code/proof gaps",
+    "resolved": [
+      "C01 late independent N/G/M oracle",
+      "C03 independent materialized financial and funding/reversal",
+      "C06 actual cross-organization cached HTTP access",
+      "C08 actual final post-build pointer/target revalidation",
+      "P1 public failed materialization raw diagnostic disclosure"
+    ],
+    "final_verbatim": "\u041f\u0440\u0435\u0436\u043d\u0438\u0439 P1 \u0441 \u0440\u0430\u0441\u043a\u0440\u044b\u0442\u0438\u0435\u043c last_error \u0443\u0441\u0442\u0440\u0430\u043d\u0451\u043d. \u0422\u0435\u043a\u0443\u0449\u0438\u0439 public materialization allowlist \u0437\u0430\u043c\u0435\u043d\u044f\u0435\u0442 last_error/last_error_json \u0431\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u044b\u043c\u0438 \u043a\u043e\u043d\u0441\u0442\u0430\u043d\u0442\u0430\u043c\u0438; \u0432\u043d\u0443\u0442\u0440\u0435\u043d\u043d\u0438\u0435 diagnostics \u0441\u043e\u0445\u0440\u0430\u043d\u044f\u044e\u0442\u0441\u044f. \u042d\u0442\u043e \u043f\u043e\u0434\u0442\u0432\u0435\u0440\u0436\u0434\u0435\u043d\u043e \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u043e\u043c \u043a\u043e\u0434\u0430 \u0438 \u043d\u0435\u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e\u0439 \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u043e\u0439 \u0441\u0435\u0440\u0438\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u0438. \u041e\u0441\u0442\u0430\u0432\u0448\u0438\u0445\u0441\u044f \u0431\u043b\u043e\u043a\u0435\u0440\u043e\u0432 \u0432 \u0440\u0430\u0441\u0441\u043c\u043e\u0442\u0440\u0435\u043d\u043d\u043e\u043c \u043a\u043e\u0434\u0435 \u0438 proof gaps \u043d\u0435 \u0432\u044b\u044f\u0432\u043b\u0435\u043d\u043e. \u041e\u0431\u044f\u0437\u0430\u0442\u0435\u043b\u044c\u043d\u043e\u0435 \u043d\u0435\u0437\u0430\u0432\u0438\u0441\u0438\u043c\u043e\u0435 \u0440\u0435\u0432\u044c\u044e \u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u043e.",
+    "limits": "Reviewer inspected code and executor logs; independently checked serialization. Final48infra result subsequently verified by executor, not independently rerun by reviewer."
+  },
+  "cleanup": [
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "roehub-npy-s07-c742ab91-pg",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "s07",
+        "-Atc",
+        "SELECT count(*) FROM pg_database WHERE datname LIKE 's04_lifecycle_%'"
+      ],
+      "exit_code": 0,
+      "stdout": "0",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "exec",
+        "roehub-npy-s07-c742ab91-pg",
+        "psql",
+        "-U",
+        "postgres",
+        "-d",
+        "s07",
+        "-Atc",
+        "SELECT count(*) FROM information_schema.schemata WHERE schema_name LIKE 'artifact_input_test_%'"
+      ],
+      "exit_code": 0,
+      "stdout": "0",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "stop",
+        "roehub-npy-s07-c742ab91-pg"
+      ],
+      "exit_code": 0,
+      "stdout": "roehub-npy-s07-c742ab91-pg",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "docker",
+        "ps",
+        "-a",
+        "--filter",
+        "name=roehub-npy-s07-c742ab91-pg",
+        "--format",
+        "{{.Names}}"
+      ],
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    }
+  ],
+  "compatibility": {
+    "imports": "none",
+    "public_cache_and_failure_diagnostics": "compatible-change for inspected platform/web clients; unknown for strict external clients",
+    "internal_diagnostics_and_persistence": "none"
+  },
+  "remaining_producers": {
+    "S08": "W1-W4 year parity and comparable performance; not executed",
+    "S09": "canonical docs and named live generated-output obligations"
+  },
+  "failures_preserved": "External log inventory includes initial import-cycle failures, cache-path disclosure, fixture-authoring corrections and live broad gate failures. postgres-security.log has44passed4failed because candles correctly returns200 independent of failed lazy trades; final test distinguishes this contract."
+}

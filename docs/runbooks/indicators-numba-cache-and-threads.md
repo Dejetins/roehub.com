@@ -118,3 +118,20 @@ Full-job child envelopes select `NUMBA_THREADING_LAYER=workqueue` by default bef
 Numba import. Explicit nonempty operator values are preserved; unsupported schedulers
 use exact unpermuted scoring. The parent environment/runtime is not changed. This
 worker remains single-lane: no nested or concurrent workqueue calls are permitted.
+
+## NPY materialization and timing
+
+Selected derivative preparation uses the existing native builder and the same
+worker thread allocation as scoring. It runs before scoring, without nested or
+concurrent workqueue pools. Full-job default is 12 threads subject to verified
+CPU capacity; existing chunk/cell/compute bounds remain stricter than disk limits.
+Warmup reuses the prepared inputs within one attempt; there is no cross-attempt
+transient derivative cache. Persistent publication is the reusable store.
+
+Report startup/import/JIT separately from steady-state preparation/scoring.
+Payload-prefix hashing and persisted prepared-input acknowledgement belong inside
+the preparation boundary for every N/G/M mode. Fresh process with populated JIT
+cache is not cold cache. The orchestration wall excludes final parent cleanup,
+IPC serialization and HTTP; outer benchmark envelopes must state their own
+boundaries. See the [backtest index](../architecture/backtest/README.md) for S08
+sample counts, hardware and the original-source parity reference.

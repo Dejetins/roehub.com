@@ -369,6 +369,8 @@ class BacktestJob:
     attempt: int = 0
     last_error: str | None = None
     last_error_json: BacktestJobErrorPayload | None = None
+    input_recipe_json: Mapping[str, Any] | None = None
+    preparation_provenance_json: Mapping[str, Any] | None = None
 
     def __post_init__(self) -> None:
         """
@@ -495,6 +497,20 @@ class BacktestJob:
                 "BacktestJob.request_json must be non-empty JSON object"
             )
         object.__setattr__(self, "request_json", MappingProxyType(normalized_request))
+
+        if self.preparation_provenance_json is not None and self.input_recipe_json is None:
+            raise BacktestJobTransitionError("preparation provenance requires a recipe")
+        for name, schema_key, schema_value in (
+            ("input_recipe_json", "schema", "backtest-input-recipe/v1"),
+            ("preparation_provenance_json", "manifest_kind", "job_prepared_inputs"),
+        ):
+            value = getattr(self, name)
+            if value is not None:
+                normalized = _normalize_json_object(value=value)
+                if normalized.get(schema_key) != schema_value:
+                    raise BacktestJobTransitionError(f"{name} has unsupported schema")
+                json.dumps(normalized, allow_nan=False)
+                object.__setattr__(self, name, MappingProxyType(normalized))
 
         if self.mode == "saved":
             if self.spec_hash is None or not self.spec_hash.strip():

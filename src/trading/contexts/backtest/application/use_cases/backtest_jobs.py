@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, Literal, Mapping, cast
 from uuid import UUID, uuid4
@@ -28,6 +28,10 @@ from trading.contexts.backtest.application.ports import (
     BacktestLazyTradesMaterializationTask,
     ResearchOrganizationScope,
     ResearchOrganizationScopeResolver,
+)
+from trading.contexts.backtest.application.ports.backtest_job_repositories import (
+    ArtifactOwnershipConflict,
+    ArtifactReaderReservation,
 )
 from trading.contexts.backtest.application.services.research_identity import (
     build_research_idempotency_key_hash,
@@ -182,7 +186,40 @@ class BacktestJobsUseCase:
             ranking_primary_metric=_ranking_primary_metric(preflight=preflight),
             ranking_secondary_metric=None,
         )
-        stored_job = self.job_repository.create(job=queued_job)
+        if preflight.input_recipe is not None:
+            queued_job = replace(queued_job, input_recipe_json=preflight.input_recipe.as_mapping())
+        coordinates = _coordinates(preflight=preflight)
+        metadata = preflight.artifact_metadata
+        try:
+            with self.job_repository.transaction():
+                self.job_repository.reserve_artifact_reader(
+                    reader=ArtifactReaderReservation(
+                        exchange=str(coordinates["exchange"]),
+                        market_type=str(coordinates["market_type"]),
+                        symbol=str(coordinates["symbol"]),
+                        slot=metadata.artifact_slot,
+                        generation=metadata.artifact_slot_generation,
+                        manifest_sha256=metadata.artifact_manifest_hash,
+                        owner_kind="job",
+                        organization_id=scope.organization_id.value,
+                        owner_id=job_id,
+                        owner_token=job_id,
+                        attempt=0,
+                        parent_incarnation=None,
+                    )
+                )
+                self.preflight_service.revalidate_preflight_source(preflight=preflight)
+                stored_job = self.job_repository.create(job=queued_job)
+        except ArtifactOwnershipConflict as error:
+            raise _error(
+                code="backtest.artifacts_unavailable",
+                message="Artifact source is reserved or changed; retry preflight",
+                details={"retryable": True, "reason": str(error)},
+            ) from error
+        except BacktestPreflightRejected as error:
+            raise _error(
+                code=error.error_code, message=error.message, details=error.details()
+            ) from error
         if self.execution_trigger is not None:
             self.execution_trigger.enqueue(
                 job_id=stored_job.job_id,

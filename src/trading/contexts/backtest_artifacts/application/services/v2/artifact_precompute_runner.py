@@ -5,19 +5,21 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import os
 import tempfile
 import time
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from dataclasses import dataclass, fields, replace
 from datetime import datetime, timedelta, timezone
 from itertools import product
 from multiprocessing import get_context
 from pathlib import Path
-from typing import Any, Mapping, Protocol, cast
+from typing import Any, Mapping, Protocol, TypeVar, cast
 
 import numpy as np
 import yaml
+from numba import get_num_threads
 
 from trading.contexts.backtest.application.ports import BacktestGridDefaultsProvider
 from trading.contexts.backtest.application.services.signals_from_indicators_v1 import (
@@ -87,14 +89,19 @@ from .contracts import (
     SIGNAL_FEATURES_ARTIFACT_MANIFEST_KIND_V2,
     SIGNAL_FEATURES_ARTIFACT_MANIFEST_SCHEMA_VERSION_V2,
     ArtifactArrayMetadataV2,
+    ArtifactCandleSnapshot,
     ArtifactCanonicalPriceExportRequestV2,
     ArtifactCanonicalPriceExportResultV2,
     ArtifactCoordinatesV2,
+    ArtifactDerivativeBuildRequest,
+    ArtifactDerivativeBuildResult,
     ArtifactFundingManifestV2,
+    ArtifactFundingPathsV2,
     ArtifactHitTimesManifestDocumentV2,
     ArtifactHitTimesPathsV2,
     ArtifactHitTimesReferenceV2,
     ArtifactHitTimesTableManifestV2,
+    ArtifactInputFileReference,
     ArtifactManifestDocumentV2,
     ArtifactManifestProvenanceV2,
     ArtifactMappingPathsV2,
@@ -102,8 +109,10 @@ from .contracts import (
     ArtifactPrecomputeRuntimeSettingsV2,
     ArtifactPrecomputeStageInputV2,
     ArtifactPrecomputeStageOutputV2,
+    ArtifactPrefixDomain,
     ArtifactPricePathsV2,
     ArtifactPriceTimeframeManifestV2,
+    ArtifactRequestedRow,
     ArtifactSignalCatalogEntryV2,
     ArtifactSignalCatalogV2,
     ArtifactSignalChunkJobV2,
@@ -382,7 +391,7 @@ class _RootManifestScaffoldV2:
     preserved_prices: tuple[ArtifactPriceTimeframeManifestV2, ...]
     mappings: tuple[ArtifactMappingTimeframeManifestV2, ...]
     signals: ArtifactSignalCatalogV2
-    hit_times: ArtifactHitTimesReferenceV2
+    hit_times: ArtifactHitTimesReferenceV2 | None
     funding: ArtifactFundingManifestV2 | None
     signal_encoding: ArtifactSignalEncodingContractV2
 
@@ -669,7 +678,7 @@ class BacktestArtifactPrecomputeRunnerV2:
 
     runtime_settings: ArtifactPrecomputeRuntimeSettingsV2
     artifact_loader: BacktestArtifactLoaderV2
-    canonical_candle_reader: CanonicalCandleReader
+    canonical_candle_reader: CanonicalCandleReader | None = None
     funding_rate_coverage_reader: FundingRateCoverageReader | None = None
     defaults_provider: BacktestGridDefaultsProvider | None = None
     signal_rules_engine: BacktestSignalRulesEngineV2 | None = None
@@ -687,7 +696,7 @@ class BacktestArtifactPrecomputeRunnerV2:
         Assumptions:
             Loader paths are already wired to `backtest_artifacts.artifact_root`.
         Raises:
-            ValueError: If runtime config, artifact loader, or candle reader is missing.
+            ValueError: If config/loader or a complete requested signal dependency set is missing.
         Side Effects:
             None.
         Docs:
@@ -701,10 +710,6 @@ class BacktestArtifactPrecomputeRunnerV2:
             raise ValueError("BacktestArtifactPrecomputeRunnerV2.runtime_settings is required")
         if self.artifact_loader is None:  # type: ignore[truthy-bool]
             raise ValueError("BacktestArtifactPrecomputeRunnerV2.artifact_loader is required")
-        if self.canonical_candle_reader is None:  # type: ignore[truthy-bool]
-            raise ValueError(
-                "BacktestArtifactPrecomputeRunnerV2.canonical_candle_reader is required"
-            )
         signal_dependencies = (
             self.defaults_provider,
             self.signal_rules_engine,
@@ -728,9 +733,274 @@ class BacktestArtifactPrecomputeRunnerV2:
                 "indicator_grid_builder"
             )
 
+    def derivative_defaults_sha256(self, rows: tuple[ArtifactRequestedRow, ...]) -> str:
+        """Fingerprint effective compute grids and signal defaults without reading candles."""
+        return derivative_defaults_sha256(
+            rows=rows, defaults_provider=self.defaults_provider,
+            signal_rules_engine=self.signal_rules_engine,
+            indicator_grid_builder=self.indicator_grid_builder,
+        )
+
+    def validate_derivative_request(self, request: ArtifactDerivativeBuildRequest) -> None:
+        """Validate supported math/defaults and canonical rows even for fully reused inputs."""
+        if (request.rule_version, request.compute_version, request.precision_version) != (
+            "signals/v1", "numba/v1", "f32-f64/v1",
+        ):
+            raise ValueError("unsupported derivative computation version")
+        if request.defaults_sha256 != self.derivative_defaults_sha256(request.rows):
+            raise ValueError("derivative defaults fingerprint mismatch")
+        for indicator in sorted({row.indicator_id for row in request.rows}):
+            assert self.defaults_provider is not None
+            assert self.indicator_grid_builder is not None
+            assert self.signal_rules_engine is not None
+            grid = self.indicator_grid_builder.materialize_indicator(
+                grid=_resolve_signal_target_compute_grid_v2(
+                    defaults_provider=self.defaults_provider, indicator_id=indicator))
+            for row in (row for row in request.rows if row.indicator_id == indicator):
+                if row.row_id >= math.prod(len(axis.values) for axis in grid.axes):
+                    raise ValueError("selected canonical row ID is outside the supported grid")
+                remainder = row.row_id
+                values = {}
+                for axis in reversed(grid.axes):
+                    remainder, index = divmod(remainder, len(axis.values))
+                    values[axis.name] = axis.values[index]
+                source, _ = self.signal_rules_engine.resolved_defaults(indicator_id=indicator)
+                if row.source != values.pop("source", source) or dict(row.parameters) != values:
+                    raise ValueError("selected row parameters/source disagree with canonical ID")
+
+    def validate_reused_signal(
+        self, *, request: ArtifactDerivativeBuildRequest,
+        manifest: ArtifactSignalManifestDocumentV2, row_ids: tuple[int, ...],
+    ) -> None:
+        """Match published canonical row identity and rule defaults before reuse."""
+        if self.defaults_provider is None or self.indicator_grid_builder is None:
+            raise ValueError("signal reuse requires supported grid definitions")
+        if self.signal_rules_engine is None:
+            raise ValueError("signal reuse requires supported signal rules")
+        if (manifest.provenance.generator, manifest.provenance.generator_version) != (
+            _PRECOMPUTE_GENERATOR_LITERAL_V2, _PRECOMPUTE_GENERATOR_VERSION_LITERAL_V2,
+        ):
+            raise ValueError("unsupported published signal computation version")
+        grid = self.indicator_grid_builder.materialize_indicator(
+            grid=_resolve_signal_target_compute_grid_v2(
+                defaults_provider=self.defaults_provider, indicator_id=manifest.indicator_id))
+        if len(row_ids) != manifest.rows_count:
+            raise ValueError("published canonical rows disagree with physical row count")
+        canonical = _build_signal_variant_rows_v2(
+            coordinates=request.snapshot.coordinates, timeframe=manifest.timeframe,
+            materialized_grid=grid, row_ids=row_ids,
+        )
+        _, params = self.signal_rules_engine.resolved_defaults(indicator_id=manifest.indicator_id)
+        if (manifest.grid.variant_key_version != 1
+                or manifest.grid.variant_keys_sha256
+                != _variant_keys_sha256_v2(signal_rows=canonical)
+                or dict(manifest.grid.signals_v1_params_defaults) != dict(params)):
+            raise ValueError("published signal grid/defaults differ from requested computation")
+
+    def materialize_derived(
+        self, request: ArtifactDerivativeBuildRequest, *, output_directory: Path,
+    ) -> ArtifactDerivativeBuildResult:
+        """Build only the missing rows/levels supplied by the resolver, from published NPY.
+
+        The caller owns the source reservation and an unused attempt output directory.
+        This operation never reads canonical candles, creates pools or switches current.yaml.
+        A derived manifest is the final commit marker; it is not a job-ready acknowledgement.
+        """
+        self.validate_derivative_request(request)
+        snapshot = request.snapshot
+        source_root = self.artifact_loader.resolve_slot_manifest_path(
+            snapshot.coordinates, snapshot.slot).parent
+        root = source_root.resolve()
+        destination = output_directory.resolve()
+        if destination == root or root in destination.parents:
+            raise ValueError("derivative output must be outside the published source")
+        if destination.exists():
+            raise FileExistsError("derivative output directory must be unused")
+        manifest_path = root / ARTIFACT_MANIFEST_FILENAME_V2
+        if _file_sha256_hex_v2(manifest_path) != snapshot.manifest_sha256:
+            raise ValueError("source manifest identity changed")
+        manifest = self.artifact_loader.load_manifest_from_path(
+            manifest_path, slot=validate_artifact_slot_v2(snapshot.slot))
+        if manifest.slot_generation != snapshot.generation or manifest.slot != snapshot.slot:
+            raise ValueError("source generation changed")
+        timeframe = snapshot.signal_timeframe
+        domains = [d for d in snapshot.consumed_domains
+                   if d.timeframe == timeframe and d.axis_order == ("time",)]
+        if not domains:
+            raise ValueError("source snapshot requires the complete price timeline")
+        bars = domains[0].shape[0]
+        available = min(request.max_compute_bytes,
+                        self.runtime_settings.execution_policy.signal_worker_memory_budget_bytes)
+        fixed_compute_bytes = bars * 128 + 1_048_576 + len(request.rows) * 1024
+        if fixed_compute_bytes >= available:
+            raise ValueError("source workspace exceeds max_compute_bytes")
+        arrays = _load_derivative_source_v2(snapshot=snapshot, root=root, manifest=manifest)
+        source_paths = self.artifact_loader.resolve_price_paths(
+            snapshot.coordinates, snapshot.slot, timeframe)
+        prices = _CanonicalPriceArraysV2(*(
+            arrays[str(path.relative_to(source_root))]
+            for path in (source_paths.open_time, source_paths.close_time, source_paths.ohlcv)
+        ))
+        _validate_rolled_price_arrays_v2(arrays=prices, timeframe=timeframe)
+        if int(prices.open_time.shape[0]) != bars:
+            raise ValueError("source price domain lengths disagree")
+        if request.tp_levels_pct or request.sl_levels_pct:
+            if timeframe != HIT_TIMES_TIMEFRAME_LITERAL_V2:
+                raise ValueError("selected hit-times require the published 15m source domain")
+        settings = replace(self.runtime_settings, execution_policy=replace(
+            self.runtime_settings.execution_policy, signal_worker_processes=1,
+            signal_worker_memory_budget_bytes=available - fixed_compute_bytes,
+            signal_chunk_rows_min=1,
+        ))
+        groups: dict[str, list[ArtifactRequestedRow]] = {}
+        for row in request.rows:
+            groups.setdefault(row.indicator_id, []).append(row)
+        planned = []
+        for indicator, requested in sorted(groups.items()):
+            assert self.indicator_grid_builder is not None
+            assert self.defaults_provider is not None
+            assert self.signal_rules_engine is not None
+            assert self.indicator_compute is not None
+            grid = self.indicator_grid_builder.materialize_indicator(
+                grid=_resolve_signal_target_compute_grid_v2(
+                    defaults_provider=self.defaults_provider, indicator_id=indicator))
+            canonical_rows = _build_signal_variant_rows_v2(
+                coordinates=snapshot.coordinates, timeframe=timeframe, materialized_grid=grid,
+                row_ids=tuple(row.row_id for row in requested))
+            if len(requested) > settings.max_signal_rows_per_artifact:
+                raise ValueError("selected rows exceed max_signal_rows_per_artifact")
+            rule = self.signal_rules_engine.rule_spec(indicator_id=indicator)
+            _plan_signal_chunk_jobs_v2(
+                runtime_settings=settings,
+                signal_target=ArtifactSignalValidationSpecV2(timeframe, indicator),
+                timeline_bar_count=bars, compute_bar_count=bars, variant_count=len(requested),
+                dependency_count=len(rule.required_dependency_ids),
+            )
+            planned.append((indicator, requested, grid, canonical_rows))
+        cells = hit_times_table_cell_count_v2(
+            timeline_bar_count=bars, tp_level_count=len(request.tp_levels_pct),
+            sl_level_count=len(request.sl_levels_pct))
+        if cells > settings.max_hit_times_cells:
+            raise ValueError("selected hit-times exceed max_hit_times_cells")
+        risk_workers = min(get_num_threads(), max(len(request.tp_levels_pct),
+                                                  len(request.sl_levels_pct)))
+        risk_compute_bytes = cells * 6 + fixed_compute_bytes + bars * 16 * risk_workers
+        if risk_compute_bytes > available and cells:
+            raise ValueError("selected hit-times exceed max_compute_bytes")
+        file_count = 2 * len(groups) + (6 if cells else 0)
+        estimate = len(request.rows) * (bars + 4 * len(SIGNAL_FEATURE_NAMES_V2)) + cells * 4
+        estimate += 4 * (len(request.tp_levels_pct) + len(request.sl_levels_pct)) + 256 * file_count
+        # A bounded manifest slot is admitted before output allocation/computation.
+        # The exact serialized result is checked again before committing it.
+        manifest_budget = 8 * 1024**2
+        if len(yaml.safe_dump(request.as_mapping()).encode()) > manifest_budget // 2:
+            raise ValueError("derivative request metadata disk budget exceeded")
+        estimate += manifest_budget
+        if estimate > request.max_generated_bytes:
+            raise ValueError("selected files exceed max_generated_bytes")
+        destination.mkdir(parents=True, exist_ok=False)
+        references: list[ArtifactInputFileReference] = []
+        ohlcv_path = str(source_paths.ohlcv.relative_to(source_root))
+        ohlcv_ref = next(ref for ref in snapshot.source_file_identities
+                         if ref.relative_path == ohlcv_path)
+        domain = next(d for d in snapshot.consumed_domains if d.role == ohlcv_ref.domain.role)
+
+        def record(path: Path, role: str, axes: tuple[str, ...],
+                   row_ids: tuple[int, ...] = (), levels: tuple[float, ...] = ()) -> None:
+            array = np.load(path, mmap_mode="r", allow_pickle=False)
+            if axes[0] == "variant":
+                width = bars if axes[1] == "time" else len(SIGNAL_FEATURE_NAMES_V2)
+                expected_shape = (len(row_ids), width)
+                expected_dtype = np.dtype("int8" if axes[1] == "time" else "float32")
+            else:
+                expected_shape = (len(levels), bars) if len(axes) == 2 else (len(levels),)
+                expected_dtype = np.dtype("uint32" if len(axes) == 2 else "float32")
+            if array.shape != expected_shape or array.dtype != expected_dtype:
+                raise ValueError("closed derivative file shape/dtype mismatch")
+            if axes == ("level",):
+                normalized = np.asarray([value / 100.0 for value in levels], dtype=np.float32)
+                if not np.array_equal(array, normalized):
+                    raise ValueError("closed derivative file risk grid mismatch")
+            for index in range(array.shape[0]):
+                values = array[index]
+                if axes == ("level", "time") and index and np.any(values < array[index - 1]):
+                    raise ValueError("closed derivative file risk monotonicity mismatch")
+                if not np.isfinite(values).all():
+                    raise ValueError("closed derivative file contains non-finite values")
+                if expected_dtype == np.dtype("int8") and not np.isin(values, (-1, 0, 1)).all():
+                    raise ValueError("closed derivative file signal encoding mismatch")
+                if expected_dtype == np.dtype("uint32") and np.any(values > bars):
+                    raise ValueError("closed derivative file sentinel mismatch")
+            references.append(ArtifactInputFileReference(
+                request.output_root_id, str(path.relative_to(destination)),
+                _file_sha256_hex_v2(path), ArtifactPrefixDomain(
+                    role, timeframe, array.dtype.str, axes, domain.origin_utc, domain.end_utc,
+                    array.shape[0], tuple(array.shape), domain.index_origin,
+                ), row_ids, levels,
+            ))
+
+        for indicator, requested, grid, canonical_rows in planned:
+            assert self.indicator_compute is not None
+            assert self.signal_rules_engine is not None
+            directory = destination / "signals" / timeframe / indicator
+            paths = ArtifactSignalPathsV2(
+                directory / "manifest.yaml", directory / "signals.i8.npy")
+            ids = tuple(row.row_id for row in requested)
+            _materialize_signal_rows_v2(
+                coordinates=snapshot.coordinates, timeframe=timeframe, indicator_id=indicator,
+                price_arrays=prices, materialized_grid=grid,
+                signal_rows=canonical_rows, selected_row_ids=ids,
+                signal_paths=paths, runtime_settings=settings,
+                signal_tail_plan=_SignalArtifactTailPlanV2(0, 0, 0, bars),
+                existing_signal_artifact=None, indicator_compute=self.indicator_compute,
+                signal_rules_engine=self.signal_rules_engine, slot=snapshot.slot,
+                slot_generation=snapshot.generation, force_full_rebuild=True,
+            )
+            record(paths.signals, f"signals.{indicator}", ("variant", "time"), ids)
+            matrix = np.load(paths.signals, mmap_mode="r", allow_pickle=False)
+            features = directory / "features.f32.npy"
+            # Row-local feature evaluation avoids a full matrix-sized boolean temporary.
+            _write_signal_features_v2(signals=matrix, path=features)
+            record(features, f"signal_features.{indicator}", ("variant", "feature"), ids)
+        if cells:
+            directory = destination / "hit_times" / timeframe
+            paths = ArtifactHitTimesPathsV2(directory / "manifest.yaml", *(
+                directory / name for name in ("tp_values.f32.npy", "sl_values.f32.npy",
+                                             "long_tp.u32.npy", "long_sl.u32.npy",
+                                             "short_tp.u32.npy", "short_sl.u32.npy")))
+            hit = materialize_hit_times_from_ohlcv_v2(
+                ohlcv=prices.ohlcv, tp_levels_pct=request.tp_levels_pct,
+                sl_levels_pct=request.sl_levels_pct,
+                max_hit_times_cells=settings.max_hit_times_cells,
+                allow_empty_levels=True,
+            )
+            _write_hit_times_arrays_atomically_v2(hit_times_paths=paths, arrays=hit)
+            for name in ("tp_values", "sl_values", "long_tp", "long_sl", "short_tp", "short_sl"):
+                levels = request.tp_levels_pct if "tp" in name else request.sl_levels_pct
+                axes = ("level",) if name.endswith("values") else ("level", "time")
+                # Empty families are not declared coverage and need no output file.
+                path = getattr(paths, name)
+                if levels:
+                    record(path, f"hit_times.{name}", axes, levels=levels)
+                else:
+                    path.unlink()
+        generated_bytes = sum(
+            (destination / ref.relative_path).stat().st_size for ref in references)
+        result = ArtifactDerivativeBuildResult(request.output_root_id, request.owner_token,
+                                              request.attempt, tuple(references), generated_bytes)
+        payload = {"schema_version": 1, "manifest_kind": "derived_artifacts",
+                   "request": request.as_mapping(), "result": result.as_mapping()}
+        encoded_bytes = len(yaml.safe_dump(payload, sort_keys=False).encode())
+        if (encoded_bytes > manifest_budget
+                or generated_bytes + encoded_bytes > request.max_generated_bytes):
+            raise ValueError("generated manifest and files exceed max_generated_bytes")
+        _write_yaml_atomically_v2(path=destination / "manifest.yaml", payload=payload)
+        return result
+
     def export_canonical_price_1m(
         self,
         request: ArtifactCanonicalPriceExportRequestV2,
+        *, output_directory: Path | None = None,
     ) -> ArtifactCanonicalPriceExportResultV2:
         """
         Export canonical `1m`, `hit_times/15m`, and timeframe-local `rolled_prices` sessions
@@ -738,12 +1008,15 @@ class BacktestArtifactPrecomputeRunnerV2:
 
         Args:
             request: Explicit export identity with symbol coordinates and `TimeRange [start, end)`.
+            output_directory: Optional new private candidate root for reservation-owned publication.
         Returns:
             ArtifactCanonicalPriceExportResultV2: Structured write result for the inactive slot.
         Assumptions:
             Public API stays rooted in canonical `1m`, while R12-03 keeps both
-            `canonical_prices` and `hit_times` in the canonical `1m` scope before the explicit
-            per-timeframe `rolled_prices -> mappings -> signals` loop begins.
+            canonical 1m prices first, followed by hit-times on their 15m rollup and
+            the per-timeframe `rolled_prices -> mappings -> signals` loop.
+            output_directory, when supplied, is a new private candidate root; installation
+            and pointer switching belong to the publisher under its writer reservation.
         Raises:
             FileNotFoundError: If strict `current.yaml` is missing for the symbol root.
             ValueError: If existing inactive-slot metadata, source candles, or derived
@@ -758,6 +1031,11 @@ class BacktestArtifactPrecomputeRunnerV2:
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
         """
+        if self.canonical_candle_reader is None:  # type: ignore[truthy-bool]
+            raise ValueError(
+                "BacktestArtifactPrecomputeRunnerV2.canonical_candle_reader is required"
+            )
+        canonical_reader = self.canonical_candle_reader
         inactive_slot, target_slot_generation = _resolve_export_target_v2(
             artifact_loader=self.artifact_loader,
             request=request,
@@ -772,6 +1050,15 @@ class BacktestArtifactPrecomputeRunnerV2:
             inactive_slot,
         )
         slot_root = manifest_path.parent
+        if output_directory is not None:
+            candidate = output_directory.resolve()
+            if candidate == slot_root.resolve() or slot_root.resolve() in candidate.parents:
+                raise ValueError("publication candidate must be outside the published slot")
+            candidate.mkdir(parents=True, exist_ok=False)
+            price_paths = _candidate_paths_v2(
+                paths=price_paths, source_root=slot_root, candidate_root=candidate)
+            slot_root = candidate
+            manifest_path = candidate / ARTIFACT_MANIFEST_FILENAME_V2
         existing_manifest = None
         existing_arrays = None
         reuse_source_slot = (
@@ -812,7 +1099,7 @@ class BacktestArtifactPrecomputeRunnerV2:
                 ),
                 execute=lambda: _materialize_canonical_prices_stage_v2(
                     artifact_loader=self.artifact_loader,
-                    canonical_candle_reader=self.canonical_candle_reader,
+                    canonical_candle_reader=canonical_reader,
                     coordinates=request.coordinates,
                     slot=inactive_slot,
                     slot_root=slot_root,
@@ -841,65 +1128,67 @@ class BacktestArtifactPrecomputeRunnerV2:
                 ),
             )
 
-            hit_times_source_arrays = _resolve_hit_times_source_arrays_v2(
-                one_minute_arrays=canonical_stage_result.rollup_source_arrays,
-            )
-            hit_times_budget = _resolve_hit_times_cell_budget_v2(
-                runtime_settings=self.runtime_settings,
-                force_full_rebuild=request.force_full_rebuild,
-                has_existing_slot_manifest=existing_manifest is not None,
-            )
-            hit_times_timeline_bar_count = int(hit_times_source_arrays.open_time.shape[0])
-            hit_times_tp_level_count = len(self.runtime_settings.hit_times_tp_levels_pct)
-            hit_times_sl_level_count = len(self.runtime_settings.hit_times_sl_levels_pct)
-            hit_times_build_result = coordinator.run_stage(
-                stage_input=ArtifactPrecomputeStageInputV2(
-                    stage="hit_times",
-                    details={
-                        "hit_times_tail_bars_1m": self.runtime_settings.hit_times_tail_bars_1m,
-                        "max_hit_times_cells": hit_times_budget,
-                        "timeline_bar_count": hit_times_timeline_bar_count,
-                        "tp_level_count": hit_times_tp_level_count,
-                        "sl_level_count": hit_times_sl_level_count,
-                        "table_cell_count": hit_times_table_cell_count_v2(
-                            timeline_bar_count=hit_times_timeline_bar_count,
-                            tp_level_count=hit_times_tp_level_count,
-                            sl_level_count=hit_times_sl_level_count,
-                        ),
-                    },
-                ),
-                execute=lambda: _materialize_hit_times_artifacts_v2(
-                    artifact_loader=self.artifact_loader,
-                    coordinates=request.coordinates,
-                    slot=inactive_slot,
-                    slot_root=slot_root,
-                    existing_slot=reuse_source_slot,
-                    existing_manifest=existing_manifest,
-                    request=request,
-                    slot_generation=target_slot_generation,
+            hit_times_build_result = None
+            if self.runtime_settings.precompute_hit_times:
+                hit_times_source_arrays = _resolve_hit_times_source_arrays_v2(
+                    one_minute_arrays=canonical_stage_result.rollup_source_arrays,
+                )
+                hit_times_budget = _resolve_hit_times_cell_budget_v2(
                     runtime_settings=self.runtime_settings,
-                    hit_times_source_arrays=hit_times_source_arrays,
-                    one_minute_manifest=canonical_stage_result.one_minute_manifest,
-                    max_hit_times_cells=hit_times_budget,
-                ),
-                build_output=lambda stage_result: ArtifactPrecomputeStageOutputV2(
-                    stage="hit_times",
-                    reused_prefix_bars=stage_result.reused_prefix_bars,
-                    rewritten_tail_bars=stage_result.rewritten_tail_bars,
-                    details={
-                        "reused_prefix_bars": stage_result.reused_prefix_bars,
-                        "rewritten_tail_bars": stage_result.rewritten_tail_bars,
-                        "timeline_bar_count": stage_result.manifest.timeline_bar_count,
-                        "tp_level_count": int(stage_result.manifest.tp_values.shape[0]),
-                        "sl_level_count": int(stage_result.manifest.sl_values.shape[0]),
-                        "table_cell_count": hit_times_table_cell_count_v2(
-                            timeline_bar_count=stage_result.manifest.timeline_bar_count,
-                            tp_level_count=int(stage_result.manifest.tp_values.shape[0]),
-                            sl_level_count=int(stage_result.manifest.sl_values.shape[0]),
-                        ),
-                    },
-                ),
-            )
+                    force_full_rebuild=request.force_full_rebuild,
+                    has_existing_slot_manifest=existing_manifest is not None,
+                )
+                hit_times_timeline_bar_count = int(hit_times_source_arrays.open_time.shape[0])
+                hit_times_tp_level_count = len(self.runtime_settings.hit_times_tp_levels_pct)
+                hit_times_sl_level_count = len(self.runtime_settings.hit_times_sl_levels_pct)
+                hit_times_build_result = coordinator.run_stage(
+                    stage_input=ArtifactPrecomputeStageInputV2(
+                        stage="hit_times",
+                        details={
+                            "hit_times_tail_bars_1m": self.runtime_settings.hit_times_tail_bars_1m,
+                            "max_hit_times_cells": hit_times_budget,
+                            "timeline_bar_count": hit_times_timeline_bar_count,
+                            "tp_level_count": hit_times_tp_level_count,
+                            "sl_level_count": hit_times_sl_level_count,
+                            "table_cell_count": hit_times_table_cell_count_v2(
+                                timeline_bar_count=hit_times_timeline_bar_count,
+                                tp_level_count=hit_times_tp_level_count,
+                                sl_level_count=hit_times_sl_level_count,
+                            ),
+                        },
+                    ),
+                    execute=lambda: _materialize_hit_times_artifacts_v2(
+                        artifact_loader=self.artifact_loader,
+                        coordinates=request.coordinates,
+                        slot=inactive_slot,
+                        slot_root=slot_root,
+                        existing_slot=reuse_source_slot,
+                        existing_manifest=existing_manifest,
+                        request=request,
+                        slot_generation=target_slot_generation,
+                        runtime_settings=self.runtime_settings,
+                        hit_times_source_arrays=hit_times_source_arrays,
+                        one_minute_manifest=canonical_stage_result.one_minute_manifest,
+                        max_hit_times_cells=hit_times_budget,
+                    ),
+                    build_output=lambda stage_result: ArtifactPrecomputeStageOutputV2(
+                        stage="hit_times",
+                        reused_prefix_bars=stage_result.reused_prefix_bars,
+                        rewritten_tail_bars=stage_result.rewritten_tail_bars,
+                        details={
+                            "reused_prefix_bars": stage_result.reused_prefix_bars,
+                            "rewritten_tail_bars": stage_result.rewritten_tail_bars,
+                            "timeline_bar_count": stage_result.manifest.timeline_bar_count,
+                            "tp_level_count": int(stage_result.manifest.tp_values.shape[0]),
+                            "sl_level_count": int(stage_result.manifest.sl_values.shape[0]),
+                            "table_cell_count": hit_times_table_cell_count_v2(
+                                timeline_bar_count=stage_result.manifest.timeline_bar_count,
+                                tp_level_count=int(stage_result.manifest.tp_values.shape[0]),
+                                sl_level_count=int(stage_result.manifest.sl_values.shape[0]),
+                            ),
+                        },
+                    ),
+                )
 
             rolled_price_manifests: list[ArtifactPriceTimeframeManifestV2] = []
             mapping_manifests: list[ArtifactMappingTimeframeManifestV2] = []
@@ -1065,7 +1354,8 @@ class BacktestArtifactPrecomputeRunnerV2:
 
             scaffold = _build_root_manifest_scaffold_v2(
                 existing_manifest=(
-                    existing_manifest if reuse_source_slot == inactive_slot else None
+                    existing_manifest
+                    if reuse_source_slot == inactive_slot and output_directory is None else None
                 )
             )
             root_signals = (
@@ -1088,7 +1378,8 @@ class BacktestArtifactPrecomputeRunnerV2:
                 preserved_prices=scaffold.preserved_prices,
                 mappings=scaffold.mappings,
                 signals=root_signals,
-                hit_times=hit_times_build_result.reference,
+                hit_times=(None if hit_times_build_result is None
+                           else hit_times_build_result.reference),
                 funding=funding_manifest,
                 signal_encoding=scaffold.signal_encoding,
             )
@@ -1115,7 +1406,8 @@ class BacktestArtifactPrecomputeRunnerV2:
                     ),
                     mapping_manifests=tuple(mapping_manifests),
                     signal_catalog=root_signals,
-                    hit_times_reference=hit_times_build_result.reference,
+                    hit_times_reference=(None if hit_times_build_result is None
+                                         else hit_times_build_result.reference),
                     funding_manifest=funding_manifest,
                 ),
                 build_output=lambda written_path: ArtifactPrecomputeStageOutputV2(
@@ -1142,8 +1434,10 @@ class BacktestArtifactPrecomputeRunnerV2:
                     rewritten_tail_bars=signal_rewritten_tail_bars,
                 ),
                 hit_times=ArtifactStageRebuildStatsV2(
-                    reused_prefix_bars=hit_times_build_result.reused_prefix_bars,
-                    rewritten_tail_bars=hit_times_build_result.rewritten_tail_bars,
+                    reused_prefix_bars=(0 if hit_times_build_result is None
+                                        else hit_times_build_result.reused_prefix_bars),
+                    rewritten_tail_bars=(0 if hit_times_build_result is None
+                                         else hit_times_build_result.rewritten_tail_bars),
                 ),
             )
             result = ArtifactCanonicalPriceExportResultV2(
@@ -1182,6 +1476,110 @@ class BacktestArtifactPrecomputeRunnerV2:
                 time.perf_counter() - export_started_at,
             )
             raise
+
+
+_CandidatePaths = TypeVar(
+    "_CandidatePaths", ArtifactPricePathsV2, ArtifactSignalPathsV2,
+    ArtifactSignalFeaturesPathsV2, ArtifactMappingPathsV2, ArtifactHitTimesPathsV2,
+    ArtifactFundingPathsV2,
+)
+
+
+def _candidate_paths_v2(
+    *, paths: _CandidatePaths, source_root: Path, candidate_root: Path,
+) -> _CandidatePaths:
+    """Keep native relative filenames while isolating every candidate write from source files."""
+    return replace(paths, **{
+        field.name: candidate_root / getattr(paths, field.name).relative_to(source_root)
+        for field in fields(paths)
+    })
+
+
+def _load_derivative_source_v2(
+    *, snapshot: ArtifactCandleSnapshot, root: Path, manifest: ArtifactManifestDocumentV2,
+) -> dict[str, np.ndarray]:
+    """Verify immutable recorded files, then expose exact original prefix views read-only."""
+    if snapshot.source_schema != manifest.schema_version:
+        raise ValueError("snapshot schema differs from published manifest")
+    metadata_by_path = {}
+    for price in manifest.prices:
+        for name in ("open_time", "close_time", "ohlcv"):
+            metadata = getattr(price, name)
+            metadata_by_path[metadata.path] = (metadata, price.timeframe)
+    for mapping in manifest.mappings:
+        for name in ("bar_open_1m_idx", "bar_close_1m_idx"):
+            metadata = getattr(mapping, name)
+            metadata_by_path[metadata.path] = (metadata, mapping.timeframe)
+    if manifest.funding is not None:
+        for name in ("funding_time", "funding_rate", "mark_price",
+                     "funding_interval_minutes", "data_quality"):
+            metadata = getattr(manifest.funding, name)
+            if metadata is not None:
+                metadata_by_path[metadata.path] = (metadata, snapshot.execution_timeframe)
+    arrays = {}
+    domains = {domain.role: domain for domain in snapshot.consumed_domains}
+    for ref in snapshot.source_file_identities:
+        entry = metadata_by_path.get(ref.relative_path)
+        if entry is None:
+            raise ValueError("snapshot file is not declared by the published manifest")
+        metadata, timeframe = entry
+        if (ref.sha256 != metadata.sha256 or ref.domain.shape != metadata.shape
+                or ref.domain.axis_order != metadata.axis_order
+                or np.dtype(ref.domain.dtype) != np.dtype(metadata.dtype)
+                or ref.domain.timeframe != timeframe or ref.domain.index_origin != 0):
+            raise ValueError("snapshot file identity differs from published manifest")
+    # Bind claimed time coverage to actual original timestamps, including prefix replay.
+    refs = {ref.relative_path: ref for ref in snapshot.source_file_identities}
+    for price in manifest.prices:
+        if price.open_time.path not in refs:
+            continue
+        open_path = (root / price.open_time.path).resolve(strict=True)
+        close_path = (root / price.close_time.path).resolve(strict=True)
+        if root not in open_path.parents or root not in close_path.parents:
+            raise ValueError("source timeline escapes published root")
+        opened = np.load(open_path, mmap_mode="r", allow_pickle=False)
+        closed = np.load(close_path, mmap_mode="r", allow_pickle=False)
+        for ref in snapshot.source_file_identities:
+            if ref.domain.timeframe != price.timeframe or "time" not in ref.domain.axis_order:
+                continue
+            consumed = domains[ref.domain.role]
+            time_axis = consumed.axis_order.index("time")
+            count = consumed.shape[time_axis]
+            if count <= 0 or count > opened.shape[0]:
+                raise ValueError("snapshot consumed timeline length mismatch")
+            origin = _epoch_millis_to_utc_timestamp_v2(int(opened[0])).value
+            full_end = _epoch_millis_to_utc_timestamp_v2(int(closed[-1])).value
+            consumed_end = _epoch_millis_to_utc_timestamp_v2(int(closed[count - 1])).value
+            if (ref.domain.origin_utc != origin.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    or ref.domain.end_utc != full_end.strftime("%Y-%m-%dT%H:%M:%SZ")
+                    or consumed.end_utc != consumed_end.strftime("%Y-%m-%dT%H:%M:%SZ")):
+                raise ValueError("snapshot time domain differs from source timestamps")
+    for ref in snapshot.source_file_identities:
+        path = (root / ref.relative_path).resolve(strict=True)
+        if root not in path.parents:
+            raise ValueError("source file escapes published root")
+        if _file_sha256_hex_v2(path) != ref.sha256:
+            raise ValueError("source file checksum mismatch")
+        array = np.load(path, mmap_mode="r", allow_pickle=False)
+        if tuple(array.shape) != ref.domain.shape or array.dtype.str != ref.domain.dtype:
+            raise ValueError("source file shape/dtype mismatch")
+        domain = domains[ref.domain.role]
+        view = array[tuple(slice(0, size) for size in domain.shape)]
+        if snapshot.prefix_proof.state == "verified":
+            proof_index = snapshot.prefix_proof.domains.index(domain)
+            if domain.payload_digest(view) != snapshot.prefix_proof.role_digests[proof_index]:
+                raise ValueError("source prefix proof mismatch")
+        arrays[ref.relative_path] = view
+    return arrays
+
+
+def _write_signal_features_v2(*, signals: np.ndarray, path: Path) -> None:
+    """One feature formula for native and selected rows, with bounded boolean scratch."""
+    features = np.empty((signals.shape[0], len(SIGNAL_FEATURE_NAMES_V2)), dtype=np.float32)
+    for index in range(signals.shape[0]):
+        features[index] = _build_signal_features_matrix_v2(
+            signal_matrix=signals[index:index + 1])[0]
+    _write_npy_atomically_v2(path=path, array=features)
 
 
 def _materialize_canonical_prices_stage_v2(
@@ -1238,6 +1636,10 @@ def _materialize_canonical_prices_stage_v2(
         slot,
         _CANONICAL_PRICE_TIMEFRAME_LITERAL_V2,
     )
+    price_paths = _candidate_paths_v2(
+        paths=price_paths, candidate_root=slot_root,
+        source_root=artifact_loader.resolve_slot_manifest_path(coordinates, slot).parent,
+    )
     tail_arrays = _read_canonical_price_arrays_v2(
         canonical_candle_reader=canonical_candle_reader,
         coordinates=coordinates,
@@ -1262,6 +1664,7 @@ def _materialize_canonical_prices_stage_v2(
         arrays=materialized_arrays,
     )
     rollup_source_arrays = _load_materialized_price_arrays_v2(
+            slot_root=slot_root,
         artifact_loader=artifact_loader,
         coordinates=coordinates,
         slot=slot,
@@ -1394,6 +1797,7 @@ def _materialize_timeframe_session_v2(
     session_price_arrays: _CanonicalPriceArraysV2 | None = None
     if signal_targets != ():
         session_price_arrays = _load_materialized_price_arrays_v2(
+            slot_root=slot_root,
             artifact_loader=artifact_loader,
             coordinates=coordinates,
             slot=slot,
@@ -1520,7 +1924,7 @@ def _write_root_manifest_stage_v2(
     price_manifests: tuple[ArtifactPriceTimeframeManifestV2, ...],
     mapping_manifests: tuple[ArtifactMappingTimeframeManifestV2, ...],
     signal_catalog: ArtifactSignalCatalogV2,
-    hit_times_reference: ArtifactHitTimesReferenceV2,
+    hit_times_reference: ArtifactHitTimesReferenceV2 | None,
     funding_manifest: ArtifactFundingManifestV2 | None,
 ) -> Path:
     """
@@ -1579,6 +1983,8 @@ def _write_root_manifest_stage_v2(
         mapping_manifests=mapping_manifests,
         provenance=provenance,
     )
+    if runtime_settings.partial_publication:
+        root_manifest_payload["schema_version"] = 2
     _write_yaml_atomically_v2(path=manifest_path, payload=root_manifest_payload)
     return manifest_path
 
@@ -1733,65 +2139,31 @@ def _materialize_signal_artifact_v2(
         effective_tail_bars=effective_tail_bars,
         rebuild_context_bars=rebuild_context_bars,
     )
-    signal_tail_price_arrays = _slice_canonical_price_arrays_v2(
-        arrays=price_arrays,
-        start_idx=signal_tail_plan.compute_start_idx,
-        end_idx=int(price_arrays.open_time.shape[0]),
-    )
-    candles = _candle_arrays_from_price_arrays_v2(
-        coordinates=coordinates,
-        timeframe=signal_target.timeframe,
-        arrays=signal_tail_price_arrays,
-    )
     signal_paths = artifact_loader.resolve_signal_paths(
-        coordinates,
-        slot,
-        signal_target.timeframe,
-        signal_target.indicator_id,
+        coordinates, slot, signal_target.timeframe, signal_target.indicator_id,
     )
-    signal_shape = (len(signal_rows), int(price_arrays.open_time.shape[0]))
-    rule_spec = signal_rules_engine.rule_spec(indicator_id=signal_target.indicator_id)
-    chunk_jobs = _plan_signal_chunk_jobs_v2(
-        runtime_settings=runtime_settings,
-        signal_target=signal_target,
-        timeline_bar_count=signal_shape[1],
-        compute_bar_count=int(candles.close.shape[0]),
-        variant_count=signal_shape[0],
-        dependency_count=len(rule_spec.required_dependency_ids),
+    signal_paths = _candidate_paths_v2(
+        paths=signal_paths, candidate_root=slot_root,
+        source_root=artifact_loader.resolve_slot_manifest_path(coordinates, slot).parent,
     )
-    chunk_blocks = tuple(
-        _build_signal_chunk_blocks_v2(
-            materialized_grid=materialized_grid,
-            chunk_job=chunk_job,
-        )
-        for chunk_job in chunk_jobs
-    )
-    _write_signal_matrix_in_chunks_v2(
-        coordinates=coordinates,
-        slot=slot,
-        slot_generation=slot_generation,
-        force_full_rebuild=request.force_full_rebuild,
-        signal_target=signal_target,
-        signal_paths=signal_paths,
-        signal_shape=signal_shape,
-        candles=candles,
-        signal_worker_processes=runtime_settings.execution_policy.signal_worker_processes,
-        chunk_jobs=chunk_jobs,
-        chunk_blocks=chunk_blocks,
-        signal_rows=signal_rows,
-        signal_tail_plan=signal_tail_plan,
-        existing_signal_artifact=existing_signal_artifact,
-        indicator_compute=indicator_compute,
-        rule_spec=rule_spec,
-        default_inputs_source=default_inputs_source,
-        signal_params_defaults=signal_params_defaults,
-        max_signal_rows_per_artifact=runtime_settings.max_signal_rows_per_artifact,
+    signal_shape, chunk_jobs = _materialize_signal_rows_v2(
+        coordinates=coordinates, timeframe=signal_target.timeframe,
+        indicator_id=signal_target.indicator_id, price_arrays=price_arrays,
+        materialized_grid=materialized_grid, signal_rows=signal_rows, selected_row_ids=None,
+        signal_paths=signal_paths, runtime_settings=runtime_settings,
+        signal_tail_plan=signal_tail_plan, existing_signal_artifact=existing_signal_artifact,
+        indicator_compute=indicator_compute, signal_rules_engine=signal_rules_engine,
+        slot=slot, slot_generation=slot_generation, force_full_rebuild=request.force_full_rebuild,
     )
     signal_features_paths = artifact_loader.resolve_signal_features_paths(
         coordinates,
         slot,
         signal_target.timeframe,
         signal_target.indicator_id,
+    )
+    signal_features_paths = _candidate_paths_v2(
+        paths=signal_features_paths, candidate_root=slot_root,
+        source_root=artifact_loader.resolve_slot_manifest_path(coordinates, slot).parent,
     )
     signal_features_build_result = _materialize_signal_features_artifact_v2(
         slot=slot,
@@ -1832,6 +2204,64 @@ def _materialize_signal_artifact_v2(
         rewritten_tail_bars=signal_shape[1] - signal_tail_plan.reused_prefix_bars,
         completed_chunks_total=len(chunk_jobs),
     )
+
+
+def _materialize_signal_rows_v2(
+    *, coordinates: ArtifactCoordinatesV2, timeframe: str, indicator_id: str,
+    price_arrays: _CanonicalPriceArraysV2, materialized_grid: Any,
+    signal_rows: tuple[_SignalVariantRowV2, ...], selected_row_ids: tuple[int, ...] | None,
+    signal_paths: ArtifactSignalPathsV2, runtime_settings: ArtifactPrecomputeRuntimeSettingsV2,
+    signal_tail_plan: _SignalArtifactTailPlanV2,
+    existing_signal_artifact: _ExistingSignalArtifactV2 | None,
+    indicator_compute: IndicatorCompute, signal_rules_engine: BacktestSignalRulesEngineV2,
+    slot: str, slot_generation: int, force_full_rebuild: bool,
+) -> tuple[tuple[int, int], tuple[ArtifactSignalChunkJobV2, ...]]:
+    """Shared native/selected grid planning, computation, encoding and atomic writer."""
+    target = ArtifactSignalValidationSpecV2(timeframe=timeframe, indicator_id=indicator_id)
+    candles = _candle_arrays_from_price_arrays_v2(
+        coordinates=coordinates, timeframe=timeframe,
+        arrays=_slice_canonical_price_arrays_v2(
+            arrays=price_arrays, start_idx=signal_tail_plan.compute_start_idx,
+            end_idx=int(price_arrays.open_time.shape[0]),
+        ),
+    )
+    shape = (len(signal_rows), int(price_arrays.open_time.shape[0]))
+    rule = signal_rules_engine.rule_spec(indicator_id=indicator_id)
+    source, params = signal_rules_engine.resolved_defaults(indicator_id=indicator_id)
+    jobs = _plan_signal_chunk_jobs_v2(
+        runtime_settings=runtime_settings, signal_target=target,
+        timeline_bar_count=shape[1], compute_bar_count=int(candles.close.shape[0]),
+        variant_count=shape[0], dependency_count=len(rule.required_dependency_ids),
+    )
+    blocks = []
+    for job in jobs:
+        if selected_row_ids is None:
+            blocks.append(_build_signal_chunk_blocks_v2(
+                materialized_grid=materialized_grid, chunk_job=job))
+        else:
+            selected_blocks = []
+            for physical in range(job.row_start_inclusive, job.row_end_exclusive):
+                canonical = selected_row_ids[physical]
+                single = replace(job, row_start_inclusive=canonical,
+                                 row_end_exclusive=canonical + 1, chunk_rows=1)
+                for block in _build_signal_chunk_blocks_v2(
+                    materialized_grid=materialized_grid, chunk_job=single,
+                ):
+                    selected_blocks.append(replace(block, row_start_inclusive=physical,
+                                                   row_end_exclusive=physical + 1))
+            blocks.append(tuple(selected_blocks))
+    _write_signal_matrix_in_chunks_v2(
+        coordinates=coordinates, slot=slot, slot_generation=slot_generation,
+        force_full_rebuild=force_full_rebuild, signal_target=target, signal_paths=signal_paths,
+        signal_shape=shape, candles=candles,
+        signal_worker_processes=runtime_settings.execution_policy.signal_worker_processes,
+        chunk_jobs=jobs, chunk_blocks=tuple(blocks), signal_rows=signal_rows,
+        signal_tail_plan=signal_tail_plan, existing_signal_artifact=existing_signal_artifact,
+        indicator_compute=indicator_compute, rule_spec=rule, default_inputs_source=source,
+        signal_params_defaults=params,
+        max_signal_rows_per_artifact=runtime_settings.max_signal_rows_per_artifact,
+    )
+    return shape, jobs
 
 
 def _materialize_signal_features_artifact_v2(
@@ -1886,8 +2316,7 @@ def _materialize_signal_features_artifact_v2(
             "written signal matrix shape must match the expected strict contract; got "
             f"{actual_signal_shape!r}, expected {signal_shape!r}"
         )
-    feature_matrix = _build_signal_features_matrix_v2(signal_matrix=signal_matrix)
-    _write_npy_atomically_v2(path=signal_features_paths.features, array=feature_matrix)
+    _write_signal_features_v2(signals=signal_matrix, path=signal_features_paths.features)
     feature_manifest = _build_signal_features_manifest_v2(
         slot=slot,
         slot_root=slot_root,
@@ -2427,7 +2856,39 @@ def _write_signal_matrix_in_chunks_v2(
         None if existing_signal_artifact is None else existing_signal_artifact.signals_path
     )
     try:
-        if compute_worker_factory is None or worker_count == 1:
+        if worker_count == 1:
+            for chunk_job, blocks in zip(chunk_jobs, chunk_blocks, strict=True):
+                started_at = time.perf_counter()
+                _log_signal_chunk_progress_v2(
+                    event="artifact_precompute_chunk_started", coordinates=coordinates,
+                    slot=slot, slot_generation=slot_generation,
+                    force_full_rebuild=force_full_rebuild,
+                    current_timeframe=signal_target.timeframe,
+                    current_indicator_id=signal_target.indicator_id, chunk_job=chunk_job,
+                )
+                result = _execute_signal_chunk_job_v2(
+                    indicator_compute=indicator_compute, candles=candles,
+                    chunk_job=chunk_job, chunk_blocks=blocks, signal_rows=signal_rows,
+                    rule_spec=rule_spec, default_inputs_source=default_inputs_source,
+                    signal_params_defaults=signal_params_defaults, output_path=temp_path,
+                    output_shape=signal_shape, existing_signals_path=existing_signals_path,
+                    reused_prefix_bars=signal_tail_plan.reused_prefix_bars,
+                    trim_prefix_bars=signal_tail_plan.trim_prefix_bars,
+                    max_signal_rows_per_artifact=max_signal_rows_per_artifact,
+                )
+                if dict(result.signal_params_defaults) != dict(signal_params_defaults):
+                    raise ValueError("signal chunk defaults drift")
+                completed_chunks_total += 1
+                _log_signal_chunk_progress_v2(
+                    event="artifact_precompute_chunk_finished", coordinates=coordinates,
+                    slot=slot, slot_generation=slot_generation,
+                    force_full_rebuild=force_full_rebuild,
+                    current_timeframe=signal_target.timeframe,
+                    current_indicator_id=signal_target.indicator_id, chunk_job=chunk_job,
+                    completed_chunks_total=completed_chunks_total,
+                    elapsed_seconds=time.perf_counter() - started_at,
+                )
+        elif compute_worker_factory is None:
             with ThreadPoolExecutor(max_workers=worker_count) as executor:
                 future_to_meta = {}
                 for chunk_job, chunk_job_blocks in zip(chunk_jobs, chunk_blocks, strict=True):
@@ -3035,6 +3496,7 @@ def _build_signal_variant_rows_v2(
     coordinates: ArtifactCoordinatesV2,
     timeframe: str,
     materialized_grid: Any,
+    row_ids: tuple[int, ...] | None = None,
 ) -> tuple[_SignalVariantRowV2, ...]:
     """
     Build deterministic signal row descriptors matching the compute tensor variant order.
@@ -3061,7 +3523,19 @@ def _build_signal_variant_rows_v2(
     """
     instrument_id = str(_instrument_id_from_coordinates_v2(coordinates))
     axis_values = tuple(axis.values for axis in materialized_grid.axes)
-    ordered_value_rows = product(*axis_values) if len(axis_values) > 0 else ((),)
+    if row_ids is None:
+        ordered_value_rows = product(*axis_values) if len(axis_values) > 0 else ((),)
+    else:
+        selected_values = []
+        for row_id in row_ids:
+            if row_id < 0 or row_id >= math.prod(len(values) for values in axis_values):
+                raise ValueError("selected canonical row ID is outside the supported grid")
+            indexes = []
+            for values in reversed(axis_values):
+                row_id, index = divmod(row_id, len(values))
+                indexes.append(values[index])
+            selected_values.append(tuple(reversed(indexes)))
+        ordered_value_rows = iter(selected_values)
     rows: list[_SignalVariantRowV2] = []
     for value_row in ordered_value_rows:
         inputs: dict[str, int | float | str] = {}
@@ -4732,6 +5206,7 @@ def _load_materialized_price_arrays_v2(
     timeframe: str,
     manifest_section: ArtifactPriceTimeframeManifestV2,
     location_prefix: str,
+    slot_root: Path | None = None,
 ) -> _CanonicalPriceArraysV2:
     """
     Load one already-materialized `prices/<tf>` family using strict manifest metadata.
@@ -4761,6 +5236,11 @@ def _load_materialized_price_arrays_v2(
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
     price_paths = artifact_loader.resolve_price_paths(coordinates, slot, timeframe)
+    if slot_root is not None:
+        price_paths = _candidate_paths_v2(
+            paths=price_paths, candidate_root=slot_root,
+            source_root=artifact_loader.resolve_slot_manifest_path(coordinates, slot).parent,
+        )
     open_time = _load_validated_array_v2(
         metadata=manifest_section.open_time,
         expected_path=price_paths.open_time,
@@ -4902,6 +5382,10 @@ def _materialize_rolled_price_timeframe_v2(
         source_tail_time_range=source_tail_time_range,
     )
     price_paths = artifact_loader.resolve_price_paths(coordinates, slot, timeframe)
+    price_paths = _candidate_paths_v2(
+        paths=price_paths, candidate_root=slot_root,
+        source_root=artifact_loader.resolve_slot_manifest_path(coordinates, slot).parent,
+    )
     _write_price_arrays_atomically_v2(price_paths=price_paths, arrays=rolled_arrays)
     return _build_price_manifest_v2(
         slot_root=slot_root,
@@ -5060,6 +5544,7 @@ def _materialize_mapping_timeframe_v2(
     if price_manifest is None:
         raise ValueError(f"materialized prices[{timeframe}] manifest section is required")
     timeframe_arrays = _load_materialized_price_arrays_v2(
+            slot_root=slot_root,
         artifact_loader=artifact_loader,
         coordinates=coordinates,
         slot=slot,
@@ -5083,6 +5568,10 @@ def _materialize_mapping_timeframe_v2(
         mapping_tail_bars_1m=mapping_tail_bars_1m,
     )
     mapping_paths = artifact_loader.resolve_mapping_paths(coordinates, slot, timeframe)
+    mapping_paths = _candidate_paths_v2(
+        paths=mapping_paths, candidate_root=slot_root,
+        source_root=artifact_loader.resolve_slot_manifest_path(coordinates, slot).parent,
+    )
     _write_mapping_arrays_atomically_v2(
         mapping_paths=mapping_paths,
         arrays=mapping_build_result.arrays,
@@ -5524,6 +6013,8 @@ def _load_existing_hit_times_artifact_v2(
         slot_root=hit_times_paths.manifest.parents[2],
         absolute_path=hit_times_paths.manifest,
     )
+    if existing_manifest.hit_times is None:
+        return None
     if existing_manifest.hit_times.manifest_path != expected_manifest_path:
         return None
     required_paths = (
@@ -5874,7 +6365,7 @@ def _materialize_hit_times_artifacts_v2(
     Returns:
         _HitTimesArtifactBuildResultV2: Typed manifest plus root-manifest reference payload.
     Assumptions:
-        Hit-times are derived only from already materialized `prices/1m` artifacts.
+        Hit-times use the original 15m rollup timeline, with unchanged global indexes.
     Raises:
         ValueError: If computed tables violate the strict contract or exceed configured budgets.
         OSError: If writing arrays or manifest files fails.
@@ -5888,6 +6379,10 @@ def _materialize_hit_times_artifacts_v2(
       - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
     """
     hit_times_paths = artifact_loader.resolve_hit_times_paths(coordinates, slot)
+    hit_times_paths = _candidate_paths_v2(
+        paths=hit_times_paths, candidate_root=slot_root,
+        source_root=artifact_loader.resolve_slot_manifest_path(coordinates, slot).parent,
+    )
     existing_hit_times_artifact = _load_existing_hit_times_artifact_v2(
         artifact_loader=artifact_loader,
         coordinates=coordinates,
@@ -6036,6 +6531,10 @@ def _build_funding_artifact_v2(
             )
         )
     funding_paths = artifact_loader.resolve_funding_paths(coordinates, slot)
+    funding_paths = _candidate_paths_v2(
+        paths=funding_paths, candidate_root=slot_root,
+        source_root=artifact_loader.resolve_slot_manifest_path(coordinates, slot).parent,
+    )
     funding_time = np.asarray(
         [int(record.funding_time.value.timestamp() * 1000) for record in snapshot.records],
         dtype=np.int64,
@@ -6938,6 +7437,8 @@ def _build_root_manifest_scaffold_v2(
             funding=None,
             signal_encoding=_default_signal_encoding_contract_v2(),
         )
+    if existing_manifest.hit_times is None:
+        raise ValueError("schema-1 publisher cannot reuse a partial schema-2 scaffold")
     return _RootManifestScaffoldV2(
         preserved_prices=tuple(
             section
@@ -7542,7 +8043,7 @@ def _build_root_manifest_payload_v2(
         mapping_manifests=mapping_manifests,
     )
     payload = {
-        "schema_version": 1,
+        "schema_version": 2 if root_scaffold.hit_times is None else 1,
         "manifest_kind": "slot_root",
         "slot": slot,
         "slot_generation": slot_generation,
@@ -7555,10 +8056,11 @@ def _build_root_manifest_payload_v2(
         "prices": [_serialize_price_manifest_v2(section) for section in merged_prices],
         "mappings": [_serialize_mapping_manifest_v2(section) for section in merged_mappings],
         "signals": _serialize_signal_catalog_v2(root_scaffold.signals),
-        "hit_times": _serialize_hit_times_reference_v2(root_scaffold.hit_times),
         "signal_encoding": _serialize_signal_encoding_v2(root_scaffold.signal_encoding),
         "provenance": _serialize_provenance_v2(provenance),
     }
+    if root_scaffold.hit_times is not None:
+        payload["hit_times"] = _serialize_hit_times_reference_v2(root_scaffold.hit_times)
     if root_scaffold.funding is not None:
         payload["funding"] = _serialize_funding_manifest_v2(root_scaffold.funding)
     return payload
@@ -8525,3 +9027,30 @@ def _time_range_literal_v2(time_range: TimeRange) -> str:
       - src/trading/shared_kernel/primitives/time_range.py
     """
     return f"{time_range.start} .. {time_range.end}"
+
+
+def derivative_defaults_sha256(
+    *, rows: tuple[ArtifactRequestedRow, ...],
+    defaults_provider: BacktestGridDefaultsProvider | None,
+    signal_rules_engine: BacktestSignalRulesEngineV2 | None,
+    indicator_grid_builder: GridBuilder | None,
+) -> str:
+    """Shared metadata-only default fingerprint for preflight and native preparation."""
+    if not rows:
+        return hashlib.sha256(b"{}").hexdigest()
+    if defaults_provider is None or signal_rules_engine is None:
+        raise ValueError("derivative signals require compute and signal defaults")
+    payload = {}
+    for indicator in sorted({row.indicator_id for row in rows}):
+        grid = _resolve_signal_target_compute_grid_v2(
+            defaults_provider=defaults_provider, indicator_id=indicator)
+        assert indicator_grid_builder is not None
+        materialized = indicator_grid_builder.materialize_indicator(grid=grid)
+        source, params = signal_rules_engine.resolved_defaults(indicator_id=indicator)
+        payload[indicator] = {
+            "axes": [(axis.name, list(axis.values)) for axis in materialized.axes],
+            "source": source, "params": dict(params),
+        }
+    return hashlib.sha256(json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), allow_nan=False,
+    ).encode()).hexdigest()

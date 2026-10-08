@@ -623,7 +623,10 @@ class _FakeArtifactResolver:
     funding_missing_event_count: int | None = None
     funding_reason_codes: tuple[str, ...] = ()
 
-    def resolve_context(self, *, coordinates: BacktestCoordinates) -> BacktestArtifactMetadata:
+    def resolve_context(
+        self, *, coordinates: BacktestCoordinates,
+        preferred: BacktestArtifactMetadata | None = None,
+    ) -> BacktestArtifactMetadata:
         self.coordinates = (*self.coordinates, coordinates)
         return BacktestArtifactMetadata(
             artifact_slot="slot_a",
@@ -703,3 +706,48 @@ def _valid_request() -> dict[str, Any]:
         },
         "top_n": 10,
     }
+
+
+def test_nonuniform_risk_levels_survive_normalization_and_runtime_parsing() -> None:
+    from trading.contexts.backtest.application.services.v2.tp_sl_hit_times import (
+        _requested_grid_from_normalized,
+    )
+
+    service = _service(resolver=_FakeArtifactResolver())
+    request = _valid_request()
+    request["risk"] = {"mode": "tp_sl_grid", "tp": [0.5, 1, 2, 3], "sl": [0.5, 1, 2]}
+    first = service.execute(request)
+    grid = _requested_grid_from_normalized(first.normalized_request)
+    assert grid.tp_levels_pct == (0.5, 1.0, 2.0, 3.0)
+    assert grid.sl_levels_pct == (0.5, 1.0, 2.0)
+    assert first.cost_estimate.tp_sl_cells == 12
+    second = service.execute(first.normalized_request)
+    assert first.request_hash == second.request_hash
+    assert first.normalized_request == second.normalized_request
+
+
+@pytest.mark.parametrize('side', [
+    {'enabled': True, 'levels_pct': [0.5, 1], 'start_pct': 0.5},
+    {'enabled': True, 'levels_pct': []},
+    {'enabled': True, 'levels_pct': {'levels_pct': [1]}},
+])
+def test_explicit_risk_levels_reject_ambiguous_or_empty_shapes(side) -> None:
+    request = _valid_request()
+    request['risk'] = {'mode': 'tp_sl_grid', 'tp': side, 'sl': {'enabled': False}}
+    with pytest.raises(BacktestPreflightRejected):
+        _service().execute(request)
+
+
+def test_uniform_risk_list_retains_legacy_range_and_identity() -> None:
+    request = _valid_request()
+    request['risk'] = {'mode': 'tp_sl_grid', 'tp': [0.5, 1, 1.5], 'sl': [1]}
+    service = _service()
+    explicit = service.execute(request)
+    request['risk'] = {
+        'mode': 'tp_sl_grid',
+        'tp': {'enabled': True, 'start_pct': 0.5, 'stop_pct': 1.5, 'step_pct': 0.5},
+        'sl': {'enabled': True, 'start_pct': 1, 'stop_pct': 1, 'step_pct': 1},
+    }
+    legacy = service.execute(request)
+    assert explicit.normalized_request['risk'] == request['risk']
+    assert explicit.request_hash == legacy.request_hash

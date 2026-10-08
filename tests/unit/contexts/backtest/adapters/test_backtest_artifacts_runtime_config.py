@@ -623,3 +623,50 @@ def test_build_backtest_artifacts_runtime_config_hash_is_deterministic(tmp_path:
     assert build_backtest_artifacts_runtime_config_hash(config=config_a) == (
         build_backtest_artifacts_runtime_config_hash(config=config_b)
     )
+
+
+def test_coordinate_retention_is_bounded_and_preserves_default_support(tmp_path):
+    import yaml
+
+    from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+        ArtifactCoordinatesV2,
+    )
+
+    payload = yaml.safe_load(_VALID_BACKTEST_ARTIFACTS_CONFIG)
+    baseline = load_backtest_artifacts_runtime_config(_write_backtest_artifacts_config(
+        tmp_path, body=_VALID_BACKTEST_ARTIFACTS_CONFIG,
+    ))
+    payload["backtest_artifacts"]["retention_policy"] = {
+        "version": 1,
+        "coordinates": [{"exchange": "binance", "market_type": "spot", "symbol": f"asset{i}usdt",
+                         "signals": "on_demand", "hit_times": "on_demand"} for i in range(200)],
+    }
+    config = load_backtest_artifacts_runtime_config(_write_backtest_artifacts_config(
+        tmp_path, body=yaml.safe_dump(payload),
+    ))
+    assert config.validation_plan == baseline.validation_plan
+    assert config.hit_times_grid == baseline.hit_times_grid
+    for i in range(200):
+        coordinates = ArtifactCoordinatesV2("binance", "spot", f"asset{i}usdt")
+        settings = config.to_precompute_runtime_settings(
+            config_sha256="a" * 64, coordinates=coordinates,
+        )
+        assert settings.signal_artifacts == ()
+        assert not settings.precompute_hit_times
+        assert settings.price_timeframes == baseline.validation_plan.price_timeframes
+        assert not config.to_validation_spec(coordinates).require_hit_times_manifest
+    other = ArtifactCoordinatesV2("binance", "spot", "btcusdt")
+    assert config.to_validation_spec(other) == baseline.to_validation_spec()
+    assert config.to_precompute_runtime_settings(
+        config_sha256="a" * 64, coordinates=other,
+    ) == baseline.to_precompute_runtime_settings(config_sha256="a" * 64)
+    assert build_backtest_artifacts_runtime_config_hash(config=config) != (
+        build_backtest_artifacts_runtime_config_hash(config=baseline)
+    )
+    payload["backtest_artifacts"]["retention_policy"]["coordinates"].append(
+        payload["backtest_artifacts"]["retention_policy"]["coordinates"][0],
+    )
+    with pytest.raises(ValueError, match="duplicate retention"):
+        load_backtest_artifacts_runtime_config(_write_backtest_artifacts_config(
+            tmp_path, body=yaml.safe_dump(payload),
+        ))

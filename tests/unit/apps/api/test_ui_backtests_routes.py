@@ -303,7 +303,10 @@ class _FakeSearchEnabledTradableInstrumentsUseCase:
 
 
 class _FakeArtifactResolver:
-    def resolve_context(self, *, coordinates: BacktestCoordinates) -> BacktestArtifactMetadata:
+    def resolve_context(
+        self, *, coordinates: BacktestCoordinates,
+        preferred: BacktestArtifactMetadata | None = None,
+    ) -> BacktestArtifactMetadata:
         return BacktestArtifactMetadata(
             artifact_slot="slot_a",
             artifact_slot_generation=4,

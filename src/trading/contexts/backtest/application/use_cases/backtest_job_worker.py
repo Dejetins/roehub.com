@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import socket
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from time import monotonic
-from typing import Any, Protocol
+from typing import Any, Mapping, Protocol
 from uuid import UUID
 
 from trading.contexts.backtest.application.dto import (
@@ -36,6 +36,8 @@ class BacktestJobExecutor(Protocol):
         preflight: BacktestPreflightResult,
         updated_at: datetime,
         cancel_event: threading.Event | None = None,
+        job: BacktestJob | None = None,
+        locked_by: str | None = None,
     ) -> Any:
         ...
 
@@ -50,6 +52,7 @@ class BacktestJobWorkerResult:
     claimed: bool
     lease_lost: bool = False
     status: str | None = None
+    stage_timings: Mapping[str, float] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +68,7 @@ class BacktestJobWorkerUseCase:
     validation_guardrails: BacktestRuntimeGuardrails | None = None
 
     def run_next(self) -> BacktestJobWorkerResult:
+        attempt_started = monotonic()
         now = datetime.now(UTC)
         owner = self._locked_by()
         job = self._claim_next(now=now, locked_by=owner)
@@ -81,12 +85,15 @@ class BacktestJobWorkerUseCase:
         )
         try:
             cancel_event = threading.Event()
-            if self.validation_guardrails is None:
+            if job.input_recipe_json is not None:
+                preflight = self.preflight_service.validate_stored_recipe(
+                    job=job, validation_guardrails=self.validation_guardrails,
+                )
+            elif self.validation_guardrails is None:
                 preflight = self.preflight_service.execute(dict(job.request_json))
             else:
                 preflight = self.preflight_service.execute(
-                    dict(job.request_json),
-                    validation_guardrails=self.validation_guardrails,
+                    dict(job.request_json), validation_guardrails=self.validation_guardrails,
                 )
             with _LeaseHeartbeat(
                 lease_repository=self.lease_repository,
@@ -101,9 +108,12 @@ class BacktestJobWorkerUseCase:
                     preflight=preflight,
                     updated_at=datetime.now(UTC),
                     cancel_event=cancel_event,
+                    job=job,
+                    locked_by=owner,
                 )
             if cancel_event.is_set() or heartbeat.cancel_requested:
                 cancelled = self.job_repository.finish_with_top_variants(
+                    attempt=job.attempt,
                     job_id=job.job_id,
                     organization_id=job.organization_id,
                     user_id=job.user_id,
@@ -135,7 +145,9 @@ class BacktestJobWorkerUseCase:
                     lease_lost=heartbeat.lease_lost or requeued is None,
                     status="requeued_heavy",
                 )
+            persistence_started = monotonic()
             finished = self.job_repository.finish_with_top_variants(
+                attempt=job.attempt,
                 job_id=job.job_id,
                 organization_id=job.organization_id,
                 user_id=job.user_id,
@@ -148,9 +160,15 @@ class BacktestJobWorkerUseCase:
                 job=finished,
                 claimed=True,
                 lease_lost=heartbeat.lease_lost or finished is None,
+                stage_timings={
+                    **execution_result.stage_timings,
+                    "parent_result_persistence": monotonic() - persistence_started,
+                    "worker_attempt_including_persistence": monotonic() - attempt_started,
+                },
             )
         except BacktestJobCancellationRequested:
             cancelled = self.job_repository.finish_with_top_variants(
+                attempt=job.attempt,
                 job_id=job.job_id,
                 organization_id=job.organization_id,
                 user_id=job.user_id,
@@ -167,6 +185,7 @@ class BacktestJobWorkerUseCase:
             )
         except Exception as error:  # noqa: BLE001
             failed = self.job_repository.finish_with_top_variants(
+                attempt=job.attempt,
                 job_id=job.job_id,
                 organization_id=job.organization_id,
                 user_id=job.user_id,
@@ -250,12 +269,17 @@ class _LeaseHeartbeat:
     def _run(self) -> None:
         next_heartbeat = monotonic() + self._interval_seconds
         while not self._stop.wait(max(next_heartbeat - monotonic(), 0.0)):
-            updated = self._lease_repository.heartbeat(
-                job_id=self._job_id,
-                now=datetime.now(UTC),
-                locked_by=self._locked_by,
-                lease_seconds=self._lease_seconds,
-            )
+            try:
+                updated = self._lease_repository.heartbeat(
+                    job_id=self._job_id,
+                    now=datetime.now(UTC),
+                    locked_by=self._locked_by,
+                    lease_seconds=self._lease_seconds,
+                )
+            except Exception:  # DB loss is uncertain ownership; stop scoring and reap.
+                self._lease_lost = True
+                self._cancel_event.set()
+                return
             if updated is None:
                 self._lease_lost = True
                 self._cancel_event.set()

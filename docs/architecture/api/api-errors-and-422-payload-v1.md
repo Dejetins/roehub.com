@@ -40,3 +40,20 @@
 
 Проверка: [tests/unit/apps/api/test_api_error_handlers.py](../../../tests/unit/apps/api/test_api_error_handlers.py),
 `python -m pytest -q tests/unit/apps/api/test_api_error_handlers.py`.
+
+## Backtest NPY readiness and replay
+
+NPY materialization сохраняет существующий error envelope: новый публичный
+source/materialization code не вводится. Отсутствующий optional derivative при
+поддерживаемом запросе означает `input_readiness.status=requires_materialization`,
+а не unavailable. Отсутствующие/непригодные candles, несовместимая source identity,
+неподтверждённый replay prefix или math version используют существующий
+`backtest.artifacts_unavailable` там, где ошибка возвращается синхронно.
+Unsupported risk grid сохраняет `backtest.tp_sl_grid_not_covered` (422).
+
+Асинхронный сбой preparation/replay отражается через job/materialization state;
+это не обязательно HTTP 503 первоначального запроса. Public cache metadata
+ограничена status/key/TTL; failed materialization выдаёт безопасные постоянные
+code/message. Raw IO diagnostics остаются внутри persistence, абсолютные paths
+и manifests не публикуются. Повтор запроса не исправляет изменённую историю или
+unsupported version: сначала требуется восстановить совместимый source/runtime.

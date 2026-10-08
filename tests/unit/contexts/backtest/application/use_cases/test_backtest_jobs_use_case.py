@@ -431,7 +431,7 @@ def _use_case(
 ) -> BacktestJobsUseCase:
     runtime_config = _runtime_config()
     return BacktestJobsUseCase(
-        job_repository=repository,
+        job_repository=cast(Any, repository),
         preflight_service=BacktestPreflightService(
             defaults_provider=None,  # type: ignore[arg-type]
             artifact_context_resolver=None,  # type: ignore[arg-type]
@@ -749,6 +749,7 @@ class _Repository:
         user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         next_state: BacktestJobState,
         top_variants: tuple[BacktestJobTopVariant, ...],
         last_error: str | None = None,
@@ -839,6 +840,14 @@ class _Repository:
 
 @dataclass
 class _CreateRepository:
+    def transaction(self):
+        from contextlib import nullcontext
+
+        return nullcontext(self)
+
+    def reserve_artifact_reader(self, *, reader):
+        return reader
+
     jobs: dict[UUID, BacktestJob] = field(default_factory=dict)
     top_rows: dict[UUID, tuple[BacktestJobTopVariant, ...]] = field(default_factory=dict)
 
@@ -972,6 +981,7 @@ class _CreateRepository:
         user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         next_state: BacktestJobState,
         top_variants: tuple[BacktestJobTopVariant, ...],
         last_error: str | None = None,
@@ -1045,6 +1055,9 @@ class _Trigger:
 
 
 class _PreflightService:
+    def revalidate_preflight_source(self, *, preflight):
+        assert preflight.artifact_metadata == _artifact_metadata()
+
     def execute(self, payload: Any) -> BacktestPreflightResult:
         request = dict(payload)
         request.setdefault("top_n", 100)
@@ -1144,3 +1157,46 @@ def _request() -> dict[str, Any]:
         "ranking": {"primary_metric": "total_return_pct", "direction": "desc"},
         "top_n": 100,
     }
+
+
+@pytest.mark.parametrize("failure", ["reserved", "stale"])
+def test_create_reports_retryable_artifact_unavailability_without_enqueue(monkeypatch, failure):
+    from trading.contexts.backtest.application.ports.backtest_job_repositories import (
+        ArtifactOwnershipConflict,
+    )
+    from trading.contexts.backtest.application.services.v2.preflight import (
+        BacktestPreflightRejected,
+    )
+
+    repository = _CreateRepository()
+    trigger = _Trigger()
+    use_case = _create_use_case(repository=repository, trigger=trigger)
+
+    def reject(**kwargs):
+        if failure == "reserved":
+            raise ArtifactOwnershipConflict("artifact_source_reserved")
+        raise BacktestPreflightRejected(
+            error_code="backtest.artifacts_unavailable",
+            message="Source changed",
+            issues=(),
+            retryable=True,
+        )
+
+    if failure == "reserved":
+        monkeypatch.setattr(repository, "reserve_artifact_reader", reject)
+    else:
+        monkeypatch.setattr(
+            _PreflightService,
+            "revalidate_preflight_source",
+            lambda self, **kwargs: reject(**kwargs),
+        )
+    with pytest.raises(RoehubError) as error:
+        use_case.create(
+            user_id=UserId.from_string("00000000-0000-0000-0000-000000000305"),
+            payload=_request(),
+            idempotency_key=None,
+        )
+    assert error.value.code == "backtest.artifacts_unavailable"
+    assert error.value.details is not None
+    assert error.value.details["retryable"] is True
+    assert not repository.jobs and not trigger.calls

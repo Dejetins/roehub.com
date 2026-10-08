@@ -1,0 +1,481 @@
+{
+  "schema": "roehub-s04-bounded-evidence/v1",
+  "stage": "S04",
+  "executor": "codex-s04-20261007-72ac4f09",
+  "commands": [
+    {
+      "label": "Required worker gate",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "tests/unit/apps/worker/backtest_job_runner",
+        "tests/unit/apps/worker/test_backtest_job_runner.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py"
+      ],
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "65 passed in 14.07s",
+      "log": "/tmp/roehub-npy-s04-72ac4f09/required-reviewed.log"
+    },
+    {
+      "label": "Disposable Postgres C07/C08 and lease/recovery gate",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "tests/real_infra/backtest/test_artifact_input_lifecycle.py"
+      ],
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "32 passed in 28.42s",
+      "log": "/tmp/roehub-npy-s04-72ac4f09/postgres-reviewed.log",
+      "environment": {
+        "ROEHUB_BACKTEST_TEST_DSN": "host=127.0.0.1 port=53951 dbname=s04 user=postgres"
+      }
+    },
+    {
+      "label": "Production incremental-source pin follow-up",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+        "-k",
+        "real_private_builder"
+      ],
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "1 passed, 31 deselected in 1.62s",
+      "log": "/tmp/roehub-npy-s04-72ac4f09/incremental-pin-final.log",
+      "environment": {
+        "ROEHUB_BACKTEST_TEST_DSN": "host=127.0.0.1 port=53951 dbname=s04 user=postgres"
+      }
+    },
+    {
+      "label": "Affected consumers and source numerical regressions",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_lazy_trades_materialization_worker_use_case.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py",
+        "tests/unit/contexts/backtest/adapters/outbound/test_postgres_research_organization_scope.py",
+        "tests/unit/contexts/market_data/adapters/test_postgres_instrument_selection_repository.py",
+        "tests/unit/apps/api/test_backtests_routes.py"
+      ],
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "208 passed in 22.72s",
+      "log": "/tmp/roehub-npy-s04-72ac4f09/consumers-current.log"
+    },
+    {
+      "label": "Publisher CLI/scheduler, preflight, loaders, lazy-detail consumers",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py",
+        "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py",
+        "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+        "tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_backtest_preflight_service.py",
+        "tests/unit/contexts/backtest/adapters/outbound/artifacts_fs",
+        "tests/unit/contexts/backtest/application/services/v2/test_lazy_trades_detail_service.py"
+      ],
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "121 passed in 10.10s",
+      "log": "/tmp/roehub-npy-s04-72ac4f09/publisher-consumers-final.log"
+    },
+    {
+      "label": "Admission error envelope follow-up",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py",
+        "tests/unit/apps/api/test_backtests_routes.py"
+      ],
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "100 passed in 4.21s",
+      "log": "/tmp/roehub-npy-s04-72ac4f09/admission-transport-final.log"
+    },
+    {
+      "label": "Final C14 policy and pre-marker crash regression",
+      "argv": [
+        "uv",
+        "run",
+        "pytest",
+        "-q",
+        "tests/unit/apps/worker/backtest_job_runner/test_materialization_lifecycle.py"
+      ],
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "13 passed in 3.12s",
+      "log": "/tmp/roehub-npy-s04-72ac4f09/c14-final.log"
+    },
+    {
+      "label": "Focused lint",
+      "argv": [
+        "uv",
+        "run",
+        "ruff",
+        "check",
+        "apps/worker/backtest_job_runner/main/full_job_child.py",
+        "apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py",
+        "apps/worker/backtest_job_runner/wiring/modules/child_ipc.py",
+        "apps/worker/backtest_job_runner/wiring/modules/child_process.py",
+        "apps/worker/backtest_job_runner/wiring/modules/compute_resources.py",
+        "apps/worker/backtest_job_runner/wiring/modules/full_job_compute.py",
+        "apps/worker/backtest_job_runner/wiring/modules/lazy_trades_child_process.py",
+        "apps/worker/backtest_job_runner/wiring/modules/process_observation.py",
+        "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py",
+        "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py",
+        "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_lease_repository.py",
+        "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_repository.py",
+        "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/gateway.py",
+        "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/lazy_trades_materialization_repository.py",
+        "src/trading/contexts/backtest/application/dto/artifact_inputs.py",
+        "src/trading/contexts/backtest/application/ports/backtest_job_repositories.py",
+        "src/trading/contexts/backtest/application/services/v2/job_orchestration.py",
+        "src/trading/contexts/backtest/application/services/v2/preflight.py",
+        "src/trading/contexts/backtest/application/services/v2/prepare_pools.py",
+        "src/trading/contexts/backtest/application/use_cases/backtest_job_worker.py",
+        "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py",
+        "src/trading/contexts/backtest/application/use_cases/lazy_trades_materialization_worker.py",
+        "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/path_builder.py",
+        "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/backtest_job_repository.py",
+        "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/gateway.py",
+        "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_loader.py",
+        "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_slot_publisher.py",
+        "src/trading/contexts/backtest_artifacts/application/services/v2/contracts.py",
+        "src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py",
+        "tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+        "tests/real_infra/market_data/test_work_requests_postgres.py",
+        "tests/unit/apps/api/test_backtests_routes.py",
+        "tests/unit/apps/worker/backtest_job_runner/materialization_drill_child.py",
+        "tests/unit/apps/worker/backtest_job_runner/test_materialization_lifecycle.py",
+        "tests/unit/contexts/backtest/adapters/outbound/test_postgres_research_organization_scope.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py",
+        "tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_lazy_trades_materialization_worker_use_case.py",
+        "tests/unit/contexts/market_data/adapters/test_postgres_instrument_selection_repository.py",
+        "tools/qa/backtests_client_fixture.py",
+        "tools/qa/backtests_expand_demo.py",
+        "tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py"
+      ],
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "All checks passed!",
+      "log": "/tmp/roehub-npy-s04-72ac4f09/ruff-complete.log"
+    },
+    {
+      "label": "Repository type gate",
+      "argv": [
+        "uv",
+        "run",
+        "pyright"
+      ],
+      "cwd": "/Users/daniildegtyarev/Projects/roehub.com",
+      "exit_code": 0,
+      "result": "0 errors, 0 warnings, 0 informations",
+      "log": "/tmp/roehub-npy-s04-72ac4f09/pyright-complete.log"
+    }
+  ],
+  "owned_code_files": [
+    {
+      "path": "apps/worker/backtest_job_runner/main/full_job_child.py",
+      "change": "modified",
+      "baseline_sha256": "e25941bb0a9bab2e79ba40e25086e2c1672ab01834e60ff4c4a28ac4435c5ae1",
+      "verified_sha256": "82a5f552ad383f3ba6d51b936517c2b4cd4b18d70da67321ebd2e3fe68825b46"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py",
+      "change": "modified",
+      "baseline_sha256": "9e6deee5c114c2d8af6bee45b0cdefa3f522a4b71b18a8f57a851981fafde107",
+      "verified_sha256": "0496d674c70d261bb29d51be398d8e2dc895b5d8ecc5337050def791d035c609"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/child_ipc.py",
+      "change": "modified",
+      "baseline_sha256": "40d1759e4b2322def842e6b49f43d63e431f7281735957bd9b7ca58abb110f2c",
+      "verified_sha256": "f24c61acc87bc699e5f8126cb3dc862c2991670829bba55bd33aee4804224e71"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/child_process.py",
+      "change": "modified",
+      "baseline_sha256": "f72090f4703292621ff8c437487f282b16c9124c876844913acda4d10a904f07",
+      "verified_sha256": "21eff4e988c8ab0e9521444131264e7ff8fb025fd43e075da91e7558880e0e7b"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/compute_resources.py",
+      "change": "modified",
+      "baseline_sha256": "74496d6b9c65ccc5389f34b3c0116f9ff3f2ea6ac098d47ec3e77dda089afb08",
+      "verified_sha256": "b696225271ad7a0e44df702b97b51db7a015fd8cf6cc10e097ef52794ff18c63"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/full_job_compute.py",
+      "change": "modified",
+      "baseline_sha256": "26d69b6f784f187e646796d0b69edd9031b7dd9432554407765430cb723400a3",
+      "verified_sha256": "f112e4aaa22f94a64c007acad345ccaf5fb5a5102e768ceb9ff06d739ab221b4"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/lazy_trades_child_process.py",
+      "change": "modified",
+      "baseline_sha256": "c106a3e9ff594b3c91b1b82c33ad2e1bfa510a3865a7ef7a33f1ec20bc603382",
+      "verified_sha256": "a976669699f2ae9999aa085bb989db8cb6e33e95ea65818048d374a4a056a2c1"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/modules/process_observation.py",
+      "change": "modified",
+      "baseline_sha256": "822abe9ca4c69460c5936d8484a3e9afb28469153daf7c9b763dc99bc10cd191",
+      "verified_sha256": "551df785ad6786e8465b6a48f3cf9bcd84f7c7968ee1fff93249c7d2635fd4f3"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py",
+      "change": "modified",
+      "baseline_sha256": "7b0a67966641564ef4211690138470d21d0af5966d4f34f4ac1b5666e924eb00",
+      "verified_sha256": "6876e06a644fd190c0ad3a137b5f98a7cd39a49f50902992c36e0d9aacfac02d"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/path_builder.py",
+      "change": "modified",
+      "baseline_sha256": "56b1d23f1be20950650d2531ead00ab360855b51877a38bed59c9b09f42d2bbc",
+      "verified_sha256": "ae9daa306409986487997b2e21efbdf1a2ebe04cddd2c8d040c8f64949c5ea69"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_lease_repository.py",
+      "change": "modified",
+      "baseline_sha256": "f14200d441c357aaf1d5978a14138c6600d9e639204b7d97498b0019db8634ed",
+      "verified_sha256": "b1375b3ec6c20279fc939179377bd8dd9e506c3230db86bbd67d97add34fb0f8"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/backtest_job_repository.py",
+      "change": "modified",
+      "baseline_sha256": "a7a51115456ba123dd21cd259ef13ca9cb61cc2220d27e56a0bafc622e12f75d",
+      "verified_sha256": "e5cb490cf6eb2ccb175418c047f31e717b0e10051ee1cb8241641f99b538f99a"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/gateway.py",
+      "change": "modified",
+      "baseline_sha256": "b55213a8bb18e0a2d09fcb1671dd1b4697cb78b86cc6b8fb918bab0163827d77",
+      "verified_sha256": "6ff11e76ba381fbbc0bb2e58ab8c85c2ab84e900bf275d9d727baaf5b6ba5695"
+    },
+    {
+      "path": "src/trading/contexts/backtest/adapters/outbound/persistence/postgres/lazy_trades_materialization_repository.py",
+      "change": "modified",
+      "baseline_sha256": "89d8af51f09e91da47878fdddc4cc4ebfe42b41106237bfaa2cc26e5960bd775",
+      "verified_sha256": "b3c4dfafb07066b1b43da48a3512b9576f5eb7a0a5120edd3e83a7a29193c830"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/dto/artifact_inputs.py",
+      "change": "modified",
+      "baseline_sha256": "4eb2474bb2f36514955320c1748a2a5790d4c9b83dedaf4a829e0bef9965be15",
+      "verified_sha256": "f0b10252f74a1f55a0d61c06debd52612dabc16f2fe11e2afa3afe2fe77cb591"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/ports/backtest_job_repositories.py",
+      "change": "modified",
+      "baseline_sha256": "a16d7b53ca8bd435857d51123249a7fb59a6625250931a315475bc3bfb9453c0",
+      "verified_sha256": "bafb6e37c1201bdb2136d8d6f0f21c9fc631dd3fb284a34c12ce667008539aeb"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/job_orchestration.py",
+      "change": "modified",
+      "baseline_sha256": "41d6e7ae42b3c5dae80e16686c9db5bc47eb7d799fb0c9194619a81c694e555c",
+      "verified_sha256": "71b5ed07738888c846141482327545b594ed96bf43918fd0a639161a7e5ff877"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/preflight.py",
+      "change": "modified",
+      "baseline_sha256": "b88916e84529e9e4c0f839b3d6fd97a08390e5c4a5d85e3670e9e478f2ed4f42",
+      "verified_sha256": "f58083ae8541ef45d0c56002bddf4d3d50628485fbf4fccdb541c18bc8f3fb1e"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/services/v2/prepare_pools.py",
+      "change": "modified",
+      "baseline_sha256": "30daf1f9c53792e90689b185d76748c18537ac2e610ce62ae69ca77ed7d0546b",
+      "verified_sha256": "0546e03b1fe0a3723fd7900128b01714c4aa721da299cc1f4732e3227ba94f75"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/use_cases/backtest_job_worker.py",
+      "change": "modified",
+      "baseline_sha256": "a07d1d89c5deb0a88bdcfe7d18ded3c0cc1c10e9fe7a582c66ad0253e0102424",
+      "verified_sha256": "64074c98fa248a94b68265846eac9d369045b781dffefd6e5037a15286021a60"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/use_cases/backtest_jobs.py",
+      "change": "modified",
+      "baseline_sha256": "0d6000e60fcef478f908466657d9a13a56e281fc6530d2ff02b21fd7e5c0898d",
+      "verified_sha256": "c8260674614a8f2282dd5c018a0354ebb273252135aaa69df636872c18763818"
+    },
+    {
+      "path": "src/trading/contexts/backtest/application/use_cases/lazy_trades_materialization_worker.py",
+      "change": "modified",
+      "baseline_sha256": "4f2dbd9bc567b772f56f49f798050590e8c28fac19897ed9b6ca58fce2d4aa32",
+      "verified_sha256": "23e71fefe4498c1ffff32fd322b0c13595b96479423165b78629427ca67460d3"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/path_builder.py",
+      "change": "modified",
+      "baseline_sha256": "5abcb63e5495031cb252ce64b5e724188417c80b7aa848ca0cac27fc4540455c",
+      "verified_sha256": "46129d000d339d0e6072c2cb0a86c1ee902b5c9a915fb0693df5d7afc009f5fd"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/backtest_job_repository.py",
+      "change": "modified",
+      "baseline_sha256": "0e592460084b9c65c998c9174ab2c238d1642bf6e393f44f2a585b15394fe2c5",
+      "verified_sha256": "484676fd2449c022e839ef3b42d0540718a2c53f874f105c4aaf070630c012d3"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/gateway.py",
+      "change": "modified",
+      "baseline_sha256": "b55213a8bb18e0a2d09fcb1671dd1b4697cb78b86cc6b8fb918bab0163827d77",
+      "verified_sha256": "6ff11e76ba381fbbc0bb2e58ab8c85c2ab84e900bf275d9d727baaf5b6ba5695"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_loader.py",
+      "change": "modified",
+      "baseline_sha256": "0c0f6ea60a9d4d9191344b86e15245cbf62b6f40b5c2239f108d1abe4012ee92",
+      "verified_sha256": "00e0f69af705d61715da4f1b1bbccbc8afa52f9cc83851aa7be72edd64b6b866"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_slot_publisher.py",
+      "change": "modified",
+      "baseline_sha256": "d6ac8aafcbbc44210f8d47307f082e66d935e26c3ad25cf53770a6bca03f4288",
+      "verified_sha256": "e288e205c2bd89c81f42d54dd594436189e9f54ea4ff6c926be913520a17de60"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/v2/contracts.py",
+      "change": "modified",
+      "baseline_sha256": "3507d3e6446e30782a0a4988e0da55759c86ed4288d2014fac8551e2ce8e8323",
+      "verified_sha256": "0df47e05ce76d9c16c50e3e450acc0c670953a9f6896a739b40c10c630a6b4f4"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py",
+      "change": "modified",
+      "baseline_sha256": "99317d7dcfce7f30a1ddadc6c195718daa181a71248736c1b774636c203a1a7f",
+      "verified_sha256": "2685cb060b126ace22d3b1590238a72262b6831a22e7f7169b2fae976a1c26e8"
+    },
+    {
+      "path": "tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+      "change": "created",
+      "baseline_sha256": null,
+      "verified_sha256": "76008cb2e4052fe43b72c2dbaab8ca217d5e446f0a7cedb44cde1c200d54df4f"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_work_requests_postgres.py",
+      "change": "modified",
+      "baseline_sha256": "a5e20e013a81ce94dbc27bd54d56bbe81e9a700b06c78a5536cf8f45f5770eda",
+      "verified_sha256": "12f462025e3e9b43fa35bdf1e56c3e0f093ec18bfce60cf8efe50b2bcb6d309a"
+    },
+    {
+      "path": "tests/unit/apps/api/test_backtests_routes.py",
+      "change": "modified",
+      "baseline_sha256": "aaee93a6cc69f811ce70298d5d6e8f2efd5da70ff8519945825ece837029d163",
+      "verified_sha256": "29f03637f55891681c98b027e4e12567dc4556902219b57523e67aeb56548fd5"
+    },
+    {
+      "path": "tests/unit/apps/worker/backtest_job_runner/materialization_drill_child.py",
+      "change": "created",
+      "baseline_sha256": null,
+      "verified_sha256": "1539bce9530afbf1f8a6f19114b38f06bf833be7222cf98d5c95279e90c4dc3d"
+    },
+    {
+      "path": "tests/unit/apps/worker/backtest_job_runner/test_materialization_lifecycle.py",
+      "change": "created",
+      "baseline_sha256": null,
+      "verified_sha256": "137056a2bd80f09f444ab93219b2dcd067cb5faf6e94dea933836b2a6c77e464"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/adapters/outbound/test_postgres_research_organization_scope.py",
+      "change": "modified",
+      "baseline_sha256": "42bd27be8f96d7210da32d27262cfcb1112292d3a575a3711ce8fb39f6e744a3",
+      "verified_sha256": "93910b5a54b2262b803a6d825971d24f523ee65b69aeaa68394509168a75e6db"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py",
+      "change": "modified",
+      "baseline_sha256": "c88abb2fd75a5a0a81c14662b7a03ecc76212c6615e471db71c4cec7bd513d44",
+      "verified_sha256": "0409c4929e39d754db15dfd339a65ce4d1444cbb52cb4adfd5a8029d5591a1ff"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py",
+      "change": "modified",
+      "baseline_sha256": "5c5990b69c670453a9ddfef422795177ab3de58b1642509013b25f0ccac256b7",
+      "verified_sha256": "0933426bf99dedd32e3aee0dd152b493cbe138539b01070431be64f04b2223d2"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py",
+      "change": "modified",
+      "baseline_sha256": "d7ef3e3d44a6cdda02ee9eb07be3cce478fd338101266f1917b7572b61775621",
+      "verified_sha256": "f491f23e9d13aaea7f170632cf4adef9b19583ed5038c68972c1896104912b79"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py",
+      "change": "modified",
+      "baseline_sha256": "7f28419d7654a33744788084a32724ac4bbc453a2d9b544a20a85e5d8ee6287f",
+      "verified_sha256": "5198575f9ebe20901e209805592ee5e16f4aeaa577b97317f6fa41325b27b1e8"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/use_cases/test_lazy_trades_materialization_worker_use_case.py",
+      "change": "modified",
+      "baseline_sha256": "8ccd1b2a805addea043e5fbb11cbc1be118235219079c27dca6fffd8cdee8702",
+      "verified_sha256": "acbf78b02af6dcbdf4826440b2c641765690ae88773f29178a49cd4b786ed67f"
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_postgres_instrument_selection_repository.py",
+      "change": "modified",
+      "baseline_sha256": "07e73d2f796ad81ce74e858a24b3fa13784dbee72ae8d1e2991580f9f52909b2",
+      "verified_sha256": "7d34809953661b31b0a108d5ee83938dbda4986967aa19ab540104a428784d6a"
+    },
+    {
+      "path": "tools/qa/backtests_client_fixture.py",
+      "change": "modified",
+      "baseline_sha256": "3b1f788ea461ba15d32eacc07b231a099a35143726a9fb54b51d7b304ec078f0",
+      "verified_sha256": "7745f32ff0423e8a547e6cda315b78677460b64e4f975815b4c620879ae6265b"
+    },
+    {
+      "path": "tools/qa/backtests_expand_demo.py",
+      "change": "modified",
+      "baseline_sha256": "2c09b3d739d26349b4ad27a549e3e2d5d961b2251afb6a3eb4cc30d2194244d5",
+      "verified_sha256": "0bc8d96e993eed8a30e6c2c683562d133d9e880260c0c0b8c42eba1fef2bb660"
+    },
+    {
+      "path": "tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py",
+      "change": "modified",
+      "baseline_sha256": "6bd791b515fdbf8356bdac8971e38e795a12727f9eda0de7da090cd581d20e1d",
+      "verified_sha256": "6bc4a9aa04cb3afa0faaabe288fa8536dbb20142e7c65713aea6ced6a924bcfc"
+    }
+  ],
+  "deleted_files": [],
+  "independent_review": {
+    "agent": "01a11827-374c-7b20-a8c1-d55484ee0e26",
+    "mode": "read-only code and test review with focused follow-up",
+    "findings": "all raised findings resolved; final follow-up found no remaining defect in the reviewed findings",
+    "limitation": "reviewer did not rerun tests; execution evidence belongs to the stage executor"
+  },
+  "disposable_postgres": {
+    "container": "roehub-npy-s04-72ac4f09-pg",
+    "image": "sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685",
+    "remaining_test_databases": 0,
+    "remaining_test_schemas": 0,
+    "container_stopped_and_removed": true
+  },
+  "proof_boundary": "Local worker subprocess/filesystem lifecycle and disposable Postgres concurrency, not production delivery or throughput"
+}

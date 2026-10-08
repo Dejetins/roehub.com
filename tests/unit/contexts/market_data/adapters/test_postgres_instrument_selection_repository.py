@@ -10,6 +10,9 @@ from trading.shared_kernel.primitives import InstrumentId, MarketId, Organizatio
 
 
 class _Gateway:
+    def transaction(self):
+        raise AssertionError("transactions are outside this fixture's query-only boundary")
+
     def __init__(self) -> None:
         self.executed: list[tuple[str, Mapping[str, Any]]] = []
         self.catalog_row: Mapping[str, Any] | None = None

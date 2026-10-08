@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -24,6 +24,9 @@ from trading.contexts.backtest_artifacts.application.services.v2 import (
     validate_mapping_timeframe_v2,
     validate_price_timeframe_v2,
     validate_signal_timeframe_v2,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactCoordinatesV2,
 )
 
 _ENV_NAME_KEY = "ROEHUB_ENV"
@@ -675,6 +678,26 @@ class BacktestArtifactExecutionPolicyRuntimeConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class BacktestArtifactRetentionPolicy:
+    """Explicit coordinate override; omission preserves legacy proactive publication."""
+
+    exchange: str
+    market_type: str
+    symbol: str
+    signals: str = "precompute"
+    hit_times: str = "precompute"
+
+    def __post_init__(self) -> None:
+        coordinates = ArtifactCoordinatesV2(self.exchange, self.market_type, self.symbol)
+        for name in ("exchange", "market_type", "symbol"):
+            object.__setattr__(self, name, getattr(coordinates, name))
+        if self.signals not in ("precompute", "on_demand") or self.hit_times not in (
+            "precompute", "on_demand",
+        ):
+            raise ValueError("retention policy must be precompute or on_demand")
+
+
+@dataclass(frozen=True, slots=True)
 class BacktestArtifactsRuntimeConfig:
     """
     Strict artifact pipeline runtime config loaded from `configs/<env>/backtest_artifacts.yaml`.
@@ -696,6 +719,7 @@ class BacktestArtifactsRuntimeConfig:
     lookback_policy: BacktestArtifactLookbackPolicyRuntimeConfig
     validation_budgets: BacktestArtifactValidationBudgetsRuntimeConfig
     execution_policy: BacktestArtifactExecutionPolicyRuntimeConfig
+    retention_policy: tuple[BacktestArtifactRetentionPolicy, ...] = ()
 
     def __post_init__(self) -> None:
         """
@@ -740,6 +764,16 @@ class BacktestArtifactsRuntimeConfig:
         if self.execution_policy is None:  # type: ignore[truthy-bool]
             raise ValueError("backtest_artifacts.execution_policy section must be configured")
 
+    def policy_for(self, coordinates: ArtifactCoordinatesV2) -> BacktestArtifactRetentionPolicy:
+        for policy in self.retention_policy:
+            if (policy.exchange, policy.market_type, policy.symbol) == (
+                coordinates.exchange, coordinates.market_type, coordinates.symbol,
+            ):
+                return policy
+        return BacktestArtifactRetentionPolicy(
+            coordinates.exchange, coordinates.market_type, coordinates.symbol,
+        )
+
     def artifact_root_path(self) -> Path:
         """
         Return the configured artifact store root as a `Path` object.
@@ -757,7 +791,9 @@ class BacktestArtifactsRuntimeConfig:
         """
         return Path(self.artifact_root)
 
-    def to_validation_spec(self) -> ArtifactSlotValidationSpecV2:
+    def to_validation_spec(
+        self, coordinates: ArtifactCoordinatesV2 | None = None,
+    ) -> ArtifactSlotValidationSpecV2:
         """
         Translate frozen artifact config into the publish-layer validation plan.
 
@@ -772,7 +808,17 @@ class BacktestArtifactsRuntimeConfig:
         Side Effects:
             None.
         """
-        return self.validation_plan.to_validation_spec()
+        spec = self.validation_plan.to_validation_spec()
+        if coordinates is None:
+            return spec
+        policy = self.policy_for(coordinates)
+        return replace(
+            spec,
+            signal_artifacts=() if policy.signals == "on_demand" else spec.signal_artifacts,
+            require_hit_times_manifest=(
+                spec.require_hit_times_manifest and policy.hit_times == "precompute"
+            ),
+        )
 
     def to_prices_mappings_publish_validation_spec(self) -> ArtifactSlotValidationSpecV2:
         """
@@ -802,6 +848,7 @@ class BacktestArtifactsRuntimeConfig:
         self,
         *,
         config_sha256: str,
+        coordinates: ArtifactCoordinatesV2 | None = None,
     ) -> ArtifactPrecomputeRuntimeSettingsV2:
         """
         Translate strict artifact config into service-layer precompute runtime settings.
@@ -824,6 +871,7 @@ class BacktestArtifactsRuntimeConfig:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
         """
+        spec = self.to_validation_spec(coordinates)
         return ArtifactPrecomputeRuntimeSettingsV2(
             price_tail_bars_1m=self.lookback_policy.price_tail_bars_1m,
             mapping_tail_bars_1m=self.lookback_policy.mapping_tail_bars_1m,
@@ -835,9 +883,13 @@ class BacktestArtifactsRuntimeConfig:
             mapping_timeframes=self.validation_plan.mapping_timeframes,
             config_sha256=config_sha256,
             execution_policy=self.execution_policy.to_execution_policy(),
-            signal_artifacts=tuple(
-                item.to_validation_spec() for item in self.validation_plan.signal_artifacts
-            ),
+            signal_artifacts=spec.signal_artifacts,
+            partial_publication=(coordinates is not None and (
+                self.policy_for(coordinates).signals == "on_demand"
+                or self.policy_for(coordinates).hit_times == "on_demand"
+            )),
+            precompute_hit_times=(coordinates is None or
+                                  self.policy_for(coordinates).hit_times == "precompute"),
             max_signal_rows_per_artifact=(self.validation_budgets.max_signal_rows_per_artifact),
             max_hit_times_cells=self.validation_budgets.max_hit_times_cells,
             max_hit_times_cells_full_rebuild=(
@@ -923,9 +975,31 @@ def load_backtest_artifacts_runtime_config(path: str | Path) -> BacktestArtifact
     )
     _require_exact_keys(
         data=artifacts_map,
-        expected_keys=_ARTIFACTS_REQUIRED_KEYS,
+        expected_keys=(*_ARTIFACTS_REQUIRED_KEYS, *(
+            ("retention_policy",) if "retention_policy" in artifacts_map else ()
+        )),
         field_path="backtest_artifacts",
     )
+
+    policies = []
+    if "retention_policy" in artifacts_map:
+        policy_map = _require_mapping(value=artifacts_map["retention_policy"],
+                                      field_path="retention_policy")
+        _require_exact_keys(data=policy_map, expected_keys=("version", "coordinates"),
+                            field_path="retention_policy")
+        if type(policy_map["version"]) is not int or policy_map["version"] != 1:
+            raise ValueError("unsupported retention_policy version")
+        if not isinstance(policy_map["coordinates"], list):
+            raise ValueError("retention_policy.coordinates must be a list")
+        for item in policy_map["coordinates"]:
+            item = _require_mapping(value=item, field_path="retention_policy.coordinates")
+            _require_exact_keys(data=item, expected_keys=(
+                "exchange", "market_type", "symbol", "signals", "hit_times",
+            ), field_path="retention_policy.coordinates")
+            policies.append(BacktestArtifactRetentionPolicy(**item))
+        keys = [(p.exchange, p.market_type, p.symbol) for p in policies]
+        if len(set(keys)) != len(keys):
+            raise ValueError("duplicate retention policy coordinate")
 
     validation_plan_map = _require_mapping(
         value=artifacts_map.get("validation_plan"),
@@ -1002,6 +1076,7 @@ def load_backtest_artifacts_runtime_config(path: str | Path) -> BacktestArtifact
     )
 
     return BacktestArtifactsRuntimeConfig(
+        retention_policy=tuple(policies),
         version=version,
         artifact_root=_require_str(
             value=artifacts_map.get("artifact_root"),
@@ -1207,6 +1282,10 @@ def build_backtest_artifacts_runtime_config_hash(
             },
         }
     }
+    if config.retention_policy:
+        payload["backtest_artifacts"]["retention_policy"] = {
+            "version": 1, "coordinates": [asdict(p) for p in config.retention_policy],
+        }
     canonical_json = json.dumps(
         _normalize_json_value(value=payload),
         sort_keys=True,

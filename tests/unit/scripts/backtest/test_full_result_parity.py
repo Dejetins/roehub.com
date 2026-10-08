@@ -481,3 +481,42 @@ def test_funding_metric_manifest_is_complete_without_changing_funding_calculatio
     ]
     # Deliberately missing metrics: matching base rows cannot pass a funding profile.
     assert assess(api, ref)["status"] == "not_assessed"
+
+
+@pytest.mark.parametrize('mismatch', [None, 'request_hash', 'engine_params_hash',
+                                     'backtest_runtime_config_hash',
+                                     'input_recipe_semantic_sha256',
+                                     'source_prefix_sha256', 'schema'])
+def test_versioned_recipe_context_keeps_semantic_and_prefix_binding(mismatch):
+    api, ref, _ = fixture(10, 10)
+    ref['schema'] = 'backtest_full_top_reference_v2'
+    context = {**CONTEXT, 'schema': 'backtest_recipe_reference_context_v1',
+               'input_recipe_semantic_sha256': 'a' * 64, 'source_prefix_sha256': 'b' * 64}
+    ref['context'] = {**context, 'artifact_manifest_hash': 'different-physical-retention'}
+    if mismatch is not None:
+        ref['context'][mismatch] = 'different'
+    result = assess_full_parity(api_top=api, reference=ref, context=context,
+                               requested_top_n=10, available_count=10,
+                               actual_metric_names=ref['metric_names'])
+    assert result['status'] == ('passed' if mismatch is None else 'not_assessed')
+
+
+def test_legacy_context_still_requires_exact_physical_manifest():
+    api, ref, _ = fixture(10, 10)
+    ref['context'] = {**CONTEXT, 'artifact_manifest_hash': 'different'}
+    assert assess(api, ref)['status'] == 'not_assessed'
+
+
+@pytest.mark.parametrize('missing', ['input_recipe_semantic_sha256', 'source_prefix_sha256',
+                                    'schema'])
+def test_recipe_reference_rejects_missing_actual_binding(missing):
+    api, ref, _ = fixture(10, 10)
+    ref['schema'] = 'backtest_full_top_reference_v2'
+    context = {**CONTEXT, 'schema': 'backtest_recipe_reference_context_v1',
+               'input_recipe_semantic_sha256': 'a' * 64, 'source_prefix_sha256': 'b' * 64}
+    ref['context'] = dict(context)
+    del context[missing]
+    result = assess_full_parity(api_top=api, reference=ref, context=context,
+                               requested_top_n=10, available_count=10,
+                               actual_metric_names=ref['metric_names'])
+    assert result['status'] == 'not_assessed'

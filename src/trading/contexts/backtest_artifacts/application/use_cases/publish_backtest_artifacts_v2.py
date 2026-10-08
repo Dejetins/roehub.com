@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Literal, Mapping
@@ -23,6 +23,7 @@ from trading.contexts.backtest_artifacts.application.services.v2 import (
     validate_current_pointer_published_at_utc_v2,
 )
 from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactPrecomputeRuntimeSettingsV2,
     validate_non_negative_manifest_int_v2,
     validate_positive_manifest_int_v2,
 )
@@ -334,6 +335,12 @@ class PublishBacktestArtifactsV2UseCase:
     slot_publisher: BacktestArtifactSlotPublisherV2
     validation_spec: ArtifactSlotValidationSpecV2
     now_provider: NowProviderV2 = _default_now_provider_v2
+    coordinate_settings: (
+        Callable[[ArtifactCoordinatesV2], ArtifactPrecomputeRuntimeSettingsV2] | None
+    ) = None
+    coordinate_validation: (
+        Callable[[ArtifactCoordinatesV2], ArtifactSlotValidationSpecV2] | None
+    ) = None
 
     def run(
         self,
@@ -376,6 +383,15 @@ class PublishBacktestArtifactsV2UseCase:
         if self.validation_spec is None:  # type: ignore[truthy-bool]
             raise ValueError("PublishBacktestArtifactsV2UseCase.validation_spec is required")
 
+        precompute_runner = self.precompute_runner
+        validation_spec = self.validation_spec
+        if self.coordinate_settings is not None:
+            precompute_runner = replace(
+                precompute_runner, runtime_settings=self.coordinate_settings(request.coordinates),
+            )
+        if self.coordinate_validation is not None:
+            validation_spec = self.coordinate_validation(request.coordinates)
+
         started_at_utc = _validated_now_utc_v2(self.now_provider())
         requested_time_range = _resolve_requested_time_range_v2(
             canonical_candle_index_reader=self.canonical_candle_index_reader,
@@ -386,13 +402,12 @@ class PublishBacktestArtifactsV2UseCase:
             time_range=requested_time_range,
             max_source_bars=request.max_source_bars,
         )
+        self.slot_publisher.recover_publications(
+            coordinates=request.coordinates,
+            validation_spec=validation_spec,
+        )
         precheck = self.slot_publisher.precheck_publish(request.coordinates)
         _ensure_precheck_ready_v2(precheck=precheck)
-        _ensure_bootstrap_slot_roots_v2(
-            slot_publisher=self.slot_publisher,
-            coordinates=request.coordinates,
-            bootstrap=precheck.bootstrap,
-        )
         publish_mode = _resolve_publish_mode_v2(
             request=request,
             bootstrap=precheck.bootstrap,
@@ -421,11 +436,11 @@ class PublishBacktestArtifactsV2UseCase:
             ),
             force_full_rebuild=publish_mode != "incremental",
         )
-        build_result = self.precompute_runner.export_canonical_price_1m(build_request)
-        publish_result = self.slot_publisher.publish(
+        build_result, publish_result = self.slot_publisher.build_and_publish(
+            request=build_request,
             precheck=precheck,
-            validation_spec=self.validation_spec,
-            asof_date=build_request.asof_date,
+            precompute_runner=precompute_runner,
+            validation_spec=validation_spec,
         )
         _ensure_build_publish_alignment_v2(
             build_request=build_request,
@@ -637,44 +652,6 @@ def _ensure_precheck_ready_v2(*, precheck: ArtifactPublishPrecheckV2) -> None:
         code=precheck.failure_code or "publish_precheck_failed",
         message=precheck.failure_message or "artifact publish precheck failed",
     )
-
-
-def _ensure_bootstrap_slot_roots_v2(
-    *,
-    slot_publisher: BacktestArtifactSlotPublisherV2,
-    coordinates: ArtifactCoordinatesV2,
-    bootstrap: bool,
-) -> None:
-    """
-    Create canonical symbol-root and slot-root directories for bootstrap publish only.
-
-    Args:
-        slot_publisher: Shared publisher exposing explicit artifact path resolution.
-        coordinates: Artifact coordinates under bootstrap.
-        bootstrap: Whether the current orchestration run is a bootstrap publish.
-    Returns:
-        None.
-    Assumptions:
-        Directory creation is deterministic because slot paths are fixed and never discovered by
-        scanning the filesystem.
-    Raises:
-        OSError: If one directory cannot be created.
-    Side Effects:
-        Creates `<symbol-root>/slot_a` and `<symbol-root>/slot_b` when bootstrap is active.
-    Docs:
-      - docs/runbooks/backtest-artifacts-rebuild.md
-      - docs/architecture/backtest/README.md
-    Related:
-      - src/trading/contexts/backtest/application/services/v2/artifact_slot_publisher.py
-    """
-    if not bootstrap:
-        return
-    artifact_loader = slot_publisher.artifact_loader
-    symbol_root = artifact_loader.resolve_current_pointer_path(coordinates).parent
-    slot_a_root = artifact_loader.resolve_slot_manifest_path(coordinates, "slot_a").parent
-    slot_b_root = artifact_loader.resolve_slot_manifest_path(coordinates, "slot_b").parent
-    for directory in (symbol_root, slot_a_root, slot_b_root):
-        directory.mkdir(parents=True, exist_ok=True)
 
 
 def _resolve_publish_mode_v2(

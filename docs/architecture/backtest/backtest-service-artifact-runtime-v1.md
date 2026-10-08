@@ -1,6 +1,6 @@
 # Backtest Service Artifact Runtime v1 — companion
 
-Status: reference pointer, synchronized 2026-09-06.
+Status: reference pointer, synchronized 2026-10-08.
 
 The maintained contract is the [Russian runtime document](backtest-service-artifact-runtime-v1.ru.md).
 The [Backtest index](README.md) identifies current API, worker and installation sources.
@@ -12,3 +12,8 @@ Runtime delivery still requires evidence from the selected installation.
 
 Historical measurements retain their original hardware and revision provenance.
 They are not instructions to deploy to a former host or resume a retired prompt pack.
+
+The normative document now covers native/reused/generated NPY inputs, recipe and
+payload-prefix attestation, ownership/ACK/replay, partial publication policy and
+reader-before-writer rollout. See the index for bounded S07/S08 local evidence;
+no production installation or latency SLO is inferred.

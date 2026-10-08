@@ -9,6 +9,7 @@ from pathlib import Path
 from uuid import UUID
 
 from apps.worker.backtest_job_runner.wiring.modules.child_ipc import (
+    acknowledge_prepared_over_socket,
     child_promotion_to_mapping,
     child_success_to_mapping,
     preflight_from_mapping,
@@ -32,6 +33,8 @@ def _configure_logging() -> None:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="backtest-full-job-child")
     parser.add_argument("--job-id", required=True)
+    parser.add_argument("--attempt-json")
+    parser.add_argument("--prepared-fd", type=int)
     parser.add_argument("--preflight-json", required=True)
     parser.add_argument("--output-json", required=True)
     parser.add_argument(
@@ -72,7 +75,35 @@ def main(argv: list[str] | None = None) -> int:
             build_full_job_compute_executor,
         )
 
-        executor = build_full_job_compute_executor(environ=os.environ)
+        attempt_inputs = None
+        if args.attempt_json is not None:
+            from trading.contexts.backtest.application.dto.artifact_inputs import (
+                BacktestAttemptInputs,
+            )
+
+            owner_path = Path(args.attempt_json)
+            owner = json.loads(owner_path.read_text())
+            if owner_path.parent != output_path.parent or owner_path.is_symlink():
+                raise ValueError("untrusted attempt ownership path")
+            if owner["owner_id"] != str(job_id) or args.prepared_fd is None:
+                raise ValueError("attempt ownership differs from child job")
+            attempt_inputs = BacktestAttemptInputs(
+                directory=owner_path.parent / "inputs",
+                organization_id=owner["organization_id"],
+                job_id=str(job_id),
+                owner_token=owner["owner_token"],
+                attempt=int(owner["attempt"]),
+                max_generated_bytes=int(owner["max_generated_bytes"]),
+                max_compute_bytes=int(owner["max_compute_bytes"]),
+                acknowledge=lambda prepared: acknowledge_prepared_over_socket(
+                    fd=args.prepared_fd,
+                    prepared=prepared,
+                    timeout_seconds=30.0,
+                ),
+            )
+        executor = build_full_job_compute_executor(
+            environ=os.environ, attempt_inputs=attempt_inputs
+        )
         result = executor.execute(
             job_id=job_id,
             preflight=preflight,
@@ -88,8 +119,11 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    with output_path.open("w", encoding="utf-8") as handle:
-        json.dump(payload, handle, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    from apps.worker.backtest_job_runner.wiring.modules.compute_resources import (
+        write_attempt_json,
+    )
+
+    write_attempt_json(output_path, payload)
     elapsed = (datetime.now(UTC) - started_at).total_seconds()
     log.info(
         "backtest child process finished: job_id=%s status=%s elapsed_seconds=%.3f",

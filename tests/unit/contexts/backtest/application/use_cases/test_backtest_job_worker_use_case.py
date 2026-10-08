@@ -371,6 +371,7 @@ class _Repository:
         user_id: UserId,
         now: datetime,
         locked_by: str,
+        attempt: int,
         next_state: BacktestJobState,
         top_variants: tuple[BacktestJobTopVariant, ...],
         last_error: str | None = None,
@@ -423,6 +424,8 @@ class _Executor:
         preflight: BacktestPreflightResult,
         updated_at: datetime,
         cancel_event: threading.Event | None = None,
+        job: BacktestJob | None = None,
+        locked_by: str | None = None,
     ) -> BacktestJobExecutionResult:
         _ = cancel_event
         self.calls = (*self.calls, job_id)
@@ -455,6 +458,8 @@ class _FailingExecutor:
         preflight: BacktestPreflightResult,
         updated_at: datetime,
         cancel_event: threading.Event | None = None,
+        job: BacktestJob | None = None,
+        locked_by: str | None = None,
     ) -> BacktestJobExecutionResult:
         _ = job_id, preflight, updated_at, cancel_event
         raise RuntimeError("boom")
@@ -468,6 +473,8 @@ class _PromotingExecutor:
         preflight: BacktestPreflightResult,
         updated_at: datetime,
         cancel_event: threading.Event | None = None,
+        job: BacktestJob | None = None,
+        locked_by: str | None = None,
     ) -> BacktestJobHeavyPromotion:
         _ = job_id, preflight, updated_at, cancel_event
         return BacktestJobHeavyPromotion(
@@ -487,6 +494,8 @@ class _BlockingExecutor:
         preflight: BacktestPreflightResult,
         updated_at: datetime,
         cancel_event: threading.Event | None = None,
+        job: BacktestJob | None = None,
+        locked_by: str | None = None,
     ) -> BacktestJobExecutionResult:
         _ = cancel_event
         deadline = time.monotonic() + 1.0
@@ -525,6 +534,8 @@ class _CancellableExecutor:
         preflight: BacktestPreflightResult,
         updated_at: datetime,
         cancel_event: threading.Event | None = None,
+        job: BacktestJob | None = None,
+        locked_by: str | None = None,
     ) -> BacktestJobExecutionResult:
         _ = job_id, preflight, updated_at
         deadline = time.monotonic() + 1.0
