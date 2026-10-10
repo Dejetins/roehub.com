@@ -25,6 +25,74 @@ mappings и требуемый funding остаются обязательным
 policy пишет schema-2; старый полный формат остаётся читаемым. Prepared job
 manifest — отдельный тип, без вымышленных slots или hit-time hashes.
 
+Managed base publisher (`AutomaticBasePublisher`) фиксирует конечный closed-candle
+диапазон и payload до записи в слот; native rollup публикует доступные полные
+бары из 11 price / 10 mapping timeframe. Schema-2 может содержать только `1m`
+при короткой истории: projection хранит `partial` и `insufficient_history`
+для остальных timeframe, preflight отклоняет запрос отсутствующего timeframe.
+Пустой источник не переключает pointer. Required futures funding фиксируется
+отдельным snapshot; `unavailable` и ноль событий (`funding_insufficient_history`)
+останавливают публикацию, сохраняя last-good. Derivatives не строятся в этом
+base-only потоке. Source scan ограничен окнами 20 000 минут и диапазоном
+5 000 000 минут; превышение даёт `resource_conflict`, без усечения истории.
+Post-commit REST/WS hook опционален в composition; повторные координаты внутри
+committed batch объединяются, ошибка hint не повторяет успешную запись свечей.
+`StoredCoordinates.observation_page` возвращает максимум 50 упорядоченных координат
+и first/last реальных minute keys до одного exclusive cutoff страницы. Адаптер
+читает `canonical_candles_1m_stats`, объединяет bitmap states и обрезает bitmap
+до cutoff; raw row counter и aggregate max timestamp не определяют эти bounds.
+Нормальный sweep выполняет один запрос на страницу, без canonical scan и без
+двух запросов на каждую координату. Epoch zero — допустимая свеча; пустой bitmap
+даёт `None`, поэтому дополнительная проверка первой минуты не нужна.
+
+Hint через `observe` читает тот же индекс для одной координаты. Периодический
+sweep сохраняет PG cursor и прежнюю паузу 30 секунд между managed cycles;
+потерянный hint восстанавливается следующим проходом. Координата с пустым bitmap
+до cutoff всё равно продвигает cursor. Полный sweep зависит от размера индекса
+и числа страниц, а длительность cycle включает работу publisher.
+
+Индекс производный: отсутствующая таблица/ошибка чтения останавливает observation
+с обычным failed cycle, без скрытого canonical fallback. Потерянные состояния
+могут временно скрывать source; существующий bounded `ClickHouseHistoryRangeVerifier`
+восстанавливает ключи из canonical (максимум семь дней за вызов, обычные окна
+60/1440 минут). Source-absence markers не входят в artifact bounds. После
+административного удаления свечей необходим отдельный rebuild индекса; периодический
+sweep сам не доказывает отсутствие drift. Активация и календарный dispatch
+остаются отдельным managed coordinator, существующее расписание не включается.
+
+
+Managed precompute использует `DerivativeDemand` / `DerivativePlan`: профиль сохраняет
+полный `catalog_indicators` вместе с выбранными compute/source и signal defaults.
+Новый draft выбирает все доступные индикаторы; явный rebase сохраняет exclusions,
+добавляет новые ID и отклоняет недоступные выбранные ID. Существующий admitted
+snapshot не перечитывает YAML. Совместимая группа (до 50 requests) требует одинаковых
+coordinate, source range/digest, funding/compute, root revision и catalog snapshot;
+объединяются конкретные canonical rows, а не отдельные оси с лишними комбинациями.
+Суммарный лимит строк отклоняет запрос целиком, без сокращения selection.
+
+Выборочные signal manifests добавляют optional `grid.row_ids`: физическая строка
+сохраняет canonical ID полного frozen grid. Старые manifests без поля обозначают
+префикс `0..rows_count-1`. TP и SL независимы: пустая level-ось имеет shape `0` /
+`[0,T]`, остальные размерности остаются положительными; объявленные пустые NPY
+также проверяются по dtype/shape/SHA. Оба пустых risk grid не создают hit-times.
+Для source-independent индикаторов `ArtifactRequestedRow.source=null` означает
+отсутствие source axis; native validator сверяет это с frozen grid/rule. Старые
+recipe с явным source сохраняют прежние сериализацию и semantic hash.
+Эти writer-возможности требуют обновлённых readers до активации: старые strict
+readers не обязаны читать новые row IDs или пустые risk axes. Legacy полные
+schema-1 файлы и их hashes не переписываются.
+
+`ManagedDerivativePublisher` проверяет trusted root binding, поддерживаемую
+compute/funding identity и frozen source digest до публикации; далее используются
+обычные private staging, validator и 0028 reservations. Mode-off/полностью пустой
+план не пишет pointer и не удаляет файлы. Обязательное обновление base независимо.
+Производные содержат полный source timeline для warmup и global risk indexes;
+запрошенные profile subranges должны быть вложены в него, начало не сдвигается.
+S05 обязан передать авторизованные immutable requests, полную совместимую demand
+группу, trusted root registry и отдельное storage admission; queue claim сам по
+себе не предоставляет физическое владение. Runtime/scheduler здесь не активируется.
+
+
 `ArtifactCandleSnapshot` хранит реальные coordinates, slot/generation и manifest
 SHA, `signal_timeframe`, `execution_timeframe=1m`, исходные `source_file_identities`
 и отдельно `consumed_domains`. Первые фиксируют полный исходный dtype/shape/domain
@@ -2334,3 +2402,119 @@ S08 измерял предыдущую derivative-only reservation и не до
 новые guards проверяются отдельно. Числа S08 не выдаются за повторное измерение
 этого изменения или production SLO. Financial kernels и исходная parity reference
 сохранены; окончательные результаты и границы проверок перечислены в S09 report.
+
+
+## Managed cadence и worker ownership (S05, 2026-10-08)
+
+Managed scheduler выбирается существующей factory только при явном
+`ROEHUB_ARTIFACT_MANAGEMENT_INSTALLATION_ID`; legacy YAML `publish_schedule.enabled`
+должен оставаться выключенным. Этот selector не включает capability и не выполняет
+handoff. Аддитивная миграция `0030_backtest_artifact_dispatch_v1.sql` применяется до
+нового scheduler: durable cursors, cadence и наследование schedule нужны его queries.
+Реальная активация остаётся отдельным действием владельца installation.
+
+Общий default и instrument overrides поддерживают только 1/3/7 календарных дней,
+с явными timezone/anchor. Отсутствующий override наследует default; Update now не
+сдвигает anchor. Для DST gap выбирается первая существующая минута после gap,
+для fold — первое вхождение. Пропущенные occurrences сворачиваются в последний
+target; совместимые automatic/manual requests связываются с одним physical build,
+сохраняя исходные request snapshots. Только непроверенные source observations
+`content_unverified` могут расширяться до последнего включающего диапазона; после
+freeze retry обязан использовать тот же candle/funding content hash.
+
+Source и schedule scans ограничены и имеют durable cursors. FIFO внутри lane,
+round-robin между organization/internal lanes и чередование retry/queued ограничивают
+голодание. Полная compatible group проверяется до compute; превышение лимитов
+возвращает resource reason без частичного усечения профиля. Резервирование места
+пересчитывается по effective source и union derivatives. Невалидный derivative
+request получает собственный error либо waiting_for_source; обязательная base и
+другие допустимые requests могут завершиться независимо.
+
+Native observer сохраняет измеренные phase/timeframe units, checkpoints и epoch.
+Неизвестный total остаётся неизвестным; каждая series монотонна внутри epoch.
+Retry создаёт новый epoch после bounded backoff. Ready записывается только после
+physical publication commit. Fsynced receipt связывает pointer generation, manifest
+hash и owner/attempt. Recovery сверяет реальные pointer и manifest под process
+lifetime lock; отсутствие/повреждение receipt и неизвестный commit outcome оставляют
+build quarantined. TTL не передаёт ownership. Ошибка доступа к storage до claim
+сохраняется как storage_inventory_unavailable, не блокируя следующие requests.
+
+Explicit handoff требует owner authorization, legacy host lock/drain и coverage
+импортированных legacy rows. Frozen legacy choices не заменяются сегодняшними
+catalog defaults. После handoff отключение capability не возвращает legacy writer;
+last-good slots и pin protocol сохраняются. Проверки S05 используют disposable PG,
+контролируемые часы и локальные фиксированные данные; они не подтверждают production
+activation, многодневную эксплуатацию или живые provider reads.
+
+### Management HTTP/storage boundary (S06, 2026-10-08)
+
+Добавлены opt-in `/api/backtest-artifacts` defaults, inventory/detail, own requests,
+events и command recovery; single/bulk policy и Update now используют durable
+management transactions. Public DTO не содержит raw source snapshot, filesystem
+path, actor/worker ownership или публикационные receipt. Profile catalog snapshot
+сохраняет существующие Backtests indicator IDs/finite grids; base timeframes не
+редактируются. Interval/anchor/timezone берутся из durable cadence/defaults.
+
+Organization membership и текущий catalog access проверяются сервером; mutation
+требует operations role, same-origin, Idempotency-Key и expected_version. Atomic
+bulk до 50 items имеет один исходный response и не применяет часть batch при CAS
+или authorization failure. Profile/schedule patch оставляет omitted поля прежними;
+`schedule: null` восстанавливает inheritance. Source target выбирается сервером.
+История только собственная, newest-first; pagination ограничена, diagnostics
+санитизированы. Base progress содержит физические base phases; при shared build
+foreign derivative timeframes/totals скрыты, derivative activity имеет unknown
+units вместо выдуманного процента. Последняя успешная physical coverage отделена
+от собственного последнего request outcome; organization size может быть unknown.
+
+Privileged `/api/v1/admin/organizations/{organization_id}/backtest-artifacts/storage`
+использует отдельную installation-owner проверку и authenticated control-agent;
+org owner/admin недостаточно. Мутации требуют recent auth. Аддитивная миграция
+0031 сохраняет replay responses/short-lived validation и cleanup previews без
+изменения 0028 slot/pin protocol. Roots приходят из installation config registry;
+публичный storage ответ содержит только safe label/readiness. First-empty setup,
+relocation refusal, guarded cleanup и установочные ограничения описаны в
+`docs/runbooks/offline-release-installation.md`. S06 не активирует runtime и не
+меняет numerical kernels, NPY schema, existing recipes или принятый UI.
+
+### Integrated local verification and S09 recovery refinements
+
+Проверка `tests/real_infra/backtest/test_artifact_integrated.py` использует отдельные
+PostgreSQL/ClickHouse: raw INSERT → существующая MV → canonical → managed cycle →
+11 price timeframes с независимым OHLCV oracle → выбранные catalog derivatives →
+manual/scheduled refresh → HTTP Backtest admission, immutable recipe/pin, реальный
+child compute и persisted `succeeded`. Пропущенная минута не становится готовым
+баром; scheduled/on-demand inputs сохраняют manifest identity. Это конечный fixture,
+не данные биржи, недельное наблюдение или capacity proof.
+
+Retry повторно проверяет membership и coordinate access каждого request. Отозванный
+request получает отдельный error и не участвует в derivative demand; если допущенных
+requests не осталось, build завершается error без native compute. Frozen snapshots
+не переписываются. Installation budget читается при каждой проверке storage;
+финальная проверка retained usage + effective reservation + 1 GiB и запись reservation
+проходят под одним installation lock. Изменение бюджета после admission относится
+к последующим admissions, не является сигналом принудительно убить текущий build.
+
+Включение precompute немедленное; повторное сохранение уже включённого профиля
+ожидает следующего occurrence. Cadence fingerprint зависит от schedule, а не от
+policy control_version. Изменение schedule не повторяет прошедший occurrence.
+Manual Update now сохраняет anchor. Эти изменения совместимы с принятыми R07/R08;
+уже admitted snapshots сохраняют свою прежнюю семантику.
+
+
+## ClickHouse budget publisher (S02, 2026-10-10)
+
+Publisher и его CLI выбирают `artifacts` в composition: discovery по индексу S01,
+чтение canonical/funding и подготовка native source разделяют одну server identity
+между процессами. Профиль ограничивает запрос 128 MiB, суммарную tracked memory
+пользователя 128 MiB, одновременный запрос одним и query threads одним; timeout
+30 секунд проверяется сервером кооперативно. Это не резервирование CPU/IO.
+Табличные права только SELECT; DDL, запись candles и смена caps запрещены.
+
+Class admission/memory refusal до начала публикации сохраняет durable attempt в
+существующем `retry_wait` с `transient_database`, backoff и пределом попыток.
+После начала публикации сохраняется `quarantined` и проверка receipt/pointer;
+ресурсный отказ не выдаётся за отсутствие source и не разрешает новую запись поверх
+неизвестного результата. Retry не меняет snapshot, ownership, authorization или
+reconciliation контракт. Установка/откат выполняются по S02 recovery runbook:
+сначала profiles/identities, затем drain и переключение клиентов; rollback
+оставляет additive identities неиспользуемыми и сохраняет свечи и артефакты.

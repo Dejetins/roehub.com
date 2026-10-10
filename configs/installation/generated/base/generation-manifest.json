@@ -63,10 +63,10 @@
       "sha256": "c9b127e8710a3f158d251a084ea2ee42c5a7660d45ae9673f16eef9a6c5a775c"
     },
     "service-configs/market-data.yaml": {
-      "sha256": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4"
+      "sha256": "d69857c430e8a9cef892738ee26ddb3c258d89abdfa9889c052e31f83d89b82d"
     },
     "service-configs/market_data.yaml": {
-      "sha256": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4"
+      "sha256": "d69857c430e8a9cef892738ee26ddb3c258d89abdfa9889c052e31f83d89b82d"
     },
     "service-configs/notifications.yaml": {
       "sha256": "c268241754499249ccb045012a578e166f07abe5193b2b9b897e51086d7bebf8"

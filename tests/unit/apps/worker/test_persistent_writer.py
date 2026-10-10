@@ -222,6 +222,7 @@ def test_app_stop_interrupts_writer_warmup_and_reaps_child():
         )
         app = object.__new__(MarketDataWsApp)
         app._recovery_lease = nullcontext
+        app._async_recovery_lease = None
         app._start_io = writer.start
         app._close_io = writer.close
         app._run = AsyncMock()
@@ -235,3 +236,16 @@ def test_app_stop_interrupts_writer_warmup_and_reaps_child():
         app._run.assert_not_called()
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize('code,expected', [(202,'storage_unavailable'),
+                                         (241,'storage_memory_pressure'),
+                                         (516,None), (497,None)])
+def test_only_resource_errors_enter_bounded_ingestion_retry(code, expected):
+    from clickhouse_connect.driver.exceptions import DatabaseError
+
+    from apps.worker.market_data_ws.wiring.io_process import classify_io_error
+    from trading.contexts.market_data.application.services.ingestion_retry import retry_delay
+    error=DatabaseError(f'Code: {code}. synthetic test')
+    assert classify_io_error(error)==expected
+    assert retry_delay(error, 100) == 300

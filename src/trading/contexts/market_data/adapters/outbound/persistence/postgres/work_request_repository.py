@@ -50,6 +50,15 @@ class PostgresMarketDataWorkRequestRepository:
             if row is None or not row[0]:
                 yield None
                 return
+            token = uuid4()
+            acquired = connection.execute(
+                "INSERT INTO market_data_coordinator_owners(lock_key,token) VALUES (%s,%s) "
+                "ON CONFLICT DO NOTHING RETURNING token",
+                (self._execution_lock_key, token),
+            ).fetchone()
+            if acquired is None:
+                yield None
+                return
             check_lock = Lock()
 
             def check() -> None:
@@ -58,8 +67,15 @@ class PostgresMarketDataWorkRequestRepository:
             try:
                 yield check
             finally:
-                # Closing this exact session releases the lock even after an error.
+                # Every caller drains owned I/O before leaving this context. A lost
+                # session alone never permits a rival to recover our live workers.
                 connection.close()
+                with psycopg.connect(self._execution_dsn, autocommit=True,
+                                     connect_timeout=2) as cleanup:
+                    cleanup.execute(
+                        "DELETE FROM market_data_coordinator_owners WHERE lock_key=%s AND token=%s",
+                        (self._execution_lock_key, token),
+                    )
 
     def backlog(self, *, organization_id: UUID) -> Mapping[str, Any]:
         row = self._gateway.fetch_one(
@@ -304,12 +320,31 @@ class PostgresMarketDataWorkRequestRepository:
     ) -> Mapping[str, Any] | None:
         return self._gateway.fetch_one(
             query="""
+            WITH resumed AS (
             UPDATE market_data_work_requests
-            SET state = CASE WHEN next_retry_at > %(now)s THEN 'retry_wait' ELSE 'queued' END,
+            SET state = CASE WHEN state = 'pause_requested' THEN 'running'
+                             WHEN next_retry_at > %(now)s THEN 'retry_wait' ELSE 'queued' END,
                 control_version = control_version + 1, progress_epoch = progress_epoch + 1,
                 updated_at = %(now)s
             WHERE organization_id = %(org)s AND job_id = %(id)s
-              AND control_version = %(version)s AND state = 'paused' RETURNING *
+              AND control_version = %(version)s
+              AND state IN ('paused', 'pause_requested') RETURNING *
+            ), pruned AS (
+                DELETE FROM market_data_work_events events USING resumed
+                WHERE resumed.state = 'running' AND events.job_id = resumed.job_id
+                  AND events.event_id < (
+                    SELECT event_id FROM market_data_work_events
+                    WHERE job_id = resumed.job_id ORDER BY event_id DESC OFFSET 510 LIMIT 1)
+            ), recorded AS (
+                -- The existing trigger records paused -> queued/retry_wait only.
+                INSERT INTO market_data_work_events
+                    (job_id, organization_id, event_type, occurred_at, state, attempt,
+                     completed_units, total_units, rows_written, error_code,
+                     error_phase, next_retry_at)
+                SELECT job_id, organization_id, 'resumed', updated_at, state, attempt,
+                       completed_units, total_units, rows_written, error_code,
+                       error_phase, next_retry_at FROM resumed WHERE state = 'running'
+            ) SELECT * FROM resumed
             """,
             parameters=dict(org=organization_id, id=job_id, version=version, now=now),
         )
@@ -387,7 +422,8 @@ class PostgresMarketDataWorkRequestRepository:
         return self._gateway.fetch_one(
             query="""
             WITH candidate AS (
-                SELECT q.job_id FROM market_data_work_requests q
+                SELECT q.job_id, q.error_code AS previous_error_code
+                FROM market_data_work_requests q
                 WHERE (q.state = 'queued' OR
                        (q.state = 'retry_wait' AND q.next_retry_at <= %(now)s))
                   AND NOT EXISTS (SELECT 1 FROM market_data_storage_cooldown
@@ -405,7 +441,7 @@ class PostgresMarketDataWorkRequestRepository:
             SET state = 'running', worker_token = %(token)s,
                 started_at = COALESCE(started_at, %(now)s), next_retry_at = NULL,
                 error_code = NULL, error_phase = NULL, updated_at = %(now)s
-            FROM candidate c WHERE j.job_id = c.job_id RETURNING j.*
+            FROM candidate c WHERE j.job_id = c.job_id RETURNING j.*, c.previous_error_code
             """,
             parameters={"now": now, "token": uuid4()},
         )
@@ -475,7 +511,8 @@ class PostgresMarketDataWorkRequestRepository:
                 next_retry_at = CASE WHEN state = 'cancel_requested' THEN NULL ELSE
                     %(now)s::timestamptz + make_interval(secs => GREATEST(
                         %(after)s, LEAST(300, 15 * power(2, LEAST(retry_count, 5))))) END,
-                retry_count = LEAST(retry_count + 1, 1000000),
+                retry_count = CASE WHEN %(previous_error)s::text IS DISTINCT FROM %(error)s THEN 1
+                                   ELSE LEAST(retry_count + 1, 1000000) END,
                 progress_epoch = progress_epoch + 1
             WHERE job_id = %(id)s AND worker_token = %(token)s
               AND state IN ('running', 'pause_requested', 'cancel_requested')
@@ -491,6 +528,7 @@ class PostgresMarketDataWorkRequestRepository:
             """,
             parameters=dict(id=job["job_id"], token=job["worker_token"],
                             error=error_code, phase=job.get("error_phase"),
+                            previous_error=job.get("previous_error_code", job.get("error_code")),
                             after=retry_after_s, now=now),
         )
 

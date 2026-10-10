@@ -79,98 +79,104 @@ class RestCatchUp1mCli:
 
         cfg = load_market_data_runtime_config(Path(ns.config))
         clock = SystemClock()
-        http = RequestsHttpClient()
+        http = RequestsHttpClient.from_config(cfg, os.environ)
+        try:
 
-        # ClickHouse
-        settings = ClickHouseSettingsLoader(os.environ).load()
-        client = _clickhouse_client(settings)
-        gw = ClickHouseConnectGateway(client)
+            # ClickHouse
+            settings = ClickHouseSettingsLoader(os.environ).load(workload="backfill")
+            client = _clickhouse_client(settings)
+            gw = ClickHouseConnectGateway(client)
 
-        index = ClickHouseCanonicalCandleIndexReader(gateway=gw, database=settings.database)
-        writer = ClickHouseRawKlineWriter(gateway=gw, database=settings.database)
+            index = ClickHouseCanonicalCandleIndexReader(gateway=gw, database=settings.database)
+            writer = ClickHouseRawKlineWriter(gateway=gw, database=settings.database)
 
-        ingest_id = uuid4()
+            ingest_id = uuid4()
 
-        source = RestCandleIngestSource(cfg=cfg, clock=clock, http=http, ingest_id=ingest_id)
+            source = RestCandleIngestSource(cfg=cfg, clock=clock, http=http, ingest_id=ingest_id)
 
-        uc = RestCatchUp1mUseCase(
-            index=index,
-            source=source,
-            writer=writer,
-            clock=clock,
-            max_days_per_insert=cfg.backfill.max_days_per_insert,
-            batch_size=int(ns.batch_size),
-            ingest_id=ingest_id,
-        )
-
-        bounded_range = _parse_optional_time_range(start=ns.start, end=ns.end)
-        if bounded_range is not None:
-            if ns.all_from_ref_instruments:
-                raise SystemExit("--start/--end cannot be combined with --all-from-ref-instruments")
-            if ns.market_id is None or ns.symbol is None:
-                raise SystemExit("--start/--end requires --market-id and --symbol")
-            instrument_id = InstrumentId(MarketId(int(ns.market_id)), Symbol(str(ns.symbol)))
-            report = RestFillRange1mUseCase(
+            uc = RestCatchUp1mUseCase(
+                index=index,
                 source=source,
                 writer=writer,
                 clock=clock,
                 max_days_per_insert=cfg.backfill.max_days_per_insert,
                 batch_size=int(ns.batch_size),
-                index_reader=index,
-            ).run(
-                RestFillTask(
-                    instrument_id=instrument_id,
-                    time_range=bounded_range,
-                    reason="operator_bounded",
+                ingest_id=ingest_id,
+            )
+
+            bounded_range = _parse_optional_time_range(start=ns.start, end=ns.end)
+            if bounded_range is not None:
+                if ns.all_from_ref_instruments:
+                    raise SystemExit(
+                        "--start/--end cannot be combined with --all-from-ref-instruments"
+                    )
+                if ns.market_id is None or ns.symbol is None:
+                    raise SystemExit("--start/--end requires --market-id and --symbol")
+                instrument_id = InstrumentId(MarketId(int(ns.market_id)), Symbol(str(ns.symbol)))
+                report = RestFillRange1mUseCase(
+                    source=source,
+                    writer=writer,
+                    clock=clock,
+                    max_days_per_insert=cfg.backfill.max_days_per_insert,
+                    batch_size=int(ns.batch_size),
+                    index_reader=index,
+                ).run(
+                    RestFillTask(
+                        instrument_id=instrument_id,
+                        time_range=bounded_range,
+                        reason="operator_bounded",
+                    )
                 )
-            )
-            _print_bounded_report(
-                report=report,
-                fmt=ns.report_format,
-                instrument_id=instrument_id,
-            )
+                _print_bounded_report(
+                    report=report,
+                    fmt=ns.report_format,
+                    instrument_id=instrument_id,
+                )
+                return 0
+
+            if ns.all_from_ref_instruments:
+                instruments = _load_enabled_instruments(gw, settings.database)
+                ok = 0
+                fail = 0
+                for idx, inst in enumerate(instruments):
+                    try:
+                        rep = uc.run(inst)
+                        ok += 1
+                        _print_report(rep, fmt=ns.report_format, instrument_id=inst)
+                    except Exception:  # noqa: BLE001
+                        log.exception("rest-catchup failed for %s", inst)
+                        fail += 1
+                    _sleep_between_instruments(
+                        delay_s=cfg.ingestion.rest_inter_instrument_delay_s,
+                        has_next=idx < len(instruments) - 1,
+                    )
+
+                summary = RestCatchUpCliReport(
+                    instruments_total=len(instruments),
+                    instruments_ok=ok,
+                    instruments_failed=fail,
+                )
+                if ns.report_format == "json":
+                    print(json.dumps(asdict(summary), ensure_ascii=False))
+                else:
+                    print(
+                        "rest-catchup summary:\n"
+                        f"- instruments_total: {summary.instruments_total}\n"
+                        f"- ok: {summary.instruments_ok}\n"
+                        f"- failed: {summary.instruments_failed}\n"
+                    )
+                return 0 if fail == 0 else 2
+
+            if ns.market_id is None or ns.symbol is None:
+                raise SystemExit("Either --all-from-ref-instruments or (--market-id and --symbol) must be provided")  # noqa: E501
+
+            inst = InstrumentId(MarketId(int(ns.market_id)), Symbol(str(ns.symbol)))
+            rep = uc.run(inst)
+            _print_report(rep, fmt=ns.report_format, instrument_id=inst)
             return 0
 
-        if ns.all_from_ref_instruments:
-            instruments = _load_enabled_instruments(gw, settings.database)
-            ok = 0
-            fail = 0
-            for idx, inst in enumerate(instruments):
-                try:
-                    rep = uc.run(inst)
-                    ok += 1
-                    _print_report(rep, fmt=ns.report_format, instrument_id=inst)
-                except Exception:  # noqa: BLE001
-                    log.exception("rest-catchup failed for %s", inst)
-                    fail += 1
-                _sleep_between_instruments(
-                    delay_s=cfg.ingestion.rest_inter_instrument_delay_s,
-                    has_next=idx < len(instruments) - 1,
-                )
-
-            summary = RestCatchUpCliReport(
-                instruments_total=len(instruments),
-                instruments_ok=ok,
-                instruments_failed=fail,
-            )
-            if ns.report_format == "json":
-                print(json.dumps(asdict(summary), ensure_ascii=False))
-            else:
-                print(
-                    "rest-catchup summary:\n"
-                    f"- instruments_total: {summary.instruments_total}\n"
-                    f"- ok: {summary.instruments_ok}\n"
-                    f"- failed: {summary.instruments_failed}\n"
-                )
-            return 0 if fail == 0 else 2
-
-        if ns.market_id is None or ns.symbol is None:
-            raise SystemExit("Either --all-from-ref-instruments or (--market-id and --symbol) must be provided")  # noqa: E501
-
-        inst = InstrumentId(MarketId(int(ns.market_id)), Symbol(str(ns.symbol)))
-        rep = uc.run(inst)
-        _print_report(rep, fmt=ns.report_format, instrument_id=inst)
-        return 0
+        finally:
+            http.close()
 
 
 def _sleep_between_instruments(*, delay_s: float, has_next: bool) -> None:

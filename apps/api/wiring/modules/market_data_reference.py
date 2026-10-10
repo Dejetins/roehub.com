@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping
+from typing import Literal, Mapping
 
 from fastapi import APIRouter
 
@@ -38,6 +38,9 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.catalog_coverage_reader import (  # noqa: E501
     ClickHouseCatalogCoverageReader,
 )
+from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_coverage_reader import (  # noqa: E501
+    ClickHouseHistoryCoverageReader,
+)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresInstrumentSelectionRepository,
 )
@@ -47,12 +50,16 @@ from trading.contexts.market_data.adapters.outbound.persistence.postgres.catalog
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_bounds_repository import (  # noqa: E501
     PostgresHistoryBoundsRepository,
 )
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.stream_recovery_store import (  # noqa: E501
+    PostgresStreamRecoveryStore,
+)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository import (  # noqa: E501
     PostgresMarketDataWorkRequestRepository,
 )
 from trading.contexts.market_data.application.dto.reference_api import (
     BTCUSDTStreamReadinessSnapshot,
 )
+from trading.contexts.market_data.application.services.history_readiness import HistoryReadiness
 from trading.contexts.market_data.application.use_cases import (
     BTCUSDTMarketReadinessUseCase,
     ListEnabledMarketsUseCase,
@@ -77,9 +84,10 @@ class MarketDataReferenceUseCases:
 
 
 def build_market_data_reference_use_cases(
-    *, environ: Mapping[str, str]
+    *, environ: Mapping[str, str],
+    clickhouse_workload: Literal["interactive", "artifacts"] = "interactive",
 ) -> MarketDataReferenceUseCases:
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
+    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload=clickhouse_workload)
     clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
         client_factory=lambda: _clickhouse_client(clickhouse_settings)
     )
@@ -143,14 +151,27 @@ def build_market_data_reference_router(
 
     use_cases = build_market_data_reference_use_cases(environ=environ)
 
+    history_readiness = None
+    if environ.get("STRATEGY_PG_DSN"):
+        history_settings = ClickHouseSettingsLoader(environ).load(workload="interactive")
+        history_readiness = HistoryReadiness(
+            origins=PostgresHistoryBoundsRepository(
+                gateway=PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
+            ),
+            coverage=ClickHouseHistoryCoverageReader(
+                gateway=ThreadLocalClickHouseConnectGateway(
+                    client_factory=lambda: _clickhouse_client(history_settings)
+                ),
+                database=history_settings.database,
+            ),
+        )
     router = build_market_data_reference_api_router(
+        history_readiness=history_readiness,
         list_enabled_markets_use_case=use_cases.list_enabled_markets,
         search_enabled_tradable_instruments_use_case=use_cases.search_enabled_tradable_instruments,
         btcusdt_market_readiness_use_case=use_cases.btcusdt_market_readiness,
         current_user_dependency=current_user_dependency,
-        organization_scope_resolver=build_research_organization_scope_resolver(
-            environ=environ
-        ),
+        organization_scope_resolver=build_research_organization_scope_resolver(environ=environ),
         instrument_selection_repository=_build_instrument_selection_repository(environ=environ),
         coverage_reader=use_cases.coverage_reader,
         artifact_inventory_reader=_build_artifact_inventory_reader(environ=environ),
@@ -160,33 +181,46 @@ def build_market_data_reference_router(
         if selections is None:
             raise ValueError("STRATEGY_PG_DSN is required for market data work requests")
         gateway = PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
-        settings = ClickHouseSettingsLoader(environ).load()
-        router.include_router(build_catalog_workspace_router(
-            history_bounds=PostgresHistoryBoundsRepository(gateway=gateway),
-            current_user_dependency=current_user_dependency,
-            scope_resolver=build_research_organization_scope_resolver(environ=environ),
-            selections=selections,
-            snapshots=PostgresCatalogSnapshotRepository(gateway=gateway),
-            jobs=PostgresMarketDataWorkRequestRepository(gateway=gateway),
-            markets=use_cases.list_enabled_markets,
-            coverage=ClickHouseCatalogCoverageReader(
-                gateway=ThreadLocalClickHouseConnectGateway(
-                    client_factory=lambda: _clickhouse_client(settings)),
-                database=settings.database),
-        ))
-        router.include_router(build_market_data_workspace_router(
-            current_user_dependency=current_user_dependency,
-            scope_resolver=build_research_organization_scope_resolver(environ=environ),
-            selections=selections,
-            snapshots=PostgresCatalogSnapshotRepository(gateway=gateway),
-            jobs=PostgresMarketDataWorkRequestRepository(gateway=gateway),
-            markets=use_cases.list_enabled_markets,
-            search=use_cases.search_enabled_tradable_instruments,
-            index=ClickHouseCanonicalCandleIndexReader(
-                gateway=ThreadLocalClickHouseConnectGateway(
-                    client_factory=lambda: _clickhouse_client(settings)),
-                database=settings.database),
-        ))
+        settings = ClickHouseSettingsLoader(environ).load(workload="interactive")
+        router.include_router(
+            build_catalog_workspace_router(
+                collector_status=PostgresStreamRecoveryStore(
+                    environ["STRATEGY_PG_DSN"]
+                ).collector_status,
+                full_history=history_readiness,
+                history_bounds=PostgresHistoryBoundsRepository(gateway=gateway),
+                current_user_dependency=current_user_dependency,
+                scope_resolver=build_research_organization_scope_resolver(environ=environ),
+                selections=selections,
+                snapshots=PostgresCatalogSnapshotRepository(gateway=gateway),
+                jobs=PostgresMarketDataWorkRequestRepository(gateway=gateway),
+                markets=use_cases.list_enabled_markets,
+                coverage=ClickHouseCatalogCoverageReader(
+                    gateway=ThreadLocalClickHouseConnectGateway(
+                        client_factory=lambda: _clickhouse_client(settings)
+                    ),
+                    database=settings.database,
+                ),
+            )
+        )
+        router.include_router(
+            build_market_data_workspace_router(
+                history_readiness=history_readiness,
+                current_user_dependency=current_user_dependency,
+                scope_resolver=build_research_organization_scope_resolver(environ=environ),
+                selections=selections,
+                snapshots=PostgresCatalogSnapshotRepository(gateway=gateway),
+                jobs=PostgresMarketDataWorkRequestRepository(gateway=gateway),
+                markets=use_cases.list_enabled_markets,
+                search=use_cases.search_enabled_tradable_instruments,
+                index=ClickHouseCanonicalCandleIndexReader(
+                    gateway=ThreadLocalClickHouseConnectGateway(
+                        client_factory=lambda: _clickhouse_client(settings)
+                    ),
+                    database=settings.database,
+                ),
+            )
+        )
     return router
 
 
@@ -196,9 +230,7 @@ def _build_instrument_selection_repository(
     dsn = environ.get("STRATEGY_PG_DSN", "").strip()
     if not dsn:
         return None
-    return PostgresInstrumentSelectionRepository(
-        gateway=PsycopgBacktestPostgresGateway(dsn=dsn)
-    )
+    return PostgresInstrumentSelectionRepository(gateway=PsycopgBacktestPostgresGateway(dsn=dsn))
 
 
 def _build_artifact_inventory_reader(
@@ -209,9 +241,7 @@ def _build_artifact_inventory_reader(
     if not path.is_file():
         return None
     config = load_backtest_artifacts_runtime_config(path)
-    return FileSystemActiveArtifactInventoryReader(
-        artifact_root=config.artifact_root_path()
-    )
+    return FileSystemActiveArtifactInventoryReader(artifact_root=config.artifact_root_path())
 
 
 class _UnavailableBTCUSDTStreamReadinessReader:

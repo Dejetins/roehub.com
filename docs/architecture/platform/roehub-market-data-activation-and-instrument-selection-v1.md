@@ -81,3 +81,46 @@ organizational selection, coverage и ingestion evidence сохраняются.
 ## Критерий завершения
 
 Этапы `00`–`05` приняты или содержат явный owner-custody handoff для OpenBao; локальный Docker Desktop демонстрирует рабочий `BTCUSDT` path и UI. Финальный production OpenBao bootstrap и native `linux/amd64` остаются отдельными строго контролируемыми действиями.
+
+
+## Локальные ClickHouse workload identities (S02, 2026-10-10)
+
+Текущий managed local renderer владеет четырьмя классами `stream`, `interactive`,
+`backfill`, `artifacts`; назначение находится в composition roots, включая
+дочерние процессы collector. Все процессы класса используют одну серверную
+identity, поэтому per-user memory/concurrency caps действуют совместно на одном
+ClickHouse server. Смена профиля и снятие caps обычным клиентом запрещены.
+
+Жизненный цикл `legacy` → `provisioned` → `active` отделяет подготовку серверных
+профилей/секретов от переключения клиентов. Private credentials сохраняются при
+повторной генерации, отдельный workload получает только свой password file.
+Rollback после drain возвращает клиентов в `provisioned`, сохраняя additive
+identities и данные. Existing credentials не ротируются и не удаляются. Точные
+лимиты, grants/MV, административные исключения и команды приведены в разделе
+S02 `docs/runbooks/navigator-local-market-data-recovery.md`; состояние фактической
+активации фиксирует отчёт S02. Выбор инструментов и полномочия организаций не
+изменены. Generic offline topology не включается этим локальным переключателем.
+
+## Общий REST egress scope (S03, 2026-10-10)
+
+Source-кандидат S03 объединяет scheduler (candles, metadata, funding, bounds),
+collector REST fill, catchup CLI и strategy history lookup через PostgreSQL
+provider admission. Для одного egress все участники используют одну БД, одинаковую
+версию policy/config и явный `rest.limiter.egress_scope`; scope не является символом,
+организацией или автоматическим определением IP. Установки за одним NAT требуют
+согласованного scope/storage. Сторонние клиенты того же IP не контролируются.
+WebSocket-трафик не расходует REST permits.
+
+Dev сохраняет concurrency 4 и safety factor 0.8; test — 2 и 0.7; prod — 3 и 0.7. Режим
+`shared_conservative` использует проверенные консервативные ceilings; `autodetect`
+не означает реальное обнаружение биржевых лимитов. Любая отправленная/неопределённая
+попытка сохраняет свой расход, Retry-After разделяется между процессами. Сбой PG
+останавливает admission без локального fallback.
+
+Перед активацией остановить и подтвердить drain всех участников, применить
+`market-data-provider-admission-0034`, сгенерировать matching config и только затем
+запустить image-bound кандидат через managed lifecycle. Старые клиенты обходят
+новый admission, поэтому смешанный rollout не поддерживается. Выбор инструментов,
+данные, membership и пользовательские права сохраняются. Фактическое включение
+в установке не следует из изменения исходников; порядок rollback и stranded-owner
+recovery находится в S03 local Market Data recovery runbook.

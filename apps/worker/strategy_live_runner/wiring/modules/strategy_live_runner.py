@@ -12,7 +12,7 @@ from datetime import timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Mapping
+from typing import Callable, Mapping
 from uuid import uuid4
 
 from prometheus_client import (
@@ -659,6 +659,7 @@ class StrategyLiveRunnerApp:
     metrics_port: int
     producer_config: StrategyProducerRuntimeConfig
     metrics_bind_host: str = "127.0.0.1"
+    close_provider_http: Callable[[], None] = lambda: None
 
     def __post_init__(self) -> None:
         """
@@ -726,6 +727,7 @@ class StrategyLiveRunnerApp:
                 except TimeoutError:
                     continue
         finally:
+            self.close_provider_http()
             http_server.stop()
 
 
@@ -786,7 +788,7 @@ def build_strategy_live_runner_app(
         on_paper_accounting=metrics.observe_strategy_paper_accounting,
     )
 
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
+    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="stream")
     clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
         client_factory=lambda: _clickhouse_client(clickhouse_settings)
     )
@@ -809,10 +811,11 @@ def build_strategy_live_runner_app(
         environ=environ,
         hooks=metrics.hot_cache_hooks(),
     )
+    provider_http = RequestsHttpClient.from_config(market_data_config, environ)
     rest_source = RestCandleIngestSource(
         cfg=market_data_config,
         clock=market_data_clock,
-        http=RequestsHttpClient(),
+        http=provider_http,
         ingest_id=uuid4(),
     )
     candle_repair_audit_repository = PostgresCandleRepairAuditRepository(
@@ -928,6 +931,7 @@ def build_strategy_live_runner_app(
         telegram_notification_policy=telegram_notification_policy,
     )
     return StrategyLiveRunnerApp(
+        close_provider_http=provider_http.close,
         poll_interval_seconds=runtime_config.poll_interval_seconds,
         runner=runner,
         metrics=metrics,

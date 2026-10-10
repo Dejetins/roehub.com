@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
+from datetime import timedelta
+from typing import Callable, Iterable
 
 from trading.contexts.market_data.application.dto import (
     CandleWithMeta,
@@ -15,6 +16,9 @@ from trading.contexts.market_data.application.ports.sources.candle_ingest_source
 from trading.contexts.market_data.application.ports.stores.canonical_candle_index_reader import (
     CanonicalCandleIndexReader,
 )
+from trading.contexts.market_data.application.ports.stores.history_range_verifier import (
+    HistoryRangeVerifier,
+)
 from trading.contexts.market_data.application.ports.stores.raw_kline_writer import RawKlineWriter
 from trading.contexts.market_data.application.services.minute_utils import floor_to_minute_utc
 from trading.contexts.market_data.application.use_cases.time_slicing import (
@@ -26,7 +30,7 @@ from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
 @dataclass(frozen=True, slots=True)
 class RestFillRange1mUseCase:
     """
-    Execute one bounded REST fill range and persist only into raw tables.
+    Execute one bounded REST fill range and verify canonical availability.
 
     Parameters:
     - source: REST-backed candle source returning closed 1m rows.
@@ -34,6 +38,8 @@ class RestFillRange1mUseCase:
     - clock: UTC clock for deterministic timing in reports/tests.
     - max_days_per_insert: maximum UTC-day span for one insert slice.
     - batch_size: raw write batch size.
+    - history_verifier: optional canonical/index verification and source-absence writer.
+    - check_lease: fence checked before verification metadata mutations.
 
     Assumptions/Invariants:
     - `max_days_per_insert` is in `[1, 7]` for ClickHouse partition safety.
@@ -46,6 +52,8 @@ class RestFillRange1mUseCase:
     max_days_per_insert: int
     batch_size: int
     index_reader: CanonicalCandleIndexReader | None = None
+    history_verifier: HistoryRangeVerifier | None = None
+    check_lease: Callable[[], None] = lambda: None
 
     def __post_init__(self) -> None:
         """
@@ -95,7 +103,7 @@ class RestFillRange1mUseCase:
         - Propagates source and writer adapter errors.
 
         Side effects:
-        - Reads external REST data and writes raw rows.
+        - Reads external REST data, writes raw rows and confirms availability metadata.
         """
         started_at = self.clock.now()
         effective_task = self._effective_task(task)
@@ -204,7 +212,7 @@ class RestFillRange1mUseCase:
         batch: list[CandleWithMeta] = []
         existing_minute_keys = self._existing_minute_keys(task=task, chunk=chunk)
 
-        for row in self.source.stream_1m(task.instrument_id, chunk):
+        for row in self._missing_rows(task=task, chunk=chunk, present=existing_minute_keys):
             rows_read += 1
             minute_key = _minute_key(row.candle.ts_open.value)
             if minute_key in existing_minute_keys:
@@ -223,7 +231,38 @@ class RestFillRange1mUseCase:
             rows_written += len(batch)
             batches_written += 1
 
+        # Only a fully consumed successful source read can confirm an omission.
+        # Existing canonical keys and every returned key must still be durable.
+        if self.history_verifier is not None:
+            self.history_verifier.confirm(
+                instrument_id=task.instrument_id, time_range=chunk,
+                observed_minutes=existing_minute_keys, observed_at=self.clock.now().value,
+                accept_absence=task.reason != "ws_recovery", check_lease=self.check_lease,
+            )
+
         return rows_read, rows_written, batches_written
+
+    def _missing_rows(self, *, task: RestFillTask, chunk: TimeRange, present: set[int]):
+        """Ask the provider only for contiguous missing minutes in this bounded chunk."""
+        cursor = _minute_key(chunk.start.value)
+        end = _minute_key(chunk.end.value)
+        while cursor < end:
+            if cursor in present:
+                cursor += 1
+                continue
+            stop = cursor + 1
+            while stop < end and stop not in present:
+                stop += 1
+            missing = TimeRange(
+                UtcTimestamp(
+                    chunk.start.value + timedelta(minutes=cursor - _minute_key(chunk.start.value))
+                ),
+                UtcTimestamp(
+                    chunk.start.value + timedelta(minutes=stop - _minute_key(chunk.start.value))
+                ),
+            )
+            yield from self.source.stream_1m(task.instrument_id, missing)
+            cursor = stop
 
     def _existing_minute_keys(self, *, task: RestFillTask, chunk) -> set[int]:
         """

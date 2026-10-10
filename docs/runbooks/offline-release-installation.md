@@ -179,3 +179,121 @@ oversized output отклоняется, а не усекается. Более 
 и v2 marker — `breaking-change` для старого worker и ранее пропускаемых overbudget
 attempts; financial schema/precision не изменены. Drain относится и к этому
 изменению, не только к schema-2 publication.
+
+## Управление Backtest artifacts: неактивный opt-in API
+
+После additive migrations до `0031_backtest_artifact_storage_v1.sql` новая API
+композиция читает `ROEHUB_ARTIFACT_MANAGEMENT_INSTALLATION_ID`,
+`ROEHUB_BACKTEST_ARTIFACTS_CONFIG`, `ROEHUB_INDICATORS_CONFIG` и существующий
+`STRATEGY_PG_DSN`. Это не активирует capability, scheduler или legacy handoff.
+Сначала нужны совместимые readers, импорт старых policy, остановка/дренирование
+старого writer и отдельная явная owner-активация по принятому management contract.
+
+Storage capability работает через существующий подписанный Unix control-agent
+и его API service identity. На стороне control-agent используется тот же trusted
+конфиг артефактов и `ROEHUB_STORAGE_POSTGRES_DSN` (или `STRATEGY_PG_DSN`).
+Registry содержит `backtest-primary`, соответствующий `artifact_root` в конфиге.
+Браузер передаёт только этот ID, settings version, budget/schedule и opaque token;
+произвольные пути, owner credentials и worker receipts не принимаются.
+
+Перед установочной активацией control-agent должен видеть именно worker mount:
+одинаковая строка пути на host и в контейнере не доказывает общий volume. Применить
+и проверить общий mount — отдельная установочная операция; текущие generated
+Compose файлы этой функцией не изменены. Отсутствующий/недоступный root или control
+service даёт unavailable, а не успешную проверку. Локальные disposable проверки
+S06 не являются доказательством соответствия production mounts.
+
+Installation owner открывает privileged storage GET, получает текущую version,
+выполняет validate (узкая запись/fsync/unlink), затем configure с validation ID,
+version и новым Idempotency-Key. Token ограничен пятью минутами, actor, root inode
+и version; configure повторно проверяет root. Первая пустая настройка сохраняется
+без включения schedules. Изменение root с файлами, pins или зарегистрированными
+работами возвращает `relocation_required`; автоматического перемещения нет.
+Изменение budget на прежнем root не удаляет файлы и не отменяет pins.
+
+Cleanup всегда отдельный явный preview/confirm одного inactive slot. Проверяются
+строгий current pointer, hash/generation manifests, существующий registered owner,
+queued/active/quarantined pins, writer reservation и актуальная settings version.
+TTL не разрешает удаление. Partial/unknown IO сохраняет reservation в quarantine;
+повтор команды с тем же ключом возвращает `unknown`, не повторяет удаление.
+Нужна отдельная owner reconciliation; не создавать новый cleanup key, пытаясь
+обойти quarantine. Автоматическая cleanup policy не включается.
+
+### S09 local verification and current recovery procedure
+
+Before any separately authorized installation activation, run the current disposable
+proof with the existing Python environment. `ROEHUB_BACKTEST_TEST_DSN` must point to a
+new disposable PostgreSQL service; `ROEHUB_BASE_TEST_CLICKHOUSE_PORT` must point to a
+new loopback disposable ClickHouse service. Fixtures create/drop their own databases
+and schemas. Never point these variables at user/preview databases.
+
+```sh
+.venv/bin/pytest -q -ra tests/real_infra/backtest/test_artifact_integrated.py tests/real_infra/backtest/test_automatic_base_lifecycle.py tests/real_infra/backtest/test_artifact_dispatch.py tests/real_infra/backtest/test_artifact_http_storage.py tests/real_infra/backtest/test_artifact_input_lifecycle.py tests/real_infra/backtest/test_managed_derivative_publication.py tests/real_infra/backtest/test_artifact_management.py
+```
+
+The existing scheduler entrypoint is
+`python -m apps.scheduler.backtest_artifact_publisher.main.main`. Managed composition
+requires explicit `ROEHUB_ARTIFACT_MANAGEMENT_INSTALLATION_ID`, migrated settings,
+trusted root and disabled legacy scheduling. Starting the process does not grant
+activation authority. Retain the existing deployment's account/config sources;
+this document provides no secrets or selected installation. Do not run the retired
+rebuild runtime. A normal owner Storage save also does not activate scheduling.
+
+For recovery, first read request/build state and retained published coverage. Do not
+confuse a source watermark with published coverage. Restore the same root revision
+and process configuration, then allow the existing managed cycle to reconcile owned
+attempts under the host/lifetime locks. A matching fsynced receipt and verified
+pointer/manifest can finish an interrupted PG completion. Missing/corrupt receipts,
+unknown liveness or ambiguous publication remain quarantined: preserve files, pins
+and reservations; no TTL takeover, new-key cleanup retry or manual SQL state reset.
+Revoked actors are rejected on retry. Correct the cause before a new explicit command.
+
+Budget edits are read by a running managed worker at its next admission, including
+retained bytes and reserve; they do not cancel work already admitted. Root relocation
+with data remains a separate operation. Cleanup still requires a fresh preview and
+confirmation, and refuses current/pinned/active targets. Disable submissions and drain
+owned work for rollback; retain schema-aware readers after sparse schema-2 publication.
+Local tests do not certify shared production mounts, S3, providers or full-market load.
+
+
+### Managed local ClickHouse budgets (S02, 2026-10-10)
+
+Для существующей managed local установки `tools/installation/local_platform.py`
+имеет явные режимы `clickhouse_workload_budgets`: `legacy`, `provisioned`, `active`.
+Это отдельный локальный installation lifecycle, не изменение подписанного
+комплекта или автоматическое включение generic offline topology. Включение требует
+совместимого image-bound candidate и сохранения текущего trust binding.
+
+Сначала `tools.installation.clickhouse_workloads` готовит additive private
+credentials (0700 directory / 0600 files), не заменяя существующие. Публичные
+outputs содержат profiles, paths и bootstrap, но не пароли. Bootstrap передаёт
+private password-hash XML ClickHouse с корректным UID/mode, затем запускает
+официальный entrypoint. После проверки `provisioned` server следует drain и
+переключение `active` clients. Rollback возвращает prior application image и
+`provisioned`, оставляя identities и данные; cleanup/rotation не подразумеваются.
+Таблица caps, grants/MV, исключения admin, диагностика отказов и воспроизводимые
+проверки находятся в разделе S02 local market-data recovery runbook. Существующие
+storage migration manifests не меняются: candle/index/PG schemas сохранены.
+
+### REST provider admission rollout (S03, 2026-10-10)
+
+Новый HTTP composition требует common PostgreSQL и explicit egress scope. До
+запуска новых scheduler/collector/CLI/strategy клиентов подтвердить остановку
+старых участников и их I/O, применить additive phase
+`market-data-provider-admission-0034`, затем активировать matching image/config.
+Смешанные старые и новые REST клиенты не обеспечивают общий лимит.
+
+Источник signed-topology конфигурации — `configs/prod/market_data.yaml`;
+`tools/release/generate_runtime_topology.py --write` обновляет оба имени
+market-data config и generation manifests, `--check` проверяет drift. Не править
+сгенерированные файлы вручную. Scope `local-installation-egress` — явный пример
+для одной установки, не определение NAT/IP. Сохраняются prod cap 3/factor 0.7,
+selections, credentials и S02 ClickHouse resource contract; новая выдача секретов
+для provider admission не требуется.
+
+Rollback требует drain новых клиентов и восстановления предыдущих image **и**
+config (legacy parser не понимает `shared_conservative`). Additive таблицы/поля,
+расход квот, cooldown и неопределённые permits сохраняются. Удаление точного owner
+возможно только после подтверждённой остановки всех его I/O; см. раздел S03
+`docs/runbooks/navigator-local-market-data-recovery.md`. Подготовка артефактов и
+локальная проверка не означают установку или production delivery.

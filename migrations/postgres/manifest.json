@@ -232,6 +232,66 @@
           "sha256": "338c9be2f943f429a2b85f00e3fb566b2538e655286e8c8e3ba4f0e0702e01a0"
         }
       ]
+    },
+    {
+      "version": "backtest-artifact-management-0029",
+      "sha256": "d9b11d2c351dac34b15c87f219d2049c76040beab87334d28c3b77275b448d52",
+      "files": [
+        {
+          "path": "0029_backtest_artifact_management_v1.sql",
+          "sha256": "ac3b66333786594567030cd6bf46f97d2a20eeb94dae86913b6b89e0e90a348b"
+        }
+      ]
+    },
+    {
+      "version": "backtest-artifact-dispatch-0030",
+      "sha256": "2f0d76ceec8356ca1dd61097929a0a6a77be12cb30c0b8fb6317357dbae42404",
+      "files": [
+        {
+          "path": "0030_backtest_artifact_dispatch_v1.sql",
+          "sha256": "cf0b9ae38b283d13ae685e41a8722182d0684c9953b34a33b25f14c297d4ecac"
+        }
+      ]
+    },
+    {
+      "version": "backtest-artifact-storage-0031",
+      "sha256": "873089e2a0f7054acf309ff6b00dc579b12ea4baf060ebca79dab7ea33f0a10f",
+      "files": [
+        {
+          "path": "0031_backtest_artifact_storage_v1.sql",
+          "sha256": "44099594d16c9873f3f8312980c7d2330d094d03b0972e509bbadd89861c34d8"
+        }
+      ]
+    },
+    {
+      "version": "identity-browser-devices-0032",
+      "sha256": "45e701e4262cb80a45ef71fde4f906bf5af0815cc764a65db8dca7a740da950d",
+      "files": [
+        {
+          "path": "0032_identity_browser_devices_v1.sql",
+          "sha256": "63f82235a1c370c0a0f6ea5b064079ddee2b8f42f07750f74b603b9487e9c4d5"
+        }
+      ]
+    },
+    {
+      "version": "market-data-stream-connections-0033",
+      "sha256": "0fd1da6fe2c1dc9dfb3d43efb7c8c5f7437ecc6f20269dc7f1e41dcd2698c379",
+      "files": [
+        {
+          "path": "0033_market_data_stream_connections_v1.sql",
+          "sha256": "5b44830c80e84142dc52153aaaf9adccbc984b8eeee3cf9644daf17dbefe86d7"
+        }
+      ]
+    },
+    {
+      "version": "market-data-provider-admission-0034",
+      "sha256": "3ef5e860c90365f1590100b2dd344eed955441726857bf3adf38d004825e3529",
+      "files": [
+        {
+          "path": "0034_market_data_provider_admission_v1.sql",
+          "sha256": "c3772dad10b9b3b14693028b827b16863847bbc8723e3e05e0c1de4451080c3f"
+        }
+      ]
     }
   ]
 }

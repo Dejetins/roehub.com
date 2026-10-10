@@ -199,6 +199,7 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
     slot_generation: int
     force_full_rebuild: bool
     execution_policy: ArtifactPrecomputeExecutionPolicyV2
+    progress_observer: Callable[[ArtifactPrecomputeProgressEventV2], None] | None = None
     _stage_results: list[ArtifactPrecomputeStageResultV2] = field(
         default_factory=list,
         init=False,
@@ -517,6 +518,8 @@ class ArtifactPrecomputeCoordinatorV2(Generic[_StageResultT]):
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
         """
+        if self.progress_observer is not None:
+            self.progress_observer(event)
         details_payload = json.dumps(
             dict(event.details),
             sort_keys=True,

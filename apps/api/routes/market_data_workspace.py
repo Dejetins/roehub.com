@@ -30,6 +30,7 @@ from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_re
 from trading.contexts.market_data.application.ports.stores.canonical_candle_index_reader import (
     CanonicalCandleIndexReader,
 )
+from trading.contexts.market_data.application.services.history_readiness import HistoryReadiness
 from trading.contexts.market_data.application.services.work_requests import WorkRequest
 from trading.contexts.market_data.application.use_cases import (
     ListEnabledMarketsUseCase,
@@ -41,6 +42,7 @@ from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, Tim
 class WorkRequestBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     idempotency_key: UUID
+    full_history: bool = False
     kind: Literal["catalog_refresh", "candle_ingestion"]
     market_id: int = Field(ge=1)
     symbols: list[str] = Field(default_factory=list, max_length=8)
@@ -57,6 +59,7 @@ class RetryBody(BaseModel):
 class WorkBatchBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     idempotency_key: UUID
+    full_history: bool = False
     kind: Literal["candle_ingestion"] = "candle_ingestion"
     market_id: int = Field(ge=1)
     symbols: list[str] = Field(min_length=1, max_length=50)
@@ -144,11 +147,10 @@ def _response(row: Mapping[str, Any]) -> WorkRequestResponse:
             **row,
             # A command acknowledgement does not prove acquisition of the worker.
             "queue_waiting": row.get("queue_waiting", row["state"] == "queued"),
-            "can_cancel": row["state"] in {
-                "queued", "running", "pause_requested", "paused", "retry_wait"
-            },
+            "can_cancel": row["state"]
+            in {"queued", "running", "pause_requested", "paused", "retry_wait"},
             "can_pause": row["state"] in {"queued", "running", "retry_wait"},
-            "can_resume": row["state"] == "paused",
+            "can_resume": row["state"] in {"paused", "pause_requested"},
             "can_retry": row["state"] == "failed" and row["attempt"] < 5,
         }
     )
@@ -175,6 +177,7 @@ def build_market_data_workspace_router(
     markets: ListEnabledMarketsUseCase,
     search: SearchEnabledTradableInstrumentsUseCase,
     index: CanonicalCandleIndexReader,
+    history_readiness: HistoryReadiness | None = None,
 ) -> APIRouter:
     router = APIRouter(tags=["market-data"])
 
@@ -185,15 +188,27 @@ def build_market_data_workspace_router(
         if not any(m.market_id.value == market_id for m in markets.execute()):
             raise HTTPException(404, "Source is not available")
 
+    def history_start(market_id: int, symbol: str) -> datetime:
+        if history_readiness is None:
+            raise HTTPException(503, "Full history verification is unavailable")
+        first = history_readiness.origins.ready_starts(market_ids=[market_id]).get(
+            (market_id, symbol)
+        )
+        if first is None:
+            raise HTTPException(409, {"code": "history_origin_unknown"})
+        return first
+
     @router.get("/market-data/workspace/backlog", response_model=WorkBacklogResponse)
     def backlog(
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> WorkBacklogResponse:
         org = organization(principal)
-        return WorkBacklogResponse.model_validate({
-            **jobs.backlog(organization_id=org.value),
-            "observed_at": datetime.now(UTC),
-        })
+        return WorkBacklogResponse.model_validate(
+            {
+                **jobs.backlog(organization_id=org.value),
+                "observed_at": datetime.now(UTC),
+            }
+        )
 
     @router.get("/market-data/workspace/catalog")
     def catalog(
@@ -232,11 +247,14 @@ def build_market_data_workspace_router(
             limit=limit + 1,
             selected_symbols=sorted(selected) if selected_only else None,
         )
-        if not raw and snapshots.latest(
-            market_id=market_id, snapshot_id=snapshot["snapshot_id"]
-        ) is None:
+        if (
+            not raw
+            and snapshots.latest(market_id=market_id, snapshot_id=snapshot["snapshot_id"]) is None
+        ):
             raise HTTPException(409, "Catalog snapshot expired; refresh the list")
-        if state == "fresh" and snapshot["refreshed_at"] < datetime.now(UTC)-timedelta(minutes=30):
+        if state == "fresh" and snapshot["refreshed_at"] < datetime.now(UTC) - timedelta(
+            minutes=30
+        ):
             state = "stale"
         items = []
         for row in raw[:limit]:
@@ -337,6 +355,10 @@ def build_market_data_workspace_router(
         require_market_data_origin(request)
         org = organization(principal)
         require_market(body.market_id)
+        if body.full_history:
+            if body.kind != "candle_ingestion" or len(body.symbols) != 1:
+                raise HTTPException(422, "Full history requires a single instrument or work batch")
+            body.start_at = history_start(body.market_id, body.symbols[0])
         command = WorkRequest(
             body.kind,
             body.market_id,
@@ -351,6 +373,16 @@ def build_market_data_workspace_router(
                 _catalog_instrument_or_error(
                     search_use_case=search, market_id=command.market_id, symbol=symbol
                 )
+                if command.kind == "candle_ingestion" and history_readiness is not None:
+                    first = history_readiness.origins.ready_starts(
+                        market_ids=[command.market_id]
+                    ).get((command.market_id, symbol))
+                    if (
+                        first is not None
+                        and command.start_at is not None
+                        and command.start_at < first
+                    ):
+                        raise ValueError("The requested range starts before exchange history")
             row = jobs.submit(
                 organization_id=org.value,
                 actor_user_id=principal.user_id.value,
@@ -367,8 +399,11 @@ def build_market_data_workspace_router(
         return _response(row)
 
     @router.post("/market-data/work-batches")
-    def submit_batch(body: WorkBatchBody, request: Request,
-                     principal: CurrentUserPrincipal = Depends(current_user_dependency)):
+    def submit_batch(
+        body: WorkBatchBody,
+        request: Request,
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
+    ):
         require_market_data_origin(request)
         org = organization(principal)
         require_market(body.market_id)
@@ -376,15 +411,38 @@ def build_market_data_workspace_router(
         try:
             if len(set(body.symbols)) != len(body.symbols):
                 raise ValueError("select distinct instruments")
-            commands = tuple(WorkRequest("candle_ingestion", body.market_id, (symbol,),
-                                         body.start_at, body.end_at) for symbol in body.symbols)
+            commands = tuple(
+                WorkRequest(
+                    "candle_ingestion",
+                    body.market_id,
+                    (symbol,),
+                    history_start(body.market_id, symbol) if body.full_history else body.start_at,
+                    body.end_at,
+                )
+                for symbol in body.symbols
+            )
             for command in commands:
                 command.validate(now=now)
-                _catalog_instrument_or_error(search_use_case=search, market_id=body.market_id,
-                                              symbol=command.symbols[0])
+                _catalog_instrument_or_error(
+                    search_use_case=search, market_id=body.market_id, symbol=command.symbols[0]
+                )
+                if history_readiness is not None:
+                    first = history_readiness.origins.ready_starts(
+                        market_ids=[command.market_id]
+                    ).get((command.market_id, command.symbols[0]))
+                    if (
+                        first is not None
+                        and command.start_at is not None
+                        and command.start_at < first
+                    ):
+                        raise ValueError("The requested range starts before exchange history")
             rows = jobs.submit_batch(
-                organization_id=org.value, actor_user_id=principal.user_id.value,
-                                     key=body.idempotency_key, requests=commands, now=now)
+                organization_id=org.value,
+                actor_user_id=principal.user_id.value,
+                key=body.idempotency_key,
+                requests=commands,
+                now=now,
+            )
         except ActiveWorkRequestError as error:
             raise HTTPException(409, {"code": error.code}) from error
         except PermissionError as error:
@@ -399,8 +457,17 @@ def build_market_data_workspace_router(
         before: datetime | None = None,
         before_id: UUID | None = None,
         kind: Literal["catalog_refresh", "candle_ingestion"] | None = None,
-        state: Literal["queued", "running", "pause_requested", "paused", "retry_wait",
-                       "cancel_requested", "cancelled", "succeeded", "failed"]
+        state: Literal[
+            "queued",
+            "running",
+            "pause_requested",
+            "paused",
+            "retry_wait",
+            "cancel_requested",
+            "cancelled",
+            "succeeded",
+            "failed",
+        ]
         | None = None,
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ):
@@ -439,17 +506,22 @@ def build_market_data_workspace_router(
         return _response(row)
 
     @router.get("/market-data/work-requests/{job_id}/events")
-    def events(job_id: UUID, before: int | None = Query(default=None, ge=1),
-               limit: int = Query(default=30, ge=1, le=100),
-               principal: CurrentUserPrincipal = Depends(current_user_dependency)):
+    def events(
+        job_id: UUID,
+        before: int | None = Query(default=None, ge=1),
+        limit: int = Query(default=30, ge=1, le=100),
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
+    ):
         org = organization(principal)
         if jobs.get(organization_id=org.value, job_id=job_id) is None:
             raise HTTPException(404, "Request not found")
-        rows = jobs.events(organization_id=org.value, job_id=job_id,
-                           before=before, limit=limit + 1)
-        return dict(items=[WorkEventResponse.model_validate(row) for row in rows[:limit]],
-                    next_cursor=rows[limit - 1]["event_id"] if len(rows) > limit else None,
-                    retention_days=30, max_events=512)
+        rows = jobs.events(organization_id=org.value, job_id=job_id, before=before, limit=limit + 1)
+        return dict(
+            items=[WorkEventResponse.model_validate(row) for row in rows[:limit]],
+            next_cursor=rows[limit - 1]["event_id"] if len(rows) > limit else None,
+            retention_days=30,
+            max_events=512,
+        )
 
     @router.post("/market-data/work-requests/{job_id}/cancel", response_model=WorkRequestResponse)
     def cancel(
@@ -468,33 +540,53 @@ def build_market_data_workspace_router(
                 raise HTTPException(409, {"code": "work_not_cancellable"})
         return _response(row)
 
-    def control(job_id: UUID, body: ControlBody, request: Request,
-                principal: CurrentUserPrincipal, action: str):
+    def control(
+        job_id: UUID,
+        body: ControlBody,
+        request: Request,
+        principal: CurrentUserPrincipal,
+        action: str,
+    ):
         require_market_data_origin(request)
         org = organization(principal)
         operation = jobs.pause if action == "pause" else jobs.resume
-        row = operation(organization_id=org.value, job_id=job_id,
-                        version=body.control_version, now=datetime.now(UTC))
+        row = operation(
+            organization_id=org.value,
+            job_id=job_id,
+            version=body.control_version,
+            now=datetime.now(UTC),
+        )
         if row is None:
             row = jobs.get(organization_id=org.value, job_id=job_id)
             if row is None:
                 raise HTTPException(404, "Request not found")
             # Retrying an acknowledged action is harmless; a delayed action from
             # an earlier pause/resume cycle cannot alter the current intent.
-            allowed = {"paused", "pause_requested"} if action == "pause" else {
-                "queued", "running", "retry_wait", "succeeded", "failed"}
+            allowed = (
+                {"paused", "pause_requested"}
+                if action == "pause"
+                else {"queued", "running", "retry_wait", "succeeded", "failed"}
+            )
             if row["control_version"] != body.control_version + 1 or row["state"] not in allowed:
                 raise HTTPException(409, {"code": "stale_work_control"})
         return _response(row)
 
     @router.post("/market-data/work-requests/{job_id}/pause", response_model=WorkRequestResponse)
-    def pause(job_id: UUID, body: ControlBody, request: Request,
-              principal: CurrentUserPrincipal = Depends(current_user_dependency)):
+    def pause(
+        job_id: UUID,
+        body: ControlBody,
+        request: Request,
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
+    ):
         return control(job_id, body, request, principal, "pause")
 
     @router.post("/market-data/work-requests/{job_id}/resume", response_model=WorkRequestResponse)
-    def resume(job_id: UUID, body: ControlBody, request: Request,
-               principal: CurrentUserPrincipal = Depends(current_user_dependency)):
+    def resume(
+        job_id: UUID,
+        body: ControlBody,
+        request: Request,
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
+    ):
         return control(job_id, body, request, principal, "resume")
 
     @router.post("/market-data/work-requests/{job_id}/retry", response_model=WorkRequestResponse)

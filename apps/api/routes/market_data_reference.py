@@ -39,6 +39,7 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresInstrumentSelectionRepository,
 )
+from trading.contexts.market_data.application.services.history_readiness import HistoryReadiness
 from trading.contexts.market_data.application.use_cases import (
     DEFAULT_INSTRUMENT_SEARCH_LIMIT,
     MAX_INSTRUMENT_SEARCH_LIMIT,
@@ -62,6 +63,7 @@ def build_market_data_reference_router(
     instrument_selection_repository: PostgresInstrumentSelectionRepository | None = None,
     coverage_reader: ClickHouseInstrumentCoverageReader | None = None,
     artifact_inventory_reader: FileSystemActiveArtifactInventoryReader | None = None,
+    history_readiness: HistoryReadiness | None = None,
 ) -> APIRouter:
     """
     Build auth-only Market Data reference API router.
@@ -291,11 +293,14 @@ def build_market_data_reference_router(
             market_id=market_id,
             symbol=symbol,
         )
+        # Persist intent independently of a moving history boundary or storage reads.
+        # The collector verifies/repairs history before admitting the live stream.
+        admission_at = datetime.now(UTC)
         repository.select(
             organization_id=scope.organization_id,
             actor_user_id=principal.user_id,
             instrument_id=instrument,
-            now=datetime.now(UTC),
+            now=admission_at,
         )
         return MarketDataSelectionItemResponse(
             market_id=instrument.market_id.value,

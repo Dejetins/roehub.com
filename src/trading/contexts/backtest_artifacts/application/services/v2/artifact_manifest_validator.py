@@ -562,6 +562,18 @@ class BacktestArtifactManifestValidatorV2:
                     diagnostics=diagnostics,
                 )
 
+        if slot_manifest.schema_version == 1 and (
+            any(signal.grid.row_ids is not None for signal in signal_manifests)
+            or (hit_times_manifest is not None and (
+                hit_times_manifest.tp_values.shape[0] == 0
+                or hit_times_manifest.sl_values.shape[0] == 0
+            ))
+        ):
+            diagnostics.append(ArtifactValidationDiagnosticV2(
+                code="partial_derivatives_require_schema2",
+                message="Sparse canonical rows and empty risk families require root schema-2",
+                location="schema_version", manifest_path=slot_manifest.path,
+            ))
         return ArtifactSlotValidationResultV2(
             slot=slot,
             slot_manifest=slot_manifest,

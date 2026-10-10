@@ -1,0 +1,392 @@
+"""Tenant HTTP application composition over the durable S02–S05 repository."""
+
+from __future__ import annotations
+
+import re
+from datetime import UTC, datetime
+from uuid import uuid4, uuid5
+
+from apps.api.dto.backtest_artifacts import (
+    Command,
+    CommandResult,
+    Detail,
+    EventView,
+    ProgressView,
+    RequestView,
+    TimeframeView,
+)
+from trading.contexts.backtest_artifacts.application.services.artifact_cadence import due_window
+from trading.contexts.backtest_artifacts.application.services.management import (
+    Coordinate,
+    ManagementError,
+    PolicyItem,
+    Profile,
+    Schedule,
+    SourceTarget,
+    digest,
+)
+
+
+def safe_reason(value):
+    return value if isinstance(value, str) and re.fullmatch("[a-z_]{1,64}", value) else None
+
+
+def progress_views(raw, kind, shared=False) -> tuple[ProgressView, ...]:
+    if not raw:
+        return ()
+    series = raw.get("series", {"latest": raw})
+    result = []
+    for p in list(series.values())[:256]:
+        base = p.get("phase") in {"base", "source_snapshot", "funding"}
+        if (kind == "base") != base:
+            continue
+        view = {k: v for k, v in p.items() if k in ProgressView.model_fields}
+        if shared and kind == "derivatives":
+            view.update(
+                phase="derivatives",
+                timeframe=None,
+                completed_units=None,
+                total_units=None,
+                unit="bars",
+            )
+        result.append(ProgressView(**view))
+    return tuple(result[-1:]) if shared and kind == "derivatives" else tuple(result)
+
+
+class ArtifactHttpService:
+    def __init__(self, repository, installation_id):
+        self.installation_id = installation_id
+        self.repo = repository
+
+    def settings(self, org, actor, *, active=True):
+        with self.repo.db.transaction():
+            installation = self.repo._authorize(org, actor)
+            if installation != self.installation_id:
+                raise ManagementError("forbidden")
+            settings = self.repo._settings(installation, active=False)
+            if active and (
+                not settings["capability_enabled"] or settings["legacy_handoff"] != "complete"
+            ):
+                raise ManagementError("management_unavailable")
+            return settings
+
+    def policy(self, org, c):
+        return self.repo._one(
+            """SELECT p.*, f.profile FROM backtest_artifact_policies p
+            JOIN backtest_artifact_profiles f USING(organization_id,profile_id)
+            WHERE p.profile_revision=f.revision AND p.organization_id=%(org)s
+            AND exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s""",
+            org=org,
+            **c.model_dump(),
+        )
+
+    def source(self, c):
+        return self.repo._one(
+            """SELECT desired_target,published FROM backtest_artifact_source_state
+            WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s""",
+            **c.model_dump(),
+        )
+
+    def default_profile(self, org, c):
+        return self.repo.catalog.default_profile().model_copy(
+            update={"profile_id": uuid5(org, "artifact-profile:" + ":".join(c.key))}
+        )
+
+    def submit(self, org, actor, key, body: Command, kind):
+        fingerprint = digest(
+            {"kind": kind, "body": body.model_dump(mode="json", exclude_unset=True)}
+        )
+        with self.repo.db.transaction():
+            installation = self.repo._authorize(org, actor, write=True)
+            if installation != self.installation_id:
+                raise ManagementError("forbidden")
+            for item in body.items:
+                self.repo.access.require(
+                    organization_id=org, actor_id=actor, coordinate=item.coordinate
+                )
+            self.repo._lock(installation)
+            old = self.repo._one(
+                """SELECT body_hash,response FROM backtest_artifact_commands
+                WHERE organization_id=%(org)s AND idempotency_key=%(key)s""",
+                org=org,
+                key=key,
+            )
+            if old:
+                if old["body_hash"] != fingerprint:
+                    raise ManagementError("idempotency_conflict")
+                return CommandResult.model_validate(old["response"])
+            prepared = []
+            for item in body.items:
+                current = self.policy(org, item.coordinate)
+                profile = (
+                    Profile.model_validate(current["profile"])
+                    if current
+                    else self.default_profile(org, item.coordinate)
+                )
+                previous_mode = profile.mode
+                schedule = (
+                    Schedule.model_validate(current["schedule"])
+                    if current and not current["inherits_schedule"]
+                    else None
+                )
+                patch = item.patch
+                if kind == "update_now" and patch is not None:
+                    raise ManagementError("invalid_command")
+                if kind == "policy":
+                    if patch is None:
+                        raise ManagementError("invalid_command")
+                    if patch.profile is not None:
+                        profile = patch.profile
+                    if patch.mode is not None:
+                        profile = profile.model_copy(
+                            update={"mode": patch.mode, "revision": profile.revision + 1}
+                        )
+                    if "schedule" in patch.model_fields_set:
+                        schedule = patch.schedule
+                observed = self.source(item.coordinate)
+                raw_source = (observed or {}).get("desired_target", {}).get("source")
+                prepared.append(
+                    PolicyItem(
+                        coordinate=item.coordinate,
+                        expected_version=item.expected_version,
+                        profile=profile,
+                        schedule=schedule,
+                        source=SourceTarget.model_validate(raw_source) if raw_source else None,
+                        kind="derivatives" if profile.mode == "precompute" else "base",
+                        admit_request=(
+                            kind == "update_now"
+                            or (
+                                profile.mode == "precompute"
+                                and patch is not None
+                                and previous_mode != "precompute"
+                            )
+                        ),
+                    )
+                )
+            return CommandResult.model_validate(
+                self.repo.submit(
+                    organization_id=org,
+                    actor_id=actor,
+                    key=key,
+                    items=tuple(prepared),
+                    kind=kind,
+                    command_body_digest=fingerprint,
+                )
+            )
+
+    def request_view(self, row):
+        # Shared build internals and other organizations' derivative plan totals are private.
+        event = self.repo._one(
+            """SELECT progress FROM backtest_artifact_events
+            WHERE request_id=%(id)s ORDER BY event_id DESC LIMIT 1""",
+            id=row["request_id"],
+        )
+        return RequestView(
+            request_id=row["request_id"],
+            coordinate=Coordinate(**{k: row[k] for k in ("exchange", "market_type", "symbol")}),
+            kind=row["kind"],
+            state=row["state"],
+            reason_code=safe_reason(row["reason"]),
+            created_at=row["created_at"],
+            progress=self.progress(row["request_id"], event["progress"], row["kind"])
+            if event
+            else (),
+        )
+
+    def progress(self, request_id, raw, kind):
+        shared = self.repo._one(
+            """SELECT 1 FROM backtest_artifact_build_requests own
+            JOIN backtest_artifact_build_requests other USING(build_id)
+            JOIN backtest_artifact_requests a ON a.request_id=own.request_id
+            JOIN backtest_artifact_requests b ON b.request_id=other.request_id
+            WHERE own.request_id=%(r)s AND b.organization_id IS DISTINCT FROM a.organization_id
+            LIMIT 1""",
+            r=request_id,
+        )
+        return progress_views(raw, kind, shared is not None)
+
+    def request(self, org, actor, request_id):
+        row = self.repo.request(organization_id=org, actor_id=actor, request_id=request_id)
+        if row is None:
+            raise ManagementError("not_found")
+        return self.request_view(row)
+
+    def events(self, org, actor, request_id, limit):
+        request = self.request(org, actor, request_id)
+        return tuple(
+            EventView(
+                state=r["state"],
+                reason_code=safe_reason(r["reason"]),
+                observed_at=r["observed_at"],
+                progress=self.progress(request_id, r["progress"], request.kind),
+            )
+            for r in self.repo.events(
+                organization_id=org, actor_id=actor, request_id=request_id, limit=limit
+            )
+        )
+
+    def requests(self, org, actor, before, limit, state=None, kind=None):
+        with self.repo.db.transaction():
+            self.repo._authorize(org, actor)
+            before_time = None
+            if before is not None:
+                cursor_row = self.repo._one(
+                    "SELECT created_at FROM backtest_artifact_requests "
+                    "WHERE organization_id=%(org)s AND request_id=%(id)s",
+                    org=org,
+                    id=before,
+                )
+                if cursor_row is None:
+                    raise ManagementError("not_found")
+                before_time = cursor_row["created_at"]
+            rows = self.repo.db.fetch_all(
+                query="""SELECT * FROM backtest_artifact_requests
+                WHERE organization_id=%(org)s
+                AND (%(state)s::text IS NULL OR state=%(state)s)
+                AND (%(kind)s::text IS NULL OR kind=%(kind)s) AND
+                (%(before_time)s::timestamptz IS NULL OR (created_at,request_id) <
+                (%(before_time)s,%(before)s))
+                ORDER BY created_at DESC,request_id DESC LIMIT %(limit)s""",
+                parameters={
+                    "org": org,
+                    "before": before,
+                    "before_time": before_time,
+                    "state": state,
+                    "kind": kind,
+                    "limit": limit + 1,
+                },
+            )
+            result = []
+            for row in rows[:limit]:
+                try:
+                    self.repo.access.require(
+                        organization_id=org,
+                        actor_id=actor,
+                        coordinate=Coordinate(
+                            **{k: row[k] for k in ("exchange", "market_type", "symbol")}
+                        ),
+                    )
+                except ManagementError as error:
+                    if str(error) == "coordinate_forbidden":
+                        continue
+                    raise
+                result.append(self.request_view(row))
+            return {
+                "items": result,
+                "next_cursor": rows[limit - 1]["request_id"] if len(rows) > limit else None,
+            }
+
+    def detail(self, org, actor, c):
+        with self.repo.db.transaction():
+            settings = self.settings(org, actor)
+            self.repo.access.require(organization_id=org, actor_id=actor, coordinate=c)
+            policy = self.policy(org, c)
+            profile = (
+                Profile.model_validate(policy["profile"])
+                if policy
+                else self.default_profile(org, c)
+            )
+            inherited = policy is None or policy["inherits_schedule"]
+            schedule = Schedule.model_validate(
+                settings["schedule"] if inherited else policy["schedule"]
+            )
+            state = self.source(c) or {}
+            published = state.get("published") or {}
+            source = state.get("desired_target", {}).get("source") or {}
+            requests = {}
+            for kind in ("base", "derivatives"):
+                row = self.repo._one(
+                    """SELECT * FROM backtest_artifact_requests
+                    WHERE organization_id=%(org)s AND exchange=%(exchange)s
+                    AND market_type=%(market_type)s AND symbol=%(symbol)s AND kind=%(kind)s
+                    ORDER BY created_at DESC,request_id DESC LIMIT 1""",
+                    org=org,
+                    kind=kind,
+                    **c.model_dump(),
+                )
+                requests[kind] = self.request_view(row) if row else None
+            # Shared base state is public only for this authorized coordinate.
+            # Internal request IDs, snapshots and progress remain private.
+            system_base = self.repo._one(
+                """SELECT state FROM backtest_artifact_requests
+                WHERE installation_id=%(installation)s AND organization_id IS NULL
+                AND kind='base' AND exchange=%(exchange)s
+                AND market_type=%(market_type)s AND symbol=%(symbol)s
+                ORDER BY CASE WHEN state IN
+                ('waiting_for_source','queued','running','retry_wait') THEN 0 ELSE 1 END,
+                created_at DESC,request_id DESC LIMIT 1""",
+                installation=self.installation_id,
+                **c.model_dump(),
+            )
+            system_state = system_base["state"] if system_base else None
+            base_state = published.get("state", system_state or "waiting_for_source")
+            if system_state in {"waiting_for_source", "queued", "running", "retry_wait"}:
+                base_state = system_state
+            frames = published.get("timeframes", {})
+            return Detail(
+                coordinate=c,
+                control_version=policy["control_version"] if policy else 0,
+                profile=profile,
+                schedule=schedule,
+                inherits_schedule=inherited,
+                next_run=due_window(schedule, datetime.now(UTC))[1],
+                last_success=policy["last_success"] if policy else None,
+                source_through=source.get("watermark"),
+                covered_through=published.get("source", {}).get("watermark"),
+                base_state=base_state,
+                timeframes=tuple(
+                    TimeframeView(
+                        timeframe=tf,
+                        start_utc=datetime.fromtimestamp(value["start_ms"] / 1000, UTC)
+                        if "start_ms" in value
+                        else None,
+                        end_utc=datetime.fromtimestamp(value["end_ms"] / 1000, UTC)
+                        if "end_ms" in value
+                        else None,
+                        **{
+                            k: v
+                            for k, v in value.items()
+                            if k in TimeframeView.model_fields and k != "timeframe"
+                        },
+                    )
+                    for tf, value in frames.items()
+                ),
+                base_request=requests["base"],
+                derivative_request=requests["derivatives"],
+            )
+
+    def inventory(self, org, actor, exchange, market_type, search, cursor, limit):
+        with self.repo.db.transaction():
+            self.settings(org, actor)
+            # Physical source coordinates are public only after the current catalog check.
+            # No foreign policy/request is part of this union.
+            rows = self.repo.db.fetch_all(
+                query="""WITH coordinates AS (
+                SELECT exchange,market_type,symbol FROM backtest_artifact_source_state UNION
+                SELECT exchange,market_type,symbol FROM backtest_artifact_policies WHERE
+                organization_id=%(org)s)
+                SELECT * FROM coordinates WHERE exchange=%(exchange)s AND market_type=%(market)s
+                AND symbol > %(cursor)s AND position(%(search)s in symbol)>0
+                ORDER BY symbol LIMIT %(limit)s""",
+                parameters={
+                    "org": org,
+                    "exchange": exchange,
+                    "market": market_type,
+                    "cursor": cursor or "",
+                    "search": search.upper(),
+                    "limit": limit + 1,
+                },
+            )
+            items = []
+            for row in rows[:limit]:
+                try:
+                    items.append(self.detail(org, actor, Coordinate(**row)))
+                except ManagementError as error:
+                    if str(error) != "coordinate_forbidden":
+                        raise
+            return dict(
+                snapshot_id=uuid4(),
+                observed_at=datetime.now(UTC),
+                items=items,
+                next_cursor=rows[limit - 1]["symbol"] if len(rows) > limit else None,
+            )

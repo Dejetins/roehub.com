@@ -13,7 +13,7 @@ market_data:
         timeout_s: 15.0
         retries: 5
         backoff: { base_s: 0.5, max_s: 15.0, jitter_s: 0.3 }
-        limiter: { mode: autodetect, safety_factor: 0.7, max_concurrency: 3 }
+        limiter: { mode: shared_conservative, egress_scope: local-installation-egress, safety_factor: 0.7, max_concurrency: 3 }
       ws:
         url: "wss://stream.binance.com:9443/stream"
         ping_interval_s: 20.0
@@ -32,7 +32,7 @@ market_data:
         timeout_s: 15.0
         retries: 5
         backoff: { base_s: 0.5, max_s: 15.0, jitter_s: 0.3 }
-        limiter: { mode: autodetect, safety_factor: 0.7, max_concurrency: 3 }
+        limiter: { mode: shared_conservative, egress_scope: local-installation-egress, safety_factor: 0.7, max_concurrency: 3 }
       ws:
         url: "wss://fstream.binance.com/market/stream"
         ping_interval_s: 20.0
@@ -51,7 +51,7 @@ market_data:
         timeout_s: 15.0
         retries: 5
         backoff: { base_s: 0.5, max_s: 15.0, jitter_s: 0.3 }
-        limiter: { mode: autodetect, safety_factor: 0.7, max_concurrency: 3 }
+        limiter: { mode: shared_conservative, egress_scope: local-installation-egress, safety_factor: 0.7, max_concurrency: 3 }
       ws:
         url: "wss://stream.bybit.com/v5/public/spot"
         ping_interval_s: 20.0
@@ -70,7 +70,7 @@ market_data:
         timeout_s: 15.0
         retries: 5
         backoff: { base_s: 0.5, max_s: 15.0, jitter_s: 0.3 }
-        limiter: { mode: autodetect, safety_factor: 0.7, max_concurrency: 3 }
+        limiter: { mode: shared_conservative, egress_scope: local-installation-egress, safety_factor: 0.7, max_concurrency: 3 }
       ws:
         url: "wss://stream.bybit.com/v5/public/linear"
         ping_interval_s: 20.0

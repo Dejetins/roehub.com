@@ -7,6 +7,7 @@ import random
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Awaitable, Callable
+from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 import websockets
@@ -313,6 +314,11 @@ def build_binance_combined_stream_url(base_url: str, symbols: tuple[str, ...]) -
     Side effects:
     - None.
     """
+    # Legacy USD-M URLs still handshake but no longer deliver market/kline data.
+    # This client subscribes only to klines; preserve other hosts and explicit routes.
+    parsed = urlsplit(base_url)
+    if parsed.hostname == "fstream.binance.com" and parsed.path.rstrip("/") == "/stream":
+        base_url = urlunsplit(parsed._replace(path="/market/stream"))
     streams = "/".join(f"{s.lower()}@kline_1m" for s in symbols)
     sep = "&" if "?" in base_url else "?"
     return f"{base_url}{sep}streams={streams}"

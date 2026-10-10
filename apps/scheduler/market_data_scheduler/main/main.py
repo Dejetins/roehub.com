@@ -129,7 +129,7 @@ async def _run_async(config_path: str, metrics_port: int, requests_only: bool = 
         metrics_port=metrics_port,
     )
     if requests_only:
-        await app.run_work_requests(stop_event)
+        await app.run_work_requests(stop_event, serve_metrics=True)
     else:
         await app.run(stop_event)
     return 0

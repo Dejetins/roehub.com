@@ -20,16 +20,22 @@ from redis import Redis
 from alembic.script import ScriptDirectory
 from apps.migrations.bootstrap import (
     apply_artifact_store_sql,
+    apply_backtest_artifact_dispatch_sql,
+    apply_backtest_artifact_management_sql,
+    apply_backtest_artifact_storage_sql,
     apply_backtest_input_recipe_sql,
     apply_control_operation_audit_sql,
     apply_execution_gateway_mainnet_safety_sql,
     apply_extensions_plugin_platform_sql,
     apply_identity_baseline_sql,
+    apply_identity_browser_devices_sql,
     apply_isolated_job_runtime_sql,
     apply_local_auth_sql,
     apply_market_data_full_history_sql,
     apply_market_data_instrument_selections_sql,
+    apply_market_data_provider_admission_sql,
     apply_market_data_queue_events_sql,
+    apply_market_data_stream_connections_sql,
     apply_market_data_stream_recovery_sql,
     apply_market_data_work_recovery_sql,
     apply_market_data_work_requests_sql,
@@ -422,8 +428,8 @@ def _load_postgres_phases(manifest_path: Path) -> dict[str, tuple[str, tuple[Pat
     if payload.get("schema") != POSTGRES_MANIFEST_SCHEMA:
         raise StorageLifecycleError("unsupported PostgreSQL migration manifest schema")
     raw_phases = payload.get("phases")
-    if not isinstance(raw_phases, list) or len(raw_phases) != 20:
-        raise StorageLifecycleError("PostgreSQL migration manifest must define twenty phases")
+    if not isinstance(raw_phases, list) or len(raw_phases) != 26:
+        raise StorageLifecycleError("PostgreSQL migration manifest must define twenty-six phases")
     phases: dict[str, tuple[str, tuple[Path, ...]]] = {}
     for raw_phase in raw_phases:
         if not isinstance(raw_phase, dict):
@@ -480,6 +486,12 @@ def _load_postgres_phases(manifest_path: Path) -> dict[str, tuple[str, tuple[Pat
         "market-data-queue-events-0026",
         "market-data-stream-recovery-0027",
         "backtest-input-recipe-0028",
+        "backtest-artifact-management-0029",
+        "backtest-artifact-dispatch-0030",
+        "backtest-artifact-storage-0031",
+        "identity-browser-devices-0032",
+        "market-data-stream-connections-0033",
+        "market-data-provider-admission-0034",
     }:
         raise StorageLifecycleError("PostgreSQL migration phases are incomplete")
     return phases
@@ -920,6 +932,73 @@ def apply_postgres_migrations(
         _record_postgres_marker(
             dsn, store="postgres-sql", version=recipe_version, checksum=recipe_checksum
         )
+
+
+    management_version = "backtest-artifact-management-0029"
+    management_checksum, _ = phases[management_version]
+    if ("postgres-sql", management_version) not in markers:
+        try:
+            apply_backtest_artifact_management_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+        except Exception as error:
+            raise StorageLifecycleError("artifact management migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=management_version, checksum=management_checksum)
+    dispatch_version = "backtest-artifact-dispatch-0030"
+    dispatch_checksum, _ = phases[dispatch_version]
+    if ("postgres-sql", dispatch_version) not in markers:
+        try:
+            apply_backtest_artifact_dispatch_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+        except Exception as error:
+            raise StorageLifecycleError("artifact dispatch migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=dispatch_version, checksum=dispatch_checksum)
+    artifact_storage_version = "backtest-artifact-storage-0031"
+    artifact_storage_checksum, _ = phases[artifact_storage_version]
+    if ("postgres-sql", artifact_storage_version) not in markers:
+        try:
+            apply_backtest_artifact_storage_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+        except Exception as error:
+            raise StorageLifecycleError("artifact storage migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=artifact_storage_version,
+            checksum=artifact_storage_checksum,
+        )
+
+    devices_version = "identity-browser-devices-0032"
+    devices_checksum, _ = phases[devices_version]
+    if ("postgres-sql", devices_version) not in markers:
+        try:
+            apply_identity_browser_devices_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+        except Exception as error:
+            raise StorageLifecycleError("identity browser devices migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=devices_version, checksum=devices_checksum)
+
+    connections_version = "market-data-stream-connections-0033"
+    connections_checksum, _ = phases[connections_version]
+    if ("postgres-sql", connections_version) not in markers:
+        try:
+            apply_market_data_stream_connections_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+        except Exception as error:
+            raise StorageLifecycleError("stream connections migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=connections_version, checksum=connections_checksum)
+
+    admission_version = "market-data-provider-admission-0034"
+    admission_checksum, _ = phases[admission_version]
+    if ("postgres-sql", admission_version) not in markers:
+        try:
+            apply_market_data_provider_admission_sql(
+                identity_dsn=dsn, migrations_dir=manifest_path.parent)
+        except Exception as error:
+            raise StorageLifecycleError("provider admission migration failed") from error
+        _record_postgres_marker(
+            dsn, store="postgres-sql", version=admission_version, checksum=admission_checksum)
 
 
 def _load_clickhouse_migrations(manifest_path: Path) -> tuple[str, tuple[MigrationFile, ...]]:

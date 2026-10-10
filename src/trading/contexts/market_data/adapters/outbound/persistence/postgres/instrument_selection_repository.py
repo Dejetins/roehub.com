@@ -30,10 +30,13 @@ class InstrumentHistoryBound:
 class PostgresInstrumentSelectionRepository:
     """Organization-scoped intent with a separate global effective reader."""
 
-    def __init__(self, *, gateway: BacktestPostgresGateway) -> None:
+    def __init__(
+        self, *, gateway: BacktestPostgresGateway, reference_fallback: bool = True
+    ) -> None:
         if gateway is None:  # type: ignore[truthy-bool]
             raise ValueError("PostgresInstrumentSelectionRepository requires gateway")
         self._gateway = gateway
+        self._reference_fallback = reference_fallback
 
     def list_for_organization(
         self, *, organization_id: OrganizationId
@@ -172,7 +175,7 @@ class PostgresInstrumentSelectionRepository:
             """,
             parameters={},
         )
-        if not rows:
+        if not rows and self._reference_fallback:
             return (InstrumentId(MarketId(2), Symbol("BTCUSDT")),)
         return tuple(
             InstrumentId(MarketId(int(row["market_id"])), Symbol(str(row["symbol"])))

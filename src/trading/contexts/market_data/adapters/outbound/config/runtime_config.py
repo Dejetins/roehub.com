@@ -33,10 +33,14 @@ class RateLimiterConfig:
     mode: str
     safety_factor: float
     max_concurrency: int
+    egress_scope: str = ""
 
     def __post_init__(self) -> None:
-        if self.mode != "autodetect":
-            raise ValueError(f"rest.limiter.mode must be 'autodetect', got {self.mode!r}")
+        if self.mode not in {"autodetect", "shared_conservative"}:
+            raise ValueError(
+                "rest.limiter.mode must be shared_conservative (legacy autodetect accepted), "
+                f"got {self.mode!r}"
+            )
         if not (0.0 < self.safety_factor <= 1.0):
             raise ValueError(f"rest.limiter.safety_factor must be in (0, 1], got {self.safety_factor}") # noqa: E501
         _require_positive_int("rest.limiter.max_concurrency", self.max_concurrency)
@@ -688,6 +692,7 @@ def _parse_market(m: Any) -> MarketConfig:
             jitter_s=_get_float(backoff_map, "jitter_s", required=True),
         ),
         limiter=RateLimiterConfig(
+            egress_scope=str(limiter_map.get("egress_scope", "")),
             mode=_get_str(limiter_map, "mode", required=True),
             safety_factor=_get_float(limiter_map, "safety_factor", required=True),
             max_concurrency=_get_int(limiter_map, "max_concurrency", required=True),

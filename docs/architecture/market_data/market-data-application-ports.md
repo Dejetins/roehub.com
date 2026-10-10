@@ -152,3 +152,83 @@ Canonical формируется автоматически через MV.
 Чтобы это было совместимо:
 - canonical reader и live источник должны отдавать одинаковую модель данных (`Candle` + `CandleMeta`)
   и согласованный ключ дедупа: `(InstrumentId, ts_open)`.
+
+
+## Artifact consumer observations (2026-10-10)
+
+Backtest Artifacts owns `StoredCoordinates` in its application reconciliation
+service. Its `StoredSourceObservation` contains an instrument and nullable first/last
+actual minute; `observation_page` is a bounded ordered keyset page at one exclusive
+cutoff. Empty observations retain coordinate traversal. `observation` serves the
+existing optional post-write hint. The ClickHouse composition adapter reads the
+Market Data exact bitmap; the application imports no concrete persistence adapter.
+The previous coordinate-only `page` and reconciler constructor remain supported.
+
+This does not replace the Market Data canonical index port used by ingestion:
+its scalar bounds still read canonical data, with null rather than epoch defaults
+for empty input. Existing bounded history verification owns index repair. Exchange
+absence markers are never candle observations. See the reference API's “Artifact
+source observations” and “Verified source availability and index repair” sections.
+
+## Shared provider admission (S03, 2026-10-10)
+
+Исторический заголовок Walking Skeleton не означает ограничение текущих портов.
+Добавлен `application/ports/provider_admission.py`: `ProviderRequest` содержит
+provider, явный egress scope, общий предел concurrency и набор `QuotaWindow`
+(dimension, seconds, limit, cost). `ProviderAdmission.reserve` атомарно резервирует
+все окна или возвращает классифицированный временный отказ. `ProviderPermit.check`
+проверяет владение; `complete` вызывается только после подтверждённой остановки I/O,
+учитывает заголовки/cooldown и освобождает точный permit. Потраченная квота не
+возвращается. Истечение TTL не доказывает остановку запроса.
+
+PostgreSQL adapter владеет транзакциями, временем квот и durable metadata; HTTP
+adapter — endpoint policy, монотонным deadline и ограниченным пулом отдельных
+HTTP-процессов с переиспользуемыми session. Каждый запрос эксклюзивно занимает
+transport; число transport не превышает `ingestion.rest_concurrency_instruments`,
+независимо от числа вызывающих потоков. Ожидание пула входит в общий deadline.
+`provider_io_guard` передаёт проверку текущего
+application-owner в синхронный HTTP вызов, не связывая application с PG/HTTP types.
+Порт не вводит service/daemon и не держит SQL-транзакцию во время сетевого I/O.
+
+`HistoryBoundsStore.defer` сохраняет token-checked queued work с `next_retry_at`
+и sanitized `error_code`. Временный отказ admission проходит через probe/source
+без превращения в отсутствие истории. HTTP/body validation и реальные свечи
+остаются источником confirmed bounds. Существующие API DTO и права не расширены.
+
+Совместимость: persistence — additive `compatible-change`; новые port implementers
+должны реализовать admission/defer, а HTTP composition требует common PG и explicit
+scope (`breaking-change` для старой конфигурации без scope). Координированный
+upgrade/rollback и cleanup только после подтверждённого drain описаны в local
+Market Data recovery runbook, раздел S03.
+
+## Async recovery admission (S04, 2026-10-11)
+
+`AsyncStreamRecoveryStore` дополняет синхронный порт: `remember_many` возвращает
+receipts в порядке входных ключей только после commit; `complete_many` удаляет
+только совпадающие `(task_key, token)`. `BatchedRecoveryAdmission` объединяет
+не более 256 записей за 2 ms, ограничивает очередь вместе с in-flight batch
+20 000 записями и длины symbol/reason 128 символами. Failed receipt требует
+явного rearm; автоматическая смена token запрещена. Синхронные потребители
+сохраняют прежний порт и persisted schema.
+
+Collector использует одну async PG session для advisory lease, admission,
+pending/retry/fail/advance/completion и socket health. Операции сериализованы;
+транзакция не охватывает CH/REST. Deadline 3 s закрывает session перед отменой
+ожидания, включая потерянный сетевой ответ. Неизвестный commit не считается
+откатом: lifecycle прекращается, restart получает lease и сверяет прежние ключи.
+Неизвестная receipt сохраняется; exactly-once между PG и CH не обещается.
+
+Buffer резервирует capacity до persistence. В общий row budget входят buffer,
+DB admissions и ожидающие producers: максимум `2 * max_buffer_rows`, из них
+не более `max_buffer_rows` уже допущены к persistence/write. Дополнительно
+применяется 64 MiB budget учтённых retained bytes (консервативная оценка объекта
+и служебных структур, не RSS). При переполнении intake получает backpressure/
+QueueFull, не durable acceptance; reconnect/tail repair покрывает такие arrivals.
+Отмена до persistence свободна; начатая owned admission завершается независимо
+от повторных отмен caller. После commit row принадлежит buffer либо остаётся
+в journal для restart. Только реальная canonical свеча разрешает закрыть
+`ws_recovery`; absence marker этого права не даёт.
+
+Совместимость additive async port — `compatible-change`; persisted shape,
+recovery keys/tokens и API DTO — `none`. Upgrade/rollback требует drain collector
+и сохранения journal; прежняя версия читает оставленные pending receipts.

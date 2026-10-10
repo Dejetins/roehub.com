@@ -68,7 +68,7 @@ def _writer_child(sock: socket.socket, environ: dict[str, str]) -> None:
     threading.Thread(target=_read_commands, args=(sock, commands), daemon=True).start()
     client = None
     try:
-        settings = ClickHouseSettingsLoader(environ).load()
+        settings = ClickHouseSettingsLoader(environ).load(workload="stream")
         client = _clickhouse_client(settings)
         gateway = ThreadLocalClickHouseConnectGateway(client_factory=lambda: client)
         writer = ClickHouseRawKlineWriter(gateway=gateway, database=settings.database)

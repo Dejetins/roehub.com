@@ -157,6 +157,7 @@ def merge_hit_times_prefix_with_rebuilt_tail_v2(
     rebuilt_tail: HitTimesArraysV2,
     prefix_bars: int,
     total_timeline_bars: int,
+    allow_empty_levels: bool = False,
 ) -> HitTimesArraysV2:
     """
     Merge a reused hit-times prefix with a freshly rebuilt tail in global timeline space.
@@ -228,7 +229,8 @@ def merge_hit_times_prefix_with_rebuilt_tail_v2(
         sentinel_index=total_timeline_bars,
     )
     if prefix is None or prefix_bars == 0:
-        _validate_materialized_hit_times_v2(hit_times=rebased_tail)
+        _validate_materialized_hit_times_v2(
+            hit_times=rebased_tail, allow_empty_levels=allow_empty_levels)
         return rebased_tail
 
     _require_matching_hit_times_grids_v2(prefix=prefix, rebuilt_tail=rebuilt_tail)
@@ -253,7 +255,7 @@ def merge_hit_times_prefix_with_rebuilt_tail_v2(
         ),
         sentinel_index=total_timeline_bars,
     )
-    _validate_materialized_hit_times_v2(hit_times=merged)
+    _validate_materialized_hit_times_v2(hit_times=merged, allow_empty_levels=allow_empty_levels)
     return merged
 
 

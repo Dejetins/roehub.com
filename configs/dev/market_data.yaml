@@ -13,7 +13,7 @@ market_data:
         timeout_s: 10.0
         retries: 3
         backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }
-        limiter: { mode: autodetect, safety_factor: 0.8, max_concurrency: 4 }
+        limiter: { mode: shared_conservative, egress_scope: local-installation-egress, safety_factor: 0.8, max_concurrency: 4 }
       ws:
         # Combined streams endpoint: /stream?streams=...
         url: "wss://stream.binance.com:9443/stream"
@@ -33,10 +33,10 @@ market_data:
         timeout_s: 10.0
         retries: 3
         backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }
-        limiter: { mode: autodetect, safety_factor: 0.8, max_concurrency: 4 }
+        limiter: { mode: shared_conservative, egress_scope: local-installation-egress, safety_factor: 0.8, max_concurrency: 4 }
       ws:
         # Combined streams endpoint: /stream?streams=...
-        url: "wss://fstream.binance.com/stream"
+        url: "wss://fstream.binance.com/market/stream"
         ping_interval_s: 20.0
         pong_timeout_s: 10.0
         reconnect: { min_delay_s: 0.5, max_delay_s: 30.0, factor: 1.7, jitter_s: 0.2 }
@@ -53,7 +53,7 @@ market_data:
         timeout_s: 10.0
         retries: 3
         backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }
-        limiter: { mode: autodetect, safety_factor: 0.8, max_concurrency: 4 }
+        limiter: { mode: shared_conservative, egress_scope: local-installation-egress, safety_factor: 0.8, max_concurrency: 4 }
       ws:
         url: "wss://stream.bybit.com/v5/public/spot"
         ping_interval_s: 20.0
@@ -74,7 +74,7 @@ market_data:
         timeout_s: 10.0
         retries: 3
         backoff: { base_s: 0.5, max_s: 10.0, jitter_s: 0.2 }
-        limiter: { mode: autodetect, safety_factor: 0.8, max_concurrency: 4 }
+        limiter: { mode: shared_conservative, egress_scope: local-installation-egress, safety_factor: 0.8, max_concurrency: 4 }
       ws:
         url: "wss://stream.bybit.com/v5/public/linear"
         ping_interval_s: 20.0

@@ -198,7 +198,9 @@ class FilesystemBacktestArtifactArrayLoader(BacktestArtifactArrayLoader):
                 raise ValueError("signal manifest differs from its declared catalog identity")
             # Native signal manifests identify a canonical prefix, verified against the
             # builder's grid/defaults before reuse. Its length is not the full grid size.
-            row_ids = tuple(range(signal.rows_count))
+            if manifest.schema_version == 1 and signal.grid.row_ids is not None:
+                raise ValueError("sparse signal rows require root schema-2")
+            row_ids = signal.grid.row_ids or tuple(range(signal.rows_count))
             canonical_count = None
             metadata[(item.timeframe, item.indicator_id)] = BacktestSignalMetadata(
                 canonical_rows_count=canonical_count,
@@ -246,6 +248,10 @@ class FilesystemBacktestArtifactArrayLoader(BacktestArtifactArrayLoader):
                 or hit.sentinel_index != coverage.bar_count
             ):
                 raise ValueError("hit-time timeline/sentinel differs from source timeline")
+            if manifest.schema_version == 1 and (
+                hit.tp_values.shape[0] == 0 or hit.sl_values.shape[0] == 0
+            ):
+                raise ValueError("empty risk families require root schema-2")
             for side in (() if metadata_only else ("tp", "sl")):
                 axis = getattr(hit, f"{side}_values")
                 axis_path = _trusted_path(root, axis.path)
@@ -253,6 +259,19 @@ class FilesystemBacktestArtifactArrayLoader(BacktestArtifactArrayLoader):
                 values = np.load(axis_path, mmap_mode="r", allow_pickle=False)
                 if values.dtype != np.dtype(np.float32) or values.shape != axis.shape:
                     raise ValueError("native risk axis dtype/shape mismatch")
+                if not len(values):
+                    # An empty family advertises files but no reusable level coverage.
+                    # Validate every declared empty payload before omitting its references.
+                    for direction in ("long", "short"):
+                        table = getattr(hit, f"{direction}_{side}").array
+                        table_path = _trusted_path(root, table.path)
+                        _verify_hash(table_path, table.sha256)
+                        empty = np.load(table_path, mmap_mode="r", allow_pickle=False)
+                        if (empty.dtype != np.dtype(np.uint32)
+                                or empty.shape != (0, hit.timeline_bar_count)
+                                or table.shape != empty.shape):
+                            raise ValueError("empty risk family dtype/shape mismatch")
+                    continue
                 levels = tuple(float(Decimal(str(value)) * 100) for value in values)
                 reference(
                     axis, f"hit_times.{side}_values", hit.timeframe, ("level",), levels=levels

@@ -116,6 +116,10 @@ class ArtifactSlotPublishErrorV2(Exception):
         self.diagnostics = diagnostics
 
 
+class ArtifactPublicationNotStarted(ArtifactOwnershipConflict):
+    """Reservation rejected before any publication filesystem mutation."""
+
+
 @dataclass(frozen=True, slots=True)
 class BacktestArtifactSlotPublisherV2:
     """
@@ -133,6 +137,7 @@ class BacktestArtifactSlotPublisherV2:
     current_pointer_writer: BacktestArtifactCurrentPointerWriterV2
     job_repository: BacktestJobRepository
     now_provider: NowProviderV2 = _default_now_provider_v2
+    recover_declared_inventory: bool = False
 
     def precheck_publish(self, coordinates: ArtifactCoordinatesV2) -> ArtifactPublishPrecheckV2:
         """
@@ -364,12 +369,27 @@ class BacktestArtifactSlotPublisherV2:
                                 coordinates, writer.slot
                             )
                             generation, digest = manifest.slot_generation, _file_sha256_hex_v2(path)
+                            recovery_spec = validation_spec
+                            if self.recover_declared_inventory:
+                                # The interrupted attempt may precede a source extension or
+                                # belong to the legacy full publisher. Validate every declared
+                                # payload using its recorded inventory, never the new plan.
+                                from .contracts import ArtifactSignalValidationSpecV2
+                                recovery_spec = ArtifactSlotValidationSpecV2(
+                                    price_timeframes=tuple(p.timeframe for p in manifest.prices),
+                                    mapping_timeframes=tuple(
+                                        p.timeframe for p in manifest.mappings),
+                                    signal_artifacts=tuple(ArtifactSignalValidationSpecV2(
+                                        timeframe=p.timeframe, indicator_id=p.indicator_id)
+                                        for p in manifest.signals.manifests),
+                                    require_hit_times_manifest=(manifest.hit_times is not None),
+                                )
                             validation = BacktestArtifactManifestValidatorV2(
                                 artifact_loader=self.artifact_loader
                             ).validate_slot(
                                 coordinates=coordinates,
                                 slot=validate_artifact_slot_v2(writer.slot),
-                                validation_spec=validation_spec,
+                                validation_spec=recovery_spec,
                                 expected_slot_generation=generation,
                             )
                             if validation.diagnostics:
@@ -440,17 +460,20 @@ class BacktestArtifactSlotPublisherV2:
                     original_generation = self.artifact_loader.load_slot_manifest(
                         coordinates, precheck.inactive_slot
                     ).slot_generation
-                writer = self.job_repository.reserve_artifact_writer(
-                    exchange=coordinates.exchange,
-                    market_type=coordinates.market_type,
-                    symbol=coordinates.symbol,
-                    slot=precheck.inactive_slot,
-                    expected_generation=original_generation,
-                    expected_manifest_sha256=precheck.inactive_manifest_hash,
-                    owner_token=token,
-                    attempt=1,
-                    parent_incarnation=incarnation,
-                )
+                try:
+                    writer = self.job_repository.reserve_artifact_writer(
+                        exchange=coordinates.exchange,
+                        market_type=coordinates.market_type,
+                        symbol=coordinates.symbol,
+                        slot=precheck.inactive_slot,
+                        expected_generation=original_generation,
+                        expected_manifest_sha256=precheck.inactive_manifest_hash,
+                        owner_token=token,
+                        attempt=1,
+                        parent_incarnation=incarnation,
+                    )
+                except ArtifactOwnershipConflict as error:
+                    raise ArtifactPublicationNotStarted(str(error)) from error
                 self._revalidate_precheck(precheck=precheck, check_target=True)
                 if request.coordinates != coordinates or (
                     request.target_slot != precheck.inactive_slot

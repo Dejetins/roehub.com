@@ -13,6 +13,8 @@ def transient_clickhouse_error(error: Exception) -> str | None:
     match = re.search(r"(?:ClickHouse error code |(?:^|\n)\s*Code:\s*)(\d+)\b", str(error))
     if match:
         code = int(match.group(1))
+        if code == 202:
+            return "storage_unavailable"
         if code == 241:
             return "storage_memory_pressure"
         if code in {159, 209, 210}:

@@ -1737,8 +1737,9 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
         Related:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
-        self._require_exact_yaml_keys(
+        self._require_exact_yaml_keys_with_optional(
             payload=payload,
+            optional_keys=("row_ids",),
             required_keys=(
                 "variant_key_version",
                 "variant_keys_sha256",
@@ -1747,6 +1748,7 @@ class YamlBacktestArtifactLoaderV2(BacktestArtifactLoaderV2):
             path=path,
         )
         return ArtifactSignalGridContractV2(
+            row_ids=tuple(payload["row_ids"]) if "row_ids" in payload else None,
             variant_key_version=self._required_yaml_field(
                 payload=payload,
                 key="variant_key_version",

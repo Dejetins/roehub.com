@@ -50,8 +50,8 @@ def test_bounds_returns_min_max():
     assert str(b[1]) == str(UtcTimestamp(dt2))
 
     assert gw.last_query is not None
-    assert "min(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
-    assert "max(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
+    assert "minOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
+    assert "maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
 
     assert gw.last_params is not None
     assert int(gw.last_params["market_id"]) == 1
@@ -80,7 +80,7 @@ def test_max_ts_open_lt():
     assert str(out) == str(UtcTimestamp(dt))
 
     assert gw.last_query is not None
-    assert "max(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
+    assert "maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
     assert "ts_open < fromUnixTimestamp64Milli(%(before_ms)s, 'UTC')" in gw.last_query
 
     assert gw.last_params is not None

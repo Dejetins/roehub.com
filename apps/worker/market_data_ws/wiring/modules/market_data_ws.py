@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from contextlib import AbstractContextManager, nullcontext
+from contextlib import AbstractContextManager, AsyncExitStack, nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Awaitable, Callable, Mapping, Sequence
@@ -45,8 +45,17 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse impor
     ClickHouseRawKlineWriter,
     ThreadLocalClickHouseConnectGateway,
 )
+from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_coverage_reader import (  # noqa: E501
+    ClickHouseHistoryCoverageReader,
+)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresInstrumentSelectionRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.async_stream_recovery_store import (  # noqa: E501
+    AsyncPostgresStreamRecoveryStore,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_bounds_repository import (  # noqa: E501
+    PostgresHistoryBoundsRepository,
 )
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.stream_recovery_store import (  # noqa: E501
     PostgresStreamRecoveryStore,
@@ -63,6 +72,17 @@ from trading.contexts.market_data.application.services import (
     ReconnectTailFillPlanner,
     RestFillQueueHooks,
     WsMinuteGapTracker,
+)
+from trading.contexts.market_data.application.services.batched_recovery import (
+    BatchedRecoveryAdmission,
+)
+from trading.contexts.market_data.application.services.history_readiness import HistoryReadiness
+from trading.contexts.market_data.application.services.history_stream_gate import (
+    HistoryReadyInstrumentReader,
+)
+from trading.contexts.market_data.application.services.stored_candle_signal import (
+    StoredCandleSignalWriter,
+    notify_stored_candles,
 )
 from trading.platform.time.system_clock import SystemClock
 from trading.shared_kernel.primitives import InstrumentId, MarketId
@@ -84,6 +104,22 @@ class WorkerConnectionPlan:
     market: MarketConfig
     symbols: tuple[str, ...]
     instruments: tuple[InstrumentId, ...]
+
+
+async def _control_read_until_stopped(operation, stop_event: asyncio.Event):
+    """Cancel/join managed control I/O promptly when the collector stops."""
+    task = asyncio.create_task(operation)
+    stopped = asyncio.create_task(stop_event.wait())
+    try:
+        await asyncio.wait((task, stopped), return_when=asyncio.FIRST_COMPLETED)
+        if stop_event.is_set():
+            raise asyncio.CancelledError
+        return await task
+    finally:
+        for pending in (task, stopped):
+            if not pending.done():
+                pending.cancel()
+        await asyncio.gather(task, stopped, return_exceptions=True)
 
 
 class MarketDataWsMetrics:
@@ -410,8 +446,13 @@ class MarketDataWsApp:
         subscription_refresh_seconds: float = 15.0,
         plan_recovery: Callable[..., Awaitable[list[RestFillTask]]] | None = None,
         recovery_lease: Callable[[], AbstractContextManager] = nullcontext,
+        async_recovery_lease=None,
+        async_publish_connections=None,
         start_io: Callable[[], Awaitable[None]] | None = None,
         close_io: Callable[[], Awaitable[None]] | None = None,
+        read_desired=None,
+        prepare_history=None,
+        publish_connections: Callable[[dict[tuple[int, str], bool]], None] | None = None,
     ) -> None:
         """
         Validate and store worker runtime dependencies.
@@ -446,17 +487,28 @@ class MarketDataWsApp:
         self._gap_tracker = gap_tracker
         self._reconnect_planner = reconnect_planner
         self._ingest_id = ingest_id
+        self._read_desired = read_desired
+        self._prepare_history = prepare_history
+        self._publish_connections = publish_connections
+        self._connections: dict[tuple[int, str], bool] = {}
         self._metrics = metrics
         self._metrics_port = metrics_port
         self._subscription_refresh_seconds = subscription_refresh_seconds
         self._plan_recovery = plan_recovery
         self._recovery_lease = recovery_lease
+        self._async_recovery_lease = async_recovery_lease
+        self._async_publish_connections = async_publish_connections
         self._ingestion_failure: Exception | None = None
         self._start_io = start_io
         self._close_io = close_io
 
     async def run(self, stop_event: asyncio.Event) -> None:
-        with self._recovery_lease():
+        async with AsyncExitStack() as stack:
+            if self._async_recovery_lease is not None:
+                await stack.enter_async_context(self._async_recovery_lease())
+            else:
+                stack.enter_context(self._recovery_lease())
+            status_task = asyncio.create_task(self._report_connections(stop_event))
             try:
                 if self._start_io is not None:
                     warmup = asyncio.ensure_future(self._start_io())
@@ -480,8 +532,46 @@ class MarketDataWsApp:
                         await asyncio.gather(warmup, stopped, return_exceptions=True)
                 await self._run(stop_event)
             finally:
+                status_task.cancel()
+                await asyncio.gather(status_task, return_exceptions=True)
                 if self._close_io is not None:
                     await self._close_io()
+
+    async def _report_connections(self, stop_event: asyncio.Event) -> None:
+        """Publish bounded snapshots outside the event loop, including initial failures."""
+        if self._publish_connections is None and self._async_publish_connections is None:
+            return
+        while not stop_event.is_set():
+            try:
+                if self._async_publish_connections is not None:
+                    publication = asyncio.create_task(
+                        self._async_publish_connections(dict(self._connections)))
+                else:
+                    assert self._publish_connections is not None
+                    publication = asyncio.create_task(
+                        asyncio.to_thread(self._publish_connections, dict(self._connections)))
+                try:
+                    await asyncio.shield(publication)
+                except asyncio.CancelledError:
+                    await publication  # Finish before releasing the collector session.
+                    raise
+            except Exception:
+                # Expired observations become unknown; never retain a false healthy state.
+                log.error("stream connection status publication failed")
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=5)
+            except TimeoutError:
+                pass
+
+    def _connection_state(self, plan: WorkerConnectionPlan, connected: int) -> None:
+        self._metrics.ws_connection_state(connected)
+        for symbol in plan.symbols:
+            self._connections[(plan.market.market_id.value, symbol)] = bool(connected)
+
+    def _connection_error(self, plan: WorkerConnectionPlan) -> None:
+        self._metrics.ws_errors_total.inc()
+        for symbol in plan.symbols:
+            self._connections[(plan.market.market_id.value, symbol)] = False
 
     async def _run(self, stop_event: asyncio.Event) -> None:
         """
@@ -508,6 +598,9 @@ class MarketDataWsApp:
         log.info("metrics server started on port %s", self._metrics_port)
 
         ws_tasks: dict[tuple[int, tuple[str, ...]], asyncio.Task[None]] = {}
+        readiness_failures = 0
+        next_preparation_at = 0.0
+        admitted: set[InstrumentId] = set()
         try:
             await self._insert_buffer.start()
             await self._rest_fill_queue.start()
@@ -517,13 +610,77 @@ class MarketDataWsApp:
                 for component in (self._insert_buffer, self._rest_fill_queue):
                     if getattr(component, "failure", None) is not None:
                         raise RuntimeError("stream ingestion failed; recovery receipts retained")
-                plans = self._build_connection_plans(
-                    self._instrument_reader.list_enabled_tradable()
-                )
-                desired = {
-                    self._plan_key(plan): plan
-                    for plan in plans
-                }
+                try:
+                    if self._read_desired is not None:
+                        assert self._prepare_history is not None
+                        requested = set(await _control_read_until_stopped(
+                            self._read_desired(), stop_event))
+                        removed = admitted - requested
+                        admitted.intersection_update(requested)
+                        if removed:
+                            for instrument in removed:
+                                log.info("stream_disabled market_id=%s symbol=%s",
+                                         instrument.market_id.value, str(instrument.symbol))
+                            # Apply disable before any unrelated history/storage check.
+                            kept = {self._plan_key(p): p for p in self._build_connection_plans(
+                                sorted(admitted, key=lambda i: (i.market_id.value, str(i.symbol))))}
+                            await self._replace_subscription_tasks(
+                                ws_tasks=ws_tasks, plans=kept, stop_event=stop_event)
+                            ws_tasks = {key: asyncio.create_task(self._run_plan(plan, stop_event))
+                                        for key, plan in kept.items()}
+                        pending = requested - admitted
+                        ready, repairs = (), ()
+                        if pending and asyncio.get_running_loop().time() >= next_preparation_at:
+                            ready, repairs = await _control_read_until_stopped(
+                                self._prepare_history(tuple(pending)), stop_event)
+                            # Intent may change while storage checks are in flight.
+                            requested = set(await _control_read_until_stopped(
+                                self._read_desired(), stop_event))
+                            admitted.intersection_update(requested)
+                            ready = tuple(i for i in ready if i in requested)
+                            repairs = tuple(r for r in repairs if r.instrument_id in requested)
+                            readiness_failures = 0
+                            next_preparation_at = 0.0
+                        for instrument in ready:
+                            log.info("stream_history_ready market_id=%s symbol=%s",
+                                     instrument.market_id.value, str(instrument.symbol))
+                        admitted.update(ready)
+                        instruments = tuple(sorted(admitted, key=lambda i: (
+                            i.market_id.value, str(i.symbol))))
+                        for repair in repairs:
+                            if await self._rest_fill_queue.enqueue(repair):
+                                log.info("stream_preparing market_id=%s symbol=%s",
+                                         repair.instrument_id.market_id.value,
+                                         str(repair.instrument_id.symbol))
+                    else:
+                        instruments = await asyncio.to_thread(
+                            self._instrument_reader.list_enabled_tradable)
+                except asyncio.CancelledError:
+                    if stop_event.is_set():
+                        break
+                    raise
+                except Exception as exc:
+                    code = classify_io_error(exc)
+                    if code is None:
+                        raise
+                    readiness_failures += 1
+                    delay = min(300, 15 * 2 ** min(readiness_failures - 1, 5))
+                    next_preparation_at = asyncio.get_running_loop().time() + delay
+                    log.warning("stream_preparation_wait code=%s retry_seconds=%s", code, delay)
+                    try:
+                        await asyncio.wait_for(
+                            stop_event.wait(),
+                            timeout=min(delay, self._subscription_refresh_seconds))
+                    except TimeoutError:
+                        pass
+                    continue
+                if self._read_desired is None and isinstance(
+                    self._instrument_reader, HistoryReadyInstrumentReader
+                ):
+                    for repair in self._instrument_reader.repairs:
+                        await self._rest_fill_queue.enqueue(repair)
+                plans = self._build_connection_plans(instruments)
+                desired = {self._plan_key(plan): plan for plan in plans}
                 needs_refresh = set(ws_tasks) != set(desired) or any(
                     task.done() for task in ws_tasks.values()
                 )
@@ -584,6 +741,7 @@ class MarketDataWsApp:
                 task.cancel()
         if ws_tasks:
             await asyncio.gather(*ws_tasks.values(), return_exceptions=True)
+        self._connections.clear()
 
     def _build_connection_plans(
         self,
@@ -661,10 +819,10 @@ class MarketDataWsApp:
                 on_closed_candle=self._on_closed_candle,
                 on_connected=lambda: self._on_connection_ready(plan.instruments),
                 hooks=BinanceWsHooks(
-                    on_connected=self._metrics.ws_connection_state,
+                    on_connected=lambda connected: self._connection_state(plan, connected),
                     on_reconnect=self._metrics.ws_reconnects_total.inc,
                     on_message=self._metrics.ws_messages_total.inc,
-                    on_error=self._metrics.ws_errors_total.inc,
+                    on_error=lambda: self._connection_error(plan),
                     on_ignored_non_closed=self._metrics.ignored_non_closed_total.inc,
                 ),
             )
@@ -685,10 +843,10 @@ class MarketDataWsApp:
                 on_closed_candle=self._on_closed_candle,
                 on_connected=lambda: self._on_connection_ready(plan.instruments),
                 hooks=BybitWsHooks(
-                    on_connected=self._metrics.ws_connection_state,
+                    on_connected=lambda connected: self._connection_state(plan, connected),
                     on_reconnect=self._metrics.ws_reconnects_total.inc,
                     on_message=self._metrics.ws_messages_total.inc,
-                    on_error=self._metrics.ws_errors_total.inc,
+                    on_error=lambda: self._connection_error(plan),
                     on_ignored_non_closed=self._metrics.ignored_non_closed_total.inc,
                 ),
             )
@@ -765,8 +923,11 @@ class MarketDataWsApp:
         - Enqueues reconnect/bootstrap rest fill tasks.
         """
         try:
-            tasks = (await self._plan_recovery(instruments) if self._plan_recovery is not None
-                     else self._reconnect_planner.plan(instruments))
+            tasks = (
+                await self._plan_recovery(instruments)
+                if self._plan_recovery is not None
+                else self._reconnect_planner.plan(instruments)
+            )
             for task in tasks:
                 await self._rest_fill_queue.enqueue(task)
         except Exception as exc:
@@ -780,6 +941,7 @@ def build_market_data_ws_app(
     config_path: str,
     environ: Mapping[str, str],
     metrics_port: int,
+    stored_candle_observer: Callable[[InstrumentId], None] | None = None,
 ) -> MarketDataWsApp:
     """
     Build fully wired market-data websocket worker app.
@@ -802,7 +964,7 @@ def build_market_data_ws_app(
     - Creates ClickHouse client and Prometheus metric objects.
     """
     config = load_market_data_runtime_config(Path(config_path))
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
+    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="stream")
     gateway = ThreadLocalClickHouseConnectGateway(
         client_factory=lambda: _clickhouse_client(clickhouse_settings)
     )
@@ -812,7 +974,21 @@ def build_market_data_ws_app(
         gateway=gateway,
         database=clickhouse_settings.database,
     )
-    instrument_reader = _effective_instrument_reader(environ=environ)
+    recovery_store = PostgresStreamRecoveryStore(environ.get("STRATEGY_PG_DSN", ""))
+    async_recovery = AsyncPostgresStreamRecoveryStore(environ.get("STRATEGY_PG_DSN", ""))
+    admission = BatchedRecoveryAdmission(async_recovery)
+    instrument_reader = HistoryReadyInstrumentReader(
+        on_ready=recovery_store.clear_history_failures,
+        source=_effective_instrument_reader(environ=environ),
+        readiness=HistoryReadiness(
+            origins=PostgresHistoryBoundsRepository(
+                gateway=PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
+            ),
+            coverage=ClickHouseHistoryCoverageReader(
+                gateway=gateway, database=clickhouse_settings.database
+            ),
+        ),
+    )
     metrics = MarketDataWsMetrics()
     clock = SystemClock()
     ingest_id = uuid4()
@@ -859,17 +1035,24 @@ def build_market_data_ws_app(
     else:
         live_candle_publisher = FanoutLiveCandlePublisher(publishers)
 
-    recovery_store = PostgresStreamRecoveryStore(environ.get("STRATEGY_PG_DSN", ""))
     io = MarketDataIoProcess(config_path=config_path, environ=environ)
     live_writer = PersistentRawWriterProcess(environ=environ)
+
+    async def observed_live_write(rows) -> None:
+        await live_writer.write(rows)
+        if stored_candle_observer is not None:
+            await asyncio.to_thread(notify_stored_candles, rows, stored_candle_observer)
+
     async def defer_received(entry) -> None:
         await rest_queue.enqueue(entry.task)
 
     insert_buffer = AsyncRawInsertBuffer(
-        writer=raw_writer,
-        async_writer=live_writer.write,
+        writer=(raw_writer if stored_candle_observer is None else
+                StoredCandleSignalWriter(raw_writer, stored_candle_observer)),
+        async_writer=observed_live_write,
         on_deferred=defer_received,
-        store=recovery_store,
+        async_store=async_recovery,
+        admission=admission,
         classify_error=classify_io_error,
         clock=clock,
         flush_interval_ms=config.raw_write.flush_interval_ms,
@@ -881,10 +1064,19 @@ def build_market_data_ws_app(
             on_insert_error=metrics.insert_errors_total.inc,
         ),
     )
+
+    async def preparation_still_requested(task):
+        if task.reason != "stream_history_repair":
+            return True
+        desired = await io.run("selected", None)
+        return task.instrument_id in desired
+
     rest_queue = AsyncRestFillQueue(
         async_executor=io.fill,
+        should_run=preparation_still_requested,
         window_minutes=60,
-        store=recovery_store,
+        async_store=async_recovery,
+        admission=admission,
         classify_error=classify_io_error,
         worker_count=config.ingestion.rest_concurrency_instruments,
         hooks=RestFillQueueHooks(
@@ -909,6 +1101,12 @@ def build_market_data_ws_app(
         tail_lookback_minutes=config.ingestion.tail_lookback_minutes,
     )
 
+    async def close_io() -> None:
+        try:
+            await admission.close()
+        finally:
+            await live_writer.close()
+
     return MarketDataWsApp(
         config=config,
         instrument_reader=instrument_reader,
@@ -922,9 +1120,12 @@ def build_market_data_ws_app(
         metrics=metrics,
         metrics_port=metrics_port,
         plan_recovery=io.plan,
-        recovery_lease=recovery_store.lease,
+        async_recovery_lease=async_recovery.lease,
+        async_publish_connections=async_recovery.publish_connections,
         start_io=live_writer.start,
-        close_io=live_writer.close,
+        close_io=close_io,
+        read_desired=lambda: io.run("selected", None),
+        prepare_history=lambda pending: io.run("prepare", pending),
     )
 
 
@@ -935,9 +1136,12 @@ def _effective_instrument_reader(
     if not dsn:
         raise ValueError("STRATEGY_PG_DSN is required for effective instrument selections")
     return PostgresInstrumentSelectionRepository(
-        gateway=PsycopgBacktestPostgresGateway(dsn=make_conninfo(
-            dsn, connect_timeout=2, options="-c statement_timeout=2000 -c lock_timeout=1000"
-        ))
+        reference_fallback=False,
+        gateway=PsycopgBacktestPostgresGateway(
+            dsn=make_conninfo(
+                dsn, connect_timeout=2, options="-c statement_timeout=2000 -c lock_timeout=1000"
+            )
+        )
     )
 
 
