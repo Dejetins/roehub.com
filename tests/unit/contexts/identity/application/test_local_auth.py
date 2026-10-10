@@ -287,3 +287,30 @@ def test_recovery_code_is_one_time_and_revokes_prior_sessions(monkeypatch) -> No
         json={"username": "owner", "recovery_code": recovery_value},
     )
     assert replay.status_code == 401
+
+
+def test_repeated_password_login_reuses_device_and_revokes_prior_cookie(monkeypatch) -> None:
+    client, service, sessions, clock, credential_id = _build_client(monkeypatch)
+    _, fallback_value = _bootstrap(client, service, credential_id)
+    prior_id = UUID(client.cookies.get("roehub_session_id"))
+    prior = sessions.find_by_session_id(session_id=prior_id)
+    assert prior is not None
+    before = sessions.list_devices(user_id=prior.user_id, now=clock.now(), before=None, limit=20)
+    marker = client.cookies.get("roehub_browser")
+    assert len(before) == 1
+    clock.value += timedelta(minutes=1)
+    for _ in range(3):
+        response = client.post(
+            "/auth/local/password", headers={"Origin": "http://testserver"},
+            json={"username": "owner", "password": fallback_value},
+        )
+        assert response.status_code == 200
+        assert client.cookies.get("roehub_browser") == marker
+    after = sessions.list_devices(user_id=prior.user_id, now=clock.now(), before=None, limit=20)
+    assert len(after) == 1
+    assert after[0].device_id == before[0].device_id
+    assert after[0].active
+    assert after[0].session_id == UUID(client.cookies.get("roehub_session_id"))
+    revoked = sessions.find_by_session_id(session_id=prior_id)
+    assert revoked is not None
+    assert not revoked.is_active_at(at=clock.now())

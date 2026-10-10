@@ -1,0 +1,12 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "tests/real_infra/backtest/test_automatic_base_lifecycle.py",
+    "tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+    "tests/real_infra/backtest/test_artifact_management.py"
+  ],
+  "conditions": "Owned disposable PostgreSQL and ClickHouse Docker containers, unique test schemas/databases; local ports 53196/53197; no user storage",
+  "exit_code": 0,
+  "output": "........................................................................ [100%]\n=============================== warnings summary ===============================\ntests/real_infra/backtest/test_automatic_base_lifecycle.py::test_real_failure_windows_keep_valid_pointer_and_recover_ownership[disk_full]\ntests/real_infra/backtest/test_automatic_base_lifecycle.py::test_real_failure_windows_keep_valid_pointer_and_recover_ownership[crash_before]\ntests/real_infra/backtest/test_automatic_base_lifecycle.py::test_real_failure_windows_keep_valid_pointer_and_recover_ownership[crash_after]\n  /Users/daniildegtyarev/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/multiprocessing/popen_fork.py:66: DeprecationWarning: This process (pid=98950) is multi-threaded, use of fork() may lead to deadlocks in the child.\n    self.pid = os.fork()\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n72 passed, 3 warnings in 79.57s (0:01:19)\n"
+}

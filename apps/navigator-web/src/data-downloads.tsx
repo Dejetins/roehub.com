@@ -31,9 +31,10 @@ export function useDownloadJob(subject:string,id:string|undefined,onDenied:()=>v
  return {query,view,eta};
 }
 
-export function JobState({state,started_at=null,completed_units=0,queue_waiting=false,storage_retry_at=null}:{state:string;started_at?:string|null;completed_units?:number;queue_waiting?:boolean;storage_retry_at?:string|null}){
+export function JobState({state,started_at=null,completed_units=0,queue_waiting=false,storage_retry_at=null,compact=false}:{state:string;started_at?:string|null;completed_units?:number;queue_waiting?:boolean;storage_retry_at?:string|null;compact?:boolean}){
  const w=useWords(),display=downloadState({state,started_at,completed_units,queue_waiting,storage_retry_at}),Icon=display==='succeeded'?CheckCircle2:display==='failed'?TriangleAlert:display==='cancelled'?XCircle:display==='downloading'?RefreshCw:display==='paused'||display==='pause_requested'?Pause:Clock3;
- return <span className={`data-job-state ${display}`}><Icon aria-hidden="true"/>{display==='downloading'?w('Downloading','Загрузка'):workState(display,w)}</span>;
+ const label=display==='downloading'?w('Downloading','Загрузка'):workState(display,w);
+ return <span className={`data-job-state ${display}${compact?' data-job-state-icon':''}`} role={compact?'img':undefined} aria-label={compact?label:undefined} title={compact?label:undefined}><Icon aria-hidden="true"/>{!compact&&label}</span>;
 }
 export function DownloadEtaLabel({eta}:{eta:DownloadEta}){
  const w=useWords();let text='';
@@ -66,7 +67,7 @@ export function DownloadJournal({subject,markets,blocked,onDenied,onClose,onSele
  useEffect(()=>{if(accessDenied(history.error))onDenied();},[history.error]);
  function filter(name:string,value:string){const next=new URLSearchParams(params);value?next.set(name,value):next.delete(name);setParams(next,{replace:true});}
  return <section id="data-download-journal" className="data-download-journal" aria-label={w('Download log','Журнал загрузок')} onKeyDown={e=>{if(e.key==='Escape'){e.stopPropagation();onClose();}}}>
-  <header><h2>{w('Download log','Журнал загрузок')}</h2><span>{w('All exchanges','Все биржи')}</span><button className="library-icon-action" aria-label={w('Refresh download log','Обновить журнал загрузок')} disabled={history.isFetching||blocked} onClick={()=>void history.refetch()}><RefreshCw aria-hidden="true"/></button><button className="library-icon-action" aria-label={w('Close download log','Закрыть журнал загрузок')} onClick={onClose}><X aria-hidden="true"/></button></header>
+  <header><h2>{w('Download log','Журнал загрузок')}</h2><span>{w('All exchanges','Все биржи')}</span><button className="library-icon-action work-icon" title={w('Refresh download log','Обновить журнал загрузок')} aria-label={w('Refresh download log','Обновить журнал загрузок')} disabled={history.isFetching||blocked} onClick={()=>void history.refetch()}><RefreshCw aria-hidden="true"/></button><button className="library-icon-action work-icon" title={w('Close download log','Закрыть журнал загрузок')} aria-label={w('Close download log','Закрыть журнал загрузок')} onClick={onClose}><X aria-hidden="true"/></button></header>
   <div className="data-journal-filters">
    <label className="data-select"><span className="sr-only">{w('Job state','Состояние задания')}</span><select value={state} onChange={e=>filter('jobstate',e.target.value)}><option value="">{w('All states','Все состояния')}</option>{['queued','running','pause_requested','paused','retry_wait','cancel_requested','cancelled','succeeded','failed'].map(s=><option key={s} value={s}>{workState(s,w)}</option>)}</select><ChevronDown aria-hidden="true"/></label>
    <label className="data-select"><span className="sr-only">{w('Job type','Тип задания')}</span><select value={kind} onChange={e=>filter('jobkind',e.target.value)}><option value="">{w('All tasks','Все задачи')}</option><option value="candle_ingestion">{w('Candles','Свечи')}</option><option value="catalog_refresh">{w('Catalog refresh','Обновление каталога')}</option></select><ChevronDown aria-hidden="true"/></label>
@@ -90,16 +91,16 @@ export function DownloadJobDetails({subject,job,eta,locked,markets,onDenied,onCh
  const w=useWords(),{i18n}=useTranslation(),percent=downloadPercent(job);
  return <section className="data-inspector-section data-job-detail" aria-label={w('Download request','Задание загрузки')}>
   <h3>{job.kind==='catalog_refresh'?w('Catalog refresh','Обновление каталога'):w('Download request','Задание загрузки')}</h3><p>{jobSource(job,markets,w)}{job.symbols.length>1?` · ${job.symbols.join(', ')}`:''}</p>
-  <div className="data-job-summary"><JobState {...job}/><strong>{percent}%</strong></div><JobProgressBar job={job} eta={eta}/>
+  {job.state==='succeeded'?<div className="data-job-completed"><CheckCircle2 aria-hidden="true"/><p>{job.kind==='candle_ingestion'&&job.end_at?w(`Download completed up to ${formatTime(job.end_at,i18n.language)} · UTC`,`Загрузка завершена до ${formatTime(job.end_at,i18n.language)} · UTC`):job.kind==='candle_ingestion'?w('Download completed','Загрузка завершена'):w('Catalog refresh completed','Обновление каталога завершено')}</p></div>:<><div className="data-job-summary"><JobState {...job}/><strong>{percent}%</strong></div><JobProgressBar job={job} eta={eta}/></>}
   <p>{w('Job progress','Ход задания')}: {job.completed_units.toLocaleString(i18n.language)} / {job.total_units.toLocaleString(i18n.language)} {job.kind==='candle_ingestion'?w('minutes','минут'):w('catalog','каталог')}</p>
   <p>{w('Attempt','Попытка')}: {job.attempt} / 5</p>
   {job.start_at&&<p>{formatTime(job.start_at,i18n.language)} – {formatTime(job.end_at,i18n.language)} · UTC</p>}
-  {job.state==='failed'&&job.error_code&&<p className="notice error" role="alert">{job.error_code==='worker_lost'?w('The worker stopped responding.','Обработчик перестал отвечать.'):w('The source or storage could not complete this request.','Источник или хранилище не смогли завершить задание.')} <span>{w('Progress is saved. Continue from the last confirmed position.','Прогресс сохранён. Продолжение — с последней подтверждённой позиции.')}</span></p>}
+  {job.state==='failed'&&job.error_code&&<p className="notice error" role="alert">{job.error_code==='source_history_incomplete'?w('The downloaded range could not be verified in storage. History is still incomplete.','Не удалось подтвердить загруженный диапазон в хранилище. История остаётся неполной.'):job.error_code==='worker_lost'?w('The worker stopped responding.','Обработчик перестал отвечать.'):w('The source or storage could not complete this request.','Источник или хранилище не смогли завершить задание.')} <span>{w('Progress is saved. Continue from the last confirmed position.','Прогресс сохранён. Продолжение — с последней подтверждённой позиции.')}</span></p>}
   {job.state==='failed'&&!job.can_retry&&<p>{w('The continuation limit has been reached. Resolve the cause, then create a new request.','Лимит продолжений исчерпан. Устраните причину, затем создайте новое задание.')}</p>}
   {job.state==='cancel_requested'&&<p role="status">{w('Stopping after the current write. Stored candles are preserved.','Загрузка остановится после текущей записи. Сохранённые свечи останутся.')}</p>}
   {job.state==='pause_requested'&&<p role="status">{w('Finishing the current write before pausing.','Завершаем текущую запись перед паузой.')}</p>}
   {job.state==='paused'&&<p>{w('Progress is saved. Resume when ready.','Прогресс сохранён. Можно продолжить в любое время.')}</p>}
-  {job.state==='retry_wait'&&<p role="status">{job.error_code==='source_rate_limited'?w('Exchange rate limit.','Ограничение частоты запросов биржи.'):job.error_code==='storage_memory_pressure'?w('Storage is waiting for memory to become available.','Хранилище ожидает освобождения памяти.'):job.error_code==='storage_unavailable'?w('Storage temporarily unavailable.','Хранилище временно недоступно.'):job.error_code==='worker_lost'?w('Recovering the download worker.','Восстановление обработчика загрузки.'):w('Source temporarily unavailable.','Источник временно недоступен.')} {w('Will retry automatically','Автоповтор')}{job.next_retry_at?` · ${formatTime(job.next_retry_at,i18n.language)} · UTC`:''}. {w('Progress is saved.','Прогресс сохранён.')}</p>}
+  {job.state==='retry_wait'&&<p role="status">{job.error_code==='source_history_incomplete'?w('Retrying history verification.','Повторяем проверку истории.'):job.error_code==='source_rate_limited'?w('Exchange rate limit.','Ограничение частоты запросов биржи.'):job.error_code==='storage_memory_pressure'?w('Storage is waiting for memory to become available.','Хранилище ожидает освобождения памяти.'):job.error_code==='storage_unavailable'?w('Storage temporarily unavailable.','Хранилище временно недоступно.'):job.error_code==='worker_lost'?w('Recovering the download worker.','Восстановление обработчика загрузки.'):w('Source temporarily unavailable.','Источник временно недоступен.')} {w('Will retry automatically','Автоповтор')}{job.next_retry_at?` · ${formatTime(job.next_retry_at,i18n.language)} · UTC`:''}. {w('Progress is saved.','Прогресс сохранён.')}</p>}
   {job.state==='queued'&&job.storage_retry_at&&<p role="status">{w('Storage recovery. Queue will continue automatically after','Восстановление хранилища. Очередь автоматически продолжится после')} {formatTime(job.storage_retry_at,i18n.language)} · UTC.</p>}
   {job.state==='queued'&&job.queue_waiting&&!job.storage_retry_at&&<p>{w('Waiting for an available download slot.','Ожидание свободного слота загрузки.')}</p>}
   <DownloadJobActions subject={subject} job={job} locked={locked} onDenied={onDenied} onChanged={onChanged}/>
@@ -115,7 +116,7 @@ export function StandaloneDownloadJob({subject,id,markets,onDenied,onChanged,onC
  </>;
 }
 
-type ActionState={pending:boolean;unknown:boolean;error?:unknown};
+type ActionState={pending:boolean;unknown:boolean;error?:unknown;intent?:'pause'|'resume'};
 /** All visible controls share the same command fence and unknown-outcome state. */
 export function DownloadJobActions({subject,job,locked,onDenied,onChanged,compact=false}:{subject:string;job:WorkJob;locked:boolean;onDenied:()=>void;onChanged?:()=>Promise<void>;compact?:boolean}){
  const w=useWords(),client=useQueryClient(),key=['data-job-action',subject,job.job_id];
@@ -125,24 +126,43 @@ export function DownloadJobActions({subject,job,locked,onDenied,onChanged,compac
  async function save(value:WorkJob){
   const progressKey=['data-job',subject,value.job_id];
   await client.cancelQueries({queryKey:progressKey,exact:true});client.setQueryData(progressKey,value);
-  await Promise.all([onChanged?.(),...['exchange-catalog','data-inspector','instrument-catalog','data-jobs','data-job-events'].map(name=>client.invalidateQueries({queryKey:[name,subject]}))]);
+ }
+ function refreshViews(){
+  void Promise.all([onChanged?.(),...['exchange-catalog','data-inspector','instrument-catalog','data-jobs','data-job-events'].map(name=>client.invalidateQueries({queryKey:[name,subject]}))]).catch(()=>undefined);
  }
  async function action(name:'cancel'|'retry'|'pause'|'resume'){
   const live=client.getQueryData<ActionState>(key);
-  if(locked||live?.pending||live?.unknown||!job[`can_${name}`])return;
-  write({pending:true,unknown:false});
-  try{await save(await workAction(job.job_id,name,job.attempt,job.control_version??0));write({pending:false,unknown:false});}
-  catch(error){write({pending:false,unknown:error instanceof ApiError&&error.outcome==='unknown',error});if(accessDenied(error))onDenied();}
+  if(locked||live?.unknown)return;
+  const control=name==='pause'||name==='resume';
+  if(live?.pending){
+   // Coalesce user intent while one command is in flight; never send in parallel.
+   if(control&&live.intent)write({...live,intent:name});
+   return;
+  }
+  if(!job[`can_${name}`])return;
+  write({pending:true,unknown:false,...(control?{intent:name}: {})});
+  try{
+   let current=job,next=name;
+   while(true){
+    current=await workAction(current.job_id,next,current.attempt,current.control_version??0);
+    await save(current);
+    const intent=client.getQueryData<ActionState>(key)?.intent;
+    if(!intent||intent===next||!current[`can_${intent}`])break;
+    next=intent;
+   }
+   write({pending:false,unknown:false});
+   refreshViews();
+  }catch(error){write({pending:false,unknown:error instanceof ApiError&&error.outcome==='unknown',error});if(accessDenied(error))onDenied();}
  }
  async function reconcile(){
   if(locked||client.getQueryData<ActionState>(key)?.pending)return;
   write({...state,pending:true});
-  try{await save(await readJob(job.job_id));write({pending:false,unknown:false});}
+  try{await save(await readJob(job.job_id));write({pending:false,unknown:false});refreshViews();}
   catch(error){write({...state,pending:false,error});if(accessDenied(error))onDenied();}
  }
  const suffix=compact?` · ${job.symbols.join(', ')}`:'';
  const label=(name:string)=>name+suffix;
- const button=(name:'pause'|'resume'|'retry',text:string,icon:React.ReactNode)=>job[`can_${name}`]&&<button type="button" className={compact?'library-icon-action':undefined} aria-label={label(text)} title={locked?w('Refresh the saved state to enable commands.','Обновите сохранённое состояние для управления.'):label(text)} disabled={disabled} onClick={()=>void action(name)}>{icon}{!compact&&text}</button>;
+ const button=(name:'pause'|'resume'|'retry',text:string,icon:React.ReactNode)=>((name==='pause'||name==='resume')&&state.intent?name!==state.intent:job[`can_${name}`])&&<button type="button" className={compact?'library-icon-action':undefined} aria-label={label(text)} title={locked?w('Refresh the saved state to enable commands.','Обновите сохранённое состояние для управления.'):label(text)} disabled={(name==='pause'||name==='resume')&&state.intent?locked||state.unknown:disabled} onClick={()=>void action(name)}>{icon}{!compact&&text}</button>;
  return <div className={compact?'data-row-actions':'work-actions data-job-actions'} aria-label={w('Download controls','Управление загрузкой')}>
   {button('pause',w('Pause','Пауза'),<Pause aria-hidden="true"/>)}
   {button('resume',w('Resume','Продолжить'),<Play aria-hidden="true"/>)}

@@ -1,0 +1,14 @@
+{
+  "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py": "2735e1c9522a7abfaad2868d99c1d549ce1c3c6e11f32110a269fa583f653b97",
+  "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py": "f14f0a1b44a774efac5fcbe168845552c43ae03fa8a98df080a460151d3ae164",
+  "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py": "4804741430cef5a2f0a2857cd69ba2ef06c09f511d094539822f2d5af7e0989e",
+  "tools/qa/market_data_resource_comparison.py": "2ac162bdbf3f03f15aae5b410882e0328ac312398b96be78f06cf63570d1b962",
+  "tests/unit/contexts/backtest_artifacts/test_automatic_base.py": "38de956a0526fe6574f675e7a09378834cb44aa3bb07c99ed503006dd9c5b8d8",
+  "tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py": "ef40a013751f748d92e745f24c25f0a8acafe367f403bc40b6d70c41ab2ce668",
+  "tests/real_infra/market_data/test_full_history_clickhouse.py": "39b1c2e581c8c8b8062f471513ba41af92c24c09020e87ebeef3eebc6cdff350",
+  "tests/real_infra/backtest/test_automatic_base_lifecycle.py": "bd897141eaa150715c036915c8c2f9fed62083a2c4c93d0260f1e6c9ceed3ce8",
+  "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md": "5502e1e448231ab68651b0593126d229592cfe370fda45c708873dbc78863df8",
+  "docs/architecture/market_data/market-data-reference-api-v1.md": "ee53b1c58496d50ff2728baa308a19eb08b82c238f3bebbf1572d25591dd33f2",
+  "docs/architecture/market_data/market-data-application-ports.md": "9e8a596c460fb95715275696b3460ba8750d0d139c113ac9d99601589d0a1ac3",
+  "docs/runbooks/navigator-local-market-data-recovery.md": "04576db9e76a9bed69699163a5513514591ef5ac8d976ad135544f3eeadc7269"
+}

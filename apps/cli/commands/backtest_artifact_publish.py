@@ -345,7 +345,7 @@ def _build_publish_use_case_v2(
     path_builder = BacktestArtifactPathBuilderV2(root=artifact_runtime_config.artifact_root_path())
     artifact_loader = YamlBacktestArtifactLoaderV2(path_resolver=path_builder)
     pointer_writer = AtomicArtifactCurrentPointerWriterV2(path_resolver=path_builder)
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
+    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="artifacts")
     clickhouse_gateway = ClickHouseConnectGateway(_clickhouse_client(clickhouse_settings))
     strategy_postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
     if not strategy_postgres_dsn:

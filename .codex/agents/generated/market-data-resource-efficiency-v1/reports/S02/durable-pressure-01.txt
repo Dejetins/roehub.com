@@ -1,0 +1,226 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+____ test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint[241] _____
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('84c0c42f-89fb-47cd-aa29-7bb5afe12437'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x10c21baa0>)
+pressure_code = 241
+
+    @pytest.mark.skipif(not os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_PORT'),
+                        reason='explicit disposable ClickHouse target required')
+    @pytest.mark.parametrize("pressure_code", [241, 202])
+    def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store, pressure_code):
+        from dataclasses import dataclass
+        from types import SimpleNamespace
+    
+        import clickhouse_connect
+    
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
+            transient_clickhouse_error,
+        )
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+        repo, org, actor, _ = store
+        ch = clickhouse_connect.get_client(
+            host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
+            username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
+            password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
+        table = 'market_data.work_recovery_test_'+uuid4().hex
+        clock = [datetime.now(UTC).replace(second=0, microsecond=0)]
+        start = clock[0]-timedelta(hours=3)
+        job = repo.submit(organization_id=org, actor_user_id=actor, key=uuid4(),
+                          request=WorkRequest('candle_ingestion', 1, ('BTCUSDT',), start, clock[0]),
+                          now=clock[0])
+        visits = []
+        fault = [True]
+    
+        class Writer:
+            def write_1m(self, rows):
+                offset = rows[0][0]
+                if offset == 60 and fault[0]:
+                    fault[0] = False
+                    if pressure_code == 241:
+                        ch.command(f'INSERT INTO {table} SELECT number FROM numbers(100000)',
+                                   settings={'max_memory_usage':1,'max_threads':1,'max_execution_time':5})
+                    else:
+                        import time
+                        other = clickhouse_connect.get_client(
+                            host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
+                            username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
+                            password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
+                        try:
+                            with ThreadPoolExecutor(max_workers=1) as pool:
+                                running = pool.submit(other.command, 'SELECT sleep(2)')
+                                time.sleep(.2)
+                                ch.command(f'INSERT INTO {table} SELECT number FROM numbers(60)',
+                                           settings={'max_concurrent_queries_for_user':1})
+                                running.result()
+                        finally:
+                            other.close()
+                    pytest.fail('ClickHouse did not enforce resource pressure')
+                ch.insert(table, rows, column_names=['minute'])
+    
+        @dataclass
+        class Fill:
+            writer: Any
+    
+            def run(self, task):
+                offset = int((task.time_range.start.value-start).total_seconds()//60)
+                visits.append(offset)
+                self.writer.write_1m([[i] for i in range(offset, offset+60)])
+                return SimpleNamespace(rows_read=60, rows_written=60)
+    
+        try:
+>           ch.command(f'CREATE TABLE {table} (minute UInt64) ENGINE=MergeTree ORDER BY minute')
+
+tests/real_infra/market_data/test_work_requests_postgres.py:588: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/httpclient.py:351: in command
+    response = self._raw_request(payload, params, headers, method, fields=fields, server_wait=False)
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/httpclient.py:462: in _raw_request
+    self._error_handler(response)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <clickhouse_connect.driver.httpclient.HttpClient object at 0x10c21bc80>
+response = <urllib3.response.HTTPResponse object at 0x1146c9690>
+retried = False
+
+    def _error_handler(self, response: HTTPResponse, retried: bool = False) -> None:
+        if self.show_clickhouse_errors:
+            try:
+                err_content = get_response_data(response)
+            except Exception:  # pylint: disable=broad-except
+                err_content = None
+            finally:
+                response.close()
+    
+            err_str = f'HTTPDriver for {self.url} returned response code {response.status}'
+            err_code = response.headers.get(ex_header)
+            if err_code:
+                err_str = f'HTTPDriver for {self.url} received ClickHouse error code {err_code}'
+            if err_content:
+                err_msg = common.format_error(err_content.decode(errors='backslashreplace'))
+                if err_msg.startswith('Code'):
+                    err_str = f'{err_str}\n {err_msg}'
+        else:
+            err_str = 'The ClickHouse server returned an error.'
+    
+>       raise OperationalError(err_str) if retried else DatabaseError(err_str) from None
+E       clickhouse_connect.driver.exceptions.DatabaseError: HTTPDriver for http://127.0.0.1:38123 received ClickHouse error code 81
+E        Code: 81. DB::Exception: Database market_data does not exist. (UNKNOWN_DATABASE) (version 25.8.33.6 (official build))
+
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/httpclient.py:385: DatabaseError
+____ test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint[202] _____
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('9235ba17-5eb3-41ad-89ff-8c3537824ca3'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x10c458260>)
+pressure_code = 202
+
+    @pytest.mark.skipif(not os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_PORT'),
+                        reason='explicit disposable ClickHouse target required')
+    @pytest.mark.parametrize("pressure_code", [241, 202])
+    def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store, pressure_code):
+        from dataclasses import dataclass
+        from types import SimpleNamespace
+    
+        import clickhouse_connect
+    
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
+            transient_clickhouse_error,
+        )
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+        repo, org, actor, _ = store
+        ch = clickhouse_connect.get_client(
+            host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
+            username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
+            password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
+        table = 'market_data.work_recovery_test_'+uuid4().hex
+        clock = [datetime.now(UTC).replace(second=0, microsecond=0)]
+        start = clock[0]-timedelta(hours=3)
+        job = repo.submit(organization_id=org, actor_user_id=actor, key=uuid4(),
+                          request=WorkRequest('candle_ingestion', 1, ('BTCUSDT',), start, clock[0]),
+                          now=clock[0])
+        visits = []
+        fault = [True]
+    
+        class Writer:
+            def write_1m(self, rows):
+                offset = rows[0][0]
+                if offset == 60 and fault[0]:
+                    fault[0] = False
+                    if pressure_code == 241:
+                        ch.command(f'INSERT INTO {table} SELECT number FROM numbers(100000)',
+                                   settings={'max_memory_usage':1,'max_threads':1,'max_execution_time':5})
+                    else:
+                        import time
+                        other = clickhouse_connect.get_client(
+                            host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
+                            username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
+                            password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
+                        try:
+                            with ThreadPoolExecutor(max_workers=1) as pool:
+                                running = pool.submit(other.command, 'SELECT sleep(2)')
+                                time.sleep(.2)
+                                ch.command(f'INSERT INTO {table} SELECT number FROM numbers(60)',
+                                           settings={'max_concurrent_queries_for_user':1})
+                                running.result()
+                        finally:
+                            other.close()
+                    pytest.fail('ClickHouse did not enforce resource pressure')
+                ch.insert(table, rows, column_names=['minute'])
+    
+        @dataclass
+        class Fill:
+            writer: Any
+    
+            def run(self, task):
+                offset = int((task.time_range.start.value-start).total_seconds()//60)
+                visits.append(offset)
+                self.writer.write_1m([[i] for i in range(offset, offset+60)])
+                return SimpleNamespace(rows_read=60, rows_written=60)
+    
+        try:
+>           ch.command(f'CREATE TABLE {table} (minute UInt64) ENGINE=MergeTree ORDER BY minute')
+
+tests/real_infra/market_data/test_work_requests_postgres.py:588: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/httpclient.py:351: in command
+    response = self._raw_request(payload, params, headers, method, fields=fields, server_wait=False)
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/httpclient.py:462: in _raw_request
+    self._error_handler(response)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <clickhouse_connect.driver.httpclient.HttpClient object at 0x11e1279e0>
+response = <urllib3.response.HTTPResponse object at 0x10c21bb20>
+retried = False
+
+    def _error_handler(self, response: HTTPResponse, retried: bool = False) -> None:
+        if self.show_clickhouse_errors:
+            try:
+                err_content = get_response_data(response)
+            except Exception:  # pylint: disable=broad-except
+                err_content = None
+            finally:
+                response.close()
+    
+            err_str = f'HTTPDriver for {self.url} returned response code {response.status}'
+            err_code = response.headers.get(ex_header)
+            if err_code:
+                err_str = f'HTTPDriver for {self.url} received ClickHouse error code {err_code}'
+            if err_content:
+                err_msg = common.format_error(err_content.decode(errors='backslashreplace'))
+                if err_msg.startswith('Code'):
+                    err_str = f'{err_str}\n {err_msg}'
+        else:
+            err_str = 'The ClickHouse server returned an error.'
+    
+>       raise OperationalError(err_str) if retried else DatabaseError(err_str) from None
+E       clickhouse_connect.driver.exceptions.DatabaseError: HTTPDriver for http://127.0.0.1:38123 received ClickHouse error code 81
+E        Code: 81. DB::Exception: Database market_data does not exist. (UNKNOWN_DATABASE) (version 25.8.33.6 (official build))
+
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/httpclient.py:385: DatabaseError
+=========================== short test summary info ============================
+FAILED tests/real_infra/market_data/test_work_requests_postgres.py::test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint[241]
+FAILED tests/real_infra/market_data/test_work_requests_postgres.py::test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint[202]
+2 failed, 21 deselected in 0.79s

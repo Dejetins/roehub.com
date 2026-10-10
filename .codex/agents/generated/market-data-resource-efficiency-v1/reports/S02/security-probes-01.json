@@ -1,0 +1,122 @@
+{
+  "stream": {
+    "effective": [
+      [
+        "max_threads",
+        "2"
+      ],
+      [
+        "max_concurrent_queries_for_user",
+        "2"
+      ],
+      [
+        "max_memory_usage",
+        "134217728"
+      ],
+      [
+        "max_memory_usage_for_user",
+        "201326592"
+      ]
+    ],
+    "override": {
+      "SET profile='default'": 452,
+      "SELECT 1 SETTINGS profile='default'": 452,
+      "SET max_memory_usage=0": 452,
+      "SET max_memory_usage_for_user=0": 452,
+      "SET max_concurrent_queries_for_user=0": 452,
+      "SET max_threads=100": 452,
+      "SET max_execution_time=0": 452,
+      "CREATE TABLE market_data.bad(n UInt8) ENGINE=Memory": 497
+    }
+  },
+  "interactive": {
+    "effective": [
+      [
+        "max_threads",
+        "2"
+      ],
+      [
+        "max_concurrent_queries_for_user",
+        "4"
+      ],
+      [
+        "max_memory_usage",
+        "134217728"
+      ],
+      [
+        "max_memory_usage_for_user",
+        "201326592"
+      ]
+    ],
+    "override": {
+      "SET profile='default'": 452,
+      "SELECT 1 SETTINGS profile='default'": 452,
+      "SET max_memory_usage=0": 452,
+      "SET max_memory_usage_for_user=0": 452,
+      "SET max_concurrent_queries_for_user=0": 452,
+      "SET max_threads=100": 452,
+      "SET max_execution_time=0": 452,
+      "CREATE TABLE market_data.bad(n UInt8) ENGINE=Memory": 497
+    }
+  },
+  "backfill": {
+    "effective": [
+      [
+        "max_threads",
+        "1"
+      ],
+      [
+        "max_concurrent_queries_for_user",
+        "1"
+      ],
+      [
+        "max_memory_usage",
+        "134217728"
+      ],
+      [
+        "max_memory_usage_for_user",
+        "134217728"
+      ]
+    ],
+    "override": {
+      "SET profile='default'": 452,
+      "SELECT 1 SETTINGS profile='default'": 452,
+      "SET max_memory_usage=0": 452,
+      "SET max_memory_usage_for_user=0": 452,
+      "SET max_concurrent_queries_for_user=0": 452,
+      "SET max_threads=100": 452,
+      "SET max_execution_time=0": 452,
+      "CREATE TABLE market_data.bad(n UInt8) ENGINE=Memory": 497
+    }
+  },
+  "artifacts": {
+    "effective": [
+      [
+        "max_threads",
+        "1"
+      ],
+      [
+        "max_concurrent_queries_for_user",
+        "1"
+      ],
+      [
+        "max_memory_usage",
+        "134217728"
+      ],
+      [
+        "max_memory_usage_for_user",
+        "134217728"
+      ]
+    ],
+    "override": {
+      "SET profile='default'": 452,
+      "SELECT 1 SETTINGS profile='default'": 452,
+      "SET max_memory_usage=0": 452,
+      "SET max_memory_usage_for_user=0": 452,
+      "SET max_concurrent_queries_for_user=0": 452,
+      "SET max_threads=100": 452,
+      "SET max_execution_time=0": 452,
+      "CREATE TABLE market_data.bad(n UInt8) ENGINE=Memory": 497
+    }
+  }
+}

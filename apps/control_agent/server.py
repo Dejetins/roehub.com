@@ -8,9 +8,16 @@ from pathlib import Path
 from threading import Thread
 from typing import cast
 
+import psycopg
+import yaml
 from pydantic import ValidationError
 
+from apps.control_agent.artifact_storage import ArtifactStorageService
 from apps.control_agent.auth import ServiceIdentityAuthorizer
+from trading.contexts.backtest.application.ports.backtest_job_repositories import (
+    ArtifactOwnershipConflict,
+)
+from trading.contexts.backtest_artifacts.application.services.management import ManagementError
 from trading.contexts.operations import ControlOperationError, ControlOperationService
 from trading.contexts.operations.adapters import AppendOnlyOperationJournal
 from trading.contexts.operations.contracts import ControlAgentRequest, ControlAgentResponse
@@ -29,7 +36,9 @@ class _ControlAgentServer(socketserver.ThreadingUnixStreamServer):
         service: ControlOperationService,
         journal: AppendOnlyOperationJournal,
         authorizer: ServiceIdentityAuthorizer,
+        storage_service: ArtifactStorageService | None = None,
     ) -> None:
+        self.storage_service = storage_service
         self.service = service
         self.journal = journal
         self.authorizer = authorizer
@@ -52,7 +61,14 @@ class _ControlAgentHandler(socketserver.StreamRequestHandler):
                 action=action,
                 request_digest=request.authorization_digest,
             )
-            if request.method == "submit":
+            if request.method == "artifact_storage":
+                if request.identity != "api" or control_server.storage_service is None:
+                    raise ControlOperationError(code="storage.unavailable")
+                assert request.storage is not None
+                response = ControlAgentResponse(
+                    status="ok", storage=control_server.storage_service.execute(request.storage)
+                )
+            elif request.method == "submit":
                 assert request.operation is not None
                 response = ControlAgentResponse(
                     status="ok",
@@ -81,6 +97,15 @@ class _ControlAgentHandler(socketserver.StreamRequestHandler):
         except ValidationError:
             self._write_error("control_agent.request_invalid")
             return
+        except ArtifactOwnershipConflict:
+            self._write_error("storage.cleanup_busy")
+            return
+        except ManagementError as error:
+            self._write_error("storage." + str(error))
+            return
+        except (psycopg.Error, OSError, ValueError, KeyError, yaml.YAMLError):
+            self._write_error("storage.unavailable")
+            return
         except ControlOperationError as error:
             self._write_error(error.code)
             return
@@ -100,6 +125,7 @@ def serve(
     service: ControlOperationService,
     journal: AppendOnlyOperationJournal,
     authorizer: ServiceIdentityAuthorizer,
+    storage_service: ArtifactStorageService | None = None,
 ) -> None:
     """Serve until terminated, replacing only a stale local socket node."""
 
@@ -108,6 +134,7 @@ def serve(
         service=service,
         journal=journal,
         authorizer=authorizer,
+        storage_service=storage_service,
     )
     try:
         os.chmod(path, 0o660)
@@ -123,6 +150,7 @@ def start_control_agent_server(
     service: ControlOperationService,
     journal: AppendOnlyOperationJournal,
     authorizer: ServiceIdentityAuthorizer,
+    storage_service: ArtifactStorageService | None = None,
 ) -> tuple[_ControlAgentServer, Thread]:
     """Start the same authenticated server for a bounded runtime composition."""
 
@@ -131,6 +159,7 @@ def start_control_agent_server(
         service=service,
         journal=journal,
         authorizer=authorizer,
+        storage_service=storage_service,
     )
     thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True)
     thread.start()
@@ -155,6 +184,7 @@ def _build_server(
     service: ControlOperationService,
     journal: AppendOnlyOperationJournal,
     authorizer: ServiceIdentityAuthorizer,
+    storage_service: ArtifactStorageService | None = None,
 ) -> tuple[Path, _ControlAgentServer]:
     path = socket_path.expanduser().resolve()
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -164,7 +194,11 @@ def _build_server(
             raise ControlOperationError(code="control_agent.socket_unsafe")
         path.unlink()
     server = _ControlAgentServer(
-        str(path), service=service, journal=journal, authorizer=authorizer
+        str(path),
+        service=service,
+        journal=journal,
+        authorizer=authorizer,
+        storage_service=storage_service,
     )
     os.chmod(path, 0o660)
     return path, server

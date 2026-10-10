@@ -1,0 +1,11 @@
+{
+  "reviewer": "/root/security_review",
+  "outcome": "No new blocking risk; M regression investigation/resolution sufficient for scoped acceptance.",
+  "required_limits": [
+    "Live p99 median worsened 14.6%; inconclusive direction does not disprove regression.",
+    "API-only ablation does not explain stream tail; reduced throttle does not establish subsecond cause.",
+    "Background latency tradeoff accepted only with all work completed.",
+    "Baseline active class concurrency unavailable, not zero.",
+    "No overall speedup, SLO or release-readiness claim."
+  ]
+}

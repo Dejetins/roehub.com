@@ -1,0 +1,400 @@
+{
+  "started_at": "2026-10-04T19:14:15.698061+00:00",
+  "target_minutes": 3,
+  "symbols": [
+    "AAVEUSDT",
+    "ADAUSDT",
+    "ALGOUSDT",
+    "ANKRUSDT"
+  ],
+  "selection": "owned reader fixes only four test subscriptions; persisted UI selections unchanged",
+  "redis": "unavailable; disabled only in test configuration",
+  "samples": [
+    {
+      "symbol": "ADAUSDT",
+      "minute_open": "2026-10-04 19:14:00+00:00",
+      "batch": 1,
+      "closed_at": "2026-10-04 19:15:00+00:00",
+      "received_at": "2026-10-04 19:15:00.048798+00:00",
+      "exchange_event_at": "2026-10-04 19:15:00.010000+00:00",
+      "write_started_at": "2026-10-04 19:15:00.316812+00:00",
+      "write_ack_at": "2026-10-04 19:15:00.341600+00:00",
+      "canonical_verified_at": "2026-10-04 19:15:00.354619+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 10.0,
+      "exchange_event_to_receive_ms": 38.798,
+      "close_to_receive_ms": 48.798,
+      "receive_to_write_start_ms": 268.0066250031814,
+      "receive_to_write_ack_ms": 292.80145798111334,
+      "close_to_write_ack_ms": 341.6,
+      "receive_to_canonical_verified_ms": 305.81541697029024,
+      "close_to_canonical_verified_ms": 354.619
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "minute_open": "2026-10-04 19:14:00+00:00",
+      "batch": 1,
+      "closed_at": "2026-10-04 19:15:00+00:00",
+      "received_at": "2026-10-04 19:15:00.066033+00:00",
+      "exchange_event_at": "2026-10-04 19:15:00.032000+00:00",
+      "write_started_at": "2026-10-04 19:15:00.316812+00:00",
+      "write_ack_at": "2026-10-04 19:15:00.341600+00:00",
+      "canonical_verified_at": "2026-10-04 19:15:00.354619+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 32.0,
+      "exchange_event_to_receive_ms": 34.033,
+      "close_to_receive_ms": 66.033,
+      "receive_to_write_start_ms": 250.7770000374876,
+      "receive_to_write_ack_ms": 275.57183301541954,
+      "close_to_write_ack_ms": 341.6,
+      "receive_to_canonical_verified_ms": 288.58579200459644,
+      "close_to_canonical_verified_ms": 354.619
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "minute_open": "2026-10-04 19:14:00+00:00",
+      "batch": 1,
+      "closed_at": "2026-10-04 19:15:00+00:00",
+      "received_at": "2026-10-04 19:15:00.142227+00:00",
+      "exchange_event_at": "2026-10-04 19:15:00.063000+00:00",
+      "write_started_at": "2026-10-04 19:15:00.316812+00:00",
+      "write_ack_at": "2026-10-04 19:15:00.341600+00:00",
+      "canonical_verified_at": "2026-10-04 19:15:00.354619+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 63.0,
+      "exchange_event_to_receive_ms": 79.227,
+      "close_to_receive_ms": 142.227,
+      "receive_to_write_start_ms": 174.57908304641023,
+      "receive_to_write_ack_ms": 199.37391602434218,
+      "close_to_write_ack_ms": 341.6,
+      "receive_to_canonical_verified_ms": 212.38787501351908,
+      "close_to_canonical_verified_ms": 354.619
+    },
+    {
+      "symbol": "ANKRUSDT",
+      "minute_open": "2026-10-04 19:14:00+00:00",
+      "batch": 1,
+      "closed_at": "2026-10-04 19:15:00+00:00",
+      "received_at": "2026-10-04 19:15:00.192016+00:00",
+      "exchange_event_at": "2026-10-04 19:15:00.105000+00:00",
+      "write_started_at": "2026-10-04 19:15:00.316812+00:00",
+      "write_ack_at": "2026-10-04 19:15:00.341600+00:00",
+      "canonical_verified_at": "2026-10-04 19:15:00.354619+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 105.0,
+      "exchange_event_to_receive_ms": 87.01599999999999,
+      "close_to_receive_ms": 192.016,
+      "receive_to_write_start_ms": 124.78966702474281,
+      "receive_to_write_ack_ms": 149.58450000267476,
+      "close_to_write_ack_ms": 341.6,
+      "receive_to_canonical_verified_ms": 162.59845899185166,
+      "close_to_canonical_verified_ms": 354.619
+    },
+    {
+      "symbol": "ADAUSDT",
+      "minute_open": "2026-10-04 19:15:00+00:00",
+      "batch": 2,
+      "closed_at": "2026-10-04 19:16:00+00:00",
+      "received_at": "2026-10-04 19:16:00.045428+00:00",
+      "exchange_event_at": "2026-10-04 19:16:00.015000+00:00",
+      "write_started_at": "2026-10-04 19:16:00.316190+00:00",
+      "write_ack_at": "2026-10-04 19:16:00.342652+00:00",
+      "canonical_verified_at": "2026-10-04 19:16:00.352405+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 15.0,
+      "exchange_event_to_receive_ms": 30.428,
+      "close_to_receive_ms": 45.428000000000004,
+      "receive_to_write_start_ms": 270.7540420233272,
+      "receive_to_write_ack_ms": 297.22120898077264,
+      "close_to_write_ack_ms": 342.652,
+      "receive_to_canonical_verified_ms": 306.9699999759905,
+      "close_to_canonical_verified_ms": 352.40500000000003
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "minute_open": "2026-10-04 19:15:00+00:00",
+      "batch": 2,
+      "closed_at": "2026-10-04 19:16:00+00:00",
+      "received_at": "2026-10-04 19:16:00.065403+00:00",
+      "exchange_event_at": "2026-10-04 19:16:00.015000+00:00",
+      "write_started_at": "2026-10-04 19:16:00.316190+00:00",
+      "write_ack_at": "2026-10-04 19:16:00.342652+00:00",
+      "canonical_verified_at": "2026-10-04 19:16:00.352405+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 15.0,
+      "exchange_event_to_receive_ms": 50.403000000000006,
+      "close_to_receive_ms": 65.403,
+      "receive_to_write_start_ms": 250.78075000783429,
+      "receive_to_write_ack_ms": 277.2479169652797,
+      "close_to_write_ack_ms": 342.652,
+      "receive_to_canonical_verified_ms": 286.9967079604976,
+      "close_to_canonical_verified_ms": 352.40500000000003
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "minute_open": "2026-10-04 19:15:00+00:00",
+      "batch": 2,
+      "closed_at": "2026-10-04 19:16:00+00:00",
+      "received_at": "2026-10-04 19:16:00.098180+00:00",
+      "exchange_event_at": "2026-10-04 19:16:00.063000+00:00",
+      "write_started_at": "2026-10-04 19:16:00.316190+00:00",
+      "write_ack_at": "2026-10-04 19:16:00.342652+00:00",
+      "canonical_verified_at": "2026-10-04 19:16:00.352405+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 63.0,
+      "exchange_event_to_receive_ms": 35.18,
+      "close_to_receive_ms": 98.18,
+      "receive_to_write_start_ms": 218.00358302425593,
+      "receive_to_write_ack_ms": 244.47074998170137,
+      "close_to_write_ack_ms": 342.652,
+      "receive_to_canonical_verified_ms": 254.21954097691923,
+      "close_to_canonical_verified_ms": 352.40500000000003
+    },
+    {
+      "symbol": "ANKRUSDT",
+      "minute_open": "2026-10-04 19:15:00+00:00",
+      "batch": 2,
+      "closed_at": "2026-10-04 19:16:00+00:00",
+      "received_at": "2026-10-04 19:16:00.132944+00:00",
+      "exchange_event_at": "2026-10-04 19:16:00.095000+00:00",
+      "write_started_at": "2026-10-04 19:16:00.316190+00:00",
+      "write_ack_at": "2026-10-04 19:16:00.342652+00:00",
+      "canonical_verified_at": "2026-10-04 19:16:00.352405+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 95.0,
+      "exchange_event_to_receive_ms": 37.943999999999996,
+      "close_to_receive_ms": 132.94400000000002,
+      "receive_to_write_start_ms": 183.2394580123946,
+      "receive_to_write_ack_ms": 209.70662496984005,
+      "close_to_write_ack_ms": 342.652,
+      "receive_to_canonical_verified_ms": 219.4554159650579,
+      "close_to_canonical_verified_ms": 352.40500000000003
+    },
+    {
+      "symbol": "ADAUSDT",
+      "minute_open": "2026-10-04 19:16:00+00:00",
+      "batch": 3,
+      "closed_at": "2026-10-04 19:17:00+00:00",
+      "received_at": "2026-10-04 19:17:00.044366+00:00",
+      "exchange_event_at": "2026-10-04 19:17:00.015000+00:00",
+      "write_started_at": "2026-10-04 19:17:00.315884+00:00",
+      "write_ack_at": "2026-10-04 19:17:00.343401+00:00",
+      "canonical_verified_at": "2026-10-04 19:17:00.359068+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 15.0,
+      "exchange_event_to_receive_ms": 29.366,
+      "close_to_receive_ms": 44.366,
+      "receive_to_write_start_ms": 271.51062502525747,
+      "receive_to_write_ack_ms": 299.03120803646743,
+      "close_to_write_ack_ms": 343.401,
+      "receive_to_canonical_verified_ms": 314.697541994974,
+      "close_to_canonical_verified_ms": 359.068
+    },
+    {
+      "symbol": "AAVEUSDT",
+      "minute_open": "2026-10-04 19:16:00+00:00",
+      "batch": 3,
+      "closed_at": "2026-10-04 19:17:00+00:00",
+      "received_at": "2026-10-04 19:17:00.065047+00:00",
+      "exchange_event_at": "2026-10-04 19:17:00.015000+00:00",
+      "write_started_at": "2026-10-04 19:17:00.315884+00:00",
+      "write_ack_at": "2026-10-04 19:17:00.343401+00:00",
+      "canonical_verified_at": "2026-10-04 19:17:00.359068+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 15.0,
+      "exchange_event_to_receive_ms": 50.047000000000004,
+      "close_to_receive_ms": 65.047,
+      "receive_to_write_start_ms": 250.83566701505333,
+      "receive_to_write_ack_ms": 278.3562500262633,
+      "close_to_write_ack_ms": 343.401,
+      "receive_to_canonical_verified_ms": 294.0225839847699,
+      "close_to_canonical_verified_ms": 359.068
+    },
+    {
+      "symbol": "ALGOUSDT",
+      "minute_open": "2026-10-04 19:16:00+00:00",
+      "batch": 3,
+      "closed_at": "2026-10-04 19:17:00+00:00",
+      "received_at": "2026-10-04 19:17:00.113766+00:00",
+      "exchange_event_at": "2026-10-04 19:17:00.076000+00:00",
+      "write_started_at": "2026-10-04 19:17:00.315884+00:00",
+      "write_ack_at": "2026-10-04 19:17:00.343401+00:00",
+      "canonical_verified_at": "2026-10-04 19:17:00.359068+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 76.0,
+      "exchange_event_to_receive_ms": 37.766,
+      "close_to_receive_ms": 113.766,
+      "receive_to_write_start_ms": 202.11545802885666,
+      "receive_to_write_ack_ms": 229.63604104006663,
+      "close_to_write_ack_ms": 343.401,
+      "receive_to_canonical_verified_ms": 245.3023749985732,
+      "close_to_canonical_verified_ms": 359.068
+    },
+    {
+      "symbol": "ANKRUSDT",
+      "minute_open": "2026-10-04 19:16:00+00:00",
+      "batch": 3,
+      "closed_at": "2026-10-04 19:17:00+00:00",
+      "received_at": "2026-10-04 19:17:00.133284+00:00",
+      "exchange_event_at": "2026-10-04 19:17:00.092000+00:00",
+      "write_started_at": "2026-10-04 19:17:00.315884+00:00",
+      "write_ack_at": "2026-10-04 19:17:00.343401+00:00",
+      "canonical_verified_at": "2026-10-04 19:17:00.359068+00:00",
+      "canonical_present": true,
+      "close_to_exchange_event_ms": 92.0,
+      "exchange_event_to_receive_ms": 41.284,
+      "close_to_receive_ms": 133.28400000000002,
+      "receive_to_write_start_ms": 182.58720799349248,
+      "receive_to_write_ack_ms": 210.10779100470245,
+      "close_to_write_ack_ms": 343.401,
+      "receive_to_canonical_verified_ms": 225.77412496320903,
+      "close_to_canonical_verified_ms": 359.068
+    }
+  ],
+  "batches": [
+    {
+      "batch": 1,
+      "rows": 4,
+      "write_started_at": "2026-10-04 19:15:00.316812+00:00",
+      "write_ack_at": "2026-10-04 19:15:00.341600+00:00",
+      "write_call_ms": 24.794832977931947,
+      "canonical_verified_at": "2026-10-04 19:15:00.354619+00:00",
+      "verification_ms": 13.0139589891769,
+      "writer_pids": [
+        64195
+      ]
+    },
+    {
+      "batch": 2,
+      "rows": 4,
+      "write_started_at": "2026-10-04 19:16:00.316190+00:00",
+      "write_ack_at": "2026-10-04 19:16:00.342652+00:00",
+      "write_call_ms": 26.467166957445443,
+      "canonical_verified_at": "2026-10-04 19:16:00.352405+00:00",
+      "verification_ms": 9.74879099521786,
+      "writer_pids": [
+        64195
+      ]
+    },
+    {
+      "batch": 3,
+      "rows": 4,
+      "write_started_at": "2026-10-04 19:17:00.315884+00:00",
+      "write_ack_at": "2026-10-04 19:17:00.343401+00:00",
+      "write_call_ms": 27.520583011209965,
+      "canonical_verified_at": "2026-10-04 19:17:00.359068+00:00",
+      "verification_ms": 15.666333958506584,
+      "writer_pids": [
+        64195
+      ]
+    }
+  ],
+  "events": [],
+  "hardware": {
+    "os": "Darwin",
+    "architecture": "arm64"
+  },
+  "flush_interval_ms": 250,
+  "clock_before": [
+    {
+      "rtt_ms": 437.3026670073159,
+      "server_minus_local_midpoint_ms": 187.261474609375,
+      "offset_lower_ms": -31.3828125,
+      "offset_upper_ms": 405.906005859375
+    },
+    {
+      "rtt_ms": 421.0690410109237,
+      "server_minus_local_midpoint_ms": 179.06884765625,
+      "offset_lower_ms": -31.4580078125,
+      "offset_upper_ms": 389.595947265625
+    },
+    {
+      "rtt_ms": 417.78775001876056,
+      "server_minus_local_midpoint_ms": 177.634765625,
+      "offset_lower_ms": -31.2509765625,
+      "offset_upper_ms": 386.52099609375
+    },
+    {
+      "rtt_ms": 440.29400002909824,
+      "server_minus_local_midpoint_ms": 191.5888671875,
+      "offset_lower_ms": -28.549072265625,
+      "offset_upper_ms": 411.72705078125
+    },
+    {
+      "rtt_ms": 421.39033402781934,
+      "server_minus_local_midpoint_ms": 179.738037109375,
+      "offset_lower_ms": -30.948974609375,
+      "offset_upper_ms": 390.4248046875
+    }
+  ],
+  "clickhouse_insert_settings": [
+    [
+      "materialized_views_ignore_errors",
+      "0"
+    ],
+    [
+      "async_insert",
+      "0"
+    ],
+    [
+      "wait_for_async_insert",
+      "1"
+    ]
+  ],
+  "canonical_mv_present": true,
+  "selection_before": [],
+  "complete_minutes": 3,
+  "elapsed_s": 163.36603687499883,
+  "metrics": {
+    "ws_connected": 1.0,
+    "ws_errors_total": 0.0,
+    "insert_rows_total": 12.0,
+    "insert_errors_total": 0.0,
+    "rest_fill_tasks_total": 4.0,
+    "rest_fill_active": 0.0,
+    "rest_fill_errors_total": 0.0
+  },
+  "writer_children_remaining": 0,
+  "finished_at": "2026-10-04T19:17:03.317132+00:00",
+  "clock_after": [
+    {
+      "rtt_ms": 438.7224579695612,
+      "server_minus_local_midpoint_ms": 188.46240234375,
+      "offset_lower_ms": -30.89404296875,
+      "offset_upper_ms": 407.81884765625
+    },
+    {
+      "rtt_ms": 431.2999579706229,
+      "server_minus_local_midpoint_ms": 188.447509765625,
+      "offset_lower_ms": -27.194091796875,
+      "offset_upper_ms": 404.0888671875
+    },
+    {
+      "rtt_ms": 419.07691600499675,
+      "server_minus_local_midpoint_ms": 179.2509765625,
+      "offset_lower_ms": -30.281005859375,
+      "offset_upper_ms": 388.782958984375
+    },
+    {
+      "rtt_ms": 458.8105420116335,
+      "server_minus_local_midpoint_ms": 175.300048828125,
+      "offset_lower_ms": -54.099853515625,
+      "offset_upper_ms": 404.699951171875
+    },
+    {
+      "rtt_ms": 453.9449170115404,
+      "server_minus_local_midpoint_ms": 195.92138671875,
+      "offset_lower_ms": -31.041015625,
+      "offset_upper_ms": 422.884033203125
+    }
+  ],
+  "selection_after": [],
+  "recovery_remaining": [],
+  "source_sha256": {
+    "apps/worker/market_data_ws/wiring/persistent_writer.py": "a55295b63c54948ca67e381bcf064afb8d5a0f04cf9dffd87e2567296e892ece",
+    "apps/worker/market_data_ws/wiring/modules/market_data_ws.py": "b322263e11387e217f0f22715633b20e0b2b5713be09ae8e01341f029f9918cb",
+    "apps/worker/market_data_ws/wiring/io_process.py": "68487d1c02009dc20ffdef8d4ccb544aa75fcaf9db7aa0b59435a0295ded263c",
+    "src/trading/contexts/market_data/application/services/insert_buffer.py": "0f7252881879a2acb9bae3b65122ed1d31a8f7d646e4f647bab2e908284794ec",
+    "src/trading/contexts/market_data/adapters/outbound/clients/binance/ws_client.py": "6ff6335bfb96fe06a52d70167efe1c4c7e18fb2202052fe8b3b8262caa604ebb"
+  }
+}

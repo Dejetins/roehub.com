@@ -1,0 +1,14 @@
+test_accept_requires_real_readable_evidence_and_report (__main__.LedgerUpdateTests.test_accept_requires_real_readable_evidence_and_report) ... ok
+test_changed_plan_invalidates_accepted_dependency (__main__.LedgerUpdateTests.test_changed_plan_invalidates_accepted_dependency) ... ok
+test_changed_updater_and_missing_entry_fail (__main__.LedgerUpdateTests.test_changed_updater_and_missing_entry_fail) ... ok
+test_directory_lock_rejects_concurrent_transaction (__main__.LedgerUpdateTests.test_directory_lock_rejects_concurrent_transaction) ... ok
+test_foreign_owner_and_out_of_order_fail_without_mutation (__main__.LedgerUpdateTests.test_foreign_owner_and_out_of_order_fail_without_mutation) ... ok
+test_missing_future_input_preserves_executing_stage (__main__.LedgerUpdateTests.test_missing_future_input_preserves_executing_stage) ... ok
+test_need_input_resume_and_terminal_block (__main__.LedgerUpdateTests.test_need_input_resume_and_terminal_block) ... ok
+test_sequential_receipts_and_final_completion (__main__.LedgerUpdateTests.test_sequential_receipts_and_final_completion) ... ok
+test_two_competing_claims_have_one_winner (__main__.LedgerUpdateTests.test_two_competing_claims_have_one_winner) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.978s
+
+OK

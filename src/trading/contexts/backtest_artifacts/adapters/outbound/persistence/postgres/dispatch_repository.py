@@ -1,0 +1,712 @@
+"""Bounded durable scheduling and fair dispatch over the managed inbox."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Mapping
+from uuid import UUID, uuid4
+
+from psycopg.types.json import Jsonb
+
+from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.automatic_base_repository import (  # noqa: E501
+    PostgresAutomaticBaseRepository,
+)
+from trading.contexts.backtest_artifacts.application.services.artifact_cadence import due_window
+from trading.contexts.backtest_artifacts.application.services.legacy_dispatch import legacy_profiles
+from trading.contexts.backtest_artifacts.application.services.management import (
+    Coordinate,
+    ManagementError,
+    Profile,
+    Schedule,
+    digest,
+)
+
+
+class PostgresArtifactDispatchRepository(PostgresAutomaticBaseRepository):
+    def rows(self, query: str, **params: Any):
+        return self.db.fetch_all(query=query, parameters=params)
+
+    def source_cursor(self, installation: UUID):
+        row = self._one(
+            "SELECT source_cursor FROM "
+            "backtest_artifact_dispatch_state WHERE "
+            "installation_id=%(i)s",
+            i=installation,
+        )
+        return tuple(row["source_cursor"]) if row and row["source_cursor"] else None
+
+    def save_source_cursor(self, installation: UUID, cursor) -> None:
+        self._exec(
+            """INSERT INTO backtest_artifact_dispatch_state(installation_id,source_cursor)
+        VALUES (%(i)s,%(c)s) ON CONFLICT (installation_id) DO UPDATE SET
+        source_cursor=EXCLUDED.source_cursor,updated_at=now()""",
+            i=installation,
+            c=Jsonb(cursor),
+        )
+
+    def tick(self, *, installation: UUID, now: datetime, limit: int = 50) -> int:
+        """One bounded due page; advance only when the complete occurrence is admitted."""
+        if not 1 <= limit <= 50:
+            raise ManagementError("invalid_limit")
+        admitted = 0
+        with self.db.transaction():
+            self._lock(installation)
+            settings = self._settings(installation, active=True)
+            # Keyset scan also revisits changed defaults and newly saved overrides; due
+            # ordering by only the internal lane would starve faster tenant cadences.
+            state = self._one(
+                "SELECT schedule_cursor FROM "
+                "backtest_artifact_dispatch_state WHERE "
+                "installation_id=%(i)s",
+                i=installation,
+            )
+            cursor = (
+                state["schedule_cursor"] if state and state["schedule_cursor"] else ["", "", ""]
+            )
+            sources = self.rows(
+                """SELECT * FROM backtest_artifact_source_state
+                WHERE (exchange,market_type,symbol)>(%(e)s,%(m)s,%(s)s)
+                ORDER BY exchange,market_type,symbol LIMIT %(n)s""",
+                e=cursor[0],
+                m=cursor[1],
+                s=cursor[2],
+                n=limit,
+            )
+            following_cursor = (
+                [sources[-1][k] for k in ("exchange", "market_type", "symbol")]
+                if len(sources) == limit
+                else None
+            )
+            self._exec(
+                (
+                    "INSERT INTO "
+                    "backtest_artifact_dispatch_state(installation_id,schedule_cursor) VALUES "
+                    "(%(i)s,%(c)s) ON CONFLICT (installation_id) DO UPDATE SET "
+                    "schedule_cursor=EXCLUDED.schedule_cursor"
+                ),
+                i=installation,
+                c=Jsonb(following_cursor),
+            )
+            for state in sources:
+                coord = Coordinate(**{k: state[k] for k in ("exchange", "market_type", "symbol")})
+                source = state["desired_target"].get("source")
+                if not source:
+                    continue
+                # Fill only unstarted source-wait requests, preserving their policy/root snapshot.
+                self._exec(
+                    (
+                        "UPDATE backtest_artifact_requests SET "
+                        "snapshot=jsonb_set(snapshot,'{source}',%(source)s),state='queued',reason=NULL"
+                        " "
+                        "WHERE installation_id=%(i)s AND exchange=%(exchange)s AND "
+                        "market_type=%(market_type)s AND symbol=%(symbol)s AND "
+                        "state='waiting_for_source' AND snapshot->'source' IS DISTINCT FROM "
+                        "%(source)s"
+                    ),
+                    i=installation,
+                    **coord.model_dump(),
+                    source=Jsonb(source),
+                )
+                lanes: list[Mapping[str, Any]] = [
+                    dict(
+                        lane="internal",
+                        schedule=settings["schedule"],
+                        version=settings["control_version"],
+                        org=None,
+                        profile=None,
+                    )
+                ]
+                policies = self.rows(
+                    (
+                        "SELECT p.*,f.profile,COALESCE(p.updated_by,f.created_by) "
+                        "AS created_by FROM "
+                        "backtest_artifact_policies p JOIN "
+                        "identity_organizations o USING(organization_id) JOIN "
+                        "backtest_artifact_profiles f ON "
+                        "f.organization_id=p.organization_id AND "
+                        "f.profile_id=p.profile_id AND f.revision=p.profile_revision WHERE "
+                        "o.installation_id=%(i)s AND o.status='active'"
+                        " AND exchange=%(exchange)s AND "
+                        "market_type=%(market_type)s AND symbol=%(symbol)s"
+                    ),
+                    i=installation,
+                    **coord.model_dump(),
+                )
+                for p in policies:
+                    try:
+                        self._authorize(p["organization_id"], p["created_by"], write=True)
+                        self.access.require(
+                            organization_id=p["organization_id"],
+                            actor_id=p["created_by"],
+                            coordinate=coord,
+                        )
+                    except ManagementError:
+                        continue
+                    lanes.append(
+                        dict(
+                            lane=str(p["organization_id"]),
+                            org=p["organization_id"],
+                            profile=p["profile"],
+                            actor_id=str(p["created_by"]),
+                            version=p["control_version"],
+                            schedule=settings["schedule"]
+                            if p["inherits_schedule"]
+                            else p["schedule"],
+                        )
+                    )
+                legacy = self._one(
+                    (
+                        "SELECT snapshot FROM backtest_artifact_legacy_demands WHERE "
+                        "installation_id=%(i)s AND exchange=%(exchange)s AND "
+                        "market_type=%(market_type)s AND symbol=%(symbol)s"
+                    ),
+                    i=installation,
+                    **coord.model_dump(),
+                )
+                legacy_active = legacy and any(
+                    legacy["snapshot"][key] == "precompute" for key in ("signals", "hit_times")
+                )
+                if len(lanes) > 1 and not legacy_active:
+                    lanes = lanes[1:]
+                for lane in lanes:
+                    schedule = Schedule.model_validate(lane["schedule"])
+                    due, following = due_window(schedule, now)
+                    fingerprint = digest({"schedule": lane["schedule"]})
+                    old = self._one(
+                        (
+                            "SELECT * FROM backtest_artifact_cadence WHERE"
+                            " installation_id=%(i)s AND "
+                            "exchange=%(exchange)s AND "
+                            "market_type=%(market_type)s AND "
+                            "symbol=%(symbol)s "
+                            "AND lane=%(lane)s"
+                        ),
+                        i=installation,
+                        **coord.model_dump(),
+                        lane=lane["lane"],
+                    )
+                    if old and old["schedule_hash"] == fingerprint and old["next_due"] > now:
+                        continue
+                    if old and old["schedule_hash"] != fingerprint:
+                        # A changed schedule governs future occurrences, never retroactive work.
+                        due = None
+                    if due is not None:
+                        key = digest(
+                            {
+                                "coordinate": coord.model_dump(),
+                                "lane": lane["lane"],
+                                "policy": fingerprint,
+                                "occurrence": due.isoformat(),
+                            }
+                        )
+                        column = (
+                            "internal_dedupe_key"
+                            if lane["org"] is None
+                            else "organization_dedupe_key"
+                        )
+                        existing = self._one(
+                            "SELECT request_id FROM backtest_artifact_requests "
+                            f"WHERE installation_id=%(i)s AND {column}=%(key)s",
+                            i=installation,
+                            key=key,
+                        )
+                        if not existing:
+                            try:
+                                self._capacity(installation, lane["org"], 1, settings)
+                            except ManagementError:
+                                continue
+                            profile = lane["profile"]
+                            snap = dict(
+                                source=source,
+                                root_id=settings["root_id"],
+                                root_revision=settings["root_revision"],
+                                schedule=lane["schedule"],
+                                policy_version=lane["version"],
+                                occurrence=due.isoformat(),
+                            )
+                            if profile is not None:
+                                snap["profile"] = profile
+                                snap["actor_id"] = lane["actor_id"]
+                            if lane["org"] is None:
+                                legacy = self._one(
+                                    """SELECT snapshot FROM backtest_artifact_legacy_demands
+                                    WHERE installation_id=%(i)s AND exchange=%(exchange)s
+                                    AND market_type=%(market_type)s AND symbol=%(symbol)s""",
+                                    i=installation,
+                                    **coord.model_dump(),
+                                )
+                                if legacy:
+                                    snap["legacy_demand"] = legacy["snapshot"]
+                            self._exec(
+                                f"""INSERT INTO backtest_artifact_requests
+                                (request_id,installation_id,organization_id,{column},exchange,
+                                 market_type,symbol,kind,trigger,snapshot,state)
+                                VALUES (%(r)s,%(i)s,%(org)s,%(key)s,%(exchange)s,%(market_type)s,
+                                 %(symbol)s,%(kind)s,'schedule',%(snap)s,'queued')""",
+                                r=uuid4(),
+                                i=installation,
+                                org=lane["org"],
+                                key=key,
+                                **coord.model_dump(),
+                                kind="derivatives"
+                                if profile and profile["mode"] == "precompute"
+                                else "base",
+                                snap=Jsonb(snap),
+                            )
+                            admitted += 1
+                    self._exec(
+                        (
+                            "INSERT INTO backtest_artifact_cadence "
+                            "(installation_id,exchange,market_type,symbol,lane,schedule_hash,last_occurrence,next_due)"
+                            " "
+                            "VALUES "
+                            "(%(i)s,%(exchange)s,%(market_type)s,%(symbol)s,%(lane)s,%(h)s,%(due)s,%(next)s)"
+                            " "
+                            "ON CONFLICT "
+                            "(installation_id,exchange,market_type,symbol,lane)"
+                            " DO UPDATE SET "
+                            "schedule_hash=EXCLUDED.schedule_hash,last_occurrence=EXCLUDED.last_occurrence,next_due=EXCLUDED.next_due"
+                        ),
+                        i=installation,
+                        **coord.model_dump(),
+                        lane=lane["lane"],
+                        h=fingerprint,
+                        due=due,
+                        next=following,
+                    )
+                    if lane["org"]:
+                        self._exec(
+                            (
+                                "UPDATE backtest_artifact_policies SET "
+                                "next_due=%(next)s WHERE "
+                                "organization_id=%(org)s AND exchange=%(exchange)s AND "
+                                "market_type=%(market_type)s AND symbol=%(symbol)s"
+                            ),
+                            org=lane["org"],
+                            **coord.model_dump(),
+                            next=following,
+                        )
+        return admitted
+
+    def next_request(self, installation: UUID):
+        """Round-robin lanes with FIFO in each lane; no scanning the reference catalog."""
+        return self._one(
+            """WITH heads AS (
+            SELECT DISTINCT ON (COALESCE(organization_id::text,'')) *
+            FROM backtest_artifact_requests
+            WHERE installation_id=%(i)s AND state='queued'
+            ORDER BY COALESCE(organization_id::text,''),created_at,request_id)
+            SELECT h.* FROM heads h LEFT JOIN backtest_artifact_dispatch_state d
+            ON d.installation_id=%(i)s
+            ORDER BY (COALESCE(h.organization_id::text,'') <= COALESCE(d.last_lane,'')),
+            COALESCE(h.organization_id::text,''),h.created_at,h.request_id LIMIT 1""",
+            i=installation,
+        )
+
+    def claim_group(
+        self,
+        *,
+        installation: UUID,
+        request: Mapping[str, Any],
+        owner: UUID,
+        incarnation: UUID,
+        reservation: int,
+    ):
+        with self.db.transaction():
+            self._one("SELECT pg_advisory_xact_lock(290029)")
+            self._lock(installation)
+            current = self._one(
+                (
+                    "SELECT * FROM backtest_artifact_requests WHERE request_id=%(r)s AND "
+                    "installation_id=%(i)s AND state='queued' FOR UPDATE"
+                ),
+                r=request["request_id"],
+                i=installation,
+            )
+            if current is None:
+                return None
+            snapshot = current["snapshot"]
+            target = snapshot["source"]
+            coalesce = target.get("revision") == "content_unverified"
+            if coalesce:
+                latest = self._one(
+                    """SELECT desired_target FROM backtest_artifact_source_state
+                    WHERE exchange=%(e)s AND market_type=%(m)s AND symbol=%(s)s""",
+                    e=current["exchange"],
+                    m=current["market_type"],
+                    s=current["symbol"],
+                )
+                candidate = latest["desired_target"].get("source") if latest else None
+                if (
+                    candidate
+                    and candidate.get("revision") == "content_unverified"
+                    and all(
+                        candidate[k] == target[k] for k in ("compute_identity", "funding_identity")
+                    )
+                    and candidate["history"]["start_utc"] <= target["history"]["start_utc"]
+                    and candidate["watermark"] >= target["watermark"]
+                ):
+                    target = candidate
+            group = self.rows(
+                (
+                    "SELECT * FROM backtest_artifact_requests WHERE installation_id=%(i)s AND "
+                    "state='queued' AND exchange=%(e)s AND "
+                    "market_type=%(m)s AND symbol=%(s)s AND "
+                    "(snapshot->'source'=%(source)s OR (%(coalesce)s AND "
+                    "snapshot->'source'->>'revision'='content_unverified' AND "
+                    "snapshot->'source'->>'compute_identity'=%(compute)s AND "
+                    "snapshot->'source'->>'funding_identity'=%(funding)s AND "
+                    "snapshot->'source'->'history'->>'start_utc'>=%(start)s AND "
+                    "snapshot->'source'->>'watermark'<=%(end)s)) AND "
+                    "snapshot->'root_id'=%(root)s AND "
+                    "snapshot->'root_revision'=%(revision)s ORDER "
+                    "BY created_at,request_id LIMIT "
+                    "2001 FOR UPDATE"
+                ),
+                i=installation,
+                e=current["exchange"],
+                m=current["market_type"],
+                s=current["symbol"],
+                source=Jsonb(target),
+                coalesce=coalesce,
+                compute=target["compute_identity"],
+                funding=target["funding_identity"],
+                start=target["history"]["start_utc"],
+                end=target["watermark"],
+                root=Jsonb(snapshot["root_id"]),
+                revision=Jsonb(snapshot["root_revision"]),
+            )
+            valid = []
+
+            def compatibility(row):
+                if row["snapshot"].get("legacy_demand"):
+                    profile = legacy_profiles(row["snapshot"]["legacy_demand"])[0]
+                    return digest(
+                        {
+                            "catalog": profile.catalog_revision,
+                            "entries": [
+                                x.model_dump(mode="json") for x in profile.catalog_indicators
+                            ],
+                        }
+                    )
+                raw = row["snapshot"].get("profile")
+                if raw is None or raw["mode"] == "on_demand":
+                    return None
+                profile = Profile.model_validate(raw)
+                if not profile.catalog_indicators:
+                    raise ManagementError("catalog_snapshot_required")
+                return digest(
+                    {
+                        "catalog": profile.catalog_revision,
+                        "entries": [x.model_dump(mode="json") for x in profile.catalog_indicators],
+                    }
+                )
+
+            for row in group:
+                try:
+                    compatibility(row)
+                    self.authorize_request(row)
+                    valid.append(row)
+                except ManagementError as error:
+                    self._exec(
+                        "UPDATE backtest_artifact_requests SET "
+                        "state='error',reason=%(reason)s WHERE "
+                        "request_id=%(r)s",
+                        reason=str(error),
+                        r=row["request_id"],
+                    )
+            if not valid:
+                return None
+            current = next((r for r in valid if r["request_id"] == current["request_id"]), valid[0])
+            snapshot = current["snapshot"]
+            seed = compatibility(current)
+            if seed is None:
+                seed = next((compatibility(r) for r in valid if compatibility(r) is not None), None)
+            group = tuple(r for r in valid if compatibility(r) is None or compatibility(r) == seed)
+            if len(group) > 50:
+                for row in group:
+                    self._exec(
+                        (
+                            "UPDATE backtest_artifact_requests SET "
+                            "state='error',reason='resource_conflict' WHERE request_id=%(r)s"
+                        ),
+                        r=row["request_id"],
+                    )
+                return None
+            build = self.claim(
+                installation_id=installation,
+                request_id=current["request_id"],
+                owner_token=owner,
+                parent_incarnation=incarnation,
+                reservation_bytes=reservation,
+            )
+            if build is None:
+                return None
+            combined = dict(
+                snapshot,
+                source=target,
+                requests=[
+                    dict(request_id=str(r["request_id"]), kind=r["kind"], snapshot=r["snapshot"])
+                    for r in group
+                ],
+            )
+            self._exec(
+                "UPDATE backtest_artifact_builds SET snapshot=%(s)s WHERE build_id=%(b)s",
+                s=Jsonb(combined),
+                b=build["build_id"],
+            )
+            for r in group:
+                self._exec(
+                    "INSERT INTO backtest_artifact_build_requests "
+                    "VALUES (%(b)s,%(r)s) ON CONFLICT DO NOTHING",
+                    b=build["build_id"],
+                    r=r["request_id"],
+                )
+                if r["request_id"] != current["request_id"]:
+                    self._exec(
+                        (
+                            "UPDATE backtest_artifact_requests SET "
+                            "state='running',control_version=control_version+1"
+                            " WHERE request_id=%(r)s"
+                        ),
+                        r=r["request_id"],
+                    )
+            self._exec(
+                (
+                    "INSERT INTO backtest_artifact_dispatch_state(installation_id,last_lane) "
+                    "VALUES (%(i)s,%(lane)s) ON CONFLICT (installation_id) DO UPDATE SET "
+                    "last_lane=EXCLUDED.last_lane"
+                ),
+                i=installation,
+                lane=str(current["organization_id"] or ""),
+            )
+            return dict(build, snapshot=combined)
+
+    def authorize_request(self, row):
+        if row["organization_id"]:
+            actor = self._one(
+                (
+                    "SELECT created_by FROM backtest_artifact_profiles WHERE "
+                    "organization_id=%(org)s AND profile_id=%(p)s "
+                    "AND revision=%(v)s"
+                ),
+                org=row["organization_id"],
+                p=row["snapshot"]["profile"]["profile_id"],
+                v=row["snapshot"]["profile"]["revision"],
+            )
+            if actor is None:
+                raise ManagementError("profile_unavailable")
+            self._authorize(
+                row["organization_id"],
+                row["snapshot"].get("actor_id", actor["created_by"]),
+                write=True,
+            )
+            self.access.require(
+                organization_id=row["organization_id"],
+                actor_id=row["snapshot"].get("actor_id", actor["created_by"]),
+                coordinate=Coordinate(
+                    exchange=row["exchange"],
+                    market_type=row["market_type"],
+                    symbol=row["symbol"],
+                ),
+            )
+
+    def retry(self, *, build, owner_token, parent_incarnation, now):
+        with self.db.transaction():
+            row = super().retry(
+                build=build, owner_token=owner_token, parent_incarnation=parent_incarnation, now=now
+            )
+            if row is None:
+                return None
+            valid = []
+            for request in self.rows(
+                "SELECT r.* FROM backtest_artifact_requests r "
+                "JOIN backtest_artifact_build_requests b USING(request_id) "
+                "WHERE b.build_id=%(b)s AND r.state='running'",
+                b=row["build_id"],
+            ):
+                try:
+                    self.authorize_request(request)
+                    valid.append(request)
+                except ManagementError as error:
+                    self._exec(
+                        "UPDATE backtest_artifact_requests SET state='error',reason=%(why)s, "
+                        "control_version=control_version+1 WHERE request_id=%(r)s",
+                        why=str(error),
+                        r=request["request_id"],
+                    )
+            if not valid:
+                self.finish(build=row, outcome="error", reason="authorization_revoked")
+                return None
+            return row
+
+    def record_handoff(
+        self,
+        *,
+        organization_id: UUID,
+        actor_id: UUID,
+        expected_version: int,
+        legacy_disabled: bool,
+        host_lock,
+        now: datetime,
+    ) -> None:
+        """Installation-owned activation while the actual legacy process lock is held.
+
+        Caller supplies the configured legacy schedule flag, not a browser assertion.
+        Source discovery/import must be completed before this explicit operation.
+        """
+        if not legacy_disabled:
+            raise ManagementError("legacy_scheduler_enabled")
+        if not host_lock.try_acquire():
+            raise ManagementError("legacy_scheduler_busy")
+        try:
+            with self.db.transaction():
+                installation = self._installation_owner(organization_id, actor_id)
+                self._one("SELECT pg_advisory_xact_lock(290029)")
+                self._lock(installation)
+                settings = self._settings(installation, active=False)
+                if settings["control_version"] != expected_version:
+                    raise ManagementError("stale_version")
+                if settings["budget_bytes"] is None:
+                    raise ManagementError("storage_unconfigured")
+                if self._one(
+                    (
+                        "SELECT build_id FROM backtest_artifact_builds WHERE state IN "
+                        "('running','quarantined') LIMIT 1"
+                    )
+                ):
+                    raise ManagementError("ownership_unknown")
+                if self._one(
+                    "SELECT exchange FROM "
+                    "backtest_artifact_slot_ownership WHERE "
+                    "owner_token IS NOT NULL LIMIT 1"
+                ):
+                    raise ManagementError("physical_writer_busy")
+                if self._one(
+                    """SELECT s.symbol FROM backtest_artifact_source_state s
+                    LEFT JOIN backtest_artifact_legacy_demands d ON d.installation_id=%(i)s
+                    AND (d.exchange,d.market_type,d.symbol)=(s.exchange,s.market_type,s.symbol)
+                    WHERE d.symbol IS NULL LIMIT 1""",
+                    i=installation,
+                ):
+                    raise ManagementError("legacy_import_incomplete")
+                self._exec(
+                    (
+                        "INSERT INTO "
+                        "backtest_artifact_dispatch_state(installation_id,handoff)"
+                        " VALUES "
+                        "(%(i)s,%(h)s) ON CONFLICT (installation_id) DO UPDATE SET "
+                        "handoff=EXCLUDED.handoff"
+                    ),
+                    i=installation,
+                    h=Jsonb(
+                        dict(
+                            actor_id=str(actor_id),
+                            observed_at=now.isoformat(),
+                            legacy_disabled=True,
+                            settings_version=expected_version,
+                        )
+                    ),
+                )
+                self._exec(
+                    """UPDATE backtest_artifact_installation_settings SET legacy_handoff='complete',
+                    capability_enabled=TRUE,paused=FALSE,control_version=control_version+1
+                    WHERE installation_id=%(i)s""",
+                    i=installation,
+                )
+        finally:
+            host_lock.release()
+
+    def finish_base(self, *, build, publication, coverage):
+        with self.db.transaction():
+            super().finish_base(build=build, publication=publication, coverage=coverage)
+            self._exec(
+                (
+                    "UPDATE backtest_artifact_policies p SET last_success=now() FROM "
+                    "backtest_artifact_requests r JOIN backtest_artifact_build_requests b "
+                    "USING(request_id) WHERE b.build_id=%(b)s AND r.state='ready' AND "
+                    "p.organization_id=r.organization_id AND "
+                    "(p.exchange,p.market_type,p.symbol)=(r.exchange,r.market_type,r.symbol)"
+                    " AND "
+                    "p.control_version=(r.snapshot->>'policy_version')::bigint"
+                ),
+                b=build["build_id"],
+            )
+
+    def observe_source(self, *, installation_id, coordinate, source, observed_at):
+        with self.db.transaction():
+            self._lock(installation_id)
+            settings = self._settings(installation_id, active=False)
+            if (
+                not settings["capability_enabled"]
+                or settings["paused"]
+                or settings["legacy_handoff"] != "complete"
+            ):
+                self._exec(
+                    (
+                        "INSERT INTO "
+                        "backtest_artifact_source_state(exchange,market_type,symbol,desired_target)"
+                        " "
+                        "VALUES "
+                        "(%(exchange)s,%(market_type)s,%(symbol)s,%(target)s)"
+                        " ON CONFLICT "
+                        "(exchange,market_type,symbol) DO UPDATE SET "
+                        "desired_target=EXCLUDED.desired_target WHERE "
+                        "backtest_artifact_source_state.desired_target->>'observed_at'"
+                        " IS NULL OR "
+                        "backtest_artifact_source_state.desired_target->>'observed_at'<=%(observed)s"
+                    ),
+                    **coordinate.model_dump(),
+                    target=Jsonb(
+                        dict(
+                            source=source.model_dump(mode="json"),
+                            observed_at=observed_at.isoformat(),
+                        )
+                    ),
+                    observed=observed_at.isoformat(),
+                )
+                return None
+            return super().observe_source(
+                installation_id=installation_id,
+                coordinate=coordinate,
+                source=source,
+                observed_at=observed_at,
+            )
+
+    def reject_retry(self, *, build, reason):
+        """Reject a stopped retry owner without claiming physical work."""
+        if reason not in (
+            "root_revision_changed",
+            "resource_conflict",
+            "storage_unconfigured",
+            "untrusted_root",
+            "storage_inventory_unavailable",
+        ):
+            raise ManagementError("invalid_reason")
+        with self.db.transaction():
+            current = self._fence(build, state="retry_wait")
+            self._exec(
+                "UPDATE backtest_artifact_builds SET "
+                "state='error',next_retry_at=NULL WHERE "
+                "build_id=%(b)s",
+                b=build["build_id"],
+            )
+            self._exec(
+                "UPDATE backtest_artifact_attempts SET "
+                "state='error' WHERE build_id=%(b)s AND "
+                "attempt=%(a)s",
+                b=build["build_id"],
+                a=build["attempt"],
+            )
+            self._exec(
+                (
+                    "UPDATE backtest_artifact_requests SET state='error',reason=%(reason)s, "
+                    "control_version=control_version+1 WHERE "
+                    "state='retry_wait' AND request_id IN "
+                    "(SELECT request_id FROM backtest_artifact_build_requests WHERE "
+                    "build_id=%(b)s)"
+                ),
+                reason=reason,
+                b=build["build_id"],
+            )
+            self._events(build["build_id"], "error", reason, current["progress"])

@@ -1,0 +1,25 @@
+src/trading/contexts/market_data/adapters/outbound/clients/history_probe_http.py:3:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+ 1 |   """A bounded, redacted transport for interactive history-bound discovery."""
+ 2 |   
+ 3 | / from dataclasses import dataclass, field
+ 4 | | from time import monotonic
+ 5 | | from typing import Any, Mapping
+ 6 | | 
+ 7 | | from trading.contexts.market_data.adapters.outbound.clients.common_http.http_client import (
+ 8 | |     HttpClient,
+ 9 | |     HttpResponse,
+10 | | )
+11 | | 
+12 | | from trading.contexts.market_data.application.services.source_retry import TemporarySourceError
+13 | | 
+14 | | 
+15 | | @dataclass
+   | |_^ I001
+16 |   class HistoryProbeHttpClient:
+17 |       delegate: HttpClient
+   |
+   = help: Organize imports
+
+Found 1 error.
+[*] 1 fixable with the `--fix` option.

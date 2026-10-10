@@ -4,14 +4,21 @@ from __future__ import annotations
 
 import logging
 import re
-from concurrent.futures import Executor, wait
+from concurrent.futures import FIRST_COMPLETED, Executor, wait
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any, Callable, ContextManager, Iterable, Mapping, Protocol
 
 from trading.contexts.market_data.application.dto import CandleWithMeta, RestFillTask
+from trading.contexts.market_data.application.ports.provider_admission import provider_io_guard
+from trading.contexts.market_data.application.ports.stores.history_coverage_reader import (
+    HistoryCoverageReader,
+)
 from trading.contexts.market_data.application.ports.stores.raw_kline_writer import RawKlineWriter
-from trading.contexts.market_data.application.services.source_retry import TemporarySourceError
+from trading.contexts.market_data.application.services.source_retry import (
+    IncompleteHistoryError,
+    TemporarySourceError,
+)
 from trading.contexts.market_data.application.use_cases.rest_fill_range_1m import (
     RestFillRange1mUseCase,
 )
@@ -92,10 +99,10 @@ class MarketDataWorkRequestRunner:
     fill: RestFillRange1mUseCase
     refresh_catalog: Callable[[int, Callable[[], None]], None]
     now: Callable[[], datetime] = lambda: datetime.now(UTC)
-
     max_windows: int = 10
     window_minutes: int = 60
     retryable_storage_error: Callable[[Exception], bool | str] = lambda _: False
+    repair_index: HistoryCoverageReader | None = None
 
     def run_once(self) -> bool:
         with self.store.execution() as check:
@@ -105,12 +112,15 @@ class MarketDataWorkRequestRunner:
             self.store.recover(now=self.now())
             return self._run_owned(check)
 
-    def run_batch(self, *, executor: Executor, concurrency: int) -> int:
-        """Run one bounded window per job, retaining the lease until all workers drain.
+    def run_batch(
+        self, *, executor: Executor, concurrency: int,
+        should_stop: Callable[[], bool] = lambda: False,
+    ) -> int:
+        """Refill completed slots under one coordinator, recovering only before dispatch.
 
-        Claims and orphan recovery happen before dispatch, never beside live siblings.
-        The caller reuses its thread pool so thread-local provider/storage clients
-        stay bounded. A second scheduler cannot add another pool under this lease.
+        Each worker yields after its configured window budget. Repository queue order
+        puts yielded work behind older eligible jobs. Ownership outlives every future,
+        including submission failure and shutdown; no recovery runs beside a sibling.
         """
         if concurrency < 1:
             raise ValueError("work request concurrency must be positive")
@@ -119,22 +129,27 @@ class MarketDataWorkRequestRunner:
                 return 0
             check()
             self.store.recover(now=self.now())
-            jobs = []
-            for _ in range(concurrency):
-                check()
-                job = self.store.claim(now=self.now())
-                if job is None:
-                    break
-                jobs.append(job)
-            futures = []
+            futures = set()
+            completed = 0
             try:
-                for job in jobs:
-                    futures.append(executor.submit(self._run_claimed, job, check))
+                while not should_stop():
+                    check()
+                    while len(futures) < concurrency and not should_stop():
+                        check()
+                        job = self.store.claim(now=self.now())
+                        if job is None:
+                            break
+                        futures.add(executor.submit(self._run_claimed, job, check))
+                    if not futures:
+                        break
+                    done, _ = wait(futures, timeout=0.1, return_when=FIRST_COMPLETED)
+                    for future in done:
+                        futures.remove(future)
+                        completed += bool(future.result())
             finally:
-                # Even a submission/worker failure must not release the global
-                # lease while a sibling can still write through it.
+                # A cancelled await or broken coordinator is not stopped worker I/O.
                 wait(futures)
-            return sum(bool(future.result()) for future in futures)
+            return completed + sum(bool(future.result()) for future in futures)
 
     def _run_owned(self, check: Callable[[], None]) -> bool:
         check()
@@ -144,6 +159,10 @@ class MarketDataWorkRequestRunner:
         return self._run_claimed(job, check)
 
     def _run_claimed(self, job: Mapping[str, Any], check: Callable[[], None]) -> bool:
+        with provider_io_guard(check):
+            return self._run_claimed_guarded(job, check)
+
+    def _run_claimed_guarded(self, job: Mapping[str, Any], check: Callable[[], None]) -> bool:
         check()
         units = int(job.get("completed_units", 0))
         rows_read = int(job.get("rows_read", 0))
@@ -177,11 +196,26 @@ class MarketDataWorkRequestRunner:
                             check()
                             self.store.release(job=job, now=self.now())
                             return True
-                        end = min(cursor + timedelta(minutes=self.window_minutes), job["end_at"])
+                        instrument = InstrumentId(MarketId(job["market_id"]), Symbol(symbol))
+                        gap_end = job["end_at"]
+                        if self.repair_index is not None:
+                            phase = "fill_window"
+                            gap = self.repair_index.first_gap(
+                                instrument_id=instrument,
+                                time_range=TimeRange(UtcTimestamp(cursor), UtcTimestamp(gap_end)),
+                            )
+                            next_cursor = gap.start.value if gap else gap_end
+                            units += int((next_cursor - cursor).total_seconds() // 60)
+                            cursor = next_cursor
+                            if gap is None:
+                                break
+                            gap_end = gap.end.value
+                        end = min(cursor + timedelta(minutes=self.window_minutes), gap_end)
                         phase = "lease_check"
                         check()
                         fill = replace(
-                            self.fill, writer=LeaseCheckedRawWriter(self.fill.writer, check)
+                            self.fill, writer=LeaseCheckedRawWriter(self.fill.writer, check),
+                            check_lease=check,
                         )
                         phase = "fill_window"
                         result = fill.run(
@@ -195,6 +229,16 @@ class MarketDataWorkRequestRunner:
                         )
                         rows_read += result.rows_read
                         rows_written += result.rows_written
+                        if self.repair_index is not None:
+                            phase = "fill_window"
+                            if (
+                                self.repair_index.first_gap(
+                                    instrument_id=instrument,
+                                    time_range=TimeRange(UtcTimestamp(cursor), UtcTimestamp(end)),
+                                )
+                                is not None
+                            ):
+                                raise IncompleteHistoryError()
                         units += int((end - cursor).total_seconds() // 60)
                         cursor = end
                         windows += 1
@@ -202,7 +246,9 @@ class MarketDataWorkRequestRunner:
             state = self.store.checkpoint(
                 job=job, units=units, rows_read=rows_read, rows_written=rows_written, now=self.now()
             )
-            if state in {"running", "pause_requested", "cancel_requested"}:
+            if state == "pause_requested":
+                self.store.release(job=job, now=self.now())
+            elif state in {"running", "cancel_requested"}:
                 phase = "finish"
                 self.store.finish(
                     job=job,
@@ -211,28 +257,60 @@ class MarketDataWorkRequestRunner:
                     now=self.now(),
                 )
         except TemporarySourceError as error:
+            check()
+            self.store.checkpoint(
+                job=job, units=units, rows_read=rows_read, rows_written=rows_written, now=self.now()
+            )
+            if (
+                isinstance(error, IncompleteHistoryError)
+                and job.get("previous_error_code", job.get("error_code")) == error.code
+                and units <= int(job.get("completed_units", 0))
+                and int(job.get("retry_count", 0)) >= 3
+            ):
+                state = self.store.checkpoint(
+                    job=job,
+                    units=units,
+                    rows_read=rows_read,
+                    rows_written=rows_written,
+                    now=self.now(),
+                )
+                if state in {"pause_requested", "cancel_requested"}:
+                    self.store.release(job=job, now=self.now())
+                elif state == "running":
+                    self.store.finish(
+                        job=job, state="failed", error_code=error.code, now=self.now()
+                    )
+                return True
             # The failed window has no checkpoint. Existing fill deduplication
             # reconciles any already stored candles when that window is replayed.
             self.store.defer(
-                job={**job, "error_phase": phase}, error_code=error.code,
-                retry_after_s=error.retry_after_s, now=self.now()
+                job={**job, "error_phase": phase},
+                error_code=error.code,
+                retry_after_s=error.retry_after_s,
+                now=self.now(),
             )
         except Exception as error:
+            check()
             # Never persist provider payloads, URLs, credentials, or exception messages.
-            log.warning("market data work error phase=%s error_type=%s",
-                        phase, type(error).__name__)
+            log.warning(
+                "market data work error phase=%s error_type=%s", phase, type(error).__name__
+            )
             storage_error = self.retryable_storage_error(error)
             if storage_error:
                 self.store.defer(
                     job={**job, "error_phase": phase},
-                    error_code=storage_error if isinstance(storage_error, str)
-                    else "storage_unavailable", retry_after_s=0, now=self.now()
+                    error_code=storage_error
+                    if isinstance(storage_error, str)
+                    else "storage_unavailable",
+                    retry_after_s=0,
+                    now=self.now(),
                 )
             else:
                 self.store.finish(
-                    job={**job, "error_phase": phase}, state="failed",
+                    job={**job, "error_phase": phase},
+                    state="failed",
                     error_code="source_or_storage_unavailable",
-                    now=self.now()
+                    now=self.now(),
                 )
         return True
 

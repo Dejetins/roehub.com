@@ -1,0 +1,12 @@
+START baseline 1 2026-10-10T20:25:02Z
+END baseline 1 exit 0
+START candidate 1 2026-10-10T20:37:16Z
+END candidate 1 exit 0
+START candidate 2 2026-10-10T20:44:02Z
+END candidate 2 exit 0
+START baseline 2 2026-10-10T20:50:46Z
+END baseline 2 exit 0
+START baseline 3 2026-10-10T21:03:03Z
+END baseline 3 exit 0
+START candidate 3 2026-10-10T21:15:20Z
+END candidate 3 exit 0

@@ -1,0 +1,22 @@
+{
+  "apps/navigator-web/src/assets/exchanges/binance.ico": {
+    "baseline_sha256": "8318ebbcb1cb4729eb0f78bb058dc618c3b63f9f9f0070a1a7a3265fdc79b833",
+    "current_sha256": "8318ebbcb1cb4729eb0f78bb058dc618c3b63f9f9f0070a1a7a3265fdc79b833",
+    "unchanged": true
+  },
+  "apps/navigator-web/src/assets/exchanges/bybit.svg": {
+    "baseline_sha256": "05197bc478bf477d3fb7f4b7f2e87a8c81501fe5be9fcc1700eeebf0ba0a0847",
+    "current_sha256": "05197bc478bf477d3fb7f4b7f2e87a8c81501fe5be9fcc1700eeebf0ba0a0847",
+    "unchanged": true
+  },
+  ".codex/agents/generated/data-artifact-management-v1/ledger_update.py": {
+    "baseline_sha256": "3e4c07659dc0c5382d908360795fd730b33b5dd2cefaf9417b73e0f6ed1965e6",
+    "current_sha256": "3e4c07659dc0c5382d908360795fd730b33b5dd2cefaf9417b73e0f6ed1965e6",
+    "unchanged": true
+  },
+  ".codex/agents/generated/data-artifact-management-v1/test_ledger_update.py": {
+    "baseline_sha256": "e400cc8ffdac1b30964632fe133bba7379c5aec358ddc7c1c7317d6a1e1eec36",
+    "current_sha256": "e400cc8ffdac1b30964632fe133bba7379c5aec358ddc7c1c7317d6a1e1eec36",
+    "unchanged": true
+  }
+}

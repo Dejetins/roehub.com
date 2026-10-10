@@ -1,0 +1,1 @@
+cannot read runtime input /Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/src/assets/exchanges/binance.ico: 'utf-8' codec can't decode byte 0xa8 in position 14: invalid start byte

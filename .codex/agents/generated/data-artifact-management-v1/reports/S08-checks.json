@@ -1,0 +1,62 @@
+[
+  {
+    "name": "frontend-tests",
+    "command": [
+      "node_modules/.bin/vitest",
+      "run",
+      "src/storage-settings.test.tsx",
+      "src/backtest-readiness.test.tsx",
+      "src/settings-page.test.tsx",
+      "src/builder.test.tsx",
+      "src/data-artifacts.test.tsx",
+      "src/read-snapshot.test.tsx",
+      "src/query-client.test.ts"
+    ],
+    "cwd": "apps/navigator-web",
+    "exit_code": 0,
+    "output": "\n RUN  v5.0.0 /Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web\n\n\n Test Files  7 passed (7)\n      Tests  105 passed (105)\n   Start at  23:07:00\n   Duration  4.12s (tests 58%, environment 21%, import 13%, transform 8%)\n\n"
+  },
+  {
+    "name": "typecheck",
+    "command": [
+      "apps/navigator-web/node_modules/.bin/tsc",
+      "--noEmit",
+      "-p",
+      "apps/navigator-web/tsconfig.json"
+    ],
+    "cwd": ".",
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "name": "build",
+    "command": [
+      "node_modules/.bin/vite",
+      "build",
+      "--outDir",
+      "../../.cache/s08-dist"
+    ],
+    "cwd": "apps/navigator-web",
+    "exit_code": 0,
+    "output": "vite v8.2.2 building client environment for production...\ntransforming...\n\u2713 2726 modules transformed.\n\n(!) outDir /Users/daniildegtyarev/Projects/roehub.com/.cache/s08-dist is not inside project root and will not be emptied.\nUse --emptyOutDir to override.\n\nrendering chunks...\ncomputing gzip size...\n../../.cache/s08-dist/.vite/manifest.json              0.37 kB \u2502 gzip:   0.19 kB\n../../.cache/s08-dist/assets/binance-gMyT8r3V.ico      4.28 kB\n../../.cache/s08-dist/assets/main-DyXDiOxF.css       135.37 kB \u2502 gzip:  23.45 kB\n../../.cache/s08-dist/assets/main-DFxb1gGz.js      1,532.70 kB \u2502 gzip: 481.38 kB\n\n\u2713 built in 202ms\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+  },
+  {
+    "name": "ruff",
+    "command": [
+      ".venv/bin/ruff",
+      "check",
+      "apps/navigator-web/e2e/storage_fixture.py",
+      "apps/navigator-web/e2e/storage_preflight.py",
+      "tools/qa/navigator_preview.py"
+    ],
+    "cwd": ".",
+    "exit_code": 0,
+    "output": "All checks passed!\n"
+  },
+  {
+    "name": "service-boundary",
+    "command": "ROEHUB_BACKTEST_TEST_DSN=<disposable loopback port 25447> .venv/bin/pytest -q tests/real_infra/backtest/test_artifact_http_storage.py tests/unit/apps/api/test_artifact_storage_routes.py tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py -k 'storage or real_preflight_freezes'",
+    "exit_code": 0,
+    "output": "............................                                             [100%]\n28 passed, 93 deselected in 5.46s\n"
+  }
+]

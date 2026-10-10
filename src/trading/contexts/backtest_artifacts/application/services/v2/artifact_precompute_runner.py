@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from itertools import product
 from multiprocessing import get_context
 from pathlib import Path
-from typing import Any, Mapping, Protocol, TypeVar, cast
+from typing import Any, Callable, Mapping, Protocol, TypeVar, cast
 
 import numpy as np
 import yaml
@@ -106,6 +106,7 @@ from .contracts import (
     ArtifactManifestProvenanceV2,
     ArtifactMappingPathsV2,
     ArtifactMappingTimeframeManifestV2,
+    ArtifactPrecomputeProgressEventV2,
     ArtifactPrecomputeRuntimeSettingsV2,
     ArtifactPrecomputeStageInputV2,
     ArtifactPrecomputeStageOutputV2,
@@ -684,6 +685,7 @@ class BacktestArtifactPrecomputeRunnerV2:
     signal_rules_engine: BacktestSignalRulesEngineV2 | None = None
     indicator_compute: IndicatorCompute | None = None
     indicator_grid_builder: GridBuilder | None = None
+    progress_observer: Callable[[ArtifactPrecomputeProgressEventV2], None] | None = None
 
     def __post_init__(self) -> None:
         """
@@ -1087,6 +1089,7 @@ class BacktestArtifactPrecomputeRunnerV2:
             slot_generation=target_slot_generation,
             force_full_rebuild=request.force_full_rebuild,
             execution_policy=self.runtime_settings.execution_policy,
+            progress_observer=self.progress_observer,
         )
         try:
             canonical_stage_result = coordinator.run_stage(
@@ -2104,6 +2107,8 @@ def _materialize_signal_artifact_v2(
         coordinates=coordinates,
         timeframe=signal_target.timeframe,
         materialized_grid=materialized_grid,
+        row_ids=next((rows for tf, ind, rows in runtime_settings.selected_signal_rows
+                      if (tf, ind) == (signal_target.timeframe, signal_target.indicator_id)), None),
     )
     signal_variant_keys_sha256 = _variant_keys_sha256_v2(signal_rows=signal_rows)
     effective_tail_bars = _effective_signal_tail_bars_v2(
@@ -2149,7 +2154,10 @@ def _materialize_signal_artifact_v2(
     signal_shape, chunk_jobs = _materialize_signal_rows_v2(
         coordinates=coordinates, timeframe=signal_target.timeframe,
         indicator_id=signal_target.indicator_id, price_arrays=price_arrays,
-        materialized_grid=materialized_grid, signal_rows=signal_rows, selected_row_ids=None,
+        materialized_grid=materialized_grid, signal_rows=signal_rows,
+        selected_row_ids=next(
+            (rows for tf, ind, rows in runtime_settings.selected_signal_rows
+             if (tf, ind) == (signal_target.timeframe, signal_target.indicator_id)), None),
         signal_paths=signal_paths, runtime_settings=runtime_settings,
         signal_tail_plan=signal_tail_plan, existing_signal_artifact=existing_signal_artifact,
         indicator_compute=indicator_compute, signal_rules_engine=signal_rules_engine,
@@ -3961,6 +3969,8 @@ def _build_signal_manifest_v2(
         variant_key_version=1,
         variant_keys_sha256=_variant_keys_sha256_v2(signal_rows=signal_rows),
         signals_v1_params_defaults=signal_params_defaults,
+        row_ids=next((rows for tf, ind, rows in runtime_settings.selected_signal_rows
+                      if (tf, ind) == (signal_target.timeframe, signal_target.indicator_id)), None),
     )
     provenance = _build_signal_manifest_provenance_v2(
         coordinates=coordinates,
@@ -6401,12 +6411,14 @@ def _materialize_hit_times_artifacts_v2(
         tp_levels_pct=runtime_settings.hit_times_tp_levels_pct,
         sl_levels_pct=runtime_settings.hit_times_sl_levels_pct,
         max_hit_times_cells=max_hit_times_cells,
+        allow_empty_levels=runtime_settings.partial_publication,
     )
     hit_times_arrays = merge_hit_times_prefix_with_rebuilt_tail_v2(
         prefix=tail_plan.prefix,
         rebuilt_tail=rebuilt_tail,
         prefix_bars=tail_plan.prefix_bars,
         total_timeline_bars=int(hit_times_source_arrays.open_time.shape[0]),
+        allow_empty_levels=runtime_settings.partial_publication,
     )
     _write_hit_times_arrays_atomically_v2(
         hit_times_paths=hit_times_paths,
@@ -8436,6 +8448,7 @@ def _serialize_signal_grid_contract_v2(
         "variant_key_version": grid.variant_key_version,
         "variant_keys_sha256": grid.variant_keys_sha256,
         "signals_v1_params_defaults": dict(grid.signals_v1_params_defaults),
+        **({"row_ids": list(grid.row_ids)} if grid.row_ids is not None else {}),
     }
 
 

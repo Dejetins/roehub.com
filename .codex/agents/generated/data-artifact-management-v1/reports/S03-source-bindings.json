@@ -1,0 +1,61 @@
+{
+  "files": [
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/automatic_base.py",
+      "sha256": "aa18931f1f6b3ef146037325b0b02929e0b7ed91bfe0cf87bb5afcca693c928e"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+      "sha256": "e6085d70849d2379199f7e3db297d98f6fbefa5bf55bcd9c43a6ffd98552b730"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/automatic_base_repository.py",
+      "sha256": "d00a5dce646040c90718e3940edd45f729a20d606f579170b0b4959e55a36e12"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+      "sha256": "c867cc9dd09ee15bd04a3e79cb7b3f7757831ae45edd73d6fac12e28b8785782"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/base_storage_admission.py",
+      "sha256": "c7fca685c5f112d735c876f1fd67c9d4cbefb4f128a68400592307042b2379b2"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/services/stored_candle_signal.py",
+      "sha256": "c7ea8e57bc16abd1195a197edb70456aada3ea22d0ad2d29f05b181fafa9e6e1"
+    },
+    {
+      "path": "apps/worker/backtest_job_runner/wiring/automatic_base.py",
+      "sha256": "d69fca5238233f4f10d54a3a0883c5458f96732dd58b2a95030b993c3b0fcc58"
+    },
+    {
+      "path": "tests/unit/contexts/backtest_artifacts/test_automatic_base.py",
+      "sha256": "f2c33227c9e2235e1ff34a3b606ecdf1b31b407247cd0640a473308518c6b91b"
+    },
+    {
+      "path": "tests/real_infra/backtest/test_automatic_base_lifecycle.py",
+      "sha256": "c4919989e81058ac2001f0bca7775b9ca01d04dbf903b12a7e9a85f6c27f7860"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_slot_publisher.py",
+      "sha256": "4f266b87e326d141ff875591874ce5e6a57bb3412b3d63e69ad664b5a571d936"
+    },
+    {
+      "path": "apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py",
+      "sha256": "f7078d5a24cbbeea95e63ec77a8f042037c09e6ccbfda701f74fe0038a28d1b5"
+    },
+    {
+      "path": "apps/worker/market_data_ws/wiring/modules/market_data_ws.py",
+      "sha256": "e02bf059c055d380972205b9fb8b808a4650c43b3e93b6e10ef236f638067f28"
+    },
+    {
+      "path": "tests/unit/contexts/market_data/test_stored_candle_signal.py",
+      "sha256": "8979f38a0c66e7158491ad9e0840a10f4ee2962451662c918faee8014c7d9160"
+    },
+    {
+      "path": "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "sha256": "a69d2b2590883ef5b04d65f2d1e7801c7b1b66a4ac4128069704e9799295ecc1"
+    }
+  ],
+  "generated_map_binding": "excluded: generator inventory is refreshed after unique immutable receipt creation"
+}

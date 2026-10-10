@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import timedelta
 from uuid import UUID
 
 from trading.contexts.identity.application.ports import IdentityClock
@@ -116,9 +117,12 @@ class RoehubSessionCurrentUser(CurrentUser):
                 message="Session user is inactive",
             )
 
+        if now - session.last_seen_at >= timedelta(seconds=60):
+            self._session_repository.touch_session(session_id=parsed_session_id, now=now)
         paid_level = PaidLevel(str(user.paid_level))
         return CurrentUserPrincipal(
             user_id=user.user_id,
             paid_level=paid_level,
             session_created_at=session.created_at,
+            session_id=session.session_id,
         )

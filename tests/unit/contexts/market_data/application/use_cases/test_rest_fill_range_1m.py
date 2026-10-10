@@ -303,6 +303,49 @@ def test_chunk_ingest_skips_existing_minutes_when_index_reader_is_configured() -
 
     result = use_case.run(task)
 
-    assert result.rows_read == 3
+    assert result.rows_read == 2
+    assert [(r.start.value.minute, r.end.value.minute) for r in source.calls] == [
+        (50, 51),
+        (52, 53),
+    ]
     assert result.rows_written == 2
     assert [item.candle.ts_open.value.minute for item in writer.rows] == [50, 52]
+
+
+def test_only_completed_source_and_write_can_confirm_absence():
+    from types import SimpleNamespace
+    from typing import cast
+
+    import pytest
+
+    from trading.contexts.market_data.application.ports.stores.history_range_verifier import (
+        HistoryRangeVerifier,
+    )
+
+    instrument = InstrumentId(MarketId(1), Symbol("AAVEUSDT"))
+    start = datetime(2020, 11, 30, 6, tzinfo=timezone.utc)
+    end = start + timedelta(hours=1)
+    task = RestFillTask(instrument, TimeRange(UtcTimestamp(start), UtcTimestamp(end)),
+                        "user_requested_fill")
+    confirmed = []
+
+    class Source:
+        fail = False
+
+        def stream_1m(self, instrument_id, time_range):
+            yield _row(instrument, start)
+            if self.fail:
+                raise RuntimeError("interrupted_response")
+
+    source = Source()
+    fill = RestFillRange1mUseCase(source, _FakeWriter(), _FixedClock(UtcTimestamp(end)), 1, 500,
+        history_verifier=cast(HistoryRangeVerifier,
+                             SimpleNamespace(confirm=lambda **kw: confirmed.append(kw))))
+    source.fail = True
+    with pytest.raises(RuntimeError, match="interrupted_response"):
+        fill.run(task)
+    assert confirmed == []
+    source.fail = False
+    fill.run(task)
+    assert confirmed[0]["observed_minutes"] == {int(start.timestamp() // 60)}
+    assert confirmed[0]["accept_absence"] is True

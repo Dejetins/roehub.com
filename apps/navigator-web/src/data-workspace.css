@@ -2,7 +2,10 @@
 .navigator-grid.workpages-grid.data-workspace{--nav-inspector:300px;grid-template-rows:40px minmax(0,1fr);grid-template-areas:'library heading inspector' 'library catalog inspector';height:calc(100dvh - 60px);min-height:620px}
 .data-workspace .data-exchanges{padding:0;gap:4px}
 .data-exchanges>a>svg{margin-inline-start:auto;width:14px;height:14px}
-.data-exchange-mark{font-size:11px;font-weight:650;width:24px;min-width:24px;height:24px;display:grid;place-items:center;border:1px solid var(--line);border-radius:6px;color:var(--muted)}
+.data-exchange-mark{width:32px;min-width:32px;height:24px;display:grid;place-items:center}
+.data-exchange-logo{display:block;width:24px;height:24px;object-fit:contain}
+.data-exchange-mark.bybit{width:52px;min-width:52px}
+.data-exchange-logo.bybit{width:52px}
 .data-workspace .navigator-heading{gap:8px}
 .data-heading-subtitle{color:var(--muted);font-size:11px;flex:1;white-space:nowrap}
 .data-workspace .navigator-heading>.work-actions{gap:6px;flex-wrap:nowrap}
@@ -26,16 +29,18 @@
 .data-read-status p{margin:0 0 6px}
 .data-catalog-missing{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 12px;font-size:11px;border-block:1px solid var(--line-soft)}
 .data-catalog-scroll{overflow:auto;flex:1;min-height:0;overscroll-behavior:contain}
-.data-catalog-table{width:100%;border-collapse:collapse;table-layout:auto;min-width:560px}
+.data-catalog-table{width:100%;border-collapse:collapse;table-layout:auto;min-width:0}
 .data-catalog-table thead{position:sticky;top:0;z-index:2;background:var(--surface-2)}
 .data-catalog-table th{height:32px;padding:0 10px;font-size:10px;font-weight:450;color:var(--muted);text-align:left;border-bottom:1px solid var(--line)}
 .data-workspace .data-catalog-table th button{font-size:10px;min-height:28px;height:28px;display:inline-flex;align-items:center;gap:5px;border:0;padding:0;background:none;border-radius:4px;color:inherit}
 .data-catalog-table th svg{width:12px;height:12px}
 .data-catalog-table td{height:38px;padding:4px 10px;white-space:nowrap;font-size:11px;line-height:18px;border-bottom:1px solid var(--line-soft);text-align:left;vertical-align:middle}
-.data-catalog-table td:nth-child(2)>a{font-weight:550;display:flex;align-items:center;min-height:28px;color:var(--text);text-decoration:none}
+.data-catalog-table .data-instrument-name{font-weight:550;display:flex;align-items:center;min-height:28px;color:var(--text);text-decoration:none}
 .data-catalog-table td:nth-child(3){color:var(--muted);font-size:10px}
 .data-catalog-table tr.selected{background:var(--surface-2);box-shadow:none}
+.data-catalog-table tbody tr:focus-visible{outline:2px solid var(--violet);outline-offset:-2px}
 .data-catalog-table tbody tr:hover{background:var(--surface-2)}
+.data-catalog-table tbody tr[data-selectable="true"]{cursor:pointer}
 .data-catalog-table .data-check-column,.data-catalog-table td:first-child{width:34px;padding:4px 6px 4px 12px}
 .data-catalog-table input[type=checkbox]{width:16px;height:16px;min-width:16px;margin:4px;accent-color:var(--violet)}
 .data-progress,.data-no-history,.data-stream-state{display:flex;align-items:center;gap:7px;font-size:10px;color:var(--muted);min-height:28px}
@@ -51,8 +56,7 @@
 .data-stream-state.enabled>svg{color:#65d69b}
 .data-stream-state.enabled>svg.lucide-circle{fill:currentColor;width:8px;height:8px;margin-inline:3px}
 .data-workspace .data-text-action{padding:2px 0;min-height:24px;border:0;border-radius:3px;background:none;color:var(--violet);font-size:10px;line-height:18px;text-decoration:underline;text-underline-offset:3px}
-.data-catalog-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);min-height:49px}
-.data-catalog-footer>div{display:flex;align-items:center;gap:10px}
+.navigator-app .navigator-grid .data-catalog-footer.library-pagination{padding:10px 12px;border-top:1px solid var(--line);min-height:49px}
 .navigator-app .data-workspace .data-inspector{min-height:0;max-height:none;padding:12px;overflow:auto}
 .data-inspector>.read-status,.data-inspector>.loading-data{font-size:10px}
 .data-inspector>.read-status{min-height:24px;margin:0}
@@ -64,10 +68,13 @@
 .data-inspector-section p{font-size:10px;line-height:16px;color:var(--muted);margin:8px 0 0}
 .data-stream-control{display:flex;align-items:center;gap:8px}
 .data-stream-control h3{flex:1}
-.navigator-app .navigator-grid.workpages-grid.data-workspace .data-inspector button.data-stream-switch{width:38px;height:24px;min-height:24px;padding:3px;justify-content:flex-start;position:relative;border:1px solid var(--line);border-radius:999px;background:var(--line-soft);flex-shrink:0}
-.data-stream-switch>span{display:block;width:16px;height:16px;border-radius:50%;background:var(--text);transform:translateX(0)}
-.data-workspace .data-stream-switch[aria-checked=true]{background:var(--violet);border-color:var(--violet)}
-.data-stream-switch[aria-checked=true]>span{transform:translateX(12px)}
+/* iOS-style track and inset thumb; button keeps the shared 28px hit height. */
+.navigator-app .navigator-grid.workpages-grid.data-workspace .data-inspector button.data-stream-switch{width:40px;height:28px;min-height:28px;padding:0;display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:999px;background:transparent;flex:0 0 40px}
+.data-stream-switch>.data-stream-track{display:block;position:relative;box-sizing:border-box;width:40px;height:24px;flex:none;border-radius:999px;background:var(--line);transition:background-color var(--motion-duration) var(--motion-easing)}
+.data-stream-switch>.data-stream-track::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px #0003;transform:translateX(0);transition:transform var(--motion-duration) var(--motion-easing)}
+.data-stream-switch[aria-checked=true]>.data-stream-track{background:var(--violet)}
+.data-stream-switch[aria-checked=true]>.data-stream-track::after{transform:translateX(16px)}
+.data-stream-switch:focus-visible{outline:2px solid var(--violet);outline-offset:3px}
 .data-stream-switch:disabled{opacity:.65;cursor:not-allowed}
 .data-lock{width:14px;height:14px;color:var(--muted)}
 .data-strategy-pins{padding:0;margin:12px 0;list-style:none}
@@ -137,10 +144,12 @@
 .data-journal-scroll tr.selected{box-shadow:none}
 
 /* Progress changes text and fills, never the workspace geometry. */
-.data-catalog-table{table-layout:fixed;min-width:740px}
-.data-catalog-table th:nth-child(2){width:24%}
-.data-catalog-table th:nth-child(3){width:11%}
-.data-catalog-table th:nth-child(4){width:43%}
+.data-catalog-table{table-layout:fixed;min-width:640px}
+.data-catalog-table th:nth-child(2){width:22%}
+.data-catalog-table th:nth-child(3){width:9%}
+.data-catalog-table th:nth-child(4){width:auto}
+.data-catalog-table th:nth-child(5){width:112px}
+.data-stream-state{white-space:nowrap}
 .data-catalog-table td:nth-child(2){overflow:hidden;text-overflow:ellipsis}
 .data-active-progress{gap:6px;font-variant-numeric:tabular-nums}
 .data-active-progress>.data-job-state{min-width:82px}
@@ -175,3 +184,41 @@
 .data-event-list p{margin:4px 0}
 .data-event-list code{overflow-wrap:anywhere}
 @media(max-width:760px){.navigator-app .data-workspace :is(.data-row-actions,.data-inspector-heading,.data-job-actions){--workspace-control-size:32px}}
+
+/* Reserve the same action rail in every history state, independent of its label. */
+.data-history-cell{min-width:0}
+.data-history-cell>:is(.data-row-coverage,.data-row-download){display:grid;grid-template-columns:minmax(0,1fr) 64px;align-items:center;gap:8px;min-height:28px}
+.data-history-cell .data-download-icon{justify-self:start}
+.data-history-cell .data-row-actions{flex-wrap:wrap;min-width:0;align-self:center}
+.data-row-coverage>.data-progress{min-width:0;flex-wrap:nowrap;gap:5px}
+.data-row-coverage>.data-progress>span{font-variant-numeric:tabular-nums}
+.data-row-coverage>.data-progress>.data-job-state-icon{flex:0 0 14px;min-width:14px}
+@media(prefers-reduced-motion:no-preference){.data-job-state-icon.downloading>svg{animation:data-loading-spin .8s linear infinite}}
+.data-history-cell .data-active-progress{flex-wrap:wrap}
+.data-job-completed{display:flex;align-items:flex-start;gap:7px;margin-top:12px;color:#65d69b}
+.data-job-completed>svg{width:14px;height:14px;flex-shrink:0;margin-top:3px}
+.data-job-completed>p{margin:0;white-space:normal}
+
+/* Reuse the platform filter popup; retain the catalog toolbar's compact geometry. */
+.data-catalog-tools>.chart-display-menu{min-width:0}
+.navigator-app .data-catalog-tools .chart-display-trigger{width:100%;height:28px;min-height:28px;justify-content:space-between;gap:8px;padding:3px 8px;font-size:11px;line-height:18px}
+.data-catalog-tools .chart-display-popup{min-width:100%;max-width:280px;z-index:30}
+.data-catalog-tools>.chart-display-menu:last-child .chart-display-popup{left:auto;right:0}
+.navigator-app .data-catalog-tools .chart-display-option{font-size:11px;white-space:normal;min-height:28px}
+
+.data-row-coverage .data-history-meter{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex-wrap:nowrap;flex:1;min-width:0;max-width:100%}
+.data-row-coverage .data-history-meter>span:first-child{flex-shrink:0}
+.data-row-coverage .data-history-eta{flex:0 1 auto;min-width:0;min-height:0;line-height:14px;overflow:hidden}
+.data-row-coverage .data-history-eta .data-download-eta{display:block;width:auto;min-width:0!important;margin:0;overflow:hidden;text-overflow:ellipsis}
+
+.data-row-coverage .data-history-meter>progress{flex:1 1 20px;min-width:20px;max-width:70px}
+@media(max-width:760px){.data-history-cell>:is(.data-row-coverage,.data-row-download){grid-template-columns:minmax(0,1fr) 66px}.data-catalog-table td{height:42px}:root[data-navigator-density=comfortable] .data-catalog-table td{height:48px}}
+
+/* Keep catalogue actions in its existing context row, without a separate title strip. */
+.navigator-grid.workpages-grid.data-workspace{grid-template-rows:minmax(0,1fr);grid-template-areas:'library catalog inspector'}
+.data-catalog-context>.work-actions{margin-inline-start:auto;gap:6px;flex-wrap:nowrap}
+.data-workspace .data-download-journal{flex-basis:350px;max-height:calc(38% + 31px)}
+@media(min-width:651px) and (max-width:1050px){.navigator-grid.workpages-grid.data-workspace{grid-template-rows:650px auto;grid-template-areas:'library catalog' 'library inspector'}}
+@media(max-width:650px){.data-workspace .data-catalog{height:608px;min-height:608px}.data-workspace .data-catalog:has(.data-download-journal){height:898px}.data-workspace .data-download-journal{flex-basis:378px;max-height:378px}}
+
+.data-stream-state.failed,#data-stream-help[role="alert"]{color:var(--danger,#ff9b87)}

@@ -1,0 +1,469 @@
+{
+  "command": [
+    ".venv/bin/ruff",
+    "check",
+    ".",
+    "--output-format",
+    "json"
+  ],
+  "exit_code": 1,
+  "diagnostics": [
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 105,
+        "row": 54
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 54
+      },
+      "message": "Line too long (104 > 100)",
+      "noqa_row": 54,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 111,
+        "row": 167
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 167
+      },
+      "message": "Line too long (110 > 100)",
+      "noqa_row": 167,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 106,
+        "row": 176
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 176
+      },
+      "message": "Line too long (105 > 100)",
+      "noqa_row": 176,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 114,
+        "row": 191
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 191
+      },
+      "message": "Line too long (113 > 100)",
+      "noqa_row": 191,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 105,
+        "row": 233
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 233
+      },
+      "message": "Line too long (104 > 100)",
+      "noqa_row": 233,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 107,
+        "row": 297
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 297
+      },
+      "message": "Line too long (106 > 100)",
+      "noqa_row": 297,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 120,
+        "row": 330
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 330
+      },
+      "message": "Line too long (119 > 100)",
+      "noqa_row": 330,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "I001",
+      "end_location": {
+        "column": 1,
+        "row": 15
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": {
+        "applicability": "safe",
+        "edits": [
+          {
+            "content": "import copy\nimport fcntl\nimport hashlib\nimport json\nimport os\nimport re\nimport shutil\nimport subprocess\nimport sys\nimport tempfile\nimport unittest\nfrom pathlib import Path\n\n",
+            "end_location": {
+              "column": 1,
+              "row": 15
+            },
+            "location": {
+              "column": 1,
+              "row": 2
+            }
+          }
+        ],
+        "message": "Organize imports"
+      },
+      "location": {
+        "column": 1,
+        "row": 2
+      },
+      "message": "Import block is un-sorted or un-formatted",
+      "noqa_row": 2,
+      "url": "https://docs.astral.sh/ruff/rules/unsorted-imports"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 104,
+        "row": 32
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 32
+      },
+      "message": "Line too long (103 > 100)",
+      "noqa_row": 32,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 108,
+        "row": 45
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 45
+      },
+      "message": "Line too long (107 > 100)",
+      "noqa_row": 45,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 108,
+        "row": 47
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 47
+      },
+      "message": "Line too long (107 > 100)",
+      "noqa_row": 47,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 111,
+        "row": 48
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 48
+      },
+      "message": "Line too long (110 > 100)",
+      "noqa_row": 48,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 103,
+        "row": 52
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 52
+      },
+      "message": "Line too long (102 > 100)",
+      "noqa_row": 52,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 102,
+        "row": 56
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 56
+      },
+      "message": "Line too long (101 > 100)",
+      "noqa_row": 56,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 105,
+        "row": 69
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 69
+      },
+      "message": "Line too long (104 > 100)",
+      "noqa_row": 69,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 108,
+        "row": 70
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 70
+      },
+      "message": "Line too long (107 > 100)",
+      "noqa_row": 70,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 107,
+        "row": 140
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 140
+      },
+      "message": "Line too long (106 > 100)",
+      "noqa_row": 140,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 104,
+        "row": 143
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 143
+      },
+      "message": "Line too long (103 > 100)",
+      "noqa_row": 143,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 108,
+        "row": 175
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 175
+      },
+      "message": "Line too long (107 > 100)",
+      "noqa_row": 175,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 105,
+        "row": 177
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 177
+      },
+      "message": "Line too long (104 > 100)",
+      "noqa_row": 177,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 106,
+        "row": 180
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 180
+      },
+      "message": "Line too long (105 > 100)",
+      "noqa_row": 180,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 119,
+        "row": 185
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 185
+      },
+      "message": "Line too long (118 > 100)",
+      "noqa_row": 185,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 108,
+        "row": 199
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 199
+      },
+      "message": "Line too long (107 > 100)",
+      "noqa_row": 199,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "E501",
+      "end_location": {
+        "column": 103,
+        "row": 200
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": null,
+      "location": {
+        "column": 101,
+        "row": 200
+      },
+      "message": "Line too long (102 > 100)",
+      "noqa_row": 200,
+      "url": "https://docs.astral.sh/ruff/rules/line-too-long"
+    },
+    {
+      "cell": null,
+      "code": "F841",
+      "end_location": {
+        "column": 15,
+        "row": 249
+      },
+      "filename": "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "fix": {
+        "applicability": "unsafe",
+        "edits": [
+          {
+            "content": "",
+            "end_location": {
+              "column": 18,
+              "row": 249
+            },
+            "location": {
+              "column": 9,
+              "row": 249
+            }
+          }
+        ],
+        "message": "Remove assignment to unused variable `repair`"
+      },
+      "location": {
+        "column": 9,
+        "row": 249
+      },
+      "message": "Local variable `repair` is assigned to but never used",
+      "noqa_row": 249,
+      "url": "https://docs.astral.sh/ruff/rules/unused-variable"
+    }
+  ]
+}

@@ -1,0 +1,529 @@
+..............ss........FFFFF.F                                          [100%]
+=================================== FAILURES ===================================
+______ test_two_processes_share_capacity_and_spent_quota_survives_restart ______
+
+admission = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_0a0979a031614404b524508fe5d24dcc'")
+
+    def test_two_processes_share_capacity_and_spent_quota_survives_restart(admission):
+        context = multiprocessing.get_context('spawn')
+        parent, child = context.Pipe()
+        process = context.Process(target=_hold, args=(admission.dsn, child))
+        process.start()
+        child.close()
+        try:
+            assert parent.poll(10)
+>           parent.recv()
+
+tests/real_infra/market_data/test_provider_admission.py:68: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/multiprocessing/connection.py:250: in recv
+    buf = self._recv_bytes()
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/multiprocessing/connection.py:430: in _recv_bytes
+    buf = self._recv(4)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <multiprocessing.connection.Connection object at 0x10b8ef7d0>, size = 4
+read = <built-in function read>
+
+    def _recv(self, size, read=_read):
+        buf = io.BytesIO()
+        handle = self._handle
+        remaining = size
+        while remaining > 0:
+            chunk = read(handle, remaining)
+            n = len(chunk)
+            if n == 0:
+                if remaining == size:
+>                   raise EOFError
+E                   EOFError
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/multiprocessing/connection.py:399: EOFError
+----------------------------- Captured stderr call -----------------------------
+Process SpawnProcess-1:
+Traceback (most recent call last):
+  File "/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py", line 40, in reserve
+    row = connection.execute(
+          ^^^^^^^^^^^^^^^^^^^
+  File "/Users/daniildegtyarev/Projects/roehub.com/.venv/lib/python3.12/site-packages/psycopg/connection.py", line 251, in execute
+    raise ex.with_traceback(None)
+psycopg.errors.DatetimeFieldOverflow: cannot subtract infinite timestamps
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/daniildegtyarev/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/multiprocessing/process.py", line 314, in _bootstrap
+    self.run()
+  File "/Users/daniildegtyarev/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/multiprocessing/process.py", line 108, in run
+    self._target(*self._args, **self._kwargs)
+  File "/Users/daniildegtyarev/Projects/roehub.com/tests/real_infra/market_data/test_provider_admission.py", line 53, in _hold
+    permit = PostgresProviderAdmission(dsn).reserve(request())
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/daniildegtyarev/Projects/roehub.com/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py", line 91, in reserve
+    raise TemporarySourceError(retry_after_s=2) from error
+trading.contexts.market_data.application.services.source_retry.TemporarySourceError: source_unavailable
+____ test_multi_quota_reservation_is_atomic_and_headers_only_increase_spend ____
+
+self = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_6a748ea6fe474f08b422e36a3880d113'")
+request = ProviderRequest(provider='binance', scope='disposable-egress', concurrency=1, windows=(QuotaWindow(dimension='spot_weight', seconds=60, limit=10, cost=2), QuotaWindow(dimension='raw', seconds=300, limit=1, cost=1)))
+
+    def reserve(self, request: ProviderRequest):
+        connection = None
+        try:
+            connection = _connect(self.dsn)
+            token = uuid4()
+            with connection.transaction():
+                connection.execute(
+                    'INSERT INTO market_data_provider_scopes(provider,scope) VALUES (%s,%s) '
+                    'ON CONFLICT DO NOTHING', (request.provider, request.scope))
+>               row = connection.execute(
+                    'SELECT EXTRACT(EPOCH FROM clock_timestamp()), '
+                    'GREATEST(0, EXTRACT(EPOCH FROM cooldown_until-clock_timestamp())) '
+                    'FROM market_data_provider_scopes WHERE provider=%s AND scope=%s FOR UPDATE',
+                    (request.provider, request.scope)).fetchone()
+
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Connection [BAD] at 0x10b8ee390>
+query = 'SELECT EXTRACT(EPOCH FROM clock_timestamp()), GREATEST(0, EXTRACT(EPOCH FROM cooldown_until-clock_timestamp())) FROM market_data_provider_scopes WHERE provider=%s AND scope=%s FOR UPDATE'
+params = ('binance', 'disposable-egress')
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+    
+            return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.DatetimeFieldOverflow: cannot subtract infinite timestamps
+
+.venv/lib/python3.12/site-packages/psycopg/connection.py:251: DatetimeFieldOverflow
+
+The above exception was the direct cause of the following exception:
+
+admission = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_6a748ea6fe474f08b422e36a3880d113'")
+
+    def test_multi_quota_reservation_is_atomic_and_headers_only_increase_spend(admission):
+        policy = request(windows=(QuotaWindow('spot_weight', 60, 10, 2),
+                                  QuotaWindow('raw', 300, 1, 1)))
+>       permit = admission.reserve(policy)
+
+tests/real_infra/market_data/test_provider_admission.py:90: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_6a748ea6fe474f08b422e36a3880d113'")
+request = ProviderRequest(provider='binance', scope='disposable-egress', concurrency=1, windows=(QuotaWindow(dimension='spot_weight', seconds=60, limit=10, cost=2), QuotaWindow(dimension='raw', seconds=300, limit=1, cost=1)))
+
+    def reserve(self, request: ProviderRequest):
+        connection = None
+        try:
+            connection = _connect(self.dsn)
+            token = uuid4()
+            with connection.transaction():
+                connection.execute(
+                    'INSERT INTO market_data_provider_scopes(provider,scope) VALUES (%s,%s) '
+                    'ON CONFLICT DO NOTHING', (request.provider, request.scope))
+                row = connection.execute(
+                    'SELECT EXTRACT(EPOCH FROM clock_timestamp()), '
+                    'GREATEST(0, EXTRACT(EPOCH FROM cooldown_until-clock_timestamp())) '
+                    'FROM market_data_provider_scopes WHERE provider=%s AND scope=%s FOR UPDATE',
+                    (request.provider, request.scope)).fetchone()
+                assert row is not None
+                now, cooldown = float(row[0]), float(row[1])
+                if cooldown > 0:
+                    raise TemporarySourceError(rate_limited=True, retry_after_s=cooldown)
+                count = connection.execute(
+                    'SELECT count(*) FROM market_data_provider_permits '
+                    'WHERE provider=%s AND scope=%s', (request.provider, request.scope)).fetchone()
+                assert count is not None
+                if count[0] >= request.concurrency:
+                    raise TemporarySourceError(rate_limited=True, retry_after_s=0.25)
+                for window in request.windows:
+                    bucket = int(now // window.seconds)
+                    connection.execute(
+                        'INSERT INTO market_data_provider_windows '
+                        '(provider,scope,dimension,seconds,bucket,spent) VALUES (%s,%s,%s,%s,%s,0) '
+                        'ON CONFLICT (provider,scope,dimension,seconds) DO UPDATE SET '
+                        'spent=CASE WHEN market_data_provider_windows.bucket>=EXCLUDED.bucket '
+                        'THEN market_data_provider_windows.spent ELSE 0 END,bucket=GREATEST(market_data_provider_windows.bucket,EXCLUDED.bucket)',
+                        (request.provider, request.scope, window.dimension, window.seconds, bucket))
+                    spent = connection.execute(
+                        'SELECT spent,bucket FROM market_data_provider_windows WHERE provider=%s '
+                        'AND scope=%s AND dimension=%s AND seconds=%s',
+                        (request.provider, request.scope, window.dimension, window.seconds)
+                    ).fetchone()
+                    assert spent is not None
+                    if spent[1] > bucket:
+                        raise TemporarySourceError(rate_limited=True,
+                            retry_after_s=(spent[1] + 1) * window.seconds - now)
+                    if spent[0] + window.cost > window.limit:
+                        raise TemporarySourceError(rate_limited=True,
+                            retry_after_s=(bucket + 1) * window.seconds - now)
+                    connection.execute(
+                        'UPDATE market_data_provider_windows SET spent=spent+%s '
+                        'WHERE provider=%s AND scope=%s AND dimension=%s AND seconds=%s',
+                        (window.cost, request.provider, request.scope, window.dimension,
+                         window.seconds))
+                connection.execute(
+                    'INSERT INTO market_data_provider_permits '
+                    '(token,provider,scope,owner_pid,owner_host) VALUES (%s,%s,%s,%s,%s)',
+                    (token, request.provider, request.scope, os.getpid(), socket.gethostname()))
+            return PostgresProviderPermit(self.dsn, connection, request, token)
+        except Exception as error:
+            if connection is not None:
+                connection.close()
+            if isinstance(error, TemporarySourceError):
+                raise
+>           raise TemporarySourceError(retry_after_s=2) from error
+E           trading.contexts.market_data.application.services.source_retry.TemporarySourceError: source_unavailable
+
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py:91: TemporarySourceError
+____ test_session_reuse_retries_charge_every_attempt_and_shared_retry_after ____
+
+self = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_1c437edce9514cc681ae04b9ca92f15b'")
+request = ProviderRequest(provider='binance', scope='disposable-egress', concurrency=1, windows=(QuotaWindow(dimension='spot_weight', seconds=60, limit=10000, cost=2), QuotaWindow(dimension='raw', seconds=300, limit=10000, cost=1)))
+
+    def reserve(self, request: ProviderRequest):
+        connection = None
+        try:
+            connection = _connect(self.dsn)
+            token = uuid4()
+            with connection.transaction():
+                connection.execute(
+                    'INSERT INTO market_data_provider_scopes(provider,scope) VALUES (%s,%s) '
+                    'ON CONFLICT DO NOTHING', (request.provider, request.scope))
+>               row = connection.execute(
+                    'SELECT EXTRACT(EPOCH FROM clock_timestamp()), '
+                    'GREATEST(0, EXTRACT(EPOCH FROM cooldown_until-clock_timestamp())) '
+                    'FROM market_data_provider_scopes WHERE provider=%s AND scope=%s FOR UPDATE',
+                    (request.provider, request.scope)).fetchone()
+
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Connection [BAD] at 0x10b947680>
+query = 'SELECT EXTRACT(EPOCH FROM clock_timestamp()), GREATEST(0, EXTRACT(EPOCH FROM cooldown_until-clock_timestamp())) FROM market_data_provider_scopes WHERE provider=%s AND scope=%s FOR UPDATE'
+params = ('binance', 'disposable-egress')
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+    
+            return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.DatetimeFieldOverflow: cannot subtract infinite timestamps
+
+.venv/lib/python3.12/site-packages/psycopg/connection.py:251: DatetimeFieldOverflow
+
+The above exception was the direct cause of the following exception:
+
+admission = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_1c437edce9514cc681ae04b9ca92f15b'")
+provider = ('http://127.0.0.1:64597', namespace(started=<threading.Event at 0x10b947260: unset>, disconnected=<threading.Event at 0x10b947cb0: unset>, requests=0, connections=set(), statuses=[503, 200]))
+
+    def test_session_reuse_retries_charge_every_attempt_and_shared_retry_after(admission, provider):
+        url, state = provider
+        http = client(admission)
+        try:
+            state.statuses = [503, 200]
+>           assert call(http, url, retries=1).body == []
+
+tests/real_infra/market_data/test_provider_admission.py:163: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/real_infra/market_data/test_provider_admission.py:154: in call
+    return http.get_json(url=url, params={}, timeout_s=timeout, retries=retries,
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:87: in get_json
+    permit = self.admission.reserve(self.policy.request(url, params))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_1c437edce9514cc681ae04b9ca92f15b'")
+request = ProviderRequest(provider='binance', scope='disposable-egress', concurrency=1, windows=(QuotaWindow(dimension='spot_weight', seconds=60, limit=10000, cost=2), QuotaWindow(dimension='raw', seconds=300, limit=10000, cost=1)))
+
+    def reserve(self, request: ProviderRequest):
+        connection = None
+        try:
+            connection = _connect(self.dsn)
+            token = uuid4()
+            with connection.transaction():
+                connection.execute(
+                    'INSERT INTO market_data_provider_scopes(provider,scope) VALUES (%s,%s) '
+                    'ON CONFLICT DO NOTHING', (request.provider, request.scope))
+                row = connection.execute(
+                    'SELECT EXTRACT(EPOCH FROM clock_timestamp()), '
+                    'GREATEST(0, EXTRACT(EPOCH FROM cooldown_until-clock_timestamp())) '
+                    'FROM market_data_provider_scopes WHERE provider=%s AND scope=%s FOR UPDATE',
+                    (request.provider, request.scope)).fetchone()
+                assert row is not None
+                now, cooldown = float(row[0]), float(row[1])
+                if cooldown > 0:
+                    raise TemporarySourceError(rate_limited=True, retry_after_s=cooldown)
+                count = connection.execute(
+                    'SELECT count(*) FROM market_data_provider_permits '
+                    'WHERE provider=%s AND scope=%s', (request.provider, request.scope)).fetchone()
+                assert count is not None
+                if count[0] >= request.concurrency:
+                    raise TemporarySourceError(rate_limited=True, retry_after_s=0.25)
+                for window in request.windows:
+                    bucket = int(now // window.seconds)
+                    connection.execute(
+                        'INSERT INTO market_data_provider_windows '
+                        '(provider,scope,dimension,seconds,bucket,spent) VALUES (%s,%s,%s,%s,%s,0) '
+                        'ON CONFLICT (provider,scope,dimension,seconds) DO UPDATE SET '
+                        'spent=CASE WHEN market_data_provider_windows.bucket>=EXCLUDED.bucket '
+                        'THEN market_data_provider_windows.spent ELSE 0 END,bucket=GREATEST(market_data_provider_windows.bucket,EXCLUDED.bucket)',
+                        (request.provider, request.scope, window.dimension, window.seconds, bucket))
+                    spent = connection.execute(
+                        'SELECT spent,bucket FROM market_data_provider_windows WHERE provider=%s '
+                        'AND scope=%s AND dimension=%s AND seconds=%s',
+                        (request.provider, request.scope, window.dimension, window.seconds)
+                    ).fetchone()
+                    assert spent is not None
+                    if spent[1] > bucket:
+                        raise TemporarySourceError(rate_limited=True,
+                            retry_after_s=(spent[1] + 1) * window.seconds - now)
+                    if spent[0] + window.cost > window.limit:
+                        raise TemporarySourceError(rate_limited=True,
+                            retry_after_s=(bucket + 1) * window.seconds - now)
+                    connection.execute(
+                        'UPDATE market_data_provider_windows SET spent=spent+%s '
+                        'WHERE provider=%s AND scope=%s AND dimension=%s AND seconds=%s',
+                        (window.cost, request.provider, request.scope, window.dimension,
+                         window.seconds))
+                connection.execute(
+                    'INSERT INTO market_data_provider_permits '
+                    '(token,provider,scope,owner_pid,owner_host) VALUES (%s,%s,%s,%s,%s)',
+                    (token, request.provider, request.scope, os.getpid(), socket.gethostname()))
+            return PostgresProviderPermit(self.dsn, connection, request, token)
+        except Exception as error:
+            if connection is not None:
+                connection.close()
+            if isinstance(error, TemporarySourceError):
+                raise
+>           raise TemporarySourceError(retry_after_s=2) from error
+E           trading.contexts.market_data.application.services.source_retry.TemporarySourceError: source_unavailable
+
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py:91: TemporarySourceError
+__________ test_absolute_deadline_stops_trickle_before_permit_release __________
+
+admission = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_de880b650c8a473693247d472099ae75'")
+provider = ('http://127.0.0.1:64632', namespace(started=<threading.Event at 0x10b945fa0: unset>, disconnected=<threading.Event at 0x10b9a2540: unset>, requests=0, connections=set(), statuses=[]))
+
+    def test_absolute_deadline_stops_trickle_before_permit_release(admission, provider):
+        url, state = provider
+        http = client(admission)
+        started = time.monotonic()
+        try:
+            with pytest.raises(TemporarySourceError):
+                call(http, url+'/trickle', timeout=1)
+            assert time.monotonic()-started < 3
+            assert all(t.closed for t in http._transports)
+>           assert state.disconnected.wait(2)
+E           assert False
+E            +  where False = wait(2)
+E            +    where wait = <threading.Event at 0x10b9a2540: unset>.wait
+E            +      where <threading.Event at 0x10b9a2540: unset> = namespace(started=<threading.Event at 0x10b945fa0: unset>, disconnected=<threading.Event at 0x10b9a2540: unset>, requests=0, connections=set(), statuses=[]).disconnected
+
+tests/real_infra/market_data/test_provider_admission.py:186: AssertionError
+_________ test_permit_session_loss_stops_io_before_capacity_is_reused __________
+
+admission = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_69b5e589223c40dbb8d24a08927511a4'")
+provider = ('http://127.0.0.1:64781', namespace(started=<threading.Event at 0x10b9a3470: unset>, disconnected=<threading.Event at 0x10b9a28d0: unset>, requests=0, connections=set(), statuses=[]))
+
+    def test_permit_session_loss_stops_io_before_capacity_is_reused(admission, provider):
+        url, state = provider
+        http = client(admission)
+        original = admission.reserve
+        permits = []
+        def reserve(policy):
+            permit = original(policy)
+            permits.append(permit)
+            return permit
+        admission.reserve = reserve
+        errors = []
+        def run():
+            try:
+                call(http, url+'/trickle', timeout=5)
+            except TemporarySourceError:
+                errors.append('stopped')
+        thread = threading.Thread(target=run)
+        thread.start()
+        try:
+>           assert state.started.wait(5)
+E           assert False
+E            +  where False = wait(5)
+E            +    where wait = <threading.Event at 0x10b9a3470: unset>.wait
+E            +      where <threading.Event at 0x10b9a3470: unset> = namespace(started=<threading.Event at 0x10b9a3470: unset>, disconnected=<threading.Event at 0x10b9a28d0: unset>, requests=0, connections=set(), statuses=[]).started
+
+tests/real_infra/market_data/test_provider_admission.py:212: AssertionError
+________ test_owner_death_keeps_uncertain_permit_until_confirmed_drain _________
+
+self = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_1e9151f37a5d42718d19c3c208a85422'")
+request = ProviderRequest(provider='binance', scope='disposable-egress', concurrency=1, windows=(QuotaWindow(dimension='spot_weight', seconds=60, limit=10000, cost=2), QuotaWindow(dimension='raw', seconds=300, limit=10000, cost=1)))
+
+    def reserve(self, request: ProviderRequest):
+        connection = None
+        try:
+            connection = _connect(self.dsn)
+            token = uuid4()
+            with connection.transaction():
+                connection.execute(
+                    'INSERT INTO market_data_provider_scopes(provider,scope) VALUES (%s,%s) '
+                    'ON CONFLICT DO NOTHING', (request.provider, request.scope))
+>               row = connection.execute(
+                    'SELECT EXTRACT(EPOCH FROM clock_timestamp()), '
+                    'CASE WHEN cooldown_until > clock_timestamp() THEN '
+                    'EXTRACT(EPOCH FROM cooldown_until-clock_timestamp()) ELSE 0 END '
+                    'FROM market_data_provider_scopes WHERE provider=%s AND scope=%s FOR UPDATE',
+                    (request.provider, request.scope)).fetchone()
+
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py:40: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Connection [BAD] at 0x10b9a1a90>
+query = 'SELECT EXTRACT(EPOCH FROM clock_timestamp()), GREATEST(0, EXTRACT(EPOCH FROM cooldown_until-clock_timestamp())) FROM market_data_provider_scopes WHERE provider=%s AND scope=%s FOR UPDATE'
+params = ('binance', 'disposable-egress')
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool = False,
+    ) -> Cursor[Row]:
+        """Execute a query and return a cursor to read its results."""
+        try:
+            cur = self.cursor()
+            if binary:
+                cur.format = BINARY
+    
+            return cur.execute(query, params, prepare=prepare)
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.DatetimeFieldOverflow: cannot subtract infinite timestamps
+
+.venv/lib/python3.12/site-packages/psycopg/connection.py:251: DatetimeFieldOverflow
+
+The above exception was the direct cause of the following exception:
+
+admission = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_1e9151f37a5d42718d19c3c208a85422'")
+
+    def test_owner_death_keeps_uncertain_permit_until_confirmed_drain(admission):
+        context = multiprocessing.get_context('spawn')
+        parent, child = context.Pipe()
+        process = context.Process(target=_hold, args=(admission.dsn, child))
+        process.start()
+        child.close()
+        try:
+            assert parent.poll(10)
+            token = parent.recv()
+            process.kill()
+            process.join(10)
+            assert not process.is_alive()
+            with pytest.raises(TemporarySourceError):
+                PostgresProviderAdmission(admission.dsn).reserve(request())
+            # Runbook recovery: all I/O for this exact disposable owner is now proven
+            # stopped by OS join; deleting a live owner's permit would be unsafe.
+            with psycopg.connect(admission.dsn) as connection:
+                connection.execute('DELETE FROM market_data_provider_permits WHERE token=%s', (token,))
+>           permit = admission.reserve(request())
+
+tests/real_infra/market_data/test_provider_admission.py:257: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PostgresProviderAdmission(dsn="user=s03 password=[REDACTED] dbname=postgres host=127.0.0.1 port=36432 options='-c search_path=provider_test_1e9151f37a5d42718d19c3c208a85422'")
+request = ProviderRequest(provider='binance', scope='disposable-egress', concurrency=1, windows=(QuotaWindow(dimension='spot_weight', seconds=60, limit=10000, cost=2), QuotaWindow(dimension='raw', seconds=300, limit=10000, cost=1)))
+
+    def reserve(self, request: ProviderRequest):
+        connection = None
+        try:
+            connection = _connect(self.dsn)
+            token = uuid4()
+            with connection.transaction():
+                connection.execute(
+                    'INSERT INTO market_data_provider_scopes(provider,scope) VALUES (%s,%s) '
+                    'ON CONFLICT DO NOTHING', (request.provider, request.scope))
+                row = connection.execute(
+                    'SELECT EXTRACT(EPOCH FROM clock_timestamp()), '
+                    'CASE WHEN cooldown_until > clock_timestamp() THEN '
+                    'EXTRACT(EPOCH FROM cooldown_until-clock_timestamp()) ELSE 0 END '
+                    'FROM market_data_provider_scopes WHERE provider=%s AND scope=%s FOR UPDATE',
+                    (request.provider, request.scope)).fetchone()
+                assert row is not None
+                now, cooldown = float(row[0]), float(row[1])
+                if cooldown > 0:
+                    raise TemporarySourceError(rate_limited=True, retry_after_s=cooldown)
+                count = connection.execute(
+                    'SELECT count(*) FROM market_data_provider_permits '
+                    'WHERE provider=%s AND scope=%s', (request.provider, request.scope)).fetchone()
+                assert count is not None
+                if count[0] >= request.concurrency:
+                    raise TemporarySourceError(rate_limited=True, retry_after_s=0.25)
+                for window in request.windows:
+                    bucket = int(now // window.seconds)
+                    connection.execute(
+                        'INSERT INTO market_data_provider_windows '
+                        '(provider,scope,dimension,seconds,bucket,spent) VALUES (%s,%s,%s,%s,%s,0) '
+                        'ON CONFLICT (provider,scope,dimension,seconds) DO UPDATE SET '
+                        'spent=CASE WHEN market_data_provider_windows.bucket>=EXCLUDED.bucket '
+                        'THEN market_data_provider_windows.spent ELSE 0 END,bucket=GREATEST(market_data_provider_windows.bucket,EXCLUDED.bucket)',
+                        (request.provider, request.scope, window.dimension, window.seconds, bucket))
+                    spent = connection.execute(
+                        'SELECT spent,bucket FROM market_data_provider_windows WHERE provider=%s '
+                        'AND scope=%s AND dimension=%s AND seconds=%s',
+                        (request.provider, request.scope, window.dimension, window.seconds)
+                    ).fetchone()
+                    assert spent is not None
+                    if spent[1] > bucket:
+                        raise TemporarySourceError(rate_limited=True,
+                            retry_after_s=(spent[1] + 1) * window.seconds - now)
+                    if spent[0] + window.cost > window.limit:
+                        raise TemporarySourceError(rate_limited=True,
+                            retry_after_s=(bucket + 1) * window.seconds - now)
+                    connection.execute(
+                        'UPDATE market_data_provider_windows SET spent=spent+%s '
+                        'WHERE provider=%s AND scope=%s AND dimension=%s AND seconds=%s',
+                        (window.cost, request.provider, request.scope, window.dimension,
+                         window.seconds))
+                connection.execute(
+                    'INSERT INTO market_data_provider_permits '
+                    '(token,provider,scope,owner_pid,owner_host) VALUES (%s,%s,%s,%s,%s)',
+                    (token, request.provider, request.scope, os.getpid(), socket.gethostname()))
+            return PostgresProviderPermit(self.dsn, connection, request, token)
+        except Exception as error:
+            if connection is not None:
+                connection.close()
+            if isinstance(error, TemporarySourceError):
+>               raise
+E               trading.contexts.market_data.application.services.source_retry.TemporarySourceError: source_unavailable
+
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py:91: TemporarySourceError
+=========================== short test summary info ============================
+SKIPPED [2] tests/real_infra/market_data/test_work_requests_postgres.py:524: explicit disposable ClickHouse target required
+FAILED tests/real_infra/market_data/test_provider_admission.py::test_two_processes_share_capacity_and_spent_quota_survives_restart
+FAILED tests/real_infra/market_data/test_provider_admission.py::test_multi_quota_reservation_is_atomic_and_headers_only_increase_spend
+FAILED tests/real_infra/market_data/test_provider_admission.py::test_session_reuse_retries_charge_every_attempt_and_shared_retry_after
+FAILED tests/real_infra/market_data/test_provider_admission.py::test_absolute_deadline_stops_trickle_before_permit_release
+FAILED tests/real_infra/market_data/test_provider_admission.py::test_permit_session_loss_stops_io_before_capacity_is_reused
+FAILED tests/real_infra/market_data/test_provider_admission.py::test_owner_death_keeps_uncertain_permit_until_confirmed_drain
+6 failed, 23 passed, 2 skipped in 19.24s

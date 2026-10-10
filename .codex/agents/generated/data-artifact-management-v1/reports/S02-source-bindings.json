@@ -1,0 +1,15 @@
+{
+  "src/trading/contexts/backtest_artifacts/application/services/management.py": "9429c0391f30a6e20aae5e43582a7d31d116d23bba6659a822241439c8588c37",
+  "src/trading/contexts/backtest_artifacts/application/ports/management.py": "4ffaa1b5619c1480595e2f85edfc2025b0e6d5989b9379f24938140a017172f9",
+  "src/trading/contexts/backtest_artifacts/adapters/outbound/defaults/management_catalog.py": "26db40e58ddde2db611bdece4f585aefbb2217734517584f96ccc466eda7f1ca",
+  "src/trading/contexts/backtest_artifacts/adapters/outbound/config/legacy_management_import.py": "e0cd2341b25157a66f435e6ff17c7ea91727c73b79a92bd38d3fce4f0a9a32ba",
+  "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py": "810fbd5fc3933f666069055792e558ff0026ea79c8aa8f827ae7d103dbfb496f",
+  "migrations/postgres/0029_backtest_artifact_management_v1.sql": "ac3b66333786594567030cd6bf46f97d2a20eeb94dae86913b6b89e0e90a348b",
+  "migrations/postgres/manifest.json": "09ded821b874984a96ccf36029f92b0d6a97e8ade3ec6be3c5b1ba0032eaf352",
+  "apps/migrations/bootstrap.py": "a59ae0891e53aa8d5d31aa07d949ca0d1060a3cbd5d46e7b8e0a780162d99cde",
+  "apps/migrations/storage.py": "08eb3bc4086742d632cf945ebac550a1b09118e4b343e02ed6b50d8e755f67c1",
+  "tests/real_infra/backtest/test_artifact_management.py": "3948e8b470a8230127df15ea87cac8df43c3da09fa28a4123425723981f4ccf9",
+  "tests/unit/contexts/backtest_artifacts/test_management_profiles.py": "7f3f3da7ad510b77ec1aefdb3830e4455bda90c824dc813632851eee4119bcb1",
+  "tests/unit/apps/migrations/test_backtest_input_recipe_sql.py": "2c21ceb48c464e0103c6b9207ff956adef484fa2b476a6d8dc966a03cdf10c88",
+  "tests/unit/apps/migrations/test_storage_lifecycle.py": "7e1d9f69252e1c05e3610963913e65c3b3af38e3ec54ff6e1a5fc3cb00f1a882"
+}

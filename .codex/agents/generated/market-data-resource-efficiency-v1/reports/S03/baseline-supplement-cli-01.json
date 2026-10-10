@@ -1,0 +1,10 @@
+{
+  "apps/cli/commands/rest_catchup_1m.py": {
+    "sha256": "32fdbe3525e01d350ff265495c10aa81d2a171d2611852ad1af356f4e41b559c",
+    "provenance": "reconstructed from S02 preserved baseline plus S02 workload argument; exact match to accepted S02 candidate hash"
+  },
+  "apps/cli/commands/funding_rate_catchup.py": {
+    "sha256": "1274d8d57f2c4d715cdd4720f7e85e9e9df2ba2b25260764c4cf568a6a769d2d",
+    "provenance": "preserved S02 source equals HEAD; S03 pre-edit git status showed path clean"
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "generator": "python -m tools.docs.generate_project_map",
+  "changes_from_pre_S06_generation": {
+    "project-map.json": {
+      "added_lines": 223,
+      "removed_lines": 11
+    },
+    "PROJECT_MAP.md": {
+      "added_lines": 12,
+      "removed_lines": 9
+    },
+    "component-map.mmd": {
+      "added_lines": 3,
+      "removed_lines": 0
+    }
+  }
+}

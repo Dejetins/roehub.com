@@ -1,0 +1,27 @@
+[
+  {
+    "command": [
+      "docker",
+      "stop",
+      "roehub-s09-postgres",
+      "roehub-s09-clickhouse"
+    ],
+    "exit_code": 0,
+    "output": "roehub-s09-postgres\nroehub-s09-clickhouse\n"
+  },
+  {
+    "command": [
+      "docker",
+      "rm",
+      "-v",
+      "roehub-s09-postgres",
+      "roehub-s09-clickhouse"
+    ],
+    "exit_code": 0,
+    "output": "roehub-s09-postgres\nroehub-s09-clickhouse\n"
+  },
+  {
+    "action": "remove owned apps/navigator-web/.cache/s09-dist",
+    "done": true
+  }
+]

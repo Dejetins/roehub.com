@@ -9,6 +9,7 @@ from uuid import UUID
 
 from pydantic import ValidationError
 
+from ..artifact_storage_contracts import StorageEnvelope, StorageResult
 from ..auth import mint_service_assertion
 from ..contracts import (
     ControlAgentRequest,
@@ -36,6 +37,12 @@ class ControlAgentUnixClient:
         self._identity: Literal["api", "installation_owner"] = identity
         self._identity_key = identity_key
         self._timeout = timeout_seconds
+
+    def artifact_storage(self, envelope: StorageEnvelope) -> StorageResult:
+        response = self._call_authenticated(method="artifact_storage", storage=envelope)
+        if response.storage is None:
+            raise ControlOperationError(code="control_agent.response_invalid")
+        return response.storage
 
     def submit(self, operation: OperationRequest) -> OperationResult:
         response = self._call_authenticated(
@@ -74,7 +81,8 @@ class ControlAgentUnixClient:
     def _call_authenticated(
         self,
         *,
-        method: Literal["submit", "get", "reconcile", "journal"],
+        method: Literal["submit", "get", "reconcile", "journal", "artifact_storage"],
+        storage: StorageEnvelope | None = None,
         operation: OperationRequest | None = None,
         operation_id: UUID | None = None,
         after_sequence: int = 0,
@@ -83,6 +91,7 @@ class ControlAgentUnixClient:
             identity=self._identity,
             credential="0" * 32,
             method=method,
+            storage=storage,
             operation=operation,
             operation_id=operation_id,
             after_sequence=after_sequence,

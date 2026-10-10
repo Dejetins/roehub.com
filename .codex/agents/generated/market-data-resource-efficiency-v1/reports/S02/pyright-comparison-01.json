@@ -1,0 +1,8 @@
+{
+  "baseline": "pyright-baseline-01.json",
+  "candidate": "pyright-final-02.json",
+  "baseline_errors": 54,
+  "candidate_errors": 54,
+  "same_file_severity_message_rule": true,
+  "line_positions_ignored": "owned insertions shift baseline diagnostics"
+}

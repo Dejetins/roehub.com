@@ -53,6 +53,9 @@ class ClickHouseConnectGateway:
             out.append({cols[i]: tup[i] for i in range(len(cols))})
         return out
 
+    def command(self, query: str, parameters: Mapping[str, Any]) -> None:
+        self._client.command(query, parameters=parameters)
+
 
 class ThreadLocalClickHouseConnectGateway:
     """
@@ -173,3 +176,10 @@ class ThreadLocalClickHouseConnectGateway:
             raise RuntimeError("ThreadLocalClickHouseConnectGateway factory returned None client")
         self._thread_local.client = created
         return created
+
+    def command(self, query: str, parameters: Mapping[str, Any]) -> None:
+        self._client().command(query, parameters=parameters)
+
+
+class ClickHouseCommandGateway(ClickHouseGateway, Protocol):
+    def command(self, query: str, parameters: Mapping[str, Any]) -> None: ...

@@ -1,0 +1,14 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "tests/real_infra/backtest/test_artifact_http_storage.py",
+    "tests/real_infra/backtest/test_artifact_management.py",
+    "tests/real_infra/backtest/test_artifact_dispatch.py"
+  ],
+  "target": "task-created roehub-s06-postgres; unique per-test schemas; temporary roots",
+  "exit_code": 0,
+  "elapsed_seconds": 20.50634933297988,
+  "stdout": ".............................................................            [100%]\n61 passed in 20.05s\n",
+  "stderr": ""
+}

@@ -1,0 +1,257 @@
+{
+  "lifecycle": [
+    {
+      "mode": "legacy",
+      "admin_access": true,
+      "rendered_sha256": "89fa862db5b815a5f7fccfde3be082e547267812e8d943e4b89e0c7a0e69cf08",
+      "unique_candles": 2,
+      "bitmap_candles": 2
+    },
+    {
+      "mode": "provisioned",
+      "admin_access": true,
+      "rendered_sha256": "7c43b5cb3b6a6674e7ea0e0a339b154be82773014960e122a2d85c36b109a8d9",
+      "stream": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "2"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "201326592"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "interactive": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "4"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "201326592"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "backfill": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "1"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "134217728"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "artifacts": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "1"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "134217728"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "private_file": "600:clickhouse:clickhouse",
+      "remote_default_denied": true,
+      "unique_candles": 4,
+      "bitmap_candles": 4
+    },
+    {
+      "mode": "active",
+      "admin_access": true,
+      "rendered_sha256": "aee26839ad2c0de27d27772e187463032ffff3a076669b99dbfb929e933cbb04",
+      "stream": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "2"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "201326592"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "interactive": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "4"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "201326592"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "backfill": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "1"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "134217728"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "artifacts": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "1"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "134217728"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "private_file": "600:clickhouse:clickhouse",
+      "remote_default_denied": true,
+      "unique_candles": 4,
+      "bitmap_candles": 4
+    },
+    {
+      "mode": "provisioned",
+      "admin_access": true,
+      "rendered_sha256": "7c43b5cb3b6a6674e7ea0e0a339b154be82773014960e122a2d85c36b109a8d9",
+      "stream": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "2"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "201326592"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "interactive": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "4"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "201326592"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "backfill": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "1"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "134217728"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "artifacts": [
+        [
+          "async_insert",
+          "0"
+        ],
+        [
+          "max_concurrent_queries_for_user",
+          "1"
+        ],
+        [
+          "max_memory_usage_for_user",
+          "134217728"
+        ],
+        [
+          "wait_for_async_insert",
+          "1"
+        ]
+      ],
+      "private_file": "600:clickhouse:clickhouse",
+      "remote_default_denied": true,
+      "unique_candles": 4,
+      "bitmap_candles": 4
+    }
+  ],
+  "credentials_unchanged": true,
+  "limits": "same renderer 1536 MiB container / 1 GiB server",
+  "boundary": "real generated ClickHouse service recreated; application mounts/mode verified by unit tests, no installation activation"
+}

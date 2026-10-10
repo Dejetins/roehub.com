@@ -148,9 +148,15 @@ def test_migration_manifests_match_immutable_sources() -> None:
         "market-data-queue-events-0026",
         "market-data-stream-recovery-0027",
         "backtest-input-recipe-0028",
+        "backtest-artifact-management-0029",
+        "backtest-artifact-dispatch-0030",
+        "backtest-artifact-storage-0031",
+        "identity-browser-devices-0032",
+        "market-data-stream-connections-0033",
+        "market-data-provider-admission-0034",
     )
     assert token == "market_data"
-    assert [migration.version for migration in clickhouse] == ["0001", "0002"]
+    assert [migration.version for migration in clickhouse] == ["0001", "0002", "0003"]
 
 
 def test_clickhouse_render_targets_configured_database_and_rejects_destructive_ddl() -> None:

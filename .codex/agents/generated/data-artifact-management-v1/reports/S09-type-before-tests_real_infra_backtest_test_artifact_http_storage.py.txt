@@ -1,0 +1,707 @@
+"""Disposable real HTTP->repository and signed Unix->filesystem/PG effects."""
+
+from datetime import UTC, datetime
+from pathlib import Path
+from types import SimpleNamespace
+from uuid import uuid4
+
+import psycopg
+import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from psycopg import sql
+
+from apps.api.routes.backtest_artifacts import build_artifact_router
+from apps.api.wiring.artifact_service import ArtifactHttpService
+from apps.control_agent.artifact_storage import ArtifactStorageService
+from apps.control_agent.auth import ServiceIdentityAuthorizer
+from apps.control_agent.server import start_control_agent_server, stop_control_agent_server
+from tests.real_infra.backtest.test_artifact_management import DSN, managed  # noqa: F401
+from tests.unit.contexts.backtest_artifacts.test_management_profiles import catalog  # noqa: F401
+from trading.contexts.operations.adapters import AppendOnlyOperationJournal, ControlAgentUnixClient
+from trading.contexts.operations.artifact_storage_contracts import StorageCommand, StorageEnvelope
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+pytestmark = pytest.mark.skipif(not DSN, reason="explicit disposable PostgreSQL target required")
+
+
+@pytest.fixture
+def context(managed, tmp_path):  # noqa: F811
+    m = managed
+    with psycopg.connect(m["dsn"]) as conn:
+        conn.execute(
+            sql.SQL(Path("migrations/postgres/0031_backtest_artifact_storage_v1.sql").read_text())
+        )
+    root = (tmp_path / "root").resolve()
+    root.mkdir(mode=0o700)
+    candidate = (tmp_path / "candidate").resolve()
+    candidate.mkdir(mode=0o700)
+    service = ArtifactStorageService(
+        repository=m["repo"],
+        roots={"backtest-primary": root, "candidate": candidate},
+        default_schedule=m["schedule"],
+        installation_id=m["installation"],
+    )
+    m.update(root=root, candidate=candidate, storage=service)
+    yield m
+
+
+def envelope(m, action, key=None, **kwargs):
+    return StorageEnvelope(
+        organization_id=m["org"],
+        actor_id=m["actor"],
+        idempotency_key=key or ("test-" + uuid4().hex),
+        command=StorageCommand(
+            action=action, expected_version=kwargs.pop("expected_version", 1), **kwargs
+        ),
+    )
+
+
+def http(m):
+    principal = SimpleNamespace(user_id=UserId(m["actor"]), session_created_at=datetime.now(UTC))
+    scope = SimpleNamespace(
+        resolve=lambda **kw: SimpleNamespace(organization_id=OrganizationId(m["org"]))
+    )
+    app = FastAPI()
+    app.include_router(
+        build_artifact_router(
+            service=ArtifactHttpService(m["repo"], m["installation"]),
+            current_user_dependency=lambda: principal,
+            scope_resolver=scope,
+        )
+    )
+    return TestClient(app), principal
+
+
+def test_http_transaction_bulk_replay_versions_private_and_dto(context):
+    m = context
+    client, principal = http(m)
+    c = {"exchange": "binance", "market_type": "spot", "symbol": "BTCUSDT"}
+    body = {"items": [{"coordinate": c, "expected_version": 0}]}
+    url = "/api/backtest-artifacts/build-requests"
+    headers = {"Origin": "http://testserver", "Idempotency-Key": "http-command-001"}
+    assert (
+        client.post(url, json=body, headers={"Idempotency-Key": "http-command-001"}).status_code
+        == 403
+    )
+    bad = client.post(url, json={"items": [dict(body["items"][0], source={})]}, headers=headers)
+    assert bad.status_code == 422
+    result = client.post(url, json=body, headers=headers)
+    assert result.status_code == 202, result.text
+    assert client.post(url, json=body, headers=headers).json() == result.json()
+    assert (
+        client.post(
+            url, json=body, headers=dict(headers, **{"Idempotency-Key": "http-command-002"})
+        ).status_code
+        == 409
+    )
+    assert client.get("/api/backtest-artifacts/commands/http-command-001").json() == result.json()
+    request = result.json()["items"][0]["request_id"]
+    assert "snapshot" not in client.get("/api/backtest-artifacts/requests/" + request).text
+    principal.user_id = UserId(m["viewer"])
+    assert client.get("/api/backtest-artifacts/requests/" + request).status_code == 200
+    assert client.post(url, json=body, headers=headers).status_code == 403
+    m["org"] = m["other"]
+    assert client.get("/api/backtest-artifacts/requests/" + request).status_code == 404
+    assert client.get("/api/backtest-artifacts/commands/http-command-001").status_code == 404
+
+
+def test_http_bulk_rollback_and_schedule_anchor(context):
+    m = context
+    client, _ = http(m)
+    prefix = "/api/backtest-artifacts"
+    items = [
+        {
+            "coordinate": {"exchange": "binance", "market_type": "spot", "symbol": s},
+            "expected_version": 0,
+            "patch": {"schedule": m["schedule"].model_dump(mode="json")},
+        }
+        for s in ("BTCUSDT", "ETHUSDT")
+    ]
+    headers = {"Origin": "http://testserver", "Idempotency-Key": "bulk-policy-001"}
+    result = client.post(prefix + "/policies:bulk", json={"items": items}, headers=headers)
+    assert result.status_code == 202, result.text
+    assert (
+        client.post(prefix + "/policies:bulk", json={"items": items}, headers=headers).json()
+        == result.json()
+    )
+    inventory = client.get(
+        prefix + "/inventory", params={"exchange": "binance", "market_type": "spot"}
+    )
+    assert inventory.status_code == 200, inventory.text
+    assert len(inventory.json()["items"]) == 2
+    detail = client.get(prefix + "/instruments/binance/spot/BTCUSDT")
+    assert detail.status_code == 200, detail.text
+    assert detail.json()["schedule"] == m["schedule"].model_dump(mode="json")
+    assert client.get(prefix + "/requests?limit=51").status_code == 422
+    assert client.get(prefix + "/storage").json() == {
+        "location_label": "Backtest artifacts",
+        "state": "ready",
+    }
+
+
+def test_real_probe_configure_replay_and_relocation(context):
+    m = context
+    s = m["storage"]
+    validation = s.execute(envelope(m, "validate"))
+    assert validation.state == "validated" and not list(m["root"].iterdir())
+    command = envelope(
+        m,
+        "configure",
+        validation_id=validation.validation_id,
+        budget_bytes=5000000000,
+        schedule=m["schedule"],
+    )
+    result = s.execute(command)
+    assert result.state == "configured" and result.control_version == 2
+    assert s.execute(command) == result
+    (m["root"] / "keep").write_text("user data")
+    validation = s.execute(envelope(m, "validate", root_id="candidate", expected_version=2))
+    result = s.execute(
+        envelope(
+            m,
+            "configure",
+            root_id="candidate",
+            expected_version=2,
+            validation_id=validation.validation_id,
+            budget_bytes=5000000000,
+            schedule=m["schedule"],
+        )
+    )
+    assert result.state == "relocation_required"
+    assert (m["root"] / "keep").read_text() == "user data"
+    assert m["repo"]._settings(m["installation"], active=False)["root_id"] == "backtest-primary"
+
+
+def test_first_root_preserves_legacy_primary_and_rejects_admin(context):
+    m = context
+    s = m["storage"]
+    m["db"].execute(query="DELETE FROM backtest_artifact_installation_settings", parameters={})
+    (m["root"] / "legacy").write_text("keep")
+    validation = s.execute(envelope(m, "validate", root_id="candidate", expected_version=0))
+    outcome = s.execute(
+        envelope(
+            m,
+            "configure",
+            root_id="candidate",
+            expected_version=0,
+            validation_id=validation.validation_id,
+            budget_bytes=5000000000,
+            schedule=m["schedule"],
+        )
+    )
+    assert outcome.state == "relocation_required"
+    command = envelope(m, "inspect", expected_version=0).model_copy(update={"actor_id": m["admin"]})
+    with pytest.raises(ValueError, match="installation_forbidden"):
+        s.execute(command)
+
+
+def test_symlink_and_failure_probe_leaves_no_file(context, monkeypatch):
+    import errno
+    import os
+
+    m = context
+    s = m["storage"]
+    (m["root"] / "escape").symlink_to(m["candidate"], target_is_directory=True)
+    with pytest.raises(ValueError, match="untrusted_root"):
+        s.execute(envelope(m, "validate"))
+    (m["root"] / "escape").unlink()
+
+    def full(*args):
+        raise OSError(errno.ENOSPC, "private path must not leak")
+
+    monkeypatch.setattr(os, "write", full)
+    with pytest.raises(ValueError, match="disk_full"):
+        s.execute(envelope(m, "validate"))
+    assert not list(m["root"].iterdir())
+
+
+def test_signed_unix_service_real_probe_and_owner_database_check(context, tmp_path):
+    m = context
+    # Synthetic fixture keys confined to the disposable socket; no installation key is minted/read.
+    for name, char in [("api", "a"), ("owner", "b")]:
+        p = tmp_path / name
+        p.write_text(char * 48)
+        p.chmod(0o600)
+    auth = ServiceIdentityAuthorizer(
+        api_token_file=tmp_path / "api",
+        owner_token_file=tmp_path / "owner",
+        replay_state_dir=tmp_path / "replay",
+    )
+    import tempfile
+
+    socket_dir = tempfile.TemporaryDirectory(prefix="s06-", dir="/tmp")
+    socket = Path(socket_dir.name) / "control.sock"
+    server, thread = start_control_agent_server(
+        socket_path=socket,
+        service=None,
+        journal=AppendOnlyOperationJournal(path=tmp_path / "journal"),
+        authorizer=auth,
+        storage_service=m["storage"],
+    )
+    transport = ControlAgentUnixClient(socket_path=socket, identity="api", identity_key="a" * 48)
+    try:
+        from apps.api.control_agent_client import ApiControlAgentClient
+        from apps.api.routes.artifact_storage import build_artifact_storage_router
+        from trading.contexts.identity.adapters.outbound.persistence.in_memory import (
+            InMemoryOrganizationRepository,
+        )
+        from trading.contexts.identity.application.ports import CurrentUserPrincipal
+        from trading.contexts.identity.application.use_cases import OrganizationAccessService
+        from trading.shared_kernel.primitives import PaidLevel
+
+        owner = CurrentUserPrincipal(
+            user_id=UserId(m["actor"]),
+            paid_level=PaidLevel.free(),
+            session_created_at=datetime.now(UTC),
+        )
+        identity_repo = InMemoryOrganizationRepository()
+        identity_service = OrganizationAccessService(repository=identity_repo)
+        _, org = identity_service.bootstrap_installation(
+            principal=owner,
+            installation_name="Disposable",
+            organization_slug="storage-test",
+            organization_name="Storage test",
+            now=datetime.now(UTC),
+        )
+        m["db"].execute(
+            query="INSERT INTO identity_organizations VALUES (%(org)s,%(i)s,'active')",
+            parameters={"org": org.organization_id.value, "i": m["installation"]},
+        )
+        m["db"].execute(
+            query="INSERT INTO identity_memberships VALUES (%(org)s,%(a)s,'owner','active')",
+            parameters={"org": org.organization_id.value, "a": m["actor"]},
+        )
+        app = FastAPI()
+        app.include_router(
+            build_artifact_storage_router(
+                current_user_dependency=lambda: owner,
+                organization_service=identity_service,
+                client=ApiControlAgentClient(transport=transport),
+            )
+        )
+        browser = TestClient(app)
+        url = f"/api/v1/admin/organizations/{org.organization_id.value}/backtest-artifacts/storage"
+        assert browser.get(url).status_code == 200
+        response = browser.post(
+            url + "/validate",
+            json={"action": "validate", "expected_version": 1},
+            headers={"Origin": "http://testserver", "Idempotency-Key": "http-unix-validate"},
+        )
+        assert response.status_code == 200, response.text
+        assert response.json()["state"] == "validated" and not list(m["root"].iterdir())
+        result = transport.artifact_storage(envelope(m, "validate"))
+        assert result.state == "validated" and not list(m["root"].iterdir())
+        from trading.contexts.operations import ControlOperationError
+
+        with pytest.raises(ControlOperationError, match="installation_forbidden"):
+            transport.artifact_storage(
+                envelope(m, "inspect").model_copy(update={"actor_id": m["admin"]})
+            )
+    finally:
+        stop_control_agent_server(server=server, thread=thread, socket_path=socket)
+        socket_dir.cleanup()
+
+
+def slots(m):
+    import hashlib
+
+    import yaml
+
+    from trading.contexts.backtest_artifacts.application.services.management import Coordinate
+
+    c = Coordinate(exchange="binance", market_type="spot", symbol="BTCUSDT")
+    base = m["root"] / "binance" / "spot" / "BTCUSDT"
+    base.mkdir(parents=True)
+    hashes = {}
+    for n, slot in enumerate(("slot_a", "slot_b"), 1):
+        path = base / slot
+        path.mkdir()
+        manifest = yaml.safe_dump({"slot_generation": n}).encode()
+        (path / "manifest.yaml").write_bytes(manifest)
+        (path / "prices.npy").write_bytes(b"owned disposable payload")
+        hashes[slot] = hashlib.sha256(manifest).hexdigest()
+        m["db"].execute(
+            query="""INSERT INTO
+                backtest_artifact_slot_ownership(exchange,market_type,symbol,slot,generation,manifest_sha256)
+            VALUES ('binance','spot','BTCUSDT',%(slot)s,%(n)s,%(h)s)""",
+            parameters={"slot": slot, "n": n, "h": hashes[slot]},
+        )
+    (base / "current.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "asof_date": "2026-10-08",
+                "published_at_utc": "2026-10-08T00:00:00Z",
+                "active_slot": "slot_b",
+                "slot_generation": 2,
+                "manifest_sha256": hashes["slot_b"],
+            }
+        )
+    )
+    return c, base, hashes
+
+
+def test_cleanup_actual_effect_current_and_unknown_slot_protected(context):
+    m = context
+    c, base, hashes = slots(m)
+    s = m["storage"]
+    with pytest.raises(ValueError, match="cleanup_current"):
+        s.execute(envelope(m, "cleanup_preview", coordinate=c, slot="slot_b"))
+    preview = s.execute(envelope(m, "cleanup_preview", coordinate=c, slot="slot_a"))
+    command = envelope(m, "cleanup_confirm", preview_id=preview.preview_id)
+    outcome = s.execute(command)
+    assert outcome.state == "cleaned" and not (base / "slot_a").exists()
+    assert (base / "slot_b" / "prices.npy").read_bytes() == b"owned disposable payload"
+    assert s.execute(command) == outcome
+    assert s.execute(envelope(m, "inspect", expected_version=0)).control_version == 1
+
+
+def test_cleanup_pin_added_after_preview_prevents_delete(context):
+    m = context
+    c, base, hashes = slots(m)
+    s = m["storage"]
+    preview = s.execute(envelope(m, "cleanup_preview", coordinate=c, slot="slot_a"))
+    m["db"].execute(
+        query="""INSERT INTO backtest_artifact_slot_readers
+        (exchange,market_type,symbol,slot,owner_kind,organization_id,owner_id,owner_token,attempt,
+         expected_generation,expected_manifest_sha256,ownership_epoch,state)
+        VALUES
+                ('binance','spot','BTCUSDT','slot_a','job',%(org)s,%(id)s,%(token)s,0,1,%(h)s,0,'queued')""",
+        parameters={"org": m["other"], "id": uuid4(), "token": uuid4(), "h": hashes["slot_a"]},
+    )
+    with pytest.raises(ValueError, match="cleanup_pinned"):
+        s.execute(envelope(m, "cleanup_confirm", preview_id=preview.preview_id))
+    assert (base / "slot_a" / "prices.npy").exists()
+
+
+def test_cleanup_changed_current_and_payload_preserved(context):
+    import yaml
+
+    m = context
+    c, base, hashes = slots(m)
+    s = m["storage"]
+    preview = s.execute(envelope(m, "cleanup_preview", coordinate=c, slot="slot_a"))
+    (base / "current.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 1,
+                "asof_date": "2026-10-08",
+                "published_at_utc": "2026-10-08T00:00:00Z",
+                "active_slot": "slot_a",
+                "slot_generation": 1,
+                "manifest_sha256": hashes["slot_a"],
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="cleanup_current"):
+        s.execute(envelope(m, "cleanup_confirm", preview_id=preview.preview_id))
+    assert (base / "slot_a" / "prices.npy").exists()
+
+
+def test_cleanup_io_failure_is_quarantined_and_replay_unknown(context, monkeypatch):
+    import errno
+    import os
+
+    m = context
+    c, base, _ = slots(m)
+    s = m["storage"]
+    preview = s.execute(envelope(m, "cleanup_preview", coordinate=c, slot="slot_a"))
+    command = envelope(m, "cleanup_confirm", preview_id=preview.preview_id)
+
+    def denied(*args, **kwargs):
+        raise OSError(errno.EACCES, "secret host path")
+
+    monkeypatch.setattr(os, "unlink", denied)
+    with pytest.raises(ValueError, match="storage_access_unavailable"):
+        s.execute(command)
+    assert s.execute(command).state == "unknown"
+    row = m["repo"]._one("SELECT state FROM backtest_artifact_slot_ownership WHERE slot='slot_a'")
+    assert row["state"] == "quarantined" and (base / "slot_a" / "prices.npy").exists()
+
+
+def test_first_empty_configuration_and_malicious_root_ids(context):
+    from pydantic import ValidationError
+
+    m = context
+    s = m["storage"]
+    m["db"].execute(query="DELETE FROM backtest_artifact_installation_settings", parameters={})
+    for root in ("/tmp/anywhere", "../escape", "root/path"):
+        with pytest.raises(ValidationError):
+            envelope(m, "validate", root_id=root, expected_version=0)
+    validated = s.execute(envelope(m, "validate", expected_version=0))
+    outcome = s.execute(
+        envelope(
+            m,
+            "configure",
+            expected_version=0,
+            validation_id=validated.validation_id,
+            budget_bytes=5000000000,
+            schedule=m["schedule"],
+        )
+    )
+    assert outcome.state == "configured" and outcome.control_version == 1
+    settings = m["repo"]._settings(m["installation"], active=False)
+    assert (
+        not settings["capability_enabled"]
+        and settings["paused"]
+        and settings["legacy_handoff"] == "pending"
+    )
+
+
+def test_progress_does_not_expose_foreign_derivative_totals():
+    from apps.api.wiring.artifact_service import progress_views
+
+    raw = {
+        "series": {
+            "a": {
+                "phase": "base",
+                "completed_units": 7,
+                "total_units": 10,
+                "unit": "bars",
+                "progress_epoch": 1,
+            },
+            "b": {
+                "phase": "derivatives",
+                "completed_units": 999,
+                "total_units": 9999,
+                "unit": "bars",
+                "progress_epoch": 1,
+            },
+        }
+    }
+    base = progress_views(raw, "base", True)
+    assert len(base) == 1 and base[0].completed_units == 7
+    derivative = progress_views(raw, "derivatives", True)
+    assert (
+        len(derivative) == 1
+        and derivative[0].completed_units is None
+        and derivative[0].total_units is None
+    )
+    assert progress_views(raw, "derivatives", False)[0].completed_units == 999
+
+
+@pytest.mark.parametrize(
+    "corruption",
+    [
+        {"active_slot": "slot_c"},
+        {"slot_generation": True},
+        {"manifest_sha256": "bad"},
+        {"schema_version": 99},
+    ],
+)
+def test_malformed_current_never_proves_cleanup_eligibility(context, corruption):
+    import yaml
+
+    m = context
+    c, base, _ = slots(m)
+    pointer = yaml.safe_load((base / "current.yaml").read_text())
+    pointer.update(corruption)
+    (base / "current.yaml").write_text(yaml.safe_dump(pointer))
+    with pytest.raises(ValueError, match="preview_stale"):
+        m["storage"].execute(envelope(m, "cleanup_preview", coordinate=c, slot="slot_a"))
+    assert (base / "slot_a" / "prices.npy").exists()
+
+
+def test_no_write_permission_probe(context):
+    m = context
+    m["root"].chmod(0o500)
+    try:
+        with pytest.raises(ValueError, match="storage_access_unavailable"):
+            m["storage"].execute(envelope(m, "validate"))
+        assert not list(m["root"].iterdir())
+    finally:
+        m["root"].chmod(0o700)
+
+
+def test_cleanup_final_version_recheck_after_durable_reservation(context, monkeypatch):
+    m = context
+    c, base, _ = slots(m)
+    s = m["storage"]
+    preview = s.execute(envelope(m, "cleanup_preview", coordinate=c, slot="slot_a"))
+    original = s.jobs.reserve_artifact_writer
+
+    def version_race(**kwargs):
+        writer = original(**kwargs)
+        m["db"].execute(
+            query=(
+                "UPDATE backtest_artifact_installation_settings "
+                "SET control_version=control_version+1"
+            ),
+            parameters={},
+        )
+        return writer
+
+    monkeypatch.setattr(s.jobs, "reserve_artifact_writer", version_race)
+    with pytest.raises(ValueError, match="preview_stale"):
+        s.execute(envelope(m, "cleanup_confirm", preview_id=preview.preview_id))
+    assert (base / "slot_a" / "prices.npy").exists()
+    assert (
+        m["repo"]._one("SELECT state FROM backtest_artifact_slot_ownership WHERE slot='slot_a'")[
+            "state"
+        ]
+        == "quarantined"
+    )
+
+
+def test_validation_token_actor_version_and_expiry(context):
+    m = context
+    s = m["storage"]
+    v = s.execute(envelope(m, "validate"))
+    m["db"].execute(
+        query="UPDATE backtest_artifact_storage_previews SET expires_at=now()-interval '1 second'",
+        parameters={},
+    )
+    with pytest.raises(ValueError, match="preview_stale"):
+        s.execute(
+            envelope(
+                m,
+                "configure",
+                validation_id=v.validation_id,
+                budget_bytes=5000000000,
+                schedule=m["schedule"],
+            )
+        )
+    v = s.execute(envelope(m, "validate"))
+    m["db"].execute(
+        query=(
+            "UPDATE backtest_artifact_installation_settings "
+            "SET control_version=control_version+1"
+        ),
+        parameters={},
+    )
+    with pytest.raises(ValueError, match="stale_version"):
+        s.execute(
+            envelope(
+                m,
+                "configure",
+                validation_id=v.validation_id,
+                budget_bytes=5000000000,
+                schedule=m["schedule"],
+            )
+        )
+    assert not list(m["root"].iterdir())
+
+
+def test_inventory_skips_revoked_coordinate_and_history_is_newest_first(context):
+    m = context
+    client, _ = http(m)
+    from psycopg.types.json import Jsonb
+
+    m["db"].execute(
+        query="""INSERT INTO backtest_artifact_source_state
+        (exchange,market_type,symbol,desired_target)
+        VALUES ('binance','spot','AAAASECRET',%(target)s)""",
+        parameters={"target": Jsonb({})},
+    )
+    for index, symbol in enumerate(("BTCUSDT", "ETHUSDT")):
+        response = client.post(
+            "/api/backtest-artifacts/build-requests",
+            json={
+                "items": [
+                    {
+                        "coordinate": {
+                            "exchange": "binance",
+                            "market_type": "spot",
+                            "symbol": symbol,
+                        },
+                        "expected_version": 0,
+                    }
+                ]
+            },
+            headers={"Origin": "http://testserver", "Idempotency-Key": f"newest-test-{index}"},
+        )
+        assert response.status_code == 202, response.text
+    history = client.get("/api/backtest-artifacts/requests?limit=1").json()
+    assert history["items"][0]["coordinate"]["symbol"] == "ETHUSDT"
+    assert (
+        client.get(
+            "/api/backtest-artifacts/requests",
+            params={"cursor": history["next_cursor"], "limit": 1},
+        ).json()["items"][0]["coordinate"]["symbol"]
+        == "BTCUSDT"
+    )
+    page = client.get(
+        "/api/backtest-artifacts/inventory", params={"exchange": "binance", "market_type": "spot"}
+    ).json()
+    assert [i["coordinate"]["symbol"] for i in page["items"]] == ["BTCUSDT", "ETHUSDT"]
+
+
+def test_disabling_precompute_and_schedule_edit_never_admit_destructive_base_refresh(context):
+    m = context
+    client, _ = http(m)
+    c = {"exchange": "binance", "market_type": "spot", "symbol": "BTCUSDT"}
+    for version, patch in [
+        (0, {"mode": "precompute"}),
+        (1, {"mode": "on_demand"}),
+        (2, {"schedule": None}),
+    ]:
+        result = client.post(
+            "/api/backtest-artifacts/policies:bulk",
+            json={"items": [{"coordinate": c, "expected_version": version, "patch": patch}]},
+            headers={"Origin": "http://testserver", "Idempotency-Key": f"mode-toggle-{version}"},
+        )
+        assert result.status_code == 202, result.text
+        if version:
+            assert result.json()["items"][0]["outcome"] == "policy_updated"
+            assert result.json()["items"][0]["request_id"] is None
+    rows = m["db"].fetch_all(query="SELECT kind FROM backtest_artifact_requests", parameters={})
+    assert [r["kind"] for r in rows] == ["derivatives"]
+
+
+def test_pre_s06_command_body_hash_remains_replayable(context):
+    from tests.real_infra.backtest.test_artifact_management import item
+    from trading.contexts.backtest_artifacts.application.services.management import digest
+
+    m = context
+    spec = item(m)
+    previous_hash = digest(
+        {"kind": "update_now", "items": [spec.model_dump(mode="json", exclude={"admit_request"})]}
+    )
+    args = dict(organization_id=m["org"], actor_id=m["actor"], items=(spec,), key="pre-s06-command")
+    original = m["repo"].submit(**args, command_body_digest=previous_hash)
+    assert m["repo"].submit(**args) == original
+
+
+def test_history_continues_past_revoked_cursor_coordinate(context):
+    m = context
+    client, _ = http(m)
+    for index, symbol in enumerate(("BTCUSDT", "ETHUSDT")):
+        response = client.post(
+            "/api/backtest-artifacts/build-requests",
+            json={
+                "items": [
+                    {
+                        "coordinate": {
+                            "exchange": "binance",
+                            "market_type": "spot",
+                            "symbol": symbol,
+                        },
+                        "expected_version": 0,
+                    }
+                ]
+            },
+            headers={"Origin": "http://testserver", "Idempotency-Key": f"cursor-test-{index}"},
+        )
+        assert response.status_code == 202, response.text
+    original = m["repo"].access
+
+    class RevokedEth:
+        def require(self, **kwargs):
+            from trading.contexts.backtest_artifacts.application.services.management import (
+                ManagementError,
+            )
+
+            if kwargs["coordinate"].symbol == "ETHUSDT":
+                raise ManagementError("coordinate_forbidden")
+            return original.require(**kwargs)
+
+    m["repo"].access = RevokedEth()
+    first = client.get("/api/backtest-artifacts/requests?limit=1")
+    assert first.status_code == 200 and first.json()["items"] == []
+    second = client.get(
+        "/api/backtest-artifacts/requests",
+        params={"limit": 1, "cursor": first.json()["next_cursor"]},
+    )
+    assert second.status_code == 200, second.text
+    assert second.json()["items"][0]["coordinate"]["symbol"] == "BTCUSDT"

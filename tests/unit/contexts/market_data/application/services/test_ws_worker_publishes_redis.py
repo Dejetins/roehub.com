@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
+from unittest.mock import Mock
 from uuid import UUID
 
 import apps.worker.market_data_ws.wiring.modules.market_data_ws as worker_module
@@ -353,3 +354,34 @@ def test_ws_worker_refreshes_subscriptions_after_empty_startup(monkeypatch) -> N
     asyncio.run(scenario())
 
     assert reader.calls >= 2
+
+
+def test_connection_callbacks_report_initial_failure_reconnect_and_disconnect(monkeypatch):
+    app = _app(insert_buffer=_InsertBufferStub(), rest_queue=_RestFillQueueStub(),
+               publisher=_PublisherStub(raise_on_call=False),
+               gap_tracker=_GapTrackerStub(task=None))
+    app._metrics = Mock(spec=worker_module.MarketDataWsMetrics,
+        ws_connection_state=lambda _: None, ws_errors_total=SimpleNamespace(inc=lambda: None),
+        ws_reconnects_total=SimpleNamespace(inc=lambda: None),
+        ws_messages_total=SimpleNamespace(inc=lambda: None),
+        ignored_non_closed_total=SimpleNamespace(inc=lambda: None))
+    plan = Mock(spec=worker_module.WorkerConnectionPlan,
+        market=SimpleNamespace(exchange="binance", market_id=MarketId(1), market_type="spot",
+                               ws=SimpleNamespace(url="unused", ping_interval_s=1,
+                                                  pong_timeout_s=1, reconnect=None)),
+        symbols=("ETHUSDT",), instruments=())
+
+    class Stream:
+        def __init__(self, **kwargs):
+            self.hooks = kwargs["hooks"]
+
+        async def run(self, stop_event):
+            self.hooks.on_error()  # Handshake failed: no prior connected callback.
+            assert app._connections == {(1, "ETHUSDT"): False}
+            self.hooks.on_connected(1)
+            assert app._connections == {(1, "ETHUSDT"): True}
+            self.hooks.on_connected(0)
+            assert app._connections == {(1, "ETHUSDT"): False}
+
+    monkeypatch.setattr(worker_module, "BinanceWsClosedCandleStream", Stream)
+    asyncio.run(app._run_plan(plan, asyncio.Event()))

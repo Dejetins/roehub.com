@@ -16,6 +16,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_PATH = ROOT / "configs" / "installation" / "runtime-input-inventory.json"
 SCAN_ROOTS = (Path("apps"), Path("src"), Path("infra"))
+BINARY_SUFFIXES = {".ico", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".woff", ".woff2"}
 TEXT_SUFFIXES = {".bash", ".env", ".example", ".sh", ".yaml", ".yml", ".zsh"}
 ENV_NAME_RE = re.compile(r"^[A-Z][A-Z0-9_]{1,127}$")
 INTERPOLATION_RE = re.compile(r"\$\{([A-Z][A-Z0-9_]{1,127})(?::[-?][^}]*)?\}")
@@ -173,6 +174,8 @@ def inventory_payload() -> dict[str, Any]:
     environment_sources: dict[str, set[str]] = defaultdict(set)
     file_input_sources: dict[str, set[str]] = defaultdict(set)
     for relative in _git_visible_files():
+        if relative.suffix.lower() in BINARY_SUFFIXES:
+            continue
         path = ROOT / relative
         try:
             text = path.read_text(encoding="utf-8")

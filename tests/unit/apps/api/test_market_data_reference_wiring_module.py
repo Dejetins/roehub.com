@@ -41,7 +41,7 @@ class _DummySettingsLoader:
         """
         self._environ = environ
 
-    def load(self):  # noqa: ANN001
+    def load(self, *, workload=None):  # noqa: ANN001
         """
         Return minimal settings namespace expected by wiring module.
 
@@ -290,3 +290,16 @@ def _paths_from_router(*, router: APIRouter) -> set[str]:
         for path in (str(getattr(route, "path", "")),)
         if path
     }
+
+
+def test_artifact_reference_wiring_uses_only_its_composition_owned_secret(tmp_path):
+    credential = tmp_path / "artifacts.password"
+    credential.write_text("x" * 64)
+    use_cases = market_data_reference_module.build_market_data_reference_use_cases(
+        environ={
+            "ROEHUB_CH_WORKLOADS_REQUIRED": "1",
+            "ROEHUB_CH_ARTIFACTS_PASSWORD_FILE": str(credential),
+        },
+        clickhouse_workload="artifacts",
+    )
+    assert use_cases.coverage_reader is not None

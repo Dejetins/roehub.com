@@ -471,7 +471,7 @@ def test_scheduler_wiring_uses_explicit_artifact_config_for_indicators_resolutio
             """
             self._environ = dict(environ)
 
-        def load(self) -> object:
+        def load(self, *, workload=None) -> object:
             """
             Return a deterministic settings object with a database attribute.
 
@@ -847,3 +847,42 @@ def test_app_starts_metrics_and_exits_cleanly_when_stop_already_set(
 
     assert metrics_ports == [9203]
     assert fake_use_case.requests == []
+
+
+def test_managed_calendar_presets_dst_and_anchor():
+    from datetime import UTC, date, datetime, time
+    from zoneinfo import ZoneInfo
+
+    from trading.contexts.backtest_artifacts.application.services.artifact_cadence import (
+        due_window,
+        occurrence,
+    )
+    from trading.contexts.backtest_artifacts.application.services.management import Schedule
+
+    for interval in (1, 3, 7):
+        s = Schedule(
+            interval_days=interval,
+            timezone="Europe/Berlin",
+            local_time=time(2, 30),
+            anchor=date(2026, 3, 29),
+        )
+        assert occurrence(s, s.anchor) == datetime(2026, 3, 29, 1, tzinfo=UTC)
+        due, nxt = due_window(s, datetime(2026, 4, 30, tzinfo=UTC))
+        assert due is not None
+        assert due < datetime(2026, 4, 30, tzinfo=UTC) < nxt
+        assert (nxt.astimezone(ZoneInfo(s.timezone)).date() - s.anchor).days % interval == 0
+        assert due_window(s, datetime(2026, 3, 1, tzinfo=UTC))[0] is None
+    s = Schedule(
+        interval_days=1, timezone="Europe/Berlin", local_time=time(2, 30), anchor=date(2026, 10, 25)
+    )
+    assert occurrence(s, s.anchor) == datetime(2026, 10, 25, 0, 30, tzinfo=UTC)
+    for invalid in (0, 2, 0.5, True):
+        with pytest.raises(ValueError):
+            Schedule.model_validate(
+                dict(
+                    interval_days=invalid,
+                    timezone="UTC",
+                    local_time=time(2),
+                    anchor=date(2026, 1, 1),
+                )
+            )

@@ -1,0 +1,94 @@
+"""Run at a quiescent M3 boundary, against owned disposable PG and same Linux image."""
+import hashlib
+import json
+import os
+import subprocess
+import time
+from pathlib import Path
+from uuid import uuid4
+
+import psycopg
+from psycopg import sql
+from psycopg.conninfo import make_conninfo, conninfo_to_dict
+
+
+def main():
+    root = Path.cwd()
+    report = root / '.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03'
+    for label in ['baseline', 'candidate']:
+        assert all(json.loads((report / f'{label}-M3-01.json').read_text())['checks'].values())
+    assert not (report/'candidate-M3-02.json').exists()
+    active = subprocess.check_output(['ps', '-axo', 'pid,args'], text=True)
+    assert not any('market_data_ingestion_comparison.py --source' in line for line in active.splitlines())
+    source = root / '.cache/market-data-s03-candidate-03-01a1273a'
+    probe = root / '.cache/market-data-s03/memory-probe'
+    assert subprocess.check_output(['docker', 'port', 'roehub-s03-postgres', '5432/tcp'], text=True).strip() == '127.0.0.1:36432'
+    image = 'sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c'
+    schema = 's03_memory_' + uuid4().hex
+    dsn = os.environ['ROEHUB_MARKET_DATA_TEST_DSN']
+    parsed = conninfo_to_dict(dsn)
+    assert parsed.get('host') == '127.0.0.1' and parsed.get('port') == '36432'
+    assert parsed.get('dbname') == 'postgres'
+    container_dsn = make_conninfo(dsn, host='host.docker.internal', options='-c search_path=' + schema)
+    env_path = root / '.cache/market-data-s03/private/memory.env'
+    record = {'source': str(source), 'image': image, 'memory_bytes': 384*1024*1024,
+              'nano_cpus': 1000000000, 'strict_installed_thread_bound': 26,
+              'boundary': 'real scheduler entrypoint/imports and built app, injected resource upper-bound work; no CH write working set',
+              'probe_hashes': {p.name: hashlib.sha256(p.read_bytes()).hexdigest() for p in probe.glob('*.py')}, 'runs': []}
+    output = report / 'linux-memory-probe-01.json'
+    with output.open('x') as out:
+        out.write('{}\n')
+    with psycopg.connect(dsn, autocommit=True) as connection:
+        connection.execute(sql.SQL('CREATE SCHEMA {}').format(sql.Identifier(schema)))
+        connection.execute(sql.SQL('SET search_path TO {}').format(sql.Identifier(schema)))
+        connection.execute('CREATE TABLE market_data_history_bounds (market_id smallint, symbol text)')
+        connection.execute(sql.SQL((source/'migrations/postgres/0034_market_data_provider_admission_v1.sql').read_text()))
+    try:
+        env_path.write_text('STRATEGY_PG_DSN=' + container_dsn + '\nROEHUB_MARKET_DATA_WORK_REQUESTS_ENABLED=1\nCH_HOST=host.docker.internal\nCH_PORT=39123\nROEHUB_CH_WORKLOADS_REQUIRED=0\nCH_USER=s03_memory_unused\n')
+        env_path.chmod(0o600)
+        for count in [6, 26]:
+            name = f'roehub-s03-memory-{count}-01'
+            raw = f'linux-memory-{count}-01.jsonl'
+            assert not (report/raw).exists()
+            cmd = ['docker', 'run', '--detach', '--name', name, '--memory', '384m', '--memory-swap', '384m', '--cpus', '1',
+                   '--entrypoint', '/opt/roehub/.venv/bin/python', '--workdir', '/source',
+                   '--mount', f'type=bind,source={source},target=/source,readonly',
+                   '--mount', f'type=bind,source={probe},target=/probe,readonly',
+                   '--mount', f'type=bind,source={report},target=/evidence',
+                   '--env-file', str(env_path), '-e', 'PYTHONPATH=/probe:/source/src:/source',
+                   '-e', f'S03_MEMORY_THREADS={count}', '-e', f'S03_MEMORY_RESULT={raw}',
+                   image, '-m', 'apps.scheduler.market_data_scheduler.main.main', '--config', 'configs/dev/market_data.yaml']
+            if count == 6:
+                cmd.append('--requests-only')
+            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL)
+            timed_out = False
+            try:
+                subprocess.run(['docker', 'wait', name], check=True, timeout=240, stdout=subprocess.DEVNULL)
+            except subprocess.TimeoutExpired:
+                timed_out = True
+                subprocess.run(['docker', 'stop', '-t', '30', name], check=True, stdout=subprocess.DEVNULL)
+            state = json.loads(subprocess.check_output(['docker', 'inspect', name, '--format', '{{json .State}}'], text=True))
+            logs = subprocess.check_output(['docker', 'logs', name], stderr=subprocess.STDOUT, text=True)
+            # Do not persist a connection string or credentials if a driver prints one.
+            password = dict(line.split('=', 1) for line in (root/'.cache/market-data-s03/private/postgres.env').read_text().splitlines())['POSTGRES_PASSWORD']
+            logs = logs.replace(password, '<redacted>').replace(container_dsn, '<redacted-dsn>')
+            (report/f'linux-memory-{count}-01.txt').write_text(logs)
+            subprocess.run(['docker', 'rm', name], check=True, stdout=subprocess.DEVNULL)
+            with psycopg.connect(make_conninfo(dsn, options='-c search_path='+schema)) as connection:
+                permits = connection.execute('SELECT count(*) FROM market_data_provider_permits').fetchone()[0]
+                spent = connection.execute('SELECT sum(spent) FROM market_data_provider_windows').fetchone()[0]
+            rows = [json.loads(line) for line in (report/raw).read_text().splitlines()] if (report/raw).exists() else []
+            record['runs'].append({'count': count, 'state': {k: state[k] for k in ['Status', 'OOMKilled', 'ExitCode', 'StartedAt', 'FinishedAt']},
+                                   'timed_out': timed_out, 'permits_after_exit': permits, 'quota_spent': spent, 'last_observation': rows[-1] if rows else None})
+            output.write_text(json.dumps(record, indent=2, default=str)+'\n')
+            if state['ExitCode'] != 0 or not rows or rows[-1]['label'] != 'drained' or rows[-1]['errors'] or permits:
+                break
+    finally:
+        with psycopg.connect(dsn, autocommit=True) as connection:
+            connection.execute(sql.SQL('DROP SCHEMA {} CASCADE').format(sql.Identifier(schema)))
+        env_path.unlink(missing_ok=True)
+        output.write_text(json.dumps(record, indent=2, default=str)+'\n')
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,11 @@
+{
+  "apps/navigator-web/src/data-page.tsx": "e3a39ff5da936d166657e046e045a33911d5768f0862eac6c409bd11b4c49473",
+  "apps/navigator-web/src/artifacts-api.ts": "ee4be0f69af948137a29679f25096e745571da772d957e34d14e2bf0b9159463",
+  "apps/navigator-web/src/artifact-profile.tsx": "0eb4c6d7e294db374ad94c098ad9f024cb6e7025004812e6c856b1c4729243a0",
+  "apps/navigator-web/src/data-artifacts.tsx": "cbffa6412a0caac1d32eec0f9acc409a4b1d0810b66f11f5046495c82b8a4b2a",
+  "apps/navigator-web/src/data-artifacts.css": "4bb14f9b1b94807abf1af3e7ae2555d21fe6bac968e95355c6e3561ff0241623",
+  "apps/navigator-web/src/data-mode.tsx": "6f1742711818c86694a0ccd6ed0788c1d0a1fff2344eeb7fb05542d0b288956a",
+  "apps/navigator-web/src/data-artifacts.test.tsx": "ab3fc697e86167276c95be7ec45de4b460616c915c7c95afae4b45d96d173dc8",
+  "apps/navigator-web/e2e/artifact_fixture.py": "8f5bd8edf0448959d3e5d90df7f2bbe7694fcb0458893462c4c136780f3fd4b9",
+  "apps/navigator-web/e2e/artifact_scenarios.py": "39fb0da3a5388175648a74b7537a168fd690c53fc3845159646e7b2a9f692db8"
+}

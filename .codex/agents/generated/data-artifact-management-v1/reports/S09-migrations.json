@@ -1,0 +1,26 @@
+[
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "apps.migrations.main",
+      "--dsn",
+      "host=127.0.0.1 port=25457 dbname=s09_migration_proof user=postgres"
+    ],
+    "repeat": 0,
+    "exit_code": 0,
+    "output": "<frozen runpy>:128: RuntimeWarning: 'apps.migrations.main' found in sys.modules after import of package 'apps.migrations', but prior to execution of 'apps.migrations.main'; this may result in unpredictable behaviour\nAcquiring pg_advisory_lock(56329814721)\nRunning: alembic upgrade head\nMigration success\nReleasing pg_advisory_lock(56329814721)\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "apps.migrations.main",
+      "--dsn",
+      "host=127.0.0.1 port=25457 dbname=s09_migration_proof user=postgres"
+    ],
+    "repeat": 1,
+    "exit_code": 0,
+    "output": "<frozen runpy>:128: RuntimeWarning: 'apps.migrations.main' found in sys.modules after import of package 'apps.migrations', but prior to execution of 'apps.migrations.main'; this may result in unpredictable behaviour\nAcquiring pg_advisory_lock(56329814721)\nRunning: alembic upgrade head\nMigration success\nReleasing pg_advisory_lock(56329814721)\n"
+  }
+]

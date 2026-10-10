@@ -1,0 +1,24 @@
+{
+  "files": {
+    "tools/qa/market_data_mixed_load.py": "ca8307ec974a070654e8ffdb6344aa378e3ee7dc5cc2e70e4c007e460f11b85c",
+    "apps/cli/wiring/db/clickhouse.py": "fa981b3ca8eb03d8793a9f7d4302b21de43ead11d872385791173e265c6f8b60",
+    "configs/dev/clickhouse-local-profiles.xml": "d2bbd5e3f9347af364f1f32a3523851b85902f76978f34c78b8c0a4dcc5bf2dc",
+    "tools/installation/clickhouse_workloads.py": "446af1290c567f15ee045254a6c0ad35cbccd7fb6074b3e577bb5ca24cfa95f4",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/work_errors.py": "af6f24a7d4a9d26e29474f2f19be2fd089148b963080040d6002e7e5ae518a55"
+  },
+  "order": [
+    "B1",
+    "C1",
+    "C2",
+    "B2",
+    "B3",
+    "C3"
+  ],
+  "warmup_s": 60,
+  "steady_s": 300,
+  "clock": "monotonic offered scheduling; fixed UTC candle timestamps",
+  "cache": "warm after 60s identical offered workload",
+  "api": "real catalog route/ASGI/serialization and CH coverage; fixed auth/catalog/PG projections",
+  "low_priority": "two separate processes per backfill/artifacts class, synchronized offered cadence 1/s each; bounded retry then finite drain",
+  "sampling": "one second plus probe overhead; may miss shorter peaks"
+}

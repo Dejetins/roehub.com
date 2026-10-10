@@ -4,14 +4,19 @@ import asyncio
 import logging
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Sequence
 from uuid import uuid4
 
 from trading.contexts.market_data.application.dto import RestFillResult, RestFillTask
 from trading.contexts.market_data.application.ports.stores.stream_recovery_store import (
+    AsyncStreamRecoveryStore,
     RecoveryEntry,
     StreamRecoveryStore,
     recovery_key,
+)
+from trading.contexts.market_data.application.services.batched_recovery import (
+    BatchedRecoveryAdmission,
+    await_owned,
 )
 from trading.contexts.market_data.application.services.ingestion_retry import (
     ErrorClassifier,
@@ -61,10 +66,14 @@ class AsyncRestFillQueue:
         hooks: RestFillQueueHooks | None = None,
         async_executor: Callable[[RestFillTask], Awaitable[RestFillResult]] | None = None,
         store: StreamRecoveryStore | None = None,
+        async_store: AsyncStreamRecoveryStore | None = None,
+        admission: BatchedRecoveryAdmission | None = None,
         classify_error: ErrorClassifier = transient_ingestion_error,
         retry_base_s: float = 15,
         max_pending: int = 20000,
         window_minutes: int | None = None,
+        failed_history_repairs: Sequence[RecoveryEntry] = (),
+        should_run: Callable[[RestFillTask], Awaitable[bool]] | None = None,
     ) -> None:
         if worker_count <= 0 or max_pending <= 0 or retry_base_s <= 0:
             raise ValueError("queue bounds must be positive")
@@ -72,15 +81,23 @@ class AsyncRestFillQueue:
             raise ValueError("window_minutes must be positive")
         if (executor is None) == (async_executor is None):
             raise ValueError("exactly one executor is required")
+        self._should_run = should_run
         self._executor = executor
         self._async_executor = async_executor
         self._worker_count = worker_count
         self._hooks = hooks or RestFillQueueHooks()
         self._store = store
+        self._async_store = async_store
+        self._admission = admission
+        self._enqueuing: dict[str, RestFillTask] = {}
+        self._admissions: set[asyncio.Task[bool]] = set()
+        if (async_store is None) != (admission is None) or (store and async_store):
+            raise ValueError("async store requires admission coordinator")
         self._classify_error = classify_error
         self._retry_base_s = retry_base_s
         self._max_pending = max_pending
         self._window_minutes = window_minutes
+        self._blocked_history = list(failed_history_repairs)
         self._pending: dict[str, RecoveryEntry] = {}
         self._active: set[str] = set()
         self._condition = asyncio.Condition()
@@ -91,6 +108,10 @@ class AsyncRestFillQueue:
     async def start(self) -> None:
         if self._workers:
             return
+        if self._async_store is not None:
+            self._blocked_history = await self._async_store.failed_history_repairs()
+            for entry in await self._async_store.pending():
+                self._pending[entry.task_key] = entry
         if self._store is not None:
             for entry in self._store.pending():
                 self._pending[entry.task_key] = entry
@@ -100,9 +121,22 @@ class AsyncRestFillQueue:
         ]
 
     async def enqueue(self, task: RestFillTask) -> bool:
+        if self._async_store is not None:
+            return await self._enqueue_async(task)
         async with self._condition:
             if self._stopping:
                 raise RuntimeError("rest fill queue is stopping")
+            if task.reason == "stream_history_repair":
+                # A moving now must not bypass an instrument's pending cooldown.
+                if any(e.task.instrument_id == task.instrument_id for e in self._pending.values()):
+                    return False
+                if any(
+                    e.task.instrument_id == task.instrument_id
+                    and e.task.time_range.start.value < task.time_range.end.value
+                    and task.time_range.start.value < e.task.time_range.end.value
+                    for e in self._blocked_history
+                ):
+                    return False
             key = recovery_key(task)
             if key in self._pending:
                 return False
@@ -114,10 +148,53 @@ class AsyncRestFillQueue:
         _emit_enqueued(self._hooks.on_task_enqueued, task)
         return True
 
+    async def _enqueue_async(self, task: RestFillTask) -> bool:
+        key = recovery_key(task)
+        # No await between checking and reserving; never hold Condition over PG.
+        if self._stopping:
+            raise RuntimeError("rest fill queue is stopping")
+        if key in self._pending or key in self._enqueuing:
+            return False
+        if task.reason == "stream_history_repair":
+            if any(e.task.instrument_id == task.instrument_id for e in self._pending.values()):
+                return False
+            if any(t.instrument_id == task.instrument_id for t in self._enqueuing.values()):
+                return False
+            if any(e.task.instrument_id == task.instrument_id
+                   and e.task.time_range.start.value < task.time_range.end.value
+                   and task.time_range.start.value < e.task.time_range.end.value
+                   for e in self._blocked_history):
+                return False
+        if len(self._pending) + len(self._enqueuing) >= self._max_pending:
+            raise RuntimeError("rest fill queue capacity exceeded")
+        self._enqueuing[key] = task
+
+        async def persist() -> bool:
+            try:
+                assert self._admission is not None
+                entry = await self._admission.remember(task)
+                async with self._condition:
+                    if not self._stopping:
+                        self._pending[key] = entry
+                        self._condition.notify_all()
+                _emit_enqueued(self._hooks.on_task_enqueued, task)
+                return True
+            finally:
+                self._enqueuing.pop(key, None)
+
+        owned = asyncio.create_task(persist(), name="durable-repair-admission")
+        self._admissions.add(owned)
+        try:
+            return await await_owned(owned)
+        finally:
+            self._admissions.discard(owned)
+
     async def close(self) -> None:
         async with self._condition:
             self._stopping = True
             self._condition.notify_all()
+        if self._admissions:
+            await await_owned(asyncio.gather(*self._admissions, return_exceptions=True))
         if self._async_executor is not None:
             # Receipts have already been saved; cancel also joins each managed child.
             for worker in self._workers:
@@ -193,6 +270,17 @@ class AsyncRestFillQueue:
         started = asyncio.get_running_loop().time()
         _emit_started(self._hooks.on_task_started, task)
         try:
+            if self._should_run is not None and not await self._should_run(work):
+                if self._async_store:
+                    await self._async_store.complete(entry)
+                if self._store:
+                    self._store.complete(entry)
+                self._pending.pop(key, None)
+                if self._hooks.on_task_cancelled:
+                    self._hooks.on_task_cancelled(task)
+                log.info("stream_history_cancelled market_id=%s symbol=%s",
+                         task.instrument_id.market_id.value, str(task.instrument_id.symbol))
+                return
             if self._async_executor is not None:
                 result = await self._async_executor(work)
             else:
@@ -207,11 +295,26 @@ class AsyncRestFillQueue:
                 self._hooks.on_task_failed, task, exc, asyncio.get_running_loop().time() - started
             )
             code = self._classify_error(exc)
-            if code is not None:
-                entry = replace(entry, attempt=entry.attempt + 1)
+            exhausted_history = (
+                task.reason == "stream_history_repair"
+                and code == "source_history_incomplete"
+                and entry.error_code == code
+                and entry.attempt >= 3
+            )
+            if code is not None and not exhausted_history:
+                entry = replace(
+                    entry,
+                    attempt=(
+                        1
+                        if task.reason == "stream_history_repair" and entry.error_code != code
+                        else entry.attempt + 1
+                    ),
+                )
                 next_at = datetime.now(UTC) + timedelta(
                     seconds=retry_delay(exc, entry.attempt, base=self._retry_base_s)
                 )
+                if self._async_store:
+                    await self._async_store.retry(entry, next_retry_at=next_at, code=code)
                 if self._store:
                     self._store.retry(entry, next_retry_at=next_at, code=code)
                 self._pending[key] = replace(entry, next_retry_at=next_at, error_code=code)
@@ -222,12 +325,23 @@ class AsyncRestFillQueue:
                     next_at.isoformat(),
                 )
             else:
+                terminal_code = (
+                    "source_history_incomplete"
+                    if exhausted_history
+                    else "non_retryable_ingestion_error"
+                )
+                if self._async_store:
+                    await self._async_store.fail(entry, code=terminal_code)
                 if self._store:
-                    self._store.fail(entry, code="non_retryable_ingestion_error")
+                    self._store.fail(entry, code=terminal_code)
+                if task.reason == "stream_history_repair":
+                    self._blocked_history.append(replace(entry, error_code=terminal_code))
                 self._pending.pop(key, None)
                 log.error("rest fill terminal error_type=%s", type(exc).__name__)
         else:
             if work.time_range.end.value < task.time_range.end.value:
+                if self._async_store:
+                    await self._async_store.advance(entry, start_at=work.time_range.end.value)
                 if self._store:
                     self._store.advance(entry, start_at=work.time_range.end.value)
                 continued = RestFillTask(
@@ -245,6 +359,8 @@ class AsyncRestFillQueue:
                     error_code=None,
                 )
             else:
+                if self._async_store:
+                    await self._async_store.complete(entry)
                 if self._store:
                     self._store.complete(entry)
                 self._pending.pop(key, None)

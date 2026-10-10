@@ -1,0 +1,11 @@
+{
+  "configs/installation/generated/ml/generation-manifest.json": "bf32038ad19b17301107e687045ff517dd2e7695e54856dd6767956e901f1018",
+  "configs/installation/generated/trading/generation-manifest.json": "1febed1173f38021711abeaf933581a1220c82fb619a970757c430c6b72f752f",
+  "configs/installation/generated/base/generation-manifest.json": "b2ec7ceecbd937c0faeba4d92cda6f6f07cf690df27dcb178c63570b3b61651a",
+  "configs/installation/generated/base/service-configs/market_data.yaml": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4",
+  "configs/installation/generated/base/service-configs/market-data.yaml": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4",
+  "configs/installation/generated/trading/service-configs/market_data.yaml": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4",
+  "configs/installation/generated/trading/service-configs/market-data.yaml": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4",
+  "configs/installation/generated/ml/service-configs/market_data.yaml": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4",
+  "configs/installation/generated/ml/service-configs/market-data.yaml": "b069c2f2226901af0d8533f8550a97c002c8acef9e3bcb2a67817259e6f008c4"
+}

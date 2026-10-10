@@ -1,0 +1,122 @@
+- link "Skip to content":
+  - /url: "#workspace-heading"
+- complementary:
+  - generic "RoeHub": R
+  - navigation "Navigation":
+    - link "Overview":
+      - /url: /dashboard
+      - generic: Overview
+    - link "Backtests":
+      - /url: /backtests
+      - generic: Backtests
+    - link "Strategies":
+      - /url: /strategies
+      - generic: Strategies
+    - link "Data":
+      - /url: /data
+      - generic: Data
+    - link "Connections":
+      - /url: /connections
+      - generic: Connections
+    - link "Monitoring":
+      - /url: /monitoring
+      - generic: Monitoring
+    - link "Settings":
+      - /url: /settings/profile
+      - generic: Settings
+  - generic "Language": 文
+  - link "Sign out":
+    - /url: /logout
+    - generic: Sign out
+- main:
+  - text: Data
+  - generic: Navigator
+  - complementary:
+    - heading "Exchanges" [level=2]
+    - navigation "Exchanges":
+      - link "Binance":
+        - /url: /data?market=1&job=8cf523dc-7ee6-4bf0-9304-c53c72ef1e1f&view=artifacts&exchange=binance
+  - heading "Data" [level=1]
+  - region "Artifact catalog":
+    - navigation "Data view":
+      - link "Candles":
+        - /url: /data?market=1&symbol=BTCUSDT&job=8cf523dc-7ee6-4bf0-9304-c53c72ef1e1f
+      - link "Artifacts":
+        - /url: /data?market=1&symbol=BTCUSDT&job=8cf523dc-7ee6-4bf0-9304-c53c72ef1e1f&view=artifacts
+    - text: Search instruments
+    - searchbox "Search instruments"
+    - text: Market
+    - combobox "Market":
+      - option "All markets" [selected]
+      - option "spot"
+    - generic: Mandatory base · optional derivative precompute
+    - button "Refresh":
+    - generic "Artifact rows":
+      - table:
+        - rowgroup:
+          - row "Select page Instrument Base NPY Derivatives Coverage · UTC Refresh":
+            - columnheader "Select page":
+              - checkbox "Select page"
+            - columnheader "Instrument"
+            - columnheader "Base NPY"
+            - columnheader "Derivatives"
+            - columnheader "Coverage · UTC"
+            - columnheader "Refresh"
+        - rowgroup:
+          - row "Select BTCUSDT spot BTCUSDT spot Ready On demand Not requested Mar 31, 2026, 12:00 AM 3 day(s)":
+            - cell "Select BTCUSDT spot":
+              - checkbox "Select BTCUSDT spot"
+            - cell "BTCUSDT spot":
+              - button "BTCUSDT"
+              - generic: spot
+            - cell "Ready":
+              - generic: Ready
+            - cell "On demand Not requested":
+              - text: On demand
+              - generic: Not requested
+            - cell "Mar 31, 2026, 12:00 AM"
+            - cell "3 day(s)"
+          - row "Select ETHUSDT spot ETHUSDT spot Waiting for source On demand Not requested — 1 day(s)":
+            - cell "Select ETHUSDT spot":
+              - checkbox "Select ETHUSDT spot"
+            - cell "ETHUSDT spot":
+              - button "ETHUSDT"
+              - generic: spot
+            - cell "Waiting for source":
+              - generic: Waiting for source
+            - cell "On demand Not requested":
+              - text: On demand
+              - generic: Not requested
+            - cell "—"
+            - cell "1 day(s)"
+    - generic: Up to 50 rows per market
+  - complementary "Artifact settings":
+    - heading "BTCUSDT" [level=2]
+    - paragraph: binance · spot
+    - button "Close instrument":
+    - button "Update now"
+    - button "Edit profile and schedule"
+    - heading "Base NPY" [level=3]
+    - generic: Ready
+    - term: Source through · UTC
+    - definition: Apr 1, 2026, 12:00 AM
+    - term: Ready through · UTC
+    - definition: Mar 31, 2026, 12:00 AM
+    - term: Last run · UTC
+    - definition: —
+    - term: Last successful run · UTC
+    - definition: —
+    - term: Next run · UTC
+    - definition: Oct 10, 2026, 11:00 PM
+    - paragraph: 3 day(s) · Europe/Moscow · 02:00:00
+    - paragraph: "Size: Unknown"
+    - generic "Timeframe coverage"
+    - heading "Derivatives" [level=3]
+    - paragraph: On demand · 39 / 40 indicators
+    - generic: Not requested
+    - paragraph: 15m, 1d, 1h, 2d, 2h, 30m, 3d, 4h, 6h, 8h
+    - paragraph: All loaded history
+    - generic "Risk levels · TP 100 / SL 50"
+    - paragraph: Turning precompute off retains existing files.
+    - status: Changes saved. Scheduled anchor is unchanged.
+    - button "Request history"

@@ -8,6 +8,7 @@ from trading.contexts.market_data.adapters.outbound.clients.common_http.http_cli
     HttpClient,
     HttpResponse,
 )
+from trading.contexts.market_data.application.services.source_retry import TemporarySourceError
 
 
 @dataclass
@@ -43,6 +44,8 @@ class HistoryProbeHttpClient:
                     backoff_max_s=0,
                     backoff_jitter_s=0,
                 )
+            except TemporarySourceError:
+                raise
             except Exception:
                 if attempt == 1:
                     raise RuntimeError("History metadata is unavailable") from None

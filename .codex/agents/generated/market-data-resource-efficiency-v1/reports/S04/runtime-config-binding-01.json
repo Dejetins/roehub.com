@@ -1,0 +1,23 @@
+{
+  "config_sha256": {
+    ".cache/market-data-s02/recreated/config/clickhouse-capacity.xml": "43f6fff40fa4d3f40b03b46d1d6bd9957665fbc14e8b589f2524a34c17c8e2d5",
+    ".cache/market-data-s02/recreated/config/clickhouse-observability.xml": "f0dd55cc97bf61e587599c8640f6b44f08f5e21d1bf226f08d3595ac1ff4a507",
+    ".cache/market-data-s02/recreated/config/clickhouse-profiles.xml": "dd47892ff7081ad82f7daf8ea806d53330049d5114b325a8265aa6668ffb4ef4",
+    ".cache/market-data-s02/recreated/config/clickhouse-query-limits.xml": "9a11a9080b04a94f85bd82673d8ae998dde1cbbc4460445837c39dd7e9b9d1a6",
+    ".cache/market-data-s02/recreated/config/clickhouse-workloads-entrypoint.sh": "51f28b7ff77c359e73f0b5a7de8a82313d7f85361eca4e1bad455a19a5341f37",
+    ".cache/market-data-s04/ch-compose.yaml": "8b8b3f8a16ef9440b5564be26f8efdbff47a06eb1e0850649c48c895f4fd1077"
+  },
+  "host": "macOS-26.7-arm64-arm-64bit-Mach-O",
+  "hardware": {
+    "cpu_count": 18,
+    "memory_bytes": 38654705664
+  },
+  "pg_version": "postgres (PostgreSQL) 16.15 (Debian 16.15-1.pgdg13+2)",
+  "ch_version": "ClickHouse local version 25.8.33.6 (official build).",
+  "config_unchanged_during_series": true,
+  "measurement_limits": [
+    "1s memory sampling misses short peaks",
+    "short postdrain observation not leak exclusion",
+    "finite replay not steady service window"
+  ]
+}

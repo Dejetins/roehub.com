@@ -1,0 +1,12 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "tests/unit/contexts/backtest_artifacts/test_derivative_profiles.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py"
+  ],
+  "exit_code": 0,
+  "observed_result": "101 passed in 35.48s",
+  "scope": "Final schema-1 guard, new profiles, validator and actual prepare regression; observed exec session 67845"
+}

@@ -1,0 +1,11 @@
+{
+  "baseline": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-final-09.json",
+  "baseline_sha256": "2267f28bb1eab083a2bc805aa59a3fc8703276c1c98de1635517015390f16bb2",
+  "candidate": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/pyright-03.json",
+  "candidate_sha256": "95dde026020eb785db7afaa42c2e6e19eaacaf2bdcb17b4da0e032991120bcd1",
+  "added": [],
+  "removed": [],
+  "equivalent": true,
+  "baseline_diagnostics": 54,
+  "candidate_diagnostics": 54
+}

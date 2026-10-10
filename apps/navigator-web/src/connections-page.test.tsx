@@ -37,3 +37,21 @@ it('requires explicit step-up, clears credentials on rejection and never replays
  const login=new URL(screen.getByRole('link',{name:'Sign in again'}).getAttribute('href')!,'http://localhost');expect(login.pathname).toBe('/logout');expect(login.searchParams.get('next')).toBe('/login?next=%2Fconnections%3Fnew%3D1');
  fireEvent.click(screen.getByRole('button',{name:'Confirm with passkey'}));await waitFor(()=>expect(screen.queryByRole('button',{name:'Confirm with passkey'})).not.toBeInTheDocument());expect(authCalls).toHaveLength(2);expect(writes).toBe(1);
 });
+it('switches public sources immediately without loading indicators or repeated market reads',async()=>{
+ const items=[['binance','spot'],['binance','futures'],['bybit','spot'],['bybit','futures']].map(([exchange_name,market_type],i)=>({market_id:i+1,exchange_name,market_type,market_code:`${exchange_name}:${market_type}`}));
+ let marketReads=0;
+ const {router}=mount(url=>{
+  if(url.pathname.endsWith('/markets')){marketReads++;return Response.json({items});}
+  if(url.pathname.includes('/catalog'))return new Promise<Response>(()=>{});
+ });
+ await screen.findByRole('link',{name:/bybit · futures/});
+ for(const market of items){
+  await act(async()=>router.navigate(`/connections?source=${market.market_id}`));
+  expect(screen.getByRole('heading',{name:`${market.exchange_name} · ${market.market_type}`})).toBeInTheDocument();
+  expect(screen.getByRole('link',{name:'Instruments'})).toHaveAttribute('href',`/data?market=${market.market_id}`);
+  expect(screen.queryByText('Loading data…')).not.toBeInTheDocument();
+  expect(screen.queryByText('Updating…')).not.toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'Check source and refresh catalog'})).toBeDisabled();
+ }
+ expect(marketReads).toBe(1);
+});

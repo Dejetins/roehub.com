@@ -1,0 +1,4806 @@
+{
+  "interval_s": 1,
+  "limits": "samples can miss shorter peaks; shared running server, not attributed memory",
+  "samples": [
+    {
+      "jemalloc.allocated": 537785224.0,
+      "MemoryResident": 952369152.0,
+      "tracked": {
+        "value": 697855122
+      },
+      "at": "2026-10-10T17:27:10.679492+00:00"
+    },
+    {
+      "jemalloc.allocated": 537881656.0,
+      "MemoryResident": 952217600.0,
+      "tracked": {
+        "value": 700978858
+      },
+      "at": "2026-10-10T17:27:11.682706+00:00"
+    },
+    {
+      "jemalloc.allocated": 549657088.0,
+      "MemoryResident": 955588608.0,
+      "tracked": {
+        "value": 701096890
+      },
+      "at": "2026-10-10T17:27:12.690342+00:00"
+    },
+    {
+      "jemalloc.allocated": 550314784.0,
+      "MemoryResident": 955756544.0,
+      "tracked": {
+        "value": 701148042
+      },
+      "at": "2026-10-10T17:27:13.694473+00:00"
+    },
+    {
+      "jemalloc.allocated": 550331384.0,
+      "MemoryResident": 955834368.0,
+      "tracked": {
+        "value": 701199066
+      },
+      "at": "2026-10-10T17:27:14.699179+00:00"
+    },
+    {
+      "jemalloc.allocated": 550397312.0,
+      "MemoryResident": 957431808.0,
+      "tracked": {
+        "value": 701250218
+      },
+      "at": "2026-10-10T17:27:15.703822+00:00"
+    },
+    {
+      "jemalloc.allocated": 550448688.0,
+      "MemoryResident": 957603840.0,
+      "tracked": {
+        "value": 701326434
+      },
+      "at": "2026-10-10T17:27:16.708973+00:00"
+    },
+    {
+      "jemalloc.allocated": 550439048.0,
+      "MemoryResident": 955944960.0,
+      "tracked": {
+        "value": 696755980
+      },
+      "at": "2026-10-10T17:27:17.714140+00:00"
+    },
+    {
+      "jemalloc.allocated": 547977152.0,
+      "MemoryResident": 955613184.0,
+      "tracked": {
+        "value": 696807132
+      },
+      "at": "2026-10-10T17:27:18.719340+00:00"
+    },
+    {
+      "jemalloc.allocated": 547997456.0,
+      "MemoryResident": 955621376.0,
+      "tracked": {
+        "value": 696858092
+      },
+      "at": "2026-10-10T17:27:19.724008+00:00"
+    },
+    {
+      "jemalloc.allocated": 548051592.0,
+      "MemoryResident": 955625472.0,
+      "tracked": {
+        "value": 696909308
+      },
+      "at": "2026-10-10T17:27:20.730113+00:00"
+    },
+    {
+      "jemalloc.allocated": 548090848.0,
+      "MemoryResident": 955633664.0,
+      "tracked": {
+        "value": 696985332
+      },
+      "at": "2026-10-10T17:27:21.731970+00:00"
+    },
+    {
+      "jemalloc.allocated": 548232096.0,
+      "MemoryResident": 955662336.0,
+      "tracked": {
+        "value": 697036420
+      },
+      "at": "2026-10-10T17:27:22.737273+00:00"
+    },
+    {
+      "jemalloc.allocated": 548274872.0,
+      "MemoryResident": 957358080.0,
+      "tracked": {
+        "value": 697087444
+      },
+      "at": "2026-10-10T17:27:23.739885+00:00"
+    },
+    {
+      "jemalloc.allocated": 548326488.0,
+      "MemoryResident": 955797504.0,
+      "tracked": {
+        "value": 697138468
+      },
+      "at": "2026-10-10T17:27:24.744825+00:00"
+    },
+    {
+      "jemalloc.allocated": 548361080.0,
+      "MemoryResident": 955801600.0,
+      "tracked": {
+        "value": 697189364
+      },
+      "at": "2026-10-10T17:27:25.748684+00:00"
+    },
+    {
+      "jemalloc.allocated": 548412872.0,
+      "MemoryResident": 955809792.0,
+      "tracked": {
+        "value": 697265580
+      },
+      "at": "2026-10-10T17:27:26.757201+00:00"
+    },
+    {
+      "jemalloc.allocated": 548420160.0,
+      "MemoryResident": 955830272.0,
+      "tracked": {
+        "value": 697861107
+      },
+      "at": "2026-10-10T17:27:27.757698+00:00"
+    },
+    {
+      "jemalloc.allocated": 548780064.0,
+      "MemoryResident": 956973056.0,
+      "tracked": {
+        "value": 697909691
+      },
+      "at": "2026-10-10T17:27:28.756431+00:00"
+    },
+    {
+      "jemalloc.allocated": 548830256.0,
+      "MemoryResident": 956981248.0,
+      "tracked": {
+        "value": 697960651
+      },
+      "at": "2026-10-10T17:27:29.762126+00:00"
+    },
+    {
+      "jemalloc.allocated": 548895208.0,
+      "MemoryResident": 958685184.0,
+      "tracked": {
+        "value": 698011675
+      },
+      "at": "2026-10-10T17:27:30.764560+00:00"
+    },
+    {
+      "jemalloc.allocated": 548905232.0,
+      "MemoryResident": 958586880.0,
+      "tracked": {
+        "value": 698134131
+      },
+      "at": "2026-10-10T17:27:31.765355+00:00"
+    },
+    {
+      "jemalloc.allocated": 549181664.0,
+      "MemoryResident": 957304832.0,
+      "tracked": {
+        "value": 698185155
+      },
+      "at": "2026-10-10T17:27:32.762578+00:00"
+    },
+    {
+      "jemalloc.allocated": 549229616.0,
+      "MemoryResident": 957313024.0,
+      "tracked": {
+        "value": 698236115
+      },
+      "at": "2026-10-10T17:27:33.767699+00:00"
+    },
+    {
+      "jemalloc.allocated": 549293944.0,
+      "MemoryResident": 957325312.0,
+      "tracked": {
+        "value": 698287075
+      },
+      "at": "2026-10-10T17:27:34.772768+00:00"
+    },
+    {
+      "jemalloc.allocated": 549332168.0,
+      "MemoryResident": 957329408.0,
+      "tracked": {
+        "value": 715696903
+      },
+      "at": "2026-10-10T17:27:35.772362+00:00"
+    },
+    {
+      "jemalloc.allocated": 596334608.0,
+      "MemoryResident": 1012072448.0,
+      "tracked": {
+        "value": 712282711
+      },
+      "at": "2026-10-10T17:27:36.772572+00:00"
+    },
+    {
+      "jemalloc.allocated": 546105776.0,
+      "MemoryResident": 997130240.0,
+      "tracked": {
+        "value": 697786160
+      },
+      "at": "2026-10-10T17:27:37.773429+00:00"
+    },
+    {
+      "jemalloc.allocated": 545580088.0,
+      "MemoryResident": 1002409984.0,
+      "tracked": {
+        "value": 741811364
+      },
+      "at": "2026-10-10T17:27:38.782240+00:00"
+    },
+    {
+      "jemalloc.allocated": 577095168.0,
+      "MemoryResident": 1015484416.0,
+      "tracked": {
+        "value": 717796052
+      },
+      "at": "2026-10-10T17:27:39.781786+00:00"
+    },
+    {
+      "jemalloc.allocated": 544742408.0,
+      "MemoryResident": 996868096.0,
+      "tracked": {
+        "value": 748104740
+      },
+      "at": "2026-10-10T17:27:40.782399+00:00"
+    },
+    {
+      "jemalloc.allocated": 582363736.0,
+      "MemoryResident": 1026994176.0,
+      "tracked": {
+        "value": 704540312
+      },
+      "at": "2026-10-10T17:27:41.787920+00:00"
+    },
+    {
+      "jemalloc.allocated": 535033520.0,
+      "MemoryResident": 952778752.0,
+      "tracked": {
+        "value": 704591336
+      },
+      "at": "2026-10-10T17:27:42.793559+00:00"
+    },
+    {
+      "jemalloc.allocated": 535112280.0,
+      "MemoryResident": 952692736.0,
+      "tracked": {
+        "value": 704642168
+      },
+      "at": "2026-10-10T17:27:43.803030+00:00"
+    },
+    {
+      "jemalloc.allocated": 535138440.0,
+      "MemoryResident": 952696832.0,
+      "tracked": {
+        "value": 704693256
+      },
+      "at": "2026-10-10T17:27:44.800193+00:00"
+    },
+    {
+      "jemalloc.allocated": 535189608.0,
+      "MemoryResident": 952705024.0,
+      "tracked": {
+        "value": 704744088
+      },
+      "at": "2026-10-10T17:27:45.810156+00:00"
+    },
+    {
+      "jemalloc.allocated": 535242760.0,
+      "MemoryResident": 952713216.0,
+      "tracked": {
+        "value": 704820304
+      },
+      "at": "2026-10-10T17:27:46.811280+00:00"
+    },
+    {
+      "jemalloc.allocated": 535269336.0,
+      "MemoryResident": 952496128.0,
+      "tracked": {
+        "value": 697900356
+      },
+      "at": "2026-10-10T17:27:47.812210+00:00"
+    },
+    {
+      "jemalloc.allocated": 526940056.0,
+      "MemoryResident": 951361536.0,
+      "tracked": {
+        "value": 697951444
+      },
+      "at": "2026-10-10T17:27:48.815679+00:00"
+    },
+    {
+      "jemalloc.allocated": 526985088.0,
+      "MemoryResident": 951365632.0,
+      "tracked": {
+        "value": 698002340
+      },
+      "at": "2026-10-10T17:27:49.821710+00:00"
+    },
+    {
+      "jemalloc.allocated": 527031696.0,
+      "MemoryResident": 951373824.0,
+      "tracked": {
+        "value": 698053364
+      },
+      "at": "2026-10-10T17:27:50.820778+00:00"
+    },
+    {
+      "jemalloc.allocated": 527086304.0,
+      "MemoryResident": 951382016.0,
+      "tracked": {
+        "value": 698129388
+      },
+      "at": "2026-10-10T17:27:51.828234+00:00"
+    },
+    {
+      "jemalloc.allocated": 527120024.0,
+      "MemoryResident": 951250944.0,
+      "tracked": {
+        "value": 698269596
+      },
+      "at": "2026-10-10T17:27:52.826754+00:00"
+    },
+    {
+      "jemalloc.allocated": 528757632.0,
+      "MemoryResident": 952098816.0,
+      "tracked": {
+        "value": 698320428
+      },
+      "at": "2026-10-10T17:27:53.836666+00:00"
+    },
+    {
+      "jemalloc.allocated": 528815624.0,
+      "MemoryResident": 951910400.0,
+      "tracked": {
+        "value": 698371452
+      },
+      "at": "2026-10-10T17:27:54.836412+00:00"
+    },
+    {
+      "jemalloc.allocated": 528858872.0,
+      "MemoryResident": 951918592.0,
+      "tracked": {
+        "value": 698422220
+      },
+      "at": "2026-10-10T17:27:55.843131+00:00"
+    },
+    {
+      "jemalloc.allocated": 528912344.0,
+      "MemoryResident": 951922688.0,
+      "tracked": {
+        "value": 697757988
+      },
+      "at": "2026-10-10T17:27:56.846080+00:00"
+    },
+    {
+      "jemalloc.allocated": 528406320.0,
+      "MemoryResident": 951910400.0,
+      "tracked": {
+        "value": 697629161
+      },
+      "at": "2026-10-10T17:27:57.847465+00:00"
+    },
+    {
+      "jemalloc.allocated": 528209088.0,
+      "MemoryResident": 951828480.0,
+      "tracked": {
+        "value": 697680185
+      },
+      "at": "2026-10-10T17:27:58.852875+00:00"
+    },
+    {
+      "jemalloc.allocated": 528252960.0,
+      "MemoryResident": 951836672.0,
+      "tracked": {
+        "value": 697731145
+      },
+      "at": "2026-10-10T17:27:59.867680+00:00"
+    },
+    {
+      "jemalloc.allocated": 528304216.0,
+      "MemoryResident": 951840768.0,
+      "tracked": {
+        "value": 698126177
+      },
+      "at": "2026-10-10T17:28:00.870592+00:00"
+    },
+    {
+      "jemalloc.allocated": 528453872.0,
+      "MemoryResident": 948432896.0,
+      "tracked": {
+        "value": 698202713
+      },
+      "at": "2026-10-10T17:28:01.881667+00:00"
+    },
+    {
+      "jemalloc.allocated": 528510760.0,
+      "MemoryResident": 948469760.0,
+      "tracked": {
+        "value": 698179501
+      },
+      "at": "2026-10-10T17:28:02.882450+00:00"
+    },
+    {
+      "jemalloc.allocated": 528565976.0,
+      "MemoryResident": 948477952.0,
+      "tracked": {
+        "value": 698230589
+      },
+      "at": "2026-10-10T17:28:03.890850+00:00"
+    },
+    {
+      "jemalloc.allocated": 528539472.0,
+      "MemoryResident": 948371456.0,
+      "tracked": {
+        "value": 698281741
+      },
+      "at": "2026-10-10T17:28:04.898175+00:00"
+    },
+    {
+      "jemalloc.allocated": 528597664.0,
+      "MemoryResident": 950022144.0,
+      "tracked": {
+        "value": 698332701
+      },
+      "at": "2026-10-10T17:28:05.906488+00:00"
+    },
+    {
+      "jemalloc.allocated": 528620968.0,
+      "MemoryResident": 950091776.0,
+      "tracked": {
+        "value": 698408917
+      },
+      "at": "2026-10-10T17:28:06.917206+00:00"
+    },
+    {
+      "jemalloc.allocated": 528668136.0,
+      "MemoryResident": 949858304.0,
+      "tracked": {
+        "value": 697790202
+      },
+      "at": "2026-10-10T17:28:07.932328+00:00"
+    },
+    {
+      "jemalloc.allocated": 528192104.0,
+      "MemoryResident": 948277248.0,
+      "tracked": {
+        "value": 697841418
+      },
+      "at": "2026-10-10T17:28:08.932275+00:00"
+    },
+    {
+      "jemalloc.allocated": 528218296.0,
+      "MemoryResident": 948285440.0,
+      "tracked": {
+        "value": 697899690
+      },
+      "at": "2026-10-10T17:28:09.939704+00:00"
+    },
+    {
+      "jemalloc.allocated": 528995736.0,
+      "MemoryResident": 948318208.0,
+      "tracked": {
+        "value": 697950906
+      },
+      "at": "2026-10-10T17:28:10.946013+00:00"
+    },
+    {
+      "jemalloc.allocated": 528990784.0,
+      "MemoryResident": 949891072.0,
+      "tracked": {
+        "value": 777811049
+      },
+      "at": "2026-10-10T17:28:11.955059+00:00"
+    },
+    {
+      "jemalloc.allocated": 621979592.0,
+      "MemoryResident": 1036390400.0,
+      "tracked": {
+        "value": 725125566
+      },
+      "at": "2026-10-10T17:28:12.964805+00:00"
+    },
+    {
+      "jemalloc.allocated": 537756880.0,
+      "MemoryResident": 999481344.0,
+      "tracked": {
+        "value": 718183278
+      },
+      "at": "2026-10-10T17:28:13.975398+00:00"
+    },
+    {
+      "jemalloc.allocated": 583412800.0,
+      "MemoryResident": 1009754112.0,
+      "tracked": {
+        "value": 749470363
+      },
+      "at": "2026-10-10T17:28:14.979620+00:00"
+    },
+    {
+      "jemalloc.allocated": 572889536.0,
+      "MemoryResident": 987566080.0,
+      "tracked": {
+        "value": 730119699
+      },
+      "at": "2026-10-10T17:28:15.989436+00:00"
+    },
+    {
+      "jemalloc.allocated": 545449856.0,
+      "MemoryResident": 976650240.0,
+      "tracked": {
+        "value": 760269306
+      },
+      "at": "2026-10-10T17:28:16.996342+00:00"
+    },
+    {
+      "jemalloc.allocated": 587114440.0,
+      "MemoryResident": 999030784.0,
+      "tracked": {
+        "value": 750828224
+      },
+      "at": "2026-10-10T17:28:17.997573+00:00"
+    },
+    {
+      "jemalloc.allocated": 576503864.0,
+      "MemoryResident": 1009557504.0,
+      "tracked": {
+        "value": 700369300
+      },
+      "at": "2026-10-10T17:28:19.015076+00:00"
+    },
+    {
+      "jemalloc.allocated": 528550720.0,
+      "MemoryResident": 947982336.0,
+      "tracked": {
+        "value": 700390260
+      },
+      "at": "2026-10-10T17:28:20.018258+00:00"
+    },
+    {
+      "jemalloc.allocated": 528627024.0,
+      "MemoryResident": 947802112.0,
+      "tracked": {
+        "value": 700441412
+      },
+      "at": "2026-10-10T17:28:21.017712+00:00"
+    },
+    {
+      "jemalloc.allocated": 528627024.0,
+      "MemoryResident": 947802112.0,
+      "tracked": {
+        "value": 700517628
+      },
+      "at": "2026-10-10T17:28:22.026482+00:00"
+    },
+    {
+      "jemalloc.allocated": 529315616.0,
+      "MemoryResident": 947838976.0,
+      "tracked": {
+        "value": 700599116
+      },
+      "at": "2026-10-10T17:28:23.033878+00:00"
+    },
+    {
+      "jemalloc.allocated": 529359384.0,
+      "MemoryResident": 947896320.0,
+      "tracked": {
+        "value": 700650268
+      },
+      "at": "2026-10-10T17:28:24.044755+00:00"
+    },
+    {
+      "jemalloc.allocated": 529410816.0,
+      "MemoryResident": 947900416.0,
+      "tracked": {
+        "value": 700701356
+      },
+      "at": "2026-10-10T17:28:25.047351+00:00"
+    },
+    {
+      "jemalloc.allocated": 529434056.0,
+      "MemoryResident": 947908608.0,
+      "tracked": {
+        "value": 700752380
+      },
+      "at": "2026-10-10T17:28:26.056231+00:00"
+    },
+    {
+      "jemalloc.allocated": 529389696.0,
+      "MemoryResident": 947916800.0,
+      "tracked": {
+        "value": 700828532
+      },
+      "at": "2026-10-10T17:28:27.067480+00:00"
+    },
+    {
+      "jemalloc.allocated": 528364376.0,
+      "MemoryResident": 947027968.0,
+      "tracked": {
+        "value": 699782730
+      },
+      "at": "2026-10-10T17:28:28.071375+00:00"
+    },
+    {
+      "jemalloc.allocated": 528401048.0,
+      "MemoryResident": 947036160.0,
+      "tracked": {
+        "value": 699833754
+      },
+      "at": "2026-10-10T17:28:29.080262+00:00"
+    },
+    {
+      "jemalloc.allocated": 528455024.0,
+      "MemoryResident": 947044352.0,
+      "tracked": {
+        "value": 699884650
+      },
+      "at": "2026-10-10T17:28:30.088565+00:00"
+    },
+    {
+      "jemalloc.allocated": 528492576.0,
+      "MemoryResident": 947060736.0,
+      "tracked": {
+        "value": 699935738
+      },
+      "at": "2026-10-10T17:28:31.093748+00:00"
+    },
+    {
+      "jemalloc.allocated": 528499800.0,
+      "MemoryResident": 946585600.0,
+      "tracked": {
+        "value": 700011762
+      },
+      "at": "2026-10-10T17:28:32.102382+00:00"
+    },
+    {
+      "jemalloc.allocated": 528546472.0,
+      "MemoryResident": 946601984.0,
+      "tracked": {
+        "value": 700062722
+      },
+      "at": "2026-10-10T17:28:33.113167+00:00"
+    },
+    {
+      "jemalloc.allocated": 528597992.0,
+      "MemoryResident": 946626560.0,
+      "tracked": {
+        "value": 700113618
+      },
+      "at": "2026-10-10T17:28:34.123775+00:00"
+    },
+    {
+      "jemalloc.allocated": 528669896.0,
+      "MemoryResident": 946659328.0,
+      "tracked": {
+        "value": 700164642
+      },
+      "at": "2026-10-10T17:28:35.126238+00:00"
+    },
+    {
+      "jemalloc.allocated": 528717408.0,
+      "MemoryResident": 946692096.0,
+      "tracked": {
+        "value": 700215602
+      },
+      "at": "2026-10-10T17:28:36.134760+00:00"
+    },
+    {
+      "jemalloc.allocated": 528769512.0,
+      "MemoryResident": 946872320.0,
+      "tracked": {
+        "value": 700291690
+      },
+      "at": "2026-10-10T17:28:37.144010+00:00"
+    },
+    {
+      "jemalloc.allocated": 527209568.0,
+      "MemoryResident": 945766400.0,
+      "tracked": {
+        "value": 697416051
+      },
+      "at": "2026-10-10T17:28:38.158508+00:00"
+    },
+    {
+      "jemalloc.allocated": 527246112.0,
+      "MemoryResident": 945729536.0,
+      "tracked": {
+        "value": 697467075
+      },
+      "at": "2026-10-10T17:28:39.161431+00:00"
+    },
+    {
+      "jemalloc.allocated": 527296000.0,
+      "MemoryResident": 945737728.0,
+      "tracked": {
+        "value": 697518035
+      },
+      "at": "2026-10-10T17:28:40.170607+00:00"
+    },
+    {
+      "jemalloc.allocated": 527410000.0,
+      "MemoryResident": 945741824.0,
+      "tracked": {
+        "value": 697569123
+      },
+      "at": "2026-10-10T17:28:41.167632+00:00"
+    },
+    {
+      "jemalloc.allocated": 527494232.0,
+      "MemoryResident": 945893376.0,
+      "tracked": {
+        "value": 697645019
+      },
+      "at": "2026-10-10T17:28:42.175408+00:00"
+    },
+    {
+      "jemalloc.allocated": 527545704.0,
+      "MemoryResident": 945762304.0,
+      "tracked": {
+        "value": 697696107
+      },
+      "at": "2026-10-10T17:28:43.189931+00:00"
+    },
+    {
+      "jemalloc.allocated": 527601040.0,
+      "MemoryResident": 945766400.0,
+      "tracked": {
+        "value": 697746939
+      },
+      "at": "2026-10-10T17:28:44.199107+00:00"
+    },
+    {
+      "jemalloc.allocated": 527647616.0,
+      "MemoryResident": 945774592.0,
+      "tracked": {
+        "value": 697797963
+      },
+      "at": "2026-10-10T17:28:45.201816+00:00"
+    },
+    {
+      "jemalloc.allocated": 527618112.0,
+      "MemoryResident": 945782784.0,
+      "tracked": {
+        "value": 697848859
+      },
+      "at": "2026-10-10T17:28:46.206929+00:00"
+    },
+    {
+      "jemalloc.allocated": 527617376.0,
+      "MemoryResident": 945790976.0,
+      "tracked": {
+        "value": 697925075
+      },
+      "at": "2026-10-10T17:28:47.216430+00:00"
+    },
+    {
+      "jemalloc.allocated": 527089448.0,
+      "MemoryResident": 945750016.0,
+      "tracked": {
+        "value": 697556591
+      },
+      "at": "2026-10-10T17:28:48.215760+00:00"
+    },
+    {
+      "jemalloc.allocated": 526481720.0,
+      "MemoryResident": 947527680.0,
+      "tracked": {
+        "value": 698271895
+      },
+      "at": "2026-10-10T17:28:49.222322+00:00"
+    },
+    {
+      "jemalloc.allocated": 526470744.0,
+      "MemoryResident": 947535872.0,
+      "tracked": {
+        "value": 698322727
+      },
+      "at": "2026-10-10T17:28:50.235219+00:00"
+    },
+    {
+      "jemalloc.allocated": 526523408.0,
+      "MemoryResident": 947544064.0,
+      "tracked": {
+        "value": 698373879
+      },
+      "at": "2026-10-10T17:28:51.237094+00:00"
+    },
+    {
+      "jemalloc.allocated": 526548376.0,
+      "MemoryResident": 947548160.0,
+      "tracked": {
+        "value": 698449839
+      },
+      "at": "2026-10-10T17:28:52.250224+00:00"
+    },
+    {
+      "jemalloc.allocated": 527000008.0,
+      "MemoryResident": 947605504.0,
+      "tracked": {
+        "value": 699708270
+      },
+      "at": "2026-10-10T17:28:53.248160+00:00"
+    },
+    {
+      "jemalloc.allocated": 527050680.0,
+      "MemoryResident": 947613696.0,
+      "tracked": {
+        "value": 699759102
+      },
+      "at": "2026-10-10T17:28:54.260880+00:00"
+    },
+    {
+      "jemalloc.allocated": 527125384.0,
+      "MemoryResident": 947621888.0,
+      "tracked": {
+        "value": 699810126
+      },
+      "at": "2026-10-10T17:28:55.267123+00:00"
+    },
+    {
+      "jemalloc.allocated": 527173304.0,
+      "MemoryResident": 947924992.0,
+      "tracked": {
+        "value": 699860958
+      },
+      "at": "2026-10-10T17:28:56.265747+00:00"
+    },
+    {
+      "jemalloc.allocated": 527138896.0,
+      "MemoryResident": 947945472.0,
+      "tracked": {
+        "value": 699718550
+      },
+      "at": "2026-10-10T17:28:57.274539+00:00"
+    },
+    {
+      "jemalloc.allocated": 526397480.0,
+      "MemoryResident": 947974144.0,
+      "tracked": {
+        "value": 699719460
+      },
+      "at": "2026-10-10T17:28:58.288058+00:00"
+    },
+    {
+      "jemalloc.allocated": 526442104.0,
+      "MemoryResident": 947978240.0,
+      "tracked": {
+        "value": 699770596
+      },
+      "at": "2026-10-10T17:28:59.296416+00:00"
+    },
+    {
+      "jemalloc.allocated": 526484408.0,
+      "MemoryResident": 947974144.0,
+      "tracked": {
+        "value": 699821604
+      },
+      "at": "2026-10-10T17:29:00.296459+00:00"
+    },
+    {
+      "jemalloc.allocated": 527132336.0,
+      "MemoryResident": 947281920.0,
+      "tracked": {
+        "value": 700255505
+      },
+      "at": "2026-10-10T17:29:01.295318+00:00"
+    },
+    {
+      "jemalloc.allocated": 527077808.0,
+      "MemoryResident": 947281920.0,
+      "tracked": {
+        "value": 700295884
+      },
+      "at": "2026-10-10T17:29:02.309384+00:00"
+    },
+    {
+      "jemalloc.allocated": 527109392.0,
+      "MemoryResident": 947216384.0,
+      "tracked": {
+        "value": 700289452
+      },
+      "at": "2026-10-10T17:29:03.318368+00:00"
+    },
+    {
+      "jemalloc.allocated": 527016504.0,
+      "MemoryResident": 948707328.0,
+      "tracked": {
+        "value": 703441356
+      },
+      "at": "2026-10-10T17:29:04.315499+00:00"
+    },
+    {
+      "jemalloc.allocated": 545048808.0,
+      "MemoryResident": 956686336.0,
+      "tracked": {
+        "value": 703358540
+      },
+      "at": "2026-10-10T17:29:05.323721+00:00"
+    },
+    {
+      "jemalloc.allocated": 545019224.0,
+      "MemoryResident": 956751872.0,
+      "tracked": {
+        "value": 703409820
+      },
+      "at": "2026-10-10T17:29:06.333689+00:00"
+    },
+    {
+      "jemalloc.allocated": 545025472.0,
+      "MemoryResident": 958357504.0,
+      "tracked": {
+        "value": 698531267
+      },
+      "at": "2026-10-10T17:29:07.339097+00:00"
+    },
+    {
+      "jemalloc.allocated": 543042312.0,
+      "MemoryResident": 956628992.0,
+      "tracked": {
+        "value": 698582419
+      },
+      "at": "2026-10-10T17:29:08.340857+00:00"
+    },
+    {
+      "jemalloc.allocated": 543093600.0,
+      "MemoryResident": 957612032.0,
+      "tracked": {
+        "value": 698633379
+      },
+      "at": "2026-10-10T17:29:09.355067+00:00"
+    },
+    {
+      "jemalloc.allocated": 543088520.0,
+      "MemoryResident": 956846080.0,
+      "tracked": {
+        "value": 698721795
+      },
+      "at": "2026-10-10T17:29:10.357638+00:00"
+    },
+    {
+      "jemalloc.allocated": 543133864.0,
+      "MemoryResident": 956858368.0,
+      "tracked": {
+        "value": 698772883
+      },
+      "at": "2026-10-10T17:29:11.357596+00:00"
+    },
+    {
+      "jemalloc.allocated": 543183824.0,
+      "MemoryResident": 958529536.0,
+      "tracked": {
+        "value": 698849163
+      },
+      "at": "2026-10-10T17:29:12.368858+00:00"
+    },
+    {
+      "jemalloc.allocated": 543275240.0,
+      "MemoryResident": 956833792.0,
+      "tracked": {
+        "value": 698900187
+      },
+      "at": "2026-10-10T17:29:13.372765+00:00"
+    },
+    {
+      "jemalloc.allocated": 543259448.0,
+      "MemoryResident": 956805120.0,
+      "tracked": {
+        "value": 698951211
+      },
+      "at": "2026-10-10T17:29:14.386792+00:00"
+    },
+    {
+      "jemalloc.allocated": 543304752.0,
+      "MemoryResident": 956846080.0,
+      "tracked": {
+        "value": 699002363
+      },
+      "at": "2026-10-10T17:29:15.392814+00:00"
+    },
+    {
+      "jemalloc.allocated": 543346712.0,
+      "MemoryResident": 956502016.0,
+      "tracked": {
+        "value": 698038475
+      },
+      "at": "2026-10-10T17:29:16.392960+00:00"
+    },
+    {
+      "jemalloc.allocated": 542620488.0,
+      "MemoryResident": 955637760.0,
+      "tracked": {
+        "value": 698356678
+      },
+      "at": "2026-10-10T17:29:17.401444+00:00"
+    },
+    {
+      "jemalloc.allocated": 541435600.0,
+      "MemoryResident": 954900480.0,
+      "tracked": {
+        "value": 698407766
+      },
+      "at": "2026-10-10T17:29:18.406112+00:00"
+    },
+    {
+      "jemalloc.allocated": 594484072.0,
+      "MemoryResident": 1015435264.0,
+      "tracked": {
+        "value": 752104258
+      },
+      "at": "2026-10-10T17:29:19.407272+00:00"
+    },
+    {
+      "jemalloc.allocated": 583015376.0,
+      "MemoryResident": 1015312384.0,
+      "tracked": {
+        "value": 746539898
+      },
+      "at": "2026-10-10T17:29:20.415497+00:00"
+    },
+    {
+      "jemalloc.allocated": 547103296.0,
+      "MemoryResident": 995610624.0,
+      "tracked": {
+        "value": 719092258
+      },
+      "at": "2026-10-10T17:29:21.418288+00:00"
+    },
+    {
+      "jemalloc.allocated": 538063456.0,
+      "MemoryResident": 989495296.0,
+      "tracked": {
+        "value": 754022682
+      },
+      "at": "2026-10-10T17:29:22.426671+00:00"
+    },
+    {
+      "jemalloc.allocated": 533422984.0,
+      "MemoryResident": 993972224.0,
+      "tracked": {
+        "value": 748080090
+      },
+      "at": "2026-10-10T17:29:23.428582+00:00"
+    },
+    {
+      "jemalloc.allocated": 576316352.0,
+      "MemoryResident": 1007005696.0,
+      "tracked": {
+        "value": 757640490
+      },
+      "at": "2026-10-10T17:29:24.432400+00:00"
+    },
+    {
+      "jemalloc.allocated": 575905008.0,
+      "MemoryResident": 993198080.0,
+      "tracked": {
+        "value": 708790758
+      },
+      "at": "2026-10-10T17:29:25.440215+00:00"
+    },
+    {
+      "jemalloc.allocated": 534052352.0,
+      "MemoryResident": 948826112.0,
+      "tracked": {
+        "value": 708920118
+      },
+      "at": "2026-10-10T17:29:26.453280+00:00"
+    },
+    {
+      "jemalloc.allocated": 534103160.0,
+      "MemoryResident": 948834304.0,
+      "tracked": {
+        "value": 701028715
+      },
+      "at": "2026-10-10T17:29:27.449048+00:00"
+    },
+    {
+      "jemalloc.allocated": 523506424.0,
+      "MemoryResident": 947433472.0,
+      "tracked": {
+        "value": 701079803
+      },
+      "at": "2026-10-10T17:29:28.460775+00:00"
+    },
+    {
+      "jemalloc.allocated": 523562952.0,
+      "MemoryResident": 947445760.0,
+      "tracked": {
+        "value": 701130635
+      },
+      "at": "2026-10-10T17:29:29.473824+00:00"
+    },
+    {
+      "jemalloc.allocated": 523605912.0,
+      "MemoryResident": 947449856.0,
+      "tracked": {
+        "value": 701181659
+      },
+      "at": "2026-10-10T17:29:30.476446+00:00"
+    },
+    {
+      "jemalloc.allocated": 523674864.0,
+      "MemoryResident": 947675136.0,
+      "tracked": {
+        "value": 701232683
+      },
+      "at": "2026-10-10T17:29:31.490556+00:00"
+    },
+    {
+      "jemalloc.allocated": 523727824.0,
+      "MemoryResident": 947679232.0,
+      "tracked": {
+        "value": 701308707
+      },
+      "at": "2026-10-10T17:29:32.487337+00:00"
+    },
+    {
+      "jemalloc.allocated": 523906576.0,
+      "MemoryResident": 947724288.0,
+      "tracked": {
+        "value": 701359667
+      },
+      "at": "2026-10-10T17:29:33.501052+00:00"
+    },
+    {
+      "jemalloc.allocated": 523570672.0,
+      "MemoryResident": 947277824.0,
+      "tracked": {
+        "value": 706355807
+      },
+      "at": "2026-10-10T17:29:34.497167+00:00"
+    },
+    {
+      "jemalloc.allocated": 542105424.0,
+      "MemoryResident": 955543552.0,
+      "tracked": {
+        "value": 703186451
+      },
+      "at": "2026-10-10T17:29:35.512697+00:00"
+    },
+    {
+      "jemalloc.allocated": 542183232.0,
+      "MemoryResident": 955551744.0,
+      "tracked": {
+        "value": 703237411
+      },
+      "at": "2026-10-10T17:29:36.519771+00:00"
+    },
+    {
+      "jemalloc.allocated": 542234608.0,
+      "MemoryResident": 955564032.0,
+      "tracked": {
+        "value": 696784759
+      },
+      "at": "2026-10-10T17:29:37.522958+00:00"
+    },
+    {
+      "jemalloc.allocated": 539680528.0,
+      "MemoryResident": 953151488.0,
+      "tracked": {
+        "value": 696835783
+      },
+      "at": "2026-10-10T17:29:38.535733+00:00"
+    },
+    {
+      "jemalloc.allocated": 539736568.0,
+      "MemoryResident": 953159680.0,
+      "tracked": {
+        "value": 696886679
+      },
+      "at": "2026-10-10T17:29:39.535481+00:00"
+    },
+    {
+      "jemalloc.allocated": 539778984.0,
+      "MemoryResident": 953163776.0,
+      "tracked": {
+        "value": 696937639
+      },
+      "at": "2026-10-10T17:29:40.546000+00:00"
+    },
+    {
+      "jemalloc.allocated": 539835624.0,
+      "MemoryResident": 953176064.0,
+      "tracked": {
+        "value": 696988599
+      },
+      "at": "2026-10-10T17:29:41.562189+00:00"
+    },
+    {
+      "jemalloc.allocated": 539890744.0,
+      "MemoryResident": 953176064.0,
+      "tracked": {
+        "value": 697064623
+      },
+      "at": "2026-10-10T17:29:42.558566+00:00"
+    },
+    {
+      "jemalloc.allocated": 540016944.0,
+      "MemoryResident": 953204736.0,
+      "tracked": {
+        "value": 697115519
+      },
+      "at": "2026-10-10T17:29:43.567348+00:00"
+    },
+    {
+      "jemalloc.allocated": 540065888.0,
+      "MemoryResident": 953212928.0,
+      "tracked": {
+        "value": 697166543
+      },
+      "at": "2026-10-10T17:29:44.574106+00:00"
+    },
+    {
+      "jemalloc.allocated": 540078560.0,
+      "MemoryResident": 953221120.0,
+      "tracked": {
+        "value": 697217439
+      },
+      "at": "2026-10-10T17:29:45.583545+00:00"
+    },
+    {
+      "jemalloc.allocated": 540129200.0,
+      "MemoryResident": 953225216.0,
+      "tracked": {
+        "value": 697268335
+      },
+      "at": "2026-10-10T17:29:46.595333+00:00"
+    },
+    {
+      "jemalloc.allocated": 540178496.0,
+      "MemoryResident": 953237504.0,
+      "tracked": {
+        "value": 697747370
+      },
+      "at": "2026-10-10T17:29:47.598721+00:00"
+    },
+    {
+      "jemalloc.allocated": 539217864.0,
+      "MemoryResident": 952483840.0,
+      "tracked": {
+        "value": 697798394
+      },
+      "at": "2026-10-10T17:29:48.612061+00:00"
+    },
+    {
+      "jemalloc.allocated": 539269080.0,
+      "MemoryResident": 952496128.0,
+      "tracked": {
+        "value": 697849290
+      },
+      "at": "2026-10-10T17:29:49.615280+00:00"
+    },
+    {
+      "jemalloc.allocated": 539311904.0,
+      "MemoryResident": 952496128.0,
+      "tracked": {
+        "value": 697900250
+      },
+      "at": "2026-10-10T17:29:50.625108+00:00"
+    },
+    {
+      "jemalloc.allocated": 539363840.0,
+      "MemoryResident": 952508416.0,
+      "tracked": {
+        "value": 697951274
+      },
+      "at": "2026-10-10T17:29:51.626858+00:00"
+    },
+    {
+      "jemalloc.allocated": 539390296.0,
+      "MemoryResident": 952512512.0,
+      "tracked": {
+        "value": 698027362
+      },
+      "at": "2026-10-10T17:29:52.625035+00:00"
+    },
+    {
+      "jemalloc.allocated": 539431952.0,
+      "MemoryResident": 952508416.0,
+      "tracked": {
+        "value": 698078194
+      },
+      "at": "2026-10-10T17:29:53.630766+00:00"
+    },
+    {
+      "jemalloc.allocated": 539385184.0,
+      "MemoryResident": 952250368.0,
+      "tracked": {
+        "value": 698129090
+      },
+      "at": "2026-10-10T17:29:54.635686+00:00"
+    },
+    {
+      "jemalloc.allocated": 539436496.0,
+      "MemoryResident": 952258560.0,
+      "tracked": {
+        "value": 756836951
+      },
+      "at": "2026-10-10T17:29:55.633518+00:00"
+    },
+    {
+      "jemalloc.allocated": 550363064.0,
+      "MemoryResident": 959070208.0,
+      "tracked": {
+        "value": 725095350
+      },
+      "at": "2026-10-10T17:29:56.640773+00:00"
+    },
+    {
+      "jemalloc.allocated": 578922296.0,
+      "MemoryResident": 993849344.0,
+      "tracked": {
+        "value": 740849455
+      },
+      "at": "2026-10-10T17:29:57.646615+00:00"
+    },
+    {
+      "jemalloc.allocated": 581147328.0,
+      "MemoryResident": 1020899328.0,
+      "tracked": {
+        "value": 743290711
+      },
+      "at": "2026-10-10T17:29:58.650043+00:00"
+    },
+    {
+      "jemalloc.allocated": 580443976.0,
+      "MemoryResident": 1019478016.0,
+      "tracked": {
+        "value": 725259151
+      },
+      "at": "2026-10-10T17:29:59.657002+00:00"
+    },
+    {
+      "jemalloc.allocated": 573484376.0,
+      "MemoryResident": 1006501888.0,
+      "tracked": {
+        "value": 714519699
+      },
+      "at": "2026-10-10T17:30:00.663498+00:00"
+    },
+    {
+      "jemalloc.allocated": 574634512.0,
+      "MemoryResident": 1011867648.0,
+      "tracked": {
+        "value": 720198657
+      },
+      "at": "2026-10-10T17:30:01.669211+00:00"
+    },
+    {
+      "jemalloc.allocated": 575607936.0,
+      "MemoryResident": 995049472.0,
+      "tracked": {
+        "value": 704104949
+      },
+      "at": "2026-10-10T17:30:02.673976+00:00"
+    },
+    {
+      "jemalloc.allocated": 533953696.0,
+      "MemoryResident": 951689216.0,
+      "tracked": {
+        "value": 704356993
+      },
+      "at": "2026-10-10T17:30:03.680635+00:00"
+    },
+    {
+      "jemalloc.allocated": 534207584.0,
+      "MemoryResident": 949968896.0,
+      "tracked": {
+        "value": 704563111
+      },
+      "at": "2026-10-10T17:30:04.678737+00:00"
+    },
+    {
+      "jemalloc.allocated": 535057336.0,
+      "MemoryResident": 950448128.0,
+      "tracked": {
+        "value": 704614199
+      },
+      "at": "2026-10-10T17:30:05.679426+00:00"
+    },
+    {
+      "jemalloc.allocated": 535083480.0,
+      "MemoryResident": 950444032.0,
+      "tracked": {
+        "value": 704665287
+      },
+      "at": "2026-10-10T17:30:06.691866+00:00"
+    },
+    {
+      "jemalloc.allocated": 535110120.0,
+      "MemoryResident": 950448128.0,
+      "tracked": {
+        "value": 698037523
+      },
+      "at": "2026-10-10T17:30:07.696675+00:00"
+    },
+    {
+      "jemalloc.allocated": 526735240.0,
+      "MemoryResident": 949125120.0,
+      "tracked": {
+        "value": 698088739
+      },
+      "at": "2026-10-10T17:30:08.703508+00:00"
+    },
+    {
+      "jemalloc.allocated": 526794704.0,
+      "MemoryResident": 949133312.0,
+      "tracked": {
+        "value": 698103159
+      },
+      "at": "2026-10-10T17:30:09.713115+00:00"
+    },
+    {
+      "jemalloc.allocated": 526863088.0,
+      "MemoryResident": 948809728.0,
+      "tracked": {
+        "value": 698154183
+      },
+      "at": "2026-10-10T17:30:10.716914+00:00"
+    },
+    {
+      "jemalloc.allocated": 526851576.0,
+      "MemoryResident": 950419456.0,
+      "tracked": {
+        "value": 698205207
+      },
+      "at": "2026-10-10T17:30:11.732161+00:00"
+    },
+    {
+      "jemalloc.allocated": 526898544.0,
+      "MemoryResident": 948330496.0,
+      "tracked": {
+        "value": 698281423
+      },
+      "at": "2026-10-10T17:30:12.735599+00:00"
+    },
+    {
+      "jemalloc.allocated": 526879216.0,
+      "MemoryResident": 948359168.0,
+      "tracked": {
+        "value": 698332319
+      },
+      "at": "2026-10-10T17:30:13.743626+00:00"
+    },
+    {
+      "jemalloc.allocated": 526956048.0,
+      "MemoryResident": 948350976.0,
+      "tracked": {
+        "value": 698383407
+      },
+      "at": "2026-10-10T17:30:14.755941+00:00"
+    },
+    {
+      "jemalloc.allocated": 526991144.0,
+      "MemoryResident": 948371456.0,
+      "tracked": {
+        "value": 698434367
+      },
+      "at": "2026-10-10T17:30:15.752154+00:00"
+    },
+    {
+      "jemalloc.allocated": 528447864.0,
+      "MemoryResident": 948219904.0,
+      "tracked": {
+        "value": 698538140
+      },
+      "at": "2026-10-10T17:30:16.762711+00:00"
+    },
+    {
+      "jemalloc.allocated": 527385184.0,
+      "MemoryResident": 948027392.0,
+      "tracked": {
+        "value": 697703633
+      },
+      "at": "2026-10-10T17:30:17.766432+00:00"
+    },
+    {
+      "jemalloc.allocated": 527392712.0,
+      "MemoryResident": 947220480.0,
+      "tracked": {
+        "value": 697734832
+      },
+      "at": "2026-10-10T17:30:18.774714+00:00"
+    },
+    {
+      "jemalloc.allocated": 527410464.0,
+      "MemoryResident": 947232768.0,
+      "tracked": {
+        "value": 697493056
+      },
+      "at": "2026-10-10T17:30:19.778790+00:00"
+    },
+    {
+      "jemalloc.allocated": 527131848.0,
+      "MemoryResident": 947105792.0,
+      "tracked": {
+        "value": 697544400
+      },
+      "at": "2026-10-10T17:30:20.788975+00:00"
+    },
+    {
+      "jemalloc.allocated": 527141992.0,
+      "MemoryResident": 947113984.0,
+      "tracked": {
+        "value": 697595424
+      },
+      "at": "2026-10-10T17:30:21.799799+00:00"
+    },
+    {
+      "jemalloc.allocated": 527157928.0,
+      "MemoryResident": 948699136.0,
+      "tracked": {
+        "value": 697671704
+      },
+      "at": "2026-10-10T17:30:22.792481+00:00"
+    },
+    {
+      "jemalloc.allocated": 527166792.0,
+      "MemoryResident": 947134464.0,
+      "tracked": {
+        "value": 697722728
+      },
+      "at": "2026-10-10T17:30:23.804155+00:00"
+    },
+    {
+      "jemalloc.allocated": 527168680.0,
+      "MemoryResident": 947245056.0,
+      "tracked": {
+        "value": 697773944
+      },
+      "at": "2026-10-10T17:30:24.811705+00:00"
+    },
+    {
+      "jemalloc.allocated": 527189920.0,
+      "MemoryResident": 947249152.0,
+      "tracked": {
+        "value": 697824904
+      },
+      "at": "2026-10-10T17:30:25.824635+00:00"
+    },
+    {
+      "jemalloc.allocated": 527242528.0,
+      "MemoryResident": 947257344.0,
+      "tracked": {
+        "value": 697875928
+      },
+      "at": "2026-10-10T17:30:26.824740+00:00"
+    },
+    {
+      "jemalloc.allocated": 527295792.0,
+      "MemoryResident": 947265536.0,
+      "tracked": {
+        "value": 697265754
+      },
+      "at": "2026-10-10T17:30:27.824285+00:00"
+    },
+    {
+      "jemalloc.allocated": 526769872.0,
+      "MemoryResident": 947146752.0,
+      "tracked": {
+        "value": 697316842
+      },
+      "at": "2026-10-10T17:30:28.826858+00:00"
+    },
+    {
+      "jemalloc.allocated": 526793280.0,
+      "MemoryResident": 947154944.0,
+      "tracked": {
+        "value": 697367738
+      },
+      "at": "2026-10-10T17:30:29.832786+00:00"
+    },
+    {
+      "jemalloc.allocated": 526844104.0,
+      "MemoryResident": 947159040.0,
+      "tracked": {
+        "value": 697418826
+      },
+      "at": "2026-10-10T17:30:30.841827+00:00"
+    },
+    {
+      "jemalloc.allocated": 526878920.0,
+      "MemoryResident": 947167232.0,
+      "tracked": {
+        "value": 697469850
+      },
+      "at": "2026-10-10T17:30:31.853274+00:00"
+    },
+    {
+      "jemalloc.allocated": 526931432.0,
+      "MemoryResident": 947175424.0,
+      "tracked": {
+        "value": 698211802
+      },
+      "at": "2026-10-10T17:30:32.850857+00:00"
+    },
+    {
+      "jemalloc.allocated": 525905168.0,
+      "MemoryResident": 947838976.0,
+      "tracked": {
+        "value": 698262634
+      },
+      "at": "2026-10-10T17:30:33.855495+00:00"
+    },
+    {
+      "jemalloc.allocated": 525957344.0,
+      "MemoryResident": 947847168.0,
+      "tracked": {
+        "value": 698313658
+      },
+      "at": "2026-10-10T17:30:34.870029+00:00"
+    },
+    {
+      "jemalloc.allocated": 525936080.0,
+      "MemoryResident": 947331072.0,
+      "tracked": {
+        "value": 698364618
+      },
+      "at": "2026-10-10T17:30:35.874948+00:00"
+    },
+    {
+      "jemalloc.allocated": 525947000.0,
+      "MemoryResident": 947335168.0,
+      "tracked": {
+        "value": 698415578
+      },
+      "at": "2026-10-10T17:30:36.885128+00:00"
+    },
+    {
+      "jemalloc.allocated": 525950200.0,
+      "MemoryResident": 947343360.0,
+      "tracked": {
+        "value": 698435860
+      },
+      "at": "2026-10-10T17:30:37.891418+00:00"
+    },
+    {
+      "jemalloc.allocated": 525209768.0,
+      "MemoryResident": 946925568.0,
+      "tracked": {
+        "value": 698486884
+      },
+      "at": "2026-10-10T17:30:38.900662+00:00"
+    },
+    {
+      "jemalloc.allocated": 525022096.0,
+      "MemoryResident": 946937856.0,
+      "tracked": {
+        "value": 698537780
+      },
+      "at": "2026-10-10T17:30:39.908509+00:00"
+    },
+    {
+      "jemalloc.allocated": 525073800.0,
+      "MemoryResident": 946941952.0,
+      "tracked": {
+        "value": 698588804
+      },
+      "at": "2026-10-10T17:30:40.922952+00:00"
+    },
+    {
+      "jemalloc.allocated": 525055296.0,
+      "MemoryResident": 946950144.0,
+      "tracked": {
+        "value": 698639700
+      },
+      "at": "2026-10-10T17:30:41.925507+00:00"
+    },
+    {
+      "jemalloc.allocated": 525106976.0,
+      "MemoryResident": 946958336.0,
+      "tracked": {
+        "value": 698715724
+      },
+      "at": "2026-10-10T17:30:42.933557+00:00"
+    },
+    {
+      "jemalloc.allocated": 525180088.0,
+      "MemoryResident": 948666368.0,
+      "tracked": {
+        "value": 698766620
+      },
+      "at": "2026-10-10T17:30:43.948399+00:00"
+    },
+    {
+      "jemalloc.allocated": 525234488.0,
+      "MemoryResident": 948690944.0,
+      "tracked": {
+        "value": 698817580
+      },
+      "at": "2026-10-10T17:30:44.957162+00:00"
+    },
+    {
+      "jemalloc.allocated": 525234248.0,
+      "MemoryResident": 948506624.0,
+      "tracked": {
+        "value": 698898668
+      },
+      "at": "2026-10-10T17:30:45.953026+00:00"
+    },
+    {
+      "jemalloc.allocated": 526106680.0,
+      "MemoryResident": 946798592.0,
+      "tracked": {
+        "value": 698949692
+      },
+      "at": "2026-10-10T17:30:46.962089+00:00"
+    },
+    {
+      "jemalloc.allocated": 526142928.0,
+      "MemoryResident": 947707904.0,
+      "tracked": {
+        "value": 697718668
+      },
+      "at": "2026-10-10T17:30:47.967690+00:00"
+    },
+    {
+      "jemalloc.allocated": 525206616.0,
+      "MemoryResident": 947060736.0,
+      "tracked": {
+        "value": 697764484
+      },
+      "at": "2026-10-10T17:30:48.985096+00:00"
+    },
+    {
+      "jemalloc.allocated": 525208000.0,
+      "MemoryResident": 948826112.0,
+      "tracked": {
+        "value": 697815316
+      },
+      "at": "2026-10-10T17:30:49.982567+00:00"
+    },
+    {
+      "jemalloc.allocated": 525259648.0,
+      "MemoryResident": 948805632.0,
+      "tracked": {
+        "value": 697866276
+      },
+      "at": "2026-10-10T17:30:50.985391+00:00"
+    },
+    {
+      "jemalloc.allocated": 525297032.0,
+      "MemoryResident": 948809728.0,
+      "tracked": {
+        "value": 697917172
+      },
+      "at": "2026-10-10T17:30:52.002957+00:00"
+    },
+    {
+      "jemalloc.allocated": 525313928.0,
+      "MemoryResident": 948768768.0,
+      "tracked": {
+        "value": 697993324
+      },
+      "at": "2026-10-10T17:30:53.000784+00:00"
+    },
+    {
+      "jemalloc.allocated": 525419656.0,
+      "MemoryResident": 948989952.0,
+      "tracked": {
+        "value": 698044284
+      },
+      "at": "2026-10-10T17:30:54.014128+00:00"
+    },
+    {
+      "jemalloc.allocated": 525454896.0,
+      "MemoryResident": 947105792.0,
+      "tracked": {
+        "value": 698095308
+      },
+      "at": "2026-10-10T17:30:55.016347+00:00"
+    },
+    {
+      "jemalloc.allocated": 525504440.0,
+      "MemoryResident": 947109888.0,
+      "tracked": {
+        "value": 698146204
+      },
+      "at": "2026-10-10T17:30:56.025487+00:00"
+    },
+    {
+      "jemalloc.allocated": 525543704.0,
+      "MemoryResident": 947118080.0,
+      "tracked": {
+        "value": 698197164
+      },
+      "at": "2026-10-10T17:30:57.035294+00:00"
+    },
+    {
+      "jemalloc.allocated": 524302040.0,
+      "MemoryResident": 946642944.0,
+      "tracked": {
+        "value": 696807890
+      },
+      "at": "2026-10-10T17:30:58.035306+00:00"
+    },
+    {
+      "jemalloc.allocated": 524228088.0,
+      "MemoryResident": 946122752.0,
+      "tracked": {
+        "value": 696858978
+      },
+      "at": "2026-10-10T17:30:59.045992+00:00"
+    },
+    {
+      "jemalloc.allocated": 524280744.0,
+      "MemoryResident": 946130944.0,
+      "tracked": {
+        "value": 696909874
+      },
+      "at": "2026-10-10T17:31:00.051007+00:00"
+    },
+    {
+      "jemalloc.allocated": 524649696.0,
+      "MemoryResident": 945512448.0,
+      "tracked": {
+        "value": 697342879
+      },
+      "at": "2026-10-10T17:31:01.063156+00:00"
+    },
+    {
+      "jemalloc.allocated": 524697016.0,
+      "MemoryResident": 945319936.0,
+      "tracked": {
+        "value": 697374134
+      },
+      "at": "2026-10-10T17:31:02.071108+00:00"
+    },
+    {
+      "jemalloc.allocated": 609123936.0,
+      "MemoryResident": 1014169600.0,
+      "tracked": {
+        "value": 781436727
+      },
+      "at": "2026-10-10T17:31:03.074197+00:00"
+    },
+    {
+      "jemalloc.allocated": 579694768.0,
+      "MemoryResident": 1000865792.0,
+      "tracked": {
+        "value": 711014190
+      },
+      "at": "2026-10-10T17:31:04.082360+00:00"
+    },
+    {
+      "jemalloc.allocated": 568959544.0,
+      "MemoryResident": 1006198784.0,
+      "tracked": {
+        "value": 746863614
+      },
+      "at": "2026-10-10T17:31:05.083405+00:00"
+    },
+    {
+      "jemalloc.allocated": 571558888.0,
+      "MemoryResident": 1005252608.0,
+      "tracked": {
+        "value": 761226166
+      },
+      "at": "2026-10-10T17:31:06.090739+00:00"
+    },
+    {
+      "jemalloc.allocated": 569823368.0,
+      "MemoryResident": 989511680.0,
+      "tracked": {
+        "value": 751237502
+      },
+      "at": "2026-10-10T17:31:07.100831+00:00"
+    },
+    {
+      "jemalloc.allocated": 533961888.0,
+      "MemoryResident": 976965632.0,
+      "tracked": {
+        "value": 740005979
+      },
+      "at": "2026-10-10T17:31:08.105502+00:00"
+    },
+    {
+      "jemalloc.allocated": 581519192.0,
+      "MemoryResident": 990773248.0,
+      "tracked": {
+        "value": 728586571
+      },
+      "at": "2026-10-10T17:31:09.108653+00:00"
+    },
+    {
+      "jemalloc.allocated": 526133304.0,
+      "MemoryResident": 942043136.0,
+      "tracked": {
+        "value": 699792411
+      },
+      "at": "2026-10-10T17:31:10.122372+00:00"
+    },
+    {
+      "jemalloc.allocated": 526107288.0,
+      "MemoryResident": 942051328.0,
+      "tracked": {
+        "value": 699689186
+      },
+      "at": "2026-10-10T17:31:11.129020+00:00"
+    },
+    {
+      "jemalloc.allocated": 526159120.0,
+      "MemoryResident": 942071808.0,
+      "tracked": {
+        "value": 699740146
+      },
+      "at": "2026-10-10T17:31:12.133401+00:00"
+    },
+    {
+      "jemalloc.allocated": 526202912.0,
+      "MemoryResident": 942096384.0,
+      "tracked": {
+        "value": 699816554
+      },
+      "at": "2026-10-10T17:31:13.142113+00:00"
+    },
+    {
+      "jemalloc.allocated": 526291960.0,
+      "MemoryResident": 942116864.0,
+      "tracked": {
+        "value": 699867514
+      },
+      "at": "2026-10-10T17:31:14.153262+00:00"
+    },
+    {
+      "jemalloc.allocated": 526362616.0,
+      "MemoryResident": 942690304.0,
+      "tracked": {
+        "value": 699918666
+      },
+      "at": "2026-10-10T17:31:15.160767+00:00"
+    },
+    {
+      "jemalloc.allocated": 533615880.0,
+      "MemoryResident": 943054848.0,
+      "tracked": {
+        "value": 700024170
+      },
+      "at": "2026-10-10T17:31:16.166810+00:00"
+    },
+    {
+      "jemalloc.allocated": 526357480.0,
+      "MemoryResident": 942653440.0,
+      "tracked": {
+        "value": 700075258
+      },
+      "at": "2026-10-10T17:31:17.173584+00:00"
+    },
+    {
+      "jemalloc.allocated": 522974040.0,
+      "MemoryResident": 941944832.0,
+      "tracked": {
+        "value": 696418086
+      },
+      "at": "2026-10-10T17:31:18.183816+00:00"
+    },
+    {
+      "jemalloc.allocated": 523103968.0,
+      "MemoryResident": 941989888.0,
+      "tracked": {
+        "value": 696469110
+      },
+      "at": "2026-10-10T17:31:19.196957+00:00"
+    },
+    {
+      "jemalloc.allocated": 523166896.0,
+      "MemoryResident": 941932544.0,
+      "tracked": {
+        "value": 696520070
+      },
+      "at": "2026-10-10T17:31:20.195786+00:00"
+    },
+    {
+      "jemalloc.allocated": 523209544.0,
+      "MemoryResident": 941903872.0,
+      "tracked": {
+        "value": 696571094
+      },
+      "at": "2026-10-10T17:31:21.203950+00:00"
+    },
+    {
+      "jemalloc.allocated": 523259768.0,
+      "MemoryResident": 942211072.0,
+      "tracked": {
+        "value": 696622118
+      },
+      "at": "2026-10-10T17:31:22.213966+00:00"
+    },
+    {
+      "jemalloc.allocated": 523309872.0,
+      "MemoryResident": 942219264.0,
+      "tracked": {
+        "value": 696698334
+      },
+      "at": "2026-10-10T17:31:23.222719+00:00"
+    },
+    {
+      "jemalloc.allocated": 523394152.0,
+      "MemoryResident": 942288896.0,
+      "tracked": {
+        "value": 696749230
+      },
+      "at": "2026-10-10T17:31:24.232675+00:00"
+    },
+    {
+      "jemalloc.allocated": 523433528.0,
+      "MemoryResident": 942321664.0,
+      "tracked": {
+        "value": 696800254
+      },
+      "at": "2026-10-10T17:31:25.240127+00:00"
+    },
+    {
+      "jemalloc.allocated": 523509800.0,
+      "MemoryResident": 942325760.0,
+      "tracked": {
+        "value": 696851086
+      },
+      "at": "2026-10-10T17:31:26.248973+00:00"
+    },
+    {
+      "jemalloc.allocated": 523539648.0,
+      "MemoryResident": 942333952.0,
+      "tracked": {
+        "value": 696993030
+      },
+      "at": "2026-10-10T17:31:27.254471+00:00"
+    },
+    {
+      "jemalloc.allocated": 524312736.0,
+      "MemoryResident": 941305856.0,
+      "tracked": {
+        "value": 697323243
+      },
+      "at": "2026-10-10T17:31:28.263182+00:00"
+    },
+    {
+      "jemalloc.allocated": 524435248.0,
+      "MemoryResident": 942989312.0,
+      "tracked": {
+        "value": 697399331
+      },
+      "at": "2026-10-10T17:31:29.275889+00:00"
+    },
+    {
+      "jemalloc.allocated": 524488888.0,
+      "MemoryResident": 941326336.0,
+      "tracked": {
+        "value": 697450227
+      },
+      "at": "2026-10-10T17:31:30.282524+00:00"
+    },
+    {
+      "jemalloc.allocated": 524521352.0,
+      "MemoryResident": 941330432.0,
+      "tracked": {
+        "value": 697501187
+      },
+      "at": "2026-10-10T17:31:31.288801+00:00"
+    },
+    {
+      "jemalloc.allocated": 524574152.0,
+      "MemoryResident": 941338624.0,
+      "tracked": {
+        "value": 697552083
+      },
+      "at": "2026-10-10T17:31:32.297550+00:00"
+    },
+    {
+      "jemalloc.allocated": 524613696.0,
+      "MemoryResident": 941346816.0,
+      "tracked": {
+        "value": 697603107
+      },
+      "at": "2026-10-10T17:31:33.301672+00:00"
+    },
+    {
+      "jemalloc.allocated": 524707392.0,
+      "MemoryResident": 941355008.0,
+      "tracked": {
+        "value": 697679067
+      },
+      "at": "2026-10-10T17:31:34.312820+00:00"
+    },
+    {
+      "jemalloc.allocated": 524738600.0,
+      "MemoryResident": 941363200.0,
+      "tracked": {
+        "value": 697730027
+      },
+      "at": "2026-10-10T17:31:35.317835+00:00"
+    },
+    {
+      "jemalloc.allocated": 524782192.0,
+      "MemoryResident": 941432832.0,
+      "tracked": {
+        "value": 697780923
+      },
+      "at": "2026-10-10T17:31:36.321325+00:00"
+    },
+    {
+      "jemalloc.allocated": 524817400.0,
+      "MemoryResident": 941441024.0,
+      "tracked": {
+        "value": 697832011
+      },
+      "at": "2026-10-10T17:31:37.325114+00:00"
+    },
+    {
+      "jemalloc.allocated": 524694800.0,
+      "MemoryResident": 942841856.0,
+      "tracked": {
+        "value": 697492505
+      },
+      "at": "2026-10-10T17:31:38.332853+00:00"
+    },
+    {
+      "jemalloc.allocated": 524807192.0,
+      "MemoryResident": 942813184.0,
+      "tracked": {
+        "value": 697568785
+      },
+      "at": "2026-10-10T17:31:39.344682+00:00"
+    },
+    {
+      "jemalloc.allocated": 568226936.0,
+      "MemoryResident": 1004597248.0,
+      "tracked": {
+        "value": 749218357
+      },
+      "at": "2026-10-10T17:31:40.345843+00:00"
+    },
+    {
+      "jemalloc.allocated": 567501488.0,
+      "MemoryResident": 987828224.0,
+      "tracked": {
+        "value": 747846541
+      },
+      "at": "2026-10-10T17:31:41.350553+00:00"
+    },
+    {
+      "jemalloc.allocated": 569278960.0,
+      "MemoryResident": 991318016.0,
+      "tracked": {
+        "value": 745526613
+      },
+      "at": "2026-10-10T17:31:42.359258+00:00"
+    },
+    {
+      "jemalloc.allocated": 542509152.0,
+      "MemoryResident": 988041216.0,
+      "tracked": {
+        "value": 716625053
+      },
+      "at": "2026-10-10T17:31:43.367006+00:00"
+    },
+    {
+      "jemalloc.allocated": 576220968.0,
+      "MemoryResident": 981221376.0,
+      "tracked": {
+        "value": 751577221
+      },
+      "at": "2026-10-10T17:31:44.366949+00:00"
+    },
+    {
+      "jemalloc.allocated": 587788928.0,
+      "MemoryResident": 996024320.0,
+      "tracked": {
+        "value": 759599493
+      },
+      "at": "2026-10-10T17:31:45.374673+00:00"
+    },
+    {
+      "jemalloc.allocated": 535591552.0,
+      "MemoryResident": 997634048.0,
+      "tracked": {
+        "value": 707810433
+      },
+      "at": "2026-10-10T17:31:46.375508+00:00"
+    },
+    {
+      "jemalloc.allocated": 535643968.0,
+      "MemoryResident": 950902784.0,
+      "tracked": {
+        "value": 707861393
+      },
+      "at": "2026-10-10T17:31:47.389637+00:00"
+    },
+    {
+      "jemalloc.allocated": 525592744.0,
+      "MemoryResident": 961282048.0,
+      "tracked": {
+        "value": 700177446
+      },
+      "at": "2026-10-10T17:31:48.392986+00:00"
+    },
+    {
+      "jemalloc.allocated": 525555456.0,
+      "MemoryResident": 961327104.0,
+      "tracked": {
+        "value": 700253598
+      },
+      "at": "2026-10-10T17:31:49.400923+00:00"
+    },
+    {
+      "jemalloc.allocated": 525518656.0,
+      "MemoryResident": 961236992.0,
+      "tracked": {
+        "value": 700304494
+      },
+      "at": "2026-10-10T17:31:50.407849+00:00"
+    },
+    {
+      "jemalloc.allocated": 525576720.0,
+      "MemoryResident": 961245184.0,
+      "tracked": {
+        "value": 700355454
+      },
+      "at": "2026-10-10T17:31:51.410794+00:00"
+    },
+    {
+      "jemalloc.allocated": 525556232.0,
+      "MemoryResident": 961249280.0,
+      "tracked": {
+        "value": 700406350
+      },
+      "at": "2026-10-10T17:31:52.421821+00:00"
+    },
+    {
+      "jemalloc.allocated": 525611592.0,
+      "MemoryResident": 961257472.0,
+      "tracked": {
+        "value": 700457438
+      },
+      "at": "2026-10-10T17:31:53.420521+00:00"
+    },
+    {
+      "jemalloc.allocated": 525687856.0,
+      "MemoryResident": 961265664.0,
+      "tracked": {
+        "value": 700533334
+      },
+      "at": "2026-10-10T17:31:54.427667+00:00"
+    },
+    {
+      "jemalloc.allocated": 525740184.0,
+      "MemoryResident": 961273856.0,
+      "tracked": {
+        "value": 699363143
+      },
+      "at": "2026-10-10T17:31:55.438019+00:00"
+    },
+    {
+      "jemalloc.allocated": 525172032.0,
+      "MemoryResident": 960757760.0,
+      "tracked": {
+        "value": 699414039
+      },
+      "at": "2026-10-10T17:31:56.448746+00:00"
+    },
+    {
+      "jemalloc.allocated": 524581216.0,
+      "MemoryResident": 960761856.0,
+      "tracked": {
+        "value": 698663111
+      },
+      "at": "2026-10-10T17:31:57.453296+00:00"
+    },
+    {
+      "jemalloc.allocated": 524990000.0,
+      "MemoryResident": 959909888.0,
+      "tracked": {
+        "value": 695990208
+      },
+      "at": "2026-10-10T17:31:58.464943+00:00"
+    },
+    {
+      "jemalloc.allocated": 524905576.0,
+      "MemoryResident": 963448832.0,
+      "tracked": {
+        "value": 696066232
+      },
+      "at": "2026-10-10T17:31:59.469171+00:00"
+    },
+    {
+      "jemalloc.allocated": 524947432.0,
+      "MemoryResident": 963457024.0,
+      "tracked": {
+        "value": 696200020
+      },
+      "at": "2026-10-10T17:32:00.478292+00:00"
+    },
+    {
+      "jemalloc.allocated": 526215016.0,
+      "MemoryResident": 962965504.0,
+      "tracked": {
+        "value": 696435252
+      },
+      "at": "2026-10-10T17:32:01.475540+00:00"
+    },
+    {
+      "jemalloc.allocated": 526125696.0,
+      "MemoryResident": 963526656.0,
+      "tracked": {
+        "value": 696486340
+      },
+      "at": "2026-10-10T17:32:02.488945+00:00"
+    },
+    {
+      "jemalloc.allocated": 526116224.0,
+      "MemoryResident": 962027520.0,
+      "tracked": {
+        "value": 696537492
+      },
+      "at": "2026-10-10T17:32:03.492301+00:00"
+    },
+    {
+      "jemalloc.allocated": 526296104.0,
+      "MemoryResident": 962035712.0,
+      "tracked": {
+        "value": 696614092
+      },
+      "at": "2026-10-10T17:32:04.494939+00:00"
+    },
+    {
+      "jemalloc.allocated": 526352328.0,
+      "MemoryResident": 962043904.0,
+      "tracked": {
+        "value": 696665372
+      },
+      "at": "2026-10-10T17:32:05.504699+00:00"
+    },
+    {
+      "jemalloc.allocated": 526394088.0,
+      "MemoryResident": 962015232.0,
+      "tracked": {
+        "value": 696716204
+      },
+      "at": "2026-10-10T17:32:06.511205+00:00"
+    },
+    {
+      "jemalloc.allocated": 526451400.0,
+      "MemoryResident": 962019328.0,
+      "tracked": {
+        "value": 696100261
+      },
+      "at": "2026-10-10T17:32:07.521773+00:00"
+    },
+    {
+      "jemalloc.allocated": 525989840.0,
+      "MemoryResident": 961540096.0,
+      "tracked": {
+        "value": 696151221
+      },
+      "at": "2026-10-10T17:32:08.530744+00:00"
+    },
+    {
+      "jemalloc.allocated": 525999704.0,
+      "MemoryResident": 961626112.0,
+      "tracked": {
+        "value": 696227309
+      },
+      "at": "2026-10-10T17:32:09.538705+00:00"
+    },
+    {
+      "jemalloc.allocated": 525998312.0,
+      "MemoryResident": 961748992.0,
+      "tracked": {
+        "value": 696241729
+      },
+      "at": "2026-10-10T17:32:10.541060+00:00"
+    },
+    {
+      "jemalloc.allocated": 526010152.0,
+      "MemoryResident": 961757184.0,
+      "tracked": {
+        "value": 696292817
+      },
+      "at": "2026-10-10T17:32:11.543521+00:00"
+    },
+    {
+      "jemalloc.allocated": 526029136.0,
+      "MemoryResident": 961765376.0,
+      "tracked": {
+        "value": 696343841
+      },
+      "at": "2026-10-10T17:32:12.556592+00:00"
+    },
+    {
+      "jemalloc.allocated": 526082472.0,
+      "MemoryResident": 961769472.0,
+      "tracked": {
+        "value": 696394865
+      },
+      "at": "2026-10-10T17:32:13.567768+00:00"
+    },
+    {
+      "jemalloc.allocated": 525878984.0,
+      "MemoryResident": 961691648.0,
+      "tracked": {
+        "value": 696435038
+      },
+      "at": "2026-10-10T17:32:14.568222+00:00"
+    },
+    {
+      "jemalloc.allocated": 525887552.0,
+      "MemoryResident": 961695744.0,
+      "tracked": {
+        "value": 696466109
+      },
+      "at": "2026-10-10T17:32:15.573921+00:00"
+    },
+    {
+      "jemalloc.allocated": 525774128.0,
+      "MemoryResident": 962023424.0,
+      "tracked": {
+        "value": 744038089
+      },
+      "at": "2026-10-10T17:32:16.574582+00:00"
+    },
+    {
+      "jemalloc.allocated": 524531512.0,
+      "MemoryResident": 963313664.0,
+      "tracked": {
+        "value": 697105532
+      },
+      "at": "2026-10-10T17:32:17.586113+00:00"
+    },
+    {
+      "jemalloc.allocated": 523893840.0,
+      "MemoryResident": 962424832.0,
+      "tracked": {
+        "value": 697156540
+      },
+      "at": "2026-10-10T17:32:18.591328+00:00"
+    },
+    {
+      "jemalloc.allocated": 523943392.0,
+      "MemoryResident": 961990656.0,
+      "tracked": {
+        "value": 697233084
+      },
+      "at": "2026-10-10T17:32:19.599427+00:00"
+    },
+    {
+      "jemalloc.allocated": 523891608.0,
+      "MemoryResident": 961990656.0,
+      "tracked": {
+        "value": 696992076
+      },
+      "at": "2026-10-10T17:32:20.602635+00:00"
+    },
+    {
+      "jemalloc.allocated": 523965960.0,
+      "MemoryResident": 961990656.0,
+      "tracked": {
+        "value": 697043356
+      },
+      "at": "2026-10-10T17:32:21.606771+00:00"
+    },
+    {
+      "jemalloc.allocated": 524014760.0,
+      "MemoryResident": 961990656.0,
+      "tracked": {
+        "value": 697094380
+      },
+      "at": "2026-10-10T17:32:22.612515+00:00"
+    },
+    {
+      "jemalloc.allocated": 524066032.0,
+      "MemoryResident": 961990656.0,
+      "tracked": {
+        "value": 697145340
+      },
+      "at": "2026-10-10T17:32:23.623551+00:00"
+    },
+    {
+      "jemalloc.allocated": 524145760.0,
+      "MemoryResident": 961908736.0,
+      "tracked": {
+        "value": 697221492
+      },
+      "at": "2026-10-10T17:32:24.629275+00:00"
+    },
+    {
+      "jemalloc.allocated": 524184048.0,
+      "MemoryResident": 961908736.0,
+      "tracked": {
+        "value": 697272580
+      },
+      "at": "2026-10-10T17:32:25.640883+00:00"
+    },
+    {
+      "jemalloc.allocated": 524235360.0,
+      "MemoryResident": 961908736.0,
+      "tracked": {
+        "value": 697323412
+      },
+      "at": "2026-10-10T17:32:26.640741+00:00"
+    },
+    {
+      "jemalloc.allocated": 524289424.0,
+      "MemoryResident": 961908736.0,
+      "tracked": {
+        "value": 696131434
+      },
+      "at": "2026-10-10T17:32:27.645953+00:00"
+    },
+    {
+      "jemalloc.allocated": 523515176.0,
+      "MemoryResident": 961495040.0,
+      "tracked": {
+        "value": 696179954
+      },
+      "at": "2026-10-10T17:32:28.652007+00:00"
+    },
+    {
+      "jemalloc.allocated": 523519992.0,
+      "MemoryResident": 963436544.0,
+      "tracked": {
+        "value": 696256042
+      },
+      "at": "2026-10-10T17:32:29.667336+00:00"
+    },
+    {
+      "jemalloc.allocated": 523499272.0,
+      "MemoryResident": 963375104.0,
+      "tracked": {
+        "value": 696306938
+      },
+      "at": "2026-10-10T17:32:30.677375+00:00"
+    },
+    {
+      "jemalloc.allocated": 523555064.0,
+      "MemoryResident": 963383296.0,
+      "tracked": {
+        "value": 696358026
+      },
+      "at": "2026-10-10T17:32:31.682011+00:00"
+    },
+    {
+      "jemalloc.allocated": 523579784.0,
+      "MemoryResident": 963391488.0,
+      "tracked": {
+        "value": 696408986
+      },
+      "at": "2026-10-10T17:32:32.683653+00:00"
+    },
+    {
+      "jemalloc.allocated": 523606464.0,
+      "MemoryResident": 963395584.0,
+      "tracked": {
+        "value": 696460010
+      },
+      "at": "2026-10-10T17:32:33.696677+00:00"
+    },
+    {
+      "jemalloc.allocated": 523546464.0,
+      "MemoryResident": 963715072.0,
+      "tracked": {
+        "value": 696535906
+      },
+      "at": "2026-10-10T17:32:34.704636+00:00"
+    },
+    {
+      "jemalloc.allocated": 523598720.0,
+      "MemoryResident": 963735552.0,
+      "tracked": {
+        "value": 696587058
+      },
+      "at": "2026-10-10T17:32:35.704091+00:00"
+    },
+    {
+      "jemalloc.allocated": 523649040.0,
+      "MemoryResident": 963751936.0,
+      "tracked": {
+        "value": 696637826
+      },
+      "at": "2026-10-10T17:32:36.713102+00:00"
+    },
+    {
+      "jemalloc.allocated": 523699664.0,
+      "MemoryResident": 963760128.0,
+      "tracked": {
+        "value": 696202450
+      },
+      "at": "2026-10-10T17:32:37.711762+00:00"
+    },
+    {
+      "jemalloc.allocated": 523204392.0,
+      "MemoryResident": 963702784.0,
+      "tracked": {
+        "value": 699350538
+      },
+      "at": "2026-10-10T17:32:38.712460+00:00"
+    },
+    {
+      "jemalloc.allocated": 541151080.0,
+      "MemoryResident": 971329536.0,
+      "tracked": {
+        "value": 699426626
+      },
+      "at": "2026-10-10T17:32:39.722445+00:00"
+    },
+    {
+      "jemalloc.allocated": 541175352.0,
+      "MemoryResident": 971329536.0,
+      "tracked": {
+        "value": 699477586
+      },
+      "at": "2026-10-10T17:32:40.726218+00:00"
+    },
+    {
+      "jemalloc.allocated": 541229888.0,
+      "MemoryResident": 971329536.0,
+      "tracked": {
+        "value": 698193588
+      },
+      "at": "2026-10-10T17:32:41.741482+00:00"
+    },
+    {
+      "jemalloc.allocated": 541019296.0,
+      "MemoryResident": 971214848.0,
+      "tracked": {
+        "value": 698244548
+      },
+      "at": "2026-10-10T17:32:42.747949+00:00"
+    },
+    {
+      "jemalloc.allocated": 541070176.0,
+      "MemoryResident": 971214848.0,
+      "tracked": {
+        "value": 698074146
+      },
+      "at": "2026-10-10T17:32:43.749186+00:00"
+    },
+    {
+      "jemalloc.allocated": 541052152.0,
+      "MemoryResident": 971227136.0,
+      "tracked": {
+        "value": 698150106
+      },
+      "at": "2026-10-10T17:32:44.753932+00:00"
+    },
+    {
+      "jemalloc.allocated": 541099496.0,
+      "MemoryResident": 972894208.0,
+      "tracked": {
+        "value": 698047620
+      },
+      "at": "2026-10-10T17:32:45.761736+00:00"
+    },
+    {
+      "jemalloc.allocated": 541131272.0,
+      "MemoryResident": 971227136.0,
+      "tracked": {
+        "value": 751703834
+      },
+      "at": "2026-10-10T17:32:46.762611+00:00"
+    },
+    {
+      "jemalloc.allocated": 642368168.0,
+      "MemoryResident": 1045078016.0,
+      "tracked": {
+        "value": 741496949
+      },
+      "at": "2026-10-10T17:32:47.767946+00:00"
+    },
+    {
+      "jemalloc.allocated": 577264248.0,
+      "MemoryResident": 1016864768.0,
+      "tracked": {
+        "value": 740446901
+      },
+      "at": "2026-10-10T17:32:48.778895+00:00"
+    },
+    {
+      "jemalloc.allocated": 575551624.0,
+      "MemoryResident": 1025429504.0,
+      "tracked": {
+        "value": 741008973
+      },
+      "at": "2026-10-10T17:32:49.785021+00:00"
+    },
+    {
+      "jemalloc.allocated": 572306200.0,
+      "MemoryResident": 1005613056.0,
+      "tracked": {
+        "value": 725414221
+      },
+      "at": "2026-10-10T17:32:50.789884+00:00"
+    },
+    {
+      "jemalloc.allocated": 554878600.0,
+      "MemoryResident": 995733504.0,
+      "tracked": {
+        "value": 751230518
+      },
+      "at": "2026-10-10T17:32:51.797886+00:00"
+    },
+    {
+      "jemalloc.allocated": 528497032.0,
+      "MemoryResident": 1001541632.0,
+      "tracked": {
+        "value": 745252118
+      },
+      "at": "2026-10-10T17:32:52.806206+00:00"
+    },
+    {
+      "jemalloc.allocated": 576227952.0,
+      "MemoryResident": 994209792.0,
+      "tracked": {
+        "value": 703609834
+      },
+      "at": "2026-10-10T17:32:53.815902+00:00"
+    },
+    {
+      "jemalloc.allocated": 528806000.0,
+      "MemoryResident": 963604480.0,
+      "tracked": {
+        "value": 703685794
+      },
+      "at": "2026-10-10T17:32:54.825392+00:00"
+    },
+    {
+      "jemalloc.allocated": 528856824.0,
+      "MemoryResident": 963272704.0,
+      "tracked": {
+        "value": 703736754
+      },
+      "at": "2026-10-10T17:32:55.829462+00:00"
+    },
+    {
+      "jemalloc.allocated": 528888288.0,
+      "MemoryResident": 963276800.0,
+      "tracked": {
+        "value": 703787586
+      },
+      "at": "2026-10-10T17:32:56.842387+00:00"
+    },
+    {
+      "jemalloc.allocated": 528942976.0,
+      "MemoryResident": 963284992.0,
+      "tracked": {
+        "value": 695002318
+      },
+      "at": "2026-10-10T17:32:57.844544+00:00"
+    },
+    {
+      "jemalloc.allocated": 519479040.0,
+      "MemoryResident": 960339968.0,
+      "tracked": {
+        "value": 695053150
+      },
+      "at": "2026-10-10T17:32:58.853657+00:00"
+    },
+    {
+      "jemalloc.allocated": 519498008.0,
+      "MemoryResident": 960499712.0,
+      "tracked": {
+        "value": 695129238
+      },
+      "at": "2026-10-10T17:32:59.865200+00:00"
+    },
+    {
+      "jemalloc.allocated": 519466080.0,
+      "MemoryResident": 960172032.0,
+      "tracked": {
+        "value": 695560755
+      },
+      "at": "2026-10-10T17:33:00.864721+00:00"
+    },
+    {
+      "jemalloc.allocated": 521300952.0,
+      "MemoryResident": 960077824.0,
+      "tracked": {
+        "value": 695383686
+      },
+      "at": "2026-10-10T17:33:01.871269+00:00"
+    },
+    {
+      "jemalloc.allocated": 521240000.0,
+      "MemoryResident": 960036864.0,
+      "tracked": {
+        "value": 695434774
+      },
+      "at": "2026-10-10T17:33:02.877806+00:00"
+    },
+    {
+      "jemalloc.allocated": 521274488.0,
+      "MemoryResident": 960040960.0,
+      "tracked": {
+        "value": 695486054
+      },
+      "at": "2026-10-10T17:33:03.885497+00:00"
+    },
+    {
+      "jemalloc.allocated": 521252176.0,
+      "MemoryResident": 960180224.0,
+      "tracked": {
+        "value": 695562782
+      },
+      "at": "2026-10-10T17:33:04.895695+00:00"
+    },
+    {
+      "jemalloc.allocated": 521229232.0,
+      "MemoryResident": 960016384.0,
+      "tracked": {
+        "value": 695613934
+      },
+      "at": "2026-10-10T17:33:05.900001+00:00"
+    },
+    {
+      "jemalloc.allocated": 521285216.0,
+      "MemoryResident": 960020480.0,
+      "tracked": {
+        "value": 695665022
+      },
+      "at": "2026-10-10T17:33:06.908757+00:00"
+    },
+    {
+      "jemalloc.allocated": 521369624.0,
+      "MemoryResident": 961802240.0,
+      "tracked": {
+        "value": 693837716
+      },
+      "at": "2026-10-10T17:33:07.911086+00:00"
+    },
+    {
+      "jemalloc.allocated": 520960800.0,
+      "MemoryResident": 960053248.0,
+      "tracked": {
+        "value": 700676304
+      },
+      "at": "2026-10-10T17:33:08.914450+00:00"
+    },
+    {
+      "jemalloc.allocated": 537780536.0,
+      "MemoryResident": 968355840.0,
+      "tracked": {
+        "value": 697049116
+      },
+      "at": "2026-10-10T17:33:09.925808+00:00"
+    },
+    {
+      "jemalloc.allocated": 537853944.0,
+      "MemoryResident": 969981952.0,
+      "tracked": {
+        "value": 697100012
+      },
+      "at": "2026-10-10T17:33:10.928208+00:00"
+    },
+    {
+      "jemalloc.allocated": 537902232.0,
+      "MemoryResident": 968032256.0,
+      "tracked": {
+        "value": 697151228
+      },
+      "at": "2026-10-10T17:33:11.931340+00:00"
+    },
+    {
+      "jemalloc.allocated": 537963216.0,
+      "MemoryResident": 968359936.0,
+      "tracked": {
+        "value": 697202188
+      },
+      "at": "2026-10-10T17:33:12.934815+00:00"
+    },
+    {
+      "jemalloc.allocated": 538014248.0,
+      "MemoryResident": 968556544.0,
+      "tracked": {
+        "value": 697253148
+      },
+      "at": "2026-10-10T17:33:13.940049+00:00"
+    },
+    {
+      "jemalloc.allocated": 538059632.0,
+      "MemoryResident": 970391552.0,
+      "tracked": {
+        "value": 697329236
+      },
+      "at": "2026-10-10T17:33:14.945673+00:00"
+    },
+    {
+      "jemalloc.allocated": 538230800.0,
+      "MemoryResident": 968462336.0,
+      "tracked": {
+        "value": 697380196
+      },
+      "at": "2026-10-10T17:33:15.954870+00:00"
+    },
+    {
+      "jemalloc.allocated": 538281688.0,
+      "MemoryResident": 970199040.0,
+      "tracked": {
+        "value": 697431220
+      },
+      "at": "2026-10-10T17:33:16.961007+00:00"
+    },
+    {
+      "jemalloc.allocated": 538314672.0,
+      "MemoryResident": 968507392.0,
+      "tracked": {
+        "value": 693221362
+      },
+      "at": "2026-10-10T17:33:17.967478+00:00"
+    },
+    {
+      "jemalloc.allocated": 535594368.0,
+      "MemoryResident": 967544832.0,
+      "tracked": {
+        "value": 693267306
+      },
+      "at": "2026-10-10T17:33:18.977003+00:00"
+    },
+    {
+      "jemalloc.allocated": 535592312.0,
+      "MemoryResident": 969175040.0,
+      "tracked": {
+        "value": 693343138
+      },
+      "at": "2026-10-10T17:33:19.986461+00:00"
+    },
+    {
+      "jemalloc.allocated": 535681960.0,
+      "MemoryResident": 969199616.0,
+      "tracked": {
+        "value": 693394482
+      },
+      "at": "2026-10-10T17:33:20.987177+00:00"
+    },
+    {
+      "jemalloc.allocated": 535744984.0,
+      "MemoryResident": 969269248.0,
+      "tracked": {
+        "value": 693445378
+      },
+      "at": "2026-10-10T17:33:22.000848+00:00"
+    },
+    {
+      "jemalloc.allocated": 535798272.0,
+      "MemoryResident": 968409088.0,
+      "tracked": {
+        "value": 693496402
+      },
+      "at": "2026-10-10T17:33:23.002794+00:00"
+    },
+    {
+      "jemalloc.allocated": 535855744.0,
+      "MemoryResident": 969191424.0,
+      "tracked": {
+        "value": 748217830
+      },
+      "at": "2026-10-10T17:33:24.002775+00:00"
+    },
+    {
+      "jemalloc.allocated": 587552536.0,
+      "MemoryResident": 1024688128.0,
+      "tracked": {
+        "value": 758954262
+      },
+      "at": "2026-10-10T17:33:25.009877+00:00"
+    },
+    {
+      "jemalloc.allocated": 582070912.0,
+      "MemoryResident": 1016430592.0,
+      "tracked": {
+        "value": 746682062
+      },
+      "at": "2026-10-10T17:33:26.017832+00:00"
+    },
+    {
+      "jemalloc.allocated": 577019088.0,
+      "MemoryResident": 1000382464.0,
+      "tracked": {
+        "value": 743282406
+      },
+      "at": "2026-10-10T17:33:27.027875+00:00"
+    },
+    {
+      "jemalloc.allocated": 566556768.0,
+      "MemoryResident": 979148800.0,
+      "tracked": {
+        "value": 739923858
+      },
+      "at": "2026-10-10T17:33:28.028822+00:00"
+    },
+    {
+      "jemalloc.allocated": 564706856.0,
+      "MemoryResident": 971464704.0,
+      "tracked": {
+        "value": 711910506
+      },
+      "at": "2026-10-10T17:33:29.033663+00:00"
+    },
+    {
+      "jemalloc.allocated": 524718016.0,
+      "MemoryResident": 976650240.0,
+      "tracked": {
+        "value": 700272589
+      },
+      "at": "2026-10-10T17:33:30.035630+00:00"
+    },
+    {
+      "jemalloc.allocated": 524762336.0,
+      "MemoryResident": 949030912.0,
+      "tracked": {
+        "value": 700323549
+      },
+      "at": "2026-10-10T17:33:31.046263+00:00"
+    },
+    {
+      "jemalloc.allocated": 524820488.0,
+      "MemoryResident": 948826112.0,
+      "tracked": {
+        "value": 700374381
+      },
+      "at": "2026-10-10T17:33:32.057169+00:00"
+    },
+    {
+      "jemalloc.allocated": 524864040.0,
+      "MemoryResident": 948830208.0,
+      "tracked": {
+        "value": 700425341
+      },
+      "at": "2026-10-10T17:33:33.062789+00:00"
+    },
+    {
+      "jemalloc.allocated": 524917384.0,
+      "MemoryResident": 948838400.0,
+      "tracked": {
+        "value": 700476301
+      },
+      "at": "2026-10-10T17:33:34.065404+00:00"
+    },
+    {
+      "jemalloc.allocated": 525026320.0,
+      "MemoryResident": 948584448.0,
+      "tracked": {
+        "value": 700552453
+      },
+      "at": "2026-10-10T17:33:35.069458+00:00"
+    },
+    {
+      "jemalloc.allocated": 525077360.0,
+      "MemoryResident": 948592640.0,
+      "tracked": {
+        "value": 700603285
+      },
+      "at": "2026-10-10T17:33:36.077356+00:00"
+    },
+    {
+      "jemalloc.allocated": 525099456.0,
+      "MemoryResident": 948604928.0,
+      "tracked": {
+        "value": 700654309
+      },
+      "at": "2026-10-10T17:33:37.082362+00:00"
+    },
+    {
+      "jemalloc.allocated": 521949376.0,
+      "MemoryResident": 947331072.0,
+      "tracked": {
+        "value": 693689753
+      },
+      "at": "2026-10-10T17:33:38.078333+00:00"
+    },
+    {
+      "jemalloc.allocated": 521994376.0,
+      "MemoryResident": 947339264.0,
+      "tracked": {
+        "value": 693902825
+      },
+      "at": "2026-10-10T17:33:39.085653+00:00"
+    },
+    {
+      "jemalloc.allocated": 522577040.0,
+      "MemoryResident": 947044352.0,
+      "tracked": {
+        "value": 693978849
+      },
+      "at": "2026-10-10T17:33:40.096606+00:00"
+    },
+    {
+      "jemalloc.allocated": 522617968.0,
+      "MemoryResident": 947052544.0,
+      "tracked": {
+        "value": 694029873
+      },
+      "at": "2026-10-10T17:33:41.099732+00:00"
+    },
+    {
+      "jemalloc.allocated": 522665072.0,
+      "MemoryResident": 947060736.0,
+      "tracked": {
+        "value": 694080641
+      },
+      "at": "2026-10-10T17:33:42.109209+00:00"
+    },
+    {
+      "jemalloc.allocated": 522713480.0,
+      "MemoryResident": 946741248.0,
+      "tracked": {
+        "value": 694131665
+      },
+      "at": "2026-10-10T17:33:43.109692+00:00"
+    },
+    {
+      "jemalloc.allocated": 522788352.0,
+      "MemoryResident": 946745344.0,
+      "tracked": {
+        "value": 694182497
+      },
+      "at": "2026-10-10T17:33:44.119133+00:00"
+    },
+    {
+      "jemalloc.allocated": 522809384.0,
+      "MemoryResident": 946745344.0,
+      "tracked": {
+        "value": 694258457
+      },
+      "at": "2026-10-10T17:33:45.130565+00:00"
+    },
+    {
+      "jemalloc.allocated": 522860024.0,
+      "MemoryResident": 947048448.0,
+      "tracked": {
+        "value": 694309289
+      },
+      "at": "2026-10-10T17:33:46.127586+00:00"
+    },
+    {
+      "jemalloc.allocated": 522908872.0,
+      "MemoryResident": 947073024.0,
+      "tracked": {
+        "value": 694360313
+      },
+      "at": "2026-10-10T17:33:47.140542+00:00"
+    },
+    {
+      "jemalloc.allocated": 521634696.0,
+      "MemoryResident": 946778112.0,
+      "tracked": {
+        "value": 693437288
+      },
+      "at": "2026-10-10T17:33:48.144835+00:00"
+    },
+    {
+      "jemalloc.allocated": 521685704.0,
+      "MemoryResident": 946786304.0,
+      "tracked": {
+        "value": 693488312
+      },
+      "at": "2026-10-10T17:33:49.141392+00:00"
+    },
+    {
+      "jemalloc.allocated": 521687960.0,
+      "MemoryResident": 946806784.0,
+      "tracked": {
+        "value": 697794188
+      },
+      "at": "2026-10-10T17:33:50.149929+00:00"
+    },
+    {
+      "jemalloc.allocated": 538664216.0,
+      "MemoryResident": 954834944.0,
+      "tracked": {
+        "value": 696712488
+      },
+      "at": "2026-10-10T17:33:51.158489+00:00"
+    },
+    {
+      "jemalloc.allocated": 538712968.0,
+      "MemoryResident": 954834944.0,
+      "tracked": {
+        "value": 696763384
+      },
+      "at": "2026-10-10T17:33:52.162233+00:00"
+    },
+    {
+      "jemalloc.allocated": 538769496.0,
+      "MemoryResident": 954834944.0,
+      "tracked": {
+        "value": 696814408
+      },
+      "at": "2026-10-10T17:33:53.168083+00:00"
+    },
+    {
+      "jemalloc.allocated": 538822312.0,
+      "MemoryResident": 954834944.0,
+      "tracked": {
+        "value": 696865176
+      },
+      "at": "2026-10-10T17:33:54.173485+00:00"
+    },
+    {
+      "jemalloc.allocated": 538961072.0,
+      "MemoryResident": 954834944.0,
+      "tracked": {
+        "value": 696941392
+      },
+      "at": "2026-10-10T17:33:55.179143+00:00"
+    },
+    {
+      "jemalloc.allocated": 538986784.0,
+      "MemoryResident": 954834944.0,
+      "tracked": {
+        "value": 696992224
+      },
+      "at": "2026-10-10T17:33:56.190574+00:00"
+    },
+    {
+      "jemalloc.allocated": 539035616.0,
+      "MemoryResident": 954834944.0,
+      "tracked": {
+        "value": 697043184
+      },
+      "at": "2026-10-10T17:33:57.193402+00:00"
+    },
+    {
+      "jemalloc.allocated": 535777800.0,
+      "MemoryResident": 953225216.0,
+      "tracked": {
+        "value": 692884289
+      },
+      "at": "2026-10-10T17:33:58.200169+00:00"
+    },
+    {
+      "jemalloc.allocated": 535823752.0,
+      "MemoryResident": 953233408.0,
+      "tracked": {
+        "value": 692935249
+      },
+      "at": "2026-10-10T17:33:59.212349+00:00"
+    },
+    {
+      "jemalloc.allocated": 535943128.0,
+      "MemoryResident": 953245696.0,
+      "tracked": {
+        "value": 772725103
+      },
+      "at": "2026-10-10T17:34:00.213960+00:00"
+    },
+    {
+      "jemalloc.allocated": 534513272.0,
+      "MemoryResident": 956592128.0,
+      "tracked": {
+        "value": 693869677
+      },
+      "at": "2026-10-10T17:34:01.226265+00:00"
+    },
+    {
+      "jemalloc.allocated": 534501368.0,
+      "MemoryResident": 956420096.0,
+      "tracked": {
+        "value": 693912003
+      },
+      "at": "2026-10-10T17:34:02.237781+00:00"
+    },
+    {
+      "jemalloc.allocated": 534553352.0,
+      "MemoryResident": 956424192.0,
+      "tracked": {
+        "value": 693963091
+      },
+      "at": "2026-10-10T17:34:03.240210+00:00"
+    },
+    {
+      "jemalloc.allocated": 534025376.0,
+      "MemoryResident": 955981824.0,
+      "tracked": {
+        "value": 694156367
+      },
+      "at": "2026-10-10T17:34:04.244662+00:00"
+    },
+    {
+      "jemalloc.allocated": 533946208.0,
+      "MemoryResident": 955949056.0,
+      "tracked": {
+        "value": 694224949
+      },
+      "at": "2026-10-10T17:34:05.254808+00:00"
+    },
+    {
+      "jemalloc.allocated": 533973376.0,
+      "MemoryResident": 955957248.0,
+      "tracked": {
+        "value": 694276037
+      },
+      "at": "2026-10-10T17:34:06.270211+00:00"
+    },
+    {
+      "jemalloc.allocated": 534008464.0,
+      "MemoryResident": 956841984.0,
+      "tracked": {
+        "value": 694327317
+      },
+      "at": "2026-10-10T17:34:07.274997+00:00"
+    },
+    {
+      "jemalloc.allocated": 533182184.0,
+      "MemoryResident": 953974784.0,
+      "tracked": {
+        "value": 695213519
+      },
+      "at": "2026-10-10T17:34:08.276274+00:00"
+    },
+    {
+      "jemalloc.allocated": 533249128.0,
+      "MemoryResident": 954179584.0,
+      "tracked": {
+        "value": 695257111
+      },
+      "at": "2026-10-10T17:34:09.284671+00:00"
+    },
+    {
+      "jemalloc.allocated": 533356192.0,
+      "MemoryResident": 954216448.0,
+      "tracked": {
+        "value": 695296595
+      },
+      "at": "2026-10-10T17:34:10.294119+00:00"
+    },
+    {
+      "jemalloc.allocated": 533391072.0,
+      "MemoryResident": 954273792.0,
+      "tracked": {
+        "value": 695347811
+      },
+      "at": "2026-10-10T17:34:11.310748+00:00"
+    },
+    {
+      "jemalloc.allocated": 533408200.0,
+      "MemoryResident": 954281984.0,
+      "tracked": {
+        "value": 695398771
+      },
+      "at": "2026-10-10T17:34:12.314412+00:00"
+    },
+    {
+      "jemalloc.allocated": 533407760.0,
+      "MemoryResident": 954257408.0,
+      "tracked": {
+        "value": 695449923
+      },
+      "at": "2026-10-10T17:34:13.319573+00:00"
+    },
+    {
+      "jemalloc.allocated": 533467368.0,
+      "MemoryResident": 954261504.0,
+      "tracked": {
+        "value": 695500819
+      },
+      "at": "2026-10-10T17:34:14.325561+00:00"
+    },
+    {
+      "jemalloc.allocated": 533426720.0,
+      "MemoryResident": 954331136.0,
+      "tracked": {
+        "value": 695577035
+      },
+      "at": "2026-10-10T17:34:15.332744+00:00"
+    },
+    {
+      "jemalloc.allocated": 533455296.0,
+      "MemoryResident": 954449920.0,
+      "tracked": {
+        "value": 695627995
+      },
+      "at": "2026-10-10T17:34:16.342135+00:00"
+    },
+    {
+      "jemalloc.allocated": 533494824.0,
+      "MemoryResident": 954343424.0,
+      "tracked": {
+        "value": 695678955
+      },
+      "at": "2026-10-10T17:34:17.345180+00:00"
+    },
+    {
+      "jemalloc.allocated": 532961280.0,
+      "MemoryResident": 953262080.0,
+      "tracked": {
+        "value": 693884993
+      },
+      "at": "2026-10-10T17:34:18.353871+00:00"
+    },
+    {
+      "jemalloc.allocated": 532973480.0,
+      "MemoryResident": 953262080.0,
+      "tracked": {
+        "value": 693936017
+      },
+      "at": "2026-10-10T17:34:19.364209+00:00"
+    },
+    {
+      "jemalloc.allocated": 532577584.0,
+      "MemoryResident": 952729600.0,
+      "tracked": {
+        "value": 693745228
+      },
+      "at": "2026-10-10T17:34:20.368806+00:00"
+    },
+    {
+      "jemalloc.allocated": 543526840.0,
+      "MemoryResident": 956301312.0,
+      "tracked": {
+        "value": 695750068
+      },
+      "at": "2026-10-10T17:34:21.383463+00:00"
+    },
+    {
+      "jemalloc.allocated": 543609976.0,
+      "MemoryResident": 956399616.0,
+      "tracked": {
+        "value": 695549430
+      },
+      "at": "2026-10-10T17:34:22.388055+00:00"
+    },
+    {
+      "jemalloc.allocated": 543607336.0,
+      "MemoryResident": 956203008.0,
+      "tracked": {
+        "value": 695600582
+      },
+      "at": "2026-10-10T17:34:23.392025+00:00"
+    },
+    {
+      "jemalloc.allocated": 543572824.0,
+      "MemoryResident": 956203008.0,
+      "tracked": {
+        "value": 695430180
+      },
+      "at": "2026-10-10T17:34:24.399941+00:00"
+    },
+    {
+      "jemalloc.allocated": 543613352.0,
+      "MemoryResident": 956006400.0,
+      "tracked": {
+        "value": 695352886
+      },
+      "at": "2026-10-10T17:34:25.403274+00:00"
+    },
+    {
+      "jemalloc.allocated": 543663880.0,
+      "MemoryResident": 956006400.0,
+      "tracked": {
+        "value": 695404550
+      },
+      "at": "2026-10-10T17:34:26.411539+00:00"
+    },
+    {
+      "jemalloc.allocated": 543714488.0,
+      "MemoryResident": 956071936.0,
+      "tracked": {
+        "value": 695454998
+      },
+      "at": "2026-10-10T17:34:27.426433+00:00"
+    },
+    {
+      "jemalloc.allocated": 540923592.0,
+      "MemoryResident": 955404288.0,
+      "tracked": {
+        "value": 691408371
+      },
+      "at": "2026-10-10T17:34:28.432938+00:00"
+    },
+    {
+      "jemalloc.allocated": 540979208.0,
+      "MemoryResident": 955346944.0,
+      "tracked": {
+        "value": 691459459
+      },
+      "at": "2026-10-10T17:34:29.444121+00:00"
+    },
+    {
+      "jemalloc.allocated": 541087448.0,
+      "MemoryResident": 955330560.0,
+      "tracked": {
+        "value": 691535419
+      },
+      "at": "2026-10-10T17:34:30.448762+00:00"
+    },
+    {
+      "jemalloc.allocated": 642388520.0,
+      "MemoryResident": 1035939840.0,
+      "tracked": {
+        "value": 734651440
+      },
+      "at": "2026-10-10T17:34:31.452778+00:00"
+    },
+    {
+      "jemalloc.allocated": 581261536.0,
+      "MemoryResident": 1018863616.0,
+      "tracked": {
+        "value": 744111336
+      },
+      "at": "2026-10-10T17:34:32.460178+00:00"
+    },
+    {
+      "jemalloc.allocated": 575345096.0,
+      "MemoryResident": 1015099392.0,
+      "tracked": {
+        "value": 749866424
+      },
+      "at": "2026-10-10T17:34:33.469381+00:00"
+    },
+    {
+      "jemalloc.allocated": 573922312.0,
+      "MemoryResident": 988889088.0,
+      "tracked": {
+        "value": 738792680
+      },
+      "at": "2026-10-10T17:34:34.478011+00:00"
+    },
+    {
+      "jemalloc.allocated": 577829744.0,
+      "MemoryResident": 1052073984.0,
+      "tracked": {
+        "value": 744537184
+      },
+      "at": "2026-10-10T17:34:35.478450+00:00"
+    },
+    {
+      "jemalloc.allocated": 578157344.0,
+      "MemoryResident": 1012248576.0,
+      "tracked": {
+        "value": 699857644
+      },
+      "at": "2026-10-10T17:34:36.481716+00:00"
+    },
+    {
+      "jemalloc.allocated": 593478648.0,
+      "MemoryResident": 1043087360.0,
+      "tracked": {
+        "value": 701730428
+      },
+      "at": "2026-10-10T17:34:37.492672+00:00"
+    },
+    {
+      "jemalloc.allocated": 516003504.0,
+      "MemoryResident": 946225152.0,
+      "tracked": {
+        "value": 689672192
+      },
+      "at": "2026-10-10T17:34:38.498851+00:00"
+    },
+    {
+      "jemalloc.allocated": 516079216.0,
+      "MemoryResident": 946069504.0,
+      "tracked": {
+        "value": 689723344
+      },
+      "at": "2026-10-10T17:34:39.508112+00:00"
+    },
+    {
+      "jemalloc.allocated": 516066008.0,
+      "MemoryResident": 946049024.0,
+      "tracked": {
+        "value": 689799304
+      },
+      "at": "2026-10-10T17:34:40.510049+00:00"
+    },
+    {
+      "jemalloc.allocated": 516073800.0,
+      "MemoryResident": 946057216.0,
+      "tracked": {
+        "value": 689850328
+      },
+      "at": "2026-10-10T17:34:41.517697+00:00"
+    },
+    {
+      "jemalloc.allocated": 516123136.0,
+      "MemoryResident": 946061312.0,
+      "tracked": {
+        "value": 689901288
+      },
+      "at": "2026-10-10T17:34:42.527861+00:00"
+    },
+    {
+      "jemalloc.allocated": 516076032.0,
+      "MemoryResident": 945803264.0,
+      "tracked": {
+        "value": 689952248
+      },
+      "at": "2026-10-10T17:34:43.535486+00:00"
+    },
+    {
+      "jemalloc.allocated": 516123008.0,
+      "MemoryResident": 945811456.0,
+      "tracked": {
+        "value": 690003272
+      },
+      "at": "2026-10-10T17:34:44.538504+00:00"
+    },
+    {
+      "jemalloc.allocated": 516186880.0,
+      "MemoryResident": 945790976.0,
+      "tracked": {
+        "value": 690079424
+      },
+      "at": "2026-10-10T17:34:45.550805+00:00"
+    },
+    {
+      "jemalloc.allocated": 516225480.0,
+      "MemoryResident": 945430528.0,
+      "tracked": {
+        "value": 690130320
+      },
+      "at": "2026-10-10T17:34:46.558926+00:00"
+    },
+    {
+      "jemalloc.allocated": 516261112.0,
+      "MemoryResident": 945442816.0,
+      "tracked": {
+        "value": 690181344
+      },
+      "at": "2026-10-10T17:34:47.568085+00:00"
+    },
+    {
+      "jemalloc.allocated": 515876904.0,
+      "MemoryResident": 944709632.0,
+      "tracked": {
+        "value": 691187139
+      },
+      "at": "2026-10-10T17:34:48.575612+00:00"
+    },
+    {
+      "jemalloc.allocated": 515928600.0,
+      "MemoryResident": 944709632.0,
+      "tracked": {
+        "value": 691238163
+      },
+      "at": "2026-10-10T17:34:49.582054+00:00"
+    },
+    {
+      "jemalloc.allocated": 515991872.0,
+      "MemoryResident": 944709632.0,
+      "tracked": {
+        "value": 691314059
+      },
+      "at": "2026-10-10T17:34:50.592228+00:00"
+    },
+    {
+      "jemalloc.allocated": 516759504.0,
+      "MemoryResident": 944537600.0,
+      "tracked": {
+        "value": 691526939
+      },
+      "at": "2026-10-10T17:34:51.595894+00:00"
+    },
+    {
+      "jemalloc.allocated": 516811976.0,
+      "MemoryResident": 944250880.0,
+      "tracked": {
+        "value": 691577963
+      },
+      "at": "2026-10-10T17:34:52.609240+00:00"
+    },
+    {
+      "jemalloc.allocated": 516856976.0,
+      "MemoryResident": 944304128.0,
+      "tracked": {
+        "value": 691628859
+      },
+      "at": "2026-10-10T17:34:53.620936+00:00"
+    },
+    {
+      "jemalloc.allocated": 516812112.0,
+      "MemoryResident": 944332800.0,
+      "tracked": {
+        "value": 691679819
+      },
+      "at": "2026-10-10T17:34:54.629513+00:00"
+    },
+    {
+      "jemalloc.allocated": 516914984.0,
+      "MemoryResident": 944291840.0,
+      "tracked": {
+        "value": 691755843
+      },
+      "at": "2026-10-10T17:34:55.636986+00:00"
+    },
+    {
+      "jemalloc.allocated": 516962808.0,
+      "MemoryResident": 944320512.0,
+      "tracked": {
+        "value": 691806675
+      },
+      "at": "2026-10-10T17:34:56.635547+00:00"
+    },
+    {
+      "jemalloc.allocated": 516988328.0,
+      "MemoryResident": 944349184.0,
+      "tracked": {
+        "value": 691857635
+      },
+      "at": "2026-10-10T17:34:57.652365+00:00"
+    },
+    {
+      "jemalloc.allocated": 516795952.0,
+      "MemoryResident": 944214016.0,
+      "tracked": {
+        "value": 691431029
+      },
+      "at": "2026-10-10T17:34:58.654898+00:00"
+    },
+    {
+      "jemalloc.allocated": 516847800.0,
+      "MemoryResident": 944234496.0,
+      "tracked": {
+        "value": 691479485
+      },
+      "at": "2026-10-10T17:34:59.655843+00:00"
+    },
+    {
+      "jemalloc.allocated": 516897560.0,
+      "MemoryResident": 943919104.0,
+      "tracked": {
+        "value": 691697665
+      },
+      "at": "2026-10-10T17:35:00.666580+00:00"
+    },
+    {
+      "jemalloc.allocated": 517473752.0,
+      "MemoryResident": 945152000.0,
+      "tracked": {
+        "value": 691989346
+      },
+      "at": "2026-10-10T17:35:01.669569+00:00"
+    },
+    {
+      "jemalloc.allocated": 518934088.0,
+      "MemoryResident": 945414144.0,
+      "tracked": {
+        "value": 692092293
+      },
+      "at": "2026-10-10T17:35:02.685462+00:00"
+    },
+    {
+      "jemalloc.allocated": 518971768.0,
+      "MemoryResident": 947048448.0,
+      "tracked": {
+        "value": 692085861
+      },
+      "at": "2026-10-10T17:35:03.695078+00:00"
+    },
+    {
+      "jemalloc.allocated": 518820008.0,
+      "MemoryResident": 945238016.0,
+      "tracked": {
+        "value": 692002981
+      },
+      "at": "2026-10-10T17:35:04.701336+00:00"
+    },
+    {
+      "jemalloc.allocated": 518853992.0,
+      "MemoryResident": 946769920.0,
+      "tracked": {
+        "value": 692079837
+      },
+      "at": "2026-10-10T17:35:05.709877+00:00"
+    },
+    {
+      "jemalloc.allocated": 518848744.0,
+      "MemoryResident": 946102272.0,
+      "tracked": {
+        "value": 692130861
+      },
+      "at": "2026-10-10T17:35:06.713279+00:00"
+    },
+    {
+      "jemalloc.allocated": 518881104.0,
+      "MemoryResident": 945115136.0,
+      "tracked": {
+        "value": 780152053
+      },
+      "at": "2026-10-10T17:35:07.714972+00:00"
+    },
+    {
+      "jemalloc.allocated": 568728944.0,
+      "MemoryResident": 1050931200.0,
+      "tracked": {
+        "value": 731592678
+      },
+      "at": "2026-10-10T17:35:08.723788+00:00"
+    },
+    {
+      "jemalloc.allocated": 570780864.0,
+      "MemoryResident": 1008447488.0,
+      "tracked": {
+        "value": 749448502
+      },
+      "at": "2026-10-10T17:35:09.731205+00:00"
+    },
+    {
+      "jemalloc.allocated": 572713624.0,
+      "MemoryResident": 1003675648.0,
+      "tracked": {
+        "value": 747331166
+      },
+      "at": "2026-10-10T17:35:10.741538+00:00"
+    },
+    {
+      "jemalloc.allocated": 572764712.0,
+      "MemoryResident": 1000361984.0,
+      "tracked": {
+        "value": 746018590
+      },
+      "at": "2026-10-10T17:35:11.750535+00:00"
+    },
+    {
+      "jemalloc.allocated": 576481800.0,
+      "MemoryResident": 1006084096.0,
+      "tracked": {
+        "value": 748629886
+      },
+      "at": "2026-10-10T17:35:12.753191+00:00"
+    },
+    {
+      "jemalloc.allocated": 575978704.0,
+      "MemoryResident": 990519296.0,
+      "tracked": {
+        "value": 748878238
+      },
+      "at": "2026-10-10T17:35:13.761627+00:00"
+    },
+    {
+      "jemalloc.allocated": 578801112.0,
+      "MemoryResident": 993087488.0,
+      "tracked": {
+        "value": 702293794
+      },
+      "at": "2026-10-10T17:35:14.776346+00:00"
+    },
+    {
+      "jemalloc.allocated": 530109560.0,
+      "MemoryResident": 947347456.0,
+      "tracked": {
+        "value": 702370074
+      },
+      "at": "2026-10-10T17:35:15.769378+00:00"
+    },
+    {
+      "jemalloc.allocated": 530137424.0,
+      "MemoryResident": 946941952.0,
+      "tracked": {
+        "value": 702420970
+      },
+      "at": "2026-10-10T17:35:16.779707+00:00"
+    },
+    {
+      "jemalloc.allocated": 530190128.0,
+      "MemoryResident": 946946048.0,
+      "tracked": {
+        "value": 693973938
+      },
+      "at": "2026-10-10T17:35:17.791777+00:00"
+    },
+    {
+      "jemalloc.allocated": 520036488.0,
+      "MemoryResident": 945545216.0,
+      "tracked": {
+        "value": 694024898
+      },
+      "at": "2026-10-10T17:35:18.803179+00:00"
+    },
+    {
+      "jemalloc.allocated": 520095152.0,
+      "MemoryResident": 945750016.0,
+      "tracked": {
+        "value": 694075986
+      },
+      "at": "2026-10-10T17:35:19.808265+00:00"
+    },
+    {
+      "jemalloc.allocated": 520172032.0,
+      "MemoryResident": 945909760.0,
+      "tracked": {
+        "value": 694152010
+      },
+      "at": "2026-10-10T17:35:20.808180+00:00"
+    },
+    {
+      "jemalloc.allocated": 520232296.0,
+      "MemoryResident": 945778688.0,
+      "tracked": {
+        "value": 694203098
+      },
+      "at": "2026-10-10T17:35:21.812323+00:00"
+    },
+    {
+      "jemalloc.allocated": 520234248.0,
+      "MemoryResident": 945786880.0,
+      "tracked": {
+        "value": 694253930
+      },
+      "at": "2026-10-10T17:35:22.812183+00:00"
+    },
+    {
+      "jemalloc.allocated": 520289808.0,
+      "MemoryResident": 945790976.0,
+      "tracked": {
+        "value": 694305210
+      },
+      "at": "2026-10-10T17:35:23.821921+00:00"
+    },
+    {
+      "jemalloc.allocated": 520337552.0,
+      "MemoryResident": 945799168.0,
+      "tracked": {
+        "value": 694356042
+      },
+      "at": "2026-10-10T17:35:24.823554+00:00"
+    },
+    {
+      "jemalloc.allocated": 520390288.0,
+      "MemoryResident": 945807360.0,
+      "tracked": {
+        "value": 694432130
+      },
+      "at": "2026-10-10T17:35:25.823793+00:00"
+    },
+    {
+      "jemalloc.allocated": 520449400.0,
+      "MemoryResident": 945819648.0,
+      "tracked": {
+        "value": 694482962
+      },
+      "at": "2026-10-10T17:35:26.825513+00:00"
+    },
+    {
+      "jemalloc.allocated": 520500072.0,
+      "MemoryResident": 945827840.0,
+      "tracked": {
+        "value": 691224509
+      },
+      "at": "2026-10-10T17:35:27.831712+00:00"
+    },
+    {
+      "jemalloc.allocated": 519448680.0,
+      "MemoryResident": 945520640.0,
+      "tracked": {
+        "value": 691275533
+      },
+      "at": "2026-10-10T17:35:28.836113+00:00"
+    },
+    {
+      "jemalloc.allocated": 519501288.0,
+      "MemoryResident": 945520640.0,
+      "tracked": {
+        "value": 691326557
+      },
+      "at": "2026-10-10T17:35:29.843608+00:00"
+    },
+    {
+      "jemalloc.allocated": 519482984.0,
+      "MemoryResident": 945520640.0,
+      "tracked": {
+        "value": 691402453
+      },
+      "at": "2026-10-10T17:35:30.845050+00:00"
+    },
+    {
+      "jemalloc.allocated": 519580752.0,
+      "MemoryResident": 945520640.0,
+      "tracked": {
+        "value": 691453477
+      },
+      "at": "2026-10-10T17:35:31.848064+00:00"
+    },
+    {
+      "jemalloc.allocated": 519148176.0,
+      "MemoryResident": 945520640.0,
+      "tracked": {
+        "value": 691532421
+      },
+      "at": "2026-10-10T17:35:32.853522+00:00"
+    },
+    {
+      "jemalloc.allocated": 519642152.0,
+      "MemoryResident": 945954816.0,
+      "tracked": {
+        "value": 691583445
+      },
+      "at": "2026-10-10T17:35:33.867230+00:00"
+    },
+    {
+      "jemalloc.allocated": 519718736.0,
+      "MemoryResident": 945954816.0,
+      "tracked": {
+        "value": 691634277
+      },
+      "at": "2026-10-10T17:35:34.867115+00:00"
+    },
+    {
+      "jemalloc.allocated": 519769824.0,
+      "MemoryResident": 945954816.0,
+      "tracked": {
+        "value": 691710301
+      },
+      "at": "2026-10-10T17:35:35.872743+00:00"
+    },
+    {
+      "jemalloc.allocated": 519900592.0,
+      "MemoryResident": 945954816.0,
+      "tracked": {
+        "value": 691761197
+      },
+      "at": "2026-10-10T17:35:36.879497+00:00"
+    },
+    {
+      "jemalloc.allocated": 519869808.0,
+      "MemoryResident": 945954816.0,
+      "tracked": {
+        "value": 691166087
+      },
+      "at": "2026-10-10T17:35:37.878688+00:00"
+    },
+    {
+      "jemalloc.allocated": 519467000.0,
+      "MemoryResident": 945897472.0,
+      "tracked": {
+        "value": 691217047
+      },
+      "at": "2026-10-10T17:35:38.890992+00:00"
+    },
+    {
+      "jemalloc.allocated": 519483424.0,
+      "MemoryResident": 945905664.0,
+      "tracked": {
+        "value": 691268007
+      },
+      "at": "2026-10-10T17:35:39.901637+00:00"
+    },
+    {
+      "jemalloc.allocated": 519522968.0,
+      "MemoryResident": 945909760.0,
+      "tracked": {
+        "value": 691343967
+      },
+      "at": "2026-10-10T17:35:40.903049+00:00"
+    },
+    {
+      "jemalloc.allocated": 519539880.0,
+      "MemoryResident": 945954816.0,
+      "tracked": {
+        "value": 691394927
+      },
+      "at": "2026-10-10T17:35:41.911709+00:00"
+    },
+    {
+      "jemalloc.allocated": 519560824.0,
+      "MemoryResident": 945967104.0,
+      "tracked": {
+        "value": 691445823
+      },
+      "at": "2026-10-10T17:35:42.912902+00:00"
+    },
+    {
+      "jemalloc.allocated": 519578752.0,
+      "MemoryResident": 945967104.0,
+      "tracked": {
+        "value": 691496783
+      },
+      "at": "2026-10-10T17:35:43.918795+00:00"
+    },
+    {
+      "jemalloc.allocated": 519629904.0,
+      "MemoryResident": 945975296.0,
+      "tracked": {
+        "value": 692212919
+      },
+      "at": "2026-10-10T17:35:44.921511+00:00"
+    },
+    {
+      "jemalloc.allocated": 519138800.0,
+      "MemoryResident": 948383744.0,
+      "tracked": {
+        "value": 692289007
+      },
+      "at": "2026-10-10T17:35:45.935544+00:00"
+    },
+    {
+      "jemalloc.allocated": 519247144.0,
+      "MemoryResident": 948326400.0,
+      "tracked": {
+        "value": 692339839
+      },
+      "at": "2026-10-10T17:35:46.937875+00:00"
+    },
+    {
+      "jemalloc.allocated": 519319608.0,
+      "MemoryResident": 952131584.0,
+      "tracked": {
+        "value": 692488211
+      },
+      "at": "2026-10-10T17:35:47.944226+00:00"
+    },
+    {
+      "jemalloc.allocated": 518840776.0,
+      "MemoryResident": 951275520.0,
+      "tracked": {
+        "value": 692534029
+      },
+      "at": "2026-10-10T17:35:48.945215+00:00"
+    },
+    {
+      "jemalloc.allocated": 518881344.0,
+      "MemoryResident": 951242752.0,
+      "tracked": {
+        "value": 692585053
+      },
+      "at": "2026-10-10T17:35:49.953213+00:00"
+    },
+    {
+      "jemalloc.allocated": 518926264.0,
+      "MemoryResident": 951246848.0,
+      "tracked": {
+        "value": 692661013
+      },
+      "at": "2026-10-10T17:35:50.959169+00:00"
+    },
+    {
+      "jemalloc.allocated": 518995960.0,
+      "MemoryResident": 951443456.0,
+      "tracked": {
+        "value": 692711973
+      },
+      "at": "2026-10-10T17:35:51.957794+00:00"
+    },
+    {
+      "jemalloc.allocated": 519033488.0,
+      "MemoryResident": 947646464.0,
+      "tracked": {
+        "value": 692762933
+      },
+      "at": "2026-10-10T17:35:52.965765+00:00"
+    },
+    {
+      "jemalloc.allocated": 519091024.0,
+      "MemoryResident": 947646464.0,
+      "tracked": {
+        "value": 692813893
+      },
+      "at": "2026-10-10T17:35:53.969611+00:00"
+    },
+    {
+      "jemalloc.allocated": 519105312.0,
+      "MemoryResident": 947646464.0,
+      "tracked": {
+        "value": 692864789
+      },
+      "at": "2026-10-10T17:35:54.976201+00:00"
+    },
+    {
+      "jemalloc.allocated": 519157528.0,
+      "MemoryResident": 953450496.0,
+      "tracked": {
+        "value": 692940877
+      },
+      "at": "2026-10-10T17:35:55.981608+00:00"
+    },
+    {
+      "jemalloc.allocated": 519239192.0,
+      "MemoryResident": 951361536.0,
+      "tracked": {
+        "value": 692991773
+      },
+      "at": "2026-10-10T17:35:56.993075+00:00"
+    },
+    {
+      "jemalloc.allocated": 519267592.0,
+      "MemoryResident": 951373824.0,
+      "tracked": {
+        "value": 691593707
+      },
+      "at": "2026-10-10T17:35:57.993274+00:00"
+    },
+    {
+      "jemalloc.allocated": 518616440.0,
+      "MemoryResident": 953167872.0,
+      "tracked": {
+        "value": 691644603
+      },
+      "at": "2026-10-10T17:35:58.993071+00:00"
+    },
+    {
+      "jemalloc.allocated": 518658312.0,
+      "MemoryResident": 951164928.0,
+      "tracked": {
+        "value": 691695499
+      },
+      "at": "2026-10-10T17:35:59.993769+00:00"
+    },
+    {
+      "jemalloc.allocated": 518659872.0,
+      "MemoryResident": 947236864.0,
+      "tracked": {
+        "value": 692057211
+      },
+      "at": "2026-10-10T17:36:01.007346+00:00"
+    },
+    {
+      "jemalloc.allocated": 523733880.0,
+      "MemoryResident": 947175424.0,
+      "tracked": {
+        "value": 692091647
+      },
+      "at": "2026-10-10T17:36:02.011517+00:00"
+    },
+    {
+      "jemalloc.allocated": 519838424.0,
+      "MemoryResident": 946339840.0,
+      "tracked": {
+        "value": 692195999
+      },
+      "at": "2026-10-10T17:36:03.012877+00:00"
+    },
+    {
+      "jemalloc.allocated": 520060912.0,
+      "MemoryResident": 947728384.0,
+      "tracked": {
+        "value": 692247151
+      },
+      "at": "2026-10-10T17:36:04.021745+00:00"
+    },
+    {
+      "jemalloc.allocated": 520105984.0,
+      "MemoryResident": 947736576.0,
+      "tracked": {
+        "value": 692298175
+      },
+      "at": "2026-10-10T17:36:05.031259+00:00"
+    },
+    {
+      "jemalloc.allocated": 520087792.0,
+      "MemoryResident": 947552256.0,
+      "tracked": {
+        "value": 692374711
+      },
+      "at": "2026-10-10T17:36:06.033880+00:00"
+    },
+    {
+      "jemalloc.allocated": 520141296.0,
+      "MemoryResident": 947142656.0,
+      "tracked": {
+        "value": 692425671
+      },
+      "at": "2026-10-10T17:36:07.037493+00:00"
+    },
+    {
+      "jemalloc.allocated": 519791112.0,
+      "MemoryResident": 947056640.0,
+      "tracked": {
+        "value": 692100302
+      },
+      "at": "2026-10-10T17:36:08.042649+00:00"
+    },
+    {
+      "jemalloc.allocated": 519840216.0,
+      "MemoryResident": 946733056.0,
+      "tracked": {
+        "value": 692151326
+      },
+      "at": "2026-10-10T17:36:09.056133+00:00"
+    },
+    {
+      "jemalloc.allocated": 519696896.0,
+      "MemoryResident": 946089984.0,
+      "tracked": {
+        "value": 691903266
+      },
+      "at": "2026-10-10T17:36:10.062752+00:00"
+    },
+    {
+      "jemalloc.allocated": 519771216.0,
+      "MemoryResident": 946147328.0,
+      "tracked": {
+        "value": 691979418
+      },
+      "at": "2026-10-10T17:36:11.064260+00:00"
+    },
+    {
+      "jemalloc.allocated": 519826000.0,
+      "MemoryResident": 946155520.0,
+      "tracked": {
+        "value": 692030506
+      },
+      "at": "2026-10-10T17:36:12.066509+00:00"
+    },
+    {
+      "jemalloc.allocated": 519833392.0,
+      "MemoryResident": 946163712.0,
+      "tracked": {
+        "value": 692081530
+      },
+      "at": "2026-10-10T17:36:13.076710+00:00"
+    },
+    {
+      "jemalloc.allocated": 520702800.0,
+      "MemoryResident": 944840704.0,
+      "tracked": {
+        "value": 692213223
+      },
+      "at": "2026-10-10T17:36:14.078165+00:00"
+    },
+    {
+      "jemalloc.allocated": 609368808.0,
+      "MemoryResident": 1014710272.0,
+      "tracked": {
+        "value": 784516633
+      },
+      "at": "2026-10-10T17:36:15.083237+00:00"
+    },
+    {
+      "jemalloc.allocated": 526956568.0,
+      "MemoryResident": 999669760.0,
+      "tracked": {
+        "value": 705850498
+      },
+      "at": "2026-10-10T17:36:16.090276+00:00"
+    },
+    {
+      "jemalloc.allocated": 572210112.0,
+      "MemoryResident": 1013706752.0,
+      "tracked": {
+        "value": 713687034
+      },
+      "at": "2026-10-10T17:36:17.096354+00:00"
+    },
+    {
+      "jemalloc.allocated": 580589056.0,
+      "MemoryResident": 1005371392.0,
+      "tracked": {
+        "value": 705921052
+      },
+      "at": "2026-10-10T17:36:18.100519+00:00"
+    },
+    {
+      "jemalloc.allocated": 571753752.0,
+      "MemoryResident": 1009700864.0,
+      "tracked": {
+        "value": 731607716
+      },
+      "at": "2026-10-10T17:36:19.103965+00:00"
+    },
+    {
+      "jemalloc.allocated": 568791848.0,
+      "MemoryResident": 1005346816.0,
+      "tracked": {
+        "value": 758301492
+      },
+      "at": "2026-10-10T17:36:20.110270+00:00"
+    },
+    {
+      "jemalloc.allocated": 570529600.0,
+      "MemoryResident": 993329152.0,
+      "tracked": {
+        "value": 749722988
+      },
+      "at": "2026-10-10T17:36:21.114212+00:00"
+    },
+    {
+      "jemalloc.allocated": 522559888.0,
+      "MemoryResident": 946925568.0,
+      "tracked": {
+        "value": 697775600
+      },
+      "at": "2026-10-10T17:36:22.126748+00:00"
+    },
+    {
+      "jemalloc.allocated": 522506608.0,
+      "MemoryResident": 947589120.0,
+      "tracked": {
+        "value": 697826624
+      },
+      "at": "2026-10-10T17:36:23.133935+00:00"
+    },
+    {
+      "jemalloc.allocated": 522559784.0,
+      "MemoryResident": 947589120.0,
+      "tracked": {
+        "value": 697877712
+      },
+      "at": "2026-10-10T17:36:24.144198+00:00"
+    },
+    {
+      "jemalloc.allocated": 522548632.0,
+      "MemoryResident": 947617792.0,
+      "tracked": {
+        "value": 697928608
+      },
+      "at": "2026-10-10T17:36:25.152298+00:00"
+    },
+    {
+      "jemalloc.allocated": 522608568.0,
+      "MemoryResident": 947503104.0,
+      "tracked": {
+        "value": 697937928
+      },
+      "at": "2026-10-10T17:36:26.163910+00:00"
+    },
+    {
+      "jemalloc.allocated": 522005992.0,
+      "MemoryResident": 947306496.0,
+      "tracked": {
+        "value": 697989064
+      },
+      "at": "2026-10-10T17:36:27.177344+00:00"
+    },
+    {
+      "jemalloc.allocated": 515539680.0,
+      "MemoryResident": 945700864.0,
+      "tracked": {
+        "value": 692968348
+      },
+      "at": "2026-10-10T17:36:28.185246+00:00"
+    },
+    {
+      "jemalloc.allocated": 515596688.0,
+      "MemoryResident": 945713152.0,
+      "tracked": {
+        "value": 693019372
+      },
+      "at": "2026-10-10T17:36:29.188882+00:00"
+    },
+    {
+      "jemalloc.allocated": 515647640.0,
+      "MemoryResident": 945786880.0,
+      "tracked": {
+        "value": 693070332
+      },
+      "at": "2026-10-10T17:36:30.194388+00:00"
+    },
+    {
+      "jemalloc.allocated": 518158680.0,
+      "MemoryResident": 960843776.0,
+      "tracked": {
+        "value": 694447811
+      },
+      "at": "2026-10-10T17:36:31.207570+00:00"
+    },
+    {
+      "jemalloc.allocated": 518212056.0,
+      "MemoryResident": 954011648.0,
+      "tracked": {
+        "value": 694498963
+      },
+      "at": "2026-10-10T17:36:32.207661+00:00"
+    },
+    {
+      "jemalloc.allocated": 518260472.0,
+      "MemoryResident": 954015744.0,
+      "tracked": {
+        "value": 694550051
+      },
+      "at": "2026-10-10T17:36:33.217648+00:00"
+    },
+    {
+      "jemalloc.allocated": 518311976.0,
+      "MemoryResident": 954023936.0,
+      "tracked": {
+        "value": 694601139
+      },
+      "at": "2026-10-10T17:36:34.219434+00:00"
+    },
+    {
+      "jemalloc.allocated": 518359600.0,
+      "MemoryResident": 954028032.0,
+      "tracked": {
+        "value": 694652035
+      },
+      "at": "2026-10-10T17:36:35.221552+00:00"
+    },
+    {
+      "jemalloc.allocated": 518338176.0,
+      "MemoryResident": 954019840.0,
+      "tracked": {
+        "value": 694728251
+      },
+      "at": "2026-10-10T17:36:36.227049+00:00"
+    },
+    {
+      "jemalloc.allocated": 518388944.0,
+      "MemoryResident": 954023936.0,
+      "tracked": {
+        "value": 694779211
+      },
+      "at": "2026-10-10T17:36:37.237656+00:00"
+    },
+    {
+      "jemalloc.allocated": 517679896.0,
+      "MemoryResident": 953556992.0,
+      "tracked": {
+        "value": 692813823
+      },
+      "at": "2026-10-10T17:36:38.244277+00:00"
+    },
+    {
+      "jemalloc.allocated": 517737560.0,
+      "MemoryResident": 953602048.0,
+      "tracked": {
+        "value": 692864911
+      },
+      "at": "2026-10-10T17:36:39.247715+00:00"
+    },
+    {
+      "jemalloc.allocated": 517757688.0,
+      "MemoryResident": 953536512.0,
+      "tracked": {
+        "value": 692943587
+      },
+      "at": "2026-10-10T17:36:40.254662+00:00"
+    },
+    {
+      "jemalloc.allocated": 517810696.0,
+      "MemoryResident": 953356288.0,
+      "tracked": {
+        "value": 693019675
+      },
+      "at": "2026-10-10T17:36:41.272551+00:00"
+    },
+    {
+      "jemalloc.allocated": 517861944.0,
+      "MemoryResident": 953356288.0,
+      "tracked": {
+        "value": 693771043
+      },
+      "at": "2026-10-10T17:36:42.270377+00:00"
+    },
+    {
+      "jemalloc.allocated": 518782416.0,
+      "MemoryResident": 953479168.0,
+      "tracked": {
+        "value": 693822067
+      },
+      "at": "2026-10-10T17:36:43.278191+00:00"
+    },
+    {
+      "jemalloc.allocated": 518833840.0,
+      "MemoryResident": 953479168.0,
+      "tracked": {
+        "value": 693873155
+      },
+      "at": "2026-10-10T17:36:44.283256+00:00"
+    },
+    {
+      "jemalloc.allocated": 518885616.0,
+      "MemoryResident": 953507840.0,
+      "tracked": {
+        "value": 693924051
+      },
+      "at": "2026-10-10T17:36:45.297090+00:00"
+    },
+    {
+      "jemalloc.allocated": 518952128.0,
+      "MemoryResident": 953442304.0,
+      "tracked": {
+        "value": 694000203
+      },
+      "at": "2026-10-10T17:36:46.300643+00:00"
+    },
+    {
+      "jemalloc.allocated": 519006688.0,
+      "MemoryResident": 953372672.0,
+      "tracked": {
+        "value": 694051291
+      },
+      "at": "2026-10-10T17:36:47.303381+00:00"
+    },
+    {
+      "jemalloc.allocated": 517850320.0,
+      "MemoryResident": 953372672.0,
+      "tracked": {
+        "value": 692491986
+      },
+      "at": "2026-10-10T17:36:48.301788+00:00"
+    },
+    {
+      "jemalloc.allocated": 517895312.0,
+      "MemoryResident": 953380864.0,
+      "tracked": {
+        "value": 692542882
+      },
+      "at": "2026-10-10T17:36:49.308986+00:00"
+    },
+    {
+      "jemalloc.allocated": 517946880.0,
+      "MemoryResident": 953389056.0,
+      "tracked": {
+        "value": 692593970
+      },
+      "at": "2026-10-10T17:36:50.317395+00:00"
+    },
+    {
+      "jemalloc.allocated": 517931768.0,
+      "MemoryResident": 953348096.0,
+      "tracked": {
+        "value": 692669930
+      },
+      "at": "2026-10-10T17:36:51.326013+00:00"
+    },
+    {
+      "jemalloc.allocated": 563552104.0,
+      "MemoryResident": 1016299520.0,
+      "tracked": {
+        "value": 748374294
+      },
+      "at": "2026-10-10T17:36:52.330426+00:00"
+    },
+    {
+      "jemalloc.allocated": 564634392.0,
+      "MemoryResident": 997384192.0,
+      "tracked": {
+        "value": 753145730
+      },
+      "at": "2026-10-10T17:36:53.337902+00:00"
+    },
+    {
+      "jemalloc.allocated": 567956648.0,
+      "MemoryResident": 995610624.0,
+      "tracked": {
+        "value": 731354470
+      },
+      "at": "2026-10-10T17:36:54.338843+00:00"
+    },
+    {
+      "jemalloc.allocated": 571152232.0,
+      "MemoryResident": 994099200.0,
+      "tracked": {
+        "value": 753943750
+      },
+      "at": "2026-10-10T17:36:55.345241+00:00"
+    },
+    {
+      "jemalloc.allocated": 572334120.0,
+      "MemoryResident": 989061120.0,
+      "tracked": {
+        "value": 754052998
+      },
+      "at": "2026-10-10T17:36:56.353891+00:00"
+    },
+    {
+      "jemalloc.allocated": 570692608.0,
+      "MemoryResident": 1007300608.0,
+      "tracked": {
+        "value": 745481830
+      },
+      "at": "2026-10-10T17:36:57.354113+00:00"
+    },
+    {
+      "jemalloc.allocated": 531852760.0,
+      "MemoryResident": 1011683328.0,
+      "tracked": {
+        "value": 691232321
+      },
+      "at": "2026-10-10T17:36:58.363455+00:00"
+    },
+    {
+      "jemalloc.allocated": 519640232.0,
+      "MemoryResident": 948936704.0,
+      "tracked": {
+        "value": 691283281
+      },
+      "at": "2026-10-10T17:36:59.379102+00:00"
+    },
+    {
+      "jemalloc.allocated": 519829472.0,
+      "MemoryResident": 948711424.0,
+      "tracked": {
+        "value": 691319849
+      },
+      "at": "2026-10-10T17:37:00.378411+00:00"
+    },
+    {
+      "jemalloc.allocated": 521207976.0,
+      "MemoryResident": 949854208.0,
+      "tracked": {
+        "value": 691463089
+      },
+      "at": "2026-10-10T17:37:01.380413+00:00"
+    },
+    {
+      "jemalloc.allocated": 521226992.0,
+      "MemoryResident": 949706752.0,
+      "tracked": {
+        "value": 691505487
+      },
+      "at": "2026-10-10T17:37:02.391097+00:00"
+    },
+    {
+      "jemalloc.allocated": 521241336.0,
+      "MemoryResident": 949788672.0,
+      "tracked": {
+        "value": 691797408
+      },
+      "at": "2026-10-10T17:37:03.396732+00:00"
+    },
+    {
+      "jemalloc.allocated": 521655768.0,
+      "MemoryResident": 949239808.0,
+      "tracked": {
+        "value": 691840222
+      },
+      "at": "2026-10-10T17:37:04.410557+00:00"
+    },
+    {
+      "jemalloc.allocated": 522756896.0,
+      "MemoryResident": 949649408.0,
+      "tracked": {
+        "value": 692569701
+      },
+      "at": "2026-10-10T17:37:05.416144+00:00"
+    },
+    {
+      "jemalloc.allocated": 522842728.0,
+      "MemoryResident": 949682176.0,
+      "tracked": {
+        "value": 692644825
+      },
+      "at": "2026-10-10T17:37:06.426027+00:00"
+    },
+    {
+      "jemalloc.allocated": 522837160.0,
+      "MemoryResident": 951164928.0,
+      "tracked": {
+        "value": 692696105
+      },
+      "at": "2026-10-10T17:37:07.434142+00:00"
+    },
+    {
+      "jemalloc.allocated": 520786864.0,
+      "MemoryResident": 948072448.0,
+      "tracked": {
+        "value": 693113887
+      },
+      "at": "2026-10-10T17:37:08.447239+00:00"
+    },
+    {
+      "jemalloc.allocated": 520889360.0,
+      "MemoryResident": 949727232.0,
+      "tracked": {
+        "value": 693165039
+      },
+      "at": "2026-10-10T17:37:09.451982+00:00"
+    },
+    {
+      "jemalloc.allocated": 521304440.0,
+      "MemoryResident": 948129792.0,
+      "tracked": {
+        "value": 693272287
+      },
+      "at": "2026-10-10T17:37:10.462510+00:00"
+    },
+    {
+      "jemalloc.allocated": 521262688.0,
+      "MemoryResident": 947716096.0,
+      "tracked": {
+        "value": 693344127
+      },
+      "at": "2026-10-10T17:37:11.540454+00:00"
+    },
+    {
+      "jemalloc.allocated": 521048664.0,
+      "MemoryResident": 947732480.0,
+      "tracked": {
+        "value": 693395151
+      },
+      "at": "2026-10-10T17:37:12.476870+00:00"
+    },
+    {
+      "jemalloc.allocated": 521090472.0,
+      "MemoryResident": 947732480.0,
+      "tracked": {
+        "value": 693446367
+      },
+      "at": "2026-10-10T17:37:13.480267+00:00"
+    }
+  ]
+}

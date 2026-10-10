@@ -1,0 +1,14 @@
+{
+  "removed_containers": [
+    "roehub-s04-pg",
+    "roehub-s04-clickhouse-1",
+    "roehub-s04-memory-01"
+  ],
+  "removed_volume": "roehub-s04-ch-data",
+  "removed_private_files": [
+    ".cache/market-data-s04/private/postgres.env",
+    ".cache/market-data-s04/private/linux.env"
+  ],
+  "remaining_owned_containers": [],
+  "user_runtime_and_data": "not modified"
+}

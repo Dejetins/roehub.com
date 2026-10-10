@@ -24,8 +24,13 @@ from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_re
 from trading.contexts.market_data.application.ports.stores.catalog_coverage_reader import (
     CatalogCoverageReader,
 )
+from trading.contexts.market_data.application.services.history_readiness import (
+    HistoryReadiness,
+    history_snapshot,
+)
 from trading.contexts.market_data.application.services.work_requests import WorkRequest
 from trading.contexts.market_data.application.use_cases import ListEnabledMarketsUseCase
+from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol
 
 
 def build_catalog_workspace_router(
@@ -38,6 +43,8 @@ def build_catalog_workspace_router(
     markets: ListEnabledMarketsUseCase,
     coverage: CatalogCoverageReader,
     history_bounds: PostgresHistoryBoundsRepository | None = None,
+    full_history: HistoryReadiness | None = None,
+    collector_status: Callable[[], dict[str, Any]] | None = None,
 ) -> APIRouter:
     router = APIRouter(tags=["market-data"])
 
@@ -55,6 +62,7 @@ def build_catalog_workspace_router(
         offset: int = Query(default=0, ge=0, le=80000),
         limit: int = Query(default=50, ge=1, le=100),
         snapshot: str = Query(default="", max_length=150),
+        history_scope: Literal["range", "full"] = "range",
         principal: CurrentUserPrincipal = Depends(current_user_dependency),
     ) -> dict[str, Any]:
         scope = _resolve_research_scope(resolver=scope_resolver, principal=principal)
@@ -91,7 +99,19 @@ def build_catalog_workspace_router(
                     "state": str(pin["state"]),
                 }
             )
-        counts = coverage.counts(market_ids=list(sources), start_at=start_at, end_at=end_at)
+        runtime = collector_status() if collector_status else None
+        starts = {}
+        absent = {}
+        if history_scope == "full":
+            if full_history is None:
+                raise HTTPException(503, "Full history coverage is unavailable")
+            start_at = datetime(2017, 1, 1, tzinfo=UTC)
+            end_at = now.replace(second=0, microsecond=0)
+            starts = full_history.origins.ready_starts(market_ids=list(sources))
+            counts = full_history.coverage.counts(starts=starts, end_at=end_at)
+            absent = full_history.coverage.source_absent_counts(starts=starts, end_at=end_at)
+        else:
+            counts = coverage.counts(market_ids=list(sources), start_at=start_at, end_at=end_at)
         requests = {
             (int(r["market_id"]), str(r["symbol"])): r
             for r in jobs.instrument_jobs(
@@ -119,8 +139,17 @@ def build_catalog_workspace_router(
                     or (stream == "pinned" and not strategies)
                 ):
                     continue
+                full: dict[str, Any] = {}
+                if history_scope == "full":
+                    full = history_snapshot(
+                        first=starts.get(key), end=end_at, actual=counts.get(key, 0),
+                        source_absent=absent.get(key, 0),
+                    )
+                    expected = full["expected_candles"]
                 actual = min(counts.get(key, 0), expected)
                 state = "complete" if actual == expected else "partial" if actual else "empty"
+                if history_scope == "full":
+                    state = full["state"]
                 job = requests.get(key)
                 job_minutes = (
                     int(
@@ -162,11 +191,20 @@ def build_catalog_workspace_router(
                         "exchange_name": exchange,
                         "selected": key in selected,
                         "effective": effective,
+                        "stream_state": _stream_state(effective, key, runtime),
                         "strategy_pinned": bool(strategies),
                         "strategies": strategies,
                         "refreshed_at": catalog["refreshed_at"],
                         "coverage_state": state,
-                        "coverage_percent": round(actual / expected * 100, 2),
+                        "source_absent_minutes": full.get("source_absent_minutes", 0),
+                        "coverage_percent": full["coverage_percent"]
+                        if history_scope == "full"
+                        else round(actual / expected * 100, 2),
+                        "history_start_at": starts.get(key)
+                        if history_scope == "full"
+                        else start_at,
+                        "history_end_at": end_at,
+                        "history_scope": history_scope,
                         "actual_candles": actual,
                         "expected_candles": expected,
                         "job": None
@@ -198,9 +236,13 @@ def build_catalog_workspace_router(
             "coverage": "coverage_percent",
             "stream": "effective",
         }[sort]
-        rows.sort(key=lambda r: (r[field], r["symbol"], r["market_id"]), reverse=descending)
+        rows.sort(
+            key=lambda r: (r[field] if r[field] is not None else -1, r["symbol"], r["market_id"]),
+            reverse=descending,
+        )
         return {
             "exchange": exchange,
+            "history_scope": history_scope,
             "start_at": start_at,
             "end_at": end_at,
             "observed_at": now,
@@ -245,6 +287,8 @@ def build_catalog_workspace_router(
         latest = coverage.latest(
             market_id=market_id, symbol=symbol, before=now.replace(second=0, microsecond=0)
         )
+        runtime = collector_status() if collector_status else None
+        repair = runtime["repairs"].get((market_id, symbol), {}) if runtime else {}
         return {
             "market_id": market_id,
             "symbol": symbol,
@@ -253,7 +297,37 @@ def build_catalog_workspace_router(
             "strategy_pinned": bool(pins),
             "strategies": pins,
             "last_candle_at": latest,
+            "stream_state": _stream_state(selected or bool(pins), (market_id, symbol), runtime),
+            "history_repair_error": repair.get("error_code")
+            if repair.get("state") == "failed"
+            and repair.get("reason") == "stream_history_repair"
+            and (selected or pins)
+            else None,
+            "next_retry_at": repair.get("next_retry_at") if selected or pins else None,
             "observed_at": now,
+        }
+
+    @router.get("/market-data/workspace/history")
+    def history(
+        market_id: int = Query(ge=1),
+        symbol: str = Query(min_length=2, max_length=64),
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
+    ) -> dict[str, Any]:
+        # Reuse the authenticated catalog validation and discovery inbox.
+        bounds = available_history(market_id=market_id, symbol=symbol, principal=principal)
+        if full_history is None:
+            raise HTTPException(503, "Full history coverage is unavailable")
+        now = datetime.now(UTC)
+        result = full_history.read(
+            instrument_id=InstrumentId(MarketId(market_id), Symbol(symbol)), now=now
+        )
+        return {
+            **result,
+            "market_id": market_id,
+            "symbol": symbol,
+            "timeframe": "1m",
+            "observed_at": now,
+            "origin_state": bounds["state"],
         }
 
     @router.get("/market-data/workspace/history-bounds")
@@ -291,3 +365,22 @@ def build_catalog_workspace_router(
         }
 
     return router
+
+
+def _stream_state(effective: bool, key: tuple[int, str], runtime: dict[str, Any] | None) -> str:
+    if not effective:
+        return "disabled"
+    if runtime is None:
+        return "unknown"
+    if not runtime["running"]:
+        return "offline"
+    connection = runtime.get("connections", {}).get(key)
+    if connection is False:
+        return "disconnected"
+    repair = runtime["repairs"].get(key)
+    if repair:
+        if repair["state"] == "failed":
+            return "blocked"
+        return "retry_wait" if repair.get("next_retry_at") else "recovering"
+    # A process lease alone is not evidence of a working provider socket.
+    return "running" if connection is True else "unknown"

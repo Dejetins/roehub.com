@@ -1,0 +1,17 @@
+{
+  "baseline": {
+    "filesAnalyzed": 1617,
+    "errorCount": 54,
+    "warningCount": 0,
+    "informationCount": 0,
+    "timeInSec": 17.692
+  },
+  "candidate": {
+    "filesAnalyzed": 1624,
+    "errorCount": 54,
+    "warningCount": 0,
+    "informationCount": 0,
+    "timeInSec": 20.05
+  },
+  "new": []
+}

@@ -1,0 +1,126 @@
+.artifact-mode{display:flex;gap:4px;padding:8px 12px;border-bottom:1px solid var(--line-soft)}
+.artifact-mode a{padding:4px 10px;min-height:28px;display:flex;align-items:center;color:var(--muted);border-radius:5px;text-decoration:none;font-size:11px}
+.artifact-mode a[aria-current=page]{background:var(--surface-2);color:var(--text)}
+.artifact-progress{display:grid;gap:4px;font-size:10px}
+.artifact-progress .data-job-progress-bar{flex-wrap:wrap;gap:4px}
+.artifact-progress .data-job-progress-bar>span{flex-basis:100%}
+.artifact-progress progress{max-width:130px}
+.artifact-actions{flex-wrap:wrap;gap:8px}
+.artifact-facts{display:grid;gap:10px;font-size:10px}
+.artifact-facts dd{margin:3px 0 0;overflow-wrap:anywhere}
+.artifact-facts dt{color:var(--muted)}
+.artifact-timeframe{margin-block:12px;font-size:10px;overflow-wrap:anywhere}
+.artifact-timeframe time{display:block;color:var(--muted)}
+.artifact-editor{display:grid;gap:12px;margin-block:16px;font-size:11px}
+.artifact-editor>fieldset{display:grid;gap:12px;border:0;padding:0;min-width:0}
+.artifact-editor :is(input,select,textarea){max-width:100%;min-width:0;width:100%;font-size:11px}
+.artifact-editor :is(label,.work-field){display:grid;gap:5px}
+.artifact-editor label:has(input[type=checkbox]){display:flex;align-items:center;min-height:28px;gap:8px}
+.artifact-editor input[type=checkbox]{width:16px;min-width:16px;height:16px;margin:4px}
+.artifact-checks{display:flex;flex-wrap:wrap;gap:8px}
+.artifact-indicators{max-height:360px;overflow:auto;overscroll-behavior:contain}
+.artifact-indicators details{padding-inline-start:28px;margin-bottom:8px}
+.artifact-indicators summary{cursor:pointer;min-height:28px}
+.artifact-editor fieldset fieldset{min-width:0;border:1px solid var(--line);border-radius:5px;padding:8px}
+.artifact-editor p{color:var(--muted);margin:0;line-height:1.5}
+@media(max-width:650px){.artifact-editor :is(input,select,textarea){font-size:16px}.artifact-mode a{min-height:32px}.artifact-table{min-width:620px}}
+/* Reuse candle row geometry; keep verbose diagnostics in the inspector. */
+.data-workspace .artifact-table{min-width:660px}
+.data-workspace .artifact-table th:first-child{width:34px}
+.data-workspace .artifact-table td{white-space:nowrap;overflow-wrap:normal}
+.navigator-app .navigator-grid.workpages-grid .artifact-table button.data-instrument-name.artifact-instrument{padding:0;border:0;background:none;border-radius:0;font-size:11px;font-weight:550;color:var(--text);text-decoration:none;min-height:28px}
+.artifact-cell-status{display:inline-flex;align-items:center;gap:5px;font-size:10px;white-space:nowrap}
+.artifact-cell-status svg{width:13px;height:13px;flex:none}
+.artifact-cell-status.ready{color:var(--positive,#63d6a2)}
+.artifact-cell-status.failed{color:var(--danger,#f49b9b)}
+.artifact-table time{font-size:10px;font-variant-numeric:tabular-nums}
+.artifact-coverage>summary{cursor:pointer}
+.navigator-app .artifact-coverage-table{width:100%;table-layout:fixed;border-collapse:collapse;margin-top:8px;font-size:10px;line-height:16px}
+.navigator-app .artifact-coverage-table :is(th,td){height:30px;padding:0 4px;border:0;border-bottom:1px solid var(--line-soft);text-align:left;background:transparent;font-weight:400}
+.navigator-app .artifact-coverage-table th:first-child{width:68px}
+.navigator-app .artifact-coverage-table :is(th,td):last-child{text-align:right;width:58px;font-variant-numeric:tabular-nums}
+.navigator-app .artifact-coverage-table thead{color:var(--muted)}
+.navigator-app .navigator-grid.workpages-grid .artifact-coverage-table button{display:flex;align-items:center;gap:4px;width:100%;height:30px;min-height:30px;padding:0;border:0;background:none;font-size:10px;text-align:left;color:var(--text)}
+.artifact-coverage-table svg{width:12px;height:12px;flex:none}
+.artifact-coverage-table button[aria-expanded=true]>svg{transform:rotate(90deg)}
+.artifact-coverage-state{display:flex;align-items:center;gap:4px;white-space:nowrap}
+.artifact-coverage-row{cursor:pointer}
+.artifact-coverage-row:hover{background:var(--surface-2)}
+.navigator-app .artifact-coverage-table .artifact-coverage-detail td{text-align:left;padding:6px 8px;height:auto;color:var(--muted);overflow-wrap:anywhere}
+.artifact-coverage-detail p{margin:0 0 4px;line-height:16px}
+
+.artifact-summary{margin:14px 0;font-size:10px;line-height:16px}
+.artifact-summary-title{display:flex;justify-content:space-between;font-weight:550;margin-bottom:6px}
+.artifact-summary-title>span{color:var(--muted);font-weight:400}
+.artifact-summary-facts{display:grid;gap:6px;margin:0}
+.artifact-summary-facts>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:baseline}
+.artifact-summary-facts dt{color:var(--muted)}
+.artifact-summary-facts dd{margin:0;white-space:nowrap;font-variant-numeric:tabular-nums}
+.artifact-summary .artifact-schedule{margin:8px 0 0;color:var(--muted)}
+
+.artifact-journal-empty{padding:8px 12px;color:var(--muted);font-size:11px}
+.artifact-job-events{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:12px}
+.artifact-job-events li{display:grid;gap:4px;padding-bottom:8px;border-bottom:1px solid var(--line-soft)}
+.artifact-job-events :is(time,code){font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+
+/* Background freshness checks keep native command locks without dimming on every poll. */
+.artifact-quiet-read button:disabled{opacity:1;color:var(--text)}
+.artifact-current-phase{color:var(--muted);font-size:10px}
+
+/* The inspector is a narrow form, independent of the global two-column fieldset. */
+.navigator-app .artifact-editor fieldset{grid-template-columns:minmax(0,1fr);margin:0;min-width:0}
+.artifact-editor-section{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;min-width:0}
+.artifact-editor-section h4{margin:0;font-size:12px;font-weight:550}
+.artifact-editor>fieldset{gap:20px}
+.navigator-app .artifact-editor .artifact-checks{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}
+.navigator-app .artifact-editor .artifact-checks label{display:flex;flex-direction:row;align-items:center;gap:5px;min-height:30px;margin:0;white-space:nowrap}
+.navigator-app .artifact-editor label:has(input[type=checkbox]){display:flex;flex-direction:row;align-items:center;gap:6px}
+.artifact-editor-disclosure{min-width:0}
+.artifact-editor-disclosure>summary{cursor:pointer;font-size:12px;font-weight:550;min-height:28px}
+.artifact-editor-disclosure>summary>span{float:right;font-size:10px;color:var(--muted);font-weight:400}
+.artifact-editor-disclosure>.artifact-editor-section{margin-top:10px}
+.artifact-editor .artifact-indicators{max-height:320px}
+.artifact-editor-footer{position:sticky;bottom:0;z-index:2;background:var(--surface);padding-block:10px;border-top:1px solid var(--line);flex-wrap:wrap;gap:6px}
+
+.artifact-editor>h3{margin:0;font-size:13px}
+.artifact-indicator-summary{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.artifact-indicator-summary h4{margin:0 0 4px;font-size:12px}
+.artifact-indicator-summary span{font-size:10px;color:var(--muted)}
+.artifact-indicator-dialog{width:min(880px,calc(100vw - 32px));max-width:none;height:min(680px,calc(100dvh - 32px));max-height:none;padding:0;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--text)}
+.artifact-indicator-dialog::backdrop{background:#0009}
+.artifact-indicator-dialog>form{height:100%;display:flex;flex-direction:column;margin:0;min-height:0}
+.artifact-indicator-dialog header,.artifact-indicator-dialog footer{display:flex;align-items:center;gap:12px;padding:16px 20px;flex:none}
+.artifact-indicator-dialog header{border-bottom:1px solid var(--line)}
+.artifact-indicator-dialog header>div,.artifact-indicator-dialog footer>span{flex:1;min-width:0}
+.artifact-indicator-dialog h2{margin:0;font-size:16px}
+.artifact-indicator-dialog p{font-size:12px;color:var(--muted);line-height:1.5;margin:8px 0}
+.artifact-indicator-dialog header>button{font-size:20px;width:32px;height:32px;padding:0}
+.artifact-indicator-dialog button{font-size:12px;min-height:30px}
+.artifact-indicator-layout{display:grid;grid-template-columns:minmax(260px, .9fr) minmax(0,1.1fr);flex:1;min-height:0}
+.artifact-indicator-picker{display:flex;flex-direction:column;min-height:0;padding:16px;border-right:1px solid var(--line);gap:10px}
+.artifact-indicator-picker>input{width:100%;min-width:0;font-size:12px}
+.artifact-indicator-selection{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px}
+.artifact-indicator-selection>span{margin-inline-end:auto;color:var(--muted)}
+.artifact-indicator-selection button{padding:3px 6px;font-size:10px}
+.artifact-indicator-list{overflow:auto;overscroll-behavior:contain;min-height:0;flex:1}
+.artifact-indicator-list h3{font-size:11px;color:var(--muted);margin:16px 0 6px;font-weight:500}
+.artifact-indicator-list>section:first-child h3{margin-top:0}
+.artifact-indicator-row{display:flex;align-items:center;gap:8px;border-radius:5px;padding-inline:6px}
+.artifact-indicator-row.selected{background:var(--surface-2)}
+.artifact-indicator-row>input,.artifact-indicator-sources input{width:16px;height:16px;min-width:16px;margin:0}
+.artifact-indicator-row button{display:flex;flex:1;justify-content:space-between;align-items:center;text-align:left;background:transparent;border:0;border-radius:0;padding:4px 0;font-weight:500;min-height:32px}
+.artifact-indicator-row button span{color:var(--muted)}
+.artifact-indicator-parameters{overflow:auto;overscroll-behavior:contain;padding:20px;min-width:0}
+.artifact-indicator-parameters h3{font-size:16px;margin:0}
+.artifact-indicator-dialog fieldset{display:grid;grid-template-columns:minmax(0,1fr);gap:10px;border:0;min-width:0;margin:16px 0 0;padding:0}
+.artifact-indicator-dialog legend,.artifact-indicator-dialog h4{font-size:12px;font-weight:550;margin:0 0 8px}
+.artifact-indicator-sources{display:flex;gap:12px;flex-wrap:wrap}
+.artifact-indicator-sources label{display:flex;align-items:center;gap:6px;font-size:12px;min-height:28px}
+.artifact-indicator-fields{display:grid;gap:10px;margin-top:12px}
+.artifact-indicator-fields label{display:grid;gap:6px;font-size:11px;color:var(--muted)}
+.artifact-indicator-fields input{width:100%;min-width:0;font-size:12px}
+.artifact-indicator-dialog footer{border-top:1px solid var(--line);font-size:11px;color:var(--muted)}
+.artifact-indicator-dialog footer strong{display:block;font-weight:400;color:var(--danger)}
+@media(max-width:600px){.artifact-indicator-layout{grid-template-columns:minmax(0,1fr);overflow:auto}.artifact-indicator-picker{min-height:240px;max-height:300px;border-right:0;border-bottom:1px solid var(--line)}.artifact-indicator-parameters{overflow:visible}.artifact-indicator-dialog footer{flex-wrap:wrap;padding:12px}.artifact-indicator-dialog footer>span{flex-basis:100%}}
+
+.artifact-indicator-sources label{flex-direction:row}

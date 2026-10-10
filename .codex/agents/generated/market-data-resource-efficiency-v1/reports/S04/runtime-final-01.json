@@ -1,0 +1,33 @@
+{
+  "installed_unchanged": true,
+  "containers": [
+    {
+      "name": "/roehub-local-market-data-scheduler-1",
+      "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "configured_image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "memory": 402653184,
+      "nano_cpus": 1000000000,
+      "started": "2026-10-10T11:39:22.132550636Z"
+    },
+    {
+      "name": "/roehub-local-market-data-ws-1",
+      "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "configured_image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "memory": 1073741824,
+      "nano_cpus": 1000000000,
+      "started": "2026-10-10T11:43:18.545674009Z"
+    },
+    {
+      "name": "/roehub-local-clickhouse-1",
+      "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+      "configured_image": "clickhouse/clickhouse-server@sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+      "memory": 1610612736,
+      "nano_cpus": 2000000000,
+      "started": "2026-10-09T22:24:58.955795211Z"
+    }
+  ],
+  "disposable_memory_events": {
+    "roehub-s04-pg": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 1\n",
+    "roehub-s04-clickhouse-1": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 879\n"
+  }
+}

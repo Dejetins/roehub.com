@@ -1,0 +1,28 @@
+{
+  "command": [
+    "docker",
+    "rm",
+    "-f",
+    "-v",
+    "roehub-s02-ch",
+    "roehub-s02-pg"
+  ],
+  "returncode": 0,
+  "stdout": "roehub-s02-ch\nroehub-s02-pg\n",
+  "stderr": "",
+  "remaining_s02_containers": [],
+  "remaining_recreate_volumes": [],
+  "owned_tunnel_processes": [
+    "40190 /bin/zsh -c python3 - <<'PY'\\012import subprocess,json,pathlib\\012p=pathlib.Path('.codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/cleanup-final-01.json')\\012assert not p.exists()\\012names=['roehub-s02-ch','roehub-s02-pg']\\012r=subprocess.run(['docker','rm','-f','-v',*names],capture_output=True,text=True)\\012remaining=subprocess.check_output(['docker','ps','-a','--format','{{.Names}}'],text=True).splitlines()\\012volumes=subprocess.check_output(['docker','volume','ls','--format','{{.Name}}'],text=True).splitlines()\\012ps=subprocess.check_output(['ps','-axo','pid,command'],text=True).splitlines()\\012own=[x for x in ps if 'python' in x and 'tunnel' in x and 'market-data-s02' in x]\\012obj={'command':['docker','rm','-f','-v',*names],'returncode':r.returncode,'stdout':r.stdout,'stderr':r.stderr,'remaining_s02_containers':[x for x in remaining if x.startswith('roehub-s02')],'remaining_recreate_volumes':[x for x in volumes if x.startswith('roehub-s02-recreate')],'owned_tunnel_processes':own,'installation_containers_present':[x for x in remaining if x.startswith('roehub-local')]}\\012p.write_text(json.dumps(obj,indent=2)+'\\n');print(json.dumps(obj,indent=2))\\012PY\\012python3 /Users/daniildegtyarev/.codex/skills/prompt-manager/scripts/validate_pack.py --help"
+  ],
+  "installation_containers_present": [
+    "roehub-local-clickhouse-1",
+    "roehub-local-web-1",
+    "roehub-local-api-1",
+    "roehub-local-backtest-artifact-publisher-1",
+    "roehub-local-market-data-scheduler-1",
+    "roehub-local-market-data-ws-1",
+    "roehub-local-operational-health-1",
+    "roehub-local-postgresql-1"
+  ]
+}

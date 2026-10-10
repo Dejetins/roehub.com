@@ -1,0 +1,38 @@
+[
+  {
+    "at": "2026-10-04T19:14:09.633950+00:00",
+    "server": "time.cloudflare.com",
+    "stratum": 3,
+    "round_trip_ms": 144.81019973754883,
+    "offset_ms": 157.69243240356445,
+    "offset_lower_ms": 85.28733253479004,
+    "offset_upper_ms": 230.09753227233887
+  },
+  {
+    "at": "2026-10-04T19:14:09.766014+00:00",
+    "server": "time.cloudflare.com",
+    "stratum": 3,
+    "round_trip_ms": 131.59847259521484,
+    "offset_ms": 149.88040924072266,
+    "offset_lower_ms": 84.08117294311523,
+    "offset_upper_ms": 215.67964553833008
+  },
+  {
+    "at": "2026-10-04T19:14:09.929582+00:00",
+    "server": "time.apple.com",
+    "stratum": 1,
+    "round_trip_ms": 163.4042263031006,
+    "offset_ms": 150.37763118743896,
+    "offset_lower_ms": 68.67551803588867,
+    "offset_upper_ms": 232.07974433898926
+  },
+  {
+    "at": "2026-10-04T19:14:10.082352+00:00",
+    "server": "time.apple.com",
+    "stratum": 1,
+    "round_trip_ms": 152.70042419433594,
+    "offset_ms": 148.14424514770508,
+    "offset_lower_ms": 71.79403305053711,
+    "offset_upper_ms": 224.49445724487305
+  }
+]

@@ -1,0 +1,28 @@
+{
+  "schema_version": "market-data-resource-comparison/v1",
+  "stage": "S02",
+  "label": "candidate",
+  "runtime": {
+    "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+    "memory": 1610612736,
+    "nano_cpus": 2000000000
+  },
+  "harness_sha256": "0255392fc8fb4c1d030fbc49c709850d859d7b75cc42585d314106444cc734d4",
+  "duration_s": 20,
+  "warmup_s": 60,
+  "steady_s": 300,
+  "source": {
+    "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py": "2735e1c9522a7abfaad2868d99c1d549ce1c3c6e11f32110a269fa583f653b97",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py": "f14f0a1b44a774efac5fcbe168845552c43ae03fa8a98df080a460151d3ae164",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py": "4804741430cef5a2f0a2857cd69ba2ef06c09f511d094539822f2d5af7e0989e"
+  },
+  "python": "3.12.12",
+  "fixture_coordinates": 102,
+  "live_streams": 4,
+  "server_version": "25.8.33.6",
+  "samples": [],
+  "lanes": [],
+  "failures": [
+    "TypeError"
+  ]
+}

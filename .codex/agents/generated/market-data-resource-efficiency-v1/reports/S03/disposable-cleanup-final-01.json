@@ -1,0 +1,29 @@
+{
+  "time": "2026-10-10T21:29:44.657130+00:00",
+  "actions": [
+    {
+      "kind": "remove_owned_disposable_container",
+      "name": "roehub-s03-postgres",
+      "exit_code": 0,
+      "output": "roehub-s03-postgres"
+    },
+    {
+      "kind": "remove_owned_disposable_container",
+      "name": "roehub-s03-clickhouse-1",
+      "exit_code": 0,
+      "output": "roehub-s03-clickhouse-1"
+    },
+    {
+      "kind": "remove_owned_disposable_volume",
+      "name": "roehub-s03-ch-data",
+      "exit_code": 0,
+      "output": "roehub-s03-ch-data"
+    },
+    {
+      "kind": "remove_owned_private_file",
+      "path": ".cache/market-data-s03/private/postgres.env"
+    }
+  ],
+  "remaining_s03_containers": [],
+  "boundary": "Only named S03 disposable targets/private credentials removed. Installed services and S02 private files preserved. Source snapshots and sanitized evidence retained."
+}

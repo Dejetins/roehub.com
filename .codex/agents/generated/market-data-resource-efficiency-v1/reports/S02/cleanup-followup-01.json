@@ -1,0 +1,5 @@
+{
+  "note": "cleanup-final-01 naive text matcher included its own parent shell; executable-aware follow-up excludes shells.",
+  "python_tunnel_processes": [],
+  "owned_source_hashes_match": true
+}

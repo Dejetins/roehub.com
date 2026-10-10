@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict
 from starlette.responses import Response
 
+from trading.contexts.identity.adapters.inbound.api.browser_device import register_browser
 from trading.contexts.identity.adapters.inbound.api.deps import (
     RequireCurrentUserDependency,
 )
@@ -126,6 +127,20 @@ def build_auth_oidc_router(
         response = RedirectResponse(result.next_path, status_code=303)
         _clear_attempt_cookie(response=response, secure=cookie_secure)
         if result.session is not None:
+            try:
+                register_browser(
+                    request=request,
+                    response=response,
+                    repository=session_repository,
+                    session_id=result.session.session_id,
+                    now=clock.now(),
+                    secure=cookie_secure,
+                )
+            except Exception:
+                session_repository.revoke_session(
+                    session_id=result.session.session_id, revoked_at=clock.now()
+                )
+                raise
             response.set_cookie(
                 key=cookie_name,
                 value=str(result.session.session_id),
@@ -181,9 +196,7 @@ def _attempt_id(raw: str | None) -> UUID | None:
         return None
 
 
-def _set_attempt_cookie(
-    *, response: RedirectResponse, attempt_id: UUID, secure: bool
-) -> None:
+def _set_attempt_cookie(*, response: RedirectResponse, attempt_id: UUID, secure: bool) -> None:
     response.set_cookie(
         key=_ATTEMPT_COOKIE,
         value=str(attempt_id),

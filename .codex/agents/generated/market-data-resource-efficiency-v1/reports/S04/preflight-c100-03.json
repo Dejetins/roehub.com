@@ -1,0 +1,216 @@
+{
+  "schema_version": "market-data-resource-comparison/v1",
+  "stage": "S04",
+  "label": "candidate",
+  "fixture": {
+    "streams": 100,
+    "stored_coordinates": 102,
+    "seed_minutes": 2880,
+    "sparse_every": 7,
+    "bursts": 2,
+    "cadence_s": 0.2,
+    "buffer_rows": 1000,
+    "flush_ms": 100,
+    "warmup_bursts": 3,
+    "post_drain_s": 5
+  },
+  "fixture_sha256": "421beeae708d815ec0c2eb966757a4a6b7b73320d616bc8a0552fcd8d8bfc33b",
+  "harness_sha256": "14fc6a6a98417138560d49003ebe63f8e07d66a0fc1b8f3943b7021e91bfd95e",
+  "python": "3.12.12",
+  "platform": "macOS-26.7-arm64-arm-64bit",
+  "source": ".",
+  "samples": [
+    {
+      "elapsed_s": 1.037602666998282,
+      "worker_child_rss_bytes": 481656832,
+      "ch": {
+        "jemalloc.allocated": 322154608.0,
+        "MemoryResident": 543199232.0,
+        "MemoryTracking": 127182336
+      },
+      "parts": 27,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 775385088,
+      "pg_cgroup_bytes": 84348928
+    },
+    {
+      "elapsed_s": 2.2115726670017466,
+      "worker_child_rss_bytes": 481656832,
+      "ch": {
+        "jemalloc.allocated": 320681944.0,
+        "MemoryResident": 546234368.0,
+        "MemoryTracking": 127283800
+      },
+      "parts": 27,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 775225344,
+      "pg_cgroup_bytes": 83165184
+    },
+    {
+      "elapsed_s": 3.46891641698312,
+      "worker_child_rss_bytes": 255098880,
+      "ch": {
+        "jemalloc.allocated": 315694160.0,
+        "MemoryResident": 553795584.0,
+        "MemoryTracking": 123862520
+      },
+      "parts": 27,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 785903616,
+      "pg_cgroup_bytes": 82956288
+    },
+    {
+      "elapsed_s": 4.591117749980185,
+      "worker_child_rss_bytes": 255115264,
+      "ch": {
+        "jemalloc.allocated": 311562768.0,
+        "MemoryResident": 547942400.0,
+        "MemoryTracking": 120638654
+      },
+      "parts": 27,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 779005952,
+      "pg_cgroup_bytes": 84307968
+    },
+    {
+      "elapsed_s": 5.688605332979932,
+      "worker_child_rss_bytes": 256278528,
+      "ch": {
+        "jemalloc.allocated": 311390352.0,
+        "MemoryResident": 549191680.0,
+        "MemoryTracking": 120740022
+      },
+      "parts": 27,
+      "merges": 0,
+      "pg_connections": 0,
+      "ch_cgroup_bytes": 779415552,
+      "pg_cgroup_bytes": 81809408
+    }
+  ],
+  "failures": [],
+  "before_memory": {
+    "jemalloc.allocated": 328082048.0,
+    "MemoryResident": 704745472.0
+  },
+  "before_cgroups": {
+    "roehub-s04-pg": {
+      "memory.current": "80044032",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 1",
+      "cpu.stat": "usage_usec 4415439\nuser_usec 1887468\nsystem_usec 2527970\nnice_usec 0\nnr_periods 426\nnr_throttled 2\nthrottled_usec 7132\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=14106624 wbytes=113164288 rios=637 wios=5598 dbytes=0 dios=0"
+    },
+    "roehub-s04-clickhouse-1": {
+      "memory.current": "767508480",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 278",
+      "cpu.stat": "usage_usec 28828794\nuser_usec 16707664\nsystem_usec 12121129\nnice_usec 0\nnr_periods 5068\nnr_throttled 20\nthrottled_usec 1661401\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=320106496 wbytes=164147200 rios=7434 wios=31673 dbytes=0 dios=0"
+    }
+  },
+  "pg_before": [
+    11,
+    0,
+    2
+  ],
+  "started_at": "2026-10-10T21:46:44.775449+00:00",
+  "child_cpu_before": 0.79,
+  "cpu_before": 0.935225,
+  "completion_s": 0.22778316697804257,
+  "occupancy_peak": [
+    100,
+    100,
+    730000
+  ],
+  "loop": {
+    "p50_ms": 0.16195804346352816,
+    "p95_ms": 0.3617500187829137,
+    "p99_ms": 1.753999968059361
+  },
+  "loop_max_ms": 5.023000005166978,
+  "parent_cpu_s": 0.07986799999999983,
+  "child_cpu_s": 0.010000000000000009,
+  "family_cpu_s": 0.08986799999999984,
+  "ended_at": "2026-10-10T21:46:50.016119+00:00",
+  "post_drain_memory": {
+    "jemalloc.allocated": 310782728.0,
+    "MemoryResident": 549519360.0
+  },
+  "pg_after": [
+    20,
+    0,
+    2
+  ],
+  "arrived": 200,
+  "accepted": 200,
+  "acknowledged": 200,
+  "pg_transactions": 9,
+  "pg_sessions_created": 0,
+  "pg_tx_per_candle": 0.045,
+  "pg_sessions_per_candle": 0.0,
+  "receive_to_ack": {
+    "p50_ms": 24.648666032589972,
+    "p95_ms": 127.45575001463294,
+    "p99_ms": 127.72908300394192
+  },
+  "receipt_to_ack": {
+    "p50_ms": 10.894500010181218,
+    "p95_ms": 114.32708305073902,
+    "p99_ms": 114.32708305073902
+  },
+  "scheduled_to_ack": {
+    "p50_ms": 25.110832997597754,
+    "p95_ms": 129.6464580227621,
+    "p99_ms": 129.6464580227621
+  },
+  "dispatch_lag": {
+    "p50_ms": 2.794041996821761,
+    "p95_ms": 4.286416980903596,
+    "p99_ms": 4.603957990184426
+  },
+  "canonical_count": 200,
+  "canonical_sha256": "7557bf524499f76955bbd683d10445df9e3ecc5859f7c874bc0fab88cd63b28c",
+  "pending_after": 0,
+  "after_cgroups": {
+    "roehub-s04-pg": {
+      "memory.current": "79343616",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 1",
+      "cpu.stat": "usage_usec 4531380\nuser_usec 1947770\nsystem_usec 2583609\nnice_usec 0\nnr_periods 450\nnr_throttled 2\nthrottled_usec 7132\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=14106624 wbytes=113344512 rios=637 wios=5612 dbytes=0 dios=0"
+    },
+    "roehub-s04-clickhouse-1": {
+      "memory.current": "779730944",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 278",
+      "cpu.stat": "usage_usec 29318457\nuser_usec 17014313\nsystem_usec 12304144\nnice_usec 0\nnr_periods 5146\nnr_throttled 20\nthrottled_usec 1661401\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=320163840 wbytes=173912064 rios=7448 wios=33978 dbytes=0 dios=0"
+    }
+  },
+  "query_metrics": [
+    [
+      "QueryStart",
+      4,
+      0,
+      0,
+      0
+    ],
+    [
+      "QueryFinish",
+      4,
+      634,
+      72440,
+      5766565
+    ]
+  ],
+  "checks": {
+    "all_accepted": true,
+    "canonical_content": true,
+    "all_acknowledged": true,
+    "all_canonical": true,
+    "empty_journal": true,
+    "bounded_rows": true,
+    "bounded_bytes": true,
+    "samples_ok": true
+  }
+}

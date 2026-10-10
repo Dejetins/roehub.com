@@ -1,0 +1,16 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/real_infra/backtest/test_artifact_dispatch.py",
+    "tests/real_infra/backtest/test_artifact_management.py",
+    "tests/real_infra/backtest/test_automatic_base_lifecycle.py",
+    "tests/real_infra/backtest/test_managed_derivative_publication.py"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 21.091084003448486,
+  "stdout": "......................................sssssss.                           [100%]\n=========================== short test summary info ============================\nSKIPPED [1] tests/real_infra/backtest/test_automatic_base_lifecycle.py:113: explicit disposable PostgreSQL/ClickHouse required\nSKIPPED [1] tests/real_infra/backtest/test_automatic_base_lifecycle.py:171: explicit disposable PostgreSQL/ClickHouse required\nSKIPPED [3] tests/real_infra/backtest/test_automatic_base_lifecycle.py:224: explicit disposable PostgreSQL/ClickHouse required\nSKIPPED [1] tests/real_infra/backtest/test_automatic_base_lifecycle.py:298: explicit disposable PostgreSQL/ClickHouse required\nSKIPPED [1] tests/real_infra/backtest/test_automatic_base_lifecycle.py:375: explicit disposable PostgreSQL/ClickHouse required\n39 passed, 7 skipped in 20.67s\n",
+  "stderr": ""
+}

@@ -1,0 +1,28 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+_______________ test_migration_manifests_match_immutable_sources _______________
+
+    def test_migration_manifests_match_immutable_sources() -> None:
+        repo_root = Path(__file__).resolve().parents[4]
+>       phases = storage._load_postgres_phases(  # noqa: SLF001
+            repo_root / "migrations" / "postgres" / "manifest.json"
+        )
+
+tests/unit/apps/migrations/test_storage_lifecycle.py:123: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+manifest_path = PosixPath('/Users/daniildegtyarev/Projects/roehub.com/migrations/postgres/manifest.json')
+
+    def _load_postgres_phases(manifest_path: Path) -> dict[str, tuple[str, tuple[Path, ...]]]:
+        payload = _load_json_object(manifest_path, label="PostgreSQL migration manifest")
+        if payload.get("schema") != POSTGRES_MANIFEST_SCHEMA:
+            raise StorageLifecycleError("unsupported PostgreSQL migration manifest schema")
+        raw_phases = payload.get("phases")
+        if not isinstance(raw_phases, list) or len(raw_phases) != 25:
+>           raise StorageLifecycleError("PostgreSQL migration manifest must define twenty-four phases")
+E           apps.migrations.storage.StorageLifecycleError: PostgreSQL migration manifest must define twenty-four phases
+
+apps/migrations/storage.py:431: StorageLifecycleError
+=========================== short test summary info ============================
+FAILED tests/unit/apps/migrations/test_storage_lifecycle.py::test_migration_manifests_match_immutable_sources
+1 failed in 0.40s

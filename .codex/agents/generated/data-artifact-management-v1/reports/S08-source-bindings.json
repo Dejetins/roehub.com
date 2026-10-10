@@ -1,0 +1,15 @@
+{
+  "apps/navigator-web/src/storage-api.ts": "7b6312d4f8ef4741d3da8bc7ebf2ecaf349ce95638bd9b353df7c9367d64d0fe",
+  "apps/navigator-web/src/storage-settings.tsx": "d808b809901be374e82b0789ca74072d1f006d962455c46fe185dced5dc7d931",
+  "apps/navigator-web/src/storage-settings.css": "47b1b21432a6b52bc4043d905a898cd493e665aad153243a3442ef02c2f0b5ad",
+  "apps/navigator-web/src/storage-settings.test.tsx": "8188300994c3b462b2e38a9780ae33390d7dde535c6e91ce61d03fcaa12335d7",
+  "apps/navigator-web/src/backtest-readiness.tsx": "f8a0b88694a14e4b4d598ab972ed9ccb71f4a78936c56498cbaac0eed1045367",
+  "apps/navigator-web/src/backtest-readiness.test.tsx": "6faa8252aa100661816e676a3a9763b52a845950c4d9ad64b32b0d60168e61a0",
+  "apps/navigator-web/src/settings-page.tsx": "b631466b8e168845901bfeaf51440c6ff2f00f0c069e90c0a948c1ed2bf26e95",
+  "apps/navigator-web/src/client-routes.ts": "c8f3ff9ad532a345127dc0d5d6038f4af8c491fb4f284a02d6a9ab9b615e2b4d",
+  "apps/navigator-web/src/builder-api.ts": "7b5965a0b967c1ebf5cde53144a2f2d2b822c321f6e5ecf3ecc3d3bab8cc9a85",
+  "apps/navigator-web/src/builder.tsx": "6e01f64dd74412c6e798d604e8f94bd9757c2c89718c3b33e5a0d051e7b2eaaa",
+  "apps/navigator-web/e2e/storage_fixture.py": "8d79bebcd15607c76b392359ad87c3e5aa755509a85c6d46c321360b10c93c39",
+  "apps/navigator-web/e2e/storage_preflight.py": "1a5529a1340cfe6c26eb410dd3d23d1aa7fc02a31a3e56af62d3d15265b71d47",
+  "tools/qa/navigator_preview.py": "341825d8d8d9b0b5b8c24c1d9b5246fd4eeaa10fd28dce3c476fb53bd6e5470a"
+}

@@ -13,6 +13,7 @@ from apps.api.operational_health_client import (
     OperationalHistoryClient,
 )
 from apps.api.routes.market_data_reference import _resolve_research_scope
+from apps.api.worker_control import worker_commands
 from apps.monitoring.operational_health import OperationalStatus
 from trading.contexts.backtest.application.ports import ResearchOrganizationScopeResolver
 from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
@@ -69,6 +70,7 @@ def _project(item: OperationalStatus, now: datetime) -> dict[str, Any]:
         signal_source="operational-health",
         runbook_path=runbook,
         required=item.required,
+        commands=worker_commands(item, now),
     )
 
 
@@ -106,6 +108,8 @@ def build_monitoring_router(
             except OperationalHealthClientError:
                 pass
         return dict(
+            organization_id=str(org),
+            profile=snapshot.profile,
             generated_at=snapshot.generated_at,
             groups=GROUPS,
             services=[_project(s, now) for s in snapshot.services],
@@ -127,6 +131,8 @@ def build_monitoring_router(
             raise HTTPException(404, "Configured service not found")
         return dict(
             service=row,
+            organization_id=snapshot["organization_id"],
+            profile=snapshot["profile"],
             generated_at=snapshot["generated_at"],
             events=[e for e in snapshot["events"] if e["service_id"] == service_id][:50],
             history_state=snapshot["history_state"],

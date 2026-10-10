@@ -366,3 +366,31 @@ def test_admin_operation_read_is_bound_to_organization_namespace() -> None:
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "admin.operation_not_found"
+
+
+def test_worker_lifecycle_owner_and_allowlist(monkeypatch):
+    monkeypatch.setitem(globals(), 'NOW', datetime.now(UTC))
+    client, principals, current, org, control, health = _build_client()
+    health.service_id = 'backtest-artifact-publisher'
+    health.action_ref = 'manage_worker'
+    health.state = 'unknown'
+    headers = {'Origin': 'http://testserver', 'Idempotency-Key': 'worker-control-test'}
+    body = {'action': 'stop', 'profile': 'trading', 'services': [health.service_id]}
+    for role in ('admin', 'operator', 'trader', 'viewer'):
+        current['principal'] = principals[role]
+        response = client.post(f'/api/v1/admin/organizations/{org}/operations', json=body,
+                               headers=headers)
+        assert response.status_code == 403, (role, response.text)
+    assert not control.submitted
+    current['principal'] = principals['owner']
+    response = client.post(f'/api/v1/admin/organizations/{org}/operations', json=body,
+                           headers=headers)
+    assert response.status_code == 202, response.text
+    health.action_ref = 'diagnostics'
+    response = client.post(f'/api/v1/admin/organizations/{org}/operations', json=body,
+                           headers=headers)
+    assert response.status_code == 409
+    body["services"] = []
+    assert client.post(f"/api/v1/admin/organizations/{org}/operations", json=body,
+                       headers=headers).status_code == 409
+    assert len(control.submitted) == 1

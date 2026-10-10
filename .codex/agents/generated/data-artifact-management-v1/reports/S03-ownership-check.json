@@ -1,0 +1,13 @@
+{
+  "baseline_count": 309,
+  "unchanged_count": 305,
+  "owned_mixed_paths": [
+    "apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py",
+    "apps/worker/market_data_ws/wiring/modules/market_data_ws.py",
+    "docs/architecture/project-map/PROJECT_MAP.md",
+    "docs/architecture/project-map/project-map.json"
+  ],
+  "unexpected_changes": [],
+  "before_snapshots": "*-S03-before.txt",
+  "maps": "current catalog/inventory generated; no baseline inventory removed"
+}

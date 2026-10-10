@@ -10,8 +10,13 @@ from trading.contexts.market_data.application.dto import CandleWithMeta, RestFil
 from trading.contexts.market_data.application.ports.clock.clock import Clock
 from trading.contexts.market_data.application.ports.stores.raw_kline_writer import RawKlineWriter
 from trading.contexts.market_data.application.ports.stores.stream_recovery_store import (
+    AsyncStreamRecoveryStore,
     RecoveryEntry,
     StreamRecoveryStore,
+)
+from trading.contexts.market_data.application.services.batched_recovery import (
+    BatchedRecoveryAdmission,
+    await_owned,
 )
 from trading.contexts.market_data.application.services.ingestion_retry import (
     ErrorClassifier,
@@ -65,6 +70,9 @@ class AsyncRawInsertBuffer:
         hooks: InsertBufferHooks | None = None,
         async_writer: Callable[[Sequence[CandleWithMeta]], Awaitable[None]] | None = None,
         store: StreamRecoveryStore | None = None,
+        async_store: AsyncStreamRecoveryStore | None = None,
+        admission: BatchedRecoveryAdmission | None = None,
+        max_retained_bytes: int = 64 * 1024 * 1024,
         classify_error: ErrorClassifier = transient_ingestion_error,
         retry_base_s: float = 15,
         shutdown_timeout_s: float = 3,
@@ -79,6 +87,18 @@ class AsyncRawInsertBuffer:
         self._max_buffer_rows = max_buffer_rows
         self._hooks = hooks or InsertBufferHooks()
         self._store = store
+        self._async_store = async_store
+        self._admission = admission
+        if (async_store is None) != (admission is None) or (store and async_store):
+            raise ValueError("async store requires its admission coordinator")
+        self._admitting = 0
+        self._retained_rows = 0
+        self._retained_bytes = 0
+        if max_retained_bytes <= 0:
+            raise ValueError("max_retained_bytes must be positive")
+        self._max_retained_bytes = max_retained_bytes
+        self._sizes: list[int] = []
+        self._producers: set[asyncio.Task[None]] = set()
         self._classify_error = classify_error
         self._retry_base_s = retry_base_s
         self._shutdown_timeout_s = shutdown_timeout_s
@@ -129,6 +149,8 @@ class AsyncRawInsertBuffer:
             self._wake.set()
 
     def submit(self, row: CandleWithMeta) -> None:
+        if self._async_store is not None:
+            raise RuntimeError("async recovery requires submit_wait")
         if self._stopping or self.failure:
             raise RuntimeError("insert buffer is stopping or failed")
         if len(self._buffer) >= self._max_buffer_rows:
@@ -136,6 +158,9 @@ class AsyncRawInsertBuffer:
         self._accept(row, self._remember(row))
 
     async def submit_wait(self, row: CandleWithMeta) -> None:
+        if self._async_store is not None:
+            await self._submit_durable(row)
+            return
         if self._stopping or self.failure:
             raise RuntimeError("insert buffer is stopping or failed")
         receipt = self._remember(row)
@@ -151,6 +176,60 @@ class AsyncRawInsertBuffer:
             if receipt is not None and self._on_deferred is not None:
                 await self._on_deferred(receipt)
             raise
+
+    async def _submit_durable(self, row: CandleWithMeta) -> None:
+        # Reserve for waiting producer, DB batch, retained row and retry together.
+        # At most max_buffer_rows additional producers can wait for write capacity.
+        import pickle
+        size = 4096 + len(pickle.dumps(row)) * 4
+        if self._stopping or self.failure:
+            raise RuntimeError("insert buffer is stopping or failed")
+        if (self._retained_rows >= self._max_buffer_rows * 2
+                or self._retained_bytes + size > self._max_retained_bytes):
+            raise asyncio.QueueFull
+        self._retained_rows += 1
+        self._retained_bytes += size
+
+        # Waiting for capacity is not accepted and is freely cancellable.
+        try:
+            while len(self._buffer) + self._admitting >= self._max_buffer_rows:
+                if self._stopping or self.failure:
+                    raise RuntimeError("insert buffer is stopping or failed")
+                self._space.clear()
+                await self._space.wait()
+            if self._stopping or self.failure:
+                raise RuntimeError("insert buffer is stopping or failed")
+        except BaseException:
+            self._retained_rows -= 1
+            self._retained_bytes -= size
+            raise
+        self._admitting += 1
+
+        async def admit() -> None:
+            accepted = False
+            try:
+                assert self._admission is not None
+                receipt = await self._admission.remember(RestFillTask(
+                    row.candle.instrument_id,
+                    TimeRange(row.candle.ts_open, UtcTimestamp(
+                        row.candle.ts_open.value + timedelta(minutes=1))), "ws_recovery"))
+                # A stopping/cancelled caller cannot erase a committed receipt.
+                self._accept(row, receipt)
+                self._sizes.append(size)
+                accepted = True
+            finally:
+                self._admitting -= 1
+                if not accepted:
+                    self._retained_rows -= 1
+                    self._retained_bytes -= size
+
+        producer = asyncio.create_task(admit(), name="durable-candle-admission")
+        self._producers.add(producer)
+        try:
+            await await_owned(producer)
+        finally:
+            self._producers.discard(producer)
+            self._space.set()
 
     async def _run(self) -> None:
         while not self._stopping and self.failure is None:
@@ -189,6 +268,10 @@ class AsyncRawInsertBuffer:
                     await self._async_writer(batch)
                 else:
                     await asyncio.to_thread(self._writer.write_1m, batch)
+                if self._async_store:
+                    await self._async_store.complete_many(
+                        [e for e in self._receipts[: len(batch)] if e is not None]
+                    )
                 if self._store:
                     self._store.complete_many(
                         [e for e in self._receipts[: len(batch)] if e is not None]
@@ -201,6 +284,11 @@ class AsyncRawInsertBuffer:
                 if code is None:
                     self.failure = exc
                     self._space.set()
+                    if self._async_store:
+                        await self._async_store.fail_many(
+                            [e for e in self._receipts[: len(batch)] if e is not None],
+                            code="non_retryable_ingestion_error",
+                        )
                     if self._store:
                         self._store.fail_many(
                             [e for e in self._receipts[: len(batch)] if e is not None],
@@ -217,6 +305,10 @@ class AsyncRawInsertBuffer:
                         "raw insert waiting code=%s retry_in_s=%s rows=%s", code, delay, len(batch)
                     )
                 return
+            if self._async_store:
+                self._retained_rows -= len(batch)
+                self._retained_bytes -= sum(self._sizes[: len(batch)])
+                del self._sizes[: len(batch)]
             del self._receipts[: len(batch)]
             del self._buffer[: len(batch)]
             self._space.set()
@@ -238,6 +330,9 @@ class AsyncRawInsertBuffer:
         self._stopping = True
         self._space.set()
         self._wake.set()
+
+        if self._producers:
+            await await_owned(asyncio.gather(*self._producers, return_exceptions=True))
 
         async def drain() -> None:
             if self._task:

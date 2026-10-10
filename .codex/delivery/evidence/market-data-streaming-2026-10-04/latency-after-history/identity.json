@@ -1,0 +1,30 @@
+{
+  "git_head": "6d7f0a31fa7225f34df816a917ca93a57fb564c3",
+  "identity": "current dirty candidate; no product changes for this measurement",
+  "sha256": {
+    "apps/worker/market_data_ws/wiring/persistent_writer.py": "a55295b63c54948ca67e381bcf064afb8d5a0f04cf9dffd87e2567296e892ece",
+    "apps/worker/market_data_ws/wiring/modules/market_data_ws.py": "b322263e11387e217f0f22715633b20e0b2b5713be09ae8e01341f029f9918cb",
+    "apps/worker/market_data_ws/wiring/io_process.py": "68487d1c02009dc20ffdef8d4ccb544aa75fcaf9db7aa0b59435a0295ded263c",
+    "src/trading/contexts/market_data/application/services/insert_buffer.py": "0f7252881879a2acb9bae3b65122ed1d31a8f7d646e4f647bab2e908284794ec",
+    "src/trading/contexts/market_data/adapters/outbound/clients/binance/ws_client.py": "6ff6335bfb96fe06a52d70167efe1c4c7e18fb2202052fe8b3b8262caa604ebb",
+    ".local_artifacts/navigator-preview-sep26/streaming_latency_after_history_probe.py": "65c3b755808abaf6ff4ede3056d92ec126dc0741ba3d23ee8e2ac8b85ad382f4",
+    ".local_artifacts/navigator-preview-sep26/streaming_latency_after_history_summary.py": "b66d73fdc893a9a984436ceedd62896641f737bc95e8f460883b78a33209588b",
+    ".local_artifacts/navigator-preview-sep26/streaming-latency-after-history-test.yaml": "1c9e105086a96b88dd29f75b050e435f993fe77832130da5457c8e2252d6777a",
+    "src/trading/contexts/market_data/application/services/history_stream_gate.py": "a07f59a0c6ef880e4f16c26702d771bbe5eec31def90ccfc7df4ab626eff8b50",
+    "src/trading/contexts/market_data/application/services/rest_fill_queue.py": "5432dd74dfd87ad120f24ed54fa8b365aedbcfbf46e5b0a892158abd4cc76a57"
+  },
+  "baseline_hot_path_equal": {
+    "apps/worker/market_data_ws/wiring/persistent_writer.py": true,
+    "apps/worker/market_data_ws/wiring/modules/market_data_ws.py": false,
+    "apps/worker/market_data_ws/wiring/io_process.py": true,
+    "src/trading/contexts/market_data/application/services/insert_buffer.py": true,
+    "src/trading/contexts/market_data/adapters/outbound/clients/binance/ws_client.py": true
+  },
+  "preflight": {
+    "running_collectors": 0,
+    "recovery_entries": 0,
+    "persistent_selections": 0,
+    "runnable_downloads": 0
+  },
+  "scope": "already-admitted healthy WS write path; fixed four-instrument test reader as in baseline; admission/full-history scan excluded"
+}

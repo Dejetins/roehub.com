@@ -39,8 +39,9 @@ market_data:
       base_url: https://api.binance.com
       earliest_available_ts_utc: '2017-01-01T00:00:00Z'
       limiter:
+        egress_scope: local-installation-egress
         max_concurrency: 3
-        mode: autodetect
+        mode: shared_conservative
         safety_factor: 0.7
       retries: 5
       timeout_s: 15.0
@@ -66,8 +67,9 @@ market_data:
       base_url: https://fapi.binance.com
       earliest_available_ts_utc: '2019-09-01T00:00:00Z'
       limiter:
+        egress_scope: local-installation-egress
         max_concurrency: 3
-        mode: autodetect
+        mode: shared_conservative
         safety_factor: 0.7
       retries: 5
       timeout_s: 15.0
@@ -93,8 +95,9 @@ market_data:
       base_url: https://api.bybit.com
       earliest_available_ts_utc: '2018-01-01T00:00:00Z'
       limiter:
+        egress_scope: local-installation-egress
         max_concurrency: 3
-        mode: autodetect
+        mode: shared_conservative
         safety_factor: 0.7
       retries: 5
       timeout_s: 15.0
@@ -120,8 +123,9 @@ market_data:
       base_url: https://api.bybit.com
       earliest_available_ts_utc: '2018-01-01T00:00:00Z'
       limiter:
+        egress_scope: local-installation-egress
         max_concurrency: 3
-        mode: autodetect
+        mode: shared_conservative
         safety_factor: 0.7
       retries: 5
       timeout_s: 15.0

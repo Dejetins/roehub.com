@@ -1,0 +1,224 @@
+{
+  "workload": "backfill",
+  "index": 0,
+  "offered": 20,
+  "operations": [
+    {
+      "n": 0,
+      "offered_s": 0.0,
+      "finished_s": 0.1876269580097869,
+      "latency_s": 0.1876269580097869,
+      "service_s": 0.18510487501043826,
+      "attempts": 2
+    },
+    {
+      "n": 1,
+      "offered_s": 1.0,
+      "finished_s": 1.0836008749902248,
+      "latency_s": 0.08360087499022484,
+      "service_s": 0.08233199996175244,
+      "attempts": 1
+    },
+    {
+      "n": 2,
+      "offered_s": 2.0,
+      "finished_s": 2.1895047079888172,
+      "latency_s": 0.18950470798881724,
+      "service_s": 0.1857174169854261,
+      "attempts": 2
+    },
+    {
+      "n": 3,
+      "offered_s": 3.0,
+      "finished_s": 3.1886425410048105,
+      "latency_s": 0.18864254100481048,
+      "service_s": 0.18623908300651237,
+      "attempts": 2
+    },
+    {
+      "n": 4,
+      "offered_s": 4.0,
+      "finished_s": 4.18856425001286,
+      "latency_s": 0.1885642500128597,
+      "service_s": 0.185163541988004,
+      "attempts": 2
+    },
+    {
+      "n": 5,
+      "offered_s": 5.0,
+      "finished_s": 5.107127082999796,
+      "latency_s": 0.10712708299979568,
+      "service_s": 0.10649770800955594,
+      "attempts": 1
+    },
+    {
+      "n": 6,
+      "offered_s": 6.0,
+      "finished_s": 6.188844708027318,
+      "latency_s": 0.18884470802731812,
+      "service_s": 0.18708058301126584,
+      "attempts": 2
+    },
+    {
+      "n": 7,
+      "offered_s": 7.0,
+      "finished_s": 7.194185415981337,
+      "latency_s": 0.19418541598133743,
+      "service_s": 0.18969120795372874,
+      "attempts": 2
+    },
+    {
+      "n": 8,
+      "offered_s": 8.0,
+      "finished_s": 8.195988624996971,
+      "latency_s": 0.19598862499697134,
+      "service_s": 0.19513695896603167,
+      "attempts": 2
+    },
+    {
+      "n": 9,
+      "offered_s": 9.0,
+      "finished_s": 9.087174249987584,
+      "latency_s": 0.08717424998758361,
+      "service_s": 0.08396020898362622,
+      "attempts": 1
+    },
+    {
+      "n": 10,
+      "offered_s": 10.0,
+      "finished_s": 10.191430083010346,
+      "latency_s": 0.1914300830103457,
+      "service_s": 0.18687129201134667,
+      "attempts": 2
+    },
+    {
+      "n": 11,
+      "offered_s": 11.0,
+      "finished_s": 11.080959375016391,
+      "latency_s": 0.08095937501639128,
+      "service_s": 0.08034491701982915,
+      "attempts": 1
+    },
+    {
+      "n": 12,
+      "offered_s": 12.0,
+      "finished_s": 12.191027124994434,
+      "latency_s": 0.19102712499443442,
+      "service_s": 0.1873809999669902,
+      "attempts": 2
+    },
+    {
+      "n": 13,
+      "offered_s": 13.0,
+      "finished_s": 13.084250290994532,
+      "latency_s": 0.0842502909945324,
+      "service_s": 0.0822859579930082,
+      "attempts": 1
+    },
+    {
+      "n": 14,
+      "offered_s": 14.0,
+      "finished_s": 14.081597250013147,
+      "latency_s": 0.08159725001314655,
+      "service_s": 0.07822324999142438,
+      "attempts": 1
+    },
+    {
+      "n": 15,
+      "offered_s": 15.0,
+      "finished_s": 15.189196541032288,
+      "latency_s": 0.18919654103228822,
+      "service_s": 0.18593362503452227,
+      "attempts": 2
+    },
+    {
+      "n": 16,
+      "offered_s": 16.0,
+      "finished_s": 16.189128625032026,
+      "latency_s": 0.18912862503202632,
+      "service_s": 0.18426500004716218,
+      "attempts": 2
+    },
+    {
+      "n": 17,
+      "offered_s": 17.0,
+      "finished_s": 17.187113457999658,
+      "latency_s": 0.18711345799965784,
+      "service_s": 0.183952292019967,
+      "attempts": 2
+    },
+    {
+      "n": 18,
+      "offered_s": 18.0,
+      "finished_s": 18.195192916027736,
+      "latency_s": 0.19519291602773592,
+      "service_s": 0.1913238750421442,
+      "attempts": 2
+    },
+    {
+      "n": 19,
+      "offered_s": 19.0,
+      "finished_s": 19.111508540983777,
+      "latency_s": 0.1115085409837775,
+      "service_s": 0.10764120798557997,
+      "attempts": 1
+    }
+  ],
+  "retries": [
+    {
+      "operation": 0,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 2,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 3,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 4,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 6,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 7,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 8,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 10,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 12,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 15,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 16,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 17,
+      "code": "storage_concurrency_pressure"
+    },
+    {
+      "operation": 18,
+      "code": "storage_concurrency_pressure"
+    }
+  ],
+  "failures": [],
+  "client_maxrss": 229818368,
+  "client_cpu_s": 0.869256
+}

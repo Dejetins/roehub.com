@@ -1,0 +1,101 @@
+{
+  "source": "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-04-01a1273a",
+  "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+  "memory_bytes": 402653184,
+  "nano_cpus": 1000000000,
+  "strict_installed_caller_bound": 26,
+  "transport_capacity": 4,
+  "boundary": "real scheduler entrypoint/imports and built app, injected resource upper-bound work; no CH write working set",
+  "probe_hashes": {
+    "s03_memory_app.py": "5bbbd8de4b6de5a906fe84c41646a7c61a3f0bd00529e8dff52840d9cd1d00b2",
+    "sitecustomize.py": "08d2c5f05ada25c631a03908e321509dfda660b6b2e3d37618d6ef34528472f6"
+  },
+  "runs": [
+    {
+      "count": 6,
+      "state": {
+        "Status": "exited",
+        "OOMKilled": false,
+        "ExitCode": 0,
+        "StartedAt": "2026-10-10T20:21:47.581039257Z",
+        "FinishedAt": "2026-10-10T20:21:52.962723801Z"
+      },
+      "timed_out": false,
+      "permits_after_exit": 0,
+      "quota_spent": "20",
+      "last_observation": {
+        "label": "drained",
+        "monotonic": 89010.752039591,
+        "processes": [
+          {
+            "Name": "python",
+            "Pid": "1",
+            "PPid": "0",
+            "VmRSS": "248368 kB"
+          }
+        ],
+        "errors": [],
+        "children": 0,
+        "child_exitcodes": [
+          -15,
+          -15,
+          -15,
+          -15
+        ],
+        "futures_done": 6,
+        "http_success": 10,
+        "held_large_bodies": 4,
+        "payload_peak": 4,
+        "retained_transports": 4,
+        "memory.current": "151027712",
+        "memory.peak": "238080000",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+        "cpu.max": "100000 100000",
+        "cpuset.cpus.effective": "0-17"
+      }
+    },
+    {
+      "count": 26,
+      "state": {
+        "Status": "exited",
+        "OOMKilled": false,
+        "ExitCode": 0,
+        "StartedAt": "2026-10-10T20:21:53.22285101Z",
+        "FinishedAt": "2026-10-10T20:21:59.798905638Z"
+      },
+      "timed_out": false,
+      "permits_after_exit": 0,
+      "quota_spent": "80",
+      "last_observation": {
+        "label": "drained",
+        "monotonic": 89017.599189261,
+        "processes": [
+          {
+            "Name": "python",
+            "Pid": "1",
+            "PPid": "0",
+            "VmRSS": "249584 kB"
+          }
+        ],
+        "errors": [],
+        "children": 0,
+        "child_exitcodes": [
+          -15,
+          -15,
+          -15,
+          -15
+        ],
+        "futures_done": 26,
+        "http_success": 30,
+        "held_large_bodies": 4,
+        "payload_peak": 4,
+        "retained_transports": 4,
+        "memory.current": "152125440",
+        "memory.peak": "240689152",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+        "cpu.max": "100000 100000",
+        "cpuset.cpus.effective": "0-17"
+      }
+    }
+  ]
+}

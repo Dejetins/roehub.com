@@ -1,0 +1,51 @@
+{
+  "schema_version": "market-data-resource-comparison/v1",
+  "stage": "S03",
+  "label": "candidate",
+  "source": {
+    "src/trading/contexts/market_data/application/services/work_requests.py": "d53e89510b4da63b6881ce8bbd864eaeaa953cccd6e119850b05e3bdbd09f06f",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py": "07fd1946c329ab5ac2c4f43924a3d4faf46e1f925b7c1808bd2d7bee8f9196e9",
+    "src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py": "8b56da6464a9542b1254dd3ef9e51edcc800a6c581b4cbf9dabe197549eeff88"
+  },
+  "runtime": {
+    "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+    "memory": 1610612736,
+    "nano_cpus": 2000000000
+  },
+  "harness_sha256": "766b12548a3e2c880660900ca9866a1890c791057a3936c0010f9e544a93e5bf",
+  "python": "3.12.12",
+  "hardware": "macOS-26.7-arm64-arm-64bit",
+  "fixture": {
+    "coordinates": 102,
+    "streams": 4,
+    "seed_minutes": 2880,
+    "sparse_every": 7,
+    "jobs": 102,
+    "windows": 1,
+    "window_minutes": 1440,
+    "concurrency": 4,
+    "fast_seconds": 0.01,
+    "slow_seconds": 0.1,
+    "collector": 2,
+    "quotas": [
+      [
+        1,
+        100,
+        2
+      ],
+      [
+        60,
+        6000,
+        2
+      ]
+    ],
+    "quota_concurrency": 4
+  },
+  "warmup_s": 60,
+  "steady_s": 300,
+  "samples": [],
+  "failures": [
+    "DatabaseError"
+  ],
+  "fixture_sha256": "17e165beb703518ef6f138977fe69d5d20e4d4a86d30d278b26e284043e9f457"
+}

@@ -1,0 +1,65 @@
+[
+  {
+    "container": "roehub-s02-ch",
+    "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+    "started_at": "2026-10-10T17:45:03.347096792Z",
+    "oom_killed": false,
+    "restart_count": 0,
+    "memory_bytes": 1610612736,
+    "nano_cpus": 2000000000
+  },
+  {
+    "container": "roehub-s02-pg",
+    "image": "sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685",
+    "started_at": "2026-10-10T17:49:18.180317966Z",
+    "oom_killed": false,
+    "restart_count": 0,
+    "memory_bytes": 268435456,
+    "nano_cpus": 1000000000
+  },
+  {
+    "container": "roehub-local-clickhouse-1",
+    "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+    "started_at": "2026-10-09T22:24:58.955795211Z",
+    "oom_killed": false,
+    "restart_count": 0,
+    "memory_bytes": 1610612736,
+    "nano_cpus": 2000000000
+  },
+  {
+    "container": "roehub-local-api-1",
+    "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+    "started_at": "2026-10-10T16:48:34.50505071Z",
+    "oom_killed": false,
+    "restart_count": 0,
+    "memory_bytes": 536870912,
+    "nano_cpus": 1000000000
+  },
+  {
+    "container": "roehub-local-market-data-ws-1",
+    "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+    "started_at": "2026-10-10T11:43:18.545674009Z",
+    "oom_killed": false,
+    "restart_count": 0,
+    "memory_bytes": 1073741824,
+    "nano_cpus": 1000000000
+  },
+  {
+    "container": "roehub-local-market-data-scheduler-1",
+    "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+    "started_at": "2026-10-10T11:39:22.132550636Z",
+    "oom_killed": false,
+    "restart_count": 0,
+    "memory_bytes": 402653184,
+    "nano_cpus": 1000000000
+  },
+  {
+    "container": "roehub-local-backtest-artifact-publisher-1",
+    "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+    "started_at": "2026-10-09T19:38:22.421682166Z",
+    "oom_killed": false,
+    "restart_count": 0,
+    "memory_bytes": 805306368,
+    "nano_cpus": 1000000000
+  }
+]

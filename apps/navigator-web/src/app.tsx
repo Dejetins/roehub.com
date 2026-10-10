@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router';
-import { ChartNoAxesCombined, Database, LayoutDashboard, LogOut, Activity, Plug, Settings, SquareChartGantt } from 'lucide-react';
+import { ChartNoAxesCombined, Check, ChevronDown, Database, LayoutDashboard, LogOut, Activity, Plug, Settings, SquareChartGantt } from 'lucide-react';
 import type { NavigatorBootstrap } from './navigator-bootstrap';
 import {SettingsPage} from './settings-page';
 import {AccountPreferences} from './account-preferences';
@@ -99,11 +99,19 @@ export function App({ bootstrap }: { bootstrap: NavigatorBootstrap }) {
       <Link to="/connections" reloadDocument={!clientRoute('/connections',bootstrap)} title={t('connections')} aria-current={connections?'page':undefined}><Plug aria-hidden="true"/><span className="nav-label">{t('connections')}</span></Link>
       <Link to="/monitoring" reloadDocument={!clientRoute('/monitoring',bootstrap)} title={t('monitoring')} aria-current={monitoring?'page':undefined}><Activity aria-hidden="true"/><span className="nav-label">{t('monitoring')}</span></Link>
       <Link to="/settings/profile" reloadDocument={!clientRoute('/settings/profile',bootstrap)} title={t('settings')} aria-current={settings?'page':undefined}><Settings aria-hidden="true" /><span className="nav-label">{t('settings')}</span></Link>
-    </nav><details className="navigator-languages"><summary aria-label={t('locale')}>文</summary><nav aria-label={t('locale')} className="languages">
+    </nav><details className="navigator-languages" onKeyDown={event => {
+      if (event.key === 'Escape') {
+        event.currentTarget.open = false;
+        event.currentTarget.querySelector('summary')?.focus();
+      }
+    }}><summary aria-label={`${t('locale')}: ${bootstrap.locale.toUpperCase()}`} title={t('locale')}>
+      {bootstrap.locale.toUpperCase()}<ChevronDown aria-hidden="true" />
+    </summary><nav aria-label={t('locale')} className="languages">
         {(['ru', 'en'] as const).map(locale => <a key={locale} lang={locale}
           aria-current={bootstrap.locale === locale ? 'true' : undefined}
           href={`/locale?${new URLSearchParams({ locale, next })}`}>
           {locale === 'ru' ? 'Русский' : 'English'}
+          {bootstrap.locale === locale && <Check aria-hidden="true" />}
         </a>)}
       </nav> </details><a className="logout" title={t('logout')} href="/logout" onClick={() => {
       clearRecovery(); clearStrategyRecovery(); clearOperationRecovery(); setLeaving(true); void client.cancelQueries(); client.clear();

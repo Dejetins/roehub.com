@@ -1,0 +1,22 @@
+{
+  "test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_siblings": {
+    "baseline": "22ccec7f9998441ecc524efd9a560846efcc01fd25308e9c5a07dead5dce5a1d",
+    "candidate": "22ccec7f9998441ecc524efd9a560846efcc01fd25308e9c5a07dead5dce5a1d",
+    "identical": true
+  },
+  "test_parallel_batch_drains_siblings_before_releasing_lease_on_failure": {
+    "baseline": "516c4dcf65b1de3206e0dc28cf9eee198a617f5d98cb12bbdd40c6f7e8617e64",
+    "candidate": "516c4dcf65b1de3206e0dc28cf9eee198a617f5d98cb12bbdd40c6f7e8617e64",
+    "identical": true
+  },
+  "test_parallel_batch_lost_lease_fences_all_four_writers": {
+    "baseline": "b24350943b73d0adc8e2fa96ad33b6283ee37d9f5d88c18231d3280e7005b9eb",
+    "candidate": "b24350943b73d0adc8e2fa96ad33b6283ee37d9f5d88c18231d3280e7005b9eb",
+    "identical": true
+  },
+  "test_incomplete_history_retry_streak_uses_persisted_previous_reason": {
+    "baseline": "f29d107520a9adae10e69777cbf8a1ee39581adaceea71a78c4e8b368bd729a1",
+    "candidate": "f29d107520a9adae10e69777cbf8a1ee39581adaceea71a78c4e8b368bd729a1",
+    "identical": true
+  }
+}

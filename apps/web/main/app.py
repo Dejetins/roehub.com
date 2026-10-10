@@ -379,7 +379,10 @@ def _register_routes(
     )
     async def proxy_api_request(request: Request, upstream_path: str) -> Response:
         upstream_suffix = (
-            f"api/{upstream_path}" if upstream_path.startswith("v1/") else upstream_path
+            f"api/{upstream_path}"
+            if upstream_path.startswith(("v1/", "backtest-artifacts/"))
+            or upstream_path == "backtest-artifacts"
+            else upstream_path
         )
         upstream_url = f"{runtime_settings.api_upstream_url}/{upstream_suffix}"
         request_body = await request.body()

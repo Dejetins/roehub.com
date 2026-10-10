@@ -1,0 +1,9 @@
+{
+  "excluded": [
+    "paired-baseline-1.json",
+    "final-mixed-1-baseline-01.json",
+    "final-mixed-1-candidate-01.json",
+    "exploratory-*"
+  ],
+  "reason": "Pre-final diagnostic work; the final paired protocol uses all six -02 results with identical frozen source, final async constraints, actual API route and no concurrent database tests."
+}

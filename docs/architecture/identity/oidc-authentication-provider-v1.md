@@ -218,3 +218,14 @@ provider adapter без raw-env fallback.
 Stage `19` добавляет административный browser UI управления invitations и
 identity links. Stage `20` расширяет общий health/incident контур, сохраняя уже
 принятый OIDC alert и `ops.roehub.io/v1` runbook.
+
+### Browser-profile session registration (2026-10-10)
+
+A successful login callback binds its new local session to the browser profile
+before sending auth/CSRF cookies. The same profile and local user reuse one public
+device ID; prior sessions for that device are revoked atomically. Registration
+failure compensates by revoking the new session. Linking callbacks without a new
+session do not register or rotate a device. The browser marker is not a credential
+or provider identity. Device storage, legacy adoption, migration ordering and
+owner-scoped revocation follow
+[local session contract](local-auth-sessions-recovery-v1.md#устройства-и-управление-входами-2026-10-10).

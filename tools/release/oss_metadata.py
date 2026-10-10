@@ -264,8 +264,8 @@ def _release_image_components(policy: dict[str, Any]) -> list[Component]:
 
 def _bundled_components(policy: dict[str, Any], tracked: list[str]) -> list[Component]:
     prefix = "apps/web/dist/vendor/"
-    actual = {item for item in tracked if item.startswith(prefix)}
     records = policy["bundled_assets"]
+    actual = {item for item in tracked if item.startswith(prefix) or item in records}
     if actual != set(records):
         missing = sorted(actual - set(records))
         stale = sorted(set(records) - actual)
@@ -315,6 +315,7 @@ def _validate_first_party_assets(policy: dict[str, Any], tracked: list[str]) -> 
         if Path(item).suffix.lower() in ASSET_SUFFIXES
         and not item.startswith(excluded)
         and not item.startswith("apps/web/dist/vendor/")
+        and item not in policy["bundled_assets"]
     }
     records = policy["first_party_assets"]
     if actual != set(records):

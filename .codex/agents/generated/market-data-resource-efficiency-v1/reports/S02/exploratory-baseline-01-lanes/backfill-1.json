@@ -1,0 +1,333 @@
+{
+  "workload": "backfill",
+  "index": 1,
+  "offered": 20,
+  "operations": [
+    {
+      "n": 0,
+      "offered_s": 0.0,
+      "finished_s": 0.010156542004551739,
+      "latency_s": 0.010156542004551739,
+      "service_s": 0.007534624950494617,
+      "attempts": 1
+    },
+    {
+      "n": 1,
+      "offered_s": 1.0,
+      "finished_s": 1.0061400840058923,
+      "latency_s": 0.006140084005892277,
+      "service_s": 0.003834292001556605,
+      "attempts": 1
+    },
+    {
+      "n": 2,
+      "offered_s": 2.0,
+      "finished_s": 2.012599500012584,
+      "latency_s": 0.01259950001258403,
+      "service_s": 0.009285540960263461,
+      "attempts": 1
+    },
+    {
+      "n": 3,
+      "offered_s": 3.0,
+      "finished_s": 3.0047091669985093,
+      "latency_s": 0.004709166998509318,
+      "service_s": 0.002753541979473084,
+      "attempts": 1
+    },
+    {
+      "n": 4,
+      "offered_s": 4.0,
+      "finished_s": 4.008295459032524,
+      "latency_s": 0.008295459032524377,
+      "service_s": 0.008148916997015476,
+      "attempts": 1
+    },
+    {
+      "n": 5,
+      "offered_s": 5.0,
+      "finished_s": 5.004316209000535,
+      "latency_s": 0.004316209000535309,
+      "service_s": 0.002413041947875172,
+      "attempts": 1
+    },
+    {
+      "n": 6,
+      "offered_s": 6.0,
+      "finished_s": 6.0075559170218185,
+      "latency_s": 0.007555917021818459,
+      "service_s": 0.003501500003039837,
+      "attempts": 1
+    },
+    {
+      "n": 7,
+      "offered_s": 7.0,
+      "finished_s": 7.0063270420068875,
+      "latency_s": 0.0063270420068874955,
+      "service_s": 0.00226470798952505,
+      "attempts": 1
+    },
+    {
+      "n": 8,
+      "offered_s": 8.0,
+      "finished_s": 8.006169500004034,
+      "latency_s": 0.006169500004034489,
+      "service_s": 0.0021089999936521053,
+      "attempts": 1
+    },
+    {
+      "n": 9,
+      "offered_s": 9.0,
+      "finished_s": 9.002435375005007,
+      "latency_s": 0.00243537500500679,
+      "service_s": 0.002097457996569574,
+      "attempts": 1
+    },
+    {
+      "n": 10,
+      "offered_s": 10.0,
+      "finished_s": 10.005183000001125,
+      "latency_s": 0.005183000001125038,
+      "service_s": 0.002210582955740392,
+      "attempts": 1
+    },
+    {
+      "n": 11,
+      "offered_s": 11.0,
+      "finished_s": 11.003292500041425,
+      "latency_s": 0.003292500041425228,
+      "service_s": 0.0026787500246427953,
+      "attempts": 1
+    },
+    {
+      "n": 12,
+      "offered_s": 12.0,
+      "finished_s": 12.006982500024606,
+      "latency_s": 0.006982500024605542,
+      "service_s": 0.001964457973372191,
+      "attempts": 1
+    },
+    {
+      "n": 13,
+      "offered_s": 13.0,
+      "finished_s": 13.00620995904319,
+      "latency_s": 0.006209959043189883,
+      "service_s": 0.002137084025889635,
+      "attempts": 1
+    },
+    {
+      "n": 14,
+      "offered_s": 14.0,
+      "finished_s": 14.00805191701511,
+      "latency_s": 0.008051917015109211,
+      "service_s": 0.003954417014028877,
+      "attempts": 1
+    },
+    {
+      "n": 15,
+      "offered_s": 15.0,
+      "finished_s": 15.006211667030584,
+      "latency_s": 0.006211667030584067,
+      "service_s": 0.004344167013186961,
+      "attempts": 1
+    },
+    {
+      "n": 16,
+      "offered_s": 16.0,
+      "finished_s": 16.006329499999993,
+      "latency_s": 0.006329499999992549,
+      "service_s": 0.0023196659749373794,
+      "attempts": 1
+    },
+    {
+      "n": 17,
+      "offered_s": 17.0,
+      "finished_s": 17.01242775004357,
+      "latency_s": 0.012427750043570995,
+      "service_s": 0.008343458001036197,
+      "attempts": 1
+    },
+    {
+      "n": 18,
+      "offered_s": 18.0,
+      "finished_s": 18.006149624998216,
+      "latency_s": 0.006149624998215586,
+      "service_s": 0.004885082948021591,
+      "attempts": 1
+    },
+    {
+      "n": 19,
+      "offered_s": 19.0,
+      "finished_s": 19.013296792050824,
+      "latency_s": 0.01329679205082357,
+      "service_s": 0.008425458043348044,
+      "attempts": 1
+    }
+  ],
+  "retries": [
+    {
+      "operation": 0,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 1,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 2,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 3,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 4,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 5,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 6,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 7,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 8,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 9,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 10,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 11,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 12,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 13,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 14,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 15,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 16,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 17,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 18,
+      "code": "DatabaseError"
+    },
+    {
+      "operation": 19,
+      "code": "DatabaseError"
+    }
+  ],
+  "failures": [
+    {
+      "operation": 0,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 1,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 2,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 3,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 4,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 5,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 6,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 7,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 8,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 9,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 10,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 11,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 12,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 13,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 14,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 15,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 16,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 17,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 18,
+      "error": "DatabaseError"
+    },
+    {
+      "operation": 19,
+      "error": "DatabaseError"
+    }
+  ],
+  "client_maxrss": 220528640,
+  "client_cpu_s": 0.866939
+}

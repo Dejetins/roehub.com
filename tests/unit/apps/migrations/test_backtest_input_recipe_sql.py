@@ -9,7 +9,8 @@ ROOT = Path(__file__).resolve().parents[4]
 
 def test_recipe_migration_is_ordered_additive_and_uses_physical_mutex_key() -> None:
     phases = _load_postgres_phases(ROOT / "migrations/postgres/manifest.json")
-    assert list(phases)[-1] == "backtest-input-recipe-0028"
+    assert list(phases).index("backtest-input-recipe-0028") < list(phases).index(
+        "backtest-artifact-management-0029")
     sql = (ROOT / "migrations/postgres/0028_backtest_input_recipe_v1.sql").read_text()
     for destructive in ("DROP ", "DELETE FROM ", "UPDATE backtest_jobs", "ALTER COLUMN"):
         assert destructive not in sql

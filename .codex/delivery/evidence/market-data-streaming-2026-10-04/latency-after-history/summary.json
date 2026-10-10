@@ -1,0 +1,368 @@
+{
+  "period": [
+    "2026-10-04 19:15:00+00:00",
+    "2026-10-04 19:17:00+00:00"
+  ],
+  "samples": 12,
+  "minutes": 3,
+  "clock_offset_bounds_ms": [
+    87.49771118164062,
+    214.3096923828125
+  ],
+  "clock_correction_estimate_ms": 150.90370178222656,
+  "clock_method": "intersection of read-only NTP offset bounds; midpoint estimate, not exact one-way delay",
+  "overall": {
+    "close_to_receive_ms": {
+      "mean": 95.62433333333334,
+      "median": 82.10650000000001,
+      "p95_nearest_rank": 192.016,
+      "min": 44.366,
+      "max": 192.016
+    },
+    "close_to_receive_utc_estimate_ms": {
+      "mean": 246.5280351155599,
+      "median": 233.01020178222657,
+      "p95_nearest_rank": 342.9197017822265,
+      "min": 195.26970178222655,
+      "max": 342.9197017822265
+    },
+    "receive_to_db_ms": {
+      "mean": 245.27233333333334,
+      "median": 258.2835,
+      "p95_nearest_rank": 297.544,
+      "min": 147.698,
+      "max": 297.544
+    },
+    "close_to_db_local_ms": {
+      "mean": 340.89666666666665,
+      "median": 341.066,
+      "p95_nearest_rank": 341.90999999999997,
+      "min": 339.714,
+      "max": 341.90999999999997
+    },
+    "close_to_db_utc_estimate_ms": {
+      "mean": 491.8003684488932,
+      "median": 491.96970178222654,
+      "p95_nearest_rank": 492.81370178222653,
+      "min": 490.61770178222656,
+      "max": 492.81370178222653
+    },
+    "receive_to_write_ack_ms": {
+      "mean": 246.92579150238694,
+      "median": 260.02129149856046,
+      "p95_nearest_rank": 299.03120803646743,
+      "min": 149.58450000267476,
+      "max": 299.03120803646743
+    },
+    "close_to_write_ack_ms": {
+      "mean": 342.551,
+      "median": 342.652,
+      "p95_nearest_rank": 343.401,
+      "min": 341.6,
+      "max": 343.401
+    },
+    "receive_to_write_start_ms": {
+      "mean": 220.66493052019118,
+      "median": 234.39029153087176,
+      "p95_nearest_rank": 271.51062502525747,
+      "min": 124.78966702474281,
+      "max": 271.51062502525747
+    }
+  },
+  "by_symbol": {
+    "AAVEUSDT": {
+      "close_to_receive_ms": {
+        "mean": 65.49433333333333,
+        "median": 65.403,
+        "p95_nearest_rank": 66.033,
+        "min": 65.047,
+        "max": 66.033
+      },
+      "close_to_receive_utc_estimate_ms": {
+        "mean": 216.3980351155599,
+        "median": 216.30670178222658,
+        "p95_nearest_rank": 216.93670178222658,
+        "min": 215.95070178222656,
+        "max": 216.93670178222658
+      },
+      "receive_to_db_ms": {
+        "mean": 275.40233333333333,
+        "median": 275.663,
+        "p95_nearest_rank": 276.863,
+        "min": 273.681,
+        "max": 276.863
+      },
+      "close_to_db_local_ms": {
+        "mean": 340.89666666666665,
+        "median": 341.066,
+        "p95_nearest_rank": 341.90999999999997,
+        "min": 339.714,
+        "max": 341.90999999999997
+      },
+      "close_to_db_utc_estimate_ms": {
+        "mean": 491.8003684488932,
+        "median": 491.96970178222654,
+        "p95_nearest_rank": 492.81370178222653,
+        "min": 490.61770178222656,
+        "max": 492.81370178222653
+      },
+      "receive_to_write_ack_ms": {
+        "mean": 277.05866666898754,
+        "median": 277.2479169652797,
+        "p95_nearest_rank": 278.3562500262633,
+        "min": 275.57183301541954,
+        "max": 278.3562500262633
+      },
+      "close_to_write_ack_ms": {
+        "mean": 342.551,
+        "median": 342.652,
+        "p95_nearest_rank": 343.401,
+        "min": 341.6,
+        "max": 343.401
+      },
+      "receive_to_write_start_ms": {
+        "mean": 250.79780568679175,
+        "median": 250.78075000783429,
+        "p95_nearest_rank": 250.83566701505333,
+        "min": 250.7770000374876,
+        "max": 250.83566701505333
+      }
+    },
+    "ADAUSDT": {
+      "close_to_receive_ms": {
+        "mean": 46.19733333333333,
+        "median": 45.428000000000004,
+        "p95_nearest_rank": 48.798,
+        "min": 44.366,
+        "max": 48.798
+      },
+      "close_to_receive_utc_estimate_ms": {
+        "mean": 197.10103511555988,
+        "median": 196.33170178222656,
+        "p95_nearest_rank": 199.70170178222656,
+        "min": 195.26970178222655,
+        "max": 199.70170178222656
+      },
+      "receive_to_db_ms": {
+        "mean": 294.69933333333336,
+        "median": 295.63800000000003,
+        "p95_nearest_rank": 297.544,
+        "min": 290.916,
+        "max": 297.544
+      },
+      "close_to_db_local_ms": {
+        "mean": 340.89666666666665,
+        "median": 341.066,
+        "p95_nearest_rank": 341.90999999999997,
+        "min": 339.714,
+        "max": 341.90999999999997
+      },
+      "close_to_db_utc_estimate_ms": {
+        "mean": 491.8003684488932,
+        "median": 491.96970178222654,
+        "p95_nearest_rank": 492.81370178222653,
+        "min": 490.61770178222656,
+        "max": 492.81370178222653
+      },
+      "receive_to_write_ack_ms": {
+        "mean": 296.3512916661178,
+        "median": 297.22120898077264,
+        "p95_nearest_rank": 299.03120803646743,
+        "min": 292.80145798111334,
+        "max": 299.03120803646743
+      },
+      "close_to_write_ack_ms": {
+        "mean": 342.551,
+        "median": 342.652,
+        "p95_nearest_rank": 343.401,
+        "min": 341.6,
+        "max": 343.401
+      },
+      "receive_to_write_start_ms": {
+        "mean": 270.090430683922,
+        "median": 270.7540420233272,
+        "p95_nearest_rank": 271.51062502525747,
+        "min": 268.0066250031814,
+        "max": 271.51062502525747
+      }
+    },
+    "ALGOUSDT": {
+      "close_to_receive_ms": {
+        "mean": 118.05766666666668,
+        "median": 113.766,
+        "p95_nearest_rank": 142.227,
+        "min": 98.18,
+        "max": 142.227
+      },
+      "close_to_receive_utc_estimate_ms": {
+        "mean": 268.9613684488932,
+        "median": 264.6697017822266,
+        "p95_nearest_rank": 293.13070178222654,
+        "min": 249.08370178222657,
+        "max": 293.13070178222654
+      },
+      "receive_to_db_ms": {
+        "mean": 222.839,
+        "median": 228.144,
+        "p95_nearest_rank": 242.886,
+        "min": 197.487,
+        "max": 242.886
+      },
+      "close_to_db_local_ms": {
+        "mean": 340.89666666666665,
+        "median": 341.066,
+        "p95_nearest_rank": 341.90999999999997,
+        "min": 339.714,
+        "max": 341.90999999999997
+      },
+      "close_to_db_utc_estimate_ms": {
+        "mean": 491.8003684488932,
+        "median": 491.96970178222654,
+        "p95_nearest_rank": 492.81370178222653,
+        "min": 490.61770178222656,
+        "max": 492.81370178222653
+      },
+      "receive_to_write_ack_ms": {
+        "mean": 224.49356901537007,
+        "median": 229.63604104006663,
+        "p95_nearest_rank": 244.47074998170137,
+        "min": 199.37391602434218,
+        "max": 244.47074998170137
+      },
+      "close_to_write_ack_ms": {
+        "mean": 342.551,
+        "median": 342.652,
+        "p95_nearest_rank": 343.401,
+        "min": 341.6,
+        "max": 343.401
+      },
+      "receive_to_write_start_ms": {
+        "mean": 198.23270803317428,
+        "median": 202.11545802885666,
+        "p95_nearest_rank": 218.00358302425593,
+        "min": 174.57908304641023,
+        "max": 218.00358302425593
+      }
+    },
+    "ANKRUSDT": {
+      "close_to_receive_ms": {
+        "mean": 152.74800000000002,
+        "median": 133.28400000000002,
+        "p95_nearest_rank": 192.016,
+        "min": 132.94400000000002,
+        "max": 192.016
+      },
+      "close_to_receive_utc_estimate_ms": {
+        "mean": 303.65170178222655,
+        "median": 284.18770178222655,
+        "p95_nearest_rank": 342.9197017822265,
+        "min": 283.8477017822266,
+        "max": 342.9197017822265
+      },
+      "receive_to_db_ms": {
+        "mean": 188.14866666666668,
+        "median": 208.122,
+        "p95_nearest_rank": 208.626,
+        "min": 147.698,
+        "max": 208.626
+      },
+      "close_to_db_local_ms": {
+        "mean": 340.89666666666665,
+        "median": 341.066,
+        "p95_nearest_rank": 341.90999999999997,
+        "min": 339.714,
+        "max": 341.90999999999997
+      },
+      "close_to_db_utc_estimate_ms": {
+        "mean": 491.8003684488932,
+        "median": 491.96970178222654,
+        "p95_nearest_rank": 492.81370178222653,
+        "min": 490.61770178222656,
+        "max": 492.81370178222653
+      },
+      "receive_to_write_ack_ms": {
+        "mean": 189.79963865907243,
+        "median": 209.70662496984005,
+        "p95_nearest_rank": 210.10779100470245,
+        "min": 149.58450000267476,
+        "max": 210.10779100470245
+      },
+      "close_to_write_ack_ms": {
+        "mean": 342.551,
+        "median": 342.652,
+        "p95_nearest_rank": 343.401,
+        "min": 341.6,
+        "max": 343.401
+      },
+      "receive_to_write_start_ms": {
+        "mean": 163.53877767687663,
+        "median": 182.58720799349248,
+        "p95_nearest_rank": 183.2394580123946,
+        "min": 124.78966702474281,
+        "max": 183.2394580123946
+      }
+    }
+  },
+  "batches": [
+    {
+      "batch": 1,
+      "rows": 4,
+      "write_started_at": "2026-10-04 19:15:00.316812+00:00",
+      "write_ack_at": "2026-10-04 19:15:00.341600+00:00",
+      "write_call_ms": 24.794832977931947,
+      "canonical_verified_at": "2026-10-04 19:15:00.354619+00:00",
+      "verification_ms": 13.0139589891769,
+      "writer_pids": [
+        64195
+      ],
+      "db_query_start": "2026-10-04 19:15:00.324714",
+      "db_query_ms": 15,
+      "db_complete_at": "2026-10-04 19:15:00.339714+00:00",
+      "db_memory_bytes": 6363056
+    },
+    {
+      "batch": 2,
+      "rows": 4,
+      "write_started_at": "2026-10-04 19:16:00.316190+00:00",
+      "write_ack_at": "2026-10-04 19:16:00.342652+00:00",
+      "write_call_ms": 26.467166957445443,
+      "canonical_verified_at": "2026-10-04 19:16:00.352405+00:00",
+      "verification_ms": 9.74879099521786,
+      "writer_pids": [
+        64195
+      ],
+      "db_query_start": "2026-10-04 19:16:00.322066",
+      "db_query_ms": 19,
+      "db_complete_at": "2026-10-04 19:16:00.341066+00:00",
+      "db_memory_bytes": 6363056
+    },
+    {
+      "batch": 3,
+      "rows": 4,
+      "write_started_at": "2026-10-04 19:17:00.315884+00:00",
+      "write_ack_at": "2026-10-04 19:17:00.343401+00:00",
+      "write_call_ms": 27.520583011209965,
+      "canonical_verified_at": "2026-10-04 19:17:00.359068+00:00",
+      "verification_ms": 15.666333958506584,
+      "writer_pids": [
+        64195
+      ],
+      "db_query_start": "2026-10-04 19:17:00.322910",
+      "db_query_ms": 19,
+      "db_complete_at": "2026-10-04 19:17:00.341910+00:00",
+      "db_memory_bytes": 6363056
+    }
+  ],
+  "metrics": {
+    "ws_connected": 1.0,
+    "ws_errors_total": 0.0,
+    "insert_rows_total": 12.0,
+    "insert_errors_total": 0.0,
+    "rest_fill_tasks_total": 4.0,
+    "rest_fill_active": 0.0,
+    "rest_fill_errors_total": 0.0
+  },
+  "canonical_all_present": true,
+  "selections_unchanged": true,
+  "remaining_recovery": []
+}

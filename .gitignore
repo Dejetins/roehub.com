@@ -48,6 +48,7 @@ target/
 .build/
 
 # Local workspace artifacts
+.cache/
 .DS_Store
 .codex/agents/.context/
 .codex/tmp/

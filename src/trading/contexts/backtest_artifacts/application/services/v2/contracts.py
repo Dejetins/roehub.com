@@ -1314,7 +1314,14 @@ class ArtifactArrayMetadataV2:
         """
         object.__setattr__(self, "path", validate_relative_artifact_path_v2(self.path))
         object.__setattr__(self, "dtype", validate_artifact_dtype_literal_v2(self.dtype))
-        object.__setattr__(self, "shape", validate_artifact_shape_v2(self.shape))
+        shape = self.shape
+        if self.axis_order in (("level",), ("level", "time")) and shape and shape[0] == 0:
+            validate_artifact_shape_v2((1, *shape[1:]))
+            if type(shape[0]) is not int:
+                raise ValueError("invalid empty level dimension")
+        else:
+            validate_artifact_shape_v2(shape)
+        object.__setattr__(self, "shape", shape)
         object.__setattr__(
             self,
             "axis_order",
@@ -1902,6 +1909,7 @@ class ArtifactSignalGridContractV2:
     variant_key_version: int
     variant_keys_sha256: str
     signals_v1_params_defaults: Mapping[str, Any]
+    row_ids: tuple[int, ...] | None = None
 
     def __post_init__(self) -> None:
         """
@@ -1923,6 +1931,11 @@ class ArtifactSignalGridContractV2:
         Related:
           - src/trading/contexts/backtest/application/services/v2/artifact_manifest_validator.py
         """
+        if self.row_ids is not None:
+            if not self.row_ids or any(type(i) is not int or i < 0 for i in self.row_ids):
+                raise ValueError("invalid canonical signal row IDs")
+            if tuple(sorted(set(self.row_ids))) != self.row_ids:
+                raise ValueError("canonical signal row IDs must be unique and sorted")
         object.__setattr__(
             self,
             "variant_key_version",
@@ -2269,6 +2282,8 @@ class ArtifactSignalManifestDocumentV2:
             "rows_count",
             validate_positive_manifest_int_v2(self.rows_count),
         )
+        if self.grid.row_ids is not None and len(self.grid.row_ids) != self.rows_count:
+            raise ValueError("canonical signal row count mismatch")
         object.__setattr__(
             self,
             "signal_value_set",
@@ -4429,6 +4444,7 @@ class ArtifactPrecomputeRuntimeSettingsV2:
     partial_publication: bool = False
     precompute_hit_times: bool = True
     signal_artifacts: tuple[ArtifactSignalValidationSpecV2, ...] = ()
+    selected_signal_rows: tuple[tuple[str, str, tuple[int, ...]], ...] = ()
     max_signal_rows_per_artifact: int = 1_000_000
     max_hit_times_cells: int = 1_000_000
     max_hit_times_cells_full_rebuild: int = 1_000_000
@@ -4479,6 +4495,7 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             "hit_times_tp_levels_pct",
             _normalize_positive_float_grid_v2(
                 values=self.hit_times_tp_levels_pct,
+                allow_empty=self.partial_publication,
                 field_name="ArtifactPrecomputeRuntimeSettingsV2.hit_times_tp_levels_pct",
             ),
         )
@@ -4487,6 +4504,7 @@ class ArtifactPrecomputeRuntimeSettingsV2:
             "hit_times_sl_levels_pct",
             _normalize_positive_float_grid_v2(
                 values=self.hit_times_sl_levels_pct,
+                allow_empty=self.partial_publication,
                 field_name="ArtifactPrecomputeRuntimeSettingsV2.hit_times_sl_levels_pct",
             ),
         )
@@ -4540,6 +4558,17 @@ class ArtifactPrecomputeRuntimeSettingsV2:
                 "ArtifactPrecomputeRuntimeSettingsV2.price_timeframes must equal "
                 f"{expected_price_timeframes!r}; got {self.price_timeframes!r}"
             )
+        selected_targets = set()
+        for tf, indicator, rows in self.selected_signal_rows:
+            if (tf, indicator) in selected_targets or (tf, indicator) not in {
+                (s.timeframe, s.indicator_id) for s in self.signal_artifacts
+            }:
+                raise ValueError("invalid selected signal target")
+            if not rows or any(type(i) is not int or i < 0 for i in rows) or (
+                tuple(sorted(set(rows))) != rows
+            ):
+                raise ValueError("invalid selected signal rows")
+            selected_targets.add((tf, indicator))
         configured_mapping_timeframes = set(self.mapping_timeframes)
         signal_timeframes = {item.timeframe for item in self.signal_artifacts}
         unexpected_signal_timeframes = tuple(
@@ -4579,6 +4608,7 @@ def _normalize_positive_float_grid_v2(
     *,
     values: tuple[float, ...],
     field_name: str,
+    allow_empty: bool = False,
 ) -> tuple[float, ...]:
     """
     Normalize one positive ascending float grid used by hit-times materialization.
@@ -4601,6 +4631,8 @@ def _normalize_positive_float_grid_v2(
       - src/trading/contexts/backtest/adapters/outbound/config/backtest_artifacts_runtime_config.py
     """
     if len(values) == 0:
+        if allow_empty:
+            return ()
         raise ValueError(f"{field_name} must contain at least one value")
     normalized = tuple(sorted(float(value) for value in values))
     if normalized[0] <= 0.0:
@@ -6051,7 +6083,7 @@ class ArtifactRequestedRow:
     """Canonical row identity independent of its compact physical position."""
 
     indicator_id: str
-    source: str
+    source: str | None
     row_id: int
     parameters: tuple[tuple[str, int | float | str], ...]
 
@@ -6059,7 +6091,8 @@ class ArtifactRequestedRow:
         import math
 
         validate_indicator_id_v2(self.indicator_id)
-        validate_signal_input_source_v2(self.source)
+        if self.source is not None:
+            validate_signal_input_source_v2(self.source)
         _input_uint(self.row_id)
         names = []
         for name, value in self.parameters:

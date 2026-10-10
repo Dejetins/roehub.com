@@ -1,0 +1,11 @@
+tools/qa/market_data_recovery_comparison.py:447:101: E501 Line too long (105 > 100)
+    |
+445 |         record["dispatch_lag"] = quantiles([received[k] - start for k, start in scheduled.items()])
+446 |         canonical = admin.query(
+447 |             "SELECT symbol,toUnixTimestamp64Milli(ts_open),open,high,low,close,volume_base,volume_quote "
+    |                                                                                                     ^^^^^ E501
+448 |             "FROM market_data.canonical_candles_1m "
+449 |             "WHERE ts_open>=toDateTime('2026-02-01 00:00:00') ORDER BY symbol,ts_open"
+    |
+
+Found 1 error.

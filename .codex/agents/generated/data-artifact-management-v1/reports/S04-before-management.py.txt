@@ -1,0 +1,224 @@
+"""Strict management snapshots. No compute, scheduler or filesystem side effects."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from datetime import date, datetime, time, timedelta
+from decimal import Decimal
+from typing import Any, Literal
+from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictFloat,
+    StrictInt,
+    StrictStr,
+    field_validator,
+    model_validator,
+)
+
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ARTIFACT_MAPPING_TIMEFRAMES_V2,
+    ArtifactCoordinatesV2,
+)
+
+
+class ManagementError(ValueError):
+    """Stable, safe application reason; adapters must not expose database exceptions."""
+
+
+class StrictModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, allow_inf_nan=False)
+
+
+def digest(value: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+    ).hexdigest()
+
+
+class Coordinate(StrictModel):
+    exchange: str
+    market_type: str
+    symbol: str = Field(max_length=64)
+
+    @model_validator(mode="after")
+    def validate_coordinate(self) -> Coordinate:
+        c = ArtifactCoordinatesV2(self.exchange, self.market_type, self.symbol)
+        if (c.exchange, c.market_type, c.symbol) != self.key:
+            raise ValueError("coordinate_not_canonical")
+        return self
+
+    @property
+    def key(self) -> tuple[str, str, str]:
+        return self.exchange, self.market_type, self.symbol
+
+
+class Grid(StrictModel):
+    mode: Literal["explicit", "range"]
+    values: tuple[StrictInt | StrictFloat | StrictStr, ...] | None = Field(
+        default=None, max_length=10000
+    )
+    start: StrictFloat | None = None
+    stop_incl: StrictFloat | None = None
+    step: StrictFloat | None = None
+
+    def expand(self) -> tuple[int | float | str, ...]:
+        if self.mode == "explicit":
+            if self.values is None or any(
+                x is not None for x in (self.start, self.stop_incl, self.step)
+            ):
+                raise ValueError("invalid_explicit_grid")
+            values = self.values
+        else:
+            if self.values is not None or None in (self.start, self.stop_incl, self.step):
+                raise ValueError("invalid_range_grid")
+            start, stop, step = (Decimal(str(x)) for x in (self.start, self.stop_incl, self.step))
+            if step <= 0 or stop < start or (stop - start) / step > 9999:
+                raise ValueError("unbounded_grid")
+            values = tuple(float(start + i * step) for i in range(int((stop - start) / step) + 1))
+        if not 1 <= len(values) <= 10000 or len(set(values)) != len(values):
+            raise ValueError("invalid_grid_values")
+        return values
+
+
+class Indicator(StrictModel):
+    indicator_id: str = Field(max_length=100)
+    sources: tuple[str, ...] = Field(max_length=16)
+    params: dict[str, Grid] = Field(max_length=32)
+    signal_params: dict[str, Grid] = Field(default_factory=dict, max_length=32)
+
+
+class History(StrictModel):
+    kind: Literal["all_loaded", "range"] = "all_loaded"
+    start_utc: datetime | None = None
+    end_utc: datetime | None = None
+
+    @model_validator(mode="after")
+    def bounds(self) -> History:
+        if self.kind == "all_loaded":
+            if self.start_utc is not None or self.end_utc is not None:
+                raise ValueError("all_loaded_has_no_bounds")
+        elif (
+            self.start_utc is None
+            or self.end_utc is None
+            or self.start_utc.utcoffset() != timedelta(0)
+            or self.end_utc.utcoffset() != timedelta(0)
+            or self.start_utc >= self.end_utc
+        ):
+            raise ValueError("invalid_utc_range")
+        return self
+
+
+class Profile(StrictModel):
+    profile_id: UUID
+    revision: int = Field(ge=1, strict=True)
+    catalog_revision: str = Field(pattern=r"^[0-9a-f]{64}$")
+    mode: Literal["on_demand", "precompute"] = "on_demand"
+    history: History = History()
+    derivative_timeframes: tuple[str, ...]
+    indicators: tuple[Indicator, ...] = Field(max_length=200)
+    tp_levels_pct: tuple[StrictFloat, ...] = Field(max_length=1000)
+    sl_levels_pct: tuple[StrictFloat, ...] = Field(max_length=1000)
+
+    @model_validator(mode="after")
+    def unique_axes(self) -> Profile:
+        for values in (
+            self.derivative_timeframes,
+            self.tp_levels_pct,
+            self.sl_levels_pct,
+            tuple(i.indicator_id for i in self.indicators),
+        ):
+            if len(values) != len(set(values)):
+                raise ValueError("duplicate_profile_values")
+        if not set(self.derivative_timeframes) <= set(ARTIFACT_MAPPING_TIMEFRAMES_V2):
+            raise ValueError("unsupported_timeframe")
+        if self.indicators and not self.derivative_timeframes:
+            raise ValueError("profile_timeframes_required")
+        return self
+
+
+class Schedule(StrictModel):
+    interval_days: int = Field(strict=True)
+    timezone: str
+    local_time: time
+    anchor: date
+
+    @field_validator("interval_days")
+    @classmethod
+    def cadence(cls, value: int) -> int:
+        if value not in (1, 3, 7):
+            raise ValueError("unsupported_cadence")
+        return value
+
+    @field_validator("timezone")
+    @classmethod
+    def zone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except ZoneInfoNotFoundError as error:
+            raise ValueError("invalid_timezone") from error
+        return value
+
+    @field_validator("local_time")
+    @classmethod
+    def wall_time(cls, value: time) -> time:
+        if value.tzinfo is not None or value.second or value.microsecond:
+            raise ValueError("local_minute_required")
+        return value
+
+
+class SourceTarget(StrictModel):
+    history: History
+    revision: str = Field(min_length=1, max_length=128)
+    watermark: datetime
+    compute_identity: str = Field(min_length=1, max_length=128)
+    funding_identity: str = Field(min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def closed_range(self) -> SourceTarget:
+        if (
+            self.history.kind != "range"
+            or self.watermark.utcoffset() != timedelta(0)
+            or self.watermark != self.history.end_utc
+        ):
+            raise ValueError("finite_source_target_required")
+        return self
+
+
+class PolicyItem(StrictModel):
+    coordinate: Coordinate
+    expected_version: int = Field(ge=0, strict=True)
+    profile: Profile
+    schedule: Schedule
+    source: SourceTarget | None = None
+    kind: Literal["base", "derivatives"] = "base"
+
+
+class Progress(StrictModel):
+    phase: str = Field(pattern=r"^[a-z_]{1,64}$")
+    timeframe: str | None = None
+    completed_units: int = Field(ge=0, strict=True)
+    total_units: int | None = Field(default=None, ge=0, strict=True)
+    unit: str = Field(pattern=r"^[a-z_]{1,32}$")
+    observed_at: datetime
+    last_checkpoint: dict[str, int | str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def measured(self) -> Progress:
+        if self.total_units is not None and self.completed_units > self.total_units:
+            raise ValueError("progress_exceeds_total")
+        if self.observed_at.utcoffset() != timedelta(0):
+            raise ValueError("utc_required")
+        if self.timeframe is not None and self.timeframe not in (
+            "1m",
+            *ARTIFACT_MAPPING_TIMEFRAMES_V2,
+        ):
+            raise ValueError("unsupported_timeframe")
+        if len(json.dumps(self.last_checkpoint)) > 8192:
+            raise ValueError("checkpoint_too_large")
+        return self

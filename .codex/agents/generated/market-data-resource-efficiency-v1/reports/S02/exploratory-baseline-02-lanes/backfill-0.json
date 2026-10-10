@@ -1,0 +1,171 @@
+{
+  "workload": "backfill",
+  "index": 0,
+  "offered": 20,
+  "operations": [
+    {
+      "n": 0,
+      "offered_s": 0.0,
+      "finished_s": 0.083693458000198,
+      "latency_s": 0.083693458000198,
+      "service_s": 0.08317587501369417,
+      "attempts": 1
+    },
+    {
+      "n": 1,
+      "offered_s": 1.0,
+      "finished_s": 1.0741839580005035,
+      "latency_s": 0.07418395800050348,
+      "service_s": 0.07256058300845325,
+      "attempts": 1
+    },
+    {
+      "n": 2,
+      "offered_s": 2.0,
+      "finished_s": 2.084512999979779,
+      "latency_s": 0.08451299997977912,
+      "service_s": 0.0812604590319097,
+      "attempts": 1
+    },
+    {
+      "n": 3,
+      "offered_s": 3.0,
+      "finished_s": 3.0801531249890104,
+      "latency_s": 0.0801531249890104,
+      "service_s": 0.07935800001723692,
+      "attempts": 1
+    },
+    {
+      "n": 4,
+      "offered_s": 4.0,
+      "finished_s": 4.076879749947693,
+      "latency_s": 0.0768797499476932,
+      "service_s": 0.07305274996906519,
+      "attempts": 1
+    },
+    {
+      "n": 5,
+      "offered_s": 5.0,
+      "finished_s": 5.076715582981706,
+      "latency_s": 0.07671558298170567,
+      "service_s": 0.07532537501538172,
+      "attempts": 1
+    },
+    {
+      "n": 6,
+      "offered_s": 6.0,
+      "finished_s": 6.078500249946956,
+      "latency_s": 0.07850024994695559,
+      "service_s": 0.07548887497978285,
+      "attempts": 1
+    },
+    {
+      "n": 7,
+      "offered_s": 7.0,
+      "finished_s": 7.063066165952478,
+      "latency_s": 0.0630661659524776,
+      "service_s": 0.06183345796307549,
+      "attempts": 1
+    },
+    {
+      "n": 8,
+      "offered_s": 8.0,
+      "finished_s": 8.080828207952436,
+      "latency_s": 0.08082820795243606,
+      "service_s": 0.07808870798908174,
+      "attempts": 1
+    },
+    {
+      "n": 9,
+      "offered_s": 9.0,
+      "finished_s": 9.078196374990512,
+      "latency_s": 0.07819637499051169,
+      "service_s": 0.07473833399126306,
+      "attempts": 1
+    },
+    {
+      "n": 10,
+      "offered_s": 10.0,
+      "finished_s": 10.080496082955506,
+      "latency_s": 0.0804960829555057,
+      "service_s": 0.07904079195577651,
+      "attempts": 1
+    },
+    {
+      "n": 11,
+      "offered_s": 11.0,
+      "finished_s": 11.079651540960185,
+      "latency_s": 0.07965154096018523,
+      "service_s": 0.07462324999505654,
+      "attempts": 1
+    },
+    {
+      "n": 12,
+      "offered_s": 12.0,
+      "finished_s": 12.076975249976385,
+      "latency_s": 0.07697524997638538,
+      "service_s": 0.07203262503026053,
+      "attempts": 1
+    },
+    {
+      "n": 13,
+      "offered_s": 13.0,
+      "finished_s": 13.05857383296825,
+      "latency_s": 0.05857383296824992,
+      "service_s": 0.0542587079689838,
+      "attempts": 1
+    },
+    {
+      "n": 14,
+      "offered_s": 14.0,
+      "finished_s": 14.079451457946561,
+      "latency_s": 0.07945145794656128,
+      "service_s": 0.0774394579930231,
+      "attempts": 1
+    },
+    {
+      "n": 15,
+      "offered_s": 15.0,
+      "finished_s": 15.075538707955275,
+      "latency_s": 0.07553870795527473,
+      "service_s": 0.0705987080000341,
+      "attempts": 1
+    },
+    {
+      "n": 16,
+      "offered_s": 16.0,
+      "finished_s": 16.076882915978786,
+      "latency_s": 0.0768829159787856,
+      "service_s": 0.0747623749775812,
+      "attempts": 1
+    },
+    {
+      "n": 17,
+      "offered_s": 17.0,
+      "finished_s": 17.08796795795206,
+      "latency_s": 0.0879679579520598,
+      "service_s": 0.08588691696058959,
+      "attempts": 1
+    },
+    {
+      "n": 18,
+      "offered_s": 18.0,
+      "finished_s": 18.07547091599554,
+      "latency_s": 0.07547091599553823,
+      "service_s": 0.07087041600607336,
+      "attempts": 1
+    },
+    {
+      "n": 19,
+      "offered_s": 19.0,
+      "finished_s": 19.079656457994133,
+      "latency_s": 0.07965645799413323,
+      "service_s": 0.07725016702897847,
+      "attempts": 1
+    }
+  ],
+  "retries": [],
+  "failures": [],
+  "client_maxrss": 218841088,
+  "client_cpu_s": 0.811312
+}

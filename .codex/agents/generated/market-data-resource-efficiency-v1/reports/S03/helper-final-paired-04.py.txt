@@ -1,0 +1,19 @@
+import json,os,subprocess,sys,time
+from pathlib import Path
+root=Path('.').resolve(); report=root/'.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03'
+candidate=root/'.cache/market-data-s03-candidate-04-01a1273a';baseline=root/'.cache/market-data-s03-baseline-01a1273a'
+env=dict(os.environ,PYTHONPATH=str(candidate/'src')+os.pathsep+str(candidate))
+sequence=[('baseline',1),('candidate',1),('candidate',2),('baseline',2),('baseline',3),('candidate',3)]
+commands=[]
+for label,n in sequence:
+ out=report/f'{label}-M4-{n:02d}.json'
+ cmd=[sys.executable,str(root/'.cache/market-data-s03/run.py'),str(candidate/'tools/qa/market_data_ingestion_comparison.py'),'--source',str(candidate if label=='candidate' else baseline),'--label',label,'--output',str(out)]
+ commands.append(cmd)
+(report/'M-protocol-frozen-04.json').write_text(json.dumps({'sequence':sequence,'commands':commands,'warmup_s':60,'steady_s':300,'windows':6,'concurrency':4,'quota_concurrency':4,'delay_s':{'normal':1.2,'slow':3},'sampling_s':1,'claim':'local replay only; full completion; no numerical threshold'},indent=2)+'\n')
+for (label,n),cmd in zip(sequence,commands):
+ print('START',label,n,time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime()),flush=True)
+ with (report/f'{label}-M4-{n:02d}.txt').open('x') as log:
+  result=subprocess.run(cmd,env=env,stdout=log,stderr=subprocess.STDOUT)
+ print('END',label,n,'exit',result.returncode,flush=True)
+ if result.returncode:
+  raise SystemExit(result.returncode)

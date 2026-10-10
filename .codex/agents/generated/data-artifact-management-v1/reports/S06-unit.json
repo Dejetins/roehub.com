@@ -1,0 +1,29 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "tests/unit/contexts/backtest_artifacts",
+    "tests/unit/contexts/backtest/adapters/outbound/cache_fs",
+    "tests/unit/contexts/backtest/adapters/outbound/artifacts_fs",
+    "tests/unit/contexts/backtest/adapters/test_backtest_artifacts_runtime_config.py",
+    "tests/unit/contexts/backtest/adapters/test_indicators_yaml_defaults_provider.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_yaml_backtest_artifact_loader_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py",
+    "tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py",
+    "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py",
+    "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+    "tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py",
+    "tests/unit/apps/api/test_artifact_storage_routes.py",
+    "tests/unit/apps/api/test_admin_routes.py",
+    "tests/unit/apps/control_agent",
+    "tests/unit/apps/migrations/test_backtest_input_recipe_sql.py",
+    "tests/unit/apps/migrations/test_storage_lifecycle.py"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 67.5230295410147,
+  "stdout": "........................................................................ [ 18%]\n........................................................................ [ 37%]\n........................................................................ [ 55%]\n........................................................................ [ 74%]\n........................................................................ [ 92%]\n............................                                             [100%]\n388 passed in 67.10s (0:01:07)\n",
+  "stderr": ""
+}

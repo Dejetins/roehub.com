@@ -91,6 +91,85 @@ class PostgresStreamRecoveryStore:
             ).fetchall()
             return [_entry(row) for row in rows]
 
+    def failed_history_repairs(self) -> list[RecoveryEntry]:
+        """Retain admission failures across restart; never automatically rearm them."""
+        with psycopg.Connection[dict[str, Any]].connect(self.dsn, row_factory=dict_row) as conn:
+            rows = conn.execute(
+                "SELECT * FROM market_data_stream_recovery WHERE state='failed' "
+                "AND reason='stream_history_repair' ORDER BY start_at LIMIT %s",
+                (self.max_entries,),
+            ).fetchall()
+            return [_entry(row) for row in rows]
+
+    def publish_connections(self, snapshot: dict[tuple[int, str], bool]) -> None:
+        """Replace ephemeral socket state; only the current lease holder can publish."""
+        if self._lease is None:
+            raise RuntimeError("collector lease required")
+        if len(snapshot) > self.max_entries:
+            raise RuntimeError("stream_connection_capacity_exceeded")
+        # Use the lease connection itself, so a lost lease cannot publish stale health.
+        with self._lease.transaction():
+            self._lease.execute("DELETE FROM market_data_stream_connections")
+            with self._lease.cursor() as cursor:
+                cursor.executemany(
+                    "INSERT INTO market_data_stream_connections "
+                    "(market_id,symbol,connected,collector_pid) VALUES (%s,%s,%s,pg_backend_pid())",
+                    [(market, symbol, connected)
+                     for (market, symbol), connected in snapshot.items()],
+                )
+
+    def collector_status(self) -> dict[str, Any]:
+        """Read the live collector lease and sanitized repair states, never worker tokens."""
+        with psycopg.connect(self.dsn) as conn:
+            running = conn.execute(
+                "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype='advisory' "
+                "AND classid=%s AND objid=%s AND objsubid=1 AND granted "
+                "AND database=(SELECT oid FROM pg_database WHERE datname=current_database()))",
+                (744948345628 >> 32, 744948345628 & 0xFFFFFFFF),
+            ).fetchone()
+            rows = conn.execute(
+                "SELECT market_id,symbol,state,error_code,next_retry_at,reason "
+                "FROM market_data_stream_recovery ORDER BY updated_at LIMIT %s",
+                (self.max_entries,),
+            ).fetchall()
+            repairs: dict[tuple[int, str], dict[str, Any]] = {}
+            for market, symbol, state, code, next_at, reason in rows:
+                key = (market, symbol)
+                # A blocked receipt must remain visible beside later pending work.
+                if repairs.get(key, {}).get("state") != "failed":
+                    repairs[key] = dict(
+                        state=state, error_code=code, next_retry_at=next_at, reason=reason
+                    )
+            connections = conn.execute(
+                "SELECT market_id,symbol,connected FROM market_data_stream_connections c "
+                "WHERE observed_at > now() - interval '20 seconds' AND EXISTS "
+                "(SELECT 1 FROM pg_locks l WHERE l.pid=c.collector_pid "
+                "AND locktype='advisory' AND classid=%s AND objid=%s AND objsubid=1 "
+                "AND granted AND database=(SELECT oid FROM pg_database "
+                "WHERE datname=current_database())) LIMIT %s",
+                (744948345628 >> 32, 744948345628 & 0xFFFFFFFF, self.max_entries),
+            ).fetchall()
+            return {"running": bool(running and running[0]), "repairs": repairs,
+                    "connections": {(m, s): connected for m, s, connected in connections}}
+
+    def history_error(self, market_id: int, symbol: str) -> str | None:
+        with psycopg.connect(self.dsn) as conn:
+            row = conn.execute(
+                "SELECT error_code FROM market_data_stream_recovery "
+                "WHERE market_id=%s AND symbol=%s AND state='failed' "
+                "AND reason='stream_history_repair' ORDER BY updated_at DESC LIMIT 1",
+                (market_id, symbol),
+            ).fetchone()
+            return str(row[0]) if row else None
+
+    def clear_history_failures(self, instrument: InstrumentId, verified_end: datetime) -> None:
+        """Acknowledge failed intervals only after complete history was independently verified."""
+        self._execute(
+            "DELETE FROM market_data_stream_recovery WHERE market_id=%s AND symbol=%s "
+            "AND reason='stream_history_repair' AND state='failed' AND end_at<=%s",
+            (instrument.market_id.value, str(instrument.symbol), verified_end),
+        )
+
     def advance(self, entry: RecoveryEntry, *, start_at: datetime) -> None:
         self._execute(
             "UPDATE market_data_stream_recovery SET start_at=%s,attempt=0,"

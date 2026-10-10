@@ -1,0 +1,9 @@
+ Container roehub-s04-clickhouse-1 Stopping 
+ Container roehub-s04-clickhouse-1 Stopped 
+ Container roehub-s04-clickhouse-1 Removing 
+ Container roehub-s04-clickhouse-1 Removed 
+ Volume roehub-s04-ch-data Removing 
+ Network roehub-s04_platform Removing 
+ Volume roehub-s04-ch-data Removed 
+ Network roehub-s04_platform Removed 
+roehub-s04-pg

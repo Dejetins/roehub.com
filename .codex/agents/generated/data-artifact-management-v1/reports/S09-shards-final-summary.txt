@@ -1,0 +1,51 @@
+web-api 0 ublic_and_authenticated_root_redirects_to_overview
+  /Users/daniildegtyarev/Projects/roehub.com/.venv/lib/python3.12/site-packages/httpx/_client.py:822: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.
+    warnings.warn(message, DeprecationWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+112 passed, 4 warnings in 3.40s
+
+apps-platform 1  cookies directly on the client instance instead.
+    warnings.warn(message, DeprecationWarning)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/unit/tools/test_oss_metadata.py::test_committed_release_metadata_matches_policy
+FAILED tests/unit/tools/test_runtime_input_inventory.py::test_runtime_input_inventory_is_current_and_value_free
+2 failed, 1301 passed, 4 warnings in 43.19s
+
+backtest-artifacts 0 ........................................................................ [ 21%]
+........................................................................ [ 42%]
+........................................................................ [ 63%]
+........................................................................ [ 84%]
+......................................................                   [100%]
+342 passed in 71.90s (0:01:11)
+
+backtest-scoring 0 ...................................................................... [ 74%]
+........................................................................ [ 80%]
+........................................................................ [ 86%]
+........................................................................ [ 91%]
+........................................................................ [ 97%]
+.............................                                            [100%]
+1253 passed in 16.62s
+
+backtest-use-cases 0 ........................................................................ [ 39%]
+........................................................................ [ 79%]
+.....................................                                    [100%]
+181 passed in 19.02s
+
+backtest-domain 0 ........................................................................ [ 57%]
+......................................................                   [100%]
+126 passed in 5.50s
+
+market-identity-strategy 0 ........................................................................ [ 20%]
+........................................................................ [ 41%]
+........................................................................ [ 61%]
+........................................................................ [ 82%]
+..............................................................           [100%]
+350 passed in 5.21s
+
+platform-contracts 0 ........................................................................ [ 93%]
+.....                                                                    [100%]
+77 passed in 0.61s
+

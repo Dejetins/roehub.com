@@ -1,0 +1,102 @@
+{
+  "reviewer": "/root/s03_review",
+  "mode": "independent, no recursive review",
+  "code_findings_closed": [
+    "absolute deadline/watchdog even with blocked PG check",
+    "durable coordinator guard prevents takeover before drain",
+    "separate Binance product header accounting",
+    "lifecycle close after all scheduler producers drain",
+    "metadata admission propagates into durable queued retry",
+    "prod config and generated topology scope compatibility",
+    "Bybit403 preserves Retry-After beyond600s"
+  ],
+  "docs_review": "no material blocker; confirmed all-owner/descendant/CH drain, exact token cleanup, no TTL/quota reset; image+config rollback; manual Bybit session termination limitation",
+  "method_review": "known family CPU, cgroup delta and admission/retry gaps closed before final freeze; main family includes collector, do not double count",
+  "preflight": {
+    "exploratory-baseline-02.json": {
+      "sha256": "ddc21afeaedff7c79441ba2ca328c075f2a1ced34961c2ee8f038453a5ce9a4f",
+      "checks": {
+        "all_windows": true,
+        "canonical_count": true,
+        "required_window": false,
+        "no_permit_leak": true,
+        "sampling_complete": true
+      },
+      "family_cpu_s": 9.329377,
+      "scheduler_admission": {},
+      "collector_admission": {},
+      "scheduler_events": [
+        [
+          "queued",
+          null,
+          102
+        ],
+        [
+          "started",
+          null,
+          102
+        ],
+        [
+          "succeeded",
+          null,
+          102
+        ]
+      ],
+      "cgroup_cpu_io_before_after": true,
+      "excluded_from_M": "short exploratory; no required 360s service window"
+    },
+    "exploratory-candidate-05.json": {
+      "sha256": "c161fe9f28b34c654735478a7bd3e6b6deef99cc902be76f3159f728fee19afd",
+      "checks": {
+        "all_windows": true,
+        "canonical_count": true,
+        "required_window": false,
+        "no_permit_leak": true,
+        "sampling_complete": true
+      },
+      "family_cpu_s": 12.751672,
+      "scheduler_admission": {
+        "attempts": 207,
+        "admitted": 205,
+        "source_rate_limited": 2,
+        "source_unavailable": 0
+      },
+      "collector_admission": {
+        "attempts": 3,
+        "admitted": 2,
+        "source_rate_limited": 1,
+        "source_unavailable": 0
+      },
+      "scheduler_events": [
+        [
+          "queued",
+          null,
+          102
+        ],
+        [
+          "recovered",
+          null,
+          2
+        ],
+        [
+          "retry_scheduled",
+          "source_rate_limited",
+          2
+        ],
+        [
+          "started",
+          null,
+          102
+        ],
+        [
+          "succeeded",
+          null,
+          102
+        ]
+      ],
+      "cgroup_cpu_io_before_after": true,
+      "excluded_from_M": "short exploratory; no required 360s service window"
+    }
+  },
+  "stage_acceptance": "pending full six-run series, final checks and evidence review"
+}

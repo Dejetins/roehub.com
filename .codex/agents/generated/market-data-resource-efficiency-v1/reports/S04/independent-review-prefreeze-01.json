@@ -1,0 +1,21 @@
+{
+  "reviewer": "/root/s04_review",
+  "mode": "independent read-only, no recursion",
+  "verdict": "no blocking finding before frozen series",
+  "resolved": [
+    "repeated producer cancellation",
+    "capacity waiter shutdown interlock",
+    "PG blackhole close-before-cancel deadline",
+    "canonical OHLCV+key parity",
+    "family CPU and memory aggregates",
+    "precise query metrics interval; parts/merges"
+  ],
+  "evidence": [
+    "real-pg-ch-02.txt",
+    "linux-memory-01.json",
+    "linux-memory-01.txt",
+    "preflight-c100-03.json",
+    "preflight-b100-02.json"
+  ],
+  "limits": "finite accelerated replay; QueryFinish separately; short postdrain, no provider/API/installed claim"
+}

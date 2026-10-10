@@ -1,0 +1,34 @@
+[
+  {
+    "identity": "org_admin",
+    "method": "GET",
+    "status": 403,
+    "response": {
+      "detail": {
+        "code": "installation_forbidden"
+      }
+    }
+  },
+  {
+    "identity": "org_admin",
+    "method": "POST",
+    "status": 403,
+    "response": {
+      "detail": {
+        "code": "installation_forbidden"
+      }
+    }
+  },
+  {
+    "case": "missing_origin",
+    "status": 403
+  },
+  {
+    "case": "path_injection",
+    "status": 422
+  },
+  {
+    "case": "stale_version",
+    "status": 409
+  }
+]

@@ -1,0 +1,348 @@
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:55:101: E501 Line too long (104 > 100)
+   |
+53 |     @classmethod
+54 |     def from_config(cls, config, environ):
+55 |         from trading.contexts.market_data.adapters.outbound.clients.common_http.provider_policy import (
+   |                                                                                                     ^^^^ E501
+56 |             ProviderPolicy,
+57 |         )
+   |
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/managed_transport.py:72:101: E501 Line too long (101 > 100)
+   |
+70 |         self.pipe, child_pipe = context.Pipe()
+71 |         child_liveness, self.liveness = context.Pipe(duplex=False)
+72 |         self.process = context.Process(target=_serve, args=(child_pipe, child_liveness), daemon=True)
+   |                                                                                                     ^ E501
+73 |         self.process.start()
+74 |         child_pipe.close()
+   |
+
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py:63:101: E501 Line too long (146 > 100)
+   |
+61 |                         'ON CONFLICT (provider,scope,dimension,seconds) DO UPDATE SET '
+62 |                         'spent=CASE WHEN market_data_provider_windows.bucket>=EXCLUDED.bucket '
+63 |                         'THEN market_data_provider_windows.spent ELSE 0 END,bucket=GREATEST(market_data_provider_windows.bucket,EXCLUDED.bucket)',
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+64 |                         (request.provider, request.scope, window.dimension, window.seconds, bucket))
+65 |                     spent = connection.execute(
+   |
+
+src/trading/contexts/market_data/application/ports/provider_admission.py:28:101: E501 Line too long (106 > 100)
+   |
+26 |         if not self.provider or not 1 <= len(self.scope) <= 128 or self.concurrency < 1:
+27 |             raise ValueError('invalid_provider_scope')
+28 |         if not self.windows or len({(w.dimension, w.seconds) for w in self.windows}) != len(self.windows):
+   |                                                                                                     ^^^^^^ E501
+29 |             raise ValueError('duplicate_or_empty_provider_windows')
+   |
+
+src/trading/contexts/market_data/application/ports/provider_admission.py:45:1: E402 Module level import not at top of file
+   |
+43 | # Execution ownership is propagated only inside the worker's synchronous scope.
+44 | # Adapters use the callback without importing the scheduler or PostgreSQL types.
+45 | from contextlib import contextmanager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
+46 | from contextvars import ContextVar
+47 | from typing import Callable
+   |
+
+src/trading/contexts/market_data/application/ports/provider_admission.py:46:1: E402 Module level import not at top of file
+   |
+44 | # Adapters use the callback without importing the scheduler or PostgreSQL types.
+45 | from contextlib import contextmanager
+46 | from contextvars import ContextVar
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
+47 | from typing import Callable
+   |
+
+src/trading/contexts/market_data/application/ports/provider_admission.py:47:1: E402 Module level import not at top of file
+   |
+45 | from contextlib import contextmanager
+46 | from contextvars import ContextVar
+47 | from typing import Callable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
+48 | 
+49 | _io_guard: ContextVar[Callable[[], None]] = ContextVar('market_data_io_guard', default=lambda: None)
+   |
+
+tests/real_infra/market_data/test_provider_admission.py:97:101: E501 Line too long (105 > 100)
+   |
+95 |         assert dict(connection.execute('SELECT dimension,spent FROM market_data_provider_windows')
+96 |                     .fetchall()) == {'spot_weight': 8, 'raw': 1}
+97 |         assert connection.execute('SELECT count(*) FROM market_data_provider_permits').fetchone() == (0,)
+   |                                                                                                     ^^^^^ E501
+98 |     # Local clocks never enter reservations. A backwards DB clock fails closed.
+99 |     with psycopg.connect(admission.dsn) as connection:
+   |
+
+tools/qa/market_data_ingestion_comparison.py:66:101: E501 Line too long (119 > 100)
+   |
+64 | PATHS = {
+65 |     'runner': 'src/trading/contexts/market_data/application/services/work_requests.py',
+66 |     'repository': 'src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py',
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^ E501
+67 |     'http': 'src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py',
+68 | }
+   |
+
+tools/qa/market_data_ingestion_comparison.py:97:101: E501 Line too long (104 > 100)
+   |
+95 |     if label == 'baseline':
+96 |         return cls()
+97 |     from trading.contexts.market_data.adapters.outbound.persistence.postgres.provider_admission import (
+   |                                                                                                     ^^^^ E501
+98 |         PostgresProviderAdmission,
+99 |     )
+   |
+
+tools/qa/market_data_ingestion_comparison.py:258:101: E501 Line too long (105 > 100)
+    |
+256 |         password=Path('.cache/market-data-s02/private/admin').read_text())
+257 |     runtime = json.loads(subprocess.check_output(['docker','inspect','--format',
+258 |         '{"image":{{json .Image}},"memory":{{.HostConfig.Memory}},"nano_cpus":{{.HostConfig.NanoCpus}}}',
+    |                                                                                                     ^^^^^ E501
+259 |         'roehub-s03-clickhouse-1'], text=True))
+260 |     record: dict[str, Any] = dict(schema_version='market-data-resource-comparison/v1', stage='S03',
+    |
+
+tools/qa/market_data_ingestion_comparison.py:270:101: E501 Line too long (112 > 100)
+    |
+268 |                      quotas=[[1,100,2],[60,6000,2]], quota_concurrency=4),
+269 |         warmup_s=60, steady_s=300, samples=[], failures=[])
+270 |     record['fixture_sha256'] = hashlib.sha256(json.dumps(record['fixture'],sort_keys=True).encode()).hexdigest()
+    |                                                                                                     ^^^^^^^^^^^^ E501
+271 |     server = Emulator(args.fast,args.slow)
+272 |     serving = threading.Thread(target=server.serve_forever,daemon=True)
+    |
+
+tools/qa/market_data_ingestion_comparison.py:283:101: E501 Line too long (116 > 100)
+    |
+281 |             connection.execute(sql.SQL('CREATE SCHEMA {}').format(sql.Identifier(schema)))
+282 |         with psycopg.connect(pgdsn,autocommit=True) as connection:
+283 |             connection.execute('CREATE TABLE identity_organizations (organization_id uuid PRIMARY KEY,status text)')
+    |                                                                                                     ^^^^^^^^^^^^^^^^ E501
+284 |             connection.execute('CREATE TABLE identity_memberships (organization_id uuid,user_id uuid,status text,PRIMARY KEY(organization_id,user_id))')
+285 |             for name in ('0023_market_data_work_requests_v1.sql','0024_market_data_full_history_v1.sql',
+    |
+
+tools/qa/market_data_ingestion_comparison.py:284:101: E501 Line too long (152 > 100)
+    |
+282 |         with psycopg.connect(pgdsn,autocommit=True) as connection:
+283 |             connection.execute('CREATE TABLE identity_organizations (organization_id uuid PRIMARY KEY,status text)')
+284 |             connection.execute('CREATE TABLE identity_memberships (organization_id uuid,user_id uuid,status text,PRIMARY KEY(organization_id,user_id))')
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+285 |             for name in ('0023_market_data_work_requests_v1.sql','0024_market_data_full_history_v1.sql',
+286 |                          '0025_market_data_work_recovery_v1.sql','0026_market_data_queue_events_v1.sql',
+    |
+
+tools/qa/market_data_ingestion_comparison.py:285:101: E501 Line too long (104 > 100)
+    |
+283 |             connection.execute('CREATE TABLE identity_organizations (organization_id uuid PRIMARY KEY,status text)')
+284 |             connection.execute('CREATE TABLE identity_memberships (organization_id uuid,user_id uuid,status text,PRIMARY KEY(organization_id,user_id))')
+285 |             for name in ('0023_market_data_work_requests_v1.sql','0024_market_data_full_history_v1.sql',
+    |                                                                                                     ^^^^ E501
+286 |                          '0025_market_data_work_recovery_v1.sql','0026_market_data_queue_events_v1.sql',
+287 |                          '0034_market_data_provider_admission_v1.sql'):
+    |
+
+tools/qa/market_data_ingestion_comparison.py:288:101: E501 Line too long (111 > 100)
+    |
+286 |                          '0025_market_data_work_recovery_v1.sql','0026_market_data_queue_events_v1.sql',
+287 |                          '0034_market_data_provider_admission_v1.sql'):
+288 |                 connection.execute(sql.SQL(cast(LiteralString, (ROOT/'migrations/postgres'/name).read_text())))
+    |                                                                                                     ^^^^^^^^^^^ E501
+289 |             org, actor = uuid4(), uuid4()
+290 |             connection.execute("INSERT INTO identity_organizations VALUES (%s,'active')",(org,))
+    |
+
+tools/qa/market_data_ingestion_comparison.py:291:101: E501 Line too long (102 > 100)
+    |
+289 |             org, actor = uuid4(), uuid4()
+290 |             connection.execute("INSERT INTO identity_organizations VALUES (%s,'active')",(org,))
+291 |             connection.execute("INSERT INTO identity_memberships VALUES (%s,%s,'active')",(org,actor))
+    |                                                                                                     ^^ E501
+292 |         for statement in split_clickhouse_sql((ROOT/'migrations/clickhouse/market_data_ddl.sql')
+293 |                                               .read_text().replace('market_data',schema)):
+    |
+
+tools/qa/market_data_ingestion_comparison.py:313:101: E501 Line too long (103 > 100)
+    |
+311 |             batch_size=10000,index_reader=ClickHouseCanonicalCandleIndexReader(storage,schema),
+312 |             observer=observed)
+313 |         repository = load(args.source,'repository',args.label).PostgresMarketDataWorkRequestRepository(
+    |                                                                                                     ^^^ E501
+314 |             gateway=PsycopgBacktestPostgresGateway(dsn=pgdsn),execution_dsn=pgdsn)
+315 |         start_at = datetime(2026,1,3,tzinfo=UTC)
+    |
+
+tools/qa/market_data_ingestion_comparison.py:326:101: E501 Line too long (129 > 100)
+    |
+324 |         with psycopg.connect(pgdsn) as connection:
+325 |             record['pg_stats_before'] = connection.execute(
+326 |                 "SELECT xact_commit,xact_rollback,numbackends FROM pg_stat_database WHERE datname=current_database()").fetchone()
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+327 |         begin = time.monotonic()
+328 |         child = mp.get_context('spawn').Process(target=collector,args=(str(args.source),args.label,
+    |
+
+tools/qa/market_data_ingestion_comparison.py:338:101: E501 Line too long (126 > 100)
+    |
+336 |                     with observed.lock:
+337 |                         active = observed.active
+338 |                     row = connection.execute("SELECT count(*) FROM market_data_work_requests WHERE state='queued'").fetchone()
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+339 |                     assert row is not None
+340 |                     queued = row[0]
+    |
+
+tools/qa/market_data_ingestion_comparison.py:342:101: E501 Line too long (123 > 100)
+    |
+340 |                     queued = row[0]
+341 |                     mem = memory(admin)
+342 |                     mem['MemoryTracking'] = admin.command("SELECT value FROM system.metrics WHERE metric='MemoryTracking'")
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^ E501
+343 |                     pg = connection.execute("SELECT xact_commit,xact_rollback,numbackends FROM pg_stat_database WHERE datname=current_database()").fetchone()
+344 |                     pids = [os.getpid()] + ([child.pid] if child and child.is_alive() else [])
+    |
+
+tools/qa/market_data_ingestion_comparison.py:343:101: E501 Line too long (157 > 100)
+    |
+341 |                     mem = memory(admin)
+342 |                     mem['MemoryTracking'] = admin.command("SELECT value FROM system.metrics WHERE metric='MemoryTracking'")
+343 |                     pg = connection.execute("SELECT xact_commit,xact_rollback,numbackends FROM pg_stat_database WHERE datname=current_database()").fetchone()
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+344 |                     pids = [os.getpid()] + ([child.pid] if child and child.is_alive() else [])
+345 |                     pids += [t.process.pid for t in getattr(http, '_transports', []) if not t.closed]
+    |
+
+tools/qa/market_data_ingestion_comparison.py:345:101: E501 Line too long (101 > 100)
+    |
+343 |                     pg = connection.execute("SELECT xact_commit,xact_rollback,numbackends FROM pg_stat_database WHERE datname=current_database()").fetchone()
+344 |                     pids = [os.getpid()] + ([child.pid] if child and child.is_alive() else [])
+345 |                     pids += [t.process.pid for t in getattr(http, '_transports', []) if not t.closed]
+    |                                                                                                     ^ E501
+346 |                     cgroup = subprocess.check_output(['docker','exec','roehub-s03-clickhouse-1',
+347 |                         'cat','/sys/fs/cgroup/memory.current'],text=True).strip()
+    |
+
+tools/qa/market_data_ingestion_comparison.py:348:101: E501 Line too long (116 > 100)
+    |
+346 |                     cgroup = subprocess.check_output(['docker','exec','roehub-s03-clickhouse-1',
+347 |                         'cat','/sys/fs/cgroup/memory.current'],text=True).strip()
+348 |                     rss = subprocess.check_output(['ps','-o','rss=','-p',','.join(map(str,pids))],text=True).split()
+    |                                                                                                     ^^^^^^^^^^^^^^^^ E501
+349 |                     parts = admin.query('SELECT count(),sum(bytes_on_disk) FROM system.parts WHERE active AND database=%(db)s',parameters={'db':schema}).result_rows[0]
+350 |                     record['samples'].append(dict(elapsed=now-begin,active=active,queued=queued,
+    |
+
+tools/qa/market_data_ingestion_comparison.py:349:101: E501 Line too long (167 > 100)
+    |
+347 |                         'cat','/sys/fs/cgroup/memory.current'],text=True).strip()
+348 |                     rss = subprocess.check_output(['ps','-o','rss=','-p',','.join(map(str,pids))],text=True).split()
+349 |                     parts = admin.query('SELECT count(),sum(bytes_on_disk) FROM system.parts WHERE active AND database=%(db)s',parameters={'db':schema}).result_rows[0]
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+350 |                     record['samples'].append(dict(elapsed=now-begin,active=active,queued=queued,
+351 |                         idle_ready_slot_seconds=(4-active)*(now-previous) if queued else 0,
+    |
+
+tools/qa/market_data_ingestion_comparison.py:360:101: E501 Line too long (133 > 100)
+    |
+358 |                 runner.run_batch(executor=pool,concurrency=4)
+359 |                 with psycopg.connect(pgdsn) as connection:
+360 |                     states=dict(connection.execute('SELECT state,count(*) FROM market_data_work_requests GROUP BY state').fetchall())
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+361 |                 if states == {'succeeded':102}:
+362 |                     break
+    |
+
+tools/qa/market_data_ingestion_comparison.py:370:23: E702 Multiple statements on one line (semicolon)
+    |
+368 |         if child.is_alive() or child.exitcode != 0:
+369 |             raise RuntimeError('collector_failed')
+370 |         finished.set();sampler.join()
+    |                       ^ E702
+371 |         marks=[at-begin for at in observed.finished]
+372 |         steady=[at for at in marks if 60<=at<360]
+    |
+
+tools/qa/market_data_ingestion_comparison.py:375:101: E501 Line too long (138 > 100)
+    |
+373 |         idle=sum(s['idle_ready_slot_seconds'] for s in record['samples'] if 60<=s['elapsed']<360)
+374 |         with psycopg.connect(pgdsn) as connection:
+375 |             record['pg_states']=dict(connection.execute('SELECT state,count(*) FROM market_data_work_requests GROUP BY state').fetchall())
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+376 |             record['pg_counters']=connection.execute('SELECT sum(completed_units),sum(rows_read),sum(rows_written) FROM market_data_work_requests').fetchone()
+377 |             row = connection.execute('SELECT count(*) FROM market_data_provider_permits').fetchone()
+    |
+
+tools/qa/market_data_ingestion_comparison.py:376:101: E501 Line too long (158 > 100)
+    |
+374 |         with psycopg.connect(pgdsn) as connection:
+375 |             record['pg_states']=dict(connection.execute('SELECT state,count(*) FROM market_data_work_requests GROUP BY state').fetchall())
+376 |             record['pg_counters']=connection.execute('SELECT sum(completed_units),sum(rows_read),sum(rows_written) FROM market_data_work_requests').fetchone()
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+377 |             row = connection.execute('SELECT count(*) FROM market_data_provider_permits').fetchone()
+378 |             assert row is not None
+    |
+
+tools/qa/market_data_ingestion_comparison.py:388:101: E501 Line too long (152 > 100)
+    |
+386 |             child_maxrss=resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss,
+387 |             cpu_s=resource.getrusage(resource.RUSAGE_SELF).ru_utime)
+388 |         record['canonical_new']=admin.command(f'SELECT count() FROM {schema}.canonical_candles_1m WHERE ts_open >= toDateTime(\'2026-01-03 00:00:00\')')
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+389 |         admin.command('SYSTEM FLUSH LOGS')
+390 |         record['query_metrics'] = admin.query(
+    |
+
+tools/qa/market_data_ingestion_comparison.py:402:101: E501 Line too long (129 > 100)
+    |
+400 |         with psycopg.connect(pgdsn) as connection:
+401 |             record['pg_stats_after'] = connection.execute(
+402 |                 "SELECT xact_commit,xact_rollback,numbackends FROM pg_stat_database WHERE datname=current_database()").fetchone()
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+403 |         record['checks']={'all_windows':len(marks)==102*args.windows,
+404 |             'canonical_count':record['canonical_new']==102*args.windows*1440,
+    |
+
+tools/qa/market_data_ingestion_comparison.py:415:25: E702 Multiple statements on one line (semicolon)
+    |
+413 |             sampler.join()
+414 |         if child is not None and child.is_alive():
+415 |             child.kill();child.join()
+    |                         ^ E702
+416 |         if http is not None and hasattr(http,'close'):
+417 |             http.close()
+    |
+
+tools/qa/market_data_ingestion_comparison.py:418:26: E702 Multiple statements on one line (semicolon)
+    |
+416 |         if http is not None and hasattr(http,'close'):
+417 |             http.close()
+418 |         server.shutdown();server.server_close();serving.join()
+    |                          ^ E702
+419 |         if client is not None:
+420 |             client.close()
+    |
+
+tools/qa/market_data_ingestion_comparison.py:418:48: E702 Multiple statements on one line (semicolon)
+    |
+416 |         if http is not None and hasattr(http,'close'):
+417 |             http.close()
+418 |         server.shutdown();server.server_close();serving.join()
+    |                                                ^ E702
+419 |         if client is not None:
+420 |             client.close()
+    |
+
+tools/qa/market_data_ingestion_comparison.py:424:101: E501 Line too long (106 > 100)
+    |
+422 |         admin.close()
+423 |         with psycopg.connect(dsn,autocommit=True) as connection:
+424 |             connection.execute(sql.SQL('DROP SCHEMA IF EXISTS {} CASCADE').format(sql.Identifier(schema)))
+    |                                                                                                     ^^^^^^ E501
+425 |         args.output.write_text(json.dumps(record,indent=2,default=str)+'\n')
+    |
+
+Found 40 errors (5 fixed, 35 remaining).

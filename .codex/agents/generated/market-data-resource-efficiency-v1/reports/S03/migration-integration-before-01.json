@@ -1,0 +1,20 @@
+{
+  "apps/migrations/storage.py": {
+    "before_integration_fix": "113bf096d7dde0de0275273de8c371c1fa682f09d0e417565989ba6f779f72ab",
+    "original_baseline_exists": false,
+    "baseline_match": false,
+    "frozen04_match": true
+  },
+  "apps/migrations/bootstrap.py": {
+    "before_integration_fix": "d299e022846e94d7d433c0ee03cfaf83f05c4c73438f8ffd9a2cd8ef0c3476f6",
+    "original_baseline_exists": false,
+    "baseline_match": false,
+    "frozen04_match": true
+  },
+  "tests/unit/apps/migrations/test_storage_lifecycle.py": {
+    "before_integration_fix": "bdd1fa219de8450aade1a3d16d6721fb0299d56bdc448ad754d1b0c5d7a66d1c",
+    "original_baseline_exists": false,
+    "baseline_match": false,
+    "frozen04_match": false
+  }
+}

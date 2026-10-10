@@ -118,3 +118,23 @@ def test_binance_closed_update_yields_normalized_1m_candle() -> None:
     assert row.candle.ts_open.value.microsecond == 0
     assert row.candle.instrument_id.market_id.value == 1
     assert str(row.candle.instrument_id.symbol) == "BTCUSDT"
+
+
+def test_legacy_usdm_kline_url_uses_market_route_without_changing_other_hosts():
+    from trading.contexts.market_data.adapters.outbound.clients.binance.ws_client import (
+        build_binance_combined_stream_url,
+    )
+
+    for base in ('wss://fstream.binance.com/stream', 'wss://fstream.binance.com/market/stream'):
+        assert build_binance_combined_stream_url(base, ('0GUSDT',)) == (
+            'wss://fstream.binance.com/market/stream?streams=0gusdt@kline_1m'
+        )
+    assert build_binance_combined_stream_url(
+        'wss://fstream.binance.com/stream?test=1', ('0GUSDT',)
+    ) == 'wss://fstream.binance.com/market/stream?test=1&streams=0gusdt@kline_1m'
+    assert build_binance_combined_stream_url(
+        'wss://stream.binance.com:9443/stream', ('ACTUSDT',)
+    ) == 'wss://stream.binance.com:9443/stream?streams=actusdt@kline_1m'
+    assert build_binance_combined_stream_url(
+        'wss://example.test/stream', ('ACTUSDT',)
+    ) == 'wss://example.test/stream?streams=actusdt@kline_1m'

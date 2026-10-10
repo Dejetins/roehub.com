@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 from typing import Sequence
 
+from apps.control_agent.artifact_storage_wiring import build_artifact_storage_service
 from apps.control_agent.auth import ServiceIdentityAuthorizer
 from apps.control_agent.backup_backend import (
     InstallationBackupControlBackend,
@@ -79,6 +81,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             service=service,
             journal=journal,
             authorizer=authorizer,
+            storage_service=build_artifact_storage_service(os.environ),
         )
     finally:
         stop_job_control_server(

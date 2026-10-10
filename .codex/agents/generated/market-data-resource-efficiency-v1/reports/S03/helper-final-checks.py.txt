@@ -1,0 +1,18 @@
+from pathlib import Path
+import subprocess,json,hashlib
+r=Path('.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03')
+owned=json.loads((r/'owned-paths-pre-freeze-04.json').read_text())+['apps/migrations/bootstrap.py','apps/migrations/storage.py','tests/unit/apps/migrations/test_storage_lifecycle.py']
+(r/'owned-paths-final-05.json').write_text(json.dumps(sorted(set(owned)),indent=2)+'\n')
+checks={
+'ruff-final-09':['uv','run','ruff','check',*[p for p in owned if p.endswith('.py')]],
+'map-final-03':['uv','run','python','-m','tools.docs.generate_project_map','--check'],
+'docs-index-final-02':['uv','run','python','-m','tools.docs.generate_docs_index','--check'],
+'runbooks-final-02':['uv','run','python','-m','tools.docs.generate_runbooks','--check'],
+'artifact-schema-final-02':['uv','run','python','-m','tools.artifacts.generate_schemas','--check'],
+'backup-schema-final-02':['uv','run','python','-m','tools.backup.generate_schemas','--check'],
+'job-schema-final-02':['uv','run','python','-m','tools.jobs.generate_schemas','--check'],
+}
+results={}
+for key,cmd in checks.items():
+ p=subprocess.run(cmd,capture_output=True,text=True);(r/(key+'.txt')).write_text(p.stdout+p.stderr);results[key]={'command':cmd,'exit_code':p.returncode};print(key,p.returncode,flush=True)
+(r/'final-gates-09.json').write_text(json.dumps(results,indent=2)+'\n')

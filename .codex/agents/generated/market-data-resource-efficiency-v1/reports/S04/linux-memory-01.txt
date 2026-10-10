@@ -1,0 +1,1 @@
+{"rows": 1000, "pending": 0, "retained_rows": 0, "retained_bytes": 0, "writer_children": [], "memory_peak": 367079424, "memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0\n"}

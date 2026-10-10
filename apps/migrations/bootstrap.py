@@ -815,3 +815,57 @@ def apply_backtest_input_recipe_sql(*, identity_dsn: str, migrations_dir: Path) 
     )[0]
     with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_backtest_artifact_management_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Add managed policies and durable inbox without activation or legacy conversion."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0029_backtest_artifact_management_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_backtest_artifact_dispatch_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Add managed policies and durable inbox without activation or legacy conversion."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0030_backtest_artifact_dispatch_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_backtest_artifact_storage_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Add managed policies and durable inbox without activation or legacy conversion."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0031_backtest_artifact_storage_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_identity_browser_devices_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Add browser-profile grouping without guessing identities for historical sessions."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0032_identity_browser_devices_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_market_data_stream_connections_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Add bounded, lease-fenced provider socket observations."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0033_market_data_stream_connections_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_market_data_provider_admission_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Add shared provider quota, owned permits and deferred history-bounds metadata."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0034_market_data_provider_admission_v1.sql",)
+    )[0]
+    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)

@@ -1,0 +1,878 @@
+{
+    "version": "1.1.408",
+    "time": "1791663750043",
+    "generalDiagnostics": [
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_fixture.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"__wrapped__\" for class \"FunctionType\"\n  Attribute \"__wrapped__\" is unknown",
+            "range": {
+                "start": {
+                    "line": 40,
+                    "character": 28
+                },
+                "end": {
+                    "line": 40,
+                    "character": 39
+                }
+            },
+            "rule": "reportFunctionMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_fixture.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"__wrapped__\" for class \"FunctionType\"\n  Attribute \"__wrapped__\" is unknown",
+            "range": {
+                "start": {
+                    "line": 40,
+                    "character": 48
+                },
+                "end": {
+                    "line": 40,
+                    "character": 59
+                }
+            },
+            "rule": "reportFunctionMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_fixture.py",
+            "severity": "error",
+            "message": "Argument of type \"str\" cannot be assigned to parameter \"obj\" of type \"LiteralString\" in function \"__init__\"\n  \"str\" is not assignable to \"LiteralString\"",
+            "range": {
+                "start": {
+                    "line": 309,
+                    "character": 16
+                },
+                "end": {
+                    "line": 309,
+                    "character": 96
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_preflight.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"__wrapped__\" for class \"FunctionType\"\n  Attribute \"__wrapped__\" is unknown",
+            "range": {
+                "start": {
+                    "line": 31,
+                    "character": 48
+                },
+                "end": {
+                    "line": 31,
+                    "character": 59
+                }
+            },
+            "rule": "reportFunctionMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py",
+            "severity": "error",
+            "message": "Argument of type \"str\" cannot be assigned to parameter \"query\" of type \"Query\" in function \"execute\"\n  Type \"str\" is not assignable to type \"Query\"\n    \"str\" is not assignable to \"LiteralString\"\n    \"str\" is not assignable to \"bytes\"\n    \"str\" is not assignable to \"SQL\"\n    \"str\" is not assignable to \"Composed\"",
+            "range": {
+                "start": {
+                    "line": 41,
+                    "character": 20
+                },
+                "end": {
+                    "line": 41,
+                    "character": 73
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py",
+            "severity": "error",
+            "message": "Argument of type \"str\" cannot be assigned to parameter \"query\" of type \"Query\" in function \"execute\"\n  Type \"str\" is not assignable to type \"Query\"\n    \"str\" is not assignable to \"LiteralString\"\n    \"str\" is not assignable to \"bytes\"\n    \"str\" is not assignable to \"SQL\"\n    \"str\" is not assignable to \"Composed\"",
+            "range": {
+                "start": {
+                    "line": 45,
+                    "character": 16
+                },
+                "end": {
+                    "line": 45,
+                    "character": 95
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py",
+            "severity": "error",
+            "message": "\"is_active_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 87,
+                    "character": 70
+                },
+                "end": {
+                    "line": 87,
+                    "character": 82
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py",
+            "severity": "error",
+            "message": "\"last_seen_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 116,
+                    "character": 33
+                },
+                "end": {
+                    "line": 116,
+                    "character": 45
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py",
+            "severity": "error",
+            "message": "\"idle_expires_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 117,
+                    "character": 33
+                },
+                "end": {
+                    "line": 117,
+                    "character": 48
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py",
+            "severity": "error",
+            "message": "\"created_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 118,
+                    "character": 33
+                },
+                "end": {
+                    "line": 118,
+                    "character": 43
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py",
+            "severity": "error",
+            "message": "\"is_active_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 121,
+                    "character": 72
+                },
+                "end": {
+                    "line": 121,
+                    "character": 84
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py",
+            "severity": "error",
+            "message": "\"last_seen_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 126,
+                    "character": 72
+                },
+                "end": {
+                    "line": 126,
+                    "character": 84
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py",
+            "severity": "error",
+            "message": "\"is_active_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 129,
+                    "character": 72
+                },
+                "end": {
+                    "line": 129,
+                    "character": 84
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py",
+            "severity": "error",
+            "message": "\"is_active_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 151,
+                    "character": 71
+                },
+                "end": {
+                    "line": 151,
+                    "character": 83
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_stream_connections_postgres.py",
+            "severity": "error",
+            "message": "Argument of type \"str\" cannot be assigned to parameter \"query\" of type \"Query\" in function \"execute\"\n  Type \"str\" is not assignable to type \"Query\"\n    \"str\" is not assignable to \"LiteralString\"\n    \"str\" is not assignable to \"bytes\"\n    \"str\" is not assignable to \"SQL\"\n    \"str\" is not assignable to \"Composed\"",
+            "range": {
+                "start": {
+                    "line": 29,
+                    "character": 37
+                },
+                "end": {
+                    "line": 29,
+                    "character": 86
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py",
+            "severity": "error",
+            "message": "Argument of type \"(request: Request) -> CurrentUserPrincipal\" cannot be assigned to parameter \"current_user_dependency\" of type \"RequireCurrentUserDependency\" in function \"build_browser_devices_router\"\n  \"FunctionType\" is not assignable to \"RequireCurrentUserDependency\"",
+            "range": {
+                "start": {
+                    "line": 46,
+                    "character": 36
+                },
+                "end": {
+                    "line": 46,
+                    "character": 43
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py",
+            "severity": "error",
+            "message": "\"is_active_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 104,
+                    "character": 64
+                },
+                "end": {
+                    "line": 104,
+                    "character": 76
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py",
+            "severity": "error",
+            "message": "\"revoked_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 108,
+                    "character": 66
+                },
+                "end": {
+                    "line": 108,
+                    "character": 76
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py",
+            "severity": "error",
+            "message": "\"is_active_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 122,
+                    "character": 69
+                },
+                "end": {
+                    "line": 122,
+                    "character": 81
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py",
+            "severity": "error",
+            "message": "\"is_active_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 123,
+                    "character": 66
+                },
+                "end": {
+                    "line": 123,
+                    "character": 78
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py",
+            "severity": "error",
+            "message": "\"is_active_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 124,
+                    "character": 64
+                },
+                "end": {
+                    "line": 124,
+                    "character": 76
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py",
+            "severity": "error",
+            "message": "\"is_active_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 166,
+                    "character": 70
+                },
+                "end": {
+                    "line": 166,
+                    "character": 82
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/identity/application/test_local_auth.py",
+            "severity": "error",
+            "message": "\"user_id\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 296,
+                    "character": 49
+                },
+                "end": {
+                    "line": 296,
+                    "character": 56
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/identity/application/test_local_auth.py",
+            "severity": "error",
+            "message": "\"user_id\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 307,
+                    "character": 48
+                },
+                "end": {
+                    "line": 307,
+                    "character": 55
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/identity/application/test_local_auth.py",
+            "severity": "error",
+            "message": "\"is_active_at\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 312,
+                    "character": 64
+                },
+                "end": {
+                    "line": 312,
+                    "character": 76
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/market_data/application/services/test_ws_worker_publishes_redis.py",
+            "severity": "error",
+            "message": "Cannot assign to attribute \"_metrics\" for class \"MarketDataWsApp\"\n  Expression of type \"SimpleNamespace\" cannot be assigned to attribute \"_metrics\" of class \"MarketDataWsApp\"\n    \"SimpleNamespace\" is not assignable to \"MarketDataWsMetrics\"",
+            "range": {
+                "start": {
+                    "line": 361,
+                    "character": 8
+                },
+                "end": {
+                    "line": 361,
+                    "character": 16
+                }
+            },
+            "rule": "reportAttributeAccessIssue"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/market_data/application/services/test_ws_worker_publishes_redis.py",
+            "severity": "error",
+            "message": "Argument of type \"SimpleNamespace\" cannot be assigned to parameter \"plan\" of type \"WorkerConnectionPlan\" in function \"_run_plan\"\n  \"SimpleNamespace\" is not assignable to \"WorkerConnectionPlan\"",
+            "range": {
+                "start": {
+                    "line": 385,
+                    "character": 30
+                },
+                "end": {
+                    "line": 385,
+                    "character": 34
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"\n  ...",
+            "range": {
+                "start": {
+                    "line": 22,
+                    "character": 15
+                },
+                "end": {
+                    "line": 22,
+                    "character": 59
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"",
+            "range": {
+                "start": {
+                    "line": 22,
+                    "character": 15
+                },
+                "end": {
+                    "line": 22,
+                    "character": 59
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"\n  ...",
+            "range": {
+                "start": {
+                    "line": 23,
+                    "character": 15
+                },
+                "end": {
+                    "line": 23,
+                    "character": 62
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"",
+            "range": {
+                "start": {
+                    "line": 23,
+                    "character": 15
+                },
+                "end": {
+                    "line": 23,
+                    "character": 62
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "\"attrib\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 27,
+                    "character": 31
+                },
+                "end": {
+                    "line": 27,
+                    "character": 37
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"\n  ...",
+            "range": {
+                "start": {
+                    "line": 30,
+                    "character": 19
+                },
+                "end": {
+                    "line": 30,
+                    "character": 53
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"",
+            "range": {
+                "start": {
+                    "line": 30,
+                    "character": 19
+                },
+                "end": {
+                    "line": 30,
+                    "character": 53
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "\"findtext\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 30,
+                    "character": 23
+                },
+                "end": {
+                    "line": 30,
+                    "character": 31
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"\n  ...",
+            "range": {
+                "start": {
+                    "line": 31,
+                    "character": 12
+                },
+                "end": {
+                    "line": 31,
+                    "character": 60
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"",
+            "range": {
+                "start": {
+                    "line": 31,
+                    "character": 12
+                },
+                "end": {
+                    "line": 31,
+                    "character": 60
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "\"findtext\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 31,
+                    "character": 16
+                },
+                "end": {
+                    "line": 31,
+                    "character": 24
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"\n  ...",
+            "range": {
+                "start": {
+                    "line": 31,
+                    "character": 68
+                },
+                "end": {
+                    "line": 31,
+                    "character": 97
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"",
+            "range": {
+                "start": {
+                    "line": 31,
+                    "character": 68
+                },
+                "end": {
+                    "line": 31,
+                    "character": 97
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "\"findtext\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 31,
+                    "character": 72
+                },
+                "end": {
+                    "line": 31,
+                    "character": 80
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "\"findtext\" is not a known attribute of \"None\"",
+            "range": {
+                "start": {
+                    "line": 32,
+                    "character": 19
+                },
+                "end": {
+                    "line": 32,
+                    "character": 27
+                }
+            },
+            "rule": "reportOptionalMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"\n  ...",
+            "range": {
+                "start": {
+                    "line": 36,
+                    "character": 15
+                },
+                "end": {
+                    "line": 36,
+                    "character": 56
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"",
+            "range": {
+                "start": {
+                    "line": 36,
+                    "character": 15
+                },
+                "end": {
+                    "line": 36,
+                    "character": 56
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"\n  ...",
+            "range": {
+                "start": {
+                    "line": 37,
+                    "character": 22
+                },
+                "end": {
+                    "line": 37,
+                    "character": 88
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"",
+            "range": {
+                "start": {
+                    "line": 37,
+                    "character": 22
+                },
+                "end": {
+                    "line": 37,
+                    "character": 88
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"\n  ...",
+            "range": {
+                "start": {
+                    "line": 39,
+                    "character": 15
+                },
+                "end": {
+                    "line": 39,
+                    "character": 67
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"",
+            "range": {
+                "start": {
+                    "line": 39,
+                    "character": 15
+                },
+                "end": {
+                    "line": 39,
+                    "character": 67
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"\n  ...",
+            "range": {
+                "start": {
+                    "line": 40,
+                    "character": 15
+                },
+                "end": {
+                    "line": 40,
+                    "character": 73
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"",
+            "range": {
+                "start": {
+                    "line": 40,
+                    "character": 15
+                },
+                "end": {
+                    "line": 40,
+                    "character": 73
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"\n  ...",
+            "range": {
+                "start": {
+                    "line": 41,
+                    "character": 15
+                },
+                "end": {
+                    "line": 41,
+                    "character": 92
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"",
+            "range": {
+                "start": {
+                    "line": 41,
+                    "character": 15
+                },
+                "end": {
+                    "line": 41,
+                    "character": 92
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"\n  ...",
+            "range": {
+                "start": {
+                    "line": 48,
+                    "character": 19
+                },
+                "end": {
+                    "line": 48,
+                    "character": 61
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py",
+            "severity": "error",
+            "message": "Argument of type \"str | None\" cannot be assigned to parameter \"x\" of type \"ConvertibleToInt\" in function \"__new__\"\n  Type \"str | None\" is not assignable to type \"ConvertibleToInt\"\n    Type \"None\" is not assignable to type \"ConvertibleToInt\"\n      \"None\" is not assignable to \"str\"\n      \"None\" is incompatible with protocol \"Buffer\"\n        \"__buffer__\" is not present\n      \"None\" is incompatible with protocol \"SupportsInt\"\n        \"__int__\" is not present\n      \"None\" is incompatible with protocol \"SupportsIndex\"",
+            "range": {
+                "start": {
+                    "line": 48,
+                    "character": 19
+                },
+                "end": {
+                    "line": 48,
+                    "character": 61
+                }
+            },
+            "rule": "reportArgumentType"
+        }
+    ],
+    "summary": {
+        "filesAnalyzed": 1626,
+        "errorCount": 54,
+        "warningCount": 0,
+        "informationCount": 0,
+        "timeInSec": 17.764
+    }
+}
+

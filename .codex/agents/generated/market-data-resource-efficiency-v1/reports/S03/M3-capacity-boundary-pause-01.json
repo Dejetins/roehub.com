@@ -1,0 +1,10 @@
+{
+  "time": "2026-10-10T20:11:33.826663+00:00",
+  "launcher_pid": 50166,
+  "signal": "SIGSTOP",
+  "active_child_pid": 55527,
+  "active_child": "candidate-M3-01",
+  "reason": "Material Linux memory retention guardrail; orchestration requested capacity proof at first completed pair before remaining expensive runs. Only launcher paused; active C1 unchanged.",
+  "resume_condition": "C1 exit and all checks; sequential capacity probe. Success resumes same frozen source/harness and normal per-run 60s warmup. Failure requires narrow fix and new final freeze; existing raw preserved.",
+  "cache_boundary": "Disposable probe will use PG unique schema only; no CH workload. OS cache may be perturbed; report explicitly and use unchanged warmup on both sides."
+}

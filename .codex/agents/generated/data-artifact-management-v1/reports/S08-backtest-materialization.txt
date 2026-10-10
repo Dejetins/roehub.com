@@ -1,0 +1,291 @@
+- link "Skip to content":
+  - /url: "#workspace-heading"
+- complementary:
+  - generic "RoeHub": R
+  - navigation "Navigation":
+    - link "Overview":
+      - /url: /dashboard
+      - generic: Overview
+    - link "Backtests":
+      - /url: /backtests
+      - generic: Backtests
+    - link "Strategies":
+      - /url: /strategies
+      - generic: Strategies
+    - link "Data":
+      - /url: /data
+      - generic: Data
+    - link "Connections":
+      - /url: /connections
+      - generic: Connections
+    - link "Monitoring":
+      - /url: /monitoring
+      - generic: Monitoring
+    - link "Settings":
+      - /url: /settings/profile
+      - generic: Settings
+  - generic "Language": 文
+  - link "Sign out":
+    - /url: /logout
+    - generic: Sign out
+- main:
+  - text: Backtests
+  - generic: Navigator
+  - heading "Backtests" [level=1]
+  - region "Jobs":
+    - heading "Jobs" [level=2]
+    - generic "Jobs on this page": "0"
+    - link "New backtest":
+      - /url: /backtests/new?limit=10
+    - tablist "Jobs":
+      - tab "New backtest" [selected]
+      - tab "History"
+    - tabpanel "New backtest":
+      - region "New backtest":
+        - paragraph:
+          - text: BTCUSDT · 15m
+          - generic: Mar 26, 2026 — Mar 31, 2026
+          - generic: Configuration checked
+        - region "Calculation console":
+          - heading "Calculation console" [level=2]
+          - group "Calculation console":
+            - generic: Calculation console
+            - generic: Job label (optional)
+            - textbox "Job label (optional)":
+              - /placeholder: Name
+            - region "Market":
+              - heading "Market" [level=3]
+              - generic: Exchange
+              - combobox "Exchange":
+                - option "Binance" [selected]
+              - generic: Market type
+              - combobox "Market type":
+                - option "Spot" [selected]
+              - generic: Symbol
+              - combobox "Symbol":
+                - option "BTCUSDT" [selected]
+              - generic: Timeframe
+              - combobox "Timeframe":
+                - option "15m" [selected]
+                - option "30m"
+                - option "1h"
+                - option "2h"
+                - option "4h"
+                - option "6h"
+                - option "8h"
+                - option "1d"
+                - option "2d"
+                - option "3d"
+              - generic: Start date
+              - textbox "Start date": 2026-03-26
+              - generic: End date
+              - textbox "End date": 2026-03-31
+            - region "Signal":
+              - heading "Signal" [level=3]
+              - region "Indicator 1":
+                - generic: "1"
+                - button "Move up" [disabled]:
+                - button "Move down" [disabled]:
+                - button "Remove indicator":
+                - generic: Indicator
+                - combobox "Indicator":
+                  - option "ma.dema"
+                  - option "ma.ema" [selected]
+                  - option "ma.hma" [disabled]
+                  - option "ma.lwma" [disabled]
+                  - option "ma.rma" [disabled]
+                  - option "ma.sma" [disabled]
+                  - option "ma.tema" [disabled]
+                  - option "ma.vwma"
+                  - option "ma.wma" [disabled]
+                  - option "ma.zlema" [disabled]
+                  - option "momentum.cci" [disabled]
+                  - option "momentum.fisher" [disabled]
+                  - option "momentum.roc" [disabled]
+                  - option "momentum.rsi" [disabled]
+                  - 'option "momentum.stoch — Unavailable: this API requires a window axis." [disabled]'
+                  - option "momentum.trix" [disabled]
+                  - option "momentum.williams_r" [disabled]
+                  - 'option "structure.candle_stats — Unavailable: this API requires a window axis." [disabled]'
+                  - 'option "structure.candle_stats_atr_norm — Unavailable: this API requires a window axis." [disabled]'
+                  - option "structure.distance_to_ma_norm" [disabled]
+                  - option "structure.percent_rank" [disabled]
+                  - 'option "structure.pivots — Unavailable: this API requires a window axis." [disabled]'
+                  - option "structure.zscore" [disabled]
+                  - option "trend.adx" [disabled]
+                  - option "trend.aroon" [disabled]
+                  - option "trend.donchian" [disabled]
+                  - option "trend.linreg_slope" [disabled]
+                  - 'option "trend.psar — Unavailable: this API requires a window axis." [disabled]'
+                  - option "trend.vortex" [disabled]
+                  - option "volatility.atr" [disabled]
+                  - option "volatility.hv" [disabled]
+                  - option "volatility.stddev" [disabled]
+                  - 'option "volatility.tr — Unavailable: this API requires a window axis." [disabled]'
+                  - option "volatility.variance" [disabled]
+                  - 'option "volume.ad_line — Unavailable: this API requires a window axis." [disabled]'
+                  - option "volume.cmf" [disabled]
+                  - option "volume.mfi" [disabled]
+                  - 'option "volume.obv — Unavailable: this API requires a window axis." [disabled]'
+                  - option "volume.volume_sma" [disabled]
+                  - option "volume.vwap" [disabled]
+                - generic: Price sources
+                - generic "Price sources close":
+                  - generic: close
+                  - text: ⌄
+                - generic: Window start
+                - spinbutton "Window start": "20"
+                - generic: Window stop
+                - spinbutton "Window stop": "20"
+                - generic: Window step
+                - spinbutton "Window step": "1"
+                - generic "Materialized window values"
+              - button "Add indicator":
+                - text: Add indicator
+            - region "Trade":
+              - heading "Trade" [level=3]
+              - generic: Direction
+              - combobox "Direction":
+                - option "Long only" [selected]
+                - option "Short"
+                - option "Long/short reversal"
+              - generic: Initial cash (quote)
+              - spinbutton "Initial cash (quote)": "10000"
+              - generic: Fee (%)
+              - spinbutton "Fee (%)": "0.075"
+              - generic: Slippage (%)
+              - spinbutton "Slippage (%)": "0.01"
+              - generic: Position sizing
+              - combobox "Position sizing":
+                - option "All available capital" [selected]
+                - option "Fixed quote amount"
+                - option "Fixed equity share"
+                - option "Equity share with minimum amount"
+                - option "Equity share with maximum amount"
+            - region "Risk":
+              - heading "Risk" [level=3]
+              - switch "Take profit / Stop loss"
+              - text: Take profit / Stop loss
+            - region "Ranking":
+              - heading "Ranking" [level=3]
+              - generic: Primary metric
+              - combobox "Primary metric":
+                - option "Total return (%)" [selected]
+                - option "Return after funding (%)"
+                - option "Maximum drawdown (%)"
+                - option "Return / maximum drawdown"
+                - option "Profit factor"
+                - option "Trade Sharpe ratio"
+                - option "Winning trades (%)"
+              - generic: Ranking direction
+              - combobox "Ranking direction":
+                - option "Ascending"
+                - option "Descending" [selected]
+              - generic: Top N
+              - spinbutton "Top N": "10"
+              - generic "Server policies"
+          - status: Configuration checked
+          - button "Reset form"
+          - button "Check configuration"
+          - button "Submit backtest"
+        - generic "Preflight review Data coverage, cost and effective settings":
+          - text: Preflight review
+          - generic: Data coverage, cost and effective settings
+        - paragraph: Preflight is advisory. Submission checks data availability and admission again.
+        - region "Source coverage":
+          - heading "Source coverage · BTCUSDT" [level=3]
+          - term: Stored candles through · UTC
+          - definition: 2026-04-01T00:00:00Z
+          - term: Base NPY through · UTC
+          - definition: 2026-03-31T00:00:00Z
+          - term: Published timeframe range · UTC · 15m
+          - definition: 2026-03-26T00:00:00Z — 2026-03-31T00:00:00Z
+          - term: Closed bars / missing bars
+          - definition: 479 / 1
+          - term: Timeframe state
+          - definition: ready
+          - paragraph: Base NPY lags stored candles. Dates after the published range are not ready for Backtests.
+          - paragraph: Indicator exclusions affect precompute only. Check inputs to see whether this request needs on-demand preparation.
+        - term: Catalog updated
+        - definition: 2026-10-08T19:58:15.411680+00:00
+        - term: Maximum end · UTC
+        - definition: 2026-03-31
+        - term: As-of date
+        - definition: 2026-03-31
+        - term: Published · UTC
+        - definition: 2026-03-25T02:00:00Z
+        - region "Input readiness":
+          - heading "Input readiness" [level=3]
+          - status: Requires on-demand preparation
+          - term: Missing / requested signal rows
+          - definition: 1 / 1
+          - term: Requested risk levels
+          - definition: "0"
+          - term: Risk coverage
+          - definition: not_required
+          - term: Generated bytes · upper bound
+          - definition: 5 111 B
+          - paragraph: The worker verifies payload checksums before execution. This is an input assessment, not a completed backtest.
+        - heading "Server cost estimate" [level=3]
+        - term: Indicator rows
+        - definition: "1"
+        - term: Candidate combinations
+        - definition: "1"
+        - term: TP/SL cells
+        - definition: "0"
+        - term: Cost class
+        - definition: Small
+        - term: Scheduling class
+        - definition: Heavy
+        - heading "Funding coverage" [level=3]
+        - term: Status
+        - definition: Not applicable
+        - term: Coverage policy
+        - definition: Not applicable
+        - term: Coverage (%)
+        - definition: Unavailable
+        - term: Funding rows
+        - definition: "0"
+        - term: Expected funding events
+        - definition: "0"
+        - term: Missing funding events
+        - definition: "0"
+        - term: Coverage warnings
+        - definition: —
+        - heading "Effective settings" [level=3]
+        - generic "Server policies"
+        - paragraph: These policies come from server defaults. Effective settings are shown after checking.
+        - term: Funding
+        - definition: "Mode: Disabled · Coverage policy: Warn on incomplete coverage"
+        - term: Profit lock
+        - definition: "Enabled: Disabled"
+        - term: Close on end
+        - definition: Enabled
+        - term: Minimum-trade policy
+        - definition: "Minimum closed trades: 1"
+        - term: Direction
+        - definition: Long only
+        - term: Fee (%)
+        - definition: "0.075"
+        - term: Slippage (%)
+        - definition: "0.01"
+        - term: Ranking
+        - definition: Total return (%)
+        - term: Initial cash (quote)
+        - definition: "10000"
+        - term: Position sizing
+        - definition: "Mode: All available capital"
+        - term: Top N
+        - definition: "10"
+        - term: Start date
+        - definition: 2026-03-26
+        - term: End date
+        - definition: 2026-03-31
+        - term: As-of date
+        - definition: 2026-03-31
+        - term: Published · UTC
+        - definition: 2026-03-25T02:00:00Z
+  - region "Select a backtest":
+    - heading "Select a backtest" [level=2]
+    - paragraph: Open a job to read its identity, state and research inputs.
+    - paragraph: Open a job to observe execution. Result views and exports are not available yet.

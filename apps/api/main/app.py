@@ -22,6 +22,7 @@ from apps.api.routes import (
     build_indicators_router,
     build_operations_router,
 )
+from apps.api.routes.artifact_storage import build_artifact_storage_router
 from apps.api.routes.monitoring import build_monitoring_router
 from apps.api.wiring.modules import (
     bind_indicators_runtime_dependencies,
@@ -41,6 +42,7 @@ from apps.api.wiring.modules import (
     build_ui_strategies_dashboard_router,
     is_strategy_api_enabled,
 )
+from apps.api.wiring.modules.backtest_artifacts import build_artifact_http_router
 from trading.platform.config import load_indicators_compute_numba_config
 
 log = logging.getLogger(__name__)
@@ -136,6 +138,12 @@ def create_app(*, environ: Mapping[str, str] | None = None) -> FastAPI:
             operational_health_client=app.state.operational_health_client,
         )
     )
+    app.include_router(build_artifact_http_router(environ=effective_environ,
+        current_user_dependency=identity_module.current_user_dependency))
+    app.include_router(build_artifact_storage_router(
+        current_user_dependency=identity_module.current_user_dependency,
+        organization_service=identity_module.organization_access_service,
+        client=getattr(app.state, "control_agent_client", None)))
     live_execution_services = build_live_execution_services(environ=effective_environ)
     if is_strategy_api_enabled(environ=effective_environ):
         app.include_router(

@@ -51,75 +51,79 @@ class FundingRateCatchupCli:
         cfg = load_market_data_runtime_config(Path(ns.config))
         funding_cfg = cfg.scheduler.jobs.funding_rate_catchup
         clock = SystemClock()
-        http = RequestsHttpClient()
+        http = RequestsHttpClient.from_config(cfg, os.environ)
+        try:
 
-        settings = ClickHouseSettingsLoader(os.environ).load()
-        gateway = ClickHouseConnectGateway(_clickhouse_client(settings))
-        store = ClickHouseFundingRateStore(gateway=gateway, database=settings.database)
-        source = RestFundingRateHistorySource(
-            cfg=cfg,
-            http=http,
-            clock=clock,
-            ingest_id=uuid4(),
-            binance_standard_interval_hours=funding_cfg.binance_standard_interval_hours,
-            allow_binance_funding_info_failure_fallback=(
-                funding_cfg.allow_binance_funding_info_failure_fallback
-            ),
-        )
+            settings = ClickHouseSettingsLoader(os.environ).load()
+            gateway = ClickHouseConnectGateway(_clickhouse_client(settings))
+            store = ClickHouseFundingRateStore(gateway=gateway, database=settings.database)
+            source = RestFundingRateHistorySource(
+                cfg=cfg,
+                http=http,
+                clock=clock,
+                ingest_id=uuid4(),
+                binance_standard_interval_hours=funding_cfg.binance_standard_interval_hours,
+                allow_binance_funding_info_failure_fallback=(
+                    funding_cfg.allow_binance_funding_info_failure_fallback
+                ),
+            )
 
-        sync_uc = SyncFuturesFundingUniverseUseCase(
-            source=source,
-            store=store,
-            clock=clock,
-            market_ids=(MarketId(2), MarketId(4)),
-        )
-        if ns.sync_universe:
-            sync_report = sync_uc.run()
-            if ns.report_format == "text":
-                print(
-                    "funding-universe sync:\n"
-                    f"- instruments_total: {sync_report.instruments_total}\n"
-                    f"- with_interval: {sync_report.instruments_with_interval}\n"
-                    f"- missing_interval: {sync_report.instruments_missing_interval}\n"
-                )
-
-        catchup_uc = BackfillFundingRatesUseCase(
-            source=source,
-            writer=store,
-            universe_store=store,
-            clock=clock,
-            tail_lookback_intervals=funding_cfg.tail_lookback_intervals,
-            settlement_lag_minutes=funding_cfg.settlement_lag_minutes,
-        )
-
-        if ns.all_due:
-            report = catchup_uc.run_due_universe(
+            sync_uc = SyncFuturesFundingUniverseUseCase(
+                source=source,
+                store=store,
+                clock=clock,
                 market_ids=(MarketId(2), MarketId(4)),
+            )
+            if ns.sync_universe:
+                sync_report = sync_uc.run()
+                if ns.report_format == "text":
+                    print(
+                        "funding-universe sync:\n"
+                        f"- instruments_total: {sync_report.instruments_total}\n"
+                        f"- with_interval: {sync_report.instruments_with_interval}\n"
+                        f"- missing_interval: {sync_report.instruments_missing_interval}\n"
+                    )
+
+            catchup_uc = BackfillFundingRatesUseCase(
+                source=source,
+                writer=store,
+                universe_store=store,
+                clock=clock,
+                tail_lookback_intervals=funding_cfg.tail_lookback_intervals,
+                settlement_lag_minutes=funding_cfg.settlement_lag_minutes,
+            )
+
+            if ns.all_due:
+                report = catchup_uc.run_due_universe(
+                    market_ids=(MarketId(2), MarketId(4)),
+                    dry_run=ns.dry_run,
+                )
+                _print_report(report.to_dict(), fmt=ns.report_format)
+                return 0 if report.instruments_failed == 0 else 2
+
+            if ns.market_id is None or ns.symbol is None:
+                raise SystemExit("Either --all-due or (--market-id and --symbol) must be provided")
+
+            instrument_id = InstrumentId(MarketId(int(ns.market_id)), Symbol(str(ns.symbol)))
+            instrument = _load_or_build_instrument(
+                cfg=cfg,
+                store=store,
+                clock=clock,
+                instrument_id=instrument_id,
+                funding_interval_minutes=ns.funding_interval_minutes,
+                funding_interval_source=ns.funding_interval_source,
+            )
+            time_range = _parse_optional_time_range(start=ns.start, end=ns.end)
+            report = catchup_uc.run_single(
+                instrument=instrument,
+                time_range=time_range,
                 dry_run=ns.dry_run,
             )
             _print_report(report.to_dict(), fmt=ns.report_format)
             return 0 if report.instruments_failed == 0 else 2
 
-        if ns.market_id is None or ns.symbol is None:
-            raise SystemExit("Either --all-due or (--market-id and --symbol) must be provided")
-
-        instrument_id = InstrumentId(MarketId(int(ns.market_id)), Symbol(str(ns.symbol)))
-        instrument = _load_or_build_instrument(
-            cfg=cfg,
-            store=store,
-            clock=clock,
-            instrument_id=instrument_id,
-            funding_interval_minutes=ns.funding_interval_minutes,
-            funding_interval_source=ns.funding_interval_source,
-        )
-        time_range = _parse_optional_time_range(start=ns.start, end=ns.end)
-        report = catchup_uc.run_single(
-            instrument=instrument,
-            time_range=time_range,
-            dry_run=ns.dry_run,
-        )
-        _print_report(report.to_dict(), fmt=ns.report_format)
-        return 0 if report.instruments_failed == 0 else 2
+        finally:
+            http.close()
 
 
 def _load_or_build_instrument(

@@ -1,0 +1,42 @@
+E                                                                        [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs _
+file /Users/daniildegtyarev/Projects/roehub.com/tests/real_infra/backtest/test_artifact_integrated.py, line 122
+  def test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs(dispatch, live_jobs, tmp_path):
+E       fixture 'dispatch' not found
+>       available fixtures: _session_event_loop, anyio_backend, anyio_backend_name, anyio_backend_options, cache, capfd, capfdbinary, caplog, capsys, capsysbinary, cov, doctest_namespace, event_loop, event_loop_policy, free_tcp_port, free_tcp_port_factory, free_udp_port, free_udp_port_factory, lifecycle_database, live_jobs, monkeypatch, no_cover, pytestconfig, record_property, record_testsuite_property, record_xml_attribute, recwarn, tests/real_infra/backtest/test_artifact_integrated.py::<event_loop>, tmp_path, tmp_path_factory, tmpdir, tmpdir_factory, unused_tcp_port, unused_tcp_port_factory, unused_udp_port, unused_udp_port_factory
+>       use 'pytest --fixtures [testpath]' for help on them.
+
+/Users/daniildegtyarev/Projects/roehub.com/tests/real_infra/backtest/test_artifact_integrated.py:122
+---------------------------- Captured stdout setup -----------------------------
+Applying identity baseline SQL: 0001_identity_v1.sql
+Applying identity baseline SQL: 0002_identity_2fa_totp_v1.sql
+Applying identity baseline SQL: 0003_identity_exchange_keys_v1.sql
+identity 0004 decision: apply (identity_exchange_keys is in v1 shape and empty; 0004 is safe to apply)
+Applied identity SQL: 0004_identity_exchange_keys_v2.sql
+Applying identity baseline SQL: 0005_identity_keycloak_cutover_v1.sql
+Applying identity baseline SQL: 0006_identity_account_settings_v1.sql
+Applying identity baseline SQL: 0007_identity_exchange_audit_events_v1.sql
+Applying identity baseline SQL: 0008_exchange_connections_v1.sql
+Applying identity baseline SQL: 0009_identity_exchange_reclassification_audit_v1.sql
+Running Alembic upgrade head for POSTGRES_DSN
+Acquiring pg_advisory_lock(56329814721)
+Running: alembic upgrade head
+Migration success
+Releasing pg_advisory_lock(56329814721)
+Applying post-Alembic identity SQL: 0010_strategy_exchange_bindings_v1.sql
+Applying post-Alembic identity SQL: 0011_identity_organizations_rbac_audit_v1.sql
+Applying post-Alembic identity SQL: 0012_identity_local_auth_v1.sql
+Applying post-Alembic identity SQL: 0013_identity_oidc_provider_v1.sql
+Applying post-Alembic identity SQL: 0014_research_organization_isolation_v1.sql
+Applying post-Alembic identity SQL: 0015_trading_organization_isolation_v1.sql
+Applying post-Alembic identity SQL: 0016_notification_provider_instances_v1.sql
+Applying post-Alembic identity SQL: 0017_extensions_plugin_platform_v1alpha1.sql
+Applying post-Alembic identity SQL: 0018_artifact_store_v1.sql
+Applying post-Alembic identity SQL: 0019_isolated_job_runtime_v1.sql
+Applying post-Alembic identity SQL: 0020_execution_gateway_mainnet_safety_v1.sql
+Applying post-Alembic identity SQL: 0021_control_operation_audit_v1.sql
+Applying post-Alembic identity SQL: 0022_market_data_instrument_selections_v1.sql
+=========================== short test summary info ============================
+ERROR tests/real_infra/backtest/test_artifact_integrated.py::test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs
+3 deselected, 1 error in 3.11s

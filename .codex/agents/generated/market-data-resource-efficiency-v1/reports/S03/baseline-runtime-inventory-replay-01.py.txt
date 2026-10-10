@@ -1,0 +1,15 @@
+from pathlib import Path
+import tools.release.runtime_input_inventory as inventory
+root=Path.cwd(); baseline=root/'.cache/market-data-s03-baseline-01a1273a'
+original=Path.read_text
+def read_baseline(self,*args,**kwargs):
+    try: relative=self.resolve().relative_to(root)
+    except ValueError: return original(self,*args,**kwargs)
+    prior=baseline/relative
+    return original(prior if prior.is_file() else self,*args,**kwargs)
+Path.read_text=read_baseline
+try:
+    inventory.inventory_payload()
+except inventory.RuntimeInputInventoryError as error:
+    print(str(error))
+    raise SystemExit(1)

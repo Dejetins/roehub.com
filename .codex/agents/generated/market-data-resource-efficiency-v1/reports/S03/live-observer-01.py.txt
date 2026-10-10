@@ -1,0 +1,20 @@
+import json,time,hashlib,os
+from datetime import UTC,datetime
+import psycopg
+from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader,_clickhouse_client
+c=_clickhouse_client(ClickHouseSettingsLoader(os.environ).load())
+pg=psycopg.connect(os.environ['STRATEGY_PG_DSN'])
+pg.execute('SET default_transaction_read_only=on')
+keys=pg.execute('SELECT market_id,symbol FROM market_data_stream_connections ORDER BY market_id,symbol').fetchall()
+assert 0<len(keys)<=4
+samples=[]
+for i in range(3):
+ if i:time.sleep(65)
+ stamp=datetime.now(UTC)
+ rows=c.query('SELECT market_id,symbol,uniqExact(ts_open),min(ts_open),max(ts_open) FROM market_data.canonical_candles_1m WHERE (market_id,symbol) IN %(keys)s AND ts_open>=now()-INTERVAL 10 MINUTE AND ts_open<toStartOfMinute(now()) GROUP BY market_id,symbol SETTINGS max_threads=1,max_memory_usage=67108864',parameters={'keys':keys}).result_rows
+ states=pg.execute('SELECT market_id,symbol,connected,observed_at FROM market_data_stream_connections ORDER BY market_id,symbol').fetchall()
+ recovery=pg.execute('SELECT state,count(*) FROM market_data_stream_recovery GROUP BY state').fetchall()
+ samples.append(dict(at=stamp.isoformat(),canonical=[dict(key=hashlib.sha256(f'{m}:{s}'.encode()).hexdigest()[:12],count=n,first=str(a),last=str(b)) for m,s,n,a,b in rows],connections=[dict(key=hashlib.sha256(f'{m}:{s}'.encode()).hexdigest()[:12],connected=v,observed_at=str(t)) for m,s,v,t in states],recovery=recovery))
+ pg.commit()
+print(json.dumps({'runtime':'installed-pre-S01-unchanged','read_only':True,'samples':samples},indent=2))
+c.close();pg.close()

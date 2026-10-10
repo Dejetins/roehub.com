@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 import pytest
 from fastapi import FastAPI, HTTPException, Request
@@ -626,6 +627,7 @@ def _build_client(
     btcusdt_readiness_use_case: _FakeBTCUSDTMarketReadinessUseCase | None = None,
     organization_scope_resolver: ResearchOrganizationScopeResolver | None = _ScopeResolver(),
     selection_repository: _FakeInstrumentSelectionRepository | None = None,
+    readiness_state: str = "complete",
 ) -> tuple[TestClient, _FakeSearchEnabledTradableInstrumentsUseCase]:
     """
     Build FastAPI test client with market-data reference router and shared error handlers.
@@ -650,10 +652,14 @@ def _build_client(
     register_api_error_handlers(app=app)
     app.include_router(
         build_market_data_reference_router(
+            history_readiness=SimpleNamespace(
+                read=lambda **kw: {"state": readiness_state, "missing_candles": 1}
+            ),  # type: ignore[arg-type]
             list_enabled_markets_use_case=list_use_case,  # type: ignore[arg-type]
             search_enabled_tradable_instruments_use_case=search_use_case,  # type: ignore[arg-type]
             btcusdt_market_readiness_use_case=(
-                btcusdt_readiness_use_case or _FakeBTCUSDTMarketReadinessUseCase(
+                btcusdt_readiness_use_case
+                or _FakeBTCUSDTMarketReadinessUseCase(
                     report=_readiness_report(
                         row=_readiness_row(
                             market_id=None,
@@ -824,3 +830,18 @@ def _instrument(market_id: int, symbol: str) -> InstrumentId:
     - None.
     """
     return InstrumentId(market_id=MarketId(market_id), symbol=Symbol(symbol))
+
+
+@pytest.mark.parametrize("readiness_state", ["partial", "unknown", "empty"])
+def test_streaming_accepts_intent_before_history_is_complete(readiness_state):
+    selections = _FakeInstrumentSelectionRepository()
+    client, _ = _build_client(
+        list_use_case=_FakeListEnabledMarketsUseCase(rows=()),
+        search_use_case=_FakeSearchEnabledTradableInstrumentsUseCase(
+            rows_by_market={1: (_instrument(1, "BTCUSDT"),)}),
+        selection_repository=selections, readiness_state=readiness_state,
+    )
+    headers = {"x-user-id": "00000000-0000-0000-0000-000000000101"}
+    assert client.put("/market-data/selections/1/BTCUSDT", headers=headers).status_code == 200
+    assert selections.selected
+    assert client.delete("/market-data/selections/1/BTCUSDT", headers=headers).status_code == 200

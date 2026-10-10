@@ -1,0 +1,17 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "-c",
+    "import hatchling.build,sys; print(hatchling.build.build_wheel(sys.argv[1]))",
+    "/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/s09-wheel-final-z906_oid"
+  ],
+  "cached_runtime": "/Users/daniildegtyarev/.cache/uv/archive-v0/i-KxbO01B49kc8fJRbtI0:/Users/daniildegtyarev/.cache/uv/archive-v0/zixHoEjQk8C2xblHc0j7F:/Users/daniildegtyarev/.cache/uv/archive-v0/eG5hbz7ZopXAuzcQ0Zg1r",
+  "dependency_installation": false,
+  "exit_code": 0,
+  "output": "roehub-0.1.0-py3-none-any.whl\n",
+  "hygiene": {
+    "required_present": true,
+    "no_bytecode": true,
+    "no_cli_test": true
+  }
+}

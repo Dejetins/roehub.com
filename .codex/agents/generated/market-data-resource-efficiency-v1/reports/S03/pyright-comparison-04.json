@@ -1,0 +1,50 @@
+{
+  "baseline": {
+    "filesAnalyzed": 1617,
+    "errorCount": 54,
+    "warningCount": 0,
+    "informationCount": 0,
+    "timeInSec": 17.692
+  },
+  "candidate": {
+    "filesAnalyzed": 1624,
+    "errorCount": 56,
+    "warningCount": 0,
+    "informationCount": 0,
+    "timeInSec": 21.116
+  },
+  "new": [
+    {
+      "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/real_infra/market_data/test_work_requests_postgres.py",
+      "severity": "error",
+      "message": "Object of type \"None\" is not subscriptable",
+      "range": {
+        "start": {
+          "line": 1023,
+          "character": 11
+        },
+        "end": {
+          "line": 1023,
+          "character": 14
+        }
+      },
+      "rule": "reportOptionalSubscript"
+    },
+    {
+      "file": "/Users/daniildegtyarev/Projects/roehub.com/tests/real_infra/market_data/test_work_requests_postgres.py",
+      "severity": "error",
+      "message": "Object of type \"None\" is not subscriptable",
+      "range": {
+        "start": {
+          "line": 1023,
+          "character": 39
+        },
+        "end": {
+          "line": 1023,
+          "character": 42
+        }
+      },
+      "rule": "reportOptionalSubscript"
+    }
+  ]
+}

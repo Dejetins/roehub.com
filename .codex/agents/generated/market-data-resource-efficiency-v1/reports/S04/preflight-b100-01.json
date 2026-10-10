@@ -1,0 +1,232 @@
+{
+  "schema_version": "market-data-resource-comparison/v1",
+  "stage": "S04",
+  "label": "baseline",
+  "fixture": {
+    "streams": 100,
+    "stored_coordinates": 102,
+    "seed_minutes": 2880,
+    "sparse_every": 7,
+    "bursts": 2,
+    "cadence_s": 0.2,
+    "buffer_rows": 1000,
+    "flush_ms": 100,
+    "warmup_bursts": 3,
+    "post_drain_s": 5
+  },
+  "fixture_sha256": "421beeae708d815ec0c2eb966757a4a6b7b73320d616bc8a0552fcd8d8bfc33b",
+  "harness_sha256": "c0a3c08ee99213fbf9ebd72ce0cba44eb0a0e3009293c36b1ce9fabb1dff4760",
+  "python": "3.12.12",
+  "platform": "macOS-26.7-arm64-arm-64bit",
+  "source": ".cache/market-data-s04-baseline-20261011",
+  "samples": [
+    {
+      "elapsed_s": 1.0361256250180304,
+      "worker_child_rss_bytes": 484245504,
+      "ch": {
+        "jemalloc.allocated": 327150520.0,
+        "MemoryResident": 540123136.0,
+        "MemoryTracking": 116365606
+      },
+      "parts": 26,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 747896832,
+      "pg_cgroup_bytes": 72380416
+    },
+    {
+      "elapsed_s": 2.1306922920048237,
+      "worker_child_rss_bytes": 484573184,
+      "ch": {
+        "jemalloc.allocated": 325149344.0,
+        "MemoryResident": 535527424.0,
+        "MemoryTracking": 116808761
+      },
+      "parts": 27,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 749965312,
+      "pg_cgroup_bytes": 71540736
+    },
+    {
+      "elapsed_s": 3.2203371670329943,
+      "worker_child_rss_bytes": 484589568,
+      "ch": {
+        "jemalloc.allocated": 322944712.0,
+        "MemoryResident": 534904832.0,
+        "MemoryTracking": 116886763
+      },
+      "parts": 27,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 751325184,
+      "pg_cgroup_bytes": 70569984
+    },
+    {
+      "elapsed_s": 4.322744292032439,
+      "worker_child_rss_bytes": 484589568,
+      "ch": {
+        "jemalloc.allocated": 322105800.0,
+        "MemoryResident": 535986176.0,
+        "MemoryTracking": 117013395
+      },
+      "parts": 27,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 751591424,
+      "pg_cgroup_bytes": 71147520
+    },
+    {
+      "elapsed_s": 5.427673541998956,
+      "worker_child_rss_bytes": 484589568,
+      "ch": {
+        "jemalloc.allocated": 320757944.0,
+        "MemoryResident": 536227840.0,
+        "MemoryTracking": 117114827
+      },
+      "parts": 27,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 747192320,
+      "pg_cgroup_bytes": 70569984
+    },
+    {
+      "elapsed_s": 6.53148433304159,
+      "worker_child_rss_bytes": 484589568,
+      "ch": {
+        "jemalloc.allocated": 320317048.0,
+        "MemoryResident": 527585280.0,
+        "MemoryTracking": 117216067
+      },
+      "parts": 27,
+      "merges": 0,
+      "pg_connections": 0,
+      "ch_cgroup_bytes": 739991552,
+      "pg_cgroup_bytes": 68661248
+    }
+  ],
+  "failures": [
+    "AssertionError"
+  ],
+  "before_memory": {
+    "jemalloc.allocated": 337583872.0,
+    "MemoryResident": 534740992.0
+  },
+  "before_cgroups": {
+    "roehub-s04-pg": {
+      "memory.current": "68583424",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "cpu.stat": "usage_usec 2942892\nuser_usec 1301230\nsystem_usec 1641662\nnice_usec 0\nnr_periods 318\nnr_throttled 2\nthrottled_usec 7132\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=12808192 wbytes=96309248 rios=320 wios=4278 dbytes=0 dios=0"
+    },
+    "roehub-s04-clickhouse-1": {
+      "memory.current": "750198784",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 162",
+      "cpu.stat": "usage_usec 23246022\nuser_usec 13081072\nsystem_usec 10164950\nnice_usec 0\nnr_periods 4626\nnr_throttled 11\nthrottled_usec 910559\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=303910912 wbytes=88977408 rios=6522 wios=17148 dbytes=0 dios=0"
+    }
+  },
+  "pg_before": [
+    915,
+    0,
+    305
+  ],
+  "started_at": "2026-10-10T21:45:59.550400+00:00",
+  "child_cpu_before": 0.77,
+  "cpu_before": 1.972348,
+  "completion_s": 1.4534167500096373,
+  "occupancy_peak": [
+    200,
+    0,
+    0
+  ],
+  "loop": {
+    "p50_ms": 0.15908299246802926,
+    "p95_ms": 705.087749985978,
+    "p99_ms": 705.087749985978
+  },
+  "loop_max_ms": 715.0550410151482,
+  "parent_cpu_s": 0.5612349999999997,
+  "child_cpu_s": 0.0,
+  "family_cpu_s": 0.5612349999999997,
+  "ended_at": "2026-10-10T21:46:06.022561+00:00",
+  "post_drain_memory": {
+    "jemalloc.allocated": 319661784.0,
+    "MemoryResident": 524079104.0
+  },
+  "pg_after": [
+    1521,
+    0,
+    507
+  ],
+  "arrived": 200,
+  "accepted": 200,
+  "acknowledged": 200,
+  "pg_transactions": 606,
+  "pg_sessions_created": 202,
+  "pg_tx_per_candle": 3.03,
+  "pg_sessions_per_candle": 1.01,
+  "receive_to_ack": {
+    "p50_ms": 721.1357909836806,
+    "p95_ms": 1341.1177910165861,
+    "p99_ms": 1406.570749997627
+  },
+  "receipt_to_ack": {
+    "p50_ms": 714.1714160097763,
+    "p95_ms": 1333.7310000206344,
+    "p99_ms": 1397.7076250012033
+  },
+  "scheduled_to_ack": {
+    "p50_ms": 1246.040083002299,
+    "p95_ms": 1431.4609580324031,
+    "p99_ms": 1431.4609580324031
+  },
+  "dispatch_lag": {
+    "p50_ms": 606.9078330183402,
+    "p95_ms": 1155.176583037246,
+    "p99_ms": 1205.4936669883318
+  },
+  "canonical_count": 200,
+  "canonical_sha256": "3b75bd29ba7d5090e91296eec9fa3252b36cdc021fffbb868c32c8f61d59e3de",
+  "pending_after": 0,
+  "after_cgroups": {
+    "roehub-s04-pg": {
+      "memory.current": "66924544",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "cpu.stat": "usage_usec 3580921\nuser_usec 1552861\nsystem_usec 2028059\nnice_usec 0\nnr_periods 351\nnr_throttled 2\nthrottled_usec 7132\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=12808192 wbytes=98095104 rios=320 wios=4684 dbytes=0 dios=0"
+    },
+    "roehub-s04-clickhouse-1": {
+      "memory.current": "740868096",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 162",
+      "cpu.stat": "usage_usec 23651719\nuser_usec 13333085\nsystem_usec 10318634\nnice_usec 0\nnr_periods 4714\nnr_throttled 11\nthrottled_usec 910559\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=304095232 wbytes=97951744 rios=6567 wios=19335 dbytes=0 dios=0"
+    }
+  },
+  "query_metrics": [
+    [
+      "QueryStart",
+      4,
+      0,
+      0,
+      0
+    ],
+    [
+      "QueryFinish",
+      4,
+      634,
+      72440,
+      5770669
+    ]
+  ],
+  "checks": {
+    "all_accepted": true,
+    "canonical_content": false,
+    "all_acknowledged": true,
+    "all_canonical": true,
+    "empty_journal": true,
+    "bounded_rows": true,
+    "bounded_bytes": true,
+    "samples_ok": true
+  }
+}

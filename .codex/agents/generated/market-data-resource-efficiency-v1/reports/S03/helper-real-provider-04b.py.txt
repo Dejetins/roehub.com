@@ -1,0 +1,78 @@
+"""One selected spot instrument, twelve missing disposable minutes, no installed writes."""
+import hashlib,json,os,subprocess,time
+from dataclasses import replace
+from datetime import UTC,datetime,timedelta
+from pathlib import Path
+from typing import LiteralString,cast
+from uuid import uuid4
+import clickhouse_connect,psycopg
+from psycopg import sql
+from psycopg.conninfo import make_conninfo
+from apps.migrations.storage import split_clickhouse_sql
+from tools.qa.market_data_ingestion_comparison import PATHS
+from trading.contexts.backtest.adapters.outbound.persistence.postgres.gateway import PsycopgBacktestPostgresGateway
+from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
+from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_source import RestCandleIngestSource
+from trading.contexts.market_data.adapters.outbound.config.runtime_config import load_market_data_runtime_config
+from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import ClickHouseCanonicalCandleIndexReader,ClickHouseRawKlineWriter
+from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import ClickHouseConnectGateway
+from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_range_verifier import ClickHouseHistoryRangeVerifier
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository import PostgresMarketDataWorkRequestRepository
+from trading.contexts.market_data.application.services.work_requests import WorkRequest,MarketDataWorkRequestRunner
+from trading.contexts.market_data.application.use_cases import RestFillRange1mUseCase
+from trading.platform.time.system_clock import SystemClock
+
+def main():
+ r=Path('.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03')
+ for label in ['baseline','candidate']:
+  for n in range(1,4):
+   assert all(json.loads((r/f'{label}-M4-{n:02d}.json').read_text())['checks'].values())
+ selection_code='import os,json,psycopg; c=psycopg.connect(os.environ["STRATEGY_PG_DSN"]); c.execute("SET TRANSACTION READ ONLY"); print(json.dumps(c.execute("SELECT market_id,symbol FROM market_data_stream_connections WHERE market_id=1 AND symbol=%s",("AAVEUSDT",)).fetchall())); c.close()'
+ selected=json.loads(subprocess.check_output(['docker','exec','roehub-local-market-data-scheduler-1','python','-c',selection_code],text=True))
+ assert selected==[[1,'AAVEUSDT']], 'selected instrument changed; do not substitute'
+ output=r/'real-provider-bounded-02.json'
+ with output.open('x') as out: out.write('{}\n')
+ schema='s03_provider_'+uuid4().hex
+ dsn=make_conninfo(os.environ['ROEHUB_MARKET_DATA_TEST_DSN'],options='-c search_path='+schema)
+ cfg=load_market_data_runtime_config(Path('configs/dev/market_data.yaml'))
+ cfg=replace(cfg,markets=tuple(replace(m,rest=replace(m.rest,base_url='https://data-api.binance.vision' if m.market_id.value==1 else m.rest.base_url,timeout_s=10,retries=0,limiter=replace(m.rest.limiter,egress_scope='s03-bounded-public-egress'))) for m in cfg.markets))
+ http=RequestsHttpClient.from_config(cfg,{'STRATEGY_PG_DSN':dsn})
+ ch=clickhouse_connect.get_client(host='127.0.0.1',port=39123,username='s02_admin',password=Path('.cache/market-data-s02/private/admin').read_text())
+ pg_created=ch_created=False
+ record={'boundary':'selected installed instrument read-only; new twelve-minute disposable gap; public GET and candidate write/verification only on disposable PG/CH','provider_origin':'https://data-api.binance.vision','key':hashlib.sha256(b'1:AAVEUSDT').hexdigest()[:12]}
+ try:
+  with psycopg.connect(dsn,autocommit=True) as c:
+   c.execute(sql.SQL('CREATE SCHEMA {}').format(sql.Identifier(schema)));pg_created=True
+   c.execute('CREATE TABLE identity_organizations (organization_id uuid PRIMARY KEY,status text)')
+   c.execute('CREATE TABLE identity_memberships (organization_id uuid,user_id uuid,status text,PRIMARY KEY(organization_id,user_id))')
+   for name in ['0023_market_data_work_requests_v1.sql','0024_market_data_full_history_v1.sql','0025_market_data_work_recovery_v1.sql','0026_market_data_queue_events_v1.sql','0034_market_data_provider_admission_v1.sql']:
+    c.execute(sql.SQL(cast(LiteralString,Path('migrations/postgres',name).read_text())))
+   org,actor=uuid4(),uuid4();c.execute("INSERT INTO identity_organizations VALUES (%s,'active')",(org,));c.execute("INSERT INTO identity_memberships VALUES (%s,%s,'active')",(org,actor))
+  ch.command('CREATE DATABASE market_data');ch_created=True
+  for name in ['market_data_ddl.sql','history_source_absences_ddl.sql']:
+   for statement in split_clickhouse_sql(Path('migrations/clickhouse',name).read_text()):ch.command(statement)
+  gateway=ClickHouseConnectGateway(ch);clock=SystemClock();store=PostgresMarketDataWorkRequestRepository(gateway=PsycopgBacktestPostgresGateway(dsn=dsn),execution_dsn=dsn,execution_lock_key=744948345610)
+  fill=RestFillRange1mUseCase(source=RestCandleIngestSource(cfg,clock,http,uuid4()),writer=ClickHouseRawKlineWriter(gateway),clock=clock,max_days_per_insert=1,batch_size=10000,index_reader=ClickHouseCanonicalCandleIndexReader(gateway),history_verifier=ClickHouseHistoryRangeVerifier(gateway))
+  end=datetime.now(UTC).replace(second=0,microsecond=0)-timedelta(minutes=1);start=end-timedelta(minutes=12)
+  job=store.submit(organization_id=org,actor_user_id=actor,key=uuid4(),request=WorkRequest('candle_ingestion',1,('AAVEUSDT',),start,end),now=datetime.now(UTC))
+  record['interval']=[start.isoformat(),end.isoformat()]
+  record['before_canonical']=ch.command('SELECT count() FROM market_data.canonical_candles_1m')
+  began=time.monotonic();runner=MarketDataWorkRequestRunner(store,fill,lambda *_:None,max_windows=1,window_minutes=1440)
+  runner.run_once();record['elapsed_s']=time.monotonic()-began
+  result=store.get(organization_id=org,job_id=job['job_id']);record['job']={k:result[k] for k in ['state','completed_units','rows_read','rows_written','error_code']}
+  record['canonical']=ch.query('SELECT count(),uniqExact(ts_open),min(ts_open),max(ts_open) FROM market_data.canonical_candles_1m WHERE market_id=1 AND symbol=%(symbol)s AND ts_open>=%(start)s AND ts_open<%(end)s',parameters={'symbol':'AAVEUSDT','start':start,'end':end}).result_rows
+  with psycopg.connect(dsn) as c:
+   record['permits_after']=c.execute('SELECT count(*) FROM market_data_provider_permits').fetchone()[0]
+   record['quota_spent']=c.execute('SELECT dimension,spent FROM market_data_provider_windows ORDER BY dimension').fetchall()
+  record['verified']=record['before_canonical']==0 and result['state']=='succeeded' and record['canonical'][0][:2]==(12,12) and record['permits_after']==0
+ except Exception as e:
+  record['unavailable_reason']=type(e).__name__
+ finally:
+  http.close();
+  if ch_created:ch.command('DROP DATABASE market_data SYNC')
+  ch.close()
+  if pg_created:
+   with psycopg.connect(dsn,autocommit=True) as c:c.execute(sql.SQL('DROP SCHEMA {} CASCADE').format(sql.Identifier(schema)))
+  output.write_text(json.dumps(record,indent=2,default=str)+'\n')
+ print('bounded provider result saved')
+if __name__=='__main__':main()

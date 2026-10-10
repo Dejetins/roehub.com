@@ -1,0 +1,28 @@
+{
+  "stage": "S03-R2",
+  "status": "accepted",
+  "ledger_status": "active",
+  "receipt": "receipts/S03-R2/receipt-764f79c2beed47d498039d6b641a9174.md",
+  "receipt_validation": "pass",
+  "S04_entry_validation": "pass",
+  "S04_prompt": "04-indicator-profiles-r2.md",
+  "S04_executed": false,
+  "original_S03": "blocked; preserved",
+  "baseline_foreign_changes": [],
+  "map_review": "Only added pack inventory, knowledge counts and structural digest; all previous inventory entries identical; components and edges unchanged",
+  "map_added_paths": [
+    ".codex/agents/generated/data-artifact-management-v1/03-automatic-base-npy-r2.md",
+    ".codex/agents/generated/data-artifact-management-v1/04-indicator-profiles-r2.md",
+    ".codex/agents/generated/data-artifact-management-v1/06-api-and-storage-boundary-r2.md",
+    ".codex/agents/generated/data-artifact-management-v1/receipts/S03-R2/receipt-764f79c2beed47d498039d6b641a9174.md",
+    ".codex/agents/generated/data-artifact-management-v1/reports/S03-R2-checks.json",
+    ".codex/agents/generated/data-artifact-management-v1/reports/S03-R2.md",
+    ".codex/agents/generated/data-artifact-management-v1/reports/pack-entry-repair-checks.md",
+    ".codex/agents/generated/data-artifact-management-v1/reports/pack-entry-repair-review.md",
+    ".codex/agents/generated/data-artifact-management-v1/reports/pack-entry-repair.md",
+    ".codex/agents/generated/data-artifact-management-v1/reports/pack-repair-before-iteration-ledger.md.txt",
+    ".codex/agents/generated/data-artifact-management-v1/reports/pack-repair-before-ledger_update.py.txt",
+    ".codex/agents/generated/data-artifact-management-v1/reports/pack-repair-before-test_ledger_update.py.txt"
+  ],
+  "map_check": "Final .venv/bin/python -m tools.docs.generate_project_map and --check both exit 0; 5 artifacts up-to-date, including this evidence path"
+}

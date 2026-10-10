@@ -51,8 +51,14 @@ def preview_identity_environment(environ: Mapping[str, str]) -> dict[str, str]:
 def create_api() -> FastAPI:
     """Use the real composition roots; the optional fault is explicit test injection."""
     from apps.api.common import register_api_error_handlers
+    from apps.api.control_agent_client import build_api_control_agent_client_from_environ
+    from apps.api.operational_health_client import build_operational_health_client_from_environ
+    from apps.api.routes.admin import build_admin_router
+    from apps.api.routes.artifact_storage import build_artifact_storage_router
     from apps.api.routes.monitoring import build_monitoring_router
     from apps.api.wiring.modules.backtest import build_backtests_router
+    from apps.api.wiring.modules.backtest_artifacts import build_artifact_http_router
+    from apps.api.wiring.modules.extensions import build_extensions_api_module
     from apps.api.wiring.modules.identity import build_identity_api_module
     from apps.api.wiring.modules.market_data_reference import build_market_data_reference_router
     from apps.api.wiring.modules.research_tenancy import build_research_organization_scope_resolver
@@ -64,19 +70,71 @@ def create_api() -> FastAPI:
     )
     from tools.qa.workpages_monitoring import PreviewOperationalClient, build_preview_observer
 
+    managed = os.environ.get("ROEHUB_LOCAL_PLATFORM_MANAGED") == "1"
+    operational = build_operational_health_client_from_environ(environ=os.environ)
+    control = (
+        build_api_control_agent_client_from_environ(environ=os.environ)
+        if os.environ.get("ROEHUB_CONTROL_AGENT_SOCKET")
+        and os.environ.get("ROEHUB_CONTROL_AGENT_API_IDENTITY_FILE") else None
+    )
     identity = build_identity_api_module(environ=preview_identity_environment(os.environ))
     app = FastAPI()
     register_api_error_handlers(app=app)
     app.include_router(identity.router)
+    # Storage reads the real administrative capability snapshot. Reuse its owner
+    # checks without exposing unrelated installation/plugin mutations in preview.
+    from fastapi.routing import APIRoute
+
+    extensions = build_extensions_api_module(
+        environ={
+            **os.environ,
+            "EXTENSIONS_PG_DSN": (
+                os.environ.get("EXTENSIONS_PG_DSN") or os.environ["IDENTITY_PG_DSN"]
+            ),
+        },
+        current_user_dependency=identity.current_user_dependency,
+        organization_repository=identity.organization_repository,
+    )
+    admin = build_admin_router(
+        organization_service=identity.organization_access_service,
+        plugin_service=extensions.service,
+        current_user_dependency=identity.current_user_dependency,
+        clock=identity.clock,
+        control_agent_client=control if managed else None,
+        operational_health_client=operational,
+    )
+    admin.routes[:] = [
+        route for route in admin.routes
+        if isinstance(route, APIRoute)
+        and ((route.path == "/api/v1/admin/organizations/{organization_id}/snapshot"
+              and route.methods == {"GET"})
+             or (managed and "/operations" in route.path))
+    ]
+    app.include_router(admin)
+    app.include_router(build_artifact_http_router(
+        environ=os.environ, current_user_dependency=identity.current_user_dependency
+    ))
+    app.include_router(build_artifact_storage_router(
+        current_user_dependency=identity.current_user_dependency,
+        organization_service=identity.organization_access_service,
+        client=(
+            build_api_control_agent_client_from_environ(environ=os.environ)
+            if os.environ.get("ROEHUB_CONTROL_AGENT_SOCKET")
+            and os.environ.get("ROEHUB_CONTROL_AGENT_API_IDENTITY_FILE")
+            else None
+        ),
+    ))
     if os.environ.get("ROEHUB_MARKET_DATA_WORK_REQUESTS_ENABLED") == "1":
-        observer = build_preview_observer(os.environ)
-        app.add_event_handler("startup", observer.start)
-        app.add_event_handler("shutdown", observer.stop)
+        if operational is None:
+            observer = build_preview_observer(os.environ)
+            app.add_event_handler("startup", observer.start)
+            app.add_event_handler("shutdown", observer.stop)
+            operational = PreviewOperationalClient(observer)
         app.include_router(build_monitoring_router(
             current_user_dependency=identity.current_user_dependency,
             scope_resolver=build_research_organization_scope_resolver(environ=os.environ),
             organization_service=identity.organization_access_service,
-            health=PreviewOperationalClient(observer),
+            health=operational,
         ))
     app.include_router(build_ui_account_router(
         environ=os.environ, current_user_dependency=identity.current_user_dependency

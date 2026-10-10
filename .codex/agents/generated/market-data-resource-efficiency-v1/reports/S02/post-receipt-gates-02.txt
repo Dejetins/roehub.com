@@ -1,0 +1,17 @@
+Prior post-receipt-gates-01 used --stage incorrectly with receipt check; corrected invocation below. No report/evidence/ledger changes.
+$ python3 /Users/daniildegtyarev/.codex/skills/prompt-manager/scripts/validate_pack.py --root /Users/daniildegtyarev/Projects/roehub.com --ledger /Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/iteration-ledger.md --check receipt --receipt /Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/receipts/S02/receipt-532ed40d08db475f9f468c928e14967d.md
+{"status": "pass", "check": "receipt", "errors": [], "proof_boundary": "artifact-structure-and-file-binding"}
+
+exit=0
+$ python3 /Users/daniildegtyarev/.codex/skills/prompt-manager/scripts/validate_pack.py --root /Users/daniildegtyarev/Projects/roehub.com --ledger /Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/iteration-ledger.md --check entry --stage S03
+{"status": "pass", "check": "entry", "errors": [], "proof_boundary": "artifact-structure-and-file-binding"}
+
+exit=0
+$ uv run python -m tools.docs.generate_project_map
+OK: project map generated (5 artifacts)
+
+exit=0
+$ uv run python -m tools.docs.generate_project_map --check
+OK: project map up-to-date (5 artifacts)
+
+exit=0

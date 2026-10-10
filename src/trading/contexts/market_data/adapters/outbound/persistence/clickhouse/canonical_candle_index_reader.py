@@ -47,8 +47,8 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
         """
         q = f"""
         SELECT
-            min(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,
-            max(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
+            minOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,
+            maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
         FROM {self._table()}
         WHERE market_id = %(market_id)s
           AND symbol = %(symbol)s
@@ -93,8 +93,8 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
         """
         q = f"""
         SELECT
-            min(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,
-            max(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
+            minOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,
+            maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
         FROM {self._table()}
         WHERE market_id = %(market_id)s
           AND symbol = %(symbol)s
@@ -151,7 +151,7 @@ class ClickHouseCanonicalCandleIndexReader(CanonicalCandleIndexReader):
         )
         q = f"""
         SELECT
-            max(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
+            maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
         FROM {self._table()}
         WHERE market_id = %(market_id)s
           AND symbol = %(symbol)s

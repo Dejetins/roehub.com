@@ -22,7 +22,7 @@ def test_requests_only_uses_configured_four_worker_pool_and_drains_before_stop()
         finished = []
 
         class Runner:
-            def run_batch(self, *, executor, concurrency):
+            def run_batch(self, *, executor, concurrency, should_stop):
                 assert concurrency == 4
 
                 def work(index):
@@ -41,3 +41,24 @@ def test_requests_only_uses_configured_four_worker_pool_and_drains_before_stop()
         assert sorted(finished) == [0, 1, 2, 3]
 
     asyncio.run(exercise())
+
+
+def test_requests_only_can_expose_metrics_without_starting_history_scans(monkeypatch):
+    ports = []
+    monkeypatch.setattr(
+        "apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler.start_http_server",
+        ports.append,
+    )
+    app = object.__new__(MarketDataSchedulerApp)
+    app._config = load_market_data_runtime_config(Path("configs/dev/market_data.yaml"))
+    app._metrics_port = 9202
+    app.work_request_runner = cast(Any, object())
+    app.history_bounds_runner = None
+
+    async def exercise():
+        stopped = asyncio.Event()
+        stopped.set()
+        await app.run_work_requests(stopped, serve_metrics=True)
+
+    asyncio.run(exercise())
+    assert ports == [9202]

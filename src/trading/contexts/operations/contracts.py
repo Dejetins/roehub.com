@@ -11,6 +11,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .artifact_storage_contracts import StorageEnvelope, StorageResult
+
 _SAFE_IDENTIFIER = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 
@@ -160,13 +162,16 @@ class ControlAgentRequest(BaseModel):
     )
     identity: Literal["api", "installation_owner"]
     credential: str = Field(min_length=32, max_length=512)
-    method: Literal["submit", "get", "reconcile", "journal"]
+    method: Literal["submit", "get", "reconcile", "journal", "artifact_storage"]
+    storage: StorageEnvelope | None = None
     operation: OperationRequest | None = None
     operation_id: UUID | None = None
     after_sequence: int = Field(default=0, ge=0)
 
     @model_validator(mode="after")
     def _validate_method(self) -> ControlAgentRequest:
+        if (self.method == "artifact_storage") != (self.storage is not None):
+            raise ValueError("storage_method_mismatch")
         if self.method == "submit" and self.operation is None:
             raise ValueError("operation is required for submit")
         if self.method in {"get", "reconcile"} and self.operation_id is None:
@@ -203,6 +208,7 @@ class ControlAgentResponse(BaseModel):
     )
     status: Literal["ok", "error"]
     result: OperationResult | None = None
+    storage: StorageResult | None = None
     journal_entries: tuple[dict[str, object], ...] = ()
     error_code: str | None = None
 

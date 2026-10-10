@@ -1,0 +1,23 @@
+{
+  "verified_at": "2026-10-10",
+  "sources": [
+    {
+      "url": "https://raw.githubusercontent.com/binance/binance-spot-api-docs/master/rest-api.md",
+      "facts": "Spot klines weight 2; exchangeInfo weight 20. IP-scoped usage headers and Retry-After on 429/418. Local ceilings are conservative policy, not an exchange capacity claim."
+    },
+    {
+      "url": "https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-usd-s-m-futures/api/rest-api/market-data",
+      "facts": "Futures kline limit tiers: below100 weight1, below500 weight2, through1000 weight5, above1000 weight10. Funding history/info share500 requests per5min perIP. FundingInfo advertised weight0; candidate deliberately charges1 as conservative upper bound."
+    },
+    {
+      "url": "https://bybit-exchange.github.io/docs/v5/rate-limit",
+      "facts": "HTTP IP limit600 per5sec. Access-frequency403 requires terminating HTTP sessions and waiting at least10min. Local policy300 per5sec and50 per1sec before configured factor; manual all-participant stop/drain remains required for ban remediation."
+    }
+  ],
+  "tested_headers": [
+    "Retry-After seconds/date (parser)",
+    "X-MBX-USED-WEIGHT-1M monotonic raised spend",
+    "X-Bapi-Limit-Reset-Timestamp on limited response"
+  ],
+  "boundary": "public supported endpoints only; unknown origin/path fails closed; external non-participating clients not counted; same PG/config/egress scope required"
+}

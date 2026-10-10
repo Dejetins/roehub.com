@@ -2,30 +2,33 @@ import {useEffect, useRef, useState, type FormEvent, type ReactNode} from 'react
 import {Link, useLocation} from 'react-router';
 import {useInfiniteQuery, useQuery, useQueryClient} from '@tanstack/react-query';
 import {useTranslation} from 'react-i18next';
-import {Bell, Settings2, Shield, User} from 'lucide-react';
+import {Bell, HardDrive, Settings2, Shield, User} from 'lucide-react';
 import {z} from 'zod';
 import {ApiError} from './api';
+import {StorageSettings} from './storage-settings';
+import {SessionDevices} from './session-devices';
+import {ChartDisplayMenu} from './chart-display-menu';
 import {accountRead, accountSave, auditSchema, notificationDraft, notificationsSchema, preferencesDraft, preferencesSchema, profileDraft, profileSchema, sessionsSchema,
   validateProfile, type Notifications, type NotificationsDraft, type Preferences, type PreferencesDraft, type Profile, type ProfileDraft} from './account-api';
 import {applyDisplayPreferences} from './account-preferences';
 import {useReadSnapshot} from './read-snapshot';
 import {NavigatorTable} from './navigator-table';
-import {deniesRead, DirtyGuard, Field, formatTime, ReadFeedback, useWords, WorkError, WorkHeading} from './workspace-ui';
+import {deniesRead, DirtyGuard, Field, formatTime, ReadFeedback, useWords, WorkError} from './workspace-ui';
 
 export function SettingsPage({subject}: {subject:string}) {
   const w=useWords(), {pathname}=useLocation();
   const category=pathname.split('/')[2]??'profile';
   const categories=[{id:'profile',label:w('Profile','Профиль'),icon:User},{id:'preferences',label:w('Interface','Интерфейс'),icon:Settings2},
-    {id:'notifications',label:w('Notifications','Уведомления'),icon:Bell},{id:'security',label:w('Security','Безопасность'),icon:Shield}];
+    {id:'notifications',label:w('Notifications','Уведомления'),icon:Bell},{id:'security',label:w('Security','Безопасность'),icon:Shield},{id:'storage',label:w('Data and storage','Данные и хранение'),icon:HardDrive}];
   return <><aside className="navigator-library"><header className="panel-head"><h2>{w('Settings','Настройки')}</h2></header>
     <nav className="work-categories" aria-label={w('Settings categories','Разделы настроек')}>{categories.map(c=><Link key={c.id} to={`/settings/${c.id}`} aria-current={c.id===category?'page':undefined}><c.icon aria-hidden="true" />{c.label}</Link>)}</nav></aside>
-    <WorkHeading title={categories.find(c=>c.id===category)?.label??w('Settings','Настройки')} />
-    <div className="work-content" key={category}>{category==='profile'?<ProfileSettings subject={subject}/>:category==='preferences'?<PreferenceSettings subject={subject}/>:category==='notifications'?<NotificationSettings subject={subject}/>:<SecuritySettings subject={subject}/>}</div></>;
+    <h1 className="sr-only" id="workspace-heading" tabIndex={-1}>{categories.find(c=>c.id===category)?.label??w('Settings','Настройки')}</h1>
+    <div className="work-content work-content-no-heading" key={category}>{category==='profile'?<ProfileSettings subject={subject}/>:category==='preferences'?<PreferenceSettings subject={subject}/>:category==='notifications'?<NotificationSettings subject={subject}/>:category==='storage'?<StorageSettings key={subject} subject={subject}/>:<SecuritySettings subject={subject}/>}</div></>;
 }
 
-type EditProps<T,D>={subject:string;path:string;cachePath?:string;className?:string;schema:z.ZodType<T>;draft:(value:T)=>D;validate?:(value:D)=>Record<string,string>;
+type EditProps<T,D>={subject:string;path:string;cachePath?:string;className?:string;actionsAtEnd?:boolean;schema:z.ZodType<T>;draft:(value:T)=>D;validate?:(value:D)=>Record<string,string>;
   saved?:(value:T)=>void;children:(value:D,set:(value:D)=>void,errors:Record<string,string>,source:T)=>ReactNode};
-function AccountEditor<T,D extends object>({subject,path,cachePath=path,className='',schema,draft,validate,saved,children}:EditProps<T,D>) {
+function AccountEditor<T,D extends object>({subject,path,cachePath=path,className='',actionsAtEnd=false,schema,draft,validate,saved,children}:EditProps<T,D>) {
   const w=useWords(), client=useQueryClient();
   const query=useQuery({queryKey:['account',subject,cachePath],queryFn:({signal})=>accountRead(path,schema,signal),retry:false,refetchOnWindowFocus:false});
   const [accessLost,setAccessLost]=useState(false);
@@ -55,14 +58,16 @@ function AccountEditor<T,D extends object>({subject,path,cachePath=path,classNam
     } finally {submitting.current=false;setPending(false);}
   }
   async function refresh(){const result=await query.refetch();if(result.isSuccess){setUnknown(false);setFailure(null);setAccessLost(false);}}
+  const saveButton=<button type="submit" className="primary" disabled={!dirty || pending || unknown || snapshot.retained}>{pending?w('Saving…','Сохранение…'):w('Save changes','Сохранить')}</button>;
+  const cancelButton=<button type="button" disabled={!dirty || pending} onClick={()=>{setValue(base);setErrors({});setFailure(null);}}>{w('Cancel','Отмена')}</button>;
+  const saveStatus=<span className="work-save-status" role="status">{pending?w('Saving…','Сохранение…'):unknown?w('Result unknown','Результат неизвестен'):dirty?w('Unsaved changes','Есть несохранённые изменения'):didSave?w('Saved','Сохранено'):''}</span>;
   return <section className={`panel ${className}`}>
     <ReadFeedback pending={query.isFetching} initial={!snapshot.data} retained={snapshot.retained} error={query.error??(accessLost?failure:null)}/>
     {(query.error || accessLost || unknown) && <div className="work-actions work-recovery"><button type="button" disabled={pending || query.isFetching} onClick={()=>void refresh()}>{unknown?w('Check saved state','Проверить сохранение'):w('Try again','Повторить')}</button></div>}
     {snapshot.data!==undefined && value!==undefined && <form ref={form} className="work-form" onSubmit={submit} noValidate>
       <DirtyGuard dirty={dirty || pending}/><fieldset disabled={pending || denied || snapshot.retained || unknown} className="work-fields">{children(value,next=>{setValue(next);setDidSave(false);},errors,snapshot.data)}</fieldset>
-      <WorkError error={failure}/><div className="work-actions"><button type="submit" className="primary" disabled={!dirty || pending || unknown || snapshot.retained}>{pending?w('Saving…','Сохранение…'):w('Save changes','Сохранить')}</button>
-      <button type="button" disabled={!dirty || pending} onClick={()=>{setValue(base);setErrors({});setFailure(null);}}>{w('Cancel','Отмена')}</button>
-      <span className="work-save-status" role="status">{pending?w('Saving…','Сохранение…'):unknown?w('Result unknown','Результат неизвестен'):dirty?w('Unsaved changes','Есть несохранённые изменения'):didSave?w('Saved','Сохранено'):''}</span></div>
+      <WorkError error={failure}/><div className={`work-actions${actionsAtEnd?' work-actions-footer':''}`}>
+      {actionsAtEnd?<>{saveStatus}{cancelButton}{saveButton}</>:<>{saveButton}{cancelButton}{saveStatus}</>}</div>
     </form>}</section>;
 }
 
@@ -78,18 +83,23 @@ function ProfileSettings({subject}:{subject:string}) {
   </AccountEditor>;
 }
 
+function PreferenceMenu({name,label,value,options,onChange}:{name:string;label:string;value:string;options:[string,string][];onChange:(value:string)=>void}) {
+  return <Field name={name} label={label}><ChartDisplayMenu triggerId={name} label={label} value={options.find(([key])=>key===value)?.[1]??value}
+    options={options.map(([key,text])=>({label:text,checked:key===value,onChange:()=>onChange(key)}))}/></Field>;
+}
+
 function PreferenceSettings({subject}:{subject:string}) {
   const w=useWords(),{i18n}=useTranslation();
   const [locale,setLocale]=useState<string>();
   useEffect(()=>{if(locale){window.location.assign(`/locale?${new URLSearchParams({locale,next:'/settings/preferences'})}`);}},[locale]);
-  return <AccountEditor<Preferences,PreferencesDraft> subject={subject} path="preferences" className="work-preferences-panel" schema={preferencesSchema} draft={preferencesDraft}
+  return <AccountEditor<Preferences,PreferencesDraft> subject={subject} path="preferences" className="work-preferences-panel" actionsAtEnd schema={preferencesSchema} draft={preferencesDraft}
     validate={(value):Record<string,string>=>value.autorefresh_preset==='custom'&&(!Number.isInteger(value.refresh_interval_seconds)||value.refresh_interval_seconds<10||value.refresh_interval_seconds>1800)?{refresh_interval_seconds:'range'}:{}}
     saved={value=>{applyDisplayPreferences(value);if(value.locale!==i18n.language)setLocale(value.locale);}}>
     {(value,set,errors,source)=><>
-      <Field name="locale" label={w('Language','Язык')}><select id="locale" name="locale" value={value.locale} onChange={e=>set({...value,locale:e.target.value as 'ru'|'en'})}><option value="en">English</option><option value="ru">Русский</option></select></Field>
-      <Field name="density" label={w('Table density','Плотность таблиц')}><select id="density" value={value.density} onChange={e=>set({...value,density:e.target.value as Preferences['density']})}><option value="compact">{w('Compact','Компактная')}</option><option value="comfortable">{w('Comfortable','Свободная')}</option></select></Field>
-      <Field name="theme" label={w('Theme','Тема')}><select id="theme" value={value.theme} onChange={e=>set({...value,theme:e.target.value as Preferences['theme']})}><option value="graphite">Graphite</option><option value="terminal-orange">Orange</option><option value="matrix-green">Green</option><option value="high-contrast">{w('High contrast','Высокий контраст')}</option></select></Field>
-      <Field name="autorefresh_preset" label={w('Automatic refresh','Автообновление')}><select id="autorefresh_preset" value={value.autorefresh_preset} onChange={e=>{const preset=e.target.value;set({...value,autorefresh_preset:preset,refresh_interval_seconds:({off:0,'10s':10,'15s':15,'30s':30,'1m':60,'5m':300} as Record<string,number>)[preset]??value.refresh_interval_seconds});}}>{[...source.autorefresh.allowed_presets,'custom'].map(p=><option key={p} value={p}>{p==='off'?w('Off','Выключено'):p==='custom'?w('Custom','Свой интервал'):p}</option>)}</select></Field>
+      <PreferenceMenu name="locale" label={w('Language','Язык')} value={value.locale} options={[["en","English"],["ru","Русский"]]} onChange={locale=>set({...value,locale:locale as Preferences['locale']})}/>
+      <PreferenceMenu name="density" label={w('Table density','Плотность таблиц')} value={value.density} options={[["compact",w('Compact','Компактная')],["comfortable",w('Comfortable','Свободная')]]} onChange={density=>set({...value,density:density as Preferences['density']})}/>
+      <PreferenceMenu name="theme" label={w('Theme','Тема')} value={value.theme} options={[["graphite","Graphite"],["terminal-orange","Orange"],["matrix-green","Green"],["high-contrast",w('High contrast','Высокий контраст')]]} onChange={theme=>set({...value,theme:theme as Preferences['theme']})}/>
+      <PreferenceMenu name="autorefresh_preset" label={w('Automatic refresh','Автообновление')} value={value.autorefresh_preset} options={[...new Set([...source.autorefresh.allowed_presets,'custom'])].map(p=>[p,p==='off'?w('Off','Выключено'):p==='custom'?w('Custom','Свой интервал'):p])} onChange={preset=>set({...value,autorefresh_preset:preset,refresh_interval_seconds:({off:0,'10s':10,'15s':15,'30s':30,'1m':60,'5m':300} as Record<string,number>)[preset]??value.refresh_interval_seconds})}/>
       {value.autorefresh_preset==='custom'&&<Field name="refresh_interval_seconds" label={w('Interval · seconds','Интервал · секунды')} error={errors.refresh_interval_seconds?w('Enter 10–1800 seconds.','Укажите от 10 до 1800 секунд.'):undefined}><input id="refresh_interval_seconds" name="refresh_interval_seconds" type="number" min={source.autorefresh.min_custom_interval_seconds} max={source.autorefresh.max_custom_interval_seconds} value={value.refresh_interval_seconds} aria-invalid={!!errors.refresh_interval_seconds} aria-describedby={errors.refresh_interval_seconds?'refresh_interval_seconds-error':undefined} onChange={e=>set({...value,refresh_interval_seconds:Number(e.target.value)})}/></Field>}
     </>}
   </AccountEditor>;
@@ -112,16 +122,16 @@ function NotificationSettings({subject}:{subject:string}) {
 function SecuritySettings({subject}:{subject:string}) {
   const w=useWords();
   const [tab,setTab]=useState<'sessions'|'audit'>('sessions');
-  const history=useAccountHistory(subject,tab);
+  const history=useAccountHistory(subject,'audit',tab==='audit');
   return <NavigatorTable value={tab} onChange={id=>setTab(id as 'sessions'|'audit')} expandable={false} tabs={[
-    {id:'sessions',label:w('Sessions','Сессии'),tools:tab==='sessions'?history.status:null,content:tab==='sessions'?history.content:null},
+    {id:'sessions',label:w('Devices','Устройства'),content:tab==='sessions'?<SessionDevices subject={subject}/>:null},
     {id:'audit',label:w('Activity','События'),tools:tab==='audit'?history.status:null,content:tab==='audit'?history.content:null},
   ]}/>;
 }
 
-function useAccountHistory(subject:string,kind:'sessions'|'audit') {
+function useAccountHistory(subject:string,kind:'sessions'|'audit',enabled=true) {
   const w=useWords(),{i18n}=useTranslation(),sentinel=useRef<HTMLDivElement>(null);
-  const query=useInfiniteQuery({queryKey:['account',subject,kind],initialPageParam:'',maxPages:5,retry:false,
+  const query=useInfiniteQuery({enabled,queryKey:['account',subject,kind],initialPageParam:'',maxPages:5,retry:false,
     queryFn:async({signal,pageParam}):Promise<{items:(z.infer<typeof sessionsSchema>['items'][number]|z.infer<typeof auditSchema>['items'][number])[];next_cursor:string|null}>=>kind==='sessions'?accountRead(`sessions?limit=20${pageParam?`&cursor=${encodeURIComponent(pageParam)}`:''}`,sessionsSchema,signal):accountRead(`audit-events?limit=20${pageParam?`&cursor=${encodeURIComponent(pageParam)}`:''}`,auditSchema,signal),
     getNextPageParam:page=>page.next_cursor??undefined,
   });

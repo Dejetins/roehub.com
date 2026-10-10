@@ -1,0 +1,42 @@
+[
+  {
+    "command": [
+      ".venv/bin/python",
+      "tools/ci/route_changes.py",
+      "ci",
+      "--changed-files",
+      "/tmp/s04_changed.txt"
+    ],
+    "exit_code": 0,
+    "output": "agent_policy=false\ncode=true\ndocs=true\nrun_migrations=true\nhas_tests=true\ntest_matrix={\"include\":[{\"name\":\"backtest-artifacts\",\"target\":\"tests/unit/contexts/backtest_artifacts tests/unit/contexts/backtest/adapters/outbound/cache_fs tests/unit/contexts/backtest/adapters/outbound/artifacts_fs tests/unit/contexts/backtest/adapters/test_backtest_artifacts_runtime_config.py tests/unit/contexts/backtest/adapters/test_indicators_yaml_defaults_provider.py tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py tests/unit/contexts/backtest/application/services/v2/test_yaml_backtest_artifact_loader_v2.py tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py tests/unit/apps/cli/test_backtest_artifact_publish_cli.py tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py\"},{\"name\":\"backtest-scoring\",\"target\":\"tests/unit/contexts/backtest/application/services/v2/test_cost_permutation.py tests/unit/contexts/backtest/application/services/v2/test_local_top_k.py tests/unit/contexts/backtest/application/services/v2/test_integer_trade_tape.py tests/unit/contexts/backtest/application/services/v2/test_prefix_guard.py tests/unit/contexts/backtest/application/services/v2/test_bitsets.py tests/unit/contexts/backtest/application/services/v2/test_row_signatures.py tests/unit/contexts/backtest/application/services/v2/test_result_candles.py tests/unit/contexts/backtest/application/services/test_signals_from_indicators_v1.py tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py tests/unit/scripts/backtest tests/unit/contexts/backtest/application/services/v2/test_combo_planning_service.py tests/unit/contexts/backtest/application/services/v2/test_hit_times_compute_v2.py tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py tests/unit/contexts/backtest/application/services/v2/test_lazy_trades_detail_service.py tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py tests/unit/contexts/backtest/application/services/v2/test_short_and_tp_sl_ranking.py tests/unit/contexts/backtest/application/services/v2/test_signal_rules_engine_v2.py tests/unit/contexts/backtest/application/services/v2/test_top_result_assembly.py tests/unit/contexts/backtest/application/services/v2/test_tp_sl_exact_scoring_service.py tests/unit/contexts/backtest/application/services/v2/test_tp_sl_hit_times_service.py\"},{\"name\":\"backtest-use-cases\",\"target\":\"tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py tests/unit/contexts/backtest/application/use_cases/test_lazy_trades_materialization_worker_use_case.py tests/unit/apps/api/test_backtests_routes.py tests/unit/apps/api/test_ui_backtests_routes.py tests/unit/apps/worker/backtest_job_runner tests/unit/apps/worker/test_backtest_job_runner.py\"},{\"name\":\"backtest-domain\",\"target\":\"tests/unit/contexts/backtest/adapters/outbound/test_postgres_research_organization_scope.py tests/unit/contexts/backtest/application/services/test_organization_scoped_market_data.py tests/unit/contexts/backtest/application/services/test_research_identity.py tests/unit/contexts/backtest/application/test_backtest_errors.py tests/unit/contexts/backtest/application/services/v2/test_admission.py tests/unit/contexts/backtest/application/services/v2/test_input_recipe_contracts.py tests/unit/contexts/backtest/application/services/v2/test_input_recipe_replay.py tests/unit/contexts/backtest/application/services/v2/test_backtest_preflight_service.py tests/unit/contexts/backtest/domain\"}]}\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_docs_index",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "OK: /Users/daniildegtyarev/Projects/roehub.com/docs/architecture/README.md is up-to-date.\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_project_map",
+      "--check"
+    ],
+    "exit_code": 1,
+    "output": "Project map is out-of-date: docs/architecture/project-map/PROJECT_MAP.md, docs/architecture/project-map/project-map.json\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      ".codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "output": "test_accept_requires_real_readable_evidence_and_report (__main__.LedgerUpdateTests.test_accept_requires_real_readable_evidence_and_report) ... ok\ntest_changed_plan_invalidates_accepted_dependency (__main__.LedgerUpdateTests.test_changed_plan_invalidates_accepted_dependency) ... ok\ntest_changed_updater_and_missing_entry_fail (__main__.LedgerUpdateTests.test_changed_updater_and_missing_entry_fail) ... ok\ntest_directory_lock_rejects_concurrent_transaction (__main__.LedgerUpdateTests.test_directory_lock_rejects_concurrent_transaction) ... ok\ntest_foreign_owner_and_out_of_order_fail_without_mutation (__main__.LedgerUpdateTests.test_foreign_owner_and_out_of_order_fail_without_mutation) ... ok\ntest_missing_future_input_preserves_executing_stage (__main__.LedgerUpdateTests.test_missing_future_input_preserves_executing_stage) ... ok\ntest_need_input_resume_and_terminal_block (__main__.LedgerUpdateTests.test_need_input_resume_and_terminal_block) ... ok\ntest_reconcile_preserves_terminal_history_and_completes_replacement (__main__.LedgerUpdateTests.test_reconcile_preserves_terminal_history_and_completes_replacement) ... ok\ntest_reconcile_rejects_changed_acceptance_even_with_bound_prompt (__main__.LedgerUpdateTests.test_reconcile_rejects_changed_acceptance_even_with_bound_prompt) ... ok\ntest_reconcile_rejects_missing_old_updater_and_changed_prompt (__main__.LedgerUpdateTests.test_reconcile_rejects_missing_old_updater_and_changed_prompt) ... ok\ntest_reconcile_rejects_stale_baseline_without_write (__main__.LedgerUpdateTests.test_reconcile_rejects_stale_baseline_without_write) ... ok\ntest_reconcile_uses_same_directory_lock_and_cannot_repeat_claim (__main__.LedgerUpdateTests.test_reconcile_uses_same_directory_lock_and_cannot_repeat_claim) ... ok\ntest_sequential_receipts_and_final_completion (__main__.LedgerUpdateTests.test_sequential_receipts_and_final_completion) ... ok\ntest_two_competing_claims_have_one_winner (__main__.LedgerUpdateTests.test_two_competing_claims_have_one_winner) ... ok\n\n----------------------------------------------------------------------\nRan 14 tests in 1.945s\n\nOK\n"
+  }
+]

@@ -52,6 +52,8 @@
 
 | Компонент | Версия | Лицензия | Статус |
 |---|---:|---|---|
+| `${RUNTIME_IMAGE}` | `unversioned` | `LicenseRef-Installation-Runtime` | `conditional` |
+| ↳ обязательство |  |  | Local control image inherits the installation-owned runtime supplied through RUNTIME_IMAGE (default roehub/local-runtime:managed). Resolve and retain the actual runtime digest and its existing dependency notices before distributing a built image; this variable is not a fixed third-party release image. |
 | `alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce` | `14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce` | `LicenseRef-Alpine-Base-Image` | `conditional` |
 | ↳ обязательство |  |  | Audit packages and layers for the final release digest and preserve all required notices and corresponding-source offers. |
 | `clickhouse/clickhouse-server:24.8` | `24.8` | `Apache-2.0` | `compatible` |
@@ -62,6 +64,8 @@
 | ↳ обязательство |  |  | Build-only image for the OpenBao derivative; preserve toolchain and base-image notices in provenance. |
 | `docker.io/library/node@sha256:ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6` | `ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6` | `MIT AND LicenseRef-Debian-Base-Image` | `conditional` |
 | ↳ обязательство |  |  | Build-only image for the OpenBao UI; preserve toolchain and base-image notices in provenance. |
+| `docker:28.5.1-cli@sha256:9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad` | `9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad` | `Apache-2.0 AND LicenseRef-Alpine-Base-Image` | `conditional` |
+| ↳ обязательство |  |  | Only Docker CLI and Compose plugin binaries are copied into the local controller. Preserve upstream Docker/Compose Apache-2.0 notices and audit the copied binaries for each distributed image digest; the Alpine base layer is a build-stage input. |
 | `ghcr.io/astral-sh/uv:0.8.4@sha256:40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0` | `40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0` | `Apache-2.0 OR MIT` | `compatible` |
 | `ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a` | `8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a` | `MPL-2.0 AND MIT` | `conditional` |
 | ↳ обязательство |  |  | Preserve the exact modified OpenBao corresponding source, Roehub patch, MPL-2.0 and MIT license texts, and derivative notice for this digest. |
@@ -108,6 +112,10 @@
 
 | Компонент | Версия | Лицензия | Статус |
 |---|---:|---|---|
+| `Binance exchange identifier` | `2026-10-04` | `LicenseRef-Exchange-Trademark` | `conditional` |
+| ↳ обязательство |  |  | Exchange-owned trademark used solely to identify a market source; preserve the unmodified asset and provenance in apps/navigator-web/src/assets/exchanges/README.md. No Apache-2.0 grant or endorsement is asserted for the brand asset. |
+| `Bybit exchange identifier` | `2026-10-04` | `LicenseRef-Exchange-Trademark` | `conditional` |
+| ↳ обязательство |  |  | Exchange-owned trademark used solely to identify a market source; preserve the unmodified asset and provenance in apps/navigator-web/src/assets/exchanges/README.md. No Apache-2.0 grant or endorsement is asserted for the brand asset. |
 | `htmx` | `1.9.12` | `0BSD` | `compatible` |
 | `lightweight-charts-notice` | `5.2.0` | `Apache-2.0 AND 0BSD` | `compatible` |
 | `lightweight-charts` | `5.2.0` | `Apache-2.0 AND 0BSD` | `compatible` |

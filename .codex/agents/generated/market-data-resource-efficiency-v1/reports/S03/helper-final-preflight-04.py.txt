@@ -1,0 +1,13 @@
+import os,sys,subprocess,json
+from pathlib import Path
+root=Path.cwd();candidate=root/'.cache/market-data-s03-candidate-04-01a1273a';baseline=root/'.cache/market-data-s03-baseline-01a1273a';r=root/'.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03'
+env=dict(os.environ,PYTHONPATH=str(candidate/'src')+os.pathsep+str(candidate))
+for label,n,source in [('baseline',3,baseline),('candidate',6,candidate)]:
+ output=r/f'exploratory-{label}-{n:02d}.json'
+ cmd=[sys.executable,str(root/'.cache/market-data-s03/run.py'),str(candidate/'tools/qa/market_data_ingestion_comparison.py'),'--source',str(source),'--label',label,'--output',str(output),'--windows','1','--fast','0.01','--slow','0.1','--collector-count','2']
+ if not output.exists():
+  with Path(str(output)+'.txt').open('x') as log:subprocess.run(cmd,env=env,stdout=log,stderr=subprocess.STDOUT)
+ checks=json.loads(output.read_text())['checks']
+ assert all(value for key,value in checks.items() if key!='required_window'),checks
+ assert checks['required_window'] is False,checks
+ print(label,'completed',flush=True)

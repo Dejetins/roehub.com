@@ -1,0 +1,5 @@
+"""Inject only in the actual scheduler parent; keep resource_tracker lightweight."""
+import sys
+
+if '-m' in sys.orig_argv and 'apps.scheduler.market_data_scheduler.main.main' in sys.orig_argv:
+    import s03_memory_app  # noqa: F401

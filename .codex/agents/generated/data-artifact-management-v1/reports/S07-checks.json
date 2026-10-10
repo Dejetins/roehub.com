@@ -1,0 +1,43 @@
+[
+  {
+    "command": [
+      "node_modules/.bin/vitest",
+      "run",
+      "src/data-artifacts.test.tsx",
+      "src/data-page.test.tsx",
+      "src/api.test.ts",
+      "src/read-snapshot.test.tsx",
+      "src/query-client.test.ts"
+    ],
+    "exit_code": 0,
+    "output": "\n RUN  v5.0.0 /Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web\n\n\n Test Files  5 passed (5)\n      Tests  86 passed (86)\n   Start at  22:41:51\n   Duration  7.81s (tests 65%, environment 21%, import 9%, transform 5%)\n\n"
+  },
+  {
+    "command": [
+      "node_modules/.bin/tsc",
+      "--noEmit"
+    ],
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "command": [
+      "node_modules/.bin/vite",
+      "build",
+      "--outDir",
+      "../../.cache/s07-dist"
+    ],
+    "exit_code": 0,
+    "output": "vite v8.2.2 building client environment for production...\ntransforming...\n\u2713 2722 modules transformed.\n\n(!) outDir /Users/daniildegtyarev/Projects/roehub.com/.cache/s07-dist is not inside project root and will not be emptied.\nUse --emptyOutDir to override.\n\nrendering chunks...\ncomputing gzip size...\n../../.cache/s07-dist/.vite/manifest.json              0.37 kB \u2502 gzip:   0.19 kB\n../../.cache/s07-dist/assets/binance-gMyT8r3V.ico      4.28 kB\n../../.cache/s07-dist/assets/main-DphVVrcU.css       134.51 kB \u2502 gzip:  23.28 kB\n../../.cache/s07-dist/assets/main-DS6u7huv.js      1,513.57 kB \u2502 gzip: 475.64 kB\n\n\u2713 built in 264ms\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+  },
+  {
+    "command": [
+      ".venv/bin/ruff",
+      "check",
+      "apps/navigator-web/e2e/artifact_fixture.py",
+      "apps/navigator-web/e2e/artifact_scenarios.py"
+    ],
+    "exit_code": 0,
+    "output": "All checks passed!\n"
+  }
+]

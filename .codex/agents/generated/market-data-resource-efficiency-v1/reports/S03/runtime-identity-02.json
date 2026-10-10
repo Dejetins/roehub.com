@@ -1,0 +1,58 @@
+{
+  "containers": [
+    {
+      "name": "/roehub-s03-postgres",
+      "image": "sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d",
+      "configured_image": "postgres:16",
+      "memory": 536870912,
+      "nano_cpus": 1000000000,
+      "started": "2026-10-10T19:15:24.377338302Z"
+    },
+    {
+      "name": "/roehub-s03-clickhouse-1",
+      "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+      "configured_image": "clickhouse/clickhouse-server@sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+      "memory": 1610612736,
+      "nano_cpus": 2000000000,
+      "started": "2026-10-10T19:21:37.331715794Z"
+    },
+    {
+      "name": "/roehub-local-market-data-scheduler-1",
+      "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "configured_image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "memory": 402653184,
+      "nano_cpus": 1000000000,
+      "started": "2026-10-10T11:39:22.132550636Z"
+    },
+    {
+      "name": "/roehub-local-market-data-ws-1",
+      "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "configured_image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "memory": 1073741824,
+      "nano_cpus": 1000000000,
+      "started": "2026-10-10T11:43:18.545674009Z"
+    },
+    {
+      "name": "/roehub-local-clickhouse-1",
+      "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+      "configured_image": "clickhouse/clickhouse-server@sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+      "memory": 1610612736,
+      "nano_cpus": 2000000000,
+      "started": "2026-10-09T22:24:58.955795211Z"
+    }
+  ],
+  "installed_source_hashes": {
+    "http": "7072489aa0fc61a4dd885c38c79fd832d7ebdcb1432e5edf20739b59ab5d747d",
+    "work_requests": "92306a6b56bad02ca6fc0837c910e868f6a95290f0f594773b8f242b2a48ee18"
+  },
+  "host": "macOS-26.7-arm64-arm-64bit-Mach-O",
+  "architecture": "arm64",
+  "host_cores": "18",
+  "host_memory_bytes": "38654705664",
+  "fixture_config": {
+    ".cache/market-data-s03/ch-compose.yaml": "a6b94066574c5f0471960b254acd9b0cfab917e9e5e3eb380057a5ca02205ef1",
+    "configs/dev/clickhouse-local-profiles.xml": "dd47892ff7081ad82f7daf8ea806d53330049d5114b325a8265aa6668ffb4ef4",
+    "configs/dev/clickhouse-local-observability.xml": "f0dd55cc97bf61e587599c8640f6b44f08f5e21d1bf226f08d3595ac1ff4a507"
+  },
+  "scope": "read-only identities; no environment or credential values; installed services unchanged"
+}

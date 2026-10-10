@@ -1,0 +1,112 @@
+[
+  {
+    "command": [
+      "uv",
+      "run",
+      "ruff",
+      "check",
+      "apps/worker/market_data_ws/wiring/modules/market_data_ws.py",
+      "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/async_stream_recovery_store.py",
+      "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+      "src/trading/contexts/market_data/application/services/batched_recovery.py",
+      "src/trading/contexts/market_data/application/services/insert_buffer.py",
+      "src/trading/contexts/market_data/application/services/rest_fill_queue.py",
+      "tests/real_infra/market_data/test_stream_recovery_postgres.py",
+      "tests/unit/apps/worker/test_persistent_writer.py",
+      "tests/unit/contexts/market_data/application/services/test_async_recovery_admission.py",
+      "tools/qa/market_data_recovery_comparison.py"
+    ],
+    "exit_code": 1,
+    "output": "gate-final-00.txt",
+    "sha256": "8618fa681c7e8d87917462627c188b953293e222d4c7a3539a8007b41e350982"
+  },
+  {
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "-m",
+      "tools.docs.generate_docs_index",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "gate-final-01.txt",
+    "sha256": "401ab7824560aed6da162e0f88076ac89f8ca62bb69b00b739e0ae679b23326f"
+  },
+  {
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "-m",
+      "tools.docs.generate_runbooks",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "gate-final-02.txt",
+    "sha256": "81897f702a64f6f2c6e6ec82b5b51bd328092a1bb03a0ca3877e022d709f7984"
+  },
+  {
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "-m",
+      "tools.artifacts.generate_schemas",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "gate-final-03.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "-m",
+      "tools.backup.generate_schemas",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "gate-final-04.txt",
+    "sha256": "64745fcc631a9a26268a4d1b4f3a1157a5b3a3d9d937bea8f34ead3c82e7db27"
+  },
+  {
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "tools/release/generate_runtime_topology.py",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "gate-final-05.txt",
+    "sha256": "435e28ce8aa4a86fc264a8faeb548a4cf1a443ae3c3663e674a1ccf9e0a30d9d"
+  },
+  {
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "tools/release/runtime_input_inventory.py",
+      "--check"
+    ],
+    "exit_code": 1,
+    "output": "gate-final-06.txt",
+    "sha256": "2a713bd02875e920b36e12b0ff43fc7ddbb7c7380708925f7de7d828642308e4"
+  },
+  {
+    "command": [
+      "uv",
+      "run",
+      "python",
+      "-m",
+      "tools.jobs.generate_schemas",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "gate-final-07.txt",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+]

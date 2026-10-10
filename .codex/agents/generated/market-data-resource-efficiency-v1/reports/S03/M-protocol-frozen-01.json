@@ -1,0 +1,107 @@
+{
+  "sequence": [
+    [
+      "baseline",
+      1
+    ],
+    [
+      "candidate",
+      1
+    ],
+    [
+      "candidate",
+      2
+    ],
+    [
+      "baseline",
+      2
+    ],
+    [
+      "baseline",
+      3
+    ],
+    [
+      "candidate",
+      3
+    ]
+  ],
+  "commands": [
+    [
+      "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python3",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03/run.py",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-01a1273a/tools/qa/market_data_ingestion_comparison.py",
+      "--source",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-baseline-01a1273a",
+      "--label",
+      "baseline",
+      "--output",
+      "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M-01.json"
+    ],
+    [
+      "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python3",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03/run.py",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-01a1273a/tools/qa/market_data_ingestion_comparison.py",
+      "--source",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-01a1273a",
+      "--label",
+      "candidate",
+      "--output",
+      "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M-01.json"
+    ],
+    [
+      "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python3",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03/run.py",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-01a1273a/tools/qa/market_data_ingestion_comparison.py",
+      "--source",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-01a1273a",
+      "--label",
+      "candidate",
+      "--output",
+      "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M-02.json"
+    ],
+    [
+      "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python3",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03/run.py",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-01a1273a/tools/qa/market_data_ingestion_comparison.py",
+      "--source",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-baseline-01a1273a",
+      "--label",
+      "baseline",
+      "--output",
+      "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M-02.json"
+    ],
+    [
+      "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python3",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03/run.py",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-01a1273a/tools/qa/market_data_ingestion_comparison.py",
+      "--source",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-baseline-01a1273a",
+      "--label",
+      "baseline",
+      "--output",
+      "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M-03.json"
+    ],
+    [
+      "/Users/daniildegtyarev/Projects/roehub.com/.venv/bin/python3",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03/run.py",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-01a1273a/tools/qa/market_data_ingestion_comparison.py",
+      "--source",
+      "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-01a1273a",
+      "--label",
+      "candidate",
+      "--output",
+      "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M-03.json"
+    ]
+  ],
+  "warmup_s": 60,
+  "steady_s": 300,
+  "windows": 6,
+  "concurrency": 4,
+  "quota_concurrency": 4,
+  "delay_s": {
+    "normal": 1.2,
+    "slow": 3
+  },
+  "sampling_s": 1,
+  "claim": "local replay only; full completion; no numerical threshold"
+}

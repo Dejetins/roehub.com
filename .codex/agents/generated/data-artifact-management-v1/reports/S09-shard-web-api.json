@@ -1,0 +1,18 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "-ra",
+    "tests/unit/apps/web",
+    "tests/unit/apps/api/test_ui_account_routes.py",
+    "tests/unit/apps/api/test_ui_backtests_routes.py",
+    "tests/unit/apps/api/test_ui_dashboard_routes.py",
+    "tests/unit/apps/api/test_ui_strategy_dashboard_routes.py"
+  ],
+  "exit_code": 0,
+  "output": "........................................................................ [ 64%]\n........................................                                 [100%]\n=============================== warnings summary ===============================\ntests/unit/apps/web/test_app_routes.py::test_public_landing_shows_current_user_when_auth_cookie_is_present\ntests/unit/apps/web/test_app_routes.py::test_locale_cookie_selects_russian_shell_without_localizing_routes\ntests/unit/apps/web/test_app_routes.py::test_invalid_locale_cookie_falls_back_to_english\ntests/unit/apps/web/test_web_v2_1_routes.py::test_login_gateway_is_public_and_authenticated_root_redirects_to_overview\n  /Users/daniildegtyarev/Projects/roehub.com/.venv/lib/python3.12/site-packages/httpx/_client.py:822: DeprecationWarning: Setting per-request cookies=<...> is being deprecated, because the expected behaviour on cookie persistence is ambiguous. Set cookies directly on the client instance instead.\n    warnings.warn(message, DeprecationWarning)\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n112 passed, 4 warnings in 3.40s\n",
+  "environment_overrides": {
+    "PYTHONPATH": ".",
+    "NUMBA_NUM_THREADS": "12"
+  }
+}

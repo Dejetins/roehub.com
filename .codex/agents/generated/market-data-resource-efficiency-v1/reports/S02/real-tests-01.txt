@@ -1,0 +1,53 @@
+F....................                                                    [100%]
+=================================== FAILURES ===================================
+_______________ test_real_grants_mv_and_normal_scheduler_funding _______________
+
+workloads = (<clickhouse_connect.driver.httpclient.HttpClient object at 0x107e43e00>, 'resource_s02_grants_3e6f46a0e579419e957ff3f....HttpClient object at 0x11bbe2ed0>, 'stream': <clickhouse_connect.driver.httpclient.HttpClient object at 0x1081567b0>})
+
+    def test_real_grants_mv_and_normal_scheduler_funding(workloads):
+        admin, db, clients = workloads
+        for w in ("stream", "backfill"):
+>           raw_insert(clients[w], db, "BTCUSDT", 29453760, 2, "s02_grants")
+
+tests/real_infra/market_data/test_clickhouse_workloads.py:70: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/qa/market_data_mixed_load.py:115: in raw_insert
+    client.command(
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/httpclient.py:351: in command
+    response = self._raw_request(payload, params, headers, method, fields=fields, server_wait=False)
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/httpclient.py:462: in _raw_request
+    self._error_handler(response)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <clickhouse_connect.driver.httpclient.HttpClient object at 0x1081567b0>
+response = <urllib3.response.HTTPResponse object at 0x11d5ac2e0>
+retried = False
+
+    def _error_handler(self, response: HTTPResponse, retried: bool = False) -> None:
+        if self.show_clickhouse_errors:
+            try:
+                err_content = get_response_data(response)
+            except Exception:  # pylint: disable=broad-except
+                err_content = None
+            finally:
+                response.close()
+    
+            err_str = f'HTTPDriver for {self.url} returned response code {response.status}'
+            err_code = response.headers.get(ex_header)
+            if err_code:
+                err_str = f'HTTPDriver for {self.url} received ClickHouse error code {err_code}'
+            if err_content:
+                err_msg = common.format_error(err_content.decode(errors='backslashreplace'))
+                if err_msg.startswith('Code'):
+                    err_str = f'{err_str}\n {err_msg}'
+        else:
+            err_str = 'The ClickHouse server returned an error.'
+    
+>       raise OperationalError(err_str) if retried else DatabaseError(err_str) from None
+E       clickhouse_connect.driver.exceptions.DatabaseError: HTTPDriver for http://127.0.0.1:38123 received ClickHouse error code 497
+E        Code: 497. DB::Exception: roehub_stream: Not enough privileges. To execute this query, it's necessary to have the grant SELECT(market_id, symbol, instrument_key, open_time, close_time, open, high, low, close, volume, quote_asset_volume, number_of_trades, taker_buy_base_asset_volume, taker_buy_quote_asset_volume, source, ingested_at, ingest_id) ON resource_s02_grants_3e6f46a0e579419e957ff3f989799cd4.raw_binance_klines_1m: while pushing to view resource_s02_grants_3e6f46a0e579419e957ff3f989799cd4.mv_raw_binance_to_canonical_1m. (ACCESS_DENIED) (version 25.8.33.6 (official build))
+
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/httpclient.py:385: DatabaseError
+=========================== short test summary info ============================
+FAILED tests/real_infra/market_data/test_clickhouse_workloads.py::test_real_grants_mv_and_normal_scheduler_funding
+1 failed, 20 passed in 20.30s

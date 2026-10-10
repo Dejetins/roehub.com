@@ -2425,7 +2425,7 @@ def _build_operation_reads(*, settings, environ):
     from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_reader import (  # noqa: E501
         ClickHouseCanonicalCandleReader,
     )
-    config = ClickHouseSettingsLoader(environ).load()
+    config = ClickHouseSettingsLoader(environ).load(workload="interactive")
     gateway = ThreadLocalClickHouseConnectGateway(client_factory=lambda: _clickhouse_client(config))
     return StrategyOperationReads(
         PostgresStrategyOperationReader(_build_live_execution_gateway(settings=settings)),

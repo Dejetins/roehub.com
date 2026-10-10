@@ -1,0 +1,555 @@
+{
+  "boundary": "55 one-second idle samples after complete final series and fixture deletion; six runs each separately record a five-second post-drain snapshot. Not a long-term leak/stability test.",
+  "samples": [
+    {
+      "at_s": 7.919734343886375e-07,
+      "memory": {
+        "jemalloc.allocated": 613150608.0,
+        "MemoryResident": 777797632.0
+      },
+      "tracked": 537759454,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 966078464
+    },
+    {
+      "at_s": 1.1418304580147378,
+      "memory": {
+        "jemalloc.allocated": 613198152.0,
+        "MemoryResident": 780300288.0
+      },
+      "tracked": 537835342,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 968065024
+    },
+    {
+      "at_s": 2.200053124979604,
+      "memory": {
+        "jemalloc.allocated": 613207144.0,
+        "MemoryResident": 781996032.0
+      },
+      "tracked": 537910958,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 968773632
+    },
+    {
+      "at_s": 3.2661257500294596,
+      "memory": {
+        "jemalloc.allocated": 613223984.0,
+        "MemoryResident": 783638528.0
+      },
+      "tracked": 537986702,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 969248768
+    },
+    {
+      "at_s": 4.318412750028074,
+      "memory": {
+        "jemalloc.allocated": 613303136.0,
+        "MemoryResident": 783667200.0
+      },
+      "tracked": 538062190,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 970096640
+    },
+    {
+      "at_s": 5.390049542009365,
+      "memory": {
+        "jemalloc.allocated": 613310104.0,
+        "MemoryResident": 782143488.0
+      },
+      "tracked": 537877454,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 968900608
+    },
+    {
+      "at_s": 6.438934916979633,
+      "memory": {
+        "jemalloc.allocated": 613241176.0,
+        "MemoryResident": 782528512.0
+      },
+      "tracked": 537953070,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 968826880
+    },
+    {
+      "at_s": 7.478822792007122,
+      "memory": {
+        "jemalloc.allocated": 613228512.0,
+        "MemoryResident": 782372864.0
+      },
+      "tracked": 538043498,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 971804672
+    },
+    {
+      "at_s": 8.529834582994226,
+      "memory": {
+        "jemalloc.allocated": 613240704.0,
+        "MemoryResident": 784809984.0
+      },
+      "tracked": 538119178,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 968908800
+    },
+    {
+      "at_s": 9.594040166994091,
+      "memory": {
+        "jemalloc.allocated": 612975664.0,
+        "MemoryResident": 799440896.0
+      },
+      "tracked": 538415360,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 987942912
+    },
+    {
+      "at_s": 10.64233379199868,
+      "memory": {
+        "jemalloc.allocated": 613012640.0,
+        "MemoryResident": 800059392.0
+      },
+      "tracked": 538483384,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 990724096
+    },
+    {
+      "at_s": 11.704989875026513,
+      "memory": {
+        "jemalloc.allocated": 613093360.0,
+        "MemoryResident": 800665600.0
+      },
+      "tracked": 538559000,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 988594176
+    },
+    {
+      "at_s": 12.755422000016551,
+      "memory": {
+        "jemalloc.allocated": 613081368.0,
+        "MemoryResident": 800780288.0
+      },
+      "tracked": 538634744,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 989569024
+    },
+    {
+      "at_s": 13.823082541988697,
+      "memory": {
+        "jemalloc.allocated": 613078896.0,
+        "MemoryResident": 800026624.0
+      },
+      "tracked": 538710360,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 988975104
+    },
+    {
+      "at_s": 14.877244958013762,
+      "memory": {
+        "jemalloc.allocated": 612362368.0,
+        "MemoryResident": 799997952.0
+      },
+      "tracked": 537954264,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 988614656
+    },
+    {
+      "at_s": 15.951986083004158,
+      "memory": {
+        "jemalloc.allocated": 612466088.0,
+        "MemoryResident": 800264192.0
+      },
+      "tracked": 538029816,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 988442624
+    },
+    {
+      "at_s": 17.000569791998714,
+      "memory": {
+        "jemalloc.allocated": 612440696.0,
+        "MemoryResident": 785063936.0
+      },
+      "tracked": 538105624,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 973123584
+    },
+    {
+      "at_s": 18.075737332983408,
+      "memory": {
+        "jemalloc.allocated": 612502296.0,
+        "MemoryResident": 785293312.0
+      },
+      "tracked": 538181304,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 972537856
+    },
+    {
+      "at_s": 19.119831999996677,
+      "memory": {
+        "jemalloc.allocated": 612475504.0,
+        "MemoryResident": 784355328.0
+      },
+      "tracked": 538256856,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 973398016
+    },
+    {
+      "at_s": 20.15970312501304,
+      "memory": {
+        "jemalloc.allocated": 611931808.0,
+        "MemoryResident": 782950400.0
+      },
+      "tracked": 537717708,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974110720
+    },
+    {
+      "at_s": 21.207927583018318,
+      "memory": {
+        "jemalloc.allocated": 611955152.0,
+        "MemoryResident": 784703488.0
+      },
+      "tracked": 537793324,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974565376
+    },
+    {
+      "at_s": 22.24290591699537,
+      "memory": {
+        "jemalloc.allocated": 611853352.0,
+        "MemoryResident": 785600512.0
+      },
+      "tracked": 537869004,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974360576
+    },
+    {
+      "at_s": 23.295936041977257,
+      "memory": {
+        "jemalloc.allocated": 611899136.0,
+        "MemoryResident": 785670144.0
+      },
+      "tracked": 537944556,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974462976
+    },
+    {
+      "at_s": 24.352826041984372,
+      "memory": {
+        "jemalloc.allocated": 611840560.0,
+        "MemoryResident": 785461248.0
+      },
+      "tracked": 538020108,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974352384
+    },
+    {
+      "at_s": 25.40103170799557,
+      "memory": {
+        "jemalloc.allocated": 611835784.0,
+        "MemoryResident": 783597568.0
+      },
+      "tracked": 538095724,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974217216
+    },
+    {
+      "at_s": 26.469863292004447,
+      "memory": {
+        "jemalloc.allocated": 611830400.0,
+        "MemoryResident": 785174528.0
+      },
+      "tracked": 538171340,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 975007744
+    },
+    {
+      "at_s": 27.514064332994167,
+      "memory": {
+        "jemalloc.allocated": 611860504.0,
+        "MemoryResident": 786038784.0
+      },
+      "tracked": 538246892,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974831616
+    },
+    {
+      "at_s": 28.557796332985163,
+      "memory": {
+        "jemalloc.allocated": 611876304.0,
+        "MemoryResident": 785289216.0
+      },
+      "tracked": 538322380,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974831616
+    },
+    {
+      "at_s": 29.603015707980376,
+      "memory": {
+        "jemalloc.allocated": 611306016.0,
+        "MemoryResident": 781307904.0
+      },
+      "tracked": 537778430,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 971644928
+    },
+    {
+      "at_s": 30.6488024580176,
+      "memory": {
+        "jemalloc.allocated": 611282368.0,
+        "MemoryResident": 782983168.0
+      },
+      "tracked": 537854046,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 973012992
+    },
+    {
+      "at_s": 31.69540283299284,
+      "memory": {
+        "jemalloc.allocated": 611203816.0,
+        "MemoryResident": 783917056.0
+      },
+      "tracked": 537929662,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 973336576
+    },
+    {
+      "at_s": 32.772054000000935,
+      "memory": {
+        "jemalloc.allocated": 611286088.0,
+        "MemoryResident": 783675392.0
+      },
+      "tracked": 538005278,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 973266944
+    },
+    {
+      "at_s": 33.81259854201926,
+      "memory": {
+        "jemalloc.allocated": 611237568.0,
+        "MemoryResident": 783372288.0
+      },
+      "tracked": 538080830,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974086144
+    },
+    {
+      "at_s": 34.851919375010766,
+      "memory": {
+        "jemalloc.allocated": 611278488.0,
+        "MemoryResident": 782614528.0
+      },
+      "tracked": 538156446,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 972279808
+    },
+    {
+      "at_s": 35.898106166976504,
+      "memory": {
+        "jemalloc.allocated": 611219184.0,
+        "MemoryResident": 783736832.0
+      },
+      "tracked": 538232062,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 972009472
+    },
+    {
+      "at_s": 36.938210875028744,
+      "memory": {
+        "jemalloc.allocated": 611207408.0,
+        "MemoryResident": 783826944.0
+      },
+      "tracked": 538307678,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 972611584
+    },
+    {
+      "at_s": 37.97928154200781,
+      "memory": {
+        "jemalloc.allocated": 611147296.0,
+        "MemoryResident": 783663104.0
+      },
+      "tracked": 538383166,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 972251136
+    },
+    {
+      "at_s": 39.01806529198075,
+      "memory": {
+        "jemalloc.allocated": 611098984.0,
+        "MemoryResident": 783687680.0
+      },
+      "tracked": 538458718,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 973381632
+    },
+    {
+      "at_s": 40.07002533302875,
+      "memory": {
+        "jemalloc.allocated": 610495824.0,
+        "MemoryResident": 781033472.0
+      },
+      "tracked": 537998596,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 972169216
+    },
+    {
+      "at_s": 41.1198354170192,
+      "memory": {
+        "jemalloc.allocated": 610426904.0,
+        "MemoryResident": 782770176.0
+      },
+      "tracked": 538074212,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 973099008
+    },
+    {
+      "at_s": 42.1689975829795,
+      "memory": {
+        "jemalloc.allocated": 610425968.0,
+        "MemoryResident": 783663104.0
+      },
+      "tracked": 538149764,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974106624
+    },
+    {
+      "at_s": 43.215020291972905,
+      "memory": {
+        "jemalloc.allocated": 610331136.0,
+        "MemoryResident": 785428480.0
+      },
+      "tracked": 538225316,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974389248
+    },
+    {
+      "at_s": 44.259323166974355,
+      "memory": {
+        "jemalloc.allocated": 610311928.0,
+        "MemoryResident": 785674240.0
+      },
+      "tracked": 538300932,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974516224
+    },
+    {
+      "at_s": 45.3034775829874,
+      "memory": {
+        "jemalloc.allocated": 610307400.0,
+        "MemoryResident": 783138816.0
+      },
+      "tracked": 538376420,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 971653120
+    },
+    {
+      "at_s": 46.35697537497617,
+      "memory": {
+        "jemalloc.allocated": 610185608.0,
+        "MemoryResident": 783253504.0
+      },
+      "tracked": 538452036,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 972517376
+    },
+    {
+      "at_s": 47.3968623750261,
+      "memory": {
+        "jemalloc.allocated": 610223912.0,
+        "MemoryResident": 783347712.0
+      },
+      "tracked": 538527716,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 972132352
+    },
+    {
+      "at_s": 48.45228374999715,
+      "memory": {
+        "jemalloc.allocated": 610192016.0,
+        "MemoryResident": 783577088.0
+      },
+      "tracked": 538603268,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 973533184
+    },
+    {
+      "at_s": 49.495827791979536,
+      "memory": {
+        "jemalloc.allocated": 610084312.0,
+        "MemoryResident": 784494592.0
+      },
+      "tracked": 538059126,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 973508608
+    },
+    {
+      "at_s": 50.53860116697615,
+      "memory": {
+        "jemalloc.allocated": 609438024.0,
+        "MemoryResident": 784351232.0
+      },
+      "tracked": 538134678,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974880768
+    },
+    {
+      "at_s": 51.6106071670074,
+      "memory": {
+        "jemalloc.allocated": 609435200.0,
+        "MemoryResident": 785457152.0
+      },
+      "tracked": 538210230,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974581760
+    },
+    {
+      "at_s": 52.664963875024114,
+      "memory": {
+        "jemalloc.allocated": 609308616.0,
+        "MemoryResident": 785596416.0
+      },
+      "tracked": 538285846,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 974647296
+    },
+    {
+      "at_s": 53.713179374986794,
+      "memory": {
+        "jemalloc.allocated": 609308992.0,
+        "MemoryResident": 784379904.0
+      },
+      "tracked": 538361334,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 973225984
+    },
+    {
+      "at_s": 54.76890458300477,
+      "memory": {
+        "jemalloc.allocated": 609134528.0,
+        "MemoryResident": 781725696.0
+      },
+      "tracked": 538176390,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 971804672
+    },
+    {
+      "at_s": 55.82498879201012,
+      "memory": {
+        "jemalloc.allocated": 609047416.0,
+        "MemoryResident": 782307328.0
+      },
+      "tracked": 538252006,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 971374592
+    },
+    {
+      "at_s": 56.866076292004436,
+      "memory": {
+        "jemalloc.allocated": 608989184.0,
+        "MemoryResident": 782417920.0
+      },
+      "tracked": 538327622,
+      "active_fixture_merges": 0,
+      "cgroup_memory": 972959744
+    }
+  ]
+}

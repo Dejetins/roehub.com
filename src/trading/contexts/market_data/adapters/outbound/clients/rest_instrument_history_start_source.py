@@ -16,6 +16,7 @@ from trading.contexts.market_data.application.ports.sources.instrument_history_s
     InstrumentHistoryStartSource,
 )
 from trading.contexts.market_data.application.services.minute_utils import floor_to_minute_utc
+from trading.contexts.market_data.application.services.source_retry import TemporarySourceError
 from trading.shared_kernel.primitives import InstrumentId, UtcTimestamp
 
 log = logging.getLogger(__name__)
@@ -72,7 +73,8 @@ class RestInstrumentHistoryStartSource(InstrumentHistoryStartSource):
         - Minute-level UTC timestamp or `None` when no symbol-specific bound is known.
 
         Assumptions/Invariants:
-        - Network or payload failures degrade to `None` instead of breaking scheduler planning.
+        - Temporary source/admission failures propagate for durable retry; invalid payloads
+          degrade to `None`.
         """
         cache_key = _cache_key(instrument_id)
         with self._lock:
@@ -83,6 +85,8 @@ class RestInstrumentHistoryStartSource(InstrumentHistoryStartSource):
         try:
             resolved = self._resolve_history_start(market=market, instrument_id=instrument_id)
             should_cache = True
+        except TemporarySourceError:
+            raise
         except Exception:  # noqa: BLE001
             log.warning(
                 "history-start resolve failed for market=%s symbol=%s; " "%s",

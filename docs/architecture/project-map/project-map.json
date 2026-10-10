@@ -118,7 +118,7 @@
   ],
   "areas": [
     {
-      "file_count": 698,
+      "file_count": 729,
       "id": "domain",
       "paths": [
         "src/trading/contexts/"
@@ -140,7 +140,7 @@
       "title": "Shared kernel и платформа"
     },
     {
-      "file_count": 473,
+      "file_count": 517,
       "id": "delivery",
       "paths": [
         "apps/"
@@ -149,7 +149,7 @@
       "title": "Приложения и delivery"
     },
     {
-      "file_count": 231,
+      "file_count": 239,
       "id": "operations",
       "paths": [
         "infra/",
@@ -162,7 +162,7 @@
       "title": "Инфраструктура и эксплуатация"
     },
     {
-      "file_count": 117,
+      "file_count": 125,
       "id": "automation",
       "paths": [
         "tools/",
@@ -172,7 +172,7 @@
       "title": "Инструменты и автоматизация"
     },
     {
-      "file_count": 465,
+      "file_count": 491,
       "id": "quality",
       "paths": [
         "tests/",
@@ -183,7 +183,7 @@
       "title": "Проверки и тестовые данные"
     },
     {
-      "file_count": 2543,
+      "file_count": 3416,
       "id": "knowledge",
       "paths": [
         "docs/",
@@ -254,7 +254,7 @@
         "apps/api/main/app.py",
         "apps/api/main/main.py"
       ],
-      "file_count": 54,
+      "file_count": 60,
       "id": "app:api",
       "kind": "app",
       "name": "api",
@@ -269,6 +269,7 @@
       ],
       "used_by": [
         "app:cli",
+        "app:navigator-web",
         "app:scheduler",
         "worker:backtest_job_runner"
       ]
@@ -332,6 +333,8 @@
     },
     {
       "depends_on": [
+        "context:backtest",
+        "context:backtest_artifacts",
         "context:operations"
       ],
       "description": "Единственная host-side граница управления Docker Engine.",
@@ -339,7 +342,7 @@
       "entrypoints": [
         "apps/control_agent/main/main.py"
       ],
-      "file_count": 9,
+      "file_count": 11,
       "id": "app:control_agent",
       "kind": "app",
       "name": "control_agent",
@@ -349,6 +352,7 @@
       ],
       "used_by": [
         "app:api",
+        "app:navigator-web",
         "app:roehubctl",
         "worker:job_runtime"
       ]
@@ -443,17 +447,27 @@
       ]
     },
     {
-      "depends_on": [],
+      "depends_on": [
+        "app:api",
+        "app:control_agent",
+        "context:backtest",
+        "context:backtest_artifacts",
+        "context:identity",
+        "context:operations",
+        "core:shared_kernel"
+      ],
       "description": "Navigator candidate prototype; not the accepted platform baseline.",
       "docs": [],
       "entrypoints": [],
-      "file_count": 106,
+      "file_count": 136,
       "id": "app:navigator-web",
       "kind": "app",
       "name": "navigator-web",
       "roots": [
         "apps/navigator-web",
+        "apps/navigator-web/e2e",
         "apps/navigator-web/src",
+        "apps/navigator-web/src/assets/exchanges",
         "apps/navigator-web/src/test-data"
       ],
       "used_by": []
@@ -549,7 +563,7 @@
         "apps/scheduler/backtest_artifact_publisher/main/main.py",
         "apps/scheduler/market_data_scheduler/main/main.py"
       ],
-      "file_count": 12,
+      "file_count": 17,
       "id": "app:scheduler",
       "kind": "app",
       "name": "scheduler",
@@ -652,7 +666,9 @@
       ],
       "used_by": [
         "app:api",
+        "app:control_agent",
         "app:migrations",
+        "app:navigator-web",
         "app:scheduler",
         "context:backtest_artifacts",
         "context:market_data",
@@ -672,7 +688,7 @@
       "description": "Публикация и чтение артефактов бектеста.",
       "docs": [],
       "entrypoints": [],
-      "file_count": 39,
+      "file_count": 53,
       "id": "context:backtest_artifacts",
       "kind": "context",
       "name": "backtest_artifacts",
@@ -686,16 +702,19 @@
         "src/trading/contexts/backtest_artifacts/adapters/outbound/config",
         "src/trading/contexts/backtest_artifacts/adapters/outbound/defaults",
         "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence",
+        "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse",
         "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres",
-        "src/trading/contexts/backtest_artifacts/application",
-        "src/trading/contexts/backtest_artifacts/application/ports"
+        "src/trading/contexts/backtest_artifacts/application"
       ],
       "used_by": [
         "app:api",
         "app:cli",
+        "app:control_agent",
+        "app:navigator-web",
         "app:scheduler",
         "context:backtest",
         "context:market_data",
+        "context:operations",
         "worker:backtest_job_runner",
         "worker:job_runtime"
       ]
@@ -764,6 +783,7 @@
       ],
       "description": "Пользователь, сессия, владение и доступ.",
       "docs": [
+        "docs/architecture/identity/browser-devices-verification-2026-10-10.md",
         "docs/architecture/identity/exchange-connections-stage-reports/00-baseline-current-state.md",
         "docs/architecture/identity/exchange-connections-stage-reports/01-security-baseline.md",
         "docs/architecture/identity/exchange-connections-stage-reports/02-exchange-control-process.md",
@@ -787,11 +807,10 @@
         "docs/architecture/identity/exchange-connections-stage-reports/10e-trading-cjm-production-readiness.md",
         "docs/architecture/identity/exchange-connections-stage-reports/11-strategy-binding-guard.md",
         "docs/architecture/identity/exchange-connections-stage-reports/12-omni-market-create-ui-api.md",
-        "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md",
-        "docs/architecture/identity/identity-2fa-totp-policy-v1.md"
+        "docs/architecture/identity/exchange-connections-stage-reports/identity-exchange-connections-live-trading-v1-iteration-ledger.md"
       ],
       "entrypoints": [],
-      "file_count": 75,
+      "file_count": 77,
       "id": "context:identity",
       "kind": "context",
       "name": "identity",
@@ -813,6 +832,7 @@
         "app:api",
         "app:cli",
         "app:migrations",
+        "app:navigator-web",
         "context:exchange_control",
         "context:extensions"
       ]
@@ -964,12 +984,13 @@
         "docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md"
       ],
       "entrypoints": [],
-      "file_count": 113,
+      "file_count": 127,
       "id": "context:market_data",
       "kind": "context",
       "name": "market_data",
       "roots": [
         "src/trading/contexts/market_data",
+        "src/trading/contexts/market_data/adapters/outbound",
         "src/trading/contexts/market_data/adapters/outbound/clients",
         "src/trading/contexts/market_data/adapters/outbound/clients/binance",
         "src/trading/contexts/market_data/adapters/outbound/clients/bybit",
@@ -979,8 +1000,7 @@
         "src/trading/contexts/market_data/adapters/outbound/messaging",
         "src/trading/contexts/market_data/adapters/outbound/messaging/redis",
         "src/trading/contexts/market_data/adapters/outbound/persistence",
-        "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse",
-        "src/trading/contexts/market_data/adapters/outbound/persistence/postgres"
+        "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse"
       ],
       "used_by": [
         "app:api",
@@ -992,6 +1012,7 @@
         "context:indicators",
         "context:strategy",
         "core:platform",
+        "worker:backtest_job_runner",
         "worker:market_data_ws",
         "worker:strategy_live_runner"
       ]
@@ -1090,13 +1111,15 @@
       ]
     },
     {
-      "depends_on": [],
+      "depends_on": [
+        "context:backtest_artifacts"
+      ],
       "description": "Типизированные host-операции, идемпотентность и аварийный журнал.",
       "docs": [
         "docs/architecture/operations/native-service-control-monitoring-admin-target-v1.md"
       ],
       "entrypoints": [],
-      "file_count": 9,
+      "file_count": 10,
       "id": "context:operations",
       "kind": "context",
       "name": "operations",
@@ -1107,6 +1130,7 @@
       "used_by": [
         "app:api",
         "app:control_agent",
+        "app:navigator-web",
         "app:roehubctl",
         "worker:job_runtime"
       ]
@@ -1331,6 +1355,7 @@
         "app:cli",
         "app:exchange_execution",
         "app:migrations",
+        "app:navigator-web",
         "app:scheduler",
         "context:backtest",
         "context:backtest_artifacts",
@@ -1357,6 +1382,7 @@
         "context:backtest",
         "context:backtest_artifacts",
         "context:indicators",
+        "context:market_data",
         "core:platform",
         "core:shared_kernel"
       ],
@@ -1365,7 +1391,7 @@
       "entrypoints": [
         "apps/worker/backtest_job_runner/main/main.py"
       ],
-      "file_count": 15,
+      "file_count": 16,
       "id": "worker:backtest_job_runner",
       "kind": "worker",
       "name": "backtest_job_runner",
@@ -1704,6 +1730,16 @@
     {
       "kind": "python-import",
       "source": "app:control_agent",
+      "target": "context:backtest"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:control_agent",
+      "target": "context:backtest_artifacts"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:control_agent",
       "target": "context:operations"
     },
     {
@@ -1779,6 +1815,41 @@
     {
       "kind": "python-import",
       "source": "app:migrations",
+      "target": "core:shared_kernel"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:navigator-web",
+      "target": "app:api"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:navigator-web",
+      "target": "app:control_agent"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:navigator-web",
+      "target": "context:backtest"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:navigator-web",
+      "target": "context:backtest_artifacts"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:navigator-web",
+      "target": "context:identity"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:navigator-web",
+      "target": "context:operations"
+    },
+    {
+      "kind": "python-import",
+      "source": "app:navigator-web",
       "target": "core:shared_kernel"
     },
     {
@@ -1998,6 +2069,11 @@
     },
     {
       "kind": "python-import",
+      "source": "context:operations",
+      "target": "context:backtest_artifacts"
+    },
+    {
+      "kind": "python-import",
       "source": "context:rl_trading",
       "target": "context:live_execution"
     },
@@ -2070,6 +2146,11 @@
       "kind": "python-import",
       "source": "worker:backtest_job_runner",
       "target": "context:indicators"
+    },
+    {
+      "kind": "python-import",
+      "source": "worker:backtest_job_runner",
+      "target": "context:market_data"
     },
     {
       "kind": "python-import",
@@ -2693,6 +2774,1476 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/01-contracts-and-baseline.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/02-policies-and-durable-jobs.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/03-automatic-base-npy-r2.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/03-automatic-base-npy.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/04-indicator-profiles-r2.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/04-indicator-profiles.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/05-scheduling-and-progress.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/06-api-and-storage-boundary-r2.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/06-api-and-storage-boundary.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/07-data-artifacts-ui.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/08-storage-and-backtest-readiness.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/09-integrated-proof.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/implementation-plan.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/iteration-ledger.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": ".codex/agents/generated/data-artifact-management-v1/ledger_update.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/receipts/S01/receipt-7354485337e543428eb1d672b3fbe808.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/receipts/S02/receipt-29065e5e121f49a7a6d1986a778e7b93.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/receipts/S03-R2/receipt-764f79c2beed47d498039d6b641a9174.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/receipts/S04/receipt-3cc212eec0074cf0850ce99c05608c11.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/receipts/S05/receipt-b3eea8aa864f4a8fa6c9f52978aa5bdf.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/receipts/S06/receipt-bf6360d5378b4ae19f0471b3f997ff55.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/receipts/S07/receipt-badaa709a40b447487f6249c6b4b1bf5.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/receipts/S08/receipt-0c2df17ddf804a39b943763968cdf408.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/receipts/S09/receipt-85365f69c88542ea84385f11c813098a.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/PROJECT_MAP.md-S03-before.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S01-baseline.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S01-catalog.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S01-data-baseline.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S01-review.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S01-source-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S01-verification.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S01.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S02-baseline.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S02-review.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S02-source-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S02-verification.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S02.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-R2-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-R2-handoff-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-R2.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-acceptance-blocker.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-baseline.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-final-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-owned-paths.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-ownership-check.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-real-infra-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-review.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-routed-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-source-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-static-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03-verification.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S03.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-administrative-initial.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-baseline.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-PROJECT_MAP.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-artifact_array_loader.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-artifact_manifest_loader.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-artifact_manifest_validator.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-artifact_precompute_runner.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-automatic_base.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-backtest-service-artifact-runtime-v1.ru.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-component-map.mmd.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-contracts.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-hit_times_compute_v2.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-management.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-management_catalog.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-before-project-map.json.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-final-docs-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-final-focused-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-owned-paths.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-ownership-check.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-pyright-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-pyright-final.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-pyright-initial.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-real-infra-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-review.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-routed-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-ruff-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-ruff-final.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-ruff-initial.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04-source-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S04.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-baseline.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-artifact_precompute_coordinator.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-artifact_precompute_runner.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-backtest_artifact_publisher.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-bootstrap.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-management.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-management_repository.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-manifest.json.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-map-PROJECT_MAP.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-map-component-map.mmd.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-map-project-map.json.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-runtime-doc.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-storage.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-test_artifact_management.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-before-test_storage_lifecycle.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-diff-check.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-lint.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-migration.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-ownership.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-physical.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-postgres.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-python-paths.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-review.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-source-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-types.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05-unit.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S05.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-baseline.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-app.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-backtest-service-artifact-runtime-v1.ru.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-bootstrap.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-contracts.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-control-main.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-control_agent_client.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-management.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-management_repository.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-manifest.json.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-map-PROJECT_MAP.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-map-component-map.mmd.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-map-project-map.json.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-offline-release-installation.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-server.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-storage.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-test_storage_lifecycle.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-before-unix_client.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-housekeeping.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-lint.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-map-ownership.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-map.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-migration.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-owned-paths.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-ownership.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-real.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-review.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-source-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-types.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-unit.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06-whitespace.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S06.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-baseline-delta.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-baseline.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-before-data-page.tsx.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-before-data-workspace.css.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-coverage.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-denied.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-desktop-before-polish.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-final-dom.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-history.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-mixed-bulk.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-narrow.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-other-subject.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-owned-paths.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-retry-after.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-review.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-unknown-command.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07-viewer.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S07.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-admin-denied.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-api-negative.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-backtest-journey.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-backtest-materialization.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-backtest-materialization.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-baseline.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-before-builder-api.ts.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-before-builder-model.ts.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-before-builder.tsx.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-before-client-routes.ts.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-before-navigator_preview.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-before-settings-page.tsx.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-beyond-npy.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-checks.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-cleanup-preview.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-existing-config-reload.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-first-config-db.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-first-configured.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-ownership.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-relocation-required.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-review.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-source-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-denied-final.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-denied-final.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-denied.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-desktop-final.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-final-desktop.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-final-narrow.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-final-overview.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-narrow.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-unavailable.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S08.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-admin-storage-denied.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-backtest-preflight.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-backtest-preflight.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-baseline.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-apps_navigator-web_README.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-artifact_service.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-base_storage_admission.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-dispatch_repository.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-docs_architecture_backtest_backtest-service-artifact-runtime-v1.ru.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-docs_architecture_market_data_market-data-reference-api-v1.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-docs_architecture_project-map_PROJECT_MAP.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-docs_architecture_project-map_component-map.mmd.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-docs_architecture_project-map_project-map.json.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-docs_runbooks_offline-release-installation.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-managed_app.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-managed_worker.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-before-test_artifact_dispatch.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-browser-console.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-bulk-update.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-candles-history.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-candles-stream.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-cleanup.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-cumulative-paths.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-evidence-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-final-gates.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-final-map.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-frontend.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-integrated-fifth.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-integrated-first.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-integrated-fourth.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-integrated-second.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-integrated-third.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-migrations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-owned-paths.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-ownership.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-profile-saved.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-pyright-bound-fixtures.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-pyright-final.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-real-infra-final.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-real-infra-initial.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-receipt-validation.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-regressions-first.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-regressions-red.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-restored-fixture-runtime.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-review.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-routing.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-ruff-global.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-scoring-budget.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-shard-apps-platform.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-shard-backtest-artifacts.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-shard-backtest-domain.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-shard-backtest-scoring.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-shard-backtest-use-cases.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-shard-market-identity-strategy.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-shard-platform-contracts.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-shard-web-api.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-shards-final-summary.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-source-bindings.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-static-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-static-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-static-2.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-static-3.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-static-4.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-static-5.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-static-6.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-static-7.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-static-8.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-static-9.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-storage-cleanup-protected.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-storage.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-tooling-attribution.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-type-before-apps_navigator-web_e2e_artifact_fixture.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-type-before-apps_navigator-web_e2e_artifact_scenarios.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-type-before-apps_navigator-web_e2e_storage_fixture.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-type-before-apps_navigator-web_e2e_storage_preflight.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-type-before-tests_real_infra_backtest_test_artifact_dispatch.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-type-before-tests_real_infra_backtest_test_artifact_http_storage.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-type-before-tests_real_infra_backtest_test_automatic_base_lifecycle.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-type-before-tests_real_infra_backtest_test_managed_derivative_publication.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-type-before-tests_unit_apps_scheduler_test_backtest_artifact_publisher_app.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-type-before-tests_unit_contexts_backtest_artifacts_test_automatic_base.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-type-before-tests_unit_contexts_backtest_artifacts_test_derivative_profiles.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-ui-build-final.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-ui-build.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-wheel-final.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09-wheel.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/S09.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/artifact-runtime-S03-before.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/artifact_slot_publisher-S03-before.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/component-map.mmd-S03-before.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/market_data_scheduler-S03-before.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/market_data_ws-S03-before.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/pack-entry-repair-checks.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/pack-entry-repair-review.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/pack-entry-repair.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/pack-repair-before-iteration-ledger.md.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/pack-repair-before-ledger_update.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/pack-repair-before-test_ledger_update.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/data-artifact-management-v1/reports/project-map.json-S03-before.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": ".codex/agents/generated/data-artifact-management-v1/test_ledger_update.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/agents/generated/identity-exchange-connections-live-trading-v1/00-freeze-current-exchange-key-baseline.md"
     },
     {
@@ -3024,6 +4575,2581 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/agents/generated/market-data-live-tail-repair-v1/07-stage-12-4-rerun-handoff.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/01-indexed-source-reconciliation.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/02-clickhouse-workload-budgets.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/03-rolling-ingestion-and-provider-limits.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/04-async-batched-recovery.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/implementation-plan.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/iteration-ledger.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/ledger_update.py"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/receipts/S01/receipt-49e8873d578647438adb6993ffc19e13.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/receipts/S02/receipt-532ed40d08db475f9f468c928e14967d.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/receipts/S03/receipt-dc1e2658ffe44ccd9528581fc8a7dcc0.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/receipts/S04/receipt-33c297169bfc4ad8a089b383928ae2a6.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/baseline-01a126d3/git-status.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/baseline-01a126d3/identity.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/baseline-01a126d3/pyright.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/baseline-01a126d3/sources.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/baseline-01a126d3/tests.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/candidate-pyright-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/candidate-pyright-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/candidate-pyright-final.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/candidate-sources-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/candidate-sources-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/candidate-sources-final.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/candidate-tests-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/candidate-tests-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/candidate-tests-final.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/comparison-102-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/comparison-102-cadence-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/disposable-cleanup-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/docs-final.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/evidence-sha256.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/generated-docs-prechange.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/index-only-1020-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/installed-source-identity-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/live-candidate-read-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/live-pre-rollout-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/owned-changes-01.diff"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/owned-changes-final.diff"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/prechange-replay-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/pyright-comparison.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/ruff-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/ruff-final.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/ruff-verified.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/runtime-config-hashes-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/runtime-identity-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/runtime-samples-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/scoped-pyright-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/scoped-pyright-final.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S01/updater-tests-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/analysis-02.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/api-ablation-01.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/api-only-ablation-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/artifact-retry-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/artifact-retry-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/artifact-retry-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/artifact-retry-05.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/artifact-retry-06.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/baseline-integrity-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/cleanup-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/cleanup-followup-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/client-inventory-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/comparison-exclusions-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/cross-process-caps-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/cross-process-caps-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/diagnostic-attempt-notes-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/docs-check-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/docs-precheck-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/durable-pressure-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/durable-pressure-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/durable-pressure-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/durable-pressure-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/evidence-sha256-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-01-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-01-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-01-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-01-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-01-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-01-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-02-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-02-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-02-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-02-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-02-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-02-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-baseline-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-01-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-01-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-01-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-01-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-01-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-01-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-03-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-03-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-03-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-03-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-03-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-03-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/exploratory-candidate-api-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-01-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-01-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-01-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-01-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-01-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-01-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-02-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-02-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-02-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-02-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-02-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-02-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-baseline-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-01-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-01-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-01-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-01-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-01-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-01-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-02-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-02-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-02-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-02-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-02-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-02-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-1-candidate-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-baseline-02-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-baseline-02-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-baseline-02-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-baseline-02-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-baseline-02-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-baseline-02-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-baseline-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-candidate-02-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-candidate-02-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-candidate-02-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-candidate-02-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-candidate-02-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-candidate-02-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-2-candidate-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-baseline-02-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-baseline-02-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-baseline-02-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-baseline-02-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-baseline-02-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-baseline-02-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-baseline-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-candidate-02-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-candidate-02-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-candidate-02-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-candidate-02-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-candidate-02-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-candidate-02-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/final-mixed-3-candidate-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/foreign-fixtures-attribution-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/foreign-fixtures-baseline-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/foreign-fixtures-baseline-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/foreign-fixtures-selected-ast-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/gates-final-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/idle-probe-01.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/installation-tests-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/ledger-tests-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/live-pre-rollout-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/map-check-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/map-check-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/map-generate-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/mixed-analysis-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/mixed-workload-frozen-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/mixed-workload-frozen-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/owned-changes-final-01.diff"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/paired-baseline-1-lanes/artifacts-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/paired-baseline-1-lanes/artifacts-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/paired-baseline-1-lanes/backfill-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/paired-baseline-1-lanes/backfill-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/paired-baseline-1-lanes/interactive-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/paired-baseline-1-lanes/stream-0.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/paired-baseline-1.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/paired-runner-02.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/performance-review-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/post-receipt-gates-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/post-receipt-gates-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/post-series-idle-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/prior-identities-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/private-env-runner-01.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/private-test-runner-02.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/pyright-baseline-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/pyright-comparison-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/pyright-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/pyright-final-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/real-tests-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/recreate-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/recreate-smoke-03.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/required-tests-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/required-tests-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/required-tests-final-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/ruff-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/ruff-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/ruff-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/ruff-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/runtime-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/runtime-identity-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/scoped-pyright-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/scoped-pyright-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/scoped-pyright-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/scoped-pyright-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/security-probes-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/security-review-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/security-tests-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/security-tests-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/security-tests-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/source-owned-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/source-owned-pre-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/tail-investigation-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/tests-baseline-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/tests-candidate-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/unit-expanded-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/unit-expanded-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/M-aborted-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/M-aborted-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/M-protocol-frozen-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/M-protocol-frozen-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/M-protocol-frozen-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/M-protocol-frozen-04.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/M3-aborted-capacity-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/M3-capacity-boundary-pause-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/M4-analysis-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/artifact-schema-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/artifact-schema-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/backup-schema-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/backup-schema-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M2-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M2-01.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M2-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M3-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M3-01.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M3-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M4-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M4-01.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M4-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M4-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M4-02.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M4-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M4-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M4-03.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-M4-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-git-status-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-pyright-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-pyright-stderr-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-real-pg-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-runtime-inventory-replay-01.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-runtime-inventory-replay-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-source-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-supplement-cli-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-supplement-generated-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-supplement-prod-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/baseline-unit-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/bounds-unit-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M3-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M3-01.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M3-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M4-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M4-01.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M4-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M4-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M4-02.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M4-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M4-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M4-03.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-M4-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-freeze-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-freeze-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-freeze-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/candidate-freeze-04.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/disposable-cleanup-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/docs-index-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/docs-index-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/effective-ch-profiles-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/evidence-sha256-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-baseline-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-baseline-01.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-baseline-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-baseline-02.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-baseline-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-baseline-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-baseline-03.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-baseline-03.json.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-02.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-03.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-04.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-04.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-05.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-05.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-05.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-06.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-06.json.collector.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/exploratory-candidate-06.json.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/final-gates-09.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/harness-ruff-09.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/harness-ruff-10.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/helper-final-analyze-04.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/helper-final-analyze-04b.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/helper-final-checks.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/helper-final-freeze-04.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/helper-final-identity.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/helper-final-memory-probe-run.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/helper-final-paired-04.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/helper-final-preflight-04.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/helper-final-s03_memory_app.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/helper-final-sitecustomize.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/helper-real-provider-04b.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/independent-review-final-05.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/independent-review-pre-freeze-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/independent-review-pre-freeze-04.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/job-schema-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/job-schema-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-26-02.jsonl"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-26-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-6-01.jsonl"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-6-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-6-02.jsonl"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-6-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-launch-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-launch-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-original-memory-probe-run.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-original-s03_memory_app.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-original-sitecustomize.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-preflight-review-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-probe-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/linux-memory-probe-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/live-observer-01.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/live-pre-rollout-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/live-pre-rollout-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/map-check-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/map-final-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/map-final-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/map-final-05.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/map-generate-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/migration-crash-replay-final-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/migration-disposable-cleanup-final-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/migration-integration-before-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/migration-integration-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/migration-integration-final-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/migration-manifest-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/migration-ruff-final-10.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/owned-paths-final-05.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/owned-paths-pre-freeze-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/owned-paths-pre-freeze-04.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/paired-M-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/paired-M-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/paired-M-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/paired-M-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pre-integration-apps_migrations_bootstrap.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pre-integration-apps_migrations_storage.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pre-integration-tests_unit_apps_migrations_test_storage_lifecycle.py.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/predecessor-integrity-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/provider-pool-real-06.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/provider-primary-policy-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/provider-real-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/provider-real-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/provider-real-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-02.stderr"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-03.stderr"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-04.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-05.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-06.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-07.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-comparison-04.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-comparison-05.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-comparison-07.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-comparison-final-09.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-final-09.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/pyright-final-09.stderr"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/real-ch-pressure-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/real-pg-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/real-pg-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/real-pg-05.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/real-pg-final-08.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/real-pg-provider-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/real-provider-bounded-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/real-provider-bounded-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/real-provider-bounded-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/real-provider-bounded-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/retry-after-unit-05.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/ruff-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/ruff-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/ruff-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/ruff-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/ruff-06.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/ruff-08.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/ruff-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/ruff-final-08.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/ruff-final-09.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/ruff-fix-05.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/ruff-fix-07.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/runbooks-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/runbooks-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/runtime-identity-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/runtime-identity-final-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/runtime-inventory-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/source-final-05.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/source-final-06.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/topology-check-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/topology-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/topology-generate-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/topology-write-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/transport-ruff-07.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/transport-unit-06.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/transport-unit-07.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/unit-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/unit-expanded-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S03/unit-final-08.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M-protocol-frozen-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-baseline-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-baseline-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-baseline-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-baseline-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-baseline-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-baseline-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-candidate-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-candidate-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-candidate-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-candidate-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-candidate-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-100-candidate-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-baseline-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-baseline-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-baseline-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-baseline-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-baseline-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-baseline-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-candidate-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-candidate-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-candidate-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-candidate-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-candidate-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-4-candidate-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-analysis-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/M1-four-stream-tail-diagnostic-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/baseline-git-status-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/baseline-source-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/candidate-freeze-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/disposable-cleanup-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/disposable-cleanup-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/evidence-sanitization-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/gate-final-00.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/gate-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/gate-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/gate-final-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/gate-final-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/gate-final-05.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/gate-final-06.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/gate-final-07.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/gates-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/generated-map-baseline-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/independent-review-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/independent-review-prefreeze-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/linux-memory-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/linux-memory-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/live-pre-rollout-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/map-final-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/map-postaccept-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/owned-changes-final-01.diff"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/owned-changes-final-02.diff"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/owned-paths-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-b100-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-b100-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-b100-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-b100-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-c100-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-c100-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-c100-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-c100-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-c100-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-c100-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-c4-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/preflight-c4-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/prerequisite-attempts-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/pyright-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/pyright-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/pyright-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/pyright-comparison-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/real-pg-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/real-pg-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/real-pg-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/real-pg-ch-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/real-pg-ch-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/ruff-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/ruff-final-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/runtime-config-binding-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/runtime-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/runtime-identity-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/source-final-01.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/source-final-02.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/source-final-03.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/unit-02.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/unit-async-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/unit-async-03.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/unit-final-04.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/reports/S04/unit-initial-interrupted-01.txt"
+    },
+    {
+      "area": "knowledge",
+      "kind": "python",
+      "path": ".codex/agents/generated/market-data-resource-efficiency-v1/test_ledger_update.py"
     },
     {
       "area": "knowledge",
@@ -3708,6 +7834,26 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/0gusdt-stream-monitor-2026-10-07/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/0gusdt-stream-monitor-2026-10-07/clock.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/0gusdt-stream-monitor-2026-10-07/observations.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/0gusdt-stream-monitor-2026-10-07/summary.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/2026-09-04-ui-rollback.md"
     },
     {
@@ -3784,6 +7930,86 @@
       "area": "knowledge",
       "kind": "documentation",
       "path": ".codex/delivery/evidence/ROEHUB-WORKPAGES-2026-10-03.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/backtest-chart-display-2026-10-07/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/backtest-chart-display-2026-10-07/button-size-fixed.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/backtest-chart-display-2026-10-07/menu.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/chart-timeline-2026-10-07/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/chart-timeline-2026-10-07/backtests-price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/chart-timeline-2026-10-07/mobile-expanded.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/chart-timeline-2026-10-07/overview.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/chart-timeline-2026-10-07/strategy-price.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/compact-summary-2026-10-07/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/compact-summary-2026-10-07/backtests-mobile.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/compact-summary-2026-10-07/backtests.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/compact-summary-2026-10-07/overview.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/compact-summary-2026-10-07/strategy.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/full-history-repair-2026-10-04/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/full-history-repair-2026-10-04/after-tail.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/full-history-repair-2026-10-04/before-tail.png"
     },
     {
       "area": "knowledge",
@@ -3923,6 +8149,41 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-after-history/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-after-history/candles.csv"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-after-history/identity.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-after-history/measurements.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-after-history/ntp-after.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-after-history/ntp-check.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-after-history/summary.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/latency-warm/README.md"
     },
     {
@@ -4049,6 +8310,71 @@
       "area": "knowledge",
       "kind": "configuration",
       "path": ".codex/delivery/evidence/market-data-streaming-2026-10-04/summary.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/navigator-coverage-labels-2026-10-04/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/navigator-coverage-labels-2026-10-04/act-coverage.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/navigator-row-selection-2026-10-04/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/navigator-row-selection-2026-10-04/alice-selected.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/pnl-disclosure-2026-10-07/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/pnl-disclosure-2026-10-07/overview-aligned.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/pnl-disclosure-2026-10-07/overview.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/publication-2026-10-11/review-notes.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/remove-title-strip-2026-10-07/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/remove-title-strip-2026-10-07/backtests.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/remove-title-strip-2026-10-07/data.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/remove-title-strip-2026-10-07/overview.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/remove-title-strip-2026-10-07/strategy.png"
     },
     {
       "area": "knowledge",
@@ -10747,6 +15073,116 @@
     },
     {
       "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/streaming-intent-2026-10-07/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-intent-2026-10-07/disabled-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-intent-2026-10-07/preparing-iab.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/README.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/bybit-single-logo.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/catalog-selection-neutral.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/controls-off.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/controls-on.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/custom-catalog-filters.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/exchange-logos-aligned-actions.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/history-inline-eta-no-overflow.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/history-meter-eta.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/immediate-resume.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/ios-switch-log-hidden.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/ios-switch-log-open.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/ios-switch-off.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/live-inspector.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/live-streaming.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/refresh-steady.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "configuration",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/runtime.json"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/single-history-progress.png"
+    },
+    {
+      "area": "knowledge",
+      "kind": "other",
+      "path": ".codex/delivery/evidence/streaming-status-2026-10-04/whole-row-selection.png"
+    },
+    {
+      "area": "knowledge",
       "kind": "other",
       "path": ".codex/delivery/evidence/ui-next-steps-2026-09-08/v23-1672.png"
     },
@@ -11628,6 +16064,11 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/api/dto/backtest_artifacts.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/api/dto/backtests.py"
     },
     {
@@ -11709,6 +16150,16 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/api/routes/admin.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/api/routes/artifact_storage.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/api/routes/backtest_artifacts.py"
     },
     {
       "area": "delivery",
@@ -11798,12 +16249,22 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/api/wiring/artifact_service.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/api/wiring/modules/__init__.py"
     },
     {
       "area": "delivery",
       "kind": "python",
       "path": "apps/api/wiring/modules/backtest.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/api/wiring/modules/backtest_artifacts.py"
     },
     {
       "area": "delivery",
@@ -11869,6 +16330,11 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/api/wiring/modules/ui_strategies_dashboard.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/api/worker_control.py"
     },
     {
       "area": "delivery",
@@ -11999,6 +16465,16 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/control_agent/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/control_agent/artifact_storage.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/control_agent/artifact_storage_wiring.py"
     },
     {
       "area": "delivery",
@@ -12197,6 +16673,31 @@
     },
     {
       "area": "delivery",
+      "kind": "python",
+      "path": "apps/navigator-web/e2e/artifact_fixture.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/navigator-web/e2e/artifact_scenarios.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/navigator-web/e2e/integrated_fixture.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/navigator-web/e2e/storage_fixture.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/navigator-web/e2e/storage_preflight.py"
+    },
+    {
+      "area": "delivery",
       "kind": "configuration",
       "path": "apps/navigator-web/package.json"
     },
@@ -12229,6 +16730,46 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/navigator-web/src/app.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/artifact-journal.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/artifact-profile.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/artifacts-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "documentation",
+      "path": "apps/navigator-web/src/assets/exchanges/README.md"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/navigator-web/src/assets/exchanges/binance.ico"
+    },
+    {
+      "area": "delivery",
+      "kind": "other",
+      "path": "apps/navigator-web/src/assets/exchanges/bybit.svg"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/backtest-readiness.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/backtest-readiness.tsx"
     },
     {
       "area": "delivery",
@@ -12283,6 +16824,11 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/navigator-web/src/chart-timeline.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/navigator-web/src/client-routes.ts"
     },
     {
@@ -12303,7 +16849,32 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/navigator-web/src/data-artifacts.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/data-artifacts.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/data-artifacts.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/navigator-web/src/data-downloads.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/data-exchange-link.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/data-mode.tsx"
     },
     {
       "area": "delivery",
@@ -12419,6 +16990,16 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/navigator-web/src/market-data-ui.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/metric-disclosure.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/metric-disclosure.tsx"
     },
     {
       "area": "delivery",
@@ -12588,6 +17169,26 @@
     {
       "area": "delivery",
       "kind": "frontend",
+      "path": "apps/navigator-web/src/service-controls.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/service-controls.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/session-devices.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/session-devices.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
       "path": "apps/navigator-web/src/session-recovery.test.ts"
     },
     {
@@ -12604,6 +17205,31 @@
       "area": "delivery",
       "kind": "frontend",
       "path": "apps/navigator-web/src/settings-page.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/storage-activity.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/storage-api.ts"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/storage-settings.css"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/storage-settings.test.tsx"
+    },
+    {
+      "area": "delivery",
+      "kind": "frontend",
+      "path": "apps/navigator-web/src/storage-settings.tsx"
     },
     {
       "area": "delivery",
@@ -13208,6 +17834,31 @@
     {
       "area": "delivery",
       "kind": "python",
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/managed_access.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/managed_app.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/managed_metrics.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/managed_recovery.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/managed_worker.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
       "path": "apps/scheduler/backtest_artifact_publisher/wiring/modules/__init__.py"
     },
     {
@@ -13669,6 +18320,11 @@
       "area": "delivery",
       "kind": "python",
       "path": "apps/worker/backtest_job_runner/wiring/__init__.py"
+    },
+    {
+      "area": "delivery",
+      "kind": "python",
+      "path": "apps/worker/backtest_job_runner/wiring/automatic_base.py"
     },
     {
       "area": "delivery",
@@ -16553,6 +21209,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/architecture/identity/browser-devices-verification-2026-10-10.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/architecture/identity/exchange-connections-stage-reports/00-baseline-current-state.md"
     },
     {
@@ -18058,6 +22719,11 @@
     {
       "area": "knowledge",
       "kind": "documentation",
+      "path": "docs/runbooks/market-data-efficiency-local-activation-20261011.md"
+    },
+    {
+      "area": "knowledge",
+      "kind": "documentation",
       "path": "docs/runbooks/market-data-live-tail-repair.md"
     },
     {
@@ -18189,6 +22855,11 @@
       "area": "operations",
       "kind": "other",
       "path": "infra/docker/.env.example"
+    },
+    {
+      "area": "operations",
+      "kind": "other",
+      "path": "infra/docker/Dockerfile.local-control"
     },
     {
       "area": "operations",
@@ -18362,6 +23033,11 @@
     },
     {
       "area": "operations",
+      "kind": "migration",
+      "path": "migrations/clickhouse/history_source_absences_ddl.sql"
+    },
+    {
+      "area": "operations",
       "kind": "configuration",
       "path": "migrations/clickhouse/manifest.json"
     },
@@ -18509,6 +23185,36 @@
       "area": "operations",
       "kind": "migration",
       "path": "migrations/postgres/0028_backtest_input_recipe_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0029_backtest_artifact_management_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0030_backtest_artifact_dispatch_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0031_backtest_artifact_storage_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0032_identity_browser_devices_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0033_market_data_stream_connections_v1.sql"
+    },
+    {
+      "area": "operations",
+      "kind": "migration",
+      "path": "migrations/postgres/0034_market_data_provider_admission_v1.sql"
     },
     {
       "area": "operations",
@@ -19503,6 +24209,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/base_storage_admission.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/current_pointer_writer.py"
     },
     {
@@ -19533,6 +24244,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/config/legacy_management_import.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/defaults/__init__.py"
     },
     {
@@ -19543,7 +24259,17 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/defaults/management_catalog.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py"
     },
     {
       "area": "domain",
@@ -19563,12 +24289,27 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/automatic_base_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/backtest_job_repository.py"
     },
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/gateway.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py"
     },
     {
       "area": "domain",
@@ -19593,7 +24334,42 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/application/ports/management.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/backtest_artifacts/application/services/__init__.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/application/services/artifact_cadence.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/application/services/automatic_base.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/application/services/legacy_dispatch.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/backtest_artifacts/application/services/management.py"
     },
     {
       "area": "domain",
@@ -19848,6 +24624,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/inbound/api/browser_device.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/identity/adapters/inbound/api/csrf.py"
     },
     {
@@ -19879,6 +24660,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/identity/adapters/inbound/api/routes/auth_oidc.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/identity/adapters/inbound/api/routes/browser_devices.py"
     },
     {
       "area": "domain",
@@ -20948,6 +25734,16 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/clients/common_http/managed_transport.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/clients/common_http/provider_policy.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/clients/files/__init__.py"
     },
     {
@@ -20999,6 +25795,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/config/whitelist.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/http_transport_worker.py"
     },
     {
       "area": "domain",
@@ -21088,6 +25889,16 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_coverage_reader.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_range_verifier.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/instrument_coverage_reader.py"
     },
     {
@@ -21118,6 +25929,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/async_stream_recovery_store.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/candle_repair_audit_repository.py"
     },
     {
@@ -21139,6 +25955,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/instrument_selection_repository.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py"
     },
     {
       "area": "domain",
@@ -21224,6 +26045,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/market_data/application/ports/feeds/live_candle_publisher.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/ports/provider_admission.py"
     },
     {
       "area": "domain",
@@ -21323,6 +26149,16 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/application/ports/stores/history_coverage_reader.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/ports/stores/history_range_verifier.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/application/ports/stores/instrument_ref_writer.py"
     },
     {
@@ -21348,6 +26184,11 @@
     {
       "area": "domain",
       "kind": "python",
+      "path": "src/trading/contexts/market_data/application/services/batched_recovery.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
       "path": "src/trading/contexts/market_data/application/services/closed_candle_tail_provider.py"
     },
     {
@@ -21359,6 +26200,16 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/market_data/application/services/history_bounds.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/services/history_readiness.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/services/history_stream_gate.py"
     },
     {
       "area": "domain",
@@ -21394,6 +26245,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/market_data/application/services/source_retry.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/market_data/application/services/stored_candle_signal.py"
     },
     {
       "area": "domain",
@@ -21704,6 +26560,11 @@
       "area": "domain",
       "kind": "python",
       "path": "src/trading/contexts/operations/adapters/unix_client.py"
+    },
+    {
+      "area": "domain",
+      "kind": "python",
+      "path": "src/trading/contexts/operations/artifact_storage_contracts.py"
     },
     {
       "area": "domain",
@@ -22943,7 +27804,52 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/real_infra/backtest/test_artifact_dispatch.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/real_infra/backtest/test_artifact_http_storage.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/real_infra/backtest/test_artifact_input_lifecycle.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/real_infra/backtest/test_artifact_integrated.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/real_infra/backtest/test_artifact_management.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/real_infra/backtest/test_automatic_base_lifecycle.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/real_infra/backtest/test_managed_derivative_publication.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/real_infra/market_data/test_clickhouse_workloads.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/real_infra/market_data/test_full_history_clickhouse.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/real_infra/market_data/test_provider_admission.py"
     },
     {
       "area": "quality",
@@ -22954,6 +27860,16 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/real_infra/market_data/test_work_requests_postgres.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/runtime/test_browser_devices_postgres.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/runtime/test_stream_connections_postgres.py"
     },
     {
       "area": "quality",
@@ -22983,12 +27899,27 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/api/test_artifact_journal.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/api/test_artifact_storage_routes.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/api/test_backtest_export.py"
     },
     {
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/api/test_backtests_routes.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/api/test_browser_devices.py"
     },
     {
       "area": "quality",
@@ -23114,6 +28045,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/apps/api/test_ui_strategy_dashboard_routes.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/apps/api/test_worker_control.py"
     },
     {
       "area": "quality",
@@ -23578,6 +28514,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/apps/worker/test_stream_intent_control.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/apps/worker/test_telegram_bot_worker_wiring.py"
     },
     {
@@ -23844,6 +28785,21 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/contexts/backtest_artifacts/test_artifact_store_v1.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/backtest_artifacts/test_automatic_base.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/backtest_artifacts/test_derivative_profiles.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/backtest_artifacts/test_management_profiles.py"
     },
     {
       "area": "quality",
@@ -24198,6 +29154,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/market_data/adapters/test_http_transport_protocol.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/market_data/adapters/test_market_data_runtime_config.py"
     },
     {
@@ -24214,6 +29175,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/contexts/market_data/adapters/test_postgres_instrument_selection_repository.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/market_data/adapters/test_provider_policy.py"
     },
     {
       "area": "quality",
@@ -24258,7 +29224,17 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/contexts/market_data/application/services/test_async_recovery_admission.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/contexts/market_data/application/services/test_closed_candle_tail_provider.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/market_data/application/services/test_full_history.py"
     },
     {
       "area": "quality",
@@ -24359,6 +29335,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/contexts/market_data/application/use_cases/test_time_slicing.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/contexts/market_data/test_stored_candle_signal.py"
     },
     {
       "area": "quality",
@@ -24893,6 +29874,11 @@
     {
       "area": "quality",
       "kind": "python",
+      "path": "tests/unit/tools/test_clickhouse_workload_installation.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
       "path": "tests/unit/tools/test_codex_quality_benchmark.py"
     },
     {
@@ -24959,6 +29945,11 @@
       "area": "quality",
       "kind": "python",
       "path": "tests/unit/tools/test_installation_backup_bundle.py"
+    },
+    {
+      "area": "quality",
+      "kind": "python",
+      "path": "tests/unit/tools/test_local_platform.py"
     },
     {
       "area": "quality",
@@ -25153,6 +30144,16 @@
     {
       "area": "automation",
       "kind": "python",
+      "path": "tools/installation/clickhouse_workloads.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/installation/local_platform.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
       "path": "tools/jobs/__init__.py"
     },
     {
@@ -25194,6 +30195,36 @@
       "area": "automation",
       "kind": "python",
       "path": "tools/qa/local_auth_browser_app.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/market_data_ingestion_comparison.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/market_data_mixed_load.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/market_data_recovery_comparison.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/market_data_resource_comparison.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/navigator_artifact_control.py"
+    },
+    {
+      "area": "automation",
+      "kind": "python",
+      "path": "tools/qa/navigator_artifact_publisher.py"
     },
     {
       "area": "automation",
@@ -25336,7 +30367,7 @@
       "path": "uv.lock"
     }
   ],
-  "inventory_file_count": 4621,
+  "inventory_file_count": 5611,
   "project": "Roehub",
   "runtime_flows": [
     {
@@ -25534,5 +30565,5 @@
     }
   ],
   "schema_version": 1,
-  "structural_digest": "792b5163cc59cc55dff380b8ec5ffa210e8bef43f6583c68d6cd842f16136e91"
+  "structural_digest": "d80f429ac3a8121ddbe778c183aa7f4f11ad1c19c48865f6c5d904e3b821e8e9"
 }

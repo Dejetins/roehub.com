@@ -1,0 +1,185 @@
+"""Managed scheduling composition; no implicit activation or legacy policy conversion."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Callable, Protocol
+from uuid import UUID, uuid4
+
+from apps.scheduler.backtest_artifact_publisher.wiring.managed_metrics import ManagedArtifactMetrics
+from apps.scheduler.backtest_artifact_publisher.wiring.managed_recovery import lifetime
+from apps.scheduler.backtest_artifact_publisher.wiring.managed_worker import ManagedArtifactWorker
+from trading.contexts.backtest_artifacts.application.services.base_source_reconciliation import (
+    BaseSourceReconciler,
+)
+from trading.contexts.backtest_artifacts.application.services.management import ManagementError
+
+
+class HostLock(Protocol):
+    def try_acquire(self) -> bool: ...
+    def release(self) -> None: ...
+
+
+@dataclass
+class ManagedArtifactPublisherApp:
+    installation_id: UUID
+    worker: ManagedArtifactWorker
+    reconciler: BaseSourceReconciler
+    host_lock: HostLock
+    now: Callable[[], datetime] = lambda: datetime.now(UTC)
+    metrics: ManagedArtifactMetrics | None = None
+    metrics_port: int | None = None
+
+    def cycle(self):
+        repo = self.worker.repository
+        if self.metrics is not None:
+            self.metrics.sample(repo, self.installation_id)
+        with repo.db.transaction():
+            repo._settings(self.installation_id, active=True)
+        # One dispatcher per legacy host lock; PG fences remain the cross-host authority.
+        if not self.host_lock.try_acquire():
+            return "lock_held"
+        try:
+            self.worker.reconcile(self.installation_id)
+            cursor = repo.source_cursor(self.installation_id)
+            following = self.reconciler.reconcile_page(after=cursor, now=self.now(), limit=50)
+            repo.save_source_cursor(self.installation_id, following)
+            repo.tick(installation=self.installation_id, now=self.now())
+            retries = repo.rows(
+                (
+                    "SELECT * FROM backtest_artifact_builds WHERE installation_id=%(i)s AND "
+                    "state='retry_wait' AND next_retry_at<=%(now)s "
+                    "ORDER BY next_retry_at LIMIT 1"
+                ),
+                i=self.installation_id,
+                now=self.now(),
+            )
+            # Alternate retry and queued lanes using persisted completion history; retries
+            # never restart unknown publication ownership.
+            request = repo.next_request(self.installation_id)
+            dispatch = repo.rows(
+                (
+                    "SELECT retry_turn FROM "
+                    "backtest_artifact_dispatch_state WHERE "
+                    "installation_id=%(i)s"
+                ),
+                i=self.installation_id,
+            )
+            retry_turn = bool(dispatch and dispatch[0]["retry_turn"])
+            if retries and (request is None or retry_turn):
+                previous = retries[0]
+                started = False
+                try:
+                    self.worker.check_storage(
+                        self.installation_id, previous["snapshot"], previous["reservation_bytes"]
+                    )
+                    owner = uuid4()
+                    with lifetime(self.worker.storage.root, {"owner_token": owner}):
+                        build = repo.retry(
+                            build=previous,
+                            owner_token=owner,
+                            parent_incarnation=uuid4(),
+                            now=self.now(),
+                        )
+                        if build:
+                            started = True
+                            self.worker.execute(build)
+                except OSError:
+                    if not started:
+                        repo.reject_retry(build=previous, reason="storage_inventory_unavailable")
+                    else:
+                        raise
+                except ManagementError as error:
+                    if not started and str(error) in (
+                        "resource_conflict",
+                        "root_revision_changed",
+                        "storage_unconfigured",
+                        "untrusted_root",
+                        "storage_inventory_unavailable",
+                    ):
+                        repo.reject_retry(build=previous, reason=str(error))
+                    else:
+                        raise
+                finally:
+                    repo._exec(
+                        (
+                            "UPDATE backtest_artifact_dispatch_state SET "
+                            "retry_turn=FALSE WHERE installation_id=%(i)s"
+                        ),
+                        i=self.installation_id,
+                    )
+            else:
+                try:
+                    self.worker.run_once(self.installation_id)
+                finally:
+                    repo._exec(
+                        (
+                            "UPDATE backtest_artifact_dispatch_state SET "
+                            "retry_turn=TRUE WHERE installation_id=%(i)s"
+                        ),
+                        i=self.installation_id,
+                    )
+            return "observed"
+        finally:
+            self.host_lock.release()
+
+    async def run(self, stop_event: asyncio.Event):
+        if self.metrics_port is not None:
+            from prometheus_client import start_http_server
+
+            start_http_server(self.metrics_port)
+        while not stop_event.is_set():
+            try:
+                await asyncio.to_thread(self.cycle)
+            except Exception:
+                # Persisted ownership/outcomes remain authoritative. Never log raw provider
+                # payloads or credentials and never let one failed coordinate stop discovery.
+                logging.getLogger(__name__).warning("managed artifact cycle unavailable")
+            try:
+                await asyncio.wait_for(stop_event.wait(), timeout=30)
+            except TimeoutError:
+                pass
+
+
+def compose_managed_app(
+    *,
+    installation_id,
+    gateway,
+    catalog,
+    access,
+    publisher,
+    stored_coordinates,
+    candle_index,
+    root,
+    root_id,
+    root_revision,
+    budget_bytes,
+    host_lock,
+    now=lambda: datetime.now(UTC),
+):
+    """Compose the actual managed application from trusted installation adapters.
+
+    Access/catalog are the same server-owned ports used for admission; no allow-all
+    placeholder. This factory does not enable settings, import legacy or launch work.
+    """
+    from trading.contexts.backtest_artifacts.adapters.outbound.artifacts_fs.base_storage_admission import (  # noqa: E501
+        BaseStorageAdmission,
+    )
+    from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.dispatch_repository import (  # noqa: E501
+        PostgresArtifactDispatchRepository,
+    )
+
+    repo = PostgresArtifactDispatchRepository(gateway=gateway, catalog=catalog, access=access)
+    worker = ManagedArtifactWorker(
+        repo, publisher, BaseStorageAdmission(root, root_id, root_revision, budget_bytes), now
+    )
+    return ManagedArtifactPublisherApp(
+        installation_id,
+        worker,
+        BaseSourceReconciler(installation_id, candle_index, stored_coordinates, repo),
+        host_lock,
+        now,
+    )

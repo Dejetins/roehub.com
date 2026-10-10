@@ -1,0 +1,249 @@
+EEEEE                                                                    [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_siblings _
+
+    @pytest.fixture
+    def store():
+        schema = "work_requests_test_" + uuid4().hex
+        with psycopg.connect(DSN) as conn:
+            conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
+            conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(schema)))
+            conn.execute(
+                "CREATE TABLE identity_organizations "
+                "(organization_id uuid PRIMARY KEY, status text DEFAULT $$active$$)"
+            )
+            conn.execute(
+                "CREATE TABLE identity_memberships "
+                "(organization_id uuid, user_id uuid, status text DEFAULT $$active$$, "
+                "PRIMARY KEY (organization_id, user_id))"
+            )
+            for filename in (
+                "0023_market_data_work_requests_v1.sql",
+                "0024_market_data_full_history_v1.sql",
+                "0025_market_data_work_recovery_v1.sql",
+                "0026_market_data_queue_events_v1.sql",
+            ):
+                migration = (
+                    Path(__file__).resolve().parents[3] / "migrations/postgres" / filename
+>               ).read_text()
+
+.cache/market-data-s02-baseline-01a126e9/tests/real_infra/market_data/test_work_requests_postgres.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/pathlib.py:1027: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s02-baseline-01a126e9/migrations/postgres/0023_market_data_work_requests_v1.sql')
+mode = 'r', buffering = -1, encoding = 'locale', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+E       FileNotFoundError: [Errno 2] No such file or directory: '/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s02-baseline-01a126e9/migrations/postgres/0023_market_data_work_requests_v1.sql'
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/pathlib.py:1013: FileNotFoundError
+_ ERROR at setup of test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[submit] _
+
+    @pytest.fixture
+    def store():
+        schema = "work_requests_test_" + uuid4().hex
+        with psycopg.connect(DSN) as conn:
+            conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
+            conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(schema)))
+            conn.execute(
+                "CREATE TABLE identity_organizations "
+                "(organization_id uuid PRIMARY KEY, status text DEFAULT $$active$$)"
+            )
+            conn.execute(
+                "CREATE TABLE identity_memberships "
+                "(organization_id uuid, user_id uuid, status text DEFAULT $$active$$, "
+                "PRIMARY KEY (organization_id, user_id))"
+            )
+            for filename in (
+                "0023_market_data_work_requests_v1.sql",
+                "0024_market_data_full_history_v1.sql",
+                "0025_market_data_work_recovery_v1.sql",
+                "0026_market_data_queue_events_v1.sql",
+            ):
+                migration = (
+                    Path(__file__).resolve().parents[3] / "migrations/postgres" / filename
+>               ).read_text()
+
+.cache/market-data-s02-baseline-01a126e9/tests/real_infra/market_data/test_work_requests_postgres.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/pathlib.py:1027: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s02-baseline-01a126e9/migrations/postgres/0023_market_data_work_requests_v1.sql')
+mode = 'r', buffering = -1, encoding = 'locale', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+E       FileNotFoundError: [Errno 2] No such file or directory: '/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s02-baseline-01a126e9/migrations/postgres/0023_market_data_work_requests_v1.sql'
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/pathlib.py:1013: FileNotFoundError
+_ ERROR at setup of test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[worker] _
+
+    @pytest.fixture
+    def store():
+        schema = "work_requests_test_" + uuid4().hex
+        with psycopg.connect(DSN) as conn:
+            conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
+            conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(schema)))
+            conn.execute(
+                "CREATE TABLE identity_organizations "
+                "(organization_id uuid PRIMARY KEY, status text DEFAULT $$active$$)"
+            )
+            conn.execute(
+                "CREATE TABLE identity_memberships "
+                "(organization_id uuid, user_id uuid, status text DEFAULT $$active$$, "
+                "PRIMARY KEY (organization_id, user_id))"
+            )
+            for filename in (
+                "0023_market_data_work_requests_v1.sql",
+                "0024_market_data_full_history_v1.sql",
+                "0025_market_data_work_recovery_v1.sql",
+                "0026_market_data_queue_events_v1.sql",
+            ):
+                migration = (
+                    Path(__file__).resolve().parents[3] / "migrations/postgres" / filename
+>               ).read_text()
+
+.cache/market-data-s02-baseline-01a126e9/tests/real_infra/market_data/test_work_requests_postgres.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/pathlib.py:1027: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s02-baseline-01a126e9/migrations/postgres/0023_market_data_work_requests_v1.sql')
+mode = 'r', buffering = -1, encoding = 'locale', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+E       FileNotFoundError: [Errno 2] No such file or directory: '/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s02-baseline-01a126e9/migrations/postgres/0023_market_data_work_requests_v1.sql'
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/pathlib.py:1013: FileNotFoundError
+___ ERROR at setup of test_parallel_batch_lost_lease_fences_all_four_writers ___
+
+    @pytest.fixture
+    def store():
+        schema = "work_requests_test_" + uuid4().hex
+        with psycopg.connect(DSN) as conn:
+            conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
+            conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(schema)))
+            conn.execute(
+                "CREATE TABLE identity_organizations "
+                "(organization_id uuid PRIMARY KEY, status text DEFAULT $$active$$)"
+            )
+            conn.execute(
+                "CREATE TABLE identity_memberships "
+                "(organization_id uuid, user_id uuid, status text DEFAULT $$active$$, "
+                "PRIMARY KEY (organization_id, user_id))"
+            )
+            for filename in (
+                "0023_market_data_work_requests_v1.sql",
+                "0024_market_data_full_history_v1.sql",
+                "0025_market_data_work_recovery_v1.sql",
+                "0026_market_data_queue_events_v1.sql",
+            ):
+                migration = (
+                    Path(__file__).resolve().parents[3] / "migrations/postgres" / filename
+>               ).read_text()
+
+.cache/market-data-s02-baseline-01a126e9/tests/real_infra/market_data/test_work_requests_postgres.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/pathlib.py:1027: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s02-baseline-01a126e9/migrations/postgres/0023_market_data_work_requests_v1.sql')
+mode = 'r', buffering = -1, encoding = 'locale', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+E       FileNotFoundError: [Errno 2] No such file or directory: '/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s02-baseline-01a126e9/migrations/postgres/0023_market_data_work_requests_v1.sql'
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/pathlib.py:1013: FileNotFoundError
+_ ERROR at setup of test_incomplete_history_retry_streak_uses_persisted_previous_reason _
+
+    @pytest.fixture
+    def store():
+        schema = "work_requests_test_" + uuid4().hex
+        with psycopg.connect(DSN) as conn:
+            conn.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
+            conn.execute(sql.SQL("SET search_path TO {}").format(sql.Identifier(schema)))
+            conn.execute(
+                "CREATE TABLE identity_organizations "
+                "(organization_id uuid PRIMARY KEY, status text DEFAULT $$active$$)"
+            )
+            conn.execute(
+                "CREATE TABLE identity_memberships "
+                "(organization_id uuid, user_id uuid, status text DEFAULT $$active$$, "
+                "PRIMARY KEY (organization_id, user_id))"
+            )
+            for filename in (
+                "0023_market_data_work_requests_v1.sql",
+                "0024_market_data_full_history_v1.sql",
+                "0025_market_data_work_recovery_v1.sql",
+                "0026_market_data_queue_events_v1.sql",
+            ):
+                migration = (
+                    Path(__file__).resolve().parents[3] / "migrations/postgres" / filename
+>               ).read_text()
+
+.cache/market-data-s02-baseline-01a126e9/tests/real_infra/market_data/test_work_requests_postgres.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/pathlib.py:1027: in read_text
+    with self.open(mode='r', encoding=encoding, errors=errors) as f:
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s02-baseline-01a126e9/migrations/postgres/0023_market_data_work_requests_v1.sql')
+mode = 'r', buffering = -1, encoding = 'locale', errors = None, newline = None
+
+    def open(self, mode='r', buffering=-1, encoding=None,
+             errors=None, newline=None):
+        """
+        Open the file pointed to by this path and return a file object, as
+        the built-in open() function does.
+        """
+        if "b" not in mode:
+            encoding = io.text_encoding(encoding)
+>       return io.open(self, mode, buffering, encoding, errors, newline)
+E       FileNotFoundError: [Errno 2] No such file or directory: '/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s02-baseline-01a126e9/migrations/postgres/0023_market_data_work_requests_v1.sql'
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/pathlib.py:1013: FileNotFoundError
+=========================== short test summary info ============================
+ERROR .cache/market-data-s02-baseline-01a126e9/tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_siblings
+ERROR .cache/market-data-s02-baseline-01a126e9/tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[submit]
+ERROR .cache/market-data-s02-baseline-01a126e9/tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[worker]
+ERROR .cache/market-data-s02-baseline-01a126e9/tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_lost_lease_fences_all_four_writers
+ERROR .cache/market-data-s02-baseline-01a126e9/tests/real_infra/market_data/test_work_requests_postgres.py::test_incomplete_history_retry_streak_uses_persisted_previous_reason
+17 deselected, 5 errors in 0.59s

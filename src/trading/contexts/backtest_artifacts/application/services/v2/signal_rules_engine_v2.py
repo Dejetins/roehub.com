@@ -181,6 +181,7 @@ class BacktestSignalRulesEngineV2:
     """
 
     defaults_provider: BacktestGridDefaultsProvider
+    indicator_scope: tuple[str, ...] | None = None
 
     def __post_init__(self) -> None:
         """
@@ -203,7 +204,9 @@ class BacktestSignalRulesEngineV2:
           - configs/prod/indicators.yaml
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
-        _validate_defaults_provider_contract_v2(defaults_provider=self.defaults_provider)
+        _validate_defaults_provider_contract_v2(
+            defaults_provider=self.defaults_provider, indicator_scope=self.indicator_scope
+        )
 
     def supported_indicator_ids(self) -> tuple[str, ...]:
         """
@@ -226,7 +229,8 @@ class BacktestSignalRulesEngineV2:
           - src/trading/contexts/backtest/application/services/v2/signal_rules_engine_v2.py
           - configs/prod/indicators.yaml
         """
-        return supported_indicator_ids_for_signal_rules_v2()
+        return (supported_indicator_ids_for_signal_rules_v2()
+                if self.indicator_scope is None else tuple(sorted(self.indicator_scope)))
 
     def rule_spec(self, *, indicator_id: str) -> SignalRuleSpecV2:
         """
@@ -249,7 +253,10 @@ class BacktestSignalRulesEngineV2:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
           - configs/prod/indicators.yaml
         """
-        return signal_rule_spec_v2(indicator_id=indicator_id)
+        spec = signal_rule_spec_v2(indicator_id=indicator_id)
+        if spec.indicator_id not in self.supported_indicator_ids():
+            raise ValueError("indicator outside frozen signal catalog")
+        return spec
 
     def resolved_defaults(
         self,
@@ -279,7 +286,7 @@ class BacktestSignalRulesEngineV2:
           - src/trading/contexts/backtest/application/services/v2/artifact_precompute_runner.py
           - configs/prod/indicators.yaml
         """
-        spec = signal_rule_spec_v2(indicator_id=indicator_id)
+        spec = self.rule_spec(indicator_id=indicator_id)
         return (
             _default_inputs_source_from_defaults_v2(
                 indicator_id=spec.indicator_id,
@@ -323,7 +330,7 @@ class BacktestSignalRulesEngineV2:
           - src/trading/contexts/backtest/application/services/v2/contracts.py
           - src/trading/contexts/backtest/application/use_cases/request_runtime_contract_v1.py
         """
-        spec = signal_rule_spec_v2(indicator_id=request.indicator_id)
+        spec = self.rule_spec(indicator_id=request.indicator_id)
         resolved_source = _resolve_inputs_source_v2(
             indicator_id=spec.indicator_id,
             request_source=request.inputs_source,
@@ -366,6 +373,7 @@ class BacktestSignalRulesEngineV2:
 def _validate_defaults_provider_contract_v2(
     *,
     defaults_provider: BacktestGridDefaultsProvider,
+    indicator_scope: tuple[str, ...] | None = None,
 ) -> None:
     """
     Validate that runtime defaults exactly cover the explicit v2 rules-engine contract.
@@ -393,6 +401,12 @@ def _validate_defaults_provider_contract_v2(
     registry_indicator_ids = supported_indicator_ids_for_signal_rules_v2()
     provider_set = set(provider_indicator_ids)
     registry_set = set(registry_indicator_ids)
+    if indicator_scope is not None:
+        if (len(set(indicator_scope)) != len(indicator_scope)
+                or not set(indicator_scope) <= registry_set):
+            raise ValueError("invalid frozen signal catalog")
+        registry_indicator_ids = tuple(sorted(indicator_scope))
+        registry_set = set(registry_indicator_ids)
     missing_in_registry = tuple(sorted(provider_set - registry_set))
     missing_in_defaults = tuple(sorted(registry_set - provider_set))
     if len(missing_in_registry) > 0 or len(missing_in_defaults) > 0:

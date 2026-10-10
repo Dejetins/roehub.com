@@ -1,0 +1,20 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "-ra",
+    "tests/unit/contexts/backtest/application/use_cases/test_backtest_job_worker_use_case.py",
+    "tests/unit/contexts/backtest/application/use_cases/test_backtest_jobs_use_case.py",
+    "tests/unit/contexts/backtest/application/use_cases/test_lazy_trades_materialization_worker_use_case.py",
+    "tests/unit/apps/api/test_backtests_routes.py",
+    "tests/unit/apps/api/test_ui_backtests_routes.py",
+    "tests/unit/apps/worker/backtest_job_runner",
+    "tests/unit/apps/worker/test_backtest_job_runner.py"
+  ],
+  "exit_code": 0,
+  "output": "........................................................................ [ 39%]\n........................................................................ [ 79%]\n.....................................                                    [100%]\n181 passed in 19.02s\n",
+  "environment_overrides": {
+    "PYTHONPATH": ".",
+    "NUMBA_NUM_THREADS": "12"
+  }
+}

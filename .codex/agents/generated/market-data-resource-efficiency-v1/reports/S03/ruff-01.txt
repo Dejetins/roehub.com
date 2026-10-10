@@ -1,0 +1,41 @@
+apps/cli/commands/rest_catchup_1m.py:110:101: E501 Line too long (104 > 100)
+    |
+108 |             if bounded_range is not None:
+109 |                 if ns.all_from_ref_instruments:
+110 |                     raise SystemExit("--start/--end cannot be combined with --all-from-ref-instruments")
+    |                                                                                                     ^^^^ E501
+111 |                 if ns.market_id is None or ns.symbol is None:
+112 |                     raise SystemExit("--start/--end requires --market-id and --symbol")
+    |
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:51:101: E501 Line too long (104 > 100)
+   |
+49 |     @classmethod
+50 |     def from_config(cls, config, environ):
+51 |         from trading.contexts.market_data.adapters.outbound.clients.common_http.provider_policy import (
+   |                                                                                                     ^^^^ E501
+52 |             ProviderPolicy,
+53 |         )
+   |
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/managed_transport.py:68:101: E501 Line too long (101 > 100)
+   |
+66 |         self.pipe, child_pipe = context.Pipe()
+67 |         child_liveness, self.liveness = context.Pipe(duplex=False)
+68 |         self.process = context.Process(target=_serve, args=(child_pipe, child_liveness), daemon=True)
+   |                                                                                                     ^ E501
+69 |         self.process.start()
+70 |         child_pipe.close()
+   |
+
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py:126:101: E501 Line too long (126 > 100)
+    |
+124 |                         connection.execute(
+125 |                             'UPDATE market_data_provider_windows SET spent=GREATEST(spent,%s) '
+126 |                             "WHERE provider=%s AND scope=%s AND dimension IN ('spot_weight','futures_weight') AND seconds=60 "
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+127 |                             'AND bucket=floor(EXTRACT(EPOCH FROM clock_timestamp())/60)',
+128 |                             (int(value), self.request.provider, self.request.scope))
+    |
+
+Found 5 errors (1 fixed, 4 remaining).

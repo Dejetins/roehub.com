@@ -1,0 +1,203 @@
+apps/cli/commands/rest_catchup_1m.py:110:101: E501 Line too long (104 > 100)
+    |
+108 |             if bounded_range is not None:
+109 |                 if ns.all_from_ref_instruments:
+110 |                     raise SystemExit("--start/--end cannot be combined with --all-from-ref-instruments")
+    |                                                                                                     ^^^^ E501
+111 |                 if ns.market_id is None or ns.symbol is None:
+112 |                     raise SystemExit("--start/--end requires --market-id and --symbol")
+    |
+
+apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py:449:101: E501 Line too long (108 > 100)
+    |
+447 |         ]
+448 |         if self.work_request_runner is not None:
+449 |             periodic_tasks.append(asyncio.create_task(self.run_work_requests(stop_event, close_http=False)))
+    |                                                                                                     ^^^^^^^^ E501
+450 |         await stop_event.wait()
+451 |         await asyncio.gather(*periodic_tasks, return_exceptions=True)
+    |
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:55:101: E501 Line too long (104 > 100)
+   |
+53 |     @classmethod
+54 |     def from_config(cls, config, environ):
+55 |         from trading.contexts.market_data.adapters.outbound.clients.common_http.provider_policy import (
+   |                                                                                                     ^^^^ E501
+56 |             ProviderPolicy,
+57 |         )
+   |
+
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py:76:101: E501 Line too long (146 > 100)
+   |
+74 |                         "ON CONFLICT (provider,scope,dimension,seconds) DO UPDATE SET "
+75 |                         "spent=CASE WHEN market_data_provider_windows.bucket>=EXCLUDED.bucket "
+76 |                         "THEN market_data_provider_windows.spent ELSE 0 END,bucket=GREATEST(market_data_provider_windows.bucket,EXCLUDED.bucket)",
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+77 |                         (request.provider, request.scope, window.dimension, window.seconds, bucket),
+78 |                     )
+   |
+
+src/trading/contexts/market_data/application/ports/provider_admission.py:48:1: E402 Module level import not at top of file
+   |
+46 | # Execution ownership is propagated only inside the worker's synchronous scope.
+47 | # Adapters use the callback without importing the scheduler or PostgreSQL types.
+48 | from contextlib import contextmanager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
+49 | from contextvars import ContextVar
+50 | from typing import Callable
+   |
+
+src/trading/contexts/market_data/application/ports/provider_admission.py:49:1: E402 Module level import not at top of file
+   |
+47 | # Adapters use the callback without importing the scheduler or PostgreSQL types.
+48 | from contextlib import contextmanager
+49 | from contextvars import ContextVar
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
+50 | from typing import Callable
+   |
+
+src/trading/contexts/market_data/application/ports/provider_admission.py:50:1: E402 Module level import not at top of file
+   |
+48 | from contextlib import contextmanager
+49 | from contextvars import ContextVar
+50 | from typing import Callable
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E402
+51 | 
+52 | _io_guard: ContextVar[Callable[[], None]] = ContextVar("market_data_io_guard", default=lambda: None)
+   |
+
+src/trading/contexts/market_data/application/services/history_bounds.py:3:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+ 1 |   """Resolve requested instrument metadata without ingesting candle history."""
+ 2 |   
+ 3 | / from dataclasses import dataclass
+ 4 | | from datetime import UTC, datetime
+ 5 | | from typing import Any, Callable, ContextManager, Mapping, Protocol
+ 6 | | 
+ 7 | | from trading.contexts.market_data.application.ports.sources.instrument_history_start_source import (
+ 8 | |     InstrumentHistoryStartSource,
+ 9 | | )
+10 | | from trading.contexts.market_data.application.ports.provider_admission import provider_io_guard
+11 | | from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol
+12 | | 
+13 | | 
+14 | | class HistoryBoundsStore(Protocol):
+   | |_^ I001
+15 |       def claim(self, *, now: datetime) -> Mapping[str, Any] | None: ...
+16 |       def finish(
+   |
+   = help: Organize imports
+
+tests/real_infra/market_data/test_work_requests_postgres.py:98:101: E501 Line too long (143 > 100)
+    |
+ 96 |         yield (
+ 97 |             PostgresMarketDataWorkRequestRepository(
+ 98 |                 gateway=gateway, execution_dsn=make_conninfo(DSN, options=f"-c search_path={schema}"), execution_lock_key=uuid4().int % (2**63)
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+ 99 |             ),
+100 |             org,
+    |
+
+tools/qa/market_data_ingestion_comparison.py:67:101: E501 Line too long (119 > 100)
+   |
+65 | PATHS = {
+66 |     "runner": "src/trading/contexts/market_data/application/services/work_requests.py",
+67 |     "repository": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py",
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^ E501
+68 |     "http": "src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py",
+69 | }
+   |
+
+tools/qa/market_data_ingestion_comparison.py:102:101: E501 Line too long (104 > 100)
+    |
+100 |     if label == "baseline":
+101 |         return cls()
+102 |     from trading.contexts.market_data.adapters.outbound.persistence.postgres.provider_admission import (
+    |                                                                                                     ^^^^ E501
+103 |         PostgresProviderAdmission,
+104 |     )
+    |
+
+tools/qa/market_data_ingestion_comparison.py:299:101: E501 Line too long (113 > 100)
+    |
+297 |                 "inspect",
+298 |                 "--format",
+299 |                 '{"image":{{json .Image}},"memory":{{.HostConfig.Memory}},"nano_cpus":{{.HostConfig.NanoCpus}}}',
+    |                                                                                                     ^^^^^^^^^^^^^ E501
+300 |                 "roehub-s03-clickhouse-1",
+301 |             ],
+    |
+
+tools/qa/market_data_ingestion_comparison.py:355:101: E501 Line too long (136 > 100)
+    |
+353 |             )
+354 |             connection.execute(
+355 |                 "CREATE TABLE identity_memberships (organization_id uuid,user_id uuid,status text,PRIMARY KEY(organization_id,user_id))"
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+356 |             )
+357 |             for name in (
+    |
+
+tools/qa/market_data_ingestion_comparison.py:442:101: E501 Line too long (117 > 100)
+    |
+440 |         with psycopg.connect(pgdsn) as connection:
+441 |             record["pg_stats_before"] = connection.execute(
+442 |                 "SELECT xact_commit,xact_rollback,numbackends FROM pg_stat_database WHERE datname=current_database()"
+    |                                                                                                     ^^^^^^^^^^^^^^^^^ E501
+443 |             ).fetchone()
+444 |         begin = time.monotonic()
+    |
+
+tools/qa/market_data_ingestion_comparison.py:476:101: E501 Line too long (125 > 100)
+    |
+474 |                     )
+475 |                     pg = connection.execute(
+476 |                         "SELECT xact_commit,xact_rollback,numbackends FROM pg_stat_database WHERE datname=current_database()"
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+477 |                     ).fetchone()
+478 |                     pids = [os.getpid()] + ([child.pid] if child and child.is_alive() else [])
+    |
+
+tools/qa/market_data_ingestion_comparison.py:496:101: E501 Line too long (111 > 100)
+    |
+494 |                     ).split()
+495 |                     parts = admin.query(
+496 |                         "SELECT count(),sum(bytes_on_disk) FROM system.parts WHERE active AND database=%(db)s",
+    |                                                                                                     ^^^^^^^^^^^ E501
+497 |                         parameters={"db": schema},
+498 |                     ).result_rows[0]
+    |
+
+tools/qa/market_data_ingestion_comparison.py:550:101: E501 Line too long (109 > 100)
+    |
+548 |             )
+549 |             record["pg_counters"] = connection.execute(
+550 |                 "SELECT sum(completed_units),sum(rows_read),sum(rows_written) FROM market_data_work_requests"
+    |                                                                                                     ^^^^^^^^^ E501
+551 |             ).fetchone()
+552 |             row = connection.execute("SELECT count(*) FROM market_data_provider_permits").fetchone()
+    |
+
+tools/qa/market_data_ingestion_comparison.py:574:101: E501 Line too long (115 > 100)
+    |
+572 |         )
+573 |         record["canonical_new"] = admin.command(
+574 |             f"SELECT count() FROM {schema}.canonical_candles_1m WHERE ts_open >= toDateTime('2026-01-03 00:00:00')"
+    |                                                                                                     ^^^^^^^^^^^^^^^ E501
+575 |         )
+576 |         admin.command("SYSTEM FLUSH LOGS")
+    |
+
+tools/qa/market_data_ingestion_comparison.py:597:101: E501 Line too long (117 > 100)
+    |
+595 |         with psycopg.connect(pgdsn) as connection:
+596 |             record["pg_stats_after"] = connection.execute(
+597 |                 "SELECT xact_commit,xact_rollback,numbackends FROM pg_stat_database WHERE datname=current_database()"
+    |                                                                                                     ^^^^^^^^^^^^^^^^^ E501
+598 |             ).fetchone()
+599 |         record["checks"] = {
+    |
+
+Found 19 errors.
+[*] 1 fixable with the `--fix` option.

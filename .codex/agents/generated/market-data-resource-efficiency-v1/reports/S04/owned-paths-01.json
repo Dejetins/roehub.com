@@ -1,0 +1,15 @@
+[
+  "apps/worker/market_data_ws/wiring/modules/market_data_ws.py",
+  "docs/architecture/market_data/market-data-application-ports.md",
+  "docs/architecture/market_data/market-data-reference-api-v1.md",
+  "docs/runbooks/navigator-local-market-data-recovery.md",
+  "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/async_stream_recovery_store.py",
+  "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+  "src/trading/contexts/market_data/application/services/batched_recovery.py",
+  "src/trading/contexts/market_data/application/services/insert_buffer.py",
+  "src/trading/contexts/market_data/application/services/rest_fill_queue.py",
+  "tests/real_infra/market_data/test_stream_recovery_postgres.py",
+  "tests/unit/apps/worker/test_persistent_writer.py",
+  "tests/unit/contexts/market_data/application/services/test_async_recovery_admission.py",
+  "tools/qa/market_data_recovery_comparison.py"
+]

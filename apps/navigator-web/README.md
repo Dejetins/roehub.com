@@ -102,3 +102,36 @@ Backtest inspector actions are direct controls. Complete CSV/XLSX export uses
 truncated response. XLSX is one workbook, with additional sheets only if Excel's
 per-sheet row limit is exceeded. Export still requires the existing owner check
 and lazy-cache readiness. Server export memory scales with file size.
+
+## Data artifacts and Storage local proof
+
+The selected candidate has `/data?view=artifacts`, shared candle filters/selection,
+catalog-backed profile exclusions, explicit Update now and 1/3/7-day cadence.
+`/settings/storage` requires installation-owner authority for privileged paths and
+commands. Backtests preflight separates stored source coverage from published NPY
+coverage and reports additional on-demand preparation. It never represents queued
+history as completed worker execution.
+
+For isolated UI verification, `e2e/integrated_fixture.py` serves the current candidate
+on a caller-selected loopback port, using only a task-created PostgreSQL on 25457 and
+`.cache/s09-dist`. Build with `node_modules/.bin/vite build --outDir ../../.cache/s09-dist`
+from this directory; start from repository root with
+`PYTHONPATH=apps/navigator-web/e2e:. .venv/bin/uvicorn integrated_fixture:app --host 127.0.0.1 --port 25459`.
+No dependency installation or existing preview restart is needed. Stop this process
+before removing its disposable DB. Its storage root is temporary and removed at exit.
+
+This UI fixture uses real artifact routes/PG/storage and native NPY preflight, but
+synthetic identity, candle/history responses and queued Backtest history. It does not
+run a worker or validate exchange ingestion/session issuance. Actual raw-to-canonical,
+managed scheduler and completed child-worker proof is the separate
+`tests/real_infra/backtest/test_artifact_integrated.py` disposable test; broader
+failure/auth/pin coverage is in the adjacent real-infra suites. Preserve that boundary
+when reporting browser results.
+
+Security settings show browser profiles using `/api/ui/account/devices`, rather
+than the historical session-record feed. A device row survives relogin and exposes
+current-device, measured activity, validity and owner-only revocation. Unidentified
+legacy logins form one explicit group. Device metadata is not authentication proof;
+see `docs/architecture/identity/local-auth-sessions-recovery-v1.md`. The view keeps
+bounded snapshots, disables commands on stale/error data and clears private rows
+on read or mutation denial. The Activity tab keeps its existing event feed.

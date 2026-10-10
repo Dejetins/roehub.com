@@ -1,0 +1,280 @@
+   Building roehub @ file:///Users/daniildegtyarev/Projects/roehub.com
+      Built roehub @ file:///Users/daniildegtyarev/Projects/roehub.com
+Uninstalled 1 package in 5ms
+Installed 1 package in 1ms
+/Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_fixture.py
+  /Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_fixture.py:41:29 - error: Cannot access attribute "__wrapped__" for class "FunctionType"
+    Attribute "__wrapped__" is unknown (reportFunctionMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_fixture.py:41:49 - error: Cannot access attribute "__wrapped__" for class "FunctionType"
+    Attribute "__wrapped__" is unknown (reportFunctionMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_fixture.py:310:17 - error: Argument of type "str" cannot be assigned to parameter "obj" of type "LiteralString" in function "__init__"
+    "str" is not assignable to "LiteralString" (reportArgumentType)
+/Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_preflight.py
+  /Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_preflight.py:32:49 - error: Cannot access attribute "__wrapped__" for class "FunctionType"
+    Attribute "__wrapped__" is unknown (reportFunctionMemberAccess)
+/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py
+  /Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py:42:21 - error: Argument of type "str" cannot be assigned to parameter "query" of type "Query" in function "execute"
+    Type "str" is not assignable to type "Query"
+      "str" is not assignable to "LiteralString"
+      "str" is not assignable to "bytes"
+      "str" is not assignable to "SQL"
+      "str" is not assignable to "Composed" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py:46:17 - error: Argument of type "str" cannot be assigned to parameter "query" of type "Query" in function "execute"
+    Type "str" is not assignable to type "Query"
+      "str" is not assignable to "LiteralString"
+      "str" is not assignable to "bytes"
+      "str" is not assignable to "SQL"
+      "str" is not assignable to "Composed" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py:88:71 - error: "is_active_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py:117:34 - error: "last_seen_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py:118:34 - error: "idle_expires_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py:119:34 - error: "created_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py:122:73 - error: "is_active_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py:127:73 - error: "last_seen_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py:130:73 - error: "is_active_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_browser_devices_postgres.py:152:72 - error: "is_active_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+/Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_stream_connections_postgres.py
+  /Users/daniildegtyarev/Projects/roehub.com/tests/runtime/test_stream_connections_postgres.py:30:38 - error: Argument of type "str" cannot be assigned to parameter "query" of type "Query" in function "execute"
+    Type "str" is not assignable to type "Query"
+      "str" is not assignable to "LiteralString"
+      "str" is not assignable to "bytes"
+      "str" is not assignable to "SQL"
+      "str" is not assignable to "Composed" (reportArgumentType)
+/Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py:47:37 - error: Argument of type "(request: Request) -> CurrentUserPrincipal" cannot be assigned to parameter "current_user_dependency" of type "RequireCurrentUserDependency" in function "build_browser_devices_router"
+    "FunctionType" is not assignable to "RequireCurrentUserDependency" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py:105:65 - error: "is_active_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py:109:67 - error: "revoked_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py:123:70 - error: "is_active_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py:124:67 - error: "is_active_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py:125:65 - error: "is_active_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/apps/api/test_browser_devices.py:167:71 - error: "is_active_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+/Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/identity/application/test_local_auth.py
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/identity/application/test_local_auth.py:297:50 - error: "user_id" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/identity/application/test_local_auth.py:308:49 - error: "user_id" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/identity/application/test_local_auth.py:313:65 - error: "is_active_at" is not a known attribute of "None" (reportOptionalMemberAccess)
+/Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/market_data/application/services/test_ws_worker_publishes_redis.py
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/market_data/application/services/test_ws_worker_publishes_redis.py:362:9 - error: Cannot assign to attribute "_metrics" for class "MarketDataWsApp"
+    Expression of type "SimpleNamespace" cannot be assigned to attribute "_metrics" of class "MarketDataWsApp"
+      "SimpleNamespace" is not assignable to "MarketDataWsMetrics" (reportAttributeAccessIssue)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/contexts/market_data/application/services/test_ws_worker_publishes_redis.py:386:31 - error: Argument of type "SimpleNamespace" cannot be assigned to parameter "plan" of type "WorkerConnectionPlan" in function "_run_plan"
+    "SimpleNamespace" is not assignable to "WorkerConnectionPlan" (reportArgumentType)
+/Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:23:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:23:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:24:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:24:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:28:32 - error: "attrib" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:31:20 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:31:20 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:31:24 - error: "findtext" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:32:13 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:32:13 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:32:17 - error: "findtext" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:32:69 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:32:69 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:32:73 - error: "findtext" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:33:20 - error: "findtext" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:37:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:37:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:38:23 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:38:23 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:40:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:40:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:41:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:41:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:42:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:42:16 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:49:20 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex"
+    ... (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tests/unit/tools/test_local_platform.py:49:20 - error: Argument of type "str | None" cannot be assigned to parameter "x" of type "ConvertibleToInt" in function "__new__"
+    Type "str | None" is not assignable to type "ConvertibleToInt"
+      Type "None" is not assignable to type "ConvertibleToInt"
+        "None" is not assignable to "str"
+        "None" is incompatible with protocol "Buffer"
+          "__buffer__" is not present
+        "None" is incompatible with protocol "SupportsInt"
+          "__int__" is not present
+        "None" is incompatible with protocol "SupportsIndex" (reportArgumentType)
+54 errors, 0 warnings, 0 informations
+WARNING: there is a new pyright version available (v1.1.408 -> v1.1.414).
+Please install the new version or set PYRIGHT_PYTHON_FORCE_VERSION to `latest`
+

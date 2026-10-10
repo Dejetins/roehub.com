@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03/run.py", line 8, in <module>
+    f=sys.argv.pop(1);sys.argv[0]=f;runpy.run_path(f,run_name='__main__')
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-04-01a1273a/tools/qa/market_data_ingestion_comparison.py", line 718, in <module>
+    main()
+  File "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-04-01a1273a/tools/qa/market_data_ingestion_comparison.py", line 688, in main
+    assert all(record["checks"].values()), record["checks"]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: {'all_windows': True, 'canonical_count': True, 'required_window': False, 'no_permit_leak': True, 'sampling_complete': True}

@@ -1,0 +1,15 @@
+tests/real_infra/backtest/test_artifact_integrated.py:536:1: I001 [*] Import block is un-sorted or un-formatted
+    |
+534 |   def test_clickhouse_pressure_keeps_artifact_attempt_retryable(dispatch, tmp_path, code, reason):
+535 |       """Real PG lifecycle, adapter-classified failure before publication; no source absence."""
+536 | /     from clickhouse_connect.driver.exceptions import DatabaseError
+537 | |     from tests.unit.contexts.backtest_artifacts.test_automatic_base import Source
+538 | |     m=dispatch
+    | |_^ I001
+539 |       submit(m,(item(m),))
+540 |       _,w=worker(m,tmp_path)
+    |
+    = help: Organize imports
+
+Found 1 error.
+[*] 1 fixable with the `--fix` option.

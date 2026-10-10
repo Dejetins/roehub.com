@@ -1,0 +1,21 @@
+import hashlib,json,subprocess,sys,time
+from pathlib import Path
+out=Path('.codex/agents/generated/market-data-resource-efficiency-v1/reports/S02')
+harness=Path('tools/qa/market_data_mixed_load.py')
+paths=[harness,Path('apps/cli/wiring/db/clickhouse.py'),Path('configs/dev/clickhouse-local-profiles.xml'),Path('tools/installation/clickhouse_workloads.py'),Path('src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/work_errors.py')]
+frozen={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
+with (out/'mixed-workload-frozen-02.json').open('x') as f:json.dump({'files':frozen,'order':['B1','C1','C2','B2','B3','C3'],'warmup_s':60,'steady_s':300,'clock':'monotonic offered scheduling; fixed UTC candle timestamps','cache':'warm after 60s identical offered workload','api':'real catalog route/ASGI/serialization and CH coverage; fixed auth/catalog/PG projections','low_priority':'two separate processes per backfill/artifacts class, synchronized offered cadence 1/s each; bounded retry then finite drain','sampling':'one second plus probe overhead; may miss shorter peaks'},f,indent=2)
+for rep,label in [(1,'baseline'),(1,'candidate'),(2,'candidate'),(2,'baseline'),(3,'baseline'),(3,'candidate')]:
+ assert frozen=={str(p):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths},'frozen source changed'
+ target=out/f'final-mixed-{rep}-{label}-02.json'
+ command=[sys.executable,'.cache/market-data-s02/run.py',str(harness),'--source','.cache/market-data-s02-baseline-01a126e9' if label=='baseline' else '.', '--label',label,'--output',str(target)]
+ print('start',rep,label,flush=True)
+ with (out/f'final-mixed-{rep}-{label}-02.log').open('x') as log:
+  p=subprocess.run(command,stdout=log,stderr=log)
+ d=json.loads(target.read_text())
+ assert p.returncode==0 and not d['failures'] and len(d['lanes'])==6
+ assert all(not lane.get('fatal') and not lane['failures'] for lane in d['lanes']), 'lane failure retained'
+ assert len(d['live_counts'])==4 and all(row[1]==360 for row in d['live_counts'])
+ assert len(d['background_counts'])==2 and all(row[1]==518400 for row in d['background_counts'])
+ print('complete',rep,label,d['full_completion_s'],flush=True)
+print('all six complete',flush=True)

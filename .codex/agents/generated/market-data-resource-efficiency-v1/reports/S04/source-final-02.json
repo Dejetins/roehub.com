@@ -1,0 +1,27 @@
+{
+  "baseline_snapshot_mismatches": [],
+  "candidate_snapshot_mismatches": [],
+  "current_vs_measured_mismatches": [],
+  "owned_final_hashes": {
+    "apps/worker/market_data_ws/wiring/modules/market_data_ws.py": "7f0abb9d56d0fe6ffe56b02781ba9bba21ba8bc13870a3b16906c068b7423815",
+    "docs/architecture/market_data/market-data-application-ports.md": "9829431ea1718237fbf21fff68658ee3451dc34c2f3631d729edf38d10c6247a",
+    "docs/architecture/market_data/market-data-reference-api-v1.md": "6f2f5df284f00fc59a0d6a9a03028f505401bb9b1c090994af543ded527e5e13",
+    "docs/runbooks/navigator-local-market-data-recovery.md": "de2bc5a1cfd89347da5d53339d6b822c7b93c35559ba87267e1b6bbf6fccc295",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/async_stream_recovery_store.py": "3b888569fe8587552a83b960aa36e7193e47f948d387bdbf9c20d8b1c6ff31ab",
+    "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py": "b0e4ccad109b74888b9717b2aac776e40e4c23aa49a4972ea8116fc8f09dcd09",
+    "src/trading/contexts/market_data/application/services/batched_recovery.py": "5288789a03df75d5bc7789c930d0847dce4072fee0f1f5950c368dd25f303557",
+    "src/trading/contexts/market_data/application/services/insert_buffer.py": "61467522aa2afa5ab87c5365366e81d1394b2014847ce5742856790d623aa460",
+    "src/trading/contexts/market_data/application/services/rest_fill_queue.py": "3e994afc7c5c3b3f089966de166cc59df93188dd21afc039603c9349a2596cb6",
+    "tests/real_infra/market_data/test_stream_recovery_postgres.py": "136150bb97a36f07fcc1857370d1878a73ee551ad33012ca7f76e963b29d6809",
+    "tests/unit/apps/worker/test_persistent_writer.py": "8c7dcfc593d0cc507c6d8a0f67b9f1cd661621db83c15d6d6a96257a8d8f4127",
+    "tests/unit/contexts/market_data/application/services/test_async_recovery_admission.py": "adb821ecde497f008c9a744cca522f555514899de5d6481cce352b3cf8c137b7",
+    "tools/qa/market_data_recovery_comparison.py": "61d55df9cfc7d18a1ac1f4cd4285034684b08c9e0095c3ab62b8ab18280a81ae"
+  },
+  "post_measurement_delta": {
+    "path": "tools/qa/market_data_recovery_comparison.py",
+    "reason": "E501 SQL literal line wrap only; AST identical",
+    "measured_sha256": "14fc6a6a98417138560d49003ebe63f8e07d66a0fc1b8f3943b7021e91bfd95e",
+    "final_sha256": "61d55df9cfc7d18a1ac1f4cd4285034684b08c9e0095c3ab62b8ab18280a81ae",
+    "AST_identical": true
+  }
+}

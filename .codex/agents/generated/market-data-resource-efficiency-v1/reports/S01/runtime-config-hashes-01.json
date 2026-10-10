@@ -1,0 +1,9 @@
+{
+  "clickhouse-capacity.xml": "43f6fff40fa4d3f40b03b46d1d6bd9957665fbc14e8b589f2524a34c17c8e2d5",
+  "indicators.yaml": "10261c4719d2e31c55791dfb52932bffcb44fac2c81c017a071abeac51903e19",
+  "clickhouse-observability.xml": "f0dd55cc97bf61e587599c8640f6b44f08f5e21d1bf226f08d3595ac1ff4a507",
+  "backtest-artifacts.yaml": "8a0a5df52a5bfd78ae61a2a3900b6d0aa35b75e90902a0fccd483c2a9bd17421",
+  "market-data.yaml": "ae1d3b3721568c59a8ec6016e142e5892fd03b19a9852dc5db30235d4e309739",
+  "clickhouse-profiles.xml": "a3cfeae041631603984a1957dcbbea5af7b8f0fbc3859e64d5b30993515e3f5b",
+  "clickhouse-query-limits.xml": "9a11a9080b04a94f85bd82673d8ae998dde1cbbc4460445837c39dd7e9b9d1a6"
+}

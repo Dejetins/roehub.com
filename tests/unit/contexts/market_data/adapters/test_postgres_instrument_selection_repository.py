@@ -79,3 +79,10 @@ def test_catalog_state_is_stale_after_freshness_window_and_failure_is_redacted()
     assert "market_data_catalog_refresh_state" in query
     assert parameters["state"] == "failed"
     assert parameters["last_error_code"] == "catalog_refresh_failed"
+
+
+def test_collector_empty_selection_has_no_implicit_reference_subscription() -> None:
+    repository = PostgresInstrumentSelectionRepository(
+        gateway=_Gateway(), reference_fallback=False)
+    assert repository.list_global_effective() == ()
+    assert repository.list_enabled_tradable() == ()

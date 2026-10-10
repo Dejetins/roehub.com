@@ -1,0 +1,20 @@
+{
+  "command": [
+    ".venv/bin/ruff",
+    "check",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/contracts.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_loader.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/hit_times_compute_v2.py",
+    "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py",
+    "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/defaults/management_catalog.py",
+    "src/trading/contexts/backtest_artifacts/application/services/automatic_base.py",
+    "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "tests/unit/contexts/backtest_artifacts/test_derivative_profiles.py",
+    "tests/real_infra/backtest/test_managed_derivative_publication.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_validator.py"
+  ],
+  "exit_code": 0,
+  "output": "All checks passed!\n"
+}

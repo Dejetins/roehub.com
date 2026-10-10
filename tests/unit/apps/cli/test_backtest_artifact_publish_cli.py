@@ -461,7 +461,7 @@ def test_build_publish_use_case_v2_uses_explicit_artifact_config_for_indicators_
             """
             self._environ = dict(environ)
 
-        def load(self) -> object:
+        def load(self, *, workload=None) -> object:
             """
             Return a deterministic settings object with a database attribute.
 

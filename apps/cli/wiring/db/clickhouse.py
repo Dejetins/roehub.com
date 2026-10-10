@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import random
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Protocol
+from typing import Literal, Mapping, Protocol
 
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
     ClickHouseConnectGateway,
@@ -10,6 +12,8 @@ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gatew
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (
     ClickHouseRawKlineWriter,
 )
+
+ClickHouseWorkload = Literal["stream", "interactive", "backfill", "artifacts"]
 
 
 class RawKlineWriter(Protocol):
@@ -54,7 +58,7 @@ class ClickHouseSettingsLoader:
     def __init__(self, environ: Mapping[str, str]) -> None:
         self._env = environ
 
-    def load(self) -> ClickHouseSettings:
+    def load(self, *, workload: ClickHouseWorkload | None = None) -> ClickHouseSettings:
         file_env: dict[str, str] = {}
         env_file = str(self._env.get("ROEHUB_ENV_FILE", "")).strip()
         if env_file:
@@ -75,19 +79,35 @@ class ClickHouseSettingsLoader:
         host = pick("CH_HOST", default="localhost")
         port = int(pick("CH_PORT", default="8123"))
 
-        # алиасы: CH_* приоритетнее, потом CLICKHOUSE_*
-        user = pick("CH_USER", "CLICKHOUSE_USER", default="default")
-        password = (
-            pick("CH_PASSWORD", "CLICKHOUSE_PASSWORD", default="")
-            or _read_optional_credential_file(
-                pick(
-                    "ROEHUB_CLICKHOUSE_PASSWORD_FILE",
-                    "CH_PASSWORD_FILE",
-                    "CLICKHOUSE_PASSWORD_FILE",
-                    default="",
+        # The composition root selects the class; no HTTP/request input controls it.
+        # Legacy mode supports ordered migration. Enabled installations mount only the
+        # selected secret and must never fall back to the old shared/admin identity.
+        required = pick("ROEHUB_CH_WORKLOADS_REQUIRED", default="0")
+        if required not in {"0", "1"}:
+            raise ValueError("invalid ClickHouse workload activation")
+        if required == "1":
+            if workload not in {"stream", "interactive", "backfill", "artifacts"}:
+                raise ValueError("ClickHouse workload is required")
+            user = "roehub_" + workload
+            credential = pick(f"ROEHUB_CH_{workload.upper()}_PASSWORD_FILE", default="")
+            if not credential:
+                raise ValueError("ClickHouse workload credential is required")
+            password = _read_optional_credential_file(credential)
+
+        else:
+            # алиасы: CH_* приоритетнее, потом CLICKHOUSE_*
+            user = pick("CH_USER", "CLICKHOUSE_USER", default="default")
+            password = (
+                pick("CH_PASSWORD", "CLICKHOUSE_PASSWORD", default="")
+                or _read_optional_credential_file(
+                    pick(
+                        "ROEHUB_CLICKHOUSE_PASSWORD_FILE",
+                        "CH_PASSWORD_FILE",
+                        "CLICKHOUSE_PASSWORD_FILE",
+                        default="",
+                    )
                 )
             )
-        )
 
         # ВАЖНО: по умолчанию используем market_data (ваш DDL),
         # не берём CLICKHOUSE_DB автоматически, чтобы не уехать в 'roehub'.
@@ -112,7 +132,7 @@ class ClickHouseWriterFactory:
     environ: Mapping[str, str]
 
     def writer(self) -> RawKlineWriter:
-        settings = ClickHouseSettingsLoader(self.environ).load()
+        settings = ClickHouseSettingsLoader(self.environ).load(workload="backfill")
         client = _clickhouse_client(settings)
         gateway = ClickHouseConnectGateway(client)
         return ClickHouseRawKlineWriter(gateway=gateway, database=settings.database)
@@ -124,14 +144,29 @@ def _clickhouse_client(settings: ClickHouseSettings):
     except Exception as e:  # noqa: BLE001
         raise RuntimeError("clickhouse-connect is required to run CLI commands") from e
 
-    return clickhouse_connect.get_client(
-        host=settings.host,
-        port=settings.port,
-        username=settings.user,
-        password=settings.password,
-        secure=settings.secure,
-        verify=settings.verify,
+    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
+        transient_clickhouse_error,
     )
+
+    # Driver initialization performs read-only metadata queries. Retry only classified
+    # admission pressure here, never replay an application INSERT/command implicitly.
+    for attempt in range(6):
+        try:
+            return clickhouse_connect.get_client(
+                host=settings.host,
+                port=settings.port,
+                username=settings.user,
+                password=settings.password,
+                secure=settings.secure,
+                verify=settings.verify,
+            )
+        except Exception as error:
+            if attempt == 5 or transient_clickhouse_error(error) not in {
+                "storage_unavailable", "storage_memory_pressure",
+            }:
+                raise
+            time.sleep(min(1.0, 0.1 * 2 ** attempt) + random.uniform(0, 0.05))
+    raise AssertionError("unreachable client initialization")
 
 
 def _parse_bool01(value: str) -> bool:

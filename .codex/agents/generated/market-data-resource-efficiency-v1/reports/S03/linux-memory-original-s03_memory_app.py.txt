@@ -1,0 +1,177 @@
+"""Resource-only injection, while the actual scheduler -m imports remain intact.
+
+No installed runtime/config is used. The fake app supplies deterministic HTTP
+work to the real client/admission at the proven executor retention upper bound.
+"""
+import asyncio
+import concurrent.futures
+import json
+import os
+import threading
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+from apps.scheduler.market_data_scheduler.wiring import modules
+from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.provider_admission import PostgresProviderAdmission
+from trading.contexts.market_data.application.ports.provider_admission import ProviderRequest, QuotaWindow
+
+payload_barrier = threading.Barrier(4)
+payload_lock = threading.Lock()
+payload_active = 0
+payload_peak = 0
+
+
+class Policy:
+    def request(self, url, params):
+        return ProviderRequest('binance', 's03-memory-probe', 4,
+                               (QuotaWindow('spot_weight', 60, 10000, 2),))
+
+
+class Handler(BaseHTTPRequestHandler):
+    protocol_version = 'HTTP/1.1'
+
+    def log_message(self, *args):
+        pass
+
+    def do_GET(self):
+        global payload_active, payload_peak
+        large = 'large' in self.path
+        if large:
+            with payload_lock:
+                payload_active += 1
+                payload_peak = max(payload_peak, payload_active)
+            try:
+                payload_barrier.wait(timeout=10)
+            except threading.BrokenBarrierError:
+                pass
+        payload = json.dumps([[1700000000000, '1.0', '2.0', '0.5', '1.5', '100.0', 1700000059999, '150.0', 10, '50.0', '75.0', '0']] * (1000 if 'large' in self.path else 0)).encode()
+        self.send_response(200)
+        self.send_header('Content-Length', str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+        if large:
+            with payload_lock:
+                payload_active -= 1
+
+
+def snapshot(label, **fields):
+    processes = []
+    for path in Path('/proc').glob('[0-9]*/status'):
+        try:
+            values = dict(line.split(':', 1) for line in path.read_text().splitlines())
+            processes.append({k: values.get(k, '').strip() for k in ['Name', 'Pid', 'PPid', 'VmRSS']})
+        except (OSError, ValueError):
+            pass
+    row = dict(label=label, monotonic=time.monotonic(), processes=processes, **fields)
+    for name in ['memory.current', 'memory.peak', 'memory.events', 'cpu.max', 'cpuset.cpus.effective']:
+        row[name] = Path('/sys/fs/cgroup', name).read_text().strip()
+    with Path('/evidence', os.environ['S03_MEMORY_RESULT']).open('a') as out:
+        out.write(json.dumps(row) + '\n')
+        out.flush()
+        os.fsync(out.fileno())
+
+
+class App:
+    def __init__(self, actual):
+        self.actual = actual
+
+    async def run_work_requests(self, stop_event, **kwargs):
+        await self.run(stop_event)
+
+    async def run(self, stop_event):
+        server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        server.daemon_threads = True
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        client = self.actual._provider_http
+        client.policy = Policy()
+        release = threading.Event()
+        futures = []
+        errors = []
+        successes = []
+        held_bodies = []
+        pool = concurrent.futures.ThreadPoolExecutor()
+        default_workers = pool._max_workers
+        pool.shutdown()
+        count = int(os.environ['S03_MEMORY_THREADS'])
+        assert default_workers == 22 and count <= default_workers + 4
+        default_pool = concurrent.futures.ThreadPoolExecutor(max_workers=max(1, count-4))
+        dedicated_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
+        payload_start = threading.Event()
+        payload_done = [threading.Event() for _ in range(min(count, 4))]
+        retained_count = 0
+        snapshot('start', python_cpu_count=os.cpu_count(), default_workers=default_workers,
+                 target_retained_transports=count, boundary='resource upper-bound injection at real scheduler entrypoint; not business-flow proof')
+        try:
+            for index in range(count):
+                ready = threading.Event()
+
+                def request(ready=ready, index=index):
+                    try:
+                        client.get_json(url=f'http://127.0.0.1:{server.server_port}/api/v3/klines', params={},
+                                        timeout_s=20, retries=0, backoff_base_s=0,
+                                        backoff_max_s=0, backoff_jitter_s=0)
+                        successes.append('small')
+                    except BaseException as error:
+                        errors.append(type(error).__name__)
+                    finally:
+                        ready.set()
+                    if index < 4:
+                        payload_start.wait()
+                        try:
+                            response = client.get_json(url=f'http://127.0.0.1:{server.server_port}/large', params={},
+                                            timeout_s=20, retries=0, backoff_base_s=0,
+                                            backoff_max_s=0, backoff_jitter_s=0)
+                            assert len(response.body) == 1000
+                            held_bodies.append(response.body)
+                            successes.append('large')
+                        except BaseException as error:
+                            errors.append(type(error).__name__)
+                        finally:
+                            payload_done[index].set()
+                    release.wait()
+
+                pool = dedicated_pool if index < 4 else default_pool
+                futures.append(pool.submit(request))
+                if not ready.wait(30):
+                    errors.append('thread_wait_timeout')
+                snapshot('retained', completed=index+1, errors=list(errors), transports=len(client._transports))
+                if errors:
+                    break
+            payload_start.set()
+            for done in payload_done[:min(4, len(futures))]:
+                if not done.wait(30):
+                    errors.append('payload_wait_timeout')
+            retained_count = len(client._transports)
+            snapshot('payloads_completed', errors=list(errors), retained_transports=retained_count,
+                     http_success=len(successes), held_large_bodies=len(held_bodies), payload_peak=payload_peak)
+            await asyncio.sleep(1)
+        finally:
+            payload_start.set()
+            release.set()
+            default_pool.shutdown(wait=True)
+            dedicated_pool.shutdown(wait=True)
+            client.close()
+            server.shutdown()
+            server.server_close()
+            import multiprocessing
+            snapshot('drained', errors=errors, children=len(multiprocessing.active_children()),
+                     futures_done=sum(future.done() for future in futures),
+                     http_success=len(successes), held_large_bodies=len(held_bodies),
+                     payload_peak=payload_peak, retained_transports=retained_count)
+        if errors:
+            raise RuntimeError('s03_memory_probe_failed')
+        assert retained_count == count and len(successes) == count+4
+        assert len(held_bodies) == payload_peak == 4
+        assert len(multiprocessing.active_children()) == 0 and all(future.done() for future in futures)
+
+
+original_build = modules.build_market_data_scheduler_app
+
+
+def build(**kwargs):
+    return App(original_build(**kwargs))
+
+
+modules.build_market_data_scheduler_app = build

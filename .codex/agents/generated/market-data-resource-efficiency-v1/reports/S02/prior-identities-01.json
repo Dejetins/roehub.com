@@ -1,0 +1,22 @@
+[
+  {
+    "container": "roehub-local-api-1",
+    "identity": "proof",
+    "password_configured": true
+  },
+  {
+    "container": "roehub-local-market-data-ws-1",
+    "identity": "proof",
+    "password_configured": true
+  },
+  {
+    "container": "roehub-local-market-data-scheduler-1",
+    "identity": "proof",
+    "password_configured": true
+  },
+  {
+    "container": "roehub-local-backtest-artifact-publisher-1",
+    "identity": "proof",
+    "password_configured": true
+  }
+]

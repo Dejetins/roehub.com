@@ -1,0 +1,119 @@
+---
+{
+  "schema_version": "stage-prompt/v1",
+  "prompt_pack_execution": {
+    "plan_doc": "implementation-plan.md",
+    "prompt_pack_dir": ".",
+    "stage_ledger": "iteration-ledger.md"
+  },
+  "stage_contract": {
+    "id": "S01",
+    "title": "Executable contracts and baseline",
+    "prompt_path": "01-contracts-and-baseline.md",
+    "report_path": "reports/S01.md",
+    "receipt_dir": "receipts/S01",
+    "depends_on": [],
+    "expected_touches": [
+      "../../../../docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "../../../../docs/architecture/market_data/market-data-reference-api-v1.md"
+    ],
+    "acceptance_criteria": [
+      "R01–R13 map to verified owners, DTO shapes, states and tests in reports/S01.md; adopted schedule interpretation and all-selected catalog default are preserved.",
+      "Authoritative platform timeframe/catalog sets, legacy policy import, shared-coordinate demand aggregation and installation-owner scope are resolved from current code; no duplicated registry or broadened privilege.",
+      "Record baseline dirty paths, numerical/source fixtures, API contracts and current Navigator behavior; no expensive publish, ingestion, scheduler enablement or product code mutation.",
+      "Concrete bounded queue/resource defaults, empty-selection semantics, short-history states, activation/rollback ordering and new endpoint/schema names are specified for subsequent stages.",
+      "Independent architecture review covers storage authorization, cross-organization shared slots and cleanup; findings are resolved or explicitly prevent acceptance."
+    ],
+    "proof_boundary": "Source-backed implementable contract and baseline; no new runtime behavior or performance proof.",
+    "validation": {
+      "profile": "roehub-focused-gates-and-prompt-pack-artifacts/v1",
+      "checks": [
+        "Read current sources and use architecture-design for remaining technical detail, architecture-review for the required independent review; no product implementation or new plan/ledger.",
+        "Read-only fixture/source inspection and existing test inventories; checks of declared source paths and requirement coverage. Browser baseline screenshot/reads if available; screenshots do not establish runtime QA.",
+        "Documentation validation only if canonical docs are modified; preserve foreign edits and do not claim unavailable runtime evidence."
+      ],
+      "requires_user_acceptance": false
+    },
+    "entry_inputs": [
+      {
+        "path": "implementation-plan.md",
+        "producer_stage": null
+      },
+      {
+        "path": "../../../../AGENTS.md",
+        "producer_stage": null
+      },
+      {
+        "path": "../../../../src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py",
+        "producer_stage": null
+      },
+      {
+        "path": "../../../../apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
+        "producer_stage": null
+      },
+      {
+        "path": "../../../../apps/navigator-web/src/builder-api.ts",
+        "producer_stage": null
+      },
+      {
+        "path": "../../../../apps/api/routes/admin.py",
+        "producer_stage": null
+      }
+    ]
+  },
+  "context": {
+    "always_read": [
+      "iteration-ledger.md",
+      "implementation-plan.md",
+      "../../../../AGENTS.md"
+    ],
+    "task_entrypoints": [
+      "../../../../src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py",
+      "../../../../apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
+      "../../../../apps/navigator-web/src/builder-api.ts",
+      "../../../../apps/api/routes/admin.py"
+    ],
+    "conditional_sources": {
+      "API/UI": "../../../../docs/architecture/apps/web/roehub-data-loading-contract-v1.md",
+      "NPY consumers": "../../../../docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "cross-context": "../../../../docs/architecture/project-map/AGENT_GUIDE.md",
+      "local runtime": "../../../../docs/runbooks/navigator-local-market-data-recovery.md"
+    },
+    "consult_if_needed": [
+      "../../../../docs/architecture/platform/artifact-store-v1.md"
+    ]
+  }
+}
+---
+
+# S01 — Executable contracts and baseline
+
+## Task and scope
+
+Execute exactly stage S01 of the linked plan when the user selects this prompt. Read the canonical journal before doing anything that changes product state. Its mutable status/claim/decision fields are authoritative; this prompt does not copy them. The owner approved the complete plan and technical direction on 2026-10-08; no repeated unchanged-plan approval is required. Preserve all accepted requirements, especially mandatory all-timeframe base NPY, common 1/3/7-day cadence and all Backtests indicators selected by default with checkbox exclusions.
+
+Finalize D1–D7 from the current worktree and record exact contracts in the stage report. Reconcile the full supported timeframe set, mandatory execution inputs and Backtests indicator catalog. Map organization/installation permissions explicitly. Resolve compatible demand union, quotas and base-trigger source ownership before schema work. Keep new tables/API names proposed until implemented. Read-only discovery of local data is bounded and secret-free; never inspect environment dumps.
+
+## Context and entry
+
+Read `always_read`, the current stage contract and its listed task entrypoints; open conditional sources only when their boundary is crossed. Read the predecessor report where declared, then inspect actual produced code/contracts before use. A missing future report is a dependency to be produced by its stage, not a request for the owner to author it. Follow AGENTS.md source/foreign-change rules and refresh affected diffs before edits. Reports and new receipt directories are authorized stage outputs in addition to expected product touch zones. Resolve exact new source/test paths inside those zones; do not invent a pre-existing file or overwrite foreign hunks.
+
+Use `staged-plan-runner` for lifecycle/claim/transition. Read the available skill and canonical lifecycle in the current session. Run the bundled validator for this journal and this stage's entry before using the existing directory-local updater. The executable path is `.codex/agents/generated/data-artifact-management-v1/ledger_update.py`; its `claim_capability` binding is in the journal. Its exclusive directory flock, re-read and atomic replacement protect claims; a read/write/read by hand does not. Do not activate or claim another pack.
+
+## Work and proof
+
+Implement only the task and `stage_contract.acceptance_criteria`. The contract front matter carries the exact touch zones, acceptance, entry inputs, report path and validation instructions; those are executable requirements, not illustrative boilerplate. Select current commands from real package/CI sources. No dependency installation, private-provider access, production migration, user-data deletion, full-catalog compute or unrelated runtime restart follows implicitly. Use disposable fixtures for destructive/failure cases. Preserve the selected Navigator client and keep apps/platform-web unchanged unless the owner explicitly expands scope.
+
+Use `backend-quality-gates` when Python changes need verification; `contract-impact-analysis` when a relied-on API/persistence/config/consumer boundary changes; `root-cause-debugging` only for an unexplained failure; `backend-performance-evidence` only for measurement claims. Use browser-qa-evidence for user-flow proof and current selected-browser onboarding; load craft skills only for materially changed layout/accessibility/copy. This is implementation of an accepted existing-screen design, not an automatic Product Design ideation task. Independent review follows AGENTS.md and this stage's checks, not a recursive reviewer chain.
+
+## Decisions and stop conditions
+
+Routine reversible implementation choices stay delegated; do not reopen all-indicator defaults, all-timeframe base coverage or cadence because of personal preference. Report evidence if a current contract makes a requirement incompatible and preserve the accepted intent. A material new owner decision uses the journal's decision packet with a precise resume condition. Missing permissions/current required policy, unresolved foreign ownership, unavailable required proof or unsafe slot/root state blocks only dependent work; continue independent authorized diagnosis. Do not label required missing review/runtime evidence passed, steal claims, reset terminal stages or invent a new execution engine.
+
+## Handoff
+
+Write `reports/S01.md` with requirement IDs addressed; actual created/modified/deleted paths and outside-zone reasons; excluded foreign edits; observed commands/results; review findings/disposition; compatibility (`none`, `compatible-change`, `breaking-change`, `unknown`); proof boundary and residual risks; exact products for the next stage. Keep secrets, credentials, raw provider data and environment dumps out of evidence.
+
+Before acceptance, validate the actual stage results and immutable receipt bindings using the existing updater under the canonical lifecycle. `--checks-passed` is an executor assertion supported by real report/evidence, never a replacement for tests. The updater cannot accept a source-required user-acceptance gate; there is none prescribed by this pack. If newly required, use runner reconciliation rather than bypassing it. Recheck the next stage's entry inputs, current source paths and declared decisions; permission for that row does not authorize automatic continuation. Never edit an accepted plan/prompt/report to make an old receipt pass.
+
+Finish in Russian with scope/results, limits and the exact next prompt link, then stop. On S09 there is no successor: complete the journal only after all required stages are satisfied and return the final local handoff. No publication, release or production delivery claim is authorized.

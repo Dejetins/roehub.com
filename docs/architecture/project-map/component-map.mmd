@@ -117,6 +117,8 @@ flowchart TB
   n_app_cli --> n_context_notifications
   n_app_cli --> n_core_platform
   n_app_cli --> n_core_shared_kernel
+  n_app_control_agent --> n_context_backtest
+  n_app_control_agent --> n_context_backtest_artifacts
   n_app_control_agent --> n_context_operations
   n_app_exchange_control --> n_context_exchange_control
   n_app_exchange_execution --> n_context_exchange_control
@@ -133,6 +135,13 @@ flowchart TB
   n_app_migrations --> n_core_integration
   n_app_migrations --> n_core_platform
   n_app_migrations --> n_core_shared_kernel
+  n_app_navigator_web --> n_app_api
+  n_app_navigator_web --> n_app_control_agent
+  n_app_navigator_web --> n_context_backtest
+  n_app_navigator_web --> n_context_backtest_artifacts
+  n_app_navigator_web --> n_context_identity
+  n_app_navigator_web --> n_context_operations
+  n_app_navigator_web --> n_core_shared_kernel
   n_app_plugin_gateway --> n_core_integration
   n_app_roehubctl --> n_app_cli
   n_app_roehubctl --> n_app_control_agent
@@ -176,6 +185,7 @@ flowchart TB
   n_context_market_data --> n_core_shared_kernel
   n_context_notifications --> n_core_platform
   n_context_notifications --> n_core_shared_kernel
+  n_context_operations --> n_context_backtest_artifacts
   n_context_rl_trading --> n_context_live_execution
   n_context_rl_trading --> n_context_strategy
   n_context_rl_trading --> n_core_shared_kernel
@@ -191,6 +201,7 @@ flowchart TB
   n_worker_backtest_job_runner --> n_context_backtest
   n_worker_backtest_job_runner --> n_context_backtest_artifacts
   n_worker_backtest_job_runner --> n_context_indicators
+  n_worker_backtest_job_runner --> n_context_market_data
   n_worker_backtest_job_runner --> n_core_platform
   n_worker_backtest_job_runner --> n_core_shared_kernel
   n_worker_job_runtime --> n_app_control_agent

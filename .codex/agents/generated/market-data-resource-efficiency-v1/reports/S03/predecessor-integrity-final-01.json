@@ -1,0 +1,22 @@
+[
+  {
+    "receipt": ".codex/agents/generated/market-data-resource-efficiency-v1/receipts/S01/receipt-49e8873d578647438adb6993ffc19e13.md",
+    "sha256": "8a018c670853be28280ae6f7362c838951adbe22dc8c30eb818e4cacd2166a6d",
+    "bindings": {
+      "implementation-plan.md": true,
+      "01-indexed-source-reconciliation.md": true,
+      "reports/S01.md": true,
+      "reports/S01/evidence-sha256.json": true
+    }
+  },
+  {
+    "receipt": ".codex/agents/generated/market-data-resource-efficiency-v1/receipts/S02/receipt-532ed40d08db475f9f468c928e14967d.md",
+    "sha256": "7f177dd43588abc70effc3f63d96162d99b70d49598934ee5cdf932235d6c24a",
+    "bindings": {
+      "implementation-plan.md": true,
+      "02-clickhouse-workload-budgets.md": true,
+      "reports/S02.md": true,
+      "reports/S02/evidence-sha256-01.json": true
+    }
+  }
+]

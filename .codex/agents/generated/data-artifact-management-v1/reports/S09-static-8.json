@@ -1,0 +1,9 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "tools/release/generate_runtime_topology.py",
+    "--check"
+  ],
+  "exit_code": 0,
+  "output": "runtime topology generation passed: mode=check, profiles=base,trading,ml\n"
+}

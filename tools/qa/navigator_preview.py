@@ -28,13 +28,14 @@ def create_app():
                 "api": "/connections", "integrations": "/connections",
                 "preferences": "/settings/preferences",
                 "notifications": "/settings/notifications", "security": "/settings/security",
+                "storage": "/settings/storage",
             }.get(request.query_params.get("tab", ""), "/settings/profile")
             return RedirectResponse(target, status_code=308)
         return await call_next(request)
 
     @app.get("/settings/{category}")
     def settings_page(request: Request, category: str):
-        if category not in {"profile", "preferences", "notifications", "security"}:
+        if category not in {"profile", "preferences", "notifications", "security", "storage"}:
             raise web.HTTPException(status_code=404)
         return web._render_protected_page(
             request=request, templates=templates, page_path=request.url.path,

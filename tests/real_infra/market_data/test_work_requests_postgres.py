@@ -10,15 +10,20 @@ from uuid import uuid4
 import psycopg
 import pytest
 from psycopg import sql
+from psycopg.conninfo import make_conninfo
 from psycopg.rows import dict_row
 
-from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_bounds_repository import (  # noqa: E501
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_bounds_repository import (  # noqa: E501  # noqa: E501
     PostgresHistoryBoundsRepository,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository import (  # noqa: E501
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository import (  # noqa: E501  # noqa: E501
     PostgresMarketDataWorkRequestRepository,
 )
+from trading.contexts.market_data.application.ports.stores.history_coverage_reader import (
+    HistoryCoverageReader,
+)
 from trading.contexts.market_data.application.services.work_requests import WorkRequest
+from trading.contexts.market_data.application.use_cases import RestFillRange1mUseCase
 
 DSN = os.environ.get("ROEHUB_MARKET_DATA_TEST_DSN", "")
 pytestmark = pytest.mark.skipif(not DSN, reason="explicit disposable PostgreSQL target required")
@@ -44,6 +49,7 @@ def store():
             "0024_market_data_full_history_v1.sql",
             "0025_market_data_work_recovery_v1.sql",
             "0026_market_data_queue_events_v1.sql",
+            "0034_market_data_provider_admission_v1.sql",
         ):
             migration = (
                 Path(__file__).resolve().parents[3] / "migrations/postgres" / filename
@@ -89,7 +95,9 @@ def store():
         gateway = Gateway()
         yield (
             PostgresMarketDataWorkRequestRepository(
-                gateway=gateway, execution_dsn=DSN, execution_lock_key=uuid4().int % (2**63)
+                gateway=gateway,
+                execution_dsn=make_conninfo(DSN, options=f"-c search_path={schema}"),
+                execution_lock_key=uuid4().int % (2**63)
             ),
             org,
             actor,
@@ -403,7 +411,7 @@ def test_queue_skips_pause_and_provider_wait_and_continues_without_reset(store):
 
 
 def test_concurrent_overlapping_admission_and_global_storage_cooldown(store):
-    from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository import (  # noqa: E501
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository import (  # noqa: E501  # noqa: E501
         ActiveWorkRequestError,
     )
     repo,org,actor,_=store
@@ -454,7 +462,7 @@ def test_events_do_not_log_checkpoints_and_are_bounded_and_paginated(store):
 
 
 def test_atomic_batches_idempotency_rollback_and_capacity(store):
-    from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository import (  # noqa: E501
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository import (  # noqa: E501  # noqa: E501
         ActiveWorkRequestError,
     )
     repo, org, actor, gateway = store
@@ -517,7 +525,8 @@ def test_pause_wins_terminal_error_and_active_job_ignores_catalog_period(store):
 
 @pytest.mark.skipif(not os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_PORT'),
                     reason='explicit disposable ClickHouse target required')
-def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store):
+@pytest.mark.parametrize("pressure_code", [241, 202])
+def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store, pressure_code):
     from dataclasses import dataclass
     from types import SimpleNamespace
 
@@ -532,7 +541,8 @@ def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store):
     repo, org, actor, _ = store
     ch = clickhouse_connect.get_client(
         host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
-        username='proof', password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
+        username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
+        password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
     table = 'market_data.work_recovery_test_'+uuid4().hex
     clock = [datetime.now(UTC).replace(second=0, microsecond=0)]
     start = clock[0]-timedelta(hours=3)
@@ -547,14 +557,31 @@ def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store):
             offset = rows[0][0]
             if offset == 60 and fault[0]:
                 fault[0] = False
-                ch.command(f'INSERT INTO {table} SELECT number FROM numbers(100000)',
-                           settings={'max_memory_usage':1,'max_threads':1,'max_execution_time':5})
-                pytest.fail('ClickHouse did not enforce the per-query memory limit')
+                if pressure_code == 241:
+                    ch.command(f'INSERT INTO {table} SELECT number FROM numbers(100000)',
+                               settings={'max_memory_usage':1,'max_threads':1,'max_execution_time':5})
+                else:
+                    import time
+                    other = clickhouse_connect.get_client(
+                        host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
+                        username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
+                        password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
+                    try:
+                        with ThreadPoolExecutor(max_workers=1) as pool:
+                            running = pool.submit(other.command, 'SELECT sleep(2)')
+                            time.sleep(.2)
+                            ch.command(f'INSERT INTO {table} SELECT number FROM numbers(60)',
+                                       settings={'max_concurrent_queries_for_user':1})
+                            running.result()
+                    finally:
+                        other.close()
+                pytest.fail('ClickHouse did not enforce resource pressure')
             ch.insert(table, rows, column_names=['minute'])
 
     @dataclass
     class Fill:
         writer: Any
+        check_lease: Any = lambda: None
 
         def run(self, task):
             offset = int((task.time_range.start.value-start).total_seconds()//60)
@@ -572,7 +599,8 @@ def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store):
         waiting = repo.get(organization_id=org, job_id=job['job_id'])
         assert (waiting['state'], waiting['completed_units'], waiting['rows_written']) == (
             'retry_wait', 60, 60)
-        assert waiting['error_code'] == 'storage_memory_pressure'
+        assert waiting['error_code'] == (
+            'storage_memory_pressure' if pressure_code == 241 else 'storage_unavailable')
         assert waiting['error_phase'] == 'fill_window'
         assert not runner.run_once()
         clock[0] = waiting['next_retry_at']
@@ -611,6 +639,7 @@ def test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_sibli
     @dataclass
     class Fill:
         writer: Any = None
+        check_lease: Any = lambda: None
 
         def run(self, task):
             entered.wait(timeout=10)
@@ -620,7 +649,8 @@ def test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_sibli
     runner = MarketDataWorkRequestRunner(repo, cast(Any, Fill()), lambda *_: None,
                                         now=lambda: now, max_windows=1)
     with ThreadPoolExecutor(max_workers=4) as workers, ThreadPoolExecutor(1) as coordinator:
-        future = coordinator.submit(runner.run_batch, executor=workers, concurrency=4)
+        future = coordinator.submit(runner.run_batch, executor=workers, concurrency=4,
+                                    should_stop=release.is_set)
         try:
             entered.wait(timeout=10)
             assert [repo.get(organization_id=org, job_id=j['job_id'])['state']
@@ -696,6 +726,7 @@ def test_parallel_batch_drains_siblings_before_releasing_lease_on_failure(store,
     @dataclass
     class Fill:
         writer: Any = None
+        check_lease: Any = lambda: None
 
         def run(self, task):
             entered.set()
@@ -764,6 +795,7 @@ def test_parallel_batch_lost_lease_fences_all_four_writers(store):
     @dataclass
     class Fill:
         writer: Any
+        check_lease: Any = lambda: None
 
         def run(self, task):
             entered.wait(timeout=10)
@@ -776,7 +808,8 @@ def test_parallel_batch_lost_lease_fences_all_four_writers(store):
         retryable_storage_error=lambda error: isinstance(error, psycopg.OperationalError),
     )
     with ThreadPoolExecutor(4) as workers, ThreadPoolExecutor(1) as coordinator:
-        future = coordinator.submit(runner.run_batch, executor=workers, concurrency=4)
+        future = coordinator.submit(runner.run_batch, executor=workers, concurrency=4,
+                                    should_stop=release.is_set)
         try:
             entered.wait(timeout=10)
             key = repo._execution_lock_key
@@ -787,9 +820,206 @@ def test_parallel_batch_lost_lease_fences_all_four_writers(store):
                 parameters=dict(high=key >> 32, low=key & 0xffffffff),
             )
             assert result and result['terminated']
+            with repo.execution() as rival:
+                assert rival is None  # Durable owner outlives automatic session unlock.
         finally:
             release.set()
-        assert future.result(timeout=10) == 4
+        with pytest.raises(psycopg.OperationalError):
+            future.result(timeout=10)
     assert writes == []
     rows = [repo.get(organization_id=org, job_id=j['job_id']) for j in jobs]
-    assert all(row['state'] == 'retry_wait' and row['completed_units'] == 0 for row in rows)
+    assert all(row['state'] == 'running' and row['completed_units'] == 0 for row in rows)
+    with repo.execution() as check:
+        assert check is not None
+        repo.recover(now=now+timedelta(minutes=6))
+    assert all(repo.get(organization_id=org, job_id=j['job_id'])['state'] == 'retry_wait'
+               for j in jobs)
+
+
+def test_incomplete_history_retry_streak_uses_persisted_previous_reason(store):
+    from dataclasses import dataclass
+    from types import SimpleNamespace
+
+    from trading.contexts.market_data.application.services.work_requests import (
+        MarketDataWorkRequestRunner,
+    )
+    repo, org, actor, _ = store
+    now = datetime.now(UTC).replace(second=0, microsecond=0)
+    start = now - timedelta(minutes=1)
+    row = repo.submit(organization_id=org, actor_user_id=actor, key=uuid4(),
+                      request=WorkRequest('candle_ingestion', 1, ('ACTUSDT',), start, now), now=now)
+    @dataclass
+    class EmptyFill:
+        writer: object = None
+        check_lease: Any = lambda: None
+        def run(self, task):
+            return SimpleNamespace(rows_read=0, rows_written=0)
+    runner = MarketDataWorkRequestRunner(
+        repo, cast(RestFillRange1mUseCase, EmptyFill()),
+        lambda *_: None, now=lambda: now,
+        repair_index=cast(
+            HistoryCoverageReader, SimpleNamespace(first_gap=lambda **kw: kw['time_range']),
+        ))
+    for expected in (1,2,3):
+        assert runner.run_once()
+        waiting = repo.get(organization_id=org, job_id=row['job_id'])
+        assert waiting['state'] == 'retry_wait'
+        assert waiting['retry_count'] == expected
+        now = waiting['next_retry_at'] + timedelta(seconds=1)
+    assert runner.run_once()
+    failed = repo.get(organization_id=org, job_id=row['job_id'])
+    assert failed['state'] == 'failed' and failed['error_code'] == 'source_history_incomplete'
+    assert failed['completed_units'] == 0
+
+
+def test_resume_before_pause_ack_preserves_worker_and_fences_old_commands(store):
+    repo, org, actor, gateway = store
+    now = datetime.now(UTC).replace(second=0, microsecond=0)
+    row = repo.submit(organization_id=org, actor_user_id=actor, key=uuid4(),
+                      request=WorkRequest('candle_ingestion', 2, ('BTCUSDT',),
+                                          now - timedelta(days=1), now), now=now)
+    job = repo.claim(now=now)
+    repo.checkpoint(job=job, units=60, rows_read=60, rows_written=57, now=now)
+    repo.pause(organization_id=org, job_id=row['job_id'], version=0, now=now)
+    assert repo.resume(organization_id=uuid4(), job_id=row['job_id'], version=1, now=now) is None
+    resumed = repo.resume(organization_id=org, job_id=row['job_id'], version=1, now=now)
+    assert resumed['state'] == 'running' and resumed['worker_token'] == job['worker_token']
+    assert resumed['completed_units'] == 60 and resumed['rows_written'] == 57
+    assert resumed['control_version'] == 2 and resumed['attempt'] == 1
+    assert repo.claim(now=now) is None
+    assert repo.pause(organization_id=org, job_id=row['job_id'], version=0, now=now) is None
+    assert repo.resume(organization_id=org, job_id=row['job_id'], version=1, now=now) is None
+    events = gateway.fetch_all(
+        query="SELECT event_type FROM market_data_work_events WHERE job_id = %(id)s",
+        parameters={'id': row['job_id']})
+    assert [event['event_type'] for event in events].count('resumed') == 1
+    # A worker that already saw pause_requested may release after the reversal.
+    repo.release(job=job, now=now)
+    saved = repo.get(organization_id=org, job_id=row['job_id'])
+    assert saved['state'] == 'queued' and saved['completed_units'] == 60
+    newer = repo.claim(now=now)
+    assert repo.checkpoint(job=job, units=120, rows_read=120, rows_written=117, now=now) is None
+    repo.pause(organization_id=org, job_id=row['job_id'], version=2, now=now)
+    repo.cancel(organization_id=org, job_id=row['job_id'], now=now)
+    assert repo.resume(organization_id=org, job_id=row['job_id'], version=3, now=now) is None
+    repo.release(job=newer, now=now)
+    assert repo.get(organization_id=org, job_id=row['job_id'])['state'] == 'cancelled'
+
+
+def test_rolling_refills_while_slow_sibling_remains_live_and_recovers_only_once(store):
+    from dataclasses import dataclass
+    from threading import Event, Lock
+    from types import SimpleNamespace
+
+    from trading.contexts.market_data.application.services.work_requests import (
+        MarketDataWorkRequestRunner,
+    )
+    repo, org, actor, gateway = store
+    now = datetime.now(UTC).replace(second=0, microsecond=0)
+    slow, fifth, release = Event(), Event(), Event()
+    lock = Lock()
+    visits = []
+    symbols = ('BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT')
+    jobs = [repo.submit(organization_id=org, actor_user_id=actor, key=uuid4(),
+                        request=WorkRequest('candle_ingestion', 1, (symbol,),
+                                            now-timedelta(minutes=1440), now),
+                        now=now+timedelta(microseconds=i)) for i, symbol in enumerate(symbols)]
+    recover = repo.recover
+    recoveries = []
+    def recovery(**kwargs):
+        recoveries.append(1)
+        recover(**kwargs)
+    repo.recover = recovery
+
+    @dataclass
+    class Fill:
+        writer: Any = None
+        check_lease: Any = lambda: None
+        def run(self, task):
+            symbol = str(task.instrument_id.symbol)
+            with lock:
+                visits.append(symbol)
+            if symbol == 'BTCUSDT':
+                slow.set()
+                assert release.wait(10)
+            if symbol == 'ADAUSDT':
+                fifth.set()
+            return SimpleNamespace(rows_read=1440, rows_written=1440)
+    runner = MarketDataWorkRequestRunner(repo, cast(Any, Fill()), lambda *_: None,
+                                        max_windows=1, window_minutes=1440)
+    with ThreadPoolExecutor(4) as workers, ThreadPoolExecutor(1) as coordinator:
+        future = coordinator.submit(runner.run_batch, executor=workers, concurrency=4)
+        try:
+            assert slow.wait(10) and fifth.wait(10)
+            assert not future.done()
+            assert repo.get(organization_id=org, job_id=jobs[0]['job_id'])['state'] == 'running'
+            assert recoveries == [1]
+        finally:
+            release.set()
+        assert future.result(10) == 5
+    assert sorted(visits) == sorted(symbols)
+    assert all(repo.get(organization_id=org, job_id=j['job_id'])['state'] == 'succeeded'
+               for j in jobs)
+
+
+def test_history_bounds_quota_wait_survives_probe_layers_and_retries(store):
+    from types import SimpleNamespace
+
+    from trading.contexts.market_data.adapters.outbound.clients.common_http import HttpResponse
+    from trading.contexts.market_data.adapters.outbound.clients.history_probe_http import (
+        HistoryProbeHttpClient,
+    )
+    from trading.contexts.market_data.adapters.outbound.clients.rest_instrument_history_start_source import (  # noqa: E501
+        RestInstrumentHistoryStartSource,
+    )
+    from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
+        load_market_data_runtime_config,
+    )
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.provider_admission import (  # noqa: E501
+        PostgresProviderAdmission,
+    )
+    from trading.contexts.market_data.application.ports.provider_admission import (
+        ProviderRequest,
+        QuotaWindow,
+    )
+    from trading.contexts.market_data.application.services.history_bounds import HistoryBoundsRunner
+    from trading.shared_kernel.primitives import UtcTimestamp
+
+    coordinator, _, _, gateway = store
+    bounds = PostgresHistoryBoundsRepository(gateway=gateway)
+    admission = PostgresProviderAdmission(coordinator._execution_dsn)
+    policy = ProviderRequest('binance', 'bounds-proof', 1, (QuotaWindow('weight', 60, 100, 2),))
+    held = admission.reserve(policy)
+    clock = [datetime.now(UTC)]
+    first = datetime(2020, 1, 1, tzinfo=UTC)
+    sent = []
+
+    def get_json(**_):
+        permit = admission.reserve(policy)
+        try:
+            sent.append(1)
+            return HttpResponse(200, {}, [[int(first.timestamp() * 1000)]])
+        finally:
+            permit.complete(headers={})
+
+    source = RestInstrumentHistoryStartSource(
+        load_market_data_runtime_config(Path('configs/dev/market_data.yaml')),
+        HistoryProbeHttpClient(cast(Any, SimpleNamespace(get_json=get_json))),
+        cast(Any, SimpleNamespace(now=lambda: UtcTimestamp(clock[0]))),
+        require_confirmed_candle=True,
+    )
+    runner = HistoryBoundsRunner(bounds, coordinator, lambda: source, now=lambda: clock[0])
+    bounds.read_or_request(market_id=1, symbol='BTCUSDT', now=clock[0])
+    try:
+        assert runner.run_once()
+        row = gateway.fetch_one(query='SELECT * FROM market_data_history_bounds', parameters={})
+        assert row['state'] == 'queued' and row['error_code'] == 'source_rate_limited'
+        assert row['next_retry_at'] > clock[0] and not sent
+        assert not runner.run_once()
+    finally:
+        held.complete(headers={})
+    clock[0] = row['next_retry_at']
+    assert runner.run_once()
+    row = bounds.read_or_request(market_id=1, symbol='BTCUSDT', now=clock[0])
+    assert row is not None
+    assert row['state'] == 'ready' and row['first_open_at'] == first and sent == [1]

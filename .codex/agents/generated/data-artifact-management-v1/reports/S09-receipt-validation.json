@@ -1,0 +1,95 @@
+[
+  {
+    "historical_receipt_validation_mode": "Pack.receipt(successor=False): validate historical accepted dependencies without trying to execute their now-terminal successors. Initial CLI check of an earlier receipt rejected terminal successor with Entry is not pending or resumable work; this is not a byte-binding failure."
+  },
+  {
+    "receipt": "receipts/S01/receipt-7354485337e543428eb1d672b3fbe808.md",
+    "result": "pass",
+    "stage": "S01"
+  },
+  {
+    "receipt": "receipts/S02/receipt-29065e5e121f49a7a6d1986a778e7b93.md",
+    "result": "pass",
+    "stage": "S02"
+  },
+  {
+    "receipt": "receipts/S03-R2/receipt-764f79c2beed47d498039d6b641a9174.md",
+    "result": "pass",
+    "stage": "S03-R2"
+  },
+  {
+    "receipt": "receipts/S04/receipt-3cc212eec0074cf0850ce99c05608c11.md",
+    "result": "pass",
+    "stage": "S04"
+  },
+  {
+    "receipt": "receipts/S05/receipt-b3eea8aa864f4a8fa6c9f52978aa5bdf.md",
+    "result": "pass",
+    "stage": "S05"
+  },
+  {
+    "receipt": "receipts/S06/receipt-bf6360d5378b4ae19f0471b3f997ff55.md",
+    "result": "pass",
+    "stage": "S06"
+  },
+  {
+    "receipt": "receipts/S07/receipt-badaa709a40b447487f6249c6b4b1bf5.md",
+    "result": "pass",
+    "stage": "S07"
+  },
+  {
+    "receipt": "receipts/S08/receipt-0c2df17ddf804a39b943763968cdf408.md",
+    "result": "pass",
+    "stage": "S08"
+  },
+  {
+    "receipt": "receipts/S09/receipt-85365f69c88542ea84385f11c813098a.md",
+    "result": "pass",
+    "stage": "S09"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "/Users/daniildegtyarev/.codex/skills/prompt-manager/scripts/validate_pack.py",
+      "--root",
+      "/Users/daniildegtyarev/Projects/roehub.com",
+      "--ledger",
+      "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/iteration-ledger.md",
+      "--check",
+      "receipt",
+      "--receipt",
+      "/Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/receipts/S09/receipt-85365f69c88542ea84385f11c813098a.md"
+    ],
+    "exit_code": 0,
+    "output": "{\"status\": \"pass\", \"check\": \"receipt\", \"errors\": [], \"proof_boundary\": \"artifact-structure-and-file-binding\"}\n"
+  },
+  {
+    "source_and_evidence_hash_validation": "pass"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_project_map",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "OK: project map up-to-date (5 artifacts)\n"
+  },
+  {
+    "ledger_status": "completed",
+    "current_stage": "S09",
+    "stage_statuses": {
+      "S01": "accepted",
+      "S02": "accepted",
+      "S03": "blocked",
+      "S04": "accepted",
+      "S05": "accepted",
+      "S06": "accepted",
+      "S07": "accepted",
+      "S08": "accepted",
+      "S09": "accepted",
+      "S03-R2": "accepted"
+    }
+  }
+]

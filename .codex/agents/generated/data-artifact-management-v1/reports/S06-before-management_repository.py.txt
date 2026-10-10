@@ -1,0 +1,808 @@
+"""Transactional artifact-owned policy/inbox. Not a scheduler or file ownership replacement.
+
+Runtime composition supplies a current catalog/access resolver. Worker methods are internal;
+HTTP adapters must expose only scoped methods. File writes still require 0028 slot reservations.
+"""
+
+from __future__ import annotations
+
+import re
+from datetime import UTC, datetime, timedelta
+from typing import Any, Mapping
+from uuid import UUID, uuid4
+
+from psycopg.types.json import Jsonb
+
+from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.gateway import (
+    BacktestPostgresGateway,
+)
+from trading.contexts.backtest_artifacts.application.ports.management import (
+    CoordinateAccess,
+    ProfileCatalog,
+)
+from trading.contexts.backtest_artifacts.application.services.management import (
+    Coordinate,
+    ManagementError,
+    PolicyItem,
+    Progress,
+    Schedule,
+    SourceTarget,
+    digest,
+)
+
+_ACTIVE = "('waiting_for_source','queued','running','retry_wait')"
+
+
+class PostgresArtifactManagementRepository:
+    def __init__(
+        self, *, gateway: BacktestPostgresGateway, catalog: ProfileCatalog, access: CoordinateAccess
+    ) -> None:
+        self.db, self.catalog, self.access = gateway, catalog, access
+
+    def _one(self, query: str, **params: Any) -> Mapping[str, Any] | None:
+        return self.db.fetch_one(query=query, parameters=params)
+
+    def _exec(self, query: str, **params: Any) -> None:
+        self.db.execute(query=query, parameters=params)
+
+    def _authorize(self, org: UUID, actor: UUID, *, write: bool = False) -> UUID:
+        row = self._one(
+            """SELECT o.installation_id, m.role FROM identity_memberships m
+            JOIN identity_organizations o USING (organization_id)
+            WHERE m.organization_id=%(org)s AND m.user_id=%(actor)s
+              AND m.status='active' AND o.status='active' FOR SHARE OF m,o""",
+            org=org,
+            actor=actor,
+        )
+        if row is None or (write and row["role"] not in ("owner", "admin", "operator")):
+            raise ManagementError("forbidden")
+        return row["installation_id"]
+
+    def _installation_owner(self, org: UUID, actor: UUID) -> UUID:
+        installation = self._authorize(org, actor, write=True)
+        if (
+            self._one(
+                """SELECT user_id FROM identity_installation_owners
+                WHERE installation_id=%(i)s AND user_id=%(a)s FOR SHARE""",
+                i=installation,
+                a=actor,
+            )
+            is None
+        ):
+            raise ManagementError("installation_forbidden")
+        return installation
+
+    def _lock(self, installation: UUID) -> None:
+        # One bounded admission/claim transaction per installation, stable before row locks.
+        self._one(
+            "SELECT pg_advisory_xact_lock(hashtextextended(%(key)s,29))", key=str(installation)
+        )
+
+    def initialize_settings(
+        self, *, organization_id: UUID, actor_id: UUID, root_id: str, schedule: Schedule
+    ) -> Mapping[str, Any]:
+        """Explicit installation-owner initialization; never overwrite installed values."""
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", root_id):
+            raise ManagementError("invalid_root_id")
+        schedule = Schedule.model_validate(schedule.model_dump())
+        with self.db.transaction():
+            installation = self._installation_owner(organization_id, actor_id)
+            self._lock(installation)
+            self._exec(
+                """INSERT INTO backtest_artifact_installation_settings
+                (installation_id,control_version,root_id,root_revision,schedule)
+                VALUES (%(i)s,1,%(root)s,1,%(schedule)s) ON CONFLICT DO NOTHING""",
+                i=installation,
+                root=root_id,
+                schedule=Jsonb(schedule.model_dump(mode="json")),
+            )
+            row = self._one(
+                "SELECT * FROM backtest_artifact_installation_settings "
+                "WHERE installation_id=%(i)s",
+                i=installation,
+            )
+            assert row is not None
+            return row
+
+    def update_defaults(
+        self,
+        *,
+        organization_id: UUID,
+        actor_id: UUID,
+        expected_version: int,
+        schedule: Schedule,
+        budget_bytes: int | None,
+    ) -> Mapping[str, Any]:
+        """CAS defaults only. Activation/root relocation require later control-agent workflow."""
+        schedule = Schedule.model_validate(schedule.model_dump())
+        if budget_bytes is not None and (type(budget_bytes) is not int or budget_bytes <= 0):
+            raise ManagementError("invalid_budget")
+        with self.db.transaction():
+            installation = self._installation_owner(organization_id, actor_id)
+            self._lock(installation)
+            row = self._one(
+                """UPDATE backtest_artifact_installation_settings
+                SET schedule=%(s)s,budget_bytes=%(b)s,control_version=control_version+1,
+                    updated_at=now()
+                WHERE installation_id=%(i)s AND control_version=%(v)s RETURNING *""",
+                i=installation,
+                v=expected_version,
+                s=Jsonb(schedule.model_dump(mode="json")),
+                b=budget_bytes,
+            )
+            if row is None:
+                raise ManagementError("stale_version")
+            return row
+
+    def _settings(self, installation: UUID, *, active: bool) -> Mapping[str, Any]:
+        row = self._one(
+            """SELECT * FROM backtest_artifact_installation_settings
+            WHERE installation_id=%(i)s FOR UPDATE""",
+            i=installation,
+        )
+        if row is None:
+            raise ManagementError("storage_unconfigured")
+        if active and (
+            not row["capability_enabled"] or row["paused"] or row["legacy_handoff"] != "complete"
+        ):
+            raise ManagementError("management_unavailable")
+        if active and row["budget_bytes"] is None:
+            raise ManagementError("storage_unconfigured")
+        return row
+
+    def _capacity(
+        self, installation: UUID, org: UUID | None, count: int, settings: Mapping[str, Any]
+    ) -> None:
+        row = self._one(
+            f"""SELECT count(*) AS total,
+                count(*) FILTER (WHERE organization_id=%(org)s) AS own
+            FROM backtest_artifact_requests WHERE installation_id=%(i)s AND state IN {_ACTIVE}""",
+            i=installation,
+            org=org,
+        )
+        assert row is not None
+        if row["total"] + count > settings["global_queue_limit"] or (
+            org is not None and row["own"] + count > settings["org_queue_limit"]
+        ):
+            raise ManagementError("quota_exceeded")
+
+    def command(
+        self, *, organization_id: UUID, actor_id: UUID, key: str
+    ) -> Mapping[str, Any] | None:
+        with self.db.transaction():
+            self._authorize(organization_id, actor_id)
+            row = self._one(
+                """SELECT response,response_status FROM backtest_artifact_commands
+                WHERE organization_id=%(org)s AND idempotency_key=%(key)s""",
+                org=organization_id,
+                key=key,
+            )
+            if row:
+                for item in row["response"]["items"]:
+                    self.access.require(
+                        organization_id=organization_id,
+                        actor_id=actor_id,
+                        coordinate=Coordinate.model_validate(item["coordinate"]),
+                    )
+            return row
+
+    def submit(
+        self,
+        *,
+        organization_id: UUID,
+        actor_id: UUID,
+        key: str,
+        items: tuple[PolicyItem, ...],
+        kind: str = "update_now",
+    ) -> Mapping[str, Any]:
+        if not re.fullmatch(r"[A-Za-z0-9._:-]{8,128}", key) or kind not in ("update_now", "policy"):
+            raise ManagementError("invalid_command")
+        if not 1 <= len(items) <= 50 or len({i.coordinate.key for i in items}) != len(items):
+            raise ManagementError("invalid_bulk")
+        # Reparse even frozen models: callers cannot bypass validators with model_copy/construct.
+        items = tuple(PolicyItem.model_validate(i.model_dump()) for i in items)
+        body_hash = digest({"kind": kind, "items": [i.model_dump(mode="json") for i in items]})
+        with self.db.transaction():
+            installation = self._authorize(organization_id, actor_id, write=True)
+            for item in items:
+                self.access.require(
+                    organization_id=organization_id, actor_id=actor_id, coordinate=item.coordinate
+                )
+            self._lock(installation)
+            existing = self._one(
+                """SELECT body_hash,response FROM backtest_artifact_commands
+                WHERE organization_id=%(org)s AND idempotency_key=%(key)s""",
+                org=organization_id,
+                key=key,
+            )
+            if existing:
+                if existing["body_hash"] != body_hash:
+                    raise ManagementError("idempotency_conflict")
+                return existing["response"]
+            # An already committed response remains recoverable after catalog/config changes.
+            profiles = [self.catalog.validate(i.profile) for i in items]
+            settings = self._settings(installation, active=True)
+            self._capacity(installation, organization_id, len(items), settings)
+            prepared = []
+            batch_profiles: dict[tuple[UUID, int], dict[str, Any]] = {}
+            for item, profile in zip(items, profiles):
+                c = item.coordinate.model_dump()
+                current = self._one(
+                    """SELECT * FROM backtest_artifact_policies
+                    WHERE organization_id=%(org)s AND exchange=%(exchange)s
+                    AND market_type=%(market_type)s AND symbol=%(symbol)s FOR UPDATE""",
+                    org=organization_id,
+                    **c,
+                )
+                if (current["control_version"] if current else 0) != item.expected_version:
+                    raise ManagementError("stale_version")
+                payload = profile.model_dump(mode="json")
+                identity = (profile.profile_id, profile.revision)
+                if identity in batch_profiles and batch_profiles[identity] != payload:
+                    raise ManagementError("immutable_profile_conflict")
+                batch_profiles[identity] = payload
+                old = self._one(
+                    """SELECT profile FROM backtest_artifact_profiles
+                    WHERE organization_id=%(org)s AND profile_id=%(p)s AND revision=%(r)s""",
+                    org=organization_id,
+                    p=profile.profile_id,
+                    r=profile.revision,
+                )
+                if old and old["profile"] != payload:
+                    raise ManagementError("immutable_profile_conflict")
+                prepared.append((item, payload, current))
+            command_id = uuid4()
+            self._exec(
+                """INSERT INTO backtest_artifact_commands
+                (command_id,organization_id,actor_id,idempotency_key,body_hash,kind,
+                 response,response_status) VALUES (%(id)s,%(org)s,%(actor)s,%(key)s,%(hash)s,
+                 %(kind)s,'{}',202)""",
+                id=command_id,
+                org=organization_id,
+                actor=actor_id,
+                key=key,
+                hash=body_hash,
+                kind=kind,
+            )
+            result: dict[str, Any] = {"command_id": str(command_id), "items": []}
+            for item, payload, current in prepared:
+                c = item.coordinate.model_dump()
+                self._exec(
+                    """INSERT INTO backtest_artifact_profiles
+                    (organization_id,profile_id,revision,profile,created_by)
+                    VALUES (%(org)s,%(p)s,%(r)s,%(profile)s,%(actor)s) ON CONFLICT DO NOTHING""",
+                    org=organization_id,
+                    p=item.profile.profile_id,
+                    r=item.profile.revision,
+                    profile=Jsonb(payload),
+                    actor=actor_id,
+                )
+                schedule = (
+                    item.schedule.model_dump(mode="json") if item.schedule else settings["schedule"]
+                )
+                inherited = item.schedule is None
+                if kind == "update_now" and current:
+                    # A manual build cannot silently act as a profile/schedule mutation.
+                    if (
+                        str(current["profile_id"]) != str(item.profile.profile_id)
+                        or current["profile_revision"] != item.profile.revision
+                        or (current.get("inherits_schedule", False) != inherited)
+                        or (not inherited and current["schedule"] != schedule)
+                    ):
+                        raise ManagementError("manual_policy_mismatch")
+                    version = current["control_version"]
+                else:
+                    version = item.expected_version + 1
+                    self._exec(
+                        """INSERT INTO backtest_artifact_policies
+                        (organization_id,exchange,market_type,symbol,control_version,
+                         profile_id,profile_revision,schedule,inherits_schedule,updated_by)
+                        VALUES (%(org)s,%(exchange)s,%(market_type)s,%(symbol)s,
+                                %(v)s,%(p)s,%(r)s,%(s)s,%(inherit)s,%(actor)s)
+                        ON CONFLICT (organization_id,exchange,market_type,symbol) DO UPDATE SET
+                        control_version=EXCLUDED.control_version,profile_id=EXCLUDED.profile_id,
+                        profile_revision=EXCLUDED.profile_revision,schedule=EXCLUDED.schedule,
+                        inherits_schedule=EXCLUDED.inherits_schedule,
+                        updated_by=EXCLUDED.updated_by,next_due=NULL""",
+                        org=organization_id,
+                        **c,
+                        v=version,
+                        p=item.profile.profile_id,
+                        r=item.profile.revision,
+                        s=Jsonb(schedule),
+                        inherit=inherited,
+                        actor=actor_id,
+                    )
+                request_id = uuid4()
+                state = "queued" if item.source is not None else "waiting_for_source"
+                snapshot = {
+                    "profile": payload,
+                    "source": item.source.model_dump(mode="json") if item.source else None,
+                    "root_id": settings["root_id"],
+                    "root_revision": settings["root_revision"],
+                    "schedule": schedule,
+                    "policy_version": version,
+                    "actor_id": str(actor_id),
+                }
+                self._exec(
+                    """INSERT INTO backtest_artifact_requests
+                    (request_id,organization_id,installation_id,command_id,exchange,market_type,
+                     symbol,kind,trigger,snapshot,state)
+                    VALUES (%(id)s,%(org)s,%(i)s,%(command)s,%(exchange)s,%(market_type)s,
+                            %(symbol)s,%(kind)s,'manual',%(snapshot)s,%(state)s)""",
+                    id=request_id,
+                    org=organization_id,
+                    i=installation,
+                    command=command_id,
+                    **c,
+                    kind=item.kind,
+                    snapshot=Jsonb(snapshot),
+                    state=state,
+                )
+                result["items"].append(
+                    {
+                        "coordinate": c,
+                        "request_id": str(request_id),
+                        "state": state,
+                        "control_version": version,
+                    }
+                )
+            self._exec(
+                "UPDATE backtest_artifact_commands SET response=%(r)s WHERE command_id=%(id)s",
+                id=command_id,
+                r=Jsonb(result),
+            )
+            return result
+
+    def request(
+        self, *, organization_id: UUID, actor_id: UUID, request_id: UUID
+    ) -> Mapping[str, Any] | None:
+        with self.db.transaction():
+            self._authorize(organization_id, actor_id)
+            row = self._one(
+                """SELECT request_id,exchange,market_type,symbol,kind,trigger,
+                snapshot,state,reason,control_version,created_at FROM backtest_artifact_requests
+                WHERE organization_id=%(org)s AND request_id=%(id)s""",
+                org=organization_id,
+                id=request_id,
+            )
+            if row:
+                self.access.require(
+                    organization_id=organization_id,
+                    actor_id=actor_id,
+                    coordinate=Coordinate(
+                        **{k: row[k] for k in ("exchange", "market_type", "symbol")}
+                    ),
+                )
+            return row
+
+    def events(
+        self, *, organization_id: UUID, actor_id: UUID, request_id: UUID, limit: int = 30
+    ) -> tuple[Mapping[str, Any], ...]:
+        if not 1 <= limit <= 50:
+            raise ManagementError("invalid_limit")
+        with self.db.transaction():
+            if (
+                self.request(
+                    organization_id=organization_id, actor_id=actor_id, request_id=request_id
+                )
+                is None
+            ):
+                return ()
+            return self.db.fetch_all(
+                query="""SELECT state,reason,progress,observed_at
+                FROM backtest_artifact_events WHERE request_id=%(id)s
+                ORDER BY event_id DESC LIMIT %(limit)s""",
+                parameters={"id": request_id, "limit": limit},
+            )
+
+    def enqueue_system(
+        self,
+        *,
+        installation_id: UUID,
+        coordinate: Coordinate,
+        source: SourceTarget | None,
+        trigger: str = "initial",
+        occurrence: str = "",
+    ) -> UUID:
+        """Trusted post-commit/reconciler seam for mandatory base work only.
+
+        Caller must resolve actual stored coordinates, not the exchange reference universe.
+        A persisted source obligation survives quota rejection for bounded reconciliation.
+        """
+        coordinate = Coordinate.model_validate(coordinate.model_dump())
+        if (
+            trigger not in ("initial", "schedule", "source_revision", "legacy")
+            or len(occurrence) > 128
+        ):
+            raise ManagementError("invalid_system_trigger")
+        if source is not None:
+            source = SourceTarget.model_validate(source.model_dump())
+        target = source.model_dump(mode="json") if source else None
+        c = coordinate.model_dump()
+        key = digest({"coordinate": c, "kind": "base", "source": target, "occurrence": occurrence})
+        full = False
+        with self.db.transaction():
+            self._lock(installation_id)
+            settings = self._settings(installation_id, active=False)
+            existing = self._one(
+                """SELECT request_id FROM backtest_artifact_requests
+                WHERE installation_id=%(i)s AND internal_dedupe_key=%(key)s""",
+                i=installation_id,
+                key=key,
+            )
+            if existing:
+                return existing["request_id"]
+            self._exec(
+                """INSERT INTO backtest_artifact_source_state
+                (exchange,market_type,symbol,desired_target) VALUES
+                (%(exchange)s,%(market_type)s,%(symbol)s,%(target)s)
+                ON CONFLICT (exchange,market_type,symbol)
+                DO UPDATE SET desired_target=EXCLUDED.desired_target""",
+                **c,
+                target=Jsonb({"source": target, "occurrence": occurrence}),
+            )
+            try:
+                self._capacity(installation_id, None, 1, settings)
+            except ManagementError:
+                full = True
+            if not full:
+                request_id = uuid4()
+                self._exec(
+                    """INSERT INTO backtest_artifact_requests
+                    (request_id,installation_id,internal_dedupe_key,exchange,market_type,symbol,
+                     kind,trigger,snapshot,state) VALUES (%(id)s,%(i)s,%(key)s,%(exchange)s,
+                     %(market_type)s,%(symbol)s,'base',%(trigger)s,%(snapshot)s,%(state)s)""",
+                    id=request_id,
+                    i=installation_id,
+                    key=key,
+                    **c,
+                    trigger=trigger,
+                    snapshot=Jsonb(
+                        {
+                            "source": target,
+                            "root_id": settings["root_id"],
+                            "root_revision": settings["root_revision"],
+                        }
+                    ),
+                    state="queued" if source else "waiting_for_source",
+                )
+                return request_id
+        raise ManagementError("quota_exceeded")
+
+    def claim(
+        self,
+        *,
+        installation_id: UUID,
+        request_id: UUID,
+        owner_token: UUID,
+        parent_incarnation: UUID,
+        reservation_bytes: int,
+    ) -> Mapping[str, Any] | None:
+        """Durable queue reservation; caller still acquires both physical slot reservations."""
+        if type(reservation_bytes) is not int or reservation_bytes < 0:
+            raise ManagementError("invalid_reservation")
+        with self.db.transaction():
+            self._one("SELECT pg_advisory_xact_lock(290029)")
+            self._lock(installation_id)
+            settings = self._settings(installation_id, active=True)
+            # Global one-build default; quarantine consumes capacity until explicit reconciliation.
+            if self._one("""SELECT build_id FROM backtest_artifact_builds
+                    WHERE state IN ('running','quarantined') LIMIT 1"""):
+                return None
+            request = self._one(
+                """SELECT * FROM backtest_artifact_requests
+                WHERE request_id=%(id)s AND installation_id=%(i)s AND state='queued' FOR UPDATE""",
+                id=request_id,
+                i=installation_id,
+            )
+            if request is None:
+                return None
+            if reservation_bytes + 1073741824 > settings["budget_bytes"]:
+                raise ManagementError("resource_conflict")
+            if (
+                request["snapshot"]["root_id"] != settings["root_id"]
+                or request["snapshot"]["root_revision"] != settings["root_revision"]
+            ):
+                raise ManagementError("root_revision_changed")
+            build_id = uuid4()
+            row = self._one(
+                """INSERT INTO backtest_artifact_builds
+                (build_id,installation_id,exchange,market_type,symbol,snapshot,state,owner_token,
+                 parent_incarnation,attempt,epoch,reservation_bytes)
+                VALUES (%(id)s,%(i)s,%(e)s,%(m)s,%(s)s,%(snapshot)s,'running',%(owner)s,
+                        %(parent)s,1,1,%(bytes)s) RETURNING *""",
+                id=build_id,
+                i=installation_id,
+                e=request["exchange"],
+                m=request["market_type"],
+                s=request["symbol"],
+                snapshot=Jsonb(request["snapshot"]),
+                owner=owner_token,
+                parent=parent_incarnation,
+                bytes=reservation_bytes,
+            )
+            self._exec(
+                """INSERT INTO backtest_artifact_build_requests VALUES (%(b)s,%(r)s)""",
+                b=build_id,
+                r=request_id,
+            )
+            self._exec(
+                """INSERT INTO backtest_artifact_attempts
+                (build_id,attempt,epoch,owner_token,parent_incarnation,state)
+                VALUES (%(b)s,1,1,%(o)s,%(p)s,'running')""",
+                b=build_id,
+                o=owner_token,
+                p=parent_incarnation,
+            )
+            self._exec(
+                """UPDATE backtest_artifact_requests SET state='running',
+                control_version=control_version+1 WHERE request_id=%(r)s""",
+                r=request_id,
+            )
+            return row
+
+    def _fence(self, build: Mapping[str, Any], *, state: str = "running") -> Mapping[str, Any]:
+        row = self._one(
+            """SELECT * FROM backtest_artifact_builds WHERE build_id=%(b)s
+            AND owner_token=%(o)s AND parent_incarnation=%(p)s AND attempt=%(a)s
+            AND epoch=%(e)s AND state=%(s)s FOR UPDATE""",
+            b=build["build_id"],
+            o=build["owner_token"],
+            p=build["parent_incarnation"],
+            a=build["attempt"],
+            e=build["epoch"],
+            s=state,
+        )
+        if row is None:
+            raise ManagementError("ownership_lost")
+        return row
+
+    def observe(self, *, build: Mapping[str, Any], progress: Progress) -> None:
+        progress = Progress.model_validate(progress.model_dump())
+        payload = progress.model_dump(mode="json") | {"progress_epoch": build["epoch"]}
+        with self.db.transaction():
+            current = self._fence(build)
+            previous = current["progress"]
+            series = dict(previous.get("series", {}))
+            key = f"{progress.phase}:{progress.timeframe or ''}:{progress.unit}"
+            observed = series.get(key)
+            if previous and progress.observed_at <= datetime.fromisoformat(previous["observed_at"]):
+                raise ManagementError("stale_progress")
+            if observed and (
+                progress.completed_units < observed["completed_units"] or
+                (observed["total_units"] is not None
+                 and progress.total_units != observed["total_units"])
+            ):
+                raise ManagementError("progress_regression")
+            series[key] = dict(payload)
+            payload["series"] = series
+            self._exec(
+                "UPDATE backtest_artifact_builds SET progress=%(p)s WHERE build_id=%(b)s",
+                p=Jsonb(payload),
+                b=build["build_id"],
+            )
+            self._exec(
+                """UPDATE backtest_artifact_attempts SET progress=%(p)s
+                WHERE build_id=%(b)s AND attempt=%(a)s""",
+                p=Jsonb(payload),
+                b=build["build_id"],
+                a=build["attempt"],
+            )
+            self._events(build["build_id"], "running", None, payload)
+
+    def _events(
+        self, build_id: UUID, state: str, reason: str | None, progress: Mapping[str, Any]
+    ) -> None:
+        self._exec(
+            """INSERT INTO backtest_artifact_events(request_id,state,reason,progress)
+            SELECT br.request_id,%(s)s,%(reason)s,%(p)s FROM backtest_artifact_build_requests br
+            JOIN backtest_artifact_requests r USING(request_id)
+            WHERE br.build_id=%(b)s AND r.state=%(s)s""",
+            b=build_id,
+            s=state,
+            reason=reason,
+            p=Jsonb(dict(progress)),
+        )
+        self._exec(
+            """DELETE FROM backtest_artifact_events WHERE event_id IN (
+            SELECT event_id FROM (
+                SELECT event_id,row_number() OVER (PARTITION BY request_id ORDER BY event_id DESC) n
+                FROM backtest_artifact_events WHERE request_id IN (
+                    SELECT request_id FROM backtest_artifact_build_requests WHERE build_id=%(b)s)
+            ) numbered WHERE n>512)""",
+            b=build_id,
+        )
+
+    def finish(
+        self,
+        *,
+        build: Mapping[str, Any],
+        outcome: str,
+        reason: str | None = None,
+        publication: Mapping[str, Any] | None = None,
+    ) -> None:
+        """Worker-owned terminal transition, after stopping work; ready requires pointer receipt.
+
+        Unknown liveness uses quarantine, retaining the reservation. No timer steals it.
+        The publisher supplies its committed/validated pointer receipt; this layer never publishes.
+        """
+        if outcome not in ("ready", "error", "retry_wait", "quarantined"):
+            raise ManagementError("invalid_outcome")
+        if reason is not None and not re.fullmatch(r"[a-z_]{1,64}", reason):
+            raise ManagementError("invalid_reason")
+        if outcome == "retry_wait" and reason not in ("transient_io", "transient_database"):
+            raise ManagementError("nonretryable_reason")
+        if outcome == "ready" and (
+            not publication
+            or set(publication) != {"generation", "manifest_sha256", "slot"}
+            or publication["slot"] not in ("slot_a", "slot_b")
+            or type(publication["generation"]) is not int
+            or publication["generation"] <= 0
+            or not re.fullmatch(r"[0-9a-f]{64}", str(publication["manifest_sha256"]))
+        ):
+            raise ManagementError("publication_receipt_required")
+        with self.db.transaction():
+            current = self._fence(build)
+            if outcome == "retry_wait" and current["attempt"] >= 8:
+                outcome, reason = "error", "attempts_exhausted"
+            retry_at = (
+                datetime.now(UTC) + timedelta(seconds=min(15 * 2 ** (current["attempt"] - 1), 300))
+                if outcome == "retry_wait"
+                else None
+            )
+            self._exec(
+                """UPDATE backtest_artifact_builds SET state=%(s)s,next_retry_at=%(retry)s
+                WHERE build_id=%(b)s""",
+                b=build["build_id"],
+                s=outcome,
+                retry=retry_at,
+            )
+            self._exec(
+                """UPDATE backtest_artifact_attempts SET state=%(s)s
+                WHERE build_id=%(b)s AND attempt=%(a)s""",
+                s=outcome,
+                b=build["build_id"],
+                a=build["attempt"],
+            )
+            request_state = "running" if outcome == "quarantined" else outcome
+            self._exec(
+                """UPDATE backtest_artifact_requests SET state=%(s)s,reason=%(reason)s,
+                control_version=control_version+1 WHERE state IN ('running','retry_wait')
+                AND request_id IN
+                (SELECT request_id FROM backtest_artifact_build_requests WHERE build_id=%(b)s)""",
+                s=request_state,
+                reason=reason or ("ownership_unknown" if outcome == "quarantined" else None),
+                b=build["build_id"],
+            )
+            self._events(build["build_id"], request_state, reason, current["progress"])
+            if outcome == "ready":
+                self._exec(
+                    """INSERT INTO backtest_artifact_source_state
+                    (exchange,market_type,symbol,desired_target,published)
+                    VALUES (%(e)s,%(m)s,%(s)s,%(target)s,%(pub)s)
+                    ON CONFLICT (exchange,market_type,symbol)
+                    DO UPDATE SET published=EXCLUDED.published
+                    """,
+                    e=current["exchange"],
+                    m=current["market_type"],
+                    s=current["symbol"],
+                    target=Jsonb(current["snapshot"]),
+                    pub=Jsonb(dict(publication or {})),
+                )
+
+    def retry(
+        self,
+        *,
+        build: Mapping[str, Any],
+        owner_token: UUID,
+        parent_incarnation: UUID,
+        now: datetime,
+    ) -> Mapping[str, Any] | None:
+        if now.utcoffset() != timedelta(0):
+            raise ManagementError("utc_required")
+        with self.db.transaction():
+            self._one("SELECT pg_advisory_xact_lock(290029)")
+            self._lock(build["installation_id"])
+            settings = self._settings(build["installation_id"], active=True)
+            current = self._fence(build, state="retry_wait")
+            if current["reservation_bytes"] + 1073741824 > settings["budget_bytes"]:
+                raise ManagementError("resource_conflict")
+            if (
+                current["snapshot"]["root_revision"] != settings["root_revision"]
+                or current["snapshot"]["root_id"] != settings["root_id"]
+            ):
+                raise ManagementError("root_revision_changed")
+            if current["next_retry_at"] > now or self._one("""SELECT build_id
+                    FROM backtest_artifact_builds
+                    WHERE state IN ('running','quarantined') LIMIT 1"""):
+                return None
+            row = self._one(
+                """UPDATE backtest_artifact_builds SET state='running',
+                owner_token=%(o)s,parent_incarnation=%(p)s,attempt=attempt+1,epoch=epoch+1,
+                progress='{}',next_retry_at=NULL WHERE build_id=%(b)s RETURNING *""",
+                o=owner_token,
+                p=parent_incarnation,
+                b=build["build_id"],
+            )
+            assert row is not None
+            self._exec(
+                """INSERT INTO backtest_artifact_attempts
+                (build_id,attempt,epoch,owner_token,parent_incarnation,state)
+                VALUES (%(b)s,%(a)s,%(e)s,%(o)s,%(p)s,'running')""",
+                b=row["build_id"],
+                a=row["attempt"],
+                e=row["epoch"],
+                o=owner_token,
+                p=parent_incarnation,
+            )
+            self._exec(
+                """UPDATE backtest_artifact_requests SET state='running',reason=NULL,
+                control_version=control_version+1 WHERE state IN ('running','retry_wait')
+                AND request_id IN
+                (SELECT request_id FROM backtest_artifact_build_requests WHERE build_id=%(b)s)""",
+                b=row["build_id"],
+            )
+            return row
+
+    def import_legacy(
+        self,
+        *,
+        organization_id: UUID,
+        actor_id: UUID,
+        demands: tuple[tuple[Coordinate, str, Mapping[str, Any]], ...],
+    ) -> dict[str, int]:
+        """Explicit, bounded installation import. Existing rows are never overwritten.
+
+        Snapshots must come from the runtime-config adapter, not an organization profile.
+        A changed hash is reported as conflict requiring explicit owner reconciliation.
+        """
+        if not 1 <= len(demands) <= 50 or len({c.key for c, _, _ in demands}) != len(demands):
+            raise ManagementError("invalid_import_page")
+        for c, config_hash, snapshot in demands:
+            Coordinate.model_validate(c.model_dump())
+            if not re.fullmatch(r"[0-9a-f]{64}", config_hash):
+                raise ManagementError("invalid_config_hash")
+            if set(snapshot) != {
+                "signals",
+                "hit_times",
+                "signal_artifacts",
+                "indicator_defaults",
+                "tp_levels_pct",
+                "sl_levels_pct",
+                "origin",
+            } or any(
+                snapshot[k] not in ("precompute", "on_demand") for k in ("signals", "hit_times")
+            ):
+                raise ManagementError("invalid_legacy_snapshot")
+            digest(snapshot)
+        counts = {"imported": 0, "skipped": 0, "conflicted": 0}
+        with self.db.transaction():
+            installation = self._installation_owner(organization_id, actor_id)
+            self._lock(installation)
+            for c, config_hash, snapshot in demands:
+                old = self._one(
+                    """SELECT config_hash,snapshot FROM backtest_artifact_legacy_demands
+                    WHERE installation_id=%(i)s AND exchange=%(exchange)s
+                    AND market_type=%(market_type)s AND symbol=%(symbol)s""",
+                    i=installation,
+                    **c.model_dump(),
+                )
+                if old:
+                    counts[
+                        "skipped"
+                        if old["config_hash"] == config_hash and old["snapshot"] == dict(snapshot)
+                        else "conflicted"
+                    ] += 1
+                    continue
+                self._exec(
+                    """INSERT INTO backtest_artifact_legacy_demands
+                    (installation_id,exchange,market_type,symbol,config_hash,snapshot)
+                    VALUES (%(i)s,%(exchange)s,%(market_type)s,%(symbol)s,%(h)s,%(s)s)""",
+                    i=installation,
+                    **c.model_dump(),
+                    h=config_hash,
+                    s=Jsonb(dict(snapshot)),
+                )
+                counts["imported"] += 1
+        return counts

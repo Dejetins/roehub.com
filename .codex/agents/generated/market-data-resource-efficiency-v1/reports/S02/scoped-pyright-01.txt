@@ -1,0 +1,32 @@
+/Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:60:37 - error: Argument of type "() -> CurrentUserPrincipal" cannot be assigned to parameter "current_user_dependency" of type "(Request) -> CurrentUserPrincipal" in function "build_catalog_workspace_router"
+    Type "() -> CurrentUserPrincipal" is not assignable to type "(Request) -> CurrentUserPrincipal"
+      Function accepts too many positional parameters; expected 0 but received 1 (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:135:52 - error: Argument of type "MeasuredGateway" cannot be assigned to parameter "gateway" of type "ClickHouseGateway" in function "__init__"
+    "MeasuredGateway" is incompatible with protocol "ClickHouseGateway"
+      "insert_rows" is not present (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:152:40 - error: "get" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:311:13 - error: Argument of type "dict[bytes, bytes]" cannot be assigned to parameter "value" of type "float" in function "__setitem__"
+    "dict[bytes, bytes]" is not assignable to "float" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:311:32 - error: No overloads for "__init__" match the provided arguments (reportCallIssue)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:312:17 - error: Argument of type "Matrix" cannot be assigned to parameter "iterable" of type "Iterable[list[bytes]]" in function "__init__"
+    "Sequence[Sequence[Any]]" is not assignable to "Iterable[list[bytes]]"
+      Type parameter "_T_co@Iterable" is covariant, but "Sequence[Any]" is not a subtype of "list[bytes]"
+        "Sequence[Any]" is not assignable to "list[bytes]" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:316:13 - error: Argument of type "str | int | Sequence[str] | QuerySummary" cannot be assigned to parameter "value" of type "float" in function "__setitem__"
+    Type "str | int | Sequence[str] | QuerySummary" is not assignable to type "float"
+      "QuerySummary" is not assignable to "float" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:319:13 - error: Argument of type "Matrix" cannot be assigned to parameter "value" of type "float" in function "__setitem__"
+    "Sequence[Sequence[Any]]" is not assignable to "float" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:322:13 - error: Argument of type "str | int | Sequence[str] | QuerySummary" cannot be assigned to parameter "value" of type "float" in function "__setitem__"
+    Type "str | int | Sequence[str] | QuerySummary" is not assignable to type "float"
+      "QuerySummary" is not assignable to "float" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:325:13 - error: Argument of type "str | int | Sequence[str] | QuerySummary" cannot be assigned to parameter "value" of type "float" in function "__setitem__"
+    Type "str | int | Sequence[str] | QuerySummary" is not assignable to type "float"
+      "QuerySummary" is not assignable to "float" (reportArgumentType)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:350:39 - error: No overloads for "__init__" match the provided arguments (reportCallIssue)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:351:13 - error: Argument of type "Matrix" cannot be assigned to parameter "iterable" of type "Iterable[list[bytes]]" in function "__init__"
+    "Sequence[Sequence[Any]]" is not assignable to "Iterable[list[bytes]]"
+      Type parameter "_T_co@Iterable" is covariant, but "Sequence[Any]" is not a subtype of "list[bytes]"
+        "Sequence[Any]" is not assignable to "list[bytes]" (reportArgumentType)
+12 errors, 0 warnings, 0 informations

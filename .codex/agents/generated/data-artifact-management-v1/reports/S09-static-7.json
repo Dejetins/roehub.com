@@ -1,0 +1,10 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "tools.jobs.generate_schemas",
+    "--check"
+  ],
+  "exit_code": 0,
+  "output": ""
+}

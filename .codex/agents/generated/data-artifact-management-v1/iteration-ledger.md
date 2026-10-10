@@ -1,0 +1,1092 @@
+# Data artifact management — iteration journal v1
+
+Created 2026-10-08. The JSON record below is the only mutable stage-state source. Authoring and review observations belong inside its `authoring` section; stage outcomes belong in their own row/report/immutable receipts. No stage has been executed by authoring this pack.
+
+## Linked triad and use
+
+[Plan](implementation-plan.md) · [Prompt directory](.) · [This journal](iteration-ledger.md).
+
+Submit one exact prompt from the plan's stage table to execute that stage. `manual_sequential` means one selected stage, one durable report/transition and a next-prompt handoff. It does not mean automatic execution of all nine prompts. The owner approved the complete plan on 2026-10-08 and will submit the prompts sequentially. Product intent and technical direction are approved; routine implementation details stay delegated. No additional unchanged-plan approval is required. Execution has not started. The canonical `ledger_status=draft` means approved but unclaimed here; it changes to `active` only upon S01 claim.
+
+## Supported existing updater
+
+`ledger_update.py` and `test_ledger_update.py` are byte-identical copies of the existing repository-supported sequential pack utility from `backtest-npy-input-materialization-v1`. Its implementation binds the sibling journal, root containment and its own bytes. This is reuse of that implementation, not revival of an old runtime or activation of the source pack. The old docstring's owner/date is provenance only. All current writers use the new pack's updater; don't move the directory or write active JSON manually.
+
+Exclusive flock on the stable directory covers reread, validation, durable executor claim, CAS check and fsynced atomic replacement. Claims outlive the short OS lock. Foreign/stale claims cannot be stolen by timeout. Receipts are uniquely named immutable evidence written before the journal references them; interruption can leave an orphan receipt but not accepted state. Supported transitions are claim/resume/accept/needs-input/block. Hard-blocked instances require canonical revision/reconciliation; this utility does not invent a terminal reset or migration command. Receipt binding does not prove that tests actually ran.
+
+Commands below are documentation, not actions performed during authoring. Run from repository root; choose a fresh executor ID and preserve it for resume/accept.
+
+```sh
+.venv/bin/python .codex/agents/generated/data-artifact-management-v1/ledger_update.py status
+.venv/bin/python .codex/agents/generated/data-artifact-management-v1/ledger_update.py claim --stage S01 --executor UNIQUE_EXECUTOR_ID
+.venv/bin/python .codex/agents/generated/data-artifact-management-v1/ledger_update.py accept --stage S01 --executor SAME_EXECUTOR_ID --checks-passed --evidence reports/S01.md
+```
+
+The accept command requires actual successful required checks and the completed stage report. It validates dependencies/next entry, creates an immutable receipt and opens only the next eligible row. Stop after returning that prompt to the owner. It supports no separate user-acceptance gate; none is added by this pack. If materially changed scope requires one, use canonical runner reconciliation. Do not edit a claimed/accepted contract or bound evidence in place.
+
+## Validation profile
+
+Bundled `prompt-pack-ledger/v1`, `stage-prompt/v1`, `prompt-pack-receipt/v1`; installed read-only validator: `/Users/daniildegtyarev/.codex/skills/prompt-manager/scripts/validate_pack.py`. Product checks use `roehub-focused-gates-and-prompt-pack-artifacts/v1` and the exact instructions in each stage contract, selected from the current repository's scripts/CI. A validator pass proves only structure/file binding; it never authorizes product implementation.
+
+```sh
+.venv/bin/python .codex/agents/generated/data-artifact-management-v1/test_ledger_update.py -v
+.venv/bin/python /Users/daniildegtyarev/.codex/skills/prompt-manager/scripts/validate_pack.py --root /Users/daniildegtyarev/Projects/roehub.com --ledger /Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/iteration-ledger.md --check draft
+.venv/bin/python /Users/daniildegtyarev/.codex/skills/prompt-manager/scripts/validate_pack.py --root /Users/daniildegtyarev/Projects/roehub.com --ledger /Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/data-artifact-management-v1/iteration-ledger.md --check entry --stage S01
+```
+
+Require exit 0 plus well-formed `status=pass` from validator or `status=ok` from updater; nonzero, missing or malformed output is not success. Disposable updater tests never touch this real journal. `draft_valid` is separate from `entry_ready` for S01 and from implementation acceptance. Use the JSON authoring validation/review fields for current observations. Final-stage acceptance sets `completed` only when every obligation has been satisfied.
+
+## Canonical record
+
+<!-- prompt-pack-ledger:v1 -->
+```json
+{
+  "schema_version": "prompt-pack-ledger/v1",
+  "prompt_pack_execution": {
+    "plan_doc": "implementation-plan.md",
+    "prompt_pack_dir": ".",
+    "stage_ledger": "iteration-ledger.md"
+  },
+  "execution_mode": "manual_sequential",
+  "ledger_status": "completed",
+  "current_stage": "S09",
+  "stages": [
+    {
+      "contract": {
+        "id": "S01",
+        "title": "Executable contracts and baseline",
+        "prompt_path": "01-contracts-and-baseline.md",
+        "report_path": "reports/S01.md",
+        "receipt_dir": "receipts/S01",
+        "depends_on": [],
+        "expected_touches": [
+          "../../../../docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+          "../../../../docs/architecture/market_data/market-data-reference-api-v1.md"
+        ],
+        "acceptance_criteria": [
+          "R01–R13 map to verified owners, DTO shapes, states and tests in reports/S01.md; adopted schedule interpretation and all-selected catalog default are preserved.",
+          "Authoritative platform timeframe/catalog sets, legacy policy import, shared-coordinate demand aggregation and installation-owner scope are resolved from current code; no duplicated registry or broadened privilege.",
+          "Record baseline dirty paths, numerical/source fixtures, API contracts and current Navigator behavior; no expensive publish, ingestion, scheduler enablement or product code mutation.",
+          "Concrete bounded queue/resource defaults, empty-selection semantics, short-history states, activation/rollback ordering and new endpoint/schema names are specified for subsequent stages.",
+          "Independent architecture review covers storage authorization, cross-organization shared slots and cleanup; findings are resolved or explicitly prevent acceptance."
+        ],
+        "proof_boundary": "Source-backed implementable contract and baseline; no new runtime behavior or performance proof.",
+        "validation": {
+          "profile": "roehub-focused-gates-and-prompt-pack-artifacts/v1",
+          "checks": [
+            "Read current sources and use architecture-design for remaining technical detail, architecture-review for the required independent review; no product implementation or new plan/ledger.",
+            "Read-only fixture/source inspection and existing test inventories; checks of declared source paths and requirement coverage. Browser baseline screenshot/reads if available; screenshots do not establish runtime QA.",
+            "Documentation validation only if canonical docs are modified; preserve foreign edits and do not claim unavailable runtime evidence."
+          ],
+          "requires_user_acceptance": false
+        },
+        "entry_inputs": [
+          {
+            "path": "implementation-plan.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../AGENTS.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/builder-api.ts",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/api/routes/admin.py",
+            "producer_stage": null
+          }
+        ]
+      },
+      "status": "accepted",
+      "execution_allowed": false,
+      "current_authority": true,
+      "executor_claim": "s01-20261008-01a11bf9-7f61-contracts",
+      "claimed_at": "2026-10-08T14:45:35.769682Z",
+      "transition_receipt": "receipts/S01/receipt-7354485337e543428eb1d672b3fbe808.md",
+      "decision_packet": null
+    },
+    {
+      "contract": {
+        "id": "S02",
+        "title": "Durable policies and artifact build requests",
+        "prompt_path": "02-policies-and-durable-jobs.md",
+        "report_path": "reports/S02.md",
+        "receipt_dir": "receipts/S02",
+        "depends_on": [
+          "S01"
+        ],
+        "expected_touches": [
+          "../../../../src/trading/contexts/backtest_artifacts",
+          "../../../../migrations/postgres",
+          "../../../../apps/migrations",
+          "../../../../tests/unit/contexts/backtest_artifacts",
+          "../../../../tests/real_infra/backtest",
+          "../../../../configs/installation"
+        ],
+        "acceptance_criteria": [
+          "Versioned organization policies, installation defaults, requests, attempts/progress and idempotency/control versions persist across restart with the S01 authorization model.",
+          "Additive ordered migration preserves existing jobs/recipes/policies; legacy precompute behavior is not silently converted to on-demand.",
+          "Concurrent submit/claim/retry and stale control versions cannot create conflicting coordinate writers or lose tenant request identity.",
+          "Profile validation bounds all selected indicators/parameters, explicit empty selection, history, risk levels and 1/3/7-day values; invalid/foreign input fails before writes.",
+          "Real disposable PostgreSQL tests prove transactions and isolation; unavailable infrastructure is not a pass."
+        ],
+        "proof_boundary": "Application/repository/migration behavior on disposable PostgreSQL; no scheduler/UI/runtime delivery claim.",
+        "validation": {
+          "profile": "roehub-focused-gates-and-prompt-pack-artifacts/v1",
+          "checks": [
+            "Use backend-quality-gates to select focused pytest, Ruff and type checks from current CI routing.",
+            "Extend appropriate tests/unit/contexts/backtest_artifacts and migration harness discovered under tests/unit/apps/migrations; run actual changed tests.",
+            "Use tests/real_infra/backtest fixture conventions for migration preservation, concurrent claims, dedupe, stale versions, scope isolation and restart recovery. No migration against user data.",
+            "Independent production-risk-review for new auth/ownership and persistence behavior; do not recursively review the reviewer."
+          ],
+          "requires_user_acceptance": false
+        },
+        "entry_inputs": [
+          {
+            "path": "implementation-plan.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../AGENTS.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/artifact_catalog_repository.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/gateway.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+            "producer_stage": null
+          },
+          {
+            "path": "reports/S01.md",
+            "producer_stage": "S01"
+          }
+        ]
+      },
+      "status": "accepted",
+      "execution_allowed": false,
+      "current_authority": true,
+      "executor_claim": "s02-20261008-01a11c06-durable",
+      "claimed_at": "2026-10-08T15:00:09.702391Z",
+      "transition_receipt": "receipts/S02/receipt-29065e5e121f49a7a6d1986a778e7b93.md",
+      "decision_packet": null
+    },
+    {
+      "contract": {
+        "id": "S03",
+        "title": "Automatic base NPY for all supported timeframes",
+        "prompt_path": "03-automatic-base-npy.md",
+        "report_path": "reports/S03.md",
+        "receipt_dir": "receipts/S03",
+        "depends_on": [
+          "S02"
+        ],
+        "expected_touches": [
+          "../../../../src/trading/contexts/backtest_artifacts",
+          "../../../../src/trading/contexts/market_data/application",
+          "../../../../apps/worker",
+          "../../../../apps/scheduler",
+          "../../../../tests/unit/contexts/backtest",
+          "../../../../tests/unit/contexts/market_data",
+          "../../../../tests/real_infra/backtest"
+        ],
+        "acceptance_criteria": [
+          "Committed candle history creates durable first base work without per-pair enablement; discovery/reconciliation includes existing stored coordinates in bounded batches.",
+          "Base prices/mappings/required funding cover all loaded closed history in every supported platform timeframe; extension, gaps and insufficient history are truthful.",
+          "First build uses a finite source snapshot even during streaming; source growth/corrections do not mutate the active work plan.",
+          "Bounded staged builds publish only after full validation; failed/disk-full/interrupted builds preserve last-good pointer and ownership.",
+          "Base-only schema remains readable by Backtests; no hidden signals/hit-times precompute in on-demand mode and no candle download side effect."
+        ],
+        "proof_boundary": "Base NPY equivalence/coverage and durable trigger/publication on tested fixtures; no throughput or complete live-catalog coverage claim.",
+        "validation": {
+          "profile": "roehub-focused-gates-and-prompt-pack-artifacts/v1",
+          "checks": [
+            "Run relevant publisher/precompute/manifest tests from tools/ci/route_changes.py backtest-artifacts shard plus changed Market Data producer tests.",
+            "Compare base arrays against known canonical candle fixtures across all supported timeframes, incomplete rolled bars, empty/short/gapped history and historical extension.",
+            "Disposable PostgreSQL/filesystem/ClickHouse boundary where actually used: commit notification loss/reconciliation, crash-before/after-publish, pinned readers and storage failure.",
+            "Use backend-quality-gates; independent production-risk-review for ownership-sensitive publisher changes."
+          ],
+          "requires_user_acceptance": false
+        },
+        "entry_inputs": [
+          {
+            "path": "implementation-plan.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../AGENTS.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/application/services/v2/artifact_slot_publisher.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/market_data/application/services/work_requests.py",
+            "producer_stage": null
+          },
+          {
+            "path": "reports/S02.md",
+            "producer_stage": "S02"
+          }
+        ]
+      },
+      "status": "blocked",
+      "execution_allowed": false,
+      "current_authority": true,
+      "executor_claim": "s03-20261008-01a11c2e-base",
+      "claimed_at": "2026-10-08T15:43:14.806870Z",
+      "transition_receipt": null,
+      "decision_packet": null,
+      "reason": "Acceptance cannot validate S04: directory-valued entry input violates validator is_file requirement; authorized pack repair/revision required.",
+      "evidence": [
+        "reports/S03-acceptance-blocker.md",
+        "reports/S03.md",
+        "reports/S03-verification.md",
+        "reports/S03-review.md"
+      ],
+      "replacement_stage": "S03-R2"
+    },
+    {
+      "contract": {
+        "id": "S04",
+        "title": "Indicator catalog profiles and selective precompute",
+        "prompt_path": "04-indicator-profiles-r2.md",
+        "report_path": "reports/S04.md",
+        "receipt_dir": "receipts/S04",
+        "depends_on": [
+          "S03"
+        ],
+        "expected_touches": [
+          "../../../../src/trading/contexts/backtest_artifacts",
+          "../../../../src/trading/contexts/backtest",
+          "../../../../tests/unit/contexts/backtest",
+          "../../../../tests/unit/contexts/backtest_artifacts",
+          "../../../../tests/real_infra/backtest"
+        ],
+        "acceptance_criteria": [
+          "New precompute profiles select every available Backtests indicator by default and persist user exclusions with catalog/profile versions.",
+          "Selected supported IDs, sources/finite parameter grids, derivative timeframes/history and TP/SL levels generate exactly the declared inventory; no second numerical engine.",
+          "All unchecked is a valid empty signal inventory; TP/SL and mandatory base work remain independent.",
+          "Catalog changes cannot silently change admitted jobs; invalid/removed indicators are explicit, not silently replaced.",
+          "Disabling precompute retains existing valid files and enables on-demand use; scheduled and on-demand outputs agree on fixed independent fixtures and preserve recipe/hash semantics."
+        ],
+        "proof_boundary": "Profile selection, publication inventory and fixed-fixture numerical/input identity parity; no benchmark speedup claim.",
+        "validation": {
+          "profile": "roehub-focused-gates-and-prompt-pack-artifacts/v1",
+          "checks": [
+            "Run focused tests for coordinate runtime config, manifest validator, derived materialization, recipe contracts/replay, prepare pools and preflight selected from current CI shards.",
+            "Fixtures cover all-default, one exclusion, all excluded, unavailable catalog entries, version changes, stale derivatives, funding and risk grids.",
+            "Run schema-1/schema-2 compatibility and pinned-reader publication tests; preserve old hashes and corrupt-file fail-closed behavior.",
+            "Use backend-quality-gates; backend-performance-evidence only if reporting measured resource/performance claims."
+          ],
+          "requires_user_acceptance": false
+        },
+        "entry_inputs": [
+          {
+            "path": "implementation-plan.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../AGENTS.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/adapters/outbound/config/backtest_artifacts_runtime_config.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest/application/services/v2/prepare_pools.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/builder-api.ts",
+            "producer_stage": null
+          },
+          {
+            "path": "reports/S03.md",
+            "producer_stage": "S03"
+          }
+        ]
+      },
+      "status": "accepted",
+      "execution_allowed": false,
+      "current_authority": true,
+      "executor_claim": "s04-20261008-01a11c65-profiles",
+      "claimed_at": "2026-10-08T16:44:02.114211Z",
+      "transition_receipt": "receipts/S04/receipt-3cc212eec0074cf0850ce99c05608c11.md",
+      "decision_packet": null
+    },
+    {
+      "contract": {
+        "id": "S05",
+        "title": "Durable cadence, reconciliation and measured progress",
+        "prompt_path": "05-scheduling-and-progress.md",
+        "report_path": "reports/S05.md",
+        "receipt_dir": "receipts/S05",
+        "depends_on": [
+          "S04"
+        ],
+        "expected_touches": [
+          "../../../../apps/scheduler/backtest_artifact_publisher",
+          "../../../../src/trading/contexts/backtest_artifacts",
+          "../../../../configs/dev/backtest_artifacts.yaml",
+          "../../../../configs/installation",
+          "../../../../tests/unit/apps/scheduler",
+          "../../../../tests/real_infra/backtest"
+        ],
+        "acceptance_criteria": [
+          "One common default plus per-instrument 1/3/7-day overrides govern both base and derivative refresh; explicit timezone/anchor survives restart and rejects subdaily input.",
+          "Initial base and precompute-on are immediate; periodic source changes coalesce; Update now never shifts the schedule anchor.",
+          "Missed occurrences collapse into one latest target, compatible concurrent automatic/manual requests dedupe and fairness/resource caps prevent unbounded load.",
+          "Measured base and derivative phase/timeframe progress is durable with epochs, checkpoints and unknown-total handling; readiness appears only after publication commit.",
+          "Legacy scheduler/new queue ownership handoff is explicit; disabling new submission preserves active pins/last-good artifacts and no real schedule is enabled during tests."
+        ],
+        "proof_boundary": "Deterministic scheduling and durable worker behavior on controlled clocks/disposable stores; not a week-long production observation.",
+        "validation": {
+          "profile": "roehub-focused-gates-and-prompt-pack-artifacts/v1",
+          "checks": [
+            "Extend tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py and metrics tests for clock, timezone/DST, 1/3/7-day anchors, manual runs, missed cycles and disabled policies.",
+            "Disposable PostgreSQL worker restart, duplicate admission, claim fencing, source-wait recovery, pause/unavailable and publish-outcome reconciliation tests.",
+            "Assert actual progress monotonicity within one epoch and truthful retry reset/unknown totals; no duration-based fabricated percentage.",
+            "Use backend-quality-gates and independent review of changed concurrency/ownership if materially unresolved."
+          ],
+          "requires_user_acceptance": false
+        },
+        "entry_inputs": [
+          {
+            "path": "implementation-plan.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../AGENTS.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_coordinator.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../configs/dev/backtest_artifacts.yaml",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+            "producer_stage": null
+          },
+          {
+            "path": "reports/S04.md",
+            "producer_stage": "S04"
+          }
+        ]
+      },
+      "status": "accepted",
+      "execution_allowed": false,
+      "current_authority": true,
+      "executor_claim": "s05-20261008-scheduling-01a11c7e",
+      "claimed_at": "2026-10-08T17:10:39.198066Z",
+      "transition_receipt": "receipts/S05/receipt-b3eea8aa864f4a8fa6c9f52978aa5bdf.md",
+      "decision_packet": null
+    },
+    {
+      "contract": {
+        "id": "S06",
+        "title": "Authorized artifact API and storage boundary",
+        "prompt_path": "06-api-and-storage-boundary-r2.md",
+        "report_path": "reports/S06.md",
+        "receipt_dir": "receipts/S06",
+        "depends_on": [
+          "S05"
+        ],
+        "expected_touches": [
+          "../../../../apps/api/routes",
+          "../../../../apps/api/dto",
+          "../../../../apps/api/wiring",
+          "../../../../apps/control_agent",
+          "../../../../src/trading/contexts/backtest_artifacts",
+          "../../../../src/trading/contexts/operations",
+          "../../../../tests/unit/apps/api",
+          "../../../../tests/unit/apps/control_agent",
+          "../../../../tests/real_infra/backtest"
+        ],
+        "acceptance_criteria": [
+          "Bounded artifact inventory/detail/profile/schedule/job/progress/history and single/bulk command endpoints use strict DTOs and server-side scope checks.",
+          "Reads hide foreign/private data; mutations enforce CSRF/origin, required organization or installation capability, idempotency and control-version conflicts.",
+          "Storage inspect/configuration/probe/budget/cleanup uses installation-owner authority and trusted-root containment, never arbitrary browser-controlled filesystem writes.",
+          "First empty-root setup reuses installation config; existing-data root changes report relocation_required without switching, moving or deleting files.",
+          "Cleanup preview/confirmed command protects current/pinned inputs and has real ownership proof; unavailable services return truthful status/retry guidance."
+        ],
+        "proof_boundary": "API and local privileged storage boundary under tested identities/disposable roots; no production credentials or S3 integration.",
+        "validation": {
+          "profile": "roehub-focused-gates-and-prompt-pack-artifacts/v1",
+          "checks": [
+            "Run affected API/admin/control-agent tests and new endpoint contract tests through backend-quality-gates.",
+            "Negative cases: viewer/foreign organization/organization admin versus installation owner, missing origin, stale version, duplicate/bulk replay, symlink/traversal, no permissions, disk full, pinned cleanup and leaking diagnostics.",
+            "Disposable service boundary tests must prove actual root probe/transaction/cleanup effects, not only mocked success.",
+            "Independent production-risk-review of authorization, privileged filesystem operations and safe cleanup; resolve findings before acceptance."
+          ],
+          "requires_user_acceptance": false
+        },
+        "entry_inputs": [
+          {
+            "path": "implementation-plan.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../AGENTS.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/api/routes/market_data_workspace.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/api/routes/admin.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/api/wiring/modules/market_data_reference.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/control_agent/server.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+            "producer_stage": null
+          },
+          {
+            "path": "reports/S05.md",
+            "producer_stage": "S05"
+          }
+        ]
+      },
+      "status": "accepted",
+      "execution_allowed": false,
+      "current_authority": true,
+      "executor_claim": "s06-20261008-api-storage-01a11cb6",
+      "claimed_at": "2026-10-08T18:12:07.157883Z",
+      "transition_receipt": "receipts/S06/receipt-bf6360d5378b4ae19f0471b3f997ff55.md",
+      "decision_packet": null
+    },
+    {
+      "contract": {
+        "id": "S07",
+        "title": "Data artifact management UI",
+        "prompt_path": "07-data-artifacts-ui.md",
+        "report_path": "reports/S07.md",
+        "receipt_dir": "receipts/S07",
+        "depends_on": [
+          "S06"
+        ],
+        "expected_touches": [
+          "../../../../apps/navigator-web/src",
+          "../../../../apps/navigator-web/e2e",
+          "../../../../packages/web-contracts/src",
+          "../../../../tools/qa/navigator_preview.py"
+        ],
+        "acceptance_criteria": [
+          "Candles / Artifacts switch preserves common URL selection/filter context and existing candle history/stream behavior in the current Navigator geometry.",
+          "Artifact rows/inspector show separate measured base and derivative progress, true source coverage, next/last run, profile and bounded history from real APIs.",
+          "Indicator catalog starts with all available entries checked, supports search/unchecking/all-none and saved exclusions; no hardcoded catalog.",
+          "Single/bulk actions support mixed values, profile/cadence changes, Update now, precompute off retaining base; stale snapshots cannot issue commands.",
+          "Real-browser desktop/narrow, keyboard, errors/loading and subject-isolation proof passes on disposable data; build/typecheck/focused tests pass."
+        ],
+        "proof_boundary": "Navigator candidate UI and real API integration on tested browser/disposable fixture; not accepted-client migration or deployment.",
+        "validation": {
+          "profile": "roehub-focused-gates-and-prompt-pack-artifacts/v1",
+          "checks": [
+            "Use the installed candidate scripts from apps/navigator-web: node_modules/.bin/tsc --noEmit; node_modules/.bin/vite build; node_modules/.bin/vitest run with affected Data/API/profile tests.",
+            "Apply browser-qa-evidence for actual flows; use in-app browser if selected/available, otherwise playwright-cli per current onboarding. No unnecessary full browser skill for screenshot-only baseline.",
+            "Cover all-default/exclusion, 1/3/7 schedule, initial/waiting/unknown progress, last-good plus error, retry, bulk mixed state, URL restore and current candle/stream controls.",
+            "Use better-layout, better-accessibility and better-writing only at their affected boundaries; preserve tokens and data-loading contract."
+          ],
+          "requires_user_acceptance": false
+        },
+        "entry_inputs": [
+          {
+            "path": "implementation-plan.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../AGENTS.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/data-page.tsx",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/data-downloads.tsx",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/data-workspace-api.ts",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/data-workspace.css",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/builder-api.ts",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/data-page.test.tsx",
+            "producer_stage": null
+          },
+          {
+            "path": "reports/S06.md",
+            "producer_stage": "S06"
+          }
+        ]
+      },
+      "status": "accepted",
+      "execution_allowed": false,
+      "current_authority": true,
+      "executor_claim": "s07-20261008-01a11ceb-artifacts-ui",
+      "claimed_at": "2026-10-08T19:10:13.305609Z",
+      "transition_receipt": "receipts/S07/receipt-badaa709a40b447487f6249c6b4b1bf5.md",
+      "decision_packet": null
+    },
+    {
+      "contract": {
+        "id": "S08",
+        "title": "Storage settings and Backtests readiness UI",
+        "prompt_path": "08-storage-and-backtest-readiness.md",
+        "report_path": "reports/S08.md",
+        "receipt_dir": "receipts/S08",
+        "depends_on": [
+          "S07"
+        ],
+        "expected_touches": [
+          "../../../../apps/navigator-web/src",
+          "../../../../apps/navigator-web/e2e",
+          "../../../../apps/api/routes/ui_backtests.py",
+          "../../../../apps/web/main/app.py",
+          "../../../../tools/qa/navigator_preview.py",
+          "../../../../tests/unit/apps/api"
+        ],
+        "acceptance_criteria": [
+          "Settings -> Storage -> Backtest artifacts presents actual server location/readiness/capacity/budget/cleanup data with installation-only privileged controls.",
+          "Root setup/save/probe and relocation-required states match S06; existing installation configuration is reused without requiring repeated setup.",
+          "Cleanup is a separate preview/confirmation flow, disabling precompute does not delete files, and forbidden users cannot act by bypassing UI.",
+          "Backtests shows actual source bounds and ready/requires-materialization state without changing scoring or pretending fresher data exists.",
+          "Browser checks cover authorized/denied/unavailable storage, NPY lag, indicator exclusion causing on-demand preparation, and the existing Backtest journey."
+        ],
+        "proof_boundary": "Storage/Backtests user flows on the candidate and verified service boundary; no actual existing-data relocation or accepted baseline replacement.",
+        "validation": {
+          "profile": "roehub-focused-gates-and-prompt-pack-artifacts/v1",
+          "checks": [
+            "Run candidate typecheck/build and affected settings/builder/API tests using existing package scripts; run focused Python tests only for changed API projection.",
+            "Use browser-qa-evidence on disposable authenticated identities for storage and Backtests flows; honor configured same-origin authentication and do not copy secrets into reports.",
+            "Verify privileged negative cases at API as well as UI; read-only unauthorized controls alone are not authorization proof.",
+            "Apply existing data-loading and materially crossed layout/accessibility/writing skills; focused self-review plus independent review only for security-boundary changes."
+          ],
+          "requires_user_acceptance": false
+        },
+        "entry_inputs": [
+          {
+            "path": "implementation-plan.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../AGENTS.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/settings-page.tsx",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/settings-page.test.tsx",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/builder.tsx",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/src/builder-api.ts",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/api/routes/ui_backtests.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../tools/qa/navigator_preview.py",
+            "producer_stage": null
+          },
+          {
+            "path": "reports/S07.md",
+            "producer_stage": "S07"
+          }
+        ]
+      },
+      "status": "accepted",
+      "execution_allowed": false,
+      "current_authority": true,
+      "executor_claim": "s08-20261008-01a11d0d-storage-readiness",
+      "claimed_at": "2026-10-08T19:47:02.849774Z",
+      "transition_receipt": "receipts/S08/receipt-0c2df17ddf804a39b943763968cdf408.md",
+      "decision_packet": null
+    },
+    {
+      "contract": {
+        "id": "S09",
+        "title": "Integrated verification and local operational handoff",
+        "prompt_path": "09-integrated-proof.md",
+        "report_path": "reports/S09.md",
+        "receipt_dir": "receipts/S09",
+        "depends_on": [
+          "S08"
+        ],
+        "expected_touches": [
+          "../../../../tests/real_infra/backtest",
+          "../../../../tests/unit/contexts/backtest",
+          "../../../../apps/navigator-web/e2e",
+          "../../../../docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+          "../../../../docs/architecture/market_data/market-data-reference-api-v1.md",
+          "../../../../docs/runbooks/offline-release-installation.md",
+          "../../../../apps/navigator-web/README.md"
+        ],
+        "acceptance_criteria": [
+          "Every R01–R13 has actual evidence or an explicit failing/unavailable result; no accepted receipt while a required boundary proof is absent.",
+          "Disposable end-to-end ingestion -> base all-timeframe NPY -> catalog-selected derivatives -> scheduled/manual update -> Backtest reuse/materialization works with preserved source identity.",
+          "Real concurrency/restart/crash/disk/quota/pin/cleanup/auth tests show bounded recovery and preserved last-good artifacts; no real-user data is reseeded or cleaned.",
+          "Final browser regression covers existing candle streaming/history plus all artifact/settings/Backtest flows; resource limits and proof scope are reported without invented capacity claims.",
+          "Canonical docs and current installation operations reflect implemented behavior; independent production-risk-review has no unresolved release-blocking findings within this local scope; publication remains unauthorized."
+        ],
+        "proof_boundary": "Integrated local disposable implementation evidence, compatibility and handoff only; no production delivery, full-market capacity or week-long live schedule claim.",
+        "validation": {
+          "profile": "roehub-focused-gates-and-prompt-pack-artifacts/v1",
+          "checks": [
+            "Select full affected CI shards/static checks using tools/ci/route_changes.py and current .github/workflows/ci.yml; record actual commands, revisions and failures.",
+            "Run real-infra artifact lifecycle and newly added orchestration/authorization tests in disposable stores plus current Navigator browser flows.",
+            "Run docs index/project-map checks only as routed; if generators are required, inspect owned changes and preserve unrelated docs work.",
+            "Independent production-risk-review for integrated trust/concurrency/recovery; no recursive review. Do not execute release/deployment workflows."
+          ],
+          "requires_user_acceptance": false
+        },
+        "entry_inputs": [
+          {
+            "path": "implementation-plan.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../AGENTS.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../tools/ci/route_changes.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../.github/workflows/ci.yml",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../docs/runbooks/offline-release-installation.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../apps/navigator-web/README.md",
+            "producer_stage": null
+          },
+          {
+            "path": "reports/S08.md",
+            "producer_stage": "S08"
+          }
+        ]
+      },
+      "status": "accepted",
+      "execution_allowed": false,
+      "current_authority": true,
+      "executor_claim": "s09-20261008-01a11d23-integrated",
+      "claimed_at": "2026-10-08T20:10:48.492925Z",
+      "transition_receipt": "receipts/S09/receipt-85365f69c88542ea84385f11c813098a.md",
+      "decision_packet": null
+    },
+    {
+      "contract": {
+        "id": "S03-R2",
+        "title": "Automatic base NPY — repaired acceptance revision",
+        "prompt_path": "03-automatic-base-npy-r2.md",
+        "report_path": "reports/S03-R2.md",
+        "receipt_dir": "receipts/S03-R2",
+        "depends_on": [
+          "S02"
+        ],
+        "expected_touches": [
+          "../../../../src/trading/contexts/backtest_artifacts",
+          "../../../../src/trading/contexts/market_data/application",
+          "../../../../apps/worker",
+          "../../../../apps/scheduler",
+          "../../../../tests/unit/contexts/backtest",
+          "../../../../tests/unit/contexts/market_data",
+          "../../../../tests/real_infra/backtest"
+        ],
+        "acceptance_criteria": [
+          "Committed candle history creates durable first base work without per-pair enablement; discovery/reconciliation includes existing stored coordinates in bounded batches.",
+          "Base prices/mappings/required funding cover all loaded closed history in every supported platform timeframe; extension, gaps and insufficient history are truthful.",
+          "First build uses a finite source snapshot even during streaming; source growth/corrections do not mutate the active work plan.",
+          "Bounded staged builds publish only after full validation; failed/disk-full/interrupted builds preserve last-good pointer and ownership.",
+          "Base-only schema remains readable by Backtests; no hidden signals/hit-times precompute in on-demand mode and no candle download side effect."
+        ],
+        "proof_boundary": "Base NPY equivalence/coverage and durable trigger/publication on tested fixtures; no throughput or complete live-catalog coverage claim.",
+        "validation": {
+          "profile": "roehub-focused-gates-and-prompt-pack-artifacts/v1",
+          "checks": [
+            "Run relevant publisher/precompute/manifest tests from tools/ci/route_changes.py backtest-artifacts shard plus changed Market Data producer tests.",
+            "Compare base arrays against known canonical candle fixtures across all supported timeframes, incomplete rolled bars, empty/short/gapped history and historical extension.",
+            "Disposable PostgreSQL/filesystem/ClickHouse boundary where actually used: commit notification loss/reconciliation, crash-before/after-publish, pinned readers and storage failure.",
+            "Use backend-quality-gates; independent production-risk-review for ownership-sensitive publisher changes."
+          ],
+          "requires_user_acceptance": false
+        },
+        "entry_inputs": [
+          {
+            "path": "implementation-plan.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../AGENTS.md",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/backtest_artifacts/application/services/v2/artifact_slot_publisher.py",
+            "producer_stage": null
+          },
+          {
+            "path": "../../../../src/trading/contexts/market_data/application/services/work_requests.py",
+            "producer_stage": null
+          },
+          {
+            "path": "reports/S02.md",
+            "producer_stage": "S02"
+          }
+        ]
+      },
+      "status": "accepted",
+      "execution_allowed": false,
+      "current_authority": true,
+      "executor_claim": "s03-r2-20261008-01a11c61-recovery",
+      "claimed_at": "2026-10-08T16:39:31.843756Z",
+      "transition_receipt": "receipts/S03-R2/receipt-764f79c2beed47d498039d6b641a9174.md",
+      "decision_packet": null,
+      "replaces_stage": "S03",
+      "repair_evidence_ref": "reports/pack-entry-repair.md"
+    }
+  ],
+  "claim_capability": {
+    "mechanism": "Existing directory-local POSIX flock updater, reused byte-for-byte from backtest-npy-input-materialization-v1; durable executor ownership; fsync and atomic ledger replacement; no automatic claim stealing.; explicit revision reconciliation with bound repair evidence",
+    "evidence": {
+      "path": "ledger_update.py",
+      "sha256": "3e4c07659dc0c5382d908360795fd730b33b5dd2cefaf9417b73e0f6ed1965e6"
+    }
+  },
+  "authoring": {
+    "created_on": "2026-10-08",
+    "authorized_scope": "Owner-approved plan and sequential S01–S09 implementation upon individual prompt selection; this update records approval only and does not start execution.",
+    "source_pack": ".codex/agents/generated/backtest-npy-input-materialization-v1",
+    "validation_status": "draft_valid; entry_ready for S01 only",
+    "review_mode": "independent security/ownership architecture review required",
+    "review_status": "passed; no material findings",
+    "baseline_sha256": {
+      "AGENTS.md": "04d398f949f7f380cdcbc3b1be07282d25227e81474d00d58bb40a69e9f479ce",
+      ".codex/AGENTS.md": "c01157be73c38000019ed0ba0d1d33b679639680f56acf1d0c052b2e84ba8e95",
+      ".codex/agents/generated/backtest-npy-input-materialization-v1/ledger_update.py": "dbae4cb40c4b69572bd275e2350fa1af79489b1d7a7df4fe3654d40429130550",
+      ".codex/agents/generated/backtest-npy-input-materialization-v1/test_ledger_update.py": "b6f469f65b2b96af8f53cd37b95cc0b6c00d741f274740da6afc265c7157caf1"
+    },
+    "requirement_correction": "All available Backtests indicators selected by default; user unchecks unwanted entries.",
+    "schedule_interpretation": "Approval of remaining requirements includes common base/derivative 1/3/7-day cadence; initial builds immediate.",
+    "capability_reuse": "Existing updater/test bytes copied without changing the completed source pack; historical docstring is provenance, not new authority.",
+    "checks": [
+      {
+        "check": "bundled validator --check draft",
+        "result": "pass",
+        "exit_code": 0,
+        "proof_boundary": "artifact-structure-and-file-binding"
+      },
+      {
+        "check": "bundled validator --check entry --stage S01",
+        "result": "pass",
+        "exit_code": 0,
+        "proof_boundary": "artifact-structure-and-file-binding; independent semantic review also passed"
+      },
+      {
+        "check": "test_ledger_update.py -v",
+        "result": "9 tests passed",
+        "exit_code": 0,
+        "proof_boundary": "disposable POSIX claim/receipt/restart/conflict fixtures; actual journal not claimed"
+      },
+      {
+        "check": "markdown links, whitespace, root containment, source baseline and updater copy checks",
+        "result": "pass; 13 new files; source updater and tests byte-identical; no source-pack mutation"
+      },
+      {
+        "check": "ledger_update.py status",
+        "result": "draft, current_stage=null, all pending; only S01 execution_allowed=true"
+      }
+    ],
+    "independent_review": {
+      "reviewer": "/root/artifact_plan_review",
+      "date": "2026-10-08",
+      "mode": "read-only architecture/security/execution-plan review",
+      "verdict": "Ready for handoff and S01 entry; no material findings",
+      "scope": "All nine prompts, plan, ledger, lifecycle/pack contract, existing updater, narrow current runtime/scheduler/admin source verification",
+      "reviewer_checks": "Bundled draft and S01 entry checks independently passed",
+      "limits": "Documentation and proposed ordering only; detailed DTOs, budgets, shared demand aggregation and compatible consumers are S01 outputs; no product implementation/runtime proof."
+    },
+    "handoff": "Plan approved. S01 is entry_ready; owner may submit it, then continue S02–S09 sequentially after each predecessor succeeds. No stage has been claimed or executed; publication and production deployment remain outside scope.",
+    "plan_status": "approved",
+    "owner_approval": {
+      "date": "2026-10-08",
+      "source": "Direct human message in this conversation",
+      "quote": "Окей, план утвержден, подставь там, что это не драфт и я буду запускать тогда.",
+      "scope": "Complete implementation plan, technical direction and sequential prompt pack; no additional unchanged-plan approval required.",
+      "execution": "Not started; owner will select prompts sequentially."
+    },
+    "approval_update": {
+      "review_mode": "Focused self-review of approval metadata and synchronized prompt wording; technical contracts unchanged; prior independent review retained as historical evidence.",
+      "validation": "Saved files: bundled --check draft and --check entry --stage S01 both passed with exit 0 after approval synchronization; unchanged stage contracts and unclaimed lifecycle verified."
+    }
+  },
+  "execution_history": [
+    {
+      "at": "2026-10-08T14:45:35.769682Z",
+      "action": "claim",
+      "stage": "S01",
+      "executor": "s01-20261008-01a11bf9-7f61-contracts",
+      "receipt": null,
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T14:57:56.219357Z",
+      "action": "accept",
+      "stage": "S01",
+      "executor": "s01-20261008-01a11bf9-7f61-contracts",
+      "receipt": "receipts/S01/receipt-7354485337e543428eb1d672b3fbe808.md",
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T15:00:09.702391Z",
+      "action": "claim",
+      "stage": "S02",
+      "executor": "s02-20261008-01a11c06-durable",
+      "receipt": null,
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T15:41:33.140618Z",
+      "action": "accept",
+      "stage": "S02",
+      "executor": "s02-20261008-01a11c06-durable",
+      "receipt": "receipts/S02/receipt-29065e5e121f49a7a6d1986a778e7b93.md",
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T15:43:14.806870Z",
+      "action": "claim",
+      "stage": "S03",
+      "executor": "s03-20261008-01a11c2e-base",
+      "receipt": null,
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T16:20:04.957375Z",
+      "action": "block",
+      "stage": "S03",
+      "executor": "s03-20261008-01a11c2e-base",
+      "receipt": null,
+      "reason": "Acceptance cannot validate S04: directory-valued entry input violates validator is_file requirement; authorized pack repair/revision required."
+    },
+    {
+      "at": "2026-10-08T16:39:31.843756Z",
+      "action": "reconcile-and-claim",
+      "stage": "S03-R2",
+      "replaces_stage": "S03",
+      "executor": "s03-r2-20261008-01a11c61-recovery",
+      "repair_evidence_ref": "reports/pack-entry-repair.md",
+      "reason": "S03 product proof is complete but successor S04 declares a directory where the validator requires a file; S06 has the same unclaimed serialization defect. Preserve terminal S03 through S03-R2 and correct only those pending entry paths."
+    },
+    {
+      "at": "2026-10-08T16:41:07.446121Z",
+      "action": "accept",
+      "stage": "S03-R2",
+      "executor": "s03-r2-20261008-01a11c61-recovery",
+      "receipt": "receipts/S03-R2/receipt-764f79c2beed47d498039d6b641a9174.md",
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T16:44:02.114211Z",
+      "action": "claim",
+      "stage": "S04",
+      "executor": "s04-20261008-01a11c65-profiles",
+      "receipt": null,
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T17:08:46.752308Z",
+      "action": "accept",
+      "stage": "S04",
+      "executor": "s04-20261008-01a11c65-profiles",
+      "receipt": "receipts/S04/receipt-3cc212eec0074cf0850ce99c05608c11.md",
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T17:10:39.198066Z",
+      "action": "claim",
+      "stage": "S05",
+      "executor": "s05-20261008-scheduling-01a11c7e",
+      "receipt": null,
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T18:09:51.758746Z",
+      "action": "accept",
+      "stage": "S05",
+      "executor": "s05-20261008-scheduling-01a11c7e",
+      "receipt": "receipts/S05/receipt-b3eea8aa864f4a8fa6c9f52978aa5bdf.md",
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T18:12:07.157883Z",
+      "action": "claim",
+      "stage": "S06",
+      "executor": "s06-20261008-api-storage-01a11cb6",
+      "receipt": null,
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T19:08:10.757568Z",
+      "action": "accept",
+      "stage": "S06",
+      "executor": "s06-20261008-api-storage-01a11cb6",
+      "receipt": "receipts/S06/receipt-bf6360d5378b4ae19f0471b3f997ff55.md",
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T19:10:13.305609Z",
+      "action": "claim",
+      "stage": "S07",
+      "executor": "s07-20261008-01a11ceb-artifacts-ui",
+      "receipt": null,
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T19:45:17.711817Z",
+      "action": "accept",
+      "stage": "S07",
+      "executor": "s07-20261008-01a11ceb-artifacts-ui",
+      "receipt": "receipts/S07/receipt-badaa709a40b447487f6249c6b4b1bf5.md",
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T19:47:02.849774Z",
+      "action": "claim",
+      "stage": "S08",
+      "executor": "s08-20261008-01a11d0d-storage-readiness",
+      "receipt": null,
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T20:09:05.446588Z",
+      "action": "accept",
+      "stage": "S08",
+      "executor": "s08-20261008-01a11d0d-storage-readiness",
+      "receipt": "receipts/S08/receipt-0c2df17ddf804a39b943763968cdf408.md",
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T20:10:48.492925Z",
+      "action": "claim",
+      "stage": "S09",
+      "executor": "s09-20261008-01a11d23-integrated",
+      "receipt": null,
+      "reason": null
+    },
+    {
+      "at": "2026-10-08T20:39:09.586642Z",
+      "action": "accept",
+      "stage": "S09",
+      "executor": "s09-20261008-01a11d23-integrated",
+      "receipt": "receipts/S09/receipt-85365f69c88542ea84385f11c813098a.md",
+      "reason": null
+    }
+  ],
+  "execution_repairs": [
+    {
+      "at": "2026-10-08T16:39:31.843756Z",
+      "repair_evidence_ref": "reports/pack-entry-repair.md",
+      "previous_updater": {
+        "path": "reports/pack-repair-before-ledger_update.py.txt",
+        "sha256": "dbae4cb40c4b69572bd275e2350fa1af79489b1d7a7df4fe3654d40429130550"
+      },
+      "new_updater": {
+        "path": "ledger_update.py",
+        "sha256": "3e4c07659dc0c5382d908360795fd730b33b5dd2cefaf9417b73e0f6ed1965e6"
+      },
+      "pending_contracts": [
+        "S04",
+        "S06"
+      ],
+      "replacement_stage": "S03-R2"
+    }
+  ]
+}
+```
+
+## Bound execution repair
+
+Reconciliation evidence: `reports/pack-entry-repair.md`. The original byte-identical updater description above is provenance; the canonical claim capability now binds its reviewed reconciliation extension. Terminal history and prior accepted artifacts are preserved. Exact current prompt paths and replacement semantics are in the canonical stage rows.

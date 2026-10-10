@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s04/run.py", line 16, in <module>
+    runpy.run_path(f,run_name='__main__')
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "tools/qa/market_data_recovery_comparison.py", line 513, in <module>
+    main()
+  File "tools/qa/market_data_recovery_comparison.py", line 494, in main
+    assert all(record["checks"].values())
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

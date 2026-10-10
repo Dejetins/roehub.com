@@ -1,0 +1,59 @@
+{
+  "source": "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-03-01a1273a",
+  "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+  "memory_bytes": 402653184,
+  "nano_cpus": 1000000000,
+  "strict_installed_thread_bound": 26,
+  "boundary": "real scheduler entrypoint/imports and built app, injected resource upper-bound work; no CH write working set",
+  "probe_hashes": {
+    "s03_memory_app.py": "a1fff3254559089ee9ba040c335f49c4ab78e180ffeecb970ceb540fe36e9f2e",
+    "sitecustomize.py": "08d2c5f05ada25c631a03908e321509dfda660b6b2e3d37618d6ef34528472f6"
+  },
+  "runs": [
+    {
+      "count": 6,
+      "state": {
+        "Status": "exited",
+        "OOMKilled": true,
+        "ExitCode": 137,
+        "StartedAt": "2026-10-10T20:15:24.508297302Z",
+        "FinishedAt": "2026-10-10T20:15:31.345774722Z"
+      },
+      "timed_out": false,
+      "permits_after_exit": 1,
+      "quota_spent": "4",
+      "last_observation": {
+        "label": "retained",
+        "monotonic": 88627.207647248,
+        "processes": [
+          {
+            "Name": "python",
+            "Pid": "1",
+            "PPid": "0",
+            "VmRSS": "244164 kB"
+          },
+          {
+            "Name": "python",
+            "Pid": "26",
+            "PPid": "1",
+            "VmRSS": "16244 kB"
+          },
+          {
+            "Name": "python",
+            "Pid": "27",
+            "PPid": "1",
+            "VmRSS": "237380 kB"
+          }
+        ],
+        "completed": 1,
+        "errors": [],
+        "transports": 1,
+        "memory.current": "290754560",
+        "memory.peak": "290762752",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+        "cpu.max": "100000 100000",
+        "cpuset.cpus.effective": "0-17"
+      }
+    }
+  ]
+}

@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from time import perf_counter
 from typing import IO, Callable, Literal, Mapping, Protocol
+from uuid import UUID
 from zoneinfo import ZoneInfo
 
 from prometheus_client import (
@@ -24,6 +25,12 @@ from apps.api.wiring.modules.indicators import (
     build_indicators_registry,
 )
 from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+from apps.scheduler.backtest_artifact_publisher.wiring.managed_access import ManagedCoordinateAccess
+from apps.scheduler.backtest_artifact_publisher.wiring.managed_app import (  # noqa: E501
+    ManagedArtifactPublisherApp,
+    compose_managed_app,
+)
+from apps.scheduler.backtest_artifact_publisher.wiring.managed_metrics import ManagedArtifactMetrics
 from trading.contexts.backtest_artifacts.adapters.outbound import (
     AtomicArtifactCurrentPointerWriterV2,
     BacktestArtifactPathBuilderV2,
@@ -470,6 +477,7 @@ class BacktestArtifactPublisherApp:
     host_lock: BacktestArtifactPublisherHostLock
     metrics_port: int
     schedule: BacktestArtifactPublisherSchedule = BacktestArtifactPublisherSchedule()
+    legacy_allowed: Callable[[], bool] = lambda: True
     now_provider: NowProvider = _default_now_provider
 
     def __post_init__(self) -> None:
@@ -687,6 +695,8 @@ class BacktestArtifactPublisherApp:
             instrument_selection_repository.py
           - src/trading/contexts/backtest/application/services/v2/contracts.py
         """
+        if not self.legacy_allowed():
+            return ()
         instruments = tuple(self.instrument_reader.list_enabled_tradable())
         ordered_instruments = tuple(
             sorted(
@@ -843,7 +853,7 @@ def build_backtest_artifact_publisher_app(
     environ: Mapping[str, str],
     metrics_port: int,
     lock_path: str | None = None,
-) -> BacktestArtifactPublisherApp:
+) -> BacktestArtifactPublisherApp | ManagedArtifactPublisherApp:
     """
     Build the fully wired backtest artifact publisher scheduler application.
 
@@ -874,7 +884,7 @@ def build_backtest_artifact_publisher_app(
     path_builder = BacktestArtifactPathBuilderV2(root=artifact_runtime_config.artifact_root_path())
     artifact_loader = YamlBacktestArtifactLoaderV2(path_resolver=path_builder)
     pointer_writer = AtomicArtifactCurrentPointerWriterV2(path_resolver=path_builder)
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
+    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="artifacts")
     clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
         client_factory=lambda: _clickhouse_client(clickhouse_settings)
     )
@@ -929,7 +939,8 @@ def build_backtest_artifact_publisher_app(
         coordinate_validation=artifact_runtime_config.to_validation_spec,
         coordinate_settings=lambda coordinates: (
             artifact_runtime_config.to_precompute_runtime_settings(
-                config_sha256=artifact_config_hash, coordinates=coordinates,
+                config_sha256=artifact_config_hash,
+                coordinates=coordinates,
             )
         ),
     )
@@ -938,11 +949,91 @@ def build_backtest_artifact_publisher_app(
         if lock_path is not None
         else artifact_runtime_config.artifact_root_path() / ".backtest_artifact_publisher.lock"
     )
+    managed_installation = environ.get("ROEHUB_ARTIFACT_MANAGEMENT_INSTALLATION_ID", "").strip()
+    if managed_installation:
+        from apps.api.wiring.modules.market_data_reference import (
+            build_market_data_reference_use_cases,  # noqa: E501
+        )
+        from trading.contexts.backtest_artifacts.adapters.outbound.defaults.management_catalog import (  # noqa: E501
+            ManagementCatalog,  # noqa: E501
+        )
+        from trading.contexts.backtest_artifacts.adapters.outbound.persistence.clickhouse.stored_coordinates import (  # noqa: E501
+            ClickHouseStoredArtifactCoordinates,  # noqa: E501
+        )
+        from trading.contexts.backtest_artifacts.application.services.automatic_base import (
+            AutomaticBasePublisher,  # noqa: E501
+        )
+        from trading.contexts.backtest_artifacts.application.services.management import (
+            ManagementError,  # noqa: E501
+        )
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.funding_rate_store import (  # noqa: E501
+            ClickHouseFundingRateStore,  # noqa: E501
+        )
+
+        installation = UUID(managed_installation)
+        gateway = PsycopgBacktestPostgresGateway(dsn=strategy_postgres_dsn)
+        settings = gateway.fetch_one(
+            query=(
+                "SELECT * FROM backtest_artifact_installation_settings "
+                "WHERE installation_id=%(i)s"
+            ),
+            parameters={"i": installation},
+        )
+        if (
+            settings is None
+            or settings["root_id"] != "backtest-primary"
+            or settings["budget_bytes"] is None
+        ):
+            raise ManagementError("storage_unconfigured")
+        if artifact_runtime_config.publish_schedule.enabled:
+            raise ManagementError("legacy_scheduler_enabled")
+        reference = build_market_data_reference_use_cases(
+            environ=environ, clickhouse_workload="artifacts"
+        )
+        app = compose_managed_app(
+            installation_id=installation,
+            gateway=gateway,
+            catalog=ManagementCatalog(
+                defaults=defaults_provider,
+                registry=indicator_registry,
+                config=artifact_runtime_config,
+            ),
+            access=ManagedCoordinateAccess(gateway, reference.search_enabled_tradable_instruments),
+            publisher=AutomaticBasePublisher(
+                replace(
+                    precompute_runner,
+                    funding_rate_coverage_reader=ClickHouseFundingRateStore(
+                        gateway=clickhouse_gateway, database=clickhouse_settings.database
+                    ),
+                ),
+                slot_publisher,
+            ),
+            stored_coordinates=ClickHouseStoredArtifactCoordinates(
+                clickhouse_gateway, clickhouse_settings.database
+            ),
+            candle_index=publish_use_case.canonical_candle_index_reader,
+            root=artifact_runtime_config.artifact_root_path(),
+            root_id=settings["root_id"],
+            root_revision=settings["root_revision"],
+            budget_bytes=settings["budget_bytes"],
+            host_lock=FileBacktestArtifactPublisherHostLock(path=resolved_lock_path),
+        )
+        app.metrics = ManagedArtifactMetrics(REGISTRY)
+        app.metrics_port = metrics_port
+        return app
     return BacktestArtifactPublisherApp(
         publish_use_case=publish_use_case,
         instrument_reader=PostgresInstrumentSelectionRepository(
             gateway=PsycopgBacktestPostgresGateway(dsn=strategy_postgres_dsn),
         ),
+        legacy_allowed=lambda: PsycopgBacktestPostgresGateway(dsn=strategy_postgres_dsn).fetch_one(
+            query=(
+                "SELECT installation_id FROM backtest_artifact_installation_settings "
+                "WHERE legacy_handoff='complete' LIMIT 1"
+            ),
+            parameters={},
+        )
+        is None,
         metrics=BacktestArtifactPublisherMetrics(),
         host_lock=FileBacktestArtifactPublisherHostLock(path=resolved_lock_path),
         metrics_port=metrics_port,
