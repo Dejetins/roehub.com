@@ -384,6 +384,16 @@
     "roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f": {
       "license": "Apache-2.0",
       "status": "compatible"
+    },
+    "${RUNTIME_IMAGE}": {
+      "license": "LicenseRef-Installation-Runtime",
+      "status": "conditional",
+      "obligation": "Local control image inherits the installation-owned runtime supplied through RUNTIME_IMAGE (default roehub/local-runtime:managed). Resolve and retain the actual runtime digest and its existing dependency notices before distributing a built image; this variable is not a fixed third-party release image."
+    },
+    "docker:28.5.1-cli@sha256:9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad": {
+      "license": "Apache-2.0 AND LicenseRef-Alpine-Base-Image",
+      "status": "conditional",
+      "obligation": "Only Docker CLI and Compose plugin binaries are copied into the local controller. Preserve upstream Docker/Compose Apache-2.0 notices and audit the copied binaries for each distributed image digest; the Alpine base layer is a build-stage input."
     }
   },
   "bundled_assets": {
@@ -414,6 +424,24 @@
       "status": "compatible",
       "sha256": "f76c6afab94884448f0426e30d6e9d555ca7247894cd3484e477d2f87513036e",
       "source": "https://raw.githubusercontent.com/tradingview/lightweight-charts/v5.2.0/NOTICE"
+    },
+    "apps/navigator-web/src/assets/exchanges/binance.ico": {
+      "component": "Binance exchange identifier",
+      "version": "2026-10-04",
+      "license": "LicenseRef-Exchange-Trademark",
+      "status": "conditional",
+      "sha256": "8318ebbcb1cb4729eb0f78bb058dc618c3b63f9f9f0070a1a7a3265fdc79b833",
+      "source": "https://bin.bnbstatic.com/static/images/common/favicon.ico",
+      "obligation": "Exchange-owned trademark used solely to identify a market source; preserve the unmodified asset and provenance in apps/navigator-web/src/assets/exchanges/README.md. No Apache-2.0 grant or endorsement is asserted for the brand asset."
+    },
+    "apps/navigator-web/src/assets/exchanges/bybit.svg": {
+      "component": "Bybit exchange identifier",
+      "version": "2026-10-04",
+      "license": "LicenseRef-Exchange-Trademark",
+      "status": "conditional",
+      "sha256": "05197bc478bf477d3fb7f4b7f2e87a8c81501fe5be9fcc1700eeebf0ba0a0847",
+      "source": "https://www.bybit.com/en/press",
+      "obligation": "Exchange-owned trademark used solely to identify a market source; preserve the unmodified asset and provenance in apps/navigator-web/src/assets/exchanges/README.md. No Apache-2.0 grant or endorsement is asserted for the brand asset."
     }
   },
   "first_party_assets": {
@@ -5104,6 +5132,230 @@
     ".codex/delivery/evidence/roehub-workpages-2026-10-03/strategies-actions-aligned-1414.jpg": {
       "license": "Apache-2.0",
       "sha256": "c396c54564bf544fb4d508f0b55435caffa90224ca5146891cee30399302ec29"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S01-data-baseline.png": {
+      "license": "Apache-2.0",
+      "sha256": "c12c2ee407ead10b18ae87d19002e55b7eeb67965431e3fc66c5c9483396f465"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S07-desktop-before-polish.png": {
+      "license": "Apache-2.0",
+      "sha256": "86ad5dc96c50175a147067777865958676a5e28244c115a0ee3c559a32785d94"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S07-desktop.png": {
+      "license": "Apache-2.0",
+      "sha256": "fcd2b446bf0191dda0b09ac4144865047cdfb4720eb3a63d1918e937d769dd2a"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S07-mixed-bulk.png": {
+      "license": "Apache-2.0",
+      "sha256": "59c367a0a653a91582e7f51bb9b5d13a22f92c2ffee88a20586d940d0de07c6e"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S07-narrow.png": {
+      "license": "Apache-2.0",
+      "sha256": "d8cbbf89422d984d6e413bac12ff5d99ef08e746a68fc6e6e754fa90745468e2"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S07-unknown-command.png": {
+      "license": "Apache-2.0",
+      "sha256": "3a55b99983500990329df175c928475e58a7e84a5f7561d1059572929809c039"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S08-backtest-materialization.png": {
+      "license": "Apache-2.0",
+      "sha256": "5231d4a8667e0882818a8bdceccba50d0f11d6017195436d23845dd5e3077e83"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S08-cleanup-preview.png": {
+      "license": "Apache-2.0",
+      "sha256": "189683a76effec648236dcc75f43fb76ebb4e234646ee717d5bc755b118a4213"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-denied-final.png": {
+      "license": "Apache-2.0",
+      "sha256": "4bddfc5b70e9336ee5cde81bcbcca44076352b8cfb9fdcc5269c28a5350b30a9"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-desktop-final.png": {
+      "license": "Apache-2.0",
+      "sha256": "576b15ccd2db5e08dffe66b79c0ab48760085e2a46e2f1182fa4a5e7341e6d9f"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-desktop.png": {
+      "license": "Apache-2.0",
+      "sha256": "838a40bdf10f72bb45071443e655578996ddc909097b1347027996259e35e70d"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-final-desktop.png": {
+      "license": "Apache-2.0",
+      "sha256": "b7bcab6cb18c302ddf07ec9c45f3d2c6cc0df4955d6b88c1ace2b2a776723e97"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-final-narrow.png": {
+      "license": "Apache-2.0",
+      "sha256": "afda839fcb39ef9f03c666853667a25cfbd3e4a4d6ea9ff109f4339bda2b7ac9"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-final-overview.png": {
+      "license": "Apache-2.0",
+      "sha256": "202d53ce20f0f5ca81cfe8818d5b5ebe78972f4ce90edffd1352d24b0c1b1e16"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S08-storage-narrow.png": {
+      "license": "Apache-2.0",
+      "sha256": "30ba77d3eb1df80fadc9eba051b8584c09d6a31b538f8f0c19ad3ad17c3dcd35"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S09-backtest-preflight.png": {
+      "license": "Apache-2.0",
+      "sha256": "3fd147917b7abcb69ab9a71489c2d8d7725105a907f307575a5068ab90cc4a0f"
+    },
+    ".codex/agents/generated/data-artifact-management-v1/reports/S09-storage.png": {
+      "license": "Apache-2.0",
+      "sha256": "9db13ce5cb8825c042409664a55e89e4cefe4fd18d8f752731ae8087c321d1eb"
+    },
+    ".codex/delivery/evidence/backtest-chart-display-2026-10-07/button-size-fixed.png": {
+      "license": "Apache-2.0",
+      "sha256": "9c68936876735d25cc35cc531552c05d531e01cd40db5c942607b03058b0d419"
+    },
+    ".codex/delivery/evidence/backtest-chart-display-2026-10-07/menu.png": {
+      "license": "Apache-2.0",
+      "sha256": "64fc5b124036a13213d47ca2597f4a01c265e6b937a92c872ceb6b075f3c0cd3"
+    },
+    ".codex/delivery/evidence/chart-timeline-2026-10-07/backtests-price.png": {
+      "license": "Apache-2.0",
+      "sha256": "cdffb87966f4b85c4fab14c8b6ed67404511e4444c1eef29906613b0864d5da3"
+    },
+    ".codex/delivery/evidence/chart-timeline-2026-10-07/mobile-expanded.png": {
+      "license": "Apache-2.0",
+      "sha256": "4896beb1af81c923a6860aabf0a528c4f81ac5a58ea57b9877f3ecbf3a761baf"
+    },
+    ".codex/delivery/evidence/chart-timeline-2026-10-07/overview.png": {
+      "license": "Apache-2.0",
+      "sha256": "b50a41d36ab3a3145d4ac578ce14d59b656eb484a4cafb91f3b9605695533a0e"
+    },
+    ".codex/delivery/evidence/chart-timeline-2026-10-07/strategy-price.png": {
+      "license": "Apache-2.0",
+      "sha256": "7c2c4f84702578487ea8afd206a195fea72de365c271886b79023d9785b73516"
+    },
+    ".codex/delivery/evidence/compact-summary-2026-10-07/backtests-mobile.png": {
+      "license": "Apache-2.0",
+      "sha256": "65ea570ffa462a06324ddedd77f7e76dd7beb5698d82aa70ee1256f3ab02f429"
+    },
+    ".codex/delivery/evidence/compact-summary-2026-10-07/backtests.png": {
+      "license": "Apache-2.0",
+      "sha256": "12ed2ecd376d51c64e5e81b11c148084f695f75d7632803a8a50adf5fc04894a"
+    },
+    ".codex/delivery/evidence/compact-summary-2026-10-07/overview.png": {
+      "license": "Apache-2.0",
+      "sha256": "a97621edb84b6cec6b3a95ffd77cacedab365c20efc87b6634ec45e9d0fb3efc"
+    },
+    ".codex/delivery/evidence/compact-summary-2026-10-07/strategy.png": {
+      "license": "Apache-2.0",
+      "sha256": "bf5f3ddae681d0bacb2e8523ecd2876d9b6a10fe6e693d22e7424d00cb42f135"
+    },
+    ".codex/delivery/evidence/full-history-repair-2026-10-04/after-tail.png": {
+      "license": "Apache-2.0",
+      "sha256": "aeced98de68e0949a861d019cacad8aeb74bacbf5acd597918d19cd76da4b1c8"
+    },
+    ".codex/delivery/evidence/full-history-repair-2026-10-04/before-tail.png": {
+      "license": "Apache-2.0",
+      "sha256": "c148b2ed76043e19d5d6c33f1e5e5afe4d978843bd55ce22a026f6aca5ccfed7"
+    },
+    ".codex/delivery/evidence/navigator-coverage-labels-2026-10-04/act-coverage.png": {
+      "license": "Apache-2.0",
+      "sha256": "c99917efc55b2cd26b61365a673d4bb58bd350f31207165ff1024fd7b503816c"
+    },
+    ".codex/delivery/evidence/navigator-row-selection-2026-10-04/alice-selected.png": {
+      "license": "Apache-2.0",
+      "sha256": "88fee0616a3ae461a4d23263a03a745057de9e8ae2b8c65212e318d6a503dc35"
+    },
+    ".codex/delivery/evidence/pnl-disclosure-2026-10-07/overview-aligned.png": {
+      "license": "Apache-2.0",
+      "sha256": "655ca45c49c0d1386152b8cf9ca7b97c2eab4da4da0d734238535d5a3510e426"
+    },
+    ".codex/delivery/evidence/pnl-disclosure-2026-10-07/overview.png": {
+      "license": "Apache-2.0",
+      "sha256": "c3a1e53861984606c3a4a402f98293dd9f773a0689495b5dada9c6e6af87df24"
+    },
+    ".codex/delivery/evidence/remove-title-strip-2026-10-07/backtests.png": {
+      "license": "Apache-2.0",
+      "sha256": "7af474af12b529348681fe33878364e5fb753e38c796aeec212a818a1cf0a5f2"
+    },
+    ".codex/delivery/evidence/remove-title-strip-2026-10-07/data.png": {
+      "license": "Apache-2.0",
+      "sha256": "a43f6dad0265aff87d988acb4bcfc48f11648ada828992e89705f83d92d0560d"
+    },
+    ".codex/delivery/evidence/remove-title-strip-2026-10-07/overview.png": {
+      "license": "Apache-2.0",
+      "sha256": "d24f4e725df4ec15ff148d2f737ea880520fa7b09a749f2982f8a592743cde20"
+    },
+    ".codex/delivery/evidence/remove-title-strip-2026-10-07/strategy.png": {
+      "license": "Apache-2.0",
+      "sha256": "76864d19868bfe838f5d87bbedc41c1795aa8af25362ae781320ecd119c0e9f4"
+    },
+    ".codex/delivery/evidence/streaming-intent-2026-10-07/disabled-iab.png": {
+      "license": "Apache-2.0",
+      "sha256": "2f5d7c87fb7dd36bc485d5a2bfbff5e1935d079251509b44a2c76070a315ea6d"
+    },
+    ".codex/delivery/evidence/streaming-intent-2026-10-07/preparing-iab.png": {
+      "license": "Apache-2.0",
+      "sha256": "5a17bd1e6210423d74ad8ba2d14974edd55bbf38ae2812f6b74033ba1a707dbe"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/bybit-single-logo.png": {
+      "license": "Apache-2.0",
+      "sha256": "415d999a2a78c425d7aa1fb24d6d1e421a020e08344f6dae639518e7d4fb20ee"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/catalog-selection-neutral.png": {
+      "license": "Apache-2.0",
+      "sha256": "3e3d707fb53dc5e278de256cf72e45d72e83ca85f0f67777f1fe397f23db3c72"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/controls-off.png": {
+      "license": "Apache-2.0",
+      "sha256": "c724beb4cca14470a84e3d3875a7e50c4957af8e1a6eb5dff1ba7b8626faf632"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/controls-on.png": {
+      "license": "Apache-2.0",
+      "sha256": "69b304815a30532961f421872a986bea63b841fac1c112dc54ce725a50af8c84"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/custom-catalog-filters.png": {
+      "license": "Apache-2.0",
+      "sha256": "87220338cf189df04c4cbc9e80435fb4ee5fad8b86394f9f7dcbb50307c85af8"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/exchange-logos-aligned-actions.png": {
+      "license": "Apache-2.0",
+      "sha256": "8583fa375c39a2e5216007c11ed38eb13c6203fea291f66c78af446eed47c9c2"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/history-inline-eta-no-overflow.png": {
+      "license": "Apache-2.0",
+      "sha256": "ec79a8b0c1d34fd1859aec322d8e506152fb09f9a2a8d304629c579f5694c940"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/history-meter-eta.png": {
+      "license": "Apache-2.0",
+      "sha256": "e2472e0e5354f88c739d71b05249c643dc1903da821c7960d646203961bef45c"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/immediate-resume.png": {
+      "license": "Apache-2.0",
+      "sha256": "0510f51df07c92a036684205a98f0a37e260626011dfadc1ba755e52bee26788"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/ios-switch-log-hidden.png": {
+      "license": "Apache-2.0",
+      "sha256": "3b0e38cc434cc322df68cec82c0e024f0e92123ca9be993039a41a1640f123ba"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/ios-switch-log-open.png": {
+      "license": "Apache-2.0",
+      "sha256": "84a1f371f7e3b04117a4c4eb189b262019a82d698ea9fddf5aec99dcf053baa2"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/ios-switch-off.png": {
+      "license": "Apache-2.0",
+      "sha256": "a5690d2475bfc3c6d460e159f2f817c3686374f1af211c4ab03a1571c3ac9ff8"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/live-inspector.png": {
+      "license": "Apache-2.0",
+      "sha256": "d761f548de4c23fa254f74d5b8e610a7d3f125cada25b0bcb013aaf5c02dee3e"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/live-streaming.png": {
+      "license": "Apache-2.0",
+      "sha256": "46f0cd640da4141d78a3c433bc9b45cb141a138ff0abe49818acf4c3678741b7"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/refresh-steady.png": {
+      "license": "Apache-2.0",
+      "sha256": "3801afa31463c3e5b51dbf43cf3ea59bcb424cf9c80cf466c86bd6e90ca8de4c"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/single-history-progress.png": {
+      "license": "Apache-2.0",
+      "sha256": "0f36a56416a731d77a30ca8275c8663b9c3eb43a8edd7c7c364dfd05b7495be8"
+    },
+    ".codex/delivery/evidence/streaming-status-2026-10-04/whole-row-selection.png": {
+      "license": "Apache-2.0",
+      "sha256": "16866d6bb7ebcc13c3a489f594d6bda21865242a9c9288ed4426eb962ea609df"
     }
   },
   "excluded_path_prefixes": {

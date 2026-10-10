@@ -56,6 +56,36 @@ def test_dependency_names_follow_python_normalization() -> None:
     assert _normalize_name("SQLAlchemy") == "sqlalchemy"
 
 
+def test_bundled_asset_outside_legacy_vendor_tree_is_not_first_party(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import hashlib
+
+    asset = tmp_path / "brand.svg"
+    asset.write_text("<svg/>")
+    policy = {
+        "bundled_assets": {
+            asset.name: {
+                "component": "external-brand", "version": "1",
+                "license": "LicenseRef-Brand", "status": "conditional",
+                "source": "https://example.invalid/brand",
+                "obligation": "Preserve attribution",
+                "sha256": hashlib.sha256(asset.read_bytes()).hexdigest(),
+            }
+        },
+        "first_party_assets": {}, "excluded_path_prefixes": [],
+    }
+    monkeypatch.setattr(oss_metadata, "ROOT", tmp_path)
+    components = oss_metadata._bundled_components(policy, [asset.name])
+    assert components[0].name == "external-brand"
+    oss_metadata._validate_first_party_assets(policy, [asset.name])
+    with pytest.raises(PolicyError, match="stale"):
+        oss_metadata._bundled_components(policy, [])
+    asset.write_text("changed")
+    with pytest.raises(PolicyError, match="hash changed"):
+        oss_metadata._bundled_components(policy, [asset.name])
+
+
 def test_conditional_component_requires_explicit_obligation() -> None:
     component = Component(
         kind="container",

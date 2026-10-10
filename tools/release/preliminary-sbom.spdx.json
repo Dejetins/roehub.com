@@ -7,7 +7,7 @@
     ]
   },
   "dataLicense": "CC0-1.0",
-  "documentNamespace": "https://github.com/Dejetins/roehub.com/spdx/roehub-0.1.0-preliminary-11ae25cc4ce84534a367",
+  "documentNamespace": "https://github.com/Dejetins/roehub.com/spdx/roehub-0.1.0-preliminary-f9ffc39e7359db39432d",
   "name": "roehub-0.1.0-preliminary",
   "packages": [
     {
@@ -371,7 +371,17 @@
       "versionInfo": "2.5.1"
     },
     {
-      "SPDXID": "SPDXRef-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-36",
+      "SPDXID": "SPDXRef-container--RUNTIME-IMAGE-36",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Local control image inherits the installation-owned runtime supplied through RUNTIME_IMAGE (default roehub/local-runtime:managed). Resolve and retain the actual runtime digest and its existing dependency notices before distributing a built image; this variable is not a fixed third-party release image.",
+      "downloadLocation": "pkg:docker/${RUNTIME_IMAGE}",
+      "filesAnalyzed": false,
+      "licenseConcluded": "LicenseRef-Installation-Runtime",
+      "licenseDeclared": "LicenseRef-Installation-Runtime",
+      "name": "${RUNTIME_IMAGE}",
+      "versionInfo": "unversioned"
+    },
+    {
+      "SPDXID": "SPDXRef-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-37",
       "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Audit packages and layers for the final release digest and preserve all required notices and corresponding-source offers.",
       "downloadLocation": "pkg:docker/alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
       "filesAnalyzed": false,
@@ -381,7 +391,7 @@
       "versionInfo": "14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
     },
     {
-      "SPDXID": "SPDXRef-container-clickhouse-clickhouse-server-24.8-37",
+      "SPDXID": "SPDXRef-container-clickhouse-clickhouse-server-24.8-38",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/clickhouse/clickhouse-server:24.8",
       "filesAnalyzed": false,
@@ -391,7 +401,7 @@
       "versionInfo": "24.8"
     },
     {
-      "SPDXID": "SPDXRef-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-38",
+      "SPDXID": "SPDXRef-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-39",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b",
       "filesAnalyzed": false,
@@ -401,7 +411,7 @@
       "versionInfo": "1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b"
     },
     {
-      "SPDXID": "SPDXRef-container-docker.io-library-alpine-sha256-5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11-39",
+      "SPDXID": "SPDXRef-container-docker.io-library-alpine-sha256-5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11-40",
       "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Build-only and runtime base for the OpenBao derivative; preserve exact package notices and audit the final digest.",
       "downloadLocation": "pkg:docker/docker.io/library/alpine@sha256:5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11",
       "filesAnalyzed": false,
@@ -411,7 +421,7 @@
       "versionInfo": "5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11"
     },
     {
-      "SPDXID": "SPDXRef-container-docker.io-library-golang-sha256-8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45-40",
+      "SPDXID": "SPDXRef-container-docker.io-library-golang-sha256-8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45-41",
       "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Build-only image for the OpenBao derivative; preserve toolchain and base-image notices in provenance.",
       "downloadLocation": "pkg:docker/docker.io/library/golang@sha256:8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45",
       "filesAnalyzed": false,
@@ -421,7 +431,7 @@
       "versionInfo": "8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45"
     },
     {
-      "SPDXID": "SPDXRef-container-docker.io-library-node-sha256-ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6-41",
+      "SPDXID": "SPDXRef-container-docker.io-library-node-sha256-ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6-42",
       "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Build-only image for the OpenBao UI; preserve toolchain and base-image notices in provenance.",
       "downloadLocation": "pkg:docker/docker.io/library/node@sha256:ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6",
       "filesAnalyzed": false,
@@ -431,7 +441,17 @@
       "versionInfo": "ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6"
     },
     {
-      "SPDXID": "SPDXRef-container-ghcr.io-astral-sh-uv-0.8.4-sha256-40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0-42",
+      "SPDXID": "SPDXRef-container-docker-28.5.1-cli-sha256-9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad-43",
+      "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Only Docker CLI and Compose plugin binaries are copied into the local controller. Preserve upstream Docker/Compose Apache-2.0 notices and audit the copied binaries for each distributed image digest; the Alpine base layer is a build-stage input.",
+      "downloadLocation": "pkg:docker/docker:28.5.1-cli@sha256:9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad",
+      "filesAnalyzed": false,
+      "licenseConcluded": "Apache-2.0 AND LicenseRef-Alpine-Base-Image",
+      "licenseDeclared": "Apache-2.0 AND LicenseRef-Alpine-Base-Image",
+      "name": "docker:28.5.1-cli@sha256:9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad",
+      "versionInfo": "9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad"
+    },
+    {
+      "SPDXID": "SPDXRef-container-ghcr.io-astral-sh-uv-0.8.4-sha256-40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0-44",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/ghcr.io/astral-sh/uv:0.8.4@sha256:40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0",
       "filesAnalyzed": false,
@@ -441,7 +461,7 @@
       "versionInfo": "40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0"
     },
     {
-      "SPDXID": "SPDXRef-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-43",
+      "SPDXID": "SPDXRef-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-45",
       "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Preserve the exact modified OpenBao corresponding source, Roehub patch, MPL-2.0 and MIT license texts, and derivative notice for this digest.",
       "downloadLocation": "pkg:docker/ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a",
       "filesAnalyzed": false,
@@ -451,7 +471,7 @@
       "versionInfo": "8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a"
     },
     {
-      "SPDXID": "SPDXRef-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-44",
+      "SPDXID": "SPDXRef-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-46",
       "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest.",
       "downloadLocation": "pkg:docker/grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa",
       "filesAnalyzed": false,
@@ -461,7 +481,7 @@
       "versionInfo": "b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa"
     },
     {
-      "SPDXID": "SPDXRef-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-45",
+      "SPDXID": "SPDXRef-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-47",
       "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest.",
       "downloadLocation": "pkg:docker/grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745",
       "filesAnalyzed": false,
@@ -471,7 +491,7 @@
       "versionInfo": "a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745"
     },
     {
-      "SPDXID": "SPDXRef-container-postgres-16-46",
+      "SPDXID": "SPDXRef-container-postgres-16-48",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/postgres:16",
       "filesAnalyzed": false,
@@ -481,7 +501,7 @@
       "versionInfo": "16"
     },
     {
-      "SPDXID": "SPDXRef-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-47",
+      "SPDXID": "SPDXRef-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-49",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c",
       "filesAnalyzed": false,
@@ -491,7 +511,7 @@
       "versionInfo": "be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c"
     },
     {
-      "SPDXID": "SPDXRef-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-48",
+      "SPDXID": "SPDXRef-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-50",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba",
       "filesAnalyzed": false,
@@ -501,7 +521,7 @@
       "versionInfo": "27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba"
     },
     {
-      "SPDXID": "SPDXRef-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-49",
+      "SPDXID": "SPDXRef-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-51",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d",
       "filesAnalyzed": false,
@@ -511,7 +531,7 @@
       "versionInfo": "a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d"
     },
     {
-      "SPDXID": "SPDXRef-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-50",
+      "SPDXID": "SPDXRef-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-52",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
       "filesAnalyzed": false,
@@ -521,7 +541,7 @@
       "versionInfo": "63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996"
     },
     {
-      "SPDXID": "SPDXRef-container-python-3.12-slim-51",
+      "SPDXID": "SPDXRef-container-python-3.12-slim-53",
       "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Audit and notice Debian packages and all transitive image layers for the final digest.",
       "downloadLocation": "pkg:docker/python:3.12-slim",
       "filesAnalyzed": false,
@@ -531,7 +551,7 @@
       "versionInfo": "3.12-slim"
     },
     {
-      "SPDXID": "SPDXRef-container-python-3.12-slim-bookworm-sha256-8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b-52",
+      "SPDXID": "SPDXRef-container-python-3.12-slim-bookworm-sha256-8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b-54",
       "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Audit and notice Debian packages and all transitive image layers for the final digest.",
       "downloadLocation": "pkg:docker/python:3.12-slim-bookworm@sha256:8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b",
       "filesAnalyzed": false,
@@ -541,7 +561,7 @@
       "versionInfo": "8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b"
     },
     {
-      "SPDXID": "SPDXRef-container-python-3.12.11-slim-bookworm-sha256-519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7-53",
+      "SPDXID": "SPDXRef-container-python-3.12.11-slim-bookworm-sha256-519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7-55",
       "comment": "kind=container; group=distribution-container; review_status=conditional; obligation=Audit and notice Debian packages and all transitive image layers for the final digest.",
       "downloadLocation": "pkg:docker/python:3.12.11-slim-bookworm@sha256:519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7",
       "filesAnalyzed": false,
@@ -551,7 +571,7 @@
       "versionInfo": "519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7"
     },
     {
-      "SPDXID": "SPDXRef-container-redis-7.2-bookworm-54",
+      "SPDXID": "SPDXRef-container-redis-7.2-bookworm-56",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/redis:7.2-bookworm",
       "filesAnalyzed": false,
@@ -561,7 +581,7 @@
       "versionInfo": "7.2-bookworm"
     },
     {
-      "SPDXID": "SPDXRef-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-55",
+      "SPDXID": "SPDXRef-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-57",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42",
       "filesAnalyzed": false,
@@ -571,7 +591,7 @@
       "versionInfo": "e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42"
     },
     {
-      "SPDXID": "SPDXRef-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-56",
+      "SPDXID": "SPDXRef-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-58",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8",
       "filesAnalyzed": false,
@@ -581,7 +601,7 @@
       "versionInfo": "32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8"
     },
     {
-      "SPDXID": "SPDXRef-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-57",
+      "SPDXID": "SPDXRef-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-59",
       "comment": "kind=container; group=distribution-container; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "filesAnalyzed": false,
@@ -591,7 +611,7 @@
       "versionInfo": "35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f"
     },
     {
-      "SPDXID": "SPDXRef-release-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-58",
+      "SPDXID": "SPDXRef-release-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-60",
       "comment": "kind=release-container; group=alertmanager; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/prom/alertmanager:v0.28.1@sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba",
       "filesAnalyzed": false,
@@ -601,7 +621,7 @@
       "versionInfo": "27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba"
     },
     {
-      "SPDXID": "SPDXRef-release-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-59",
+      "SPDXID": "SPDXRef-release-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-61",
       "comment": "kind=release-container; group=blackbox; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d",
       "filesAnalyzed": false,
@@ -611,7 +631,7 @@
       "versionInfo": "a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d"
     },
     {
-      "SPDXID": "SPDXRef-release-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-60",
+      "SPDXID": "SPDXRef-release-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-62",
       "comment": "kind=release-container; group=clickhouse; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b",
       "filesAnalyzed": false,
@@ -621,7 +641,7 @@
       "versionInfo": "1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b"
     },
     {
-      "SPDXID": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-61",
+      "SPDXID": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-63",
       "comment": "kind=release-container; group=config_consumer; review_status=conditional; obligation=Audit every package and layer for the final release digest; preserve required notices and corresponding-source offers before distribution.",
       "downloadLocation": "pkg:docker/alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
       "filesAnalyzed": false,
@@ -631,7 +651,7 @@
       "versionInfo": "14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
     },
     {
-      "SPDXID": "SPDXRef-release-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-62",
+      "SPDXID": "SPDXRef-release-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-64",
       "comment": "kind=release-container; group=grafana; review_status=conditional; obligation=Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest.",
       "downloadLocation": "pkg:docker/grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa",
       "filesAnalyzed": false,
@@ -641,7 +661,7 @@
       "versionInfo": "b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa"
     },
     {
-      "SPDXID": "SPDXRef-release-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-63",
+      "SPDXID": "SPDXRef-release-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-65",
       "comment": "kind=release-container; group=loki; review_status=conditional; obligation=Distribute only as a separate unmodified aggregate service; preserve notices and provide corresponding-source access for this exact digest.",
       "downloadLocation": "pkg:docker/grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745",
       "filesAnalyzed": false,
@@ -651,7 +671,7 @@
       "versionInfo": "a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745"
     },
     {
-      "SPDXID": "SPDXRef-release-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-64",
+      "SPDXID": "SPDXRef-release-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-66",
       "comment": "kind=release-container; group=ml_runtime; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/roehub/runtime-ml@sha256:32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8",
       "filesAnalyzed": false,
@@ -661,7 +681,7 @@
       "versionInfo": "32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8"
     },
     {
-      "SPDXID": "SPDXRef-release-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-65",
+      "SPDXID": "SPDXRef-release-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-67",
       "comment": "kind=release-container; group=openbao; review_status=conditional; obligation=Preserve the exact modified OpenBao corresponding source, Roehub patch, MPL-2.0 and MIT license texts, and derivative notice for this digest.",
       "downloadLocation": "pkg:docker/ghcr.io/dejetins/roehub-openbao:2.5.4-roehub-licensed-qr.1@sha256:8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a",
       "filesAnalyzed": false,
@@ -671,7 +691,7 @@
       "versionInfo": "8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a"
     },
     {
-      "SPDXID": "SPDXRef-release-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-66",
+      "SPDXID": "SPDXRef-release-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-68",
       "comment": "kind=release-container; group=postgresql; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/postgres:16@sha256:be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c",
       "filesAnalyzed": false,
@@ -681,7 +701,7 @@
       "versionInfo": "be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c"
     },
     {
-      "SPDXID": "SPDXRef-release-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-67",
+      "SPDXID": "SPDXRef-release-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-69",
       "comment": "kind=release-container; group=prometheus; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/prom/prometheus:v3.5.0@sha256:63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996",
       "filesAnalyzed": false,
@@ -691,7 +711,7 @@
       "versionInfo": "63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996"
     },
     {
-      "SPDXID": "SPDXRef-release-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-68",
+      "SPDXID": "SPDXRef-release-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-70",
       "comment": "kind=release-container; group=redis; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/redis:7.2-bookworm@sha256:e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42",
       "filesAnalyzed": false,
@@ -701,7 +721,7 @@
       "versionInfo": "e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42"
     },
     {
-      "SPDXID": "SPDXRef-release-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-69",
+      "SPDXID": "SPDXRef-release-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-71",
       "comment": "kind=release-container; group=runtime; review_status=compatible; obligation=none",
       "downloadLocation": "pkg:docker/roehub/runtime@sha256:35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f",
       "filesAnalyzed": false,
@@ -711,7 +731,7 @@
       "versionInfo": "35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f"
     },
     {
-      "SPDXID": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-70",
+      "SPDXID": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-72",
       "comment": "kind=release-container; group=secret_init; review_status=conditional; obligation=Audit every package and layer for the final release digest; preserve required notices and corresponding-source offers before distribution.",
       "downloadLocation": "pkg:docker/alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce",
       "filesAnalyzed": false,
@@ -721,7 +741,39 @@
       "versionInfo": "14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
     },
     {
-      "SPDXID": "SPDXRef-bundled-asset-htmx-71",
+      "SPDXID": "SPDXRef-bundled-asset-Binance-exchange-identifier-73",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "8318ebbcb1cb4729eb0f78bb058dc618c3b63f9f9f0070a1a7a3265fdc79b833"
+        }
+      ],
+      "comment": "kind=bundled-asset; group=apps/navigator-web/src/assets/exchanges/binance.ico; review_status=conditional; obligation=Exchange-owned trademark used solely to identify a market source; preserve the unmodified asset and provenance in apps/navigator-web/src/assets/exchanges/README.md. No Apache-2.0 grant or endorsement is asserted for the brand asset.",
+      "downloadLocation": "https://bin.bnbstatic.com/static/images/common/favicon.ico",
+      "filesAnalyzed": false,
+      "licenseConcluded": "LicenseRef-Exchange-Trademark",
+      "licenseDeclared": "LicenseRef-Exchange-Trademark",
+      "name": "Binance exchange identifier",
+      "versionInfo": "2026-10-04"
+    },
+    {
+      "SPDXID": "SPDXRef-bundled-asset-Bybit-exchange-identifier-74",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "05197bc478bf477d3fb7f4b7f2e87a8c81501fe5be9fcc1700eeebf0ba0a0847"
+        }
+      ],
+      "comment": "kind=bundled-asset; group=apps/navigator-web/src/assets/exchanges/bybit.svg; review_status=conditional; obligation=Exchange-owned trademark used solely to identify a market source; preserve the unmodified asset and provenance in apps/navigator-web/src/assets/exchanges/README.md. No Apache-2.0 grant or endorsement is asserted for the brand asset.",
+      "downloadLocation": "https://www.bybit.com/en/press",
+      "filesAnalyzed": false,
+      "licenseConcluded": "LicenseRef-Exchange-Trademark",
+      "licenseDeclared": "LicenseRef-Exchange-Trademark",
+      "name": "Bybit exchange identifier",
+      "versionInfo": "2026-10-04"
+    },
+    {
+      "SPDXID": "SPDXRef-bundled-asset-htmx-75",
       "checksums": [
         {
           "algorithm": "SHA256",
@@ -737,7 +789,7 @@
       "versionInfo": "1.9.12"
     },
     {
-      "SPDXID": "SPDXRef-bundled-asset-lightweight-charts-notice-72",
+      "SPDXID": "SPDXRef-bundled-asset-lightweight-charts-notice-76",
       "checksums": [
         {
           "algorithm": "SHA256",
@@ -753,7 +805,7 @@
       "versionInfo": "5.2.0"
     },
     {
-      "SPDXID": "SPDXRef-bundled-asset-lightweight-charts-73",
+      "SPDXID": "SPDXRef-bundled-asset-lightweight-charts-77",
       "checksums": [
         {
           "algorithm": "SHA256",
@@ -951,192 +1003,212 @@
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-36",
+      "relatedSpdxElement": "SPDXRef-container--RUNTIME-IMAGE-36",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-clickhouse-clickhouse-server-24.8-37",
+      "relatedSpdxElement": "SPDXRef-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-37",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-38",
+      "relatedSpdxElement": "SPDXRef-container-clickhouse-clickhouse-server-24.8-38",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-docker.io-library-alpine-sha256-5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11-39",
+      "relatedSpdxElement": "SPDXRef-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-39",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-docker.io-library-golang-sha256-8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45-40",
+      "relatedSpdxElement": "SPDXRef-container-docker.io-library-alpine-sha256-5b10f432ef3da1b8d4c7eb6c487f2f5a8f096bc91145e68878dd4a5019afde11-40",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-docker.io-library-node-sha256-ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6-41",
+      "relatedSpdxElement": "SPDXRef-container-docker.io-library-golang-sha256-8d22e29d960bc50cd025d93d5b7c7d220b1ee9aa7a239b3c8f55a57e987e8d45-41",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-ghcr.io-astral-sh-uv-0.8.4-sha256-40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0-42",
+      "relatedSpdxElement": "SPDXRef-container-docker.io-library-node-sha256-ba36e9b2705008e63e354214f0e3011c528af9df2ca13ac2bd2c0114650302e6-42",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-43",
+      "relatedSpdxElement": "SPDXRef-container-docker-28.5.1-cli-sha256-9190b0613792e658a7783cf14b2d5ace5941bb68ede7276922ea36ee457d76ad-43",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-44",
+      "relatedSpdxElement": "SPDXRef-container-ghcr.io-astral-sh-uv-0.8.4-sha256-40775a79214294fb51d097c9117592f193bcfdfc634f4daa0e169ee965b10ef0-44",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-45",
+      "relatedSpdxElement": "SPDXRef-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-45",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-postgres-16-46",
+      "relatedSpdxElement": "SPDXRef-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-46",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-47",
+      "relatedSpdxElement": "SPDXRef-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-47",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-48",
+      "relatedSpdxElement": "SPDXRef-container-postgres-16-48",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-49",
+      "relatedSpdxElement": "SPDXRef-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-49",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-50",
+      "relatedSpdxElement": "SPDXRef-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-50",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-python-3.12-slim-51",
+      "relatedSpdxElement": "SPDXRef-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-51",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-python-3.12-slim-bookworm-sha256-8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b-52",
+      "relatedSpdxElement": "SPDXRef-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-52",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-python-3.12.11-slim-bookworm-sha256-519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7-53",
+      "relatedSpdxElement": "SPDXRef-container-python-3.12-slim-53",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-redis-7.2-bookworm-54",
+      "relatedSpdxElement": "SPDXRef-container-python-3.12-slim-bookworm-sha256-8a7e7cc04fd3e2bd787f7f24e22d5d119aa590d429b50c95dfe12b3abe52f48b-54",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-55",
+      "relatedSpdxElement": "SPDXRef-container-python-3.12.11-slim-bookworm-sha256-519591d6871b7bc437060736b9f7456b8731f1499a57e22e6c285135ae657bf7-55",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-56",
+      "relatedSpdxElement": "SPDXRef-container-redis-7.2-bookworm-56",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-57",
+      "relatedSpdxElement": "SPDXRef-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-57",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-58",
+      "relatedSpdxElement": "SPDXRef-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-58",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-59",
+      "relatedSpdxElement": "SPDXRef-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-59",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-60",
+      "relatedSpdxElement": "SPDXRef-release-container-prom-alertmanager-v0.28.1-sha256-27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba-60",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-61",
+      "relatedSpdxElement": "SPDXRef-release-container-prom-blackbox-exporter-v0.27.0-sha256-a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d-61",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-62",
+      "relatedSpdxElement": "SPDXRef-release-container-clickhouse-clickhouse-server-24.8-sha256-1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b-62",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-63",
+      "relatedSpdxElement": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-63",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-64",
+      "relatedSpdxElement": "SPDXRef-release-container-grafana-grafana-12.0.2-sha256-b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa-64",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-65",
+      "relatedSpdxElement": "SPDXRef-release-container-grafana-loki-3.5.1-sha256-a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745-65",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-66",
+      "relatedSpdxElement": "SPDXRef-release-container-roehub-runtime-ml-sha256-32ea812a7450a6949a14d333ced2bf420858144ed935887b5a159301b1e43ad8-66",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-67",
+      "relatedSpdxElement": "SPDXRef-release-container-ghcr.io-dejetins-roehub-openbao-2.5.4-roehub-licensed-qr.1-sha256-8492e2c1a523aac5da44e41c86e84eac992479fb7c4a79c2e1a07b8b24bcec4a-67",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-68",
+      "relatedSpdxElement": "SPDXRef-release-container-postgres-16-sha256-be01cf82fc7dbba824acf0a82e150b4b360f3ff93c6631d7844af431e841a95c-68",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-69",
+      "relatedSpdxElement": "SPDXRef-release-container-prom-prometheus-v3.5.0-sha256-63805ebb8d2b3920190daf1cb14a60871b16fd38bed42b857a3182bc621f4996-69",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-70",
+      "relatedSpdxElement": "SPDXRef-release-container-redis-7.2-bookworm-sha256-e51cbc16f94b2426e80b9516db174a07d55e882217a1ec1d729b137b32e24e42-70",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-bundled-asset-htmx-71",
+      "relatedSpdxElement": "SPDXRef-release-container-roehub-runtime-sha256-35ad7fdd77e6aa6cbbcf5fc20b29184277b4400d0e8c97c24f46876a061b352f-71",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-bundled-asset-lightweight-charts-notice-72",
+      "relatedSpdxElement": "SPDXRef-release-container-alpine-3.22-sha256-14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce-72",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     },
     {
-      "relatedSpdxElement": "SPDXRef-bundled-asset-lightweight-charts-73",
+      "relatedSpdxElement": "SPDXRef-bundled-asset-Binance-exchange-identifier-73",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-bundled-asset-Bybit-exchange-identifier-74",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-bundled-asset-htmx-75",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-bundled-asset-lightweight-charts-notice-76",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-Package-Roehub"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-bundled-asset-lightweight-charts-77",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-Package-Roehub"
     }
