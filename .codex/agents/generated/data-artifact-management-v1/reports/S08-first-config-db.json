@@ -1,0 +1,22 @@
+[
+  {
+    "schema": "artifact_management_test_085202eb8f894125968fec44d98b8ae6",
+    "settings": [
+      [
+        true,
+        false,
+        "complete"
+      ]
+    ]
+  },
+  {
+    "schema": "artifact_management_test_846e9756dfc849c6b3ba7f3ffd1461c6",
+    "settings": [
+      [
+        false,
+        true,
+        "pending"
+      ]
+    ]
+  }
+]

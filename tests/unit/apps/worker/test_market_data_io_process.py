@@ -113,3 +113,23 @@ def test_parent_death_stops_owned_io_process():
             except ProcessLookupError:
                 pass
         parent.close()
+
+
+def test_stop_interrupts_hanging_preparation_and_reaps_child():
+    from apps.worker.market_data_ws.wiring.modules.market_data_ws import (
+        _control_read_until_stopped,
+    )
+
+    async def scenario():
+        io = MarketDataIoProcess(config_path="unused", environ={}, child_target=hanging_child)
+        stop = asyncio.Event()
+        call = asyncio.create_task(_control_read_until_stopped(io.run("prepare", ()), stop))
+        while not io.active_pids:
+            await asyncio.sleep(0.01)
+        stop.set()
+        with pytest.raises(asyncio.CancelledError):
+            await asyncio.wait_for(call, 1.5)
+        assert not io.active_pids
+        assert getattr(asyncio.get_running_loop(), "_default_executor") is None
+
+    asyncio.run(scenario())

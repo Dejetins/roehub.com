@@ -8,6 +8,7 @@ from trading.contexts.identity.adapters.outbound.persistence.postgres.gateway im
     IdentityPostgresGateway,
 )
 from trading.contexts.identity.application.ports.session_repository import (
+    BrowserDevice,
     IdentitySession,
     SessionRepository,
 )
@@ -51,12 +52,83 @@ class PostgresIdentitySessionRepository(SessionRepository):
             raise ValueError("PostgresIdentitySessionRepository requires gateway")
         normalized_sessions_table = sessions_table.strip()
         if not normalized_sessions_table:
-            raise ValueError(
-                "PostgresIdentitySessionRepository requires non-empty sessions_table"
-            )
+            raise ValueError("PostgresIdentitySessionRepository requires non-empty sessions_table")
 
         self._gateway = gateway
         self._sessions_table = normalized_sessions_table
+
+    def bind_device(self, *, session_id: UUID, device_key: str, label: str, now: datetime) -> UUID:
+        row = self._gateway.fetch_one(
+            query="SELECT identity_bind_browser_device(%(sid)s, %(key)s, %(label)s, "
+            "%(now)s, %(did)s) AS device_id",
+            parameters={
+                "sid": session_id,
+                "key": device_key,
+                "label": label,
+                "now": now,
+                "did": uuid4(),
+            },
+        )
+        if row is None:
+            raise ValueError("device_registration_failed")
+        return UUID(str(row["device_id"]))
+
+    def list_devices(
+        self, *, user_id: UserId, now: datetime, before: UUID | None, limit: int
+    ) -> tuple[BrowserDevice, ...]:
+        rows = self._gateway.fetch_all(
+            query="""
+            SELECT d.device_id, d.label, s.session_id, s.last_seen_at,
+                   LEAST(s.idle_expires_at, s.absolute_expires_at) AS expires_at,
+                   (s.revoked_at IS NULL AND s.idle_expires_at > %(now)s
+                    AND s.absolute_expires_at > %(now)s) AS active
+            FROM identity_browser_devices d
+            JOIN identity_sessions s ON s.session_id = d.current_session_id
+            WHERE d.user_id = %(owner)s AND s.user_id = %(owner)s
+              AND (%(before)s::uuid IS NULL OR d.device_id < %(before)s::uuid)
+            ORDER BY d.device_id DESC LIMIT %(limit)s
+            """,
+            parameters={"owner": str(user_id), "now": now, "before": before, "limit": limit},
+        )
+        return tuple(
+            BrowserDevice(
+                device_id=UUID(str(row["device_id"])),
+                label=str(row["label"]),
+                session_id=UUID(str(row["session_id"])),
+                last_seen_at=row["last_seen_at"],
+                expires_at=row["expires_at"],
+                active=bool(row["active"]),
+            )
+            for row in rows
+        )
+
+    def legacy_session_count(self, *, user_id: UserId, now: datetime) -> int:
+        row = self._gateway.fetch_one(
+            query="""
+            SELECT count(*) AS count FROM identity_sessions
+            WHERE user_id = %(owner)s AND device_id IS NULL AND revoked_at IS NULL
+              AND idle_expires_at > %(now)s AND absolute_expires_at > %(now)s
+            """,
+            parameters={"owner": str(user_id), "now": now},
+        )
+        return int(row["count"]) if row else 0
+
+    def revoke_device(self, *, user_id: UserId, device_id: UUID | None, now: datetime) -> None:
+        self._gateway.execute(
+            query="SELECT identity_revoke_browser_device(%(owner)s, %(device)s, %(now)s)",
+            parameters={"owner": str(user_id), "device": device_id, "now": now},
+        )
+
+    def touch_session(self, *, session_id: UUID, now: datetime) -> None:
+        self._gateway.execute(
+            query=f"""
+            UPDATE {self._sessions_table} SET last_seen_at = %(now)s
+            WHERE session_id = %(sid)s AND revoked_at IS NULL
+              AND idle_expires_at > %(now)s AND absolute_expires_at > %(now)s
+              AND last_seen_at <= %(now)s - interval '60 seconds'
+            """,
+            parameters={"sid": session_id, "now": now},
+        )
 
     def create_session(
         self,

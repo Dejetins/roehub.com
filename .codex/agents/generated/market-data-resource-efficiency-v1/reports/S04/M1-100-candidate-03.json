@@ -1,0 +1,370 @@
+{
+  "schema_version": "market-data-resource-comparison/v1",
+  "stage": "S04",
+  "label": "candidate",
+  "fixture": {
+    "streams": 100,
+    "stored_coordinates": 102,
+    "seed_minutes": 2880,
+    "sparse_every": 7,
+    "bursts": 60,
+    "cadence_s": 0.2,
+    "buffer_rows": 1000,
+    "flush_ms": 100,
+    "warmup_bursts": 3,
+    "post_drain_s": 5
+  },
+  "fixture_sha256": "43bb0e2e4f6c28bc4cbe07bb28a575d8aabfd7d3d0b24215e238fba26acfff8f",
+  "harness_sha256": "14fc6a6a98417138560d49003ebe63f8e07d66a0fc1b8f3943b7021e91bfd95e",
+  "python": "3.12.12",
+  "platform": "macOS-26.7-arm64-arm-64bit",
+  "source": "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s04-candidate-20261011",
+  "samples": [
+    {
+      "elapsed_s": 1.0364373750053346,
+      "worker_child_rss_bytes": 481984512,
+      "ch": {
+        "jemalloc.allocated": 321115584.0,
+        "MemoryResident": 531943424.0,
+        "MemoryTracking": 131321298
+      },
+      "parts": 36,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 771530752,
+      "pg_cgroup_bytes": 112312320
+    },
+    {
+      "elapsed_s": 2.128386792028323,
+      "worker_child_rss_bytes": 483016704,
+      "ch": {
+        "jemalloc.allocated": 316237248.0,
+        "MemoryResident": 535490560.0,
+        "MemoryTracking": 128040415
+      },
+      "parts": 25,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 776310784,
+      "pg_cgroup_bytes": 112992256
+    },
+    {
+      "elapsed_s": 3.233076875039842,
+      "worker_child_rss_bytes": 483753984,
+      "ch": {
+        "jemalloc.allocated": 304861024.0,
+        "MemoryResident": 538112000.0,
+        "MemoryTracking": 129002255
+      },
+      "parts": 26,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 780574720,
+      "pg_cgroup_bytes": 113287168
+    },
+    {
+      "elapsed_s": 4.343995750008617,
+      "worker_child_rss_bytes": 484884480,
+      "ch": {
+        "jemalloc.allocated": 294641416.0,
+        "MemoryResident": 539697152.0,
+        "MemoryTracking": 130100971
+      },
+      "parts": 29,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 780070912,
+      "pg_cgroup_bytes": 112377856
+    },
+    {
+      "elapsed_s": 5.454963417025283,
+      "worker_child_rss_bytes": 485736448,
+      "ch": {
+        "jemalloc.allocated": 290101736.0,
+        "MemoryResident": 534560768.0,
+        "MemoryTracking": 131036451
+      },
+      "parts": 30,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 778092544,
+      "pg_cgroup_bytes": 113487872
+    },
+    {
+      "elapsed_s": 6.564402625022922,
+      "worker_child_rss_bytes": 486195200,
+      "ch": {
+        "jemalloc.allocated": 279163048.0,
+        "MemoryResident": 541110272.0,
+        "MemoryTracking": 128788306
+      },
+      "parts": 33,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 781479936,
+      "pg_cgroup_bytes": 113070080
+    },
+    {
+      "elapsed_s": 7.66383316705469,
+      "worker_child_rss_bytes": 487194624,
+      "ch": {
+        "jemalloc.allocated": 275977136.0,
+        "MemoryResident": 538447872.0,
+        "MemoryTracking": 129752220
+      },
+      "parts": 29,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 784678912,
+      "pg_cgroup_bytes": 113655808
+    },
+    {
+      "elapsed_s": 8.772059542010538,
+      "worker_child_rss_bytes": 487915520,
+      "ch": {
+        "jemalloc.allocated": 270189544.0,
+        "MemoryResident": 542269440.0,
+        "MemoryTracking": 130849301
+      },
+      "parts": 33,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 780619776,
+      "pg_cgroup_bytes": 113696768
+    },
+    {
+      "elapsed_s": 9.877277542022057,
+      "worker_child_rss_bytes": 488374272,
+      "ch": {
+        "jemalloc.allocated": 264544832.0,
+        "MemoryResident": 533680128.0,
+        "MemoryTracking": 131766020
+      },
+      "parts": 33,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 777383936,
+      "pg_cgroup_bytes": 113205248
+    },
+    {
+      "elapsed_s": 10.988756167003885,
+      "worker_child_rss_bytes": 489914368,
+      "ch": {
+        "jemalloc.allocated": 259319016.0,
+        "MemoryResident": 518045696.0,
+        "MemoryTracking": 132865280
+      },
+      "parts": 37,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 771280896,
+      "pg_cgroup_bytes": 115023872
+    },
+    {
+      "elapsed_s": 12.09396445803577,
+      "worker_child_rss_bytes": 490749952,
+      "ch": {
+        "jemalloc.allocated": 254718632.0,
+        "MemoryResident": 520974336.0,
+        "MemoryTracking": 131910234
+      },
+      "parts": 37,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 782925824,
+      "pg_cgroup_bytes": 114573312
+    },
+    {
+      "elapsed_s": 13.195095375005621,
+      "worker_child_rss_bytes": 490749952,
+      "ch": {
+        "jemalloc.allocated": 249977680.0,
+        "MemoryResident": 530223104.0,
+        "MemoryTracking": 131817476
+      },
+      "parts": 37,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 784060416,
+      "pg_cgroup_bytes": 114888704
+    },
+    {
+      "elapsed_s": 14.298257375019602,
+      "worker_child_rss_bytes": 490749952,
+      "ch": {
+        "jemalloc.allocated": 249605552.0,
+        "MemoryResident": 509808640.0,
+        "MemoryTracking": 131918972
+      },
+      "parts": 37,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 763719680,
+      "pg_cgroup_bytes": 114089984
+    },
+    {
+      "elapsed_s": 15.41250229201978,
+      "worker_child_rss_bytes": 490749952,
+      "ch": {
+        "jemalloc.allocated": 249295360.0,
+        "MemoryResident": 491569152.0,
+        "MemoryTracking": 132020148
+      },
+      "parts": 37,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 748015616,
+      "pg_cgroup_bytes": 114237440
+    },
+    {
+      "elapsed_s": 16.523332833021414,
+      "worker_child_rss_bytes": 490749952,
+      "ch": {
+        "jemalloc.allocated": 246375632.0,
+        "MemoryResident": 494825472.0,
+        "MemoryTracking": 129273150
+      },
+      "parts": 37,
+      "merges": 0,
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 738992128,
+      "pg_cgroup_bytes": 113074176
+    },
+    {
+      "elapsed_s": 17.611570250010118,
+      "worker_child_rss_bytes": 490749952,
+      "ch": {
+        "jemalloc.allocated": 246357240.0,
+        "MemoryResident": 485736448.0,
+        "MemoryTracking": 129374198
+      },
+      "parts": 37,
+      "merges": 0,
+      "pg_connections": 0,
+      "ch_cgroup_bytes": 739303424,
+      "pg_cgroup_bytes": 111955968
+    }
+  ],
+  "failures": [],
+  "before_memory": {
+    "jemalloc.allocated": 326834768.0,
+    "MemoryResident": 526118912.0
+  },
+  "before_cgroups": {
+    "roehub-s04-pg": {
+      "memory.current": "110374912",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 1",
+      "cpu.stat": "usage_usec 62143916\nuser_usec 23178545\nsystem_usec 38965371\nnice_usec 0\nnr_periods 3078\nnr_throttled 2\nthrottled_usec 7132\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=30662656 wbytes=380973056 rios=752 wios=49370 dbytes=0 dios=0"
+    },
+    "roehub-s04-clickhouse-1": {
+      "memory.current": "768688128",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 879",
+      "cpu.stat": "usage_usec 72275791\nuser_usec 43885650\nsystem_usec 28390141\nnice_usec 0\nnr_periods 9146\nnr_throttled 74\nthrottled_usec 11201911\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=352198656 wbytes=975454208 rios=14658 wios=182246 dbytes=0 dios=0"
+    }
+  },
+  "pg_before": [
+    11,
+    0,
+    2
+  ],
+  "started_at": "2026-10-10T21:53:38.719296+00:00",
+  "child_cpu_before": 0.73,
+  "cpu_before": 0.9081109999999999,
+  "completion_s": 11.82129225000972,
+  "occupancy_peak": [
+    100,
+    100,
+    730000
+  ],
+  "loop": {
+    "p50_ms": 0.16008404782041907,
+    "p95_ms": 0.21175004076212645,
+    "p99_ms": 2.268749987706542
+  },
+  "loop_max_ms": 47.23166598705575,
+  "parent_cpu_s": 1.3691690000000003,
+  "child_cpu_s": 0.20999999999999996,
+  "family_cpu_s": 1.5791690000000003,
+  "ended_at": "2026-10-10T21:53:55.564620+00:00",
+  "post_drain_memory": {
+    "jemalloc.allocated": 246357240.0,
+    "MemoryResident": 485736448.0
+  },
+  "pg_after": [
+    136,
+    0,
+    2
+  ],
+  "arrived": 6000,
+  "accepted": 6000,
+  "acknowledged": 6000,
+  "pg_transactions": 125,
+  "pg_sessions_created": 0,
+  "pg_tx_per_candle": 0.020833333333333332,
+  "pg_sessions_per_candle": 0.0,
+  "receive_to_ack": {
+    "p50_ms": 126.38216698542237,
+    "p95_ms": 148.47995800664648,
+    "p99_ms": 161.80916700977832
+  },
+  "receipt_to_ack": {
+    "p50_ms": 112.87608300335705,
+    "p95_ms": 123.26966598629951,
+    "p99_ms": 125.72512502083555
+  },
+  "scheduled_to_ack": {
+    "p50_ms": 129.35179198393598,
+    "p95_ms": 150.04183299606666,
+    "p99_ms": 165.38425005273893
+  },
+  "dispatch_lag": {
+    "p50_ms": 2.7013750514015555,
+    "p95_ms": 6.1309170559979975,
+    "p99_ms": 6.815250031650066
+  },
+  "canonical_count": 6000,
+  "canonical_sha256": "ca0d810fc26118c01800770cb64c717b5a84c4606c94a0f4db99ccb04fc0d0e1",
+  "pending_after": 0,
+  "after_cgroups": {
+    "roehub-s04-pg": {
+      "memory.current": "109531136",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 1",
+      "cpu.stat": "usage_usec 62421566\nuser_usec 23341493\nsystem_usec 39080073\nnice_usec 0\nnr_periods 3219\nnr_throttled 2\nthrottled_usec 7132\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=30662656 wbytes=385224704 rios=752 wios=49618 dbytes=0 dios=0"
+    },
+    "roehub-s04-clickhouse-1": {
+      "memory.current": "742711296",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 879",
+      "cpu.stat": "usage_usec 73728729\nuser_usec 44815452\nsystem_usec 28913277\nnice_usec 0\nnr_periods 9338\nnr_throttled 74\nthrottled_usec 11201911\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=352538624 wbytes=1050890240 rios=14741 wios=196066 dbytes=0 dios=0"
+    }
+  },
+  "query_metrics": [
+    [
+      "QueryStart",
+      120,
+      0,
+      0,
+      0
+    ],
+    [
+      "QueryFinish",
+      120,
+      19020,
+      2173200,
+      5770669
+    ]
+  ],
+  "checks": {
+    "all_accepted": true,
+    "canonical_content": true,
+    "all_acknowledged": true,
+    "all_canonical": true,
+    "empty_journal": true,
+    "bounded_rows": true,
+    "bounded_bytes": true,
+    "samples_ok": true
+  }
+}

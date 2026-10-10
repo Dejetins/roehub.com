@@ -1,0 +1,39 @@
+F..............                                                          [100%]
+=================================== FAILURES ===================================
+_______________ test_real_grants_mv_and_normal_scheduler_funding _______________
+
+workloads = (<clickhouse_connect.driver.httpclient.HttpClient object at 0x110207320>, 'resource_s02_grants_4c6a5c45c915451489d0a03....HttpClient object at 0x110609a60>, 'stream': <clickhouse_connect.driver.httpclient.HttpClient object at 0x110555a60>})
+
+    def test_real_grants_mv_and_normal_scheduler_funding(workloads):
+        admin, db, clients = workloads
+        for w in ("stream", "backfill"):
+>           raw_insert(clients[w], db, "BTCUSDT", 29453760, 2, "s02_grants")
+
+tests/real_infra/market_data/test_clickhouse_workloads.py:70: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tools/qa/market_data_mixed_load.py:118: in raw_insert
+    client.command(
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/httpclient.py:325: in command
+    cmd, params = bind_query(cmd, parameters, self.server_tz)
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/binding.py:79: in bind_query
+    query, bound_params = finalize_query(query, final_params, server_tz), {}
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+query = "INSERT INTO resource_s02_grants_4c6a5c45c915451489d0a035ef17e899.raw_binance_klines_1m (market_id,symbol,instrument_k...4((%(minute)s+number+1)*60,3,'UTC'),1,1,1,1,1,1,1,1,1,'rest' FROM numbers(%(count)s) WHERE %(sparse)s=0 OR number%7!=0"
+parameters = {'count': 2, 'minute': 29453760, 'sparse': 0, 'symbol': 'BTCUSDT'}
+server_tz = <UTC>
+
+    def finalize_query(query: str, parameters: Optional[Union[Sequence, Dict[str, Any]]],
+                       server_tz: Optional[tzinfo] = None) -> str:
+        while query.endswith(';'):
+            query = query[:-1]
+        if not parameters:
+            return query
+        if hasattr(parameters, 'items'):
+>           return query % {k: format_query_value(v, server_tz) for k, v in parameters.items()}
+E           TypeError: not enough arguments for format string
+
+.venv/lib/python3.12/site-packages/clickhouse_connect/driver/binding.py:48: TypeError
+=========================== short test summary info ============================
+FAILED tests/real_infra/market_data/test_clickhouse_workloads.py::test_real_grants_mv_and_normal_scheduler_funding
+1 failed, 14 passed in 1.35s

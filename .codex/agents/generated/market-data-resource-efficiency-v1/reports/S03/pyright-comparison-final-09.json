@@ -1,0 +1,10 @@
+{
+  "reference": "pyright-07.json (54 baseline-equivalent errors)",
+  "candidate": "pyright-final-09.json",
+  "reference_count": 54,
+  "candidate_count": 54,
+  "added": [],
+  "removed": [],
+  "comparison": "multiset excluding line-position changes",
+  "full_type_gate": "failed"
+}

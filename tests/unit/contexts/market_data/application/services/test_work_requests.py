@@ -7,6 +7,9 @@ from uuid import uuid4
 
 import pytest
 
+from trading.contexts.market_data.application.ports.stores.history_coverage_reader import (
+    HistoryCoverageReader,
+)
 from trading.contexts.market_data.application.services.work_requests import (
     MarketDataWorkRequestRunner,
     WorkRequest,
@@ -36,6 +39,7 @@ def test_work_request_bounds_reject_unsupported_or_unclosed_ranges():
 class Fill:
     run: object
     writer: object = None
+    check_lease: object = None
 
 
 class Store:
@@ -207,14 +211,20 @@ def test_temporary_error_keeps_checkpoint_and_provider_cooldown():
 def test_transient_checkpoint_failure_retries_without_turning_into_terminal_failure(caplog):
     store = Store()
     original = store.checkpoint
+
     def checkpoint(**kwargs):
         if kwargs["units"] == 60:
             raise ConnectionError("private-connection-details")
         return original(**kwargs)
+
     store.checkpoint = checkpoint
     runner = MarketDataWorkRequestRunner(
-        store, cast(RestFillRange1mUseCase, Fill(lambda _: SimpleNamespace(
-            rows_read=60, rows_written=60))), lambda *_: None, now=lambda: NOW,
+        store,
+        cast(
+            RestFillRange1mUseCase, Fill(lambda _: SimpleNamespace(rows_read=60, rows_written=60))
+        ),
+        lambda *_: None,
+        now=lambda: NOW,
         retryable_storage_error=lambda e: isinstance(e, ConnectionError),
     )
     runner.run_once()
@@ -232,6 +242,7 @@ def test_runtime_storage_classifier_excludes_permanent_errors():
     from apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler import (
         _retryable_work_storage_error,
     )
+
     for error in [psycopg.OperationalError(), OperationalError(), TimeoutError()]:
         assert _retryable_work_storage_error(error)
     for error in [psycopg.errors.InvalidPassword(), psycopg.errors.SyntaxError(), ValueError()]:
@@ -244,8 +255,11 @@ def test_clickhouse_memory_error_recovers_but_schema_and_auth_errors_do_not():
     from apps.scheduler.market_data_scheduler.wiring.modules.market_data_scheduler import (
         _retryable_work_storage_error,
     )
-    for error in [DatabaseError('Code: 241. memory limit'),
-                  DatabaseError('HTTPDriver for private-url received ClickHouse error code 241')]:
+
+    for error in [
+        DatabaseError("Code: 241. memory limit"),
+        DatabaseError("HTTPDriver for private-url received ClickHouse error code 241"),
+    ]:
         store = Store()
         store.job.update(completed_units=60, rows_read=60, rows_written=60)
         seen = []
@@ -255,25 +269,29 @@ def test_clickhouse_memory_error_recovers_but_schema_and_auth_errors_do_not():
             raise error
 
         runner = MarketDataWorkRequestRunner(
-            store, cast(RestFillRange1mUseCase, Fill(fill)), lambda *_: None,
-            now=lambda: NOW, retryable_storage_error=_retryable_work_storage_error,
+            store,
+            cast(RestFillRange1mUseCase, Fill(fill)),
+            lambda *_: None,
+            now=lambda: NOW,
+            retryable_storage_error=_retryable_work_storage_error,
         )
         runner.run_once()
-        assert seen == [store.job['start_at'] + timedelta(minutes=60)]
+        assert seen == [store.job["start_at"] + timedelta(minutes=60)]
         assert store.outcome is not None
-        assert store.outcome['error_code'] == 'storage_memory_pressure'
-        assert store.outcome['job']['error_phase'] == 'fill_window'
-        assert store.states[-1]['units'] == 60
+        assert store.outcome["error_code"] == "storage_memory_pressure"
+        assert store.outcome["job"]["error_phase"] == "fill_window"
+        assert store.states[-1]["units"] == 60
     for code in [60, 62, 81, 516, 497]:
         for cls in [DatabaseError, OperationalError]:
-            assert not _retryable_work_storage_error(cls(f'Code: {code}. permanent'))
-    assert not _retryable_work_storage_error(DatabaseError('unknown failure'))
+            assert not _retryable_work_storage_error(cls(f"Code: {code}. permanent"))
+    assert not _retryable_work_storage_error(DatabaseError("unknown failure"))
 
 
 def test_bounded_larger_window_preserves_cursor_and_yields_after_confirmed_insert():
     store = Store()
-    store.job.update(start_at=NOW-timedelta(days=3), completed_units=75,
-                     rows_read=75, rows_written=75)
+    store.job.update(
+        start_at=NOW - timedelta(days=3), completed_units=75, rows_read=75, rows_written=75
+    )
     windows = []
 
     def fill(task):
@@ -281,11 +299,78 @@ def test_bounded_larger_window_preserves_cursor_and_yields_after_confirmed_inser
         return SimpleNamespace(rows_read=1440, rows_written=1440)
 
     runner = MarketDataWorkRequestRunner(
-        store, cast(RestFillRange1mUseCase, Fill(fill)), lambda *_: None, now=lambda: NOW,
-        window_minutes=1440, max_windows=1,
+        store,
+        cast(RestFillRange1mUseCase, Fill(fill)),
+        lambda *_: None,
+        now=lambda: NOW,
+        window_minutes=1440,
+        max_windows=1,
     )
     runner.run_once()
     assert len(windows) == 1
-    assert windows[0].start.value == NOW-timedelta(days=3)+timedelta(minutes=75)
-    assert store.job['completed_units'] == 1515
-    assert store.job['rows_written'] == 1515
+    assert windows[0].start.value == NOW - timedelta(days=3) + timedelta(minutes=75)
+    assert store.job["completed_units"] == 1515
+    assert store.job["rows_written"] == 1515
+
+
+def test_repair_skips_confirmed_prefix_and_reads_only_gap_before_finishing():
+    from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
+
+    store = Store()
+    store.job["start_at"] = NOW - timedelta(days=700)
+    missing = True
+    calls = []
+
+    def gap(**kwargs):
+        return (
+            TimeRange(UtcTimestamp(NOW - timedelta(minutes=1)), UtcTimestamp(NOW))
+            if missing
+            else None
+        )
+
+    def fill(task):
+        nonlocal missing
+        calls.append(task.time_range)
+        missing = False
+        return SimpleNamespace(rows_read=1, rows_written=1)
+
+    runner = MarketDataWorkRequestRunner(
+        store,
+        cast(RestFillRange1mUseCase, Fill(fill)),
+        lambda *_: None,
+        now=lambda: NOW,
+        repair_index=cast(HistoryCoverageReader, SimpleNamespace(first_gap=gap)),
+    )
+    runner.run_once()
+    assert len(calls) == 1
+    assert calls[0].start.value == NOW - timedelta(minutes=1)
+    assert store.states[-1]["units"] == 700 * 1440
+    assert store.states[-1]["rows_written"] == 1
+    assert store.outcome is not None
+    assert store.outcome["state"] == "succeeded"
+
+
+def test_unavailable_gap_retries_without_acknowledging_then_stops_with_reason():
+    from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
+
+    store = Store()
+    store.job["end_at"] = store.job["start_at"] + timedelta(minutes=1)
+    gap = TimeRange(UtcTimestamp(store.job["start_at"]), UtcTimestamp(store.job["end_at"]))
+    runner = MarketDataWorkRequestRunner(
+        store,
+        cast(RestFillRange1mUseCase, Fill(lambda _: SimpleNamespace(rows_read=0, rows_written=0))),
+        lambda *_: None,
+        now=lambda: NOW,
+        repair_index=cast(HistoryCoverageReader, SimpleNamespace(first_gap=lambda **kw: gap)),
+    )
+    runner.run_once()
+    assert store.outcome is not None
+    assert store.outcome["state"] == "retry_wait"
+    assert store.outcome["error_code"] == "source_history_incomplete"
+    assert store.states[-1]["units"] == 0
+    store.job["retry_count"] = 3
+    store.job["error_code"] = "source_history_incomplete"
+    runner.run_once()
+    assert store.outcome is not None
+    assert store.outcome["state"] == "failed"
+    assert store.outcome["error_code"] == "source_history_incomplete"

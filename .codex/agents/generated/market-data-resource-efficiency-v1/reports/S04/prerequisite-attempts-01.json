@@ -1,0 +1,1 @@
+{"unit_initial":"27 tests progressed, warmup fixture constructed object without new async lease field; interrupted stuck fixture and updated it", "CH_compose_initial":"unhealthy because current schema-dependent healthcheck ran before fixture DDL; server running; initialize owned disposable schema before recheck"}

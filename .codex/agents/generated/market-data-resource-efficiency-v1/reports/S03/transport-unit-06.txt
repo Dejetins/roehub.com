@@ -1,0 +1,380 @@
+....FFFFFFF.F..                                                          [100%]
+=================================== FAILURES ===================================
+_______ test_network_loss_retries_reacquire_and_never_refund_sent_quota ________
+
+harness = namespace(call=<function harness.<locals>.call at 0x1081d3ce0>, responses=[('temporary',), ('temporary',), ('temporary...pClient object at 0x107d32a50>, reserved=[namespace(provider='binance')], completed=[{'headers': {}, 'cooldown_s': 0}])
+
+    def test_network_loss_retries_reacquire_and_never_refund_sent_quota(harness):
+        harness.responses.extend([('temporary',)] * 3)
+        with pytest.raises(TemporarySourceError, match='source_unavailable'):
+>           harness.call()
+
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:38: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:28: in call
+    return http.get_json(url='https://source.invalid/candles', params={}, timeout_s=1,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trading.contexts.market_data.adapters.outbound.clients.common_http.http_client.RequestsHttpClient object at 0x107d32a50>
+
+    def get_json(
+        self, *, url: str, params: Mapping[str, Any], timeout_s: float, retries: int,
+        backoff_base_s: float, backoff_max_s: float, backoff_jitter_s: float,
+    ) -> HttpResponse:
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
+            raise ValueError('positive_finite_http_deadline_required')
+        if self.admission is None or self.policy is None:
+            raise RuntimeError('shared_provider_admission_required')
+        deadline = time.monotonic() + timeout_s
+        for attempt in range(retries + 1):
+            if time.monotonic() >= deadline:
+                raise TemporarySourceError()
+            check_provider_io_owner()
+            permit = self.admission.reserve(self.policy.request(url, params))
+            headers = {}
+            cooldown = 0
+            transport = None
+            try:
+                def check():
+                    check_provider_io_owner()
+                    permit.check()
+>               transport = self._transport(deadline, check)
+E               TypeError: harness.<locals>.<lambda>() takes 0 positional arguments but 2 were given
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:126: TypeError
+_ test_temporary_codes_and_shared_cooldown[429-body0-headers0-source_rate_limited-120] _
+
+harness = namespace(call=<function harness.<locals>.call at 0x1082bad40>, responses=[('ok', 429, {'Retry-After': '120'}, {}), ('...pClient object at 0x1082aacc0>, reserved=[namespace(provider='binance')], completed=[{'headers': {}, 'cooldown_s': 0}])
+status = 429, body = {}, headers = {'Retry-After': '120'}
+code = 'source_rate_limited', after = 120
+
+    @pytest.mark.parametrize('status,body,headers,code,after', [
+        (429, {}, {'Retry-After': '120'}, 'source_rate_limited', 120),
+        (503, {}, {'Retry-After': '30'}, 'source_unavailable', 30),
+        (200, {'retCode': 10006}, {'Retry-After': '60'}, 'source_rate_limited', 60),
+        (200, {'retCode': 10016}, {}, 'source_unavailable', 0),
+    ])
+    def test_temporary_codes_and_shared_cooldown(harness, status, body, headers, code, after):
+        harness.responses.extend([('ok', status, headers, body)] * 3)
+        with pytest.raises(TemporarySourceError) as caught:
+>           harness.call()
+
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:28: in call
+    return http.get_json(url='https://source.invalid/candles', params={}, timeout_s=1,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trading.contexts.market_data.adapters.outbound.clients.common_http.http_client.RequestsHttpClient object at 0x1082aacc0>
+
+    def get_json(
+        self, *, url: str, params: Mapping[str, Any], timeout_s: float, retries: int,
+        backoff_base_s: float, backoff_max_s: float, backoff_jitter_s: float,
+    ) -> HttpResponse:
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
+            raise ValueError('positive_finite_http_deadline_required')
+        if self.admission is None or self.policy is None:
+            raise RuntimeError('shared_provider_admission_required')
+        deadline = time.monotonic() + timeout_s
+        for attempt in range(retries + 1):
+            if time.monotonic() >= deadline:
+                raise TemporarySourceError()
+            check_provider_io_owner()
+            permit = self.admission.reserve(self.policy.request(url, params))
+            headers = {}
+            cooldown = 0
+            transport = None
+            try:
+                def check():
+                    check_provider_io_owner()
+                    permit.check()
+>               transport = self._transport(deadline, check)
+E               TypeError: harness.<locals>.<lambda>() takes 0 positional arguments but 2 were given
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:126: TypeError
+_ test_temporary_codes_and_shared_cooldown[503-body1-headers1-source_unavailable-30] _
+
+harness = namespace(call=<function harness.<locals>.call at 0x1082bb100>, responses=[('ok', 503, {'Retry-After': '30'}, {}), ('o...pClient object at 0x1082a89b0>, reserved=[namespace(provider='binance')], completed=[{'headers': {}, 'cooldown_s': 0}])
+status = 503, body = {}, headers = {'Retry-After': '30'}
+code = 'source_unavailable', after = 30
+
+    @pytest.mark.parametrize('status,body,headers,code,after', [
+        (429, {}, {'Retry-After': '120'}, 'source_rate_limited', 120),
+        (503, {}, {'Retry-After': '30'}, 'source_unavailable', 30),
+        (200, {'retCode': 10006}, {'Retry-After': '60'}, 'source_rate_limited', 60),
+        (200, {'retCode': 10016}, {}, 'source_unavailable', 0),
+    ])
+    def test_temporary_codes_and_shared_cooldown(harness, status, body, headers, code, after):
+        harness.responses.extend([('ok', status, headers, body)] * 3)
+        with pytest.raises(TemporarySourceError) as caught:
+>           harness.call()
+
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:28: in call
+    return http.get_json(url='https://source.invalid/candles', params={}, timeout_s=1,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trading.contexts.market_data.adapters.outbound.clients.common_http.http_client.RequestsHttpClient object at 0x1082a89b0>
+
+    def get_json(
+        self, *, url: str, params: Mapping[str, Any], timeout_s: float, retries: int,
+        backoff_base_s: float, backoff_max_s: float, backoff_jitter_s: float,
+    ) -> HttpResponse:
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
+            raise ValueError('positive_finite_http_deadline_required')
+        if self.admission is None or self.policy is None:
+            raise RuntimeError('shared_provider_admission_required')
+        deadline = time.monotonic() + timeout_s
+        for attempt in range(retries + 1):
+            if time.monotonic() >= deadline:
+                raise TemporarySourceError()
+            check_provider_io_owner()
+            permit = self.admission.reserve(self.policy.request(url, params))
+            headers = {}
+            cooldown = 0
+            transport = None
+            try:
+                def check():
+                    check_provider_io_owner()
+                    permit.check()
+>               transport = self._transport(deadline, check)
+E               TypeError: harness.<locals>.<lambda>() takes 0 positional arguments but 2 were given
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:126: TypeError
+_ test_temporary_codes_and_shared_cooldown[200-body2-headers2-source_rate_limited-60] _
+
+harness = namespace(call=<function harness.<locals>.call at 0x1082bb880>, responses=[('ok', 200, {'Retry-After': '60'}, {'retCod...pClient object at 0x1082a9af0>, reserved=[namespace(provider='binance')], completed=[{'headers': {}, 'cooldown_s': 0}])
+status = 200, body = {'retCode': 10006}, headers = {'Retry-After': '60'}
+code = 'source_rate_limited', after = 60
+
+    @pytest.mark.parametrize('status,body,headers,code,after', [
+        (429, {}, {'Retry-After': '120'}, 'source_rate_limited', 120),
+        (503, {}, {'Retry-After': '30'}, 'source_unavailable', 30),
+        (200, {'retCode': 10006}, {'Retry-After': '60'}, 'source_rate_limited', 60),
+        (200, {'retCode': 10016}, {}, 'source_unavailable', 0),
+    ])
+    def test_temporary_codes_and_shared_cooldown(harness, status, body, headers, code, after):
+        harness.responses.extend([('ok', status, headers, body)] * 3)
+        with pytest.raises(TemporarySourceError) as caught:
+>           harness.call()
+
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:28: in call
+    return http.get_json(url='https://source.invalid/candles', params={}, timeout_s=1,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trading.contexts.market_data.adapters.outbound.clients.common_http.http_client.RequestsHttpClient object at 0x1082a9af0>
+
+    def get_json(
+        self, *, url: str, params: Mapping[str, Any], timeout_s: float, retries: int,
+        backoff_base_s: float, backoff_max_s: float, backoff_jitter_s: float,
+    ) -> HttpResponse:
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
+            raise ValueError('positive_finite_http_deadline_required')
+        if self.admission is None or self.policy is None:
+            raise RuntimeError('shared_provider_admission_required')
+        deadline = time.monotonic() + timeout_s
+        for attempt in range(retries + 1):
+            if time.monotonic() >= deadline:
+                raise TemporarySourceError()
+            check_provider_io_owner()
+            permit = self.admission.reserve(self.policy.request(url, params))
+            headers = {}
+            cooldown = 0
+            transport = None
+            try:
+                def check():
+                    check_provider_io_owner()
+                    permit.check()
+>               transport = self._transport(deadline, check)
+E               TypeError: harness.<locals>.<lambda>() takes 0 positional arguments but 2 were given
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:126: TypeError
+_ test_temporary_codes_and_shared_cooldown[200-body3-headers3-source_unavailable-0] _
+
+harness = namespace(call=<function harness.<locals>.call at 0x10796bba0>, responses=[('ok', 200, {}, {'retCode': 10016}), ('ok',...pClient object at 0x1081b3dd0>, reserved=[namespace(provider='binance')], completed=[{'headers': {}, 'cooldown_s': 0}])
+status = 200, body = {'retCode': 10016}, headers = {}
+code = 'source_unavailable', after = 0
+
+    @pytest.mark.parametrize('status,body,headers,code,after', [
+        (429, {}, {'Retry-After': '120'}, 'source_rate_limited', 120),
+        (503, {}, {'Retry-After': '30'}, 'source_unavailable', 30),
+        (200, {'retCode': 10006}, {'Retry-After': '60'}, 'source_rate_limited', 60),
+        (200, {'retCode': 10016}, {}, 'source_unavailable', 0),
+    ])
+    def test_temporary_codes_and_shared_cooldown(harness, status, body, headers, code, after):
+        harness.responses.extend([('ok', status, headers, body)] * 3)
+        with pytest.raises(TemporarySourceError) as caught:
+>           harness.call()
+
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:28: in call
+    return http.get_json(url='https://source.invalid/candles', params={}, timeout_s=1,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trading.contexts.market_data.adapters.outbound.clients.common_http.http_client.RequestsHttpClient object at 0x1081b3dd0>
+
+    def get_json(
+        self, *, url: str, params: Mapping[str, Any], timeout_s: float, retries: int,
+        backoff_base_s: float, backoff_max_s: float, backoff_jitter_s: float,
+    ) -> HttpResponse:
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
+            raise ValueError('positive_finite_http_deadline_required')
+        if self.admission is None or self.policy is None:
+            raise RuntimeError('shared_provider_admission_required')
+        deadline = time.monotonic() + timeout_s
+        for attempt in range(retries + 1):
+            if time.monotonic() >= deadline:
+                raise TemporarySourceError()
+            check_provider_io_owner()
+            permit = self.admission.reserve(self.policy.request(url, params))
+            headers = {}
+            cooldown = 0
+            transport = None
+            try:
+                def check():
+                    check_provider_io_owner()
+                    permit.check()
+>               transport = self._transport(deadline, check)
+E               TypeError: harness.<locals>.<lambda>() takes 0 positional arguments but 2 were given
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:126: TypeError
+_____ test_permanent_http_error_is_not_retried_and_payload_is_not_exposed ______
+
+harness = namespace(call=<function harness.<locals>.call at 0x1082bafc0>, responses=[('ok', 400, {}, 'sensitive-payload')], sent...pClient object at 0x1082a93a0>, reserved=[namespace(provider='binance')], completed=[{'headers': {}, 'cooldown_s': 0}])
+
+    def test_permanent_http_error_is_not_retried_and_payload_is_not_exposed(harness):
+        harness.responses.append(('ok', 400, {}, 'sensitive-payload'))
+        with pytest.raises(RuntimeError, match='^source_http_400$'):
+>           harness.call()
+
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:59: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:28: in call
+    return http.get_json(url='https://source.invalid/candles', params={}, timeout_s=1,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trading.contexts.market_data.adapters.outbound.clients.common_http.http_client.RequestsHttpClient object at 0x1082a93a0>
+
+    def get_json(
+        self, *, url: str, params: Mapping[str, Any], timeout_s: float, retries: int,
+        backoff_base_s: float, backoff_max_s: float, backoff_jitter_s: float,
+    ) -> HttpResponse:
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
+            raise ValueError('positive_finite_http_deadline_required')
+        if self.admission is None or self.policy is None:
+            raise RuntimeError('shared_provider_admission_required')
+        deadline = time.monotonic() + timeout_s
+        for attempt in range(retries + 1):
+            if time.monotonic() >= deadline:
+                raise TemporarySourceError()
+            check_provider_io_owner()
+            permit = self.admission.reserve(self.policy.request(url, params))
+            headers = {}
+            cooldown = 0
+            transport = None
+            try:
+                def check():
+                    check_provider_io_owner()
+                    permit.check()
+>               transport = self._transport(deadline, check)
+E               TypeError: harness.<locals>.<lambda>() takes 0 positional arguments but 2 were given
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:126: TypeError
+_______ test_invalid_json_has_bounded_retries_without_endless_job_retry ________
+
+harness = namespace(call=<function harness.<locals>.call at 0x1083642c0>, responses=[('ok', 200, {}, None), ('ok', 200, {}, None...pClient object at 0x1082aa9f0>, reserved=[namespace(provider='binance')], completed=[{'headers': {}, 'cooldown_s': 0}])
+
+    def test_invalid_json_has_bounded_retries_without_endless_job_retry(harness):
+        harness.responses.extend([('ok', 200, {}, None)]*2 + [('ok', 200, {}, [])])
+>       assert harness.call().body == [] and len(harness.sent) == 3
+
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:66: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:28: in call
+    return http.get_json(url='https://source.invalid/candles', params={}, timeout_s=1,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trading.contexts.market_data.adapters.outbound.clients.common_http.http_client.RequestsHttpClient object at 0x1082aa9f0>
+
+    def get_json(
+        self, *, url: str, params: Mapping[str, Any], timeout_s: float, retries: int,
+        backoff_base_s: float, backoff_max_s: float, backoff_jitter_s: float,
+    ) -> HttpResponse:
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
+            raise ValueError('positive_finite_http_deadline_required')
+        if self.admission is None or self.policy is None:
+            raise RuntimeError('shared_provider_admission_required')
+        deadline = time.monotonic() + timeout_s
+        for attempt in range(retries + 1):
+            if time.monotonic() >= deadline:
+                raise TemporarySourceError()
+            check_provider_io_owner()
+            permit = self.admission.reserve(self.policy.request(url, params))
+            headers = {}
+            cooldown = 0
+            transport = None
+            try:
+                def check():
+                    check_provider_io_owner()
+                    permit.check()
+>               transport = self._transport(deadline, check)
+E               TypeError: harness.<locals>.<lambda>() takes 0 positional arguments but 2 were given
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:126: TypeError
+_________________ test_bybit_ban_preserves_longer_retry_after __________________
+
+harness = namespace(call=<function harness.<locals>.call at 0x108364b80>, responses=[('ok', 403, {'Retry-After': '1200'}, {})], ...ttpClient object at 0x1082abf20>, reserved=[namespace(provider='bybit')], completed=[{'headers': {}, 'cooldown_s': 0}])
+
+    def test_bybit_ban_preserves_longer_retry_after(harness):
+        harness.http.policy = SimpleNamespace(request=lambda *_: SimpleNamespace(provider='bybit'))
+        harness.responses.append(('ok', 403, {'Retry-After': '1200'}, {}))
+        with pytest.raises(TemporarySourceError) as caught:
+>           harness.call()
+
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:86: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+tests/unit/contexts/market_data/adapters/test_http_source_retry.py:28: in call
+    return http.get_json(url='https://source.invalid/candles', params={}, timeout_s=1,
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <trading.contexts.market_data.adapters.outbound.clients.common_http.http_client.RequestsHttpClient object at 0x1082abf20>
+
+    def get_json(
+        self, *, url: str, params: Mapping[str, Any], timeout_s: float, retries: int,
+        backoff_base_s: float, backoff_max_s: float, backoff_jitter_s: float,
+    ) -> HttpResponse:
+        if not math.isfinite(timeout_s) or timeout_s <= 0:
+            raise ValueError('positive_finite_http_deadline_required')
+        if self.admission is None or self.policy is None:
+            raise RuntimeError('shared_provider_admission_required')
+        deadline = time.monotonic() + timeout_s
+        for attempt in range(retries + 1):
+            if time.monotonic() >= deadline:
+                raise TemporarySourceError()
+            check_provider_io_owner()
+            permit = self.admission.reserve(self.policy.request(url, params))
+            headers = {}
+            cooldown = 0
+            transport = None
+            try:
+                def check():
+                    check_provider_io_owner()
+                    permit.check()
+>               transport = self._transport(deadline, check)
+E               TypeError: harness.<locals>.<lambda>() takes 0 positional arguments but 2 were given
+
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:126: TypeError
+=========================== short test summary info ============================
+FAILED tests/unit/contexts/market_data/adapters/test_http_source_retry.py::test_network_loss_retries_reacquire_and_never_refund_sent_quota
+FAILED tests/unit/contexts/market_data/adapters/test_http_source_retry.py::test_temporary_codes_and_shared_cooldown[429-body0-headers0-source_rate_limited-120]
+FAILED tests/unit/contexts/market_data/adapters/test_http_source_retry.py::test_temporary_codes_and_shared_cooldown[503-body1-headers1-source_unavailable-30]
+FAILED tests/unit/contexts/market_data/adapters/test_http_source_retry.py::test_temporary_codes_and_shared_cooldown[200-body2-headers2-source_rate_limited-60]
+FAILED tests/unit/contexts/market_data/adapters/test_http_source_retry.py::test_temporary_codes_and_shared_cooldown[200-body3-headers3-source_unavailable-0]
+FAILED tests/unit/contexts/market_data/adapters/test_http_source_retry.py::test_permanent_http_error_is_not_retried_and_payload_is_not_exposed
+FAILED tests/unit/contexts/market_data/adapters/test_http_source_retry.py::test_invalid_json_has_bounded_retries_without_endless_job_retry
+FAILED tests/unit/contexts/market_data/adapters/test_http_source_retry.py::test_bybit_ban_preserves_longer_retry_after
+8 failed, 7 passed in 0.20s

@@ -1,0 +1,22 @@
+{
+  "modified_baseline_paths": [
+    "tools/qa/navigator_preview.py",
+    "apps/navigator-web/src/client-routes.ts",
+    "apps/navigator-web/src/builder-api.ts",
+    "apps/navigator-web/src/builder.tsx",
+    "apps/navigator-web/src/settings-page.tsx"
+  ],
+  "new_owned_paths": [
+    "apps/navigator-web/src/storage-api.ts",
+    "apps/navigator-web/src/storage-settings.tsx",
+    "apps/navigator-web/src/storage-settings.css",
+    "apps/navigator-web/src/storage-settings.test.tsx",
+    "apps/navigator-web/src/backtest-readiness.tsx",
+    "apps/navigator-web/src/backtest-readiness.test.tsx",
+    "apps/navigator-web/e2e/storage_fixture.py",
+    "apps/navigator-web/e2e/storage_preflight.py"
+  ],
+  "foreign_baseline_changes": [],
+  "platform_web_unchanged": true,
+  "comparison": "Every path in S08-baseline.json rehashed. Pack lifecycle/reports outside git inventory separately governed by stage updater."
+}

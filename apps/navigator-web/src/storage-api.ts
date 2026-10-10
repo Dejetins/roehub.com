@@ -1,0 +1,13 @@
+import {z} from 'zod';
+import {requestJson} from './api';
+import {scheduleSchema} from './artifacts-api';
+export const storageSchema=z.object({state:z.enum(['ready','validated','configured','relocation_required','preview','cleaned','busy','preview_stale','unknown']),root_id:z.string(),control_version:z.number(),root_revision:z.number(),path:z.string().nullable(),free_bytes:z.number().nullable(),used_bytes:z.number().nullable(),budget_bytes:z.number().nullable(),validation_id:z.string().nullable(),preview_id:z.string().nullable(),expires_at:z.string().nullable(),eligible_bytes:z.number().nullable(),schedule:scheduleSchema.nullable(),cleanup_policy:z.literal('explicit_inactive_unpinned')});
+export type Storage=z.infer<typeof storageSchema>;
+const accessSchema=z.object({organization_id:z.string(),installation_owner:z.boolean(),recent_auth:z.boolean(),permissions:z.array(z.string())});
+export const readStorageOrganizations=(signal?:AbortSignal)=>requestJson('/api/v1/organizations',z.array(z.object({organization:z.object({organization_id:z.string(),display_name:z.string()}),permissions:z.array(z.string())})),{signal}).then(r=>r.data);
+export const readStorageAccess=(org:string,signal?:AbortSignal)=>requestJson(`/api/v1/admin/organizations/${encodeURIComponent(org)}/snapshot`,accessSchema,{signal}).then(r=>r.data);
+export const readPublicStorage=(signal?:AbortSignal)=>requestJson('/api/backtest-artifacts/storage',z.object({location_label:z.string(),state:z.string()}),{signal}).then(r=>r.data);
+const prefix=(org:string)=>`/api/v1/admin/organizations/${encodeURIComponent(org)}/backtest-artifacts/storage`;
+export const readStorage=(org:string,signal?:AbortSignal)=>requestJson(prefix(org),storageSchema,{signal}).then(r=>r.data);
+export type StorageCommand={action:'validate'|'configure'|'cleanup_preview'|'cleanup_confirm';expected_version:number;root_id:string;validation_id?:string;preview_id?:string;budget_bytes?:number;schedule?:NonNullable<Storage['schedule']>;coordinate?:{exchange:string;market_type:string;symbol:string};slot?:'slot_a'|'slot_b'};
+export const storageCommand=(org:string,body:StorageCommand,key:string,signal?:AbortSignal)=>requestJson(prefix(org)+({validate:'/validate',configure:'',cleanup_preview:'/cleanup:preview',cleanup_confirm:'/cleanup:confirm'}[body.action]),storageSchema,{method:body.action==='configure'?'PUT':'POST',body,idempotencyKey:key,signal}).then(r=>r.data);

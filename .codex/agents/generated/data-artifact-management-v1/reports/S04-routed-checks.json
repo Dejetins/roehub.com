@@ -1,0 +1,26 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "tests/unit/contexts/backtest_artifacts",
+    "tests/unit/contexts/backtest/adapters/outbound/cache_fs",
+    "tests/unit/contexts/backtest/adapters/outbound/artifacts_fs",
+    "tests/unit/contexts/backtest/adapters/test_backtest_artifacts_runtime_config.py",
+    "tests/unit/contexts/backtest/adapters/test_indicators_yaml_defaults_provider.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_yaml_backtest_artifact_loader_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py",
+    "tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py",
+    "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py",
+    "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+    "tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_input_recipe_contracts.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_input_recipe_replay.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_backtest_preflight_service.py"
+  ],
+  "exit_code": 0,
+  "output": "........................................................................ [ 15%]\n........................................................................ [ 30%]\n........................................................................ [ 45%]\n........................................................................ [ 60%]\n........................................................................ [ 76%]\n........................................................................ [ 91%]\n.........................................                                [100%]\n473 passed in 98.64s (0:01:38)\n"
+}

@@ -1,0 +1,16 @@
+$ uv run python -m tools.docs.generate_project_map
+OK: project map generated (5 artifacts)
+
+exit=0
+$ uv run python -m tools.docs.generate_project_map --check
+OK: project map up-to-date (5 artifacts)
+
+exit=0
+$ uv run python -m tools.docs.generate_docs_index --check
+OK: /Users/daniildegtyarev/Projects/roehub.com/docs/architecture/README.md is up-to-date.
+
+exit=0
+$ python3 /Users/daniildegtyarev/.codex/skills/prompt-manager/scripts/validate_pack.py --root /Users/daniildegtyarev/Projects/roehub.com --ledger /Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/iteration-ledger.md --check entry --stage S02 --executor s02-01a126e9-8273-7231-887b-b70303ac077c
+{"status": "pass", "check": "entry", "errors": [], "proof_boundary": "artifact-structure-and-file-binding"}
+
+exit=0

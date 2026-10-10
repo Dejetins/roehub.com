@@ -1,0 +1,42 @@
+"""Read-only reduction of all six final raw measurements; no trial selection."""
+import collections,hashlib,json,math,statistics
+from pathlib import Path
+out=Path('.codex/agents/generated/market-data-resource-efficiency-v1/reports/S02')
+def quantile(a,p):
+ a=sorted(a);x=(len(a)-1)*p;lo=math.floor(x);hi=math.ceil(x)
+ return a[lo]+(a[hi]-a[lo])*(x-lo)
+def io(lines):
+ counts=collections.Counter()
+ for line in lines:
+  for part in line.split():
+   if '=' in part:
+    k,v=part.split('=');counts[k]+=int(v)
+ return counts
+def cpu(lines):
+ for line in lines:
+  if line.startswith('usage_usec '):return int(line.split()[1])
+ return 0
+rows=[]
+for rep in (1,2,3):
+ for label in ('baseline','candidate'):
+  p=out/f'final-mixed-{rep}-{label}-02.json';d=json.loads(p.read_text())
+  assert not d['failures'] and len(d['lanes'])==6
+  ss=[s for s in d['samples'] if 60<=s['at_s']<360]
+  row={'rep':rep,'label':label,'raw':p.name,'raw_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'full_completion_s':d['full_completion_s'],'live_counts':d['live_counts'],'background_counts':d['background_counts'],'lanes':[]}
+  for lane in d['lanes']:
+   assert not lane.get('fatal') and not lane['failures'] and len(lane['operations'])==lane['offered']
+   ops=[o for o in lane['operations'] if 60<=o['offered_s']<360]
+   row['lanes'].append({'class':lane['workload'],'index':lane['index'],'offered':lane['offered'],'completed':len(lane['operations']),'steady_offered':len(ops),'p50_ms':quantile([o['latency_s']*1000 for o in ops],.5),'p95_ms':quantile([o['latency_s']*1000 for o in ops],.95),'p99_ms':quantile([o['latency_s']*1000 for o in ops],.99),'service_p99_ms':quantile([o['service_s']*1000 for o in ops],.99),'retry_codes':dict(collections.Counter(r['code'] for r in lane['retries'])),'completed_by_steady_end':sum(o['finished_s']<360 for o in lane['operations']),'last_completion_s':max(o['finished_s'] for o in lane['operations']),'scheduled_backoff_s':sum(sum(min(2,0.1*a)+lane['index']*0.037 for a in range(1,o['attempts'])) for o in lane['operations']),'queue_wait_peak_s':max(o['latency_s']-o['service_s'] for o in lane['operations']),'maxrss_bytes_macos':lane['client_maxrss'],'cpu_s':lane['client_cpu_s']})
+  row['server']={'tracked_peak_bytes':max(s['tracked'] for s in ss),'allocated_peak_bytes':max(s['memory']['jemalloc.allocated'] for s in ss),'rss_peak_bytes':max(s['memory']['MemoryResident'] for s in ss),'cgroup_peak_bytes':max(int(s['cgroup'][0]) for s in ss),'tracked_median_bytes':statistics.median(s['tracked'] for s in ss),'post_drain':d['post_drain_memory'],'parts_peak':max(s['parts'] for s in ss),'merges_peak':max(s['merges'] for s in ss),'cpu_s':(cpu(ss[-1]['cgroup'])-cpu(ss[0]['cgroup']))/1e6,'io_delta':dict(io(ss[-1]['cgroup'])-io(ss[0]['cgroup']))}
+  q=[q for q in d['query_metrics'] if q[1].startswith('s02_'+label+'_')]
+  row['queries']={'finished_queries':sum(q[3] for q in q if q[2]=='QueryFinish'),'exception_queries':sum(q[3] for q in q if q[2] in ('ExceptionBeforeStart','ExceptionWhileProcessing')),'read_rows_finished':sum(q[4] for q in q if q[2]=='QueryFinish'),'read_bytes_finished':sum(q[5] for q in q if q[2]=='QueryFinish'),'query_peak_memory_bytes':max(q[6] for q in q),'cpu_user_s_finished':sum(q[7] for q in q if q[2]=='QueryFinish')/1e6,'file_read_bytes_finished':sum(q[8] for q in q if q[2]=='QueryFinish')}
+  rows.append(row)
+summary={}
+for cls in ('stream','interactive','backfill','artifacts'):
+ for metric in ('p95_ms','p99_ms'):
+  vals={l:[statistics.mean(x[metric] for x in r['lanes'] if x['class']==cls) for r in rows if r['label']==l] for l in ('baseline','candidate')}
+  b,c=map(statistics.median,(vals['baseline'],vals['candidate']))
+  summary[cls+'_'+metric]={'repetitions':vals,'median_baseline':b,'median_candidate':c,'delta':c-b,'percent':100*(c-b)/b,'baseline_range':[min(vals['baseline']),max(vals['baseline'])],'candidate_range':[min(vals['candidate']),max(vals['candidate'])],'paired_deltas':[c-b for b,c in zip(vals['baseline'],vals['candidate'])]}
+result={'schema':'s02-mixed-load-reduction/v1','quantiles':'linear interpolation of per-lane offered-time latencies, 60<=offered<360; low-priority summary is mean of two lane quantiles per run, then median over repetitions','runs':rows,'summary':summary,'numerical_performance_acceptance':'not assessed — numerical threshold not specified'}
+with (out/'mixed-analysis-02.json').open('x') as f:json.dump(result,f,indent=2);f.write('\n')
+print(json.dumps(summary,indent=2))

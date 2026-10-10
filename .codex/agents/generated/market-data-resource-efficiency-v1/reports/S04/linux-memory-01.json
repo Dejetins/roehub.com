@@ -1,0 +1,7 @@
+{
+  "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+  "limit_bytes": 1073741824,
+  "exit": 0,
+  "oom": false,
+  "canonical_count": 1000
+}

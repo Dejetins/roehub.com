@@ -1,0 +1,1275 @@
+{
+  "schema_version": "market-data-resource-comparison/v1",
+  "stage": "S02",
+  "label": "candidate",
+  "duration_s": 20,
+  "warmup_s": 60,
+  "steady_s": 300,
+  "source": {
+    "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py": "2735e1c9522a7abfaad2868d99c1d549ce1c3c6e11f32110a269fa583f653b97",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py": "f14f0a1b44a774efac5fcbe168845552c43ae03fa8a98df080a460151d3ae164",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py": "4804741430cef5a2f0a2857cd69ba2ef06c09f511d094539822f2d5af7e0989e"
+  },
+  "python": "3.12.12",
+  "fixture_coordinates": 102,
+  "live_streams": 4,
+  "server_version": "25.8.33.6",
+  "samples": [
+    {
+      "at_s": -4.948008292005397,
+      "memory": {
+        "jemalloc.allocated": 424968800.0,
+        "MemoryResident": 785264640.0
+      },
+      "tracked": 407936316,
+      "active": [],
+      "parts": 17,
+      "merges": 0
+    },
+    {
+      "at_s": -3.9033426250098273,
+      "memory": {
+        "jemalloc.allocated": 440768952.0,
+        "MemoryResident": 850120704.0
+      },
+      "tracked": 406125939,
+      "active": [],
+      "parts": 17,
+      "merges": 0
+    },
+    {
+      "at_s": -2.886977249989286,
+      "memory": {
+        "jemalloc.allocated": 438185888.0,
+        "MemoryResident": 709091328.0
+      },
+      "tracked": 406253699,
+      "active": [],
+      "parts": 17,
+      "merges": 0
+    },
+    {
+      "at_s": -1.8719985829666257,
+      "memory": {
+        "jemalloc.allocated": 437361992.0,
+        "MemoryResident": 713699328.0
+      },
+      "tracked": 406381331,
+      "active": [],
+      "parts": 17,
+      "merges": 0
+    },
+    {
+      "at_s": -0.8500655419775285,
+      "memory": {
+        "jemalloc.allocated": 435784032.0,
+        "MemoryResident": 713969664.0
+      },
+      "tracked": 406508643,
+      "active": [],
+      "parts": 17,
+      "merges": 0
+    },
+    {
+      "at_s": 0.1683172500343062,
+      "memory": {
+        "jemalloc.allocated": 434756888.0,
+        "MemoryResident": 714092544.0
+      },
+      "tracked": 406916381,
+      "active": [],
+      "parts": 19,
+      "merges": 0
+    },
+    {
+      "at_s": 1.1784665419836529,
+      "memory": {
+        "jemalloc.allocated": 434357008.0,
+        "MemoryResident": 715259904.0
+      },
+      "tracked": 398191254,
+      "active": [],
+      "parts": 21,
+      "merges": 0
+    },
+    {
+      "at_s": 2.18911570799537,
+      "memory": {
+        "jemalloc.allocated": 422148064.0,
+        "MemoryResident": 738746368.0
+      },
+      "tracked": 398568458,
+      "active": [],
+      "parts": 23,
+      "merges": 0
+    },
+    {
+      "at_s": 3.2025320830289274,
+      "memory": {
+        "jemalloc.allocated": 421207752.0,
+        "MemoryResident": 737517568.0
+      },
+      "tracked": 399061816,
+      "active": [],
+      "parts": 25,
+      "merges": 0
+    },
+    {
+      "at_s": 4.213215916999616,
+      "memory": {
+        "jemalloc.allocated": 420583520.0,
+        "MemoryResident": 738729984.0
+      },
+      "tracked": 399481087,
+      "active": [],
+      "parts": 22,
+      "merges": 0
+    },
+    {
+      "at_s": 5.23031091701705,
+      "memory": {
+        "jemalloc.allocated": 421183968.0,
+        "MemoryResident": 739368960.0
+      },
+      "tracked": 399837155,
+      "active": [],
+      "parts": 24,
+      "merges": 0
+    },
+    {
+      "at_s": 6.2438442499842495,
+      "memory": {
+        "jemalloc.allocated": 420815424.0,
+        "MemoryResident": 716320768.0
+      },
+      "tracked": 400216677,
+      "active": [],
+      "parts": 26,
+      "merges": 0
+    },
+    {
+      "at_s": 7.254882542009,
+      "memory": {
+        "jemalloc.allocated": 420204992.0,
+        "MemoryResident": 725209088.0
+      },
+      "tracked": 400596455,
+      "active": [],
+      "parts": 28,
+      "merges": 0
+    },
+    {
+      "at_s": 8.26771387498593,
+      "memory": {
+        "jemalloc.allocated": 419070072.0,
+        "MemoryResident": 727474176.0
+      },
+      "tracked": 400975849,
+      "active": [],
+      "parts": 30,
+      "merges": 0
+    },
+    {
+      "at_s": 9.284337958029937,
+      "memory": {
+        "jemalloc.allocated": 420153600.0,
+        "MemoryResident": 729571328.0
+      },
+      "tracked": 401395184,
+      "active": [],
+      "parts": 27,
+      "merges": 0
+    },
+    {
+      "at_s": 10.299326499982271,
+      "memory": {
+        "jemalloc.allocated": 420150248.0,
+        "MemoryResident": 709345280.0
+      },
+      "tracked": 401751060,
+      "active": [],
+      "parts": 29,
+      "merges": 0
+    },
+    {
+      "at_s": 11.3073946670047,
+      "memory": {
+        "jemalloc.allocated": 417113488.0,
+        "MemoryResident": 726528000.0
+      },
+      "tracked": 393438978,
+      "active": [],
+      "parts": 31,
+      "merges": 0
+    },
+    {
+      "at_s": 12.319799458025955,
+      "memory": {
+        "jemalloc.allocated": 421906128.0,
+        "MemoryResident": 730537984.0
+      },
+      "tracked": 393961516,
+      "active": [],
+      "parts": 33,
+      "merges": 0
+    },
+    {
+      "at_s": 13.336863542033825,
+      "memory": {
+        "jemalloc.allocated": 418238016.0,
+        "MemoryResident": 739667968.0
+      },
+      "tracked": 394338662,
+      "active": [],
+      "parts": 35,
+      "merges": 0
+    },
+    {
+      "at_s": 14.352551833027974,
+      "memory": {
+        "jemalloc.allocated": 418796544.0,
+        "MemoryResident": 741236736.0
+      },
+      "tracked": 394734095,
+      "active": [],
+      "parts": 32,
+      "merges": 0
+    },
+    {
+      "at_s": 15.361559582990594,
+      "memory": {
+        "jemalloc.allocated": 419405744.0,
+        "MemoryResident": 716500992.0
+      },
+      "tracked": 395113873,
+      "active": [],
+      "parts": 34,
+      "merges": 0
+    },
+    {
+      "at_s": 16.380878292024136,
+      "memory": {
+        "jemalloc.allocated": 419855288.0,
+        "MemoryResident": 722112512.0
+      },
+      "tracked": 395493587,
+      "active": [],
+      "parts": 36,
+      "merges": 0
+    },
+    {
+      "at_s": 17.392271333024837,
+      "memory": {
+        "jemalloc.allocated": 420372776.0,
+        "MemoryResident": 716156928.0
+      },
+      "tracked": 395872981,
+      "active": [],
+      "parts": 38,
+      "merges": 0
+    },
+    {
+      "at_s": 18.409202750015538,
+      "memory": {
+        "jemalloc.allocated": 420042368.0,
+        "MemoryResident": 716451840.0
+      },
+      "tracked": 396252567,
+      "active": [],
+      "parts": 40,
+      "merges": 0
+    }
+  ],
+  "lanes": [
+    {
+      "workload": "stream",
+      "index": 0,
+      "offered": 20,
+      "operations": [
+        {
+          "n": 0,
+          "offered_s": 0.0,
+          "finished_s": 0.024419167020823807,
+          "latency_s": 0.024419167020823807,
+          "service_s": 0.021354584023356438,
+          "attempts": 1
+        },
+        {
+          "n": 1,
+          "offered_s": 1.0,
+          "finished_s": 1.009930957981851,
+          "latency_s": 0.009930957981850952,
+          "service_s": 0.005233999982010573,
+          "attempts": 1
+        },
+        {
+          "n": 2,
+          "offered_s": 2.0,
+          "finished_s": 2.0139223330188543,
+          "latency_s": 0.01392233301885426,
+          "service_s": 0.012695125013124198,
+          "attempts": 1
+        },
+        {
+          "n": 3,
+          "offered_s": 3.0,
+          "finished_s": 3.0060576670221053,
+          "latency_s": 0.006057667022105306,
+          "service_s": 0.005954333988483995,
+          "attempts": 1
+        },
+        {
+          "n": 4,
+          "offered_s": 4.0,
+          "finished_s": 4.012488708016463,
+          "latency_s": 0.012488708016462624,
+          "service_s": 0.011113249987829477,
+          "attempts": 1
+        },
+        {
+          "n": 5,
+          "offered_s": 5.0,
+          "finished_s": 5.014688500028569,
+          "latency_s": 0.014688500028569251,
+          "service_s": 0.012297833047341555,
+          "attempts": 1
+        },
+        {
+          "n": 6,
+          "offered_s": 6.0,
+          "finished_s": 6.00511066702893,
+          "latency_s": 0.005110667028930038,
+          "service_s": 0.004425834049470723,
+          "attempts": 1
+        },
+        {
+          "n": 7,
+          "offered_s": 7.0,
+          "finished_s": 7.0152652080287226,
+          "latency_s": 0.015265208028722554,
+          "service_s": 0.011042208003345877,
+          "attempts": 1
+        },
+        {
+          "n": 8,
+          "offered_s": 8.0,
+          "finished_s": 8.013322208018508,
+          "latency_s": 0.013322208018507808,
+          "service_s": 0.011103166034445167,
+          "attempts": 1
+        },
+        {
+          "n": 9,
+          "offered_s": 9.0,
+          "finished_s": 9.016344333009329,
+          "latency_s": 0.016344333009328693,
+          "service_s": 0.012436832999810576,
+          "attempts": 1
+        },
+        {
+          "n": 10,
+          "offered_s": 10.0,
+          "finished_s": 10.009448708035052,
+          "latency_s": 0.009448708035051823,
+          "service_s": 0.009103833057451993,
+          "attempts": 1
+        },
+        {
+          "n": 11,
+          "offered_s": 11.0,
+          "finished_s": 11.007589999993797,
+          "latency_s": 0.007589999993797392,
+          "service_s": 0.004706957959569991,
+          "attempts": 1
+        },
+        {
+          "n": 12,
+          "offered_s": 12.0,
+          "finished_s": 12.007191999990027,
+          "latency_s": 0.007191999990027398,
+          "service_s": 0.004091124981641769,
+          "attempts": 1
+        },
+        {
+          "n": 13,
+          "offered_s": 13.0,
+          "finished_s": 13.014124542009085,
+          "latency_s": 0.014124542009085417,
+          "service_s": 0.009890709014143795,
+          "attempts": 1
+        },
+        {
+          "n": 14,
+          "offered_s": 14.0,
+          "finished_s": 14.013950708031189,
+          "latency_s": 0.013950708031188697,
+          "service_s": 0.012620333000086248,
+          "attempts": 1
+        },
+        {
+          "n": 15,
+          "offered_s": 15.0,
+          "finished_s": 15.010914875019807,
+          "latency_s": 0.010914875019807369,
+          "service_s": 0.006151582987513393,
+          "attempts": 1
+        },
+        {
+          "n": 16,
+          "offered_s": 16.0,
+          "finished_s": 16.008896582992747,
+          "latency_s": 0.008896582992747426,
+          "service_s": 0.005434082995634526,
+          "attempts": 1
+        },
+        {
+          "n": 17,
+          "offered_s": 17.0,
+          "finished_s": 17.01598362502409,
+          "latency_s": 0.015983625024091452,
+          "service_s": 0.012890625046566129,
+          "attempts": 1
+        },
+        {
+          "n": 18,
+          "offered_s": 18.0,
+          "finished_s": 18.01768216700293,
+          "latency_s": 0.017682167002931237,
+          "service_s": 0.013445999997202307,
+          "attempts": 1
+        },
+        {
+          "n": 19,
+          "offered_s": 19.0,
+          "finished_s": 19.01438374997815,
+          "latency_s": 0.014383749978151172,
+          "service_s": 0.012030082987621427,
+          "attempts": 1
+        }
+      ],
+      "retries": [
+        {
+          "operation": 0,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 1,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 2,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 3,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 4,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 5,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 6,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 7,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 8,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 9,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 10,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 11,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 12,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 13,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 14,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 15,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 16,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 17,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 18,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 19,
+          "code": "DatabaseError"
+        }
+      ],
+      "failures": [
+        {
+          "operation": 0,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 1,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 2,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 3,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 4,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 5,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 6,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 7,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 8,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 9,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 10,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 11,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 12,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 13,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 14,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 15,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 16,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 17,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 18,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 19,
+          "error": "DatabaseError"
+        }
+      ],
+      "client_maxrss": 219561984,
+      "client_cpu_s": 0.898444
+    },
+    {
+      "workload": "interactive",
+      "index": 0,
+      "fatal": "PydanticUndefinedAnnotation"
+    },
+    {
+      "workload": "backfill",
+      "index": 0,
+      "fatal": "DatabaseError"
+    },
+    {
+      "workload": "backfill",
+      "index": 1,
+      "offered": 20,
+      "operations": [
+        {
+          "n": 0,
+          "offered_s": 0.0,
+          "finished_s": 0.10282016702694818,
+          "latency_s": 0.10282016702694818,
+          "service_s": 0.09981870901538059,
+          "attempts": 1
+        },
+        {
+          "n": 1,
+          "offered_s": 1.0,
+          "finished_s": 1.08605466701556,
+          "latency_s": 0.08605466701555997,
+          "service_s": 0.08300741703715175,
+          "attempts": 1
+        },
+        {
+          "n": 2,
+          "offered_s": 2.0,
+          "finished_s": 2.1016344579984434,
+          "latency_s": 0.1016344579984434,
+          "service_s": 0.10012041596928611,
+          "attempts": 1
+        },
+        {
+          "n": 3,
+          "offered_s": 3.0,
+          "finished_s": 3.0809346670284867,
+          "latency_s": 0.08093466702848673,
+          "service_s": 0.0808312920271419,
+          "attempts": 1
+        },
+        {
+          "n": 4,
+          "offered_s": 4.0,
+          "finished_s": 4.105936917010695,
+          "latency_s": 0.10593691701069474,
+          "service_s": 0.10448170901509002,
+          "attempts": 1
+        },
+        {
+          "n": 5,
+          "offered_s": 5.0,
+          "finished_s": 5.101883750001434,
+          "latency_s": 0.10188375000143424,
+          "service_s": 0.10141704202396795,
+          "attempts": 1
+        },
+        {
+          "n": 6,
+          "offered_s": 6.0,
+          "finished_s": 6.081901416997425,
+          "latency_s": 0.08190141699742526,
+          "service_s": 0.0812174589955248,
+          "attempts": 1
+        },
+        {
+          "n": 7,
+          "offered_s": 7.0,
+          "finished_s": 7.106105167011265,
+          "latency_s": 0.10610516701126471,
+          "service_s": 0.10307829198427498,
+          "attempts": 1
+        },
+        {
+          "n": 8,
+          "offered_s": 8.0,
+          "finished_s": 8.111599375028163,
+          "latency_s": 0.1115993750281632,
+          "service_s": 0.10703008301788941,
+          "attempts": 1
+        },
+        {
+          "n": 9,
+          "offered_s": 9.0,
+          "finished_s": 9.106436417030636,
+          "latency_s": 0.10643641703063622,
+          "service_s": 0.10252679203404114,
+          "attempts": 1
+        },
+        {
+          "n": 10,
+          "offered_s": 10.0,
+          "finished_s": 10.0972816250287,
+          "latency_s": 0.09728162502869964,
+          "service_s": 0.09422937501221895,
+          "attempts": 1
+        },
+        {
+          "n": 11,
+          "offered_s": 11.0,
+          "finished_s": 11.089230875018984,
+          "latency_s": 0.08923087501898408,
+          "service_s": 0.08609854202950373,
+          "attempts": 1
+        },
+        {
+          "n": 12,
+          "offered_s": 12.0,
+          "finished_s": 12.07585416699294,
+          "latency_s": 0.07585416699294001,
+          "service_s": 0.0748950419947505,
+          "attempts": 1
+        },
+        {
+          "n": 13,
+          "offered_s": 13.0,
+          "finished_s": 13.106296917016152,
+          "latency_s": 0.10629691701615229,
+          "service_s": 0.10406066698487848,
+          "attempts": 1
+        },
+        {
+          "n": 14,
+          "offered_s": 14.0,
+          "finished_s": 14.102399917028379,
+          "latency_s": 0.1023999170283787,
+          "service_s": 0.10106791701400653,
+          "attempts": 1
+        },
+        {
+          "n": 15,
+          "offered_s": 15.0,
+          "finished_s": 15.07966824999312,
+          "latency_s": 0.07966824999311939,
+          "service_s": 0.07659762498224154,
+          "attempts": 1
+        },
+        {
+          "n": 16,
+          "offered_s": 16.0,
+          "finished_s": 16.085156749992166,
+          "latency_s": 0.08515674999216571,
+          "service_s": 0.08418529201298952,
+          "attempts": 1
+        },
+        {
+          "n": 17,
+          "offered_s": 17.0,
+          "finished_s": 17.106079875025898,
+          "latency_s": 0.10607987502589822,
+          "service_s": 0.1018915000022389,
+          "attempts": 1
+        },
+        {
+          "n": 18,
+          "offered_s": 18.0,
+          "finished_s": 18.106287125032395,
+          "latency_s": 0.10628712503239512,
+          "service_s": 0.10204583301674575,
+          "attempts": 1
+        },
+        {
+          "n": 19,
+          "offered_s": 19.0,
+          "finished_s": 19.105325250013266,
+          "latency_s": 0.10532525001326576,
+          "service_s": 0.10297412500949576,
+          "attempts": 1
+        }
+      ],
+      "retries": [
+        {
+          "operation": 0,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 1,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 2,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 3,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 4,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 5,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 6,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 7,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 8,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 9,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 10,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 11,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 12,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 13,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 14,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 15,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 16,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 17,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 18,
+          "code": "DatabaseError"
+        },
+        {
+          "operation": 19,
+          "code": "DatabaseError"
+        }
+      ],
+      "failures": [
+        {
+          "operation": 0,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 1,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 2,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 3,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 4,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 5,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 6,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 7,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 8,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 9,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 10,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 11,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 12,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 13,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 14,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 15,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 16,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 17,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 18,
+          "error": "DatabaseError"
+        },
+        {
+          "operation": 19,
+          "error": "DatabaseError"
+        }
+      ],
+      "client_maxrss": 218710016,
+      "client_cpu_s": 0.906127
+    },
+    {
+      "workload": "artifacts",
+      "index": 0,
+      "fatal": "DatabaseError"
+    },
+    {
+      "workload": "artifacts",
+      "index": 1,
+      "offered": 20,
+      "operations": [
+        {
+          "n": 0,
+          "offered_s": 0.0,
+          "finished_s": 0.018549750035163015,
+          "latency_s": 0.018549750035163015,
+          "service_s": 0.01553754199994728,
+          "attempts": 1
+        },
+        {
+          "n": 1,
+          "offered_s": 1.0,
+          "finished_s": 1.0127315830322914,
+          "latency_s": 0.012731583032291383,
+          "service_s": 0.008031083038076758,
+          "attempts": 1
+        },
+        {
+          "n": 2,
+          "offered_s": 2.0,
+          "finished_s": 2.0166743749869056,
+          "latency_s": 0.016674374986905605,
+          "service_s": 0.01577062497381121,
+          "attempts": 1
+        },
+        {
+          "n": 3,
+          "offered_s": 3.0,
+          "finished_s": 3.008552792016417,
+          "latency_s": 0.008552792016416788,
+          "service_s": 0.008447583997622132,
+          "attempts": 1
+        },
+        {
+          "n": 4,
+          "offered_s": 4.0,
+          "finished_s": 4.015521624998655,
+          "latency_s": 0.01552162499865517,
+          "service_s": 0.015399625001009554,
+          "attempts": 1
+        },
+        {
+          "n": 5,
+          "offered_s": 5.0,
+          "finished_s": 5.018326707999222,
+          "latency_s": 0.01832670799922198,
+          "service_s": 0.015937832999043167,
+          "attempts": 1
+        },
+        {
+          "n": 6,
+          "offered_s": 6.0,
+          "finished_s": 6.010795250011142,
+          "latency_s": 0.010795250011142343,
+          "service_s": 0.006551917002070695,
+          "attempts": 1
+        },
+        {
+          "n": 7,
+          "offered_s": 7.0,
+          "finished_s": 7.018356207991019,
+          "latency_s": 0.01835620799101889,
+          "service_s": 0.01585191598860547,
+          "attempts": 1
+        },
+        {
+          "n": 8,
+          "offered_s": 8.0,
+          "finished_s": 8.016089666984044,
+          "latency_s": 0.016089666984044015,
+          "service_s": 0.01511045900406316,
+          "attempts": 1
+        },
+        {
+          "n": 9,
+          "offered_s": 9.0,
+          "finished_s": 9.021170000021812,
+          "latency_s": 0.021170000021811575,
+          "service_s": 0.01726116699865088,
+          "attempts": 1
+        },
+        {
+          "n": 10,
+          "offered_s": 10.0,
+          "finished_s": 10.014798625023104,
+          "latency_s": 0.01479862502310425,
+          "service_s": 0.010613333026412874,
+          "attempts": 1
+        },
+        {
+          "n": 11,
+          "offered_s": 11.0,
+          "finished_s": 11.009842917032074,
+          "latency_s": 0.009842917032074183,
+          "service_s": 0.006798417016398162,
+          "attempts": 1
+        },
+        {
+          "n": 12,
+          "offered_s": 12.0,
+          "finished_s": 12.009874249983113,
+          "latency_s": 0.009874249983113259,
+          "service_s": 0.006819667003583163,
+          "attempts": 1
+        },
+        {
+          "n": 13,
+          "offered_s": 13.0,
+          "finished_s": 13.016846332990099,
+          "latency_s": 0.016846332990098745,
+          "service_s": 0.014609165955334902,
+          "attempts": 1
+        },
+        {
+          "n": 14,
+          "offered_s": 14.0,
+          "finished_s": 14.018072707985993,
+          "latency_s": 0.018072707985993475,
+          "service_s": 0.01674783299677074,
+          "attempts": 1
+        },
+        {
+          "n": 15,
+          "offered_s": 15.0,
+          "finished_s": 15.011026874999516,
+          "latency_s": 0.011026874999515712,
+          "service_s": 0.007953708001878113,
+          "attempts": 1
+        },
+        {
+          "n": 16,
+          "offered_s": 16.0,
+          "finished_s": 16.01242149999598,
+          "latency_s": 0.012421499995980412,
+          "service_s": 0.00934370799222961,
+          "attempts": 1
+        },
+        {
+          "n": 17,
+          "offered_s": 17.0,
+          "finished_s": 17.021291791985277,
+          "latency_s": 0.021291791985277086,
+          "service_s": 0.018195416952949017,
+          "attempts": 1
+        },
+        {
+          "n": 18,
+          "offered_s": 18.0,
+          "finished_s": 18.020590458007064,
+          "latency_s": 0.020590458007063717,
+          "service_s": 0.017494999978225678,
+          "attempts": 1
+        },
+        {
+          "n": 19,
+          "offered_s": 19.0,
+          "finished_s": 19.018159417028073,
+          "latency_s": 0.01815941702807322,
+          "service_s": 0.01474875002168119,
+          "attempts": 1
+        }
+      ],
+      "retries": [],
+      "failures": [],
+      "client_maxrss": 219742208,
+      "client_cpu_s": 0.909349
+    }
+  ],
+  "failures": [],
+  "fixture_rows": 246720,
+  "container_limits": {
+    "memory_bytes": 1610612736,
+    "cpus": 2,
+    "server_memory_bytes": 1073741824
+  },
+  "fixture_sha256": "bfbd144ebb2e4e18870c5bb6c2de9173969f30747a426f6bbdfb32221a9ab515",
+  "full_completion_s": 19.42835483298404,
+  "background_counts": [],
+  "live_counts": [],
+  "query_metrics": [
+    [
+      "roehub_backfill",
+      "s02_candidate_backfill_1",
+      "QueryFinish",
+      20,
+      4934720,
+      44415160,
+      9023994,
+      1725130,
+      6191698
+    ],
+    [
+      "roehub_artifacts",
+      "s02_candidate_artifacts_1",
+      "QueryStart",
+      40,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      "s02_admin",
+      "s02_seed",
+      "QueryFinish",
+      102,
+      740160,
+      39975780,
+      11423730,
+      461512,
+      0
+    ],
+    [
+      "s02_admin",
+      "",
+      "QueryFinish",
+      13,
+      0,
+      0,
+      4223546,
+      12302,
+      0
+    ],
+    [
+      "roehub_stream",
+      "s02_candidate_stream_0",
+      "ExceptionWhileProcessing",
+      20,
+      20,
+      160,
+      3483785,
+      91093,
+      0
+    ],
+    [
+      "roehub_stream",
+      "s02_candidate_stream_0",
+      "QueryStart",
+      20,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      "roehub_artifacts",
+      "s02_candidate_artifacts_1",
+      "QueryFinish",
+      40,
+      347640,
+      6275360,
+      4621220,
+      135139,
+      445489
+    ],
+    [
+      "s02_admin",
+      "s02_seed",
+      "QueryStart",
+      102,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      "s02_admin",
+      "",
+      "QueryStart",
+      13,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      "roehub_backfill",
+      "s02_candidate_backfill_1",
+      "ExceptionWhileProcessing",
+      20,
+      28800,
+      230400,
+      5477734,
+      36799,
+      0
+    ],
+    [
+      "roehub_backfill",
+      "s02_candidate_backfill_1",
+      "QueryStart",
+      40,
+      0,
+      0,
+      0,
+      0,
+      0
+    ]
+  ],
+  "post_drain_memory": {
+    "jemalloc.allocated": 424526240.0,
+    "MemoryResident": 713195520.0
+  }
+}

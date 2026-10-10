@@ -5,6 +5,8 @@ import {createMemoryRouter,RouterProvider} from 'react-router';
 import {QueryClientProvider} from '@tanstack/react-query';
 import {I18nextProvider} from 'react-i18next';
 import {DataPage} from './data-page';
+import {ApiError} from './api';
+import {createDataReadRecovery} from './data-workspace-api';
 import {LegacyDownloadsRedirect} from './data-downloads';
 import {createQueryClient} from './query-client';
 import {createI18n} from './i18n';
@@ -13,11 +15,11 @@ const item=(symbol:string,pinned=false)=>({market_id:1,symbol,base_asset:symbol.
 const pins=[{strategy_id:'strategy-a',name:'Running EMA',state:'running'}];
 const catalog=(symbol:string)=>({snapshot_id:'snapshot',refreshed_at:'2026-10-02T00:00Z',catalog_state:'fresh',total:2,items:[item(symbol)],next_cursor:null});
 const rows=['BTCUSDT','ETHUSDT'].map(symbol=>({...item(symbol),exchange_name:'binance',market_type:'spot',refreshed_at:'2026-10-02T00:00Z',strategies:[],coverage_state:'complete',coverage_percent:100,actual_candles:5,expected_candles:5,job:null}));
-const coverage=(symbol:string)=>({market_id:1,symbol,timeframe:'1m',start_at:'2024-01-01T00:00Z',end_at:'2024-01-01T00:05Z',state:'complete',expected_candles:5,actual_candles:5,coverage_percent:100,observed_at:'2026-10-02T00:00Z',gap_count:0,gaps_truncated:false,gaps:[]});
+const coverage=(symbol:string)=>({market_id:1,symbol,timeframe:'1m',start_at:'2024-01-01T00:00Z',end_at:'2024-01-01T00:05Z',state:'complete',origin_state:'ready',missing_candles:0,expected_candles:5,actual_candles:5,coverage_percent:100,observed_at:'2026-10-02T00:00Z',gap_count:0,gaps_truncated:false,gaps:[]});
 const collection=(symbol:string,pinned=false)=>({...item(symbol,pinned),strategies:pinned?pins:[],last_candle_at:null,observed_at:'2026-10-02T00:00Z'});
 const exchangeCatalog=(q='',exchange='binance')=>({exchange,start_at:'2024-01-01T00:00Z',end_at:'2024-01-01T00:05Z',observed_at:'2026-10-02T00:00Z',total:q==='ZZ'?0:2,offset:0,limit:50,snapshot:'snapshot',missing_market_ids:[],items:q==='ZZ'?[]:rows});
 function mount(handler?: (url:URL,options:RequestInit)=>Response|Promise<Response>|undefined,initial='/data?market=1&symbol=BTCUSDT'+suffix){
- vi.stubGlobal('fetch',vi.fn((url:URL,options:RequestInit)=>handler?.(url,options)??Promise.resolve(Response.json(url.pathname.endsWith('/markets')?{items:[{market_id:1,exchange_name:'binance',market_type:'spot',market_code:'binance:spot'},{market_id:3,exchange_name:'bybit',market_type:'spot',market_code:'bybit:spot'}]}:url.pathname.endsWith('/instruments')?exchangeCatalog(url.searchParams.get('q')??'',url.searchParams.get('exchange')??'binance'):url.pathname.endsWith('/catalog')?catalog(url.searchParams.get('q')??''):url.pathname.endsWith('/collection')?collection(url.searchParams.get('symbol')??''):url.pathname.endsWith('/history-bounds')?{market_id:Number(url.searchParams.get('market_id')),symbol:url.searchParams.get('symbol'),state:'ready',first_open_at:'2024-01-01T00:00Z',end_at:'2024-01-01T00:05Z',observed_at:'2026-10-03T00:00Z'}:url.pathname.endsWith('/coverage')?coverage(url.searchParams.get('symbol')??''):{}))));
+ vi.stubGlobal('fetch',vi.fn((url:URL,options:RequestInit)=>handler?.(url,options)??Promise.resolve(Response.json(url.pathname.endsWith('/markets')?{items:[{market_id:1,exchange_name:'binance',market_type:'spot',market_code:'binance:spot'},{market_id:3,exchange_name:'bybit',market_type:'spot',market_code:'bybit:spot'}]}:url.pathname.endsWith('/instruments')?exchangeCatalog(url.searchParams.get('q')??'',url.searchParams.get('exchange')??'binance'):url.pathname.endsWith('/catalog')?catalog(url.searchParams.get('q')??''):url.pathname.endsWith('/collection')?collection(url.searchParams.get('symbol')??''):url.pathname.endsWith('/history-bounds')?{market_id:Number(url.searchParams.get('market_id')),symbol:url.searchParams.get('symbol'),state:'ready',first_open_at:'2024-01-01T00:00Z',end_at:'2024-01-01T00:05Z',observed_at:'2026-10-03T00:00Z'}:url.pathname.endsWith('/history')?coverage(url.searchParams.get('symbol')??''):{}))));
  const client=createQueryClient(),router=createMemoryRouter([{path:'/data/ingestion',element:<LegacyDownloadsRedirect/>},{path:'*',element:<DataPage subject="owner"/>}],{initialEntries:[initial]});
  render(<I18nextProvider i18n={createI18n('en')}><QueryClientProvider client={client}><RouterProvider router={router}/></QueryClientProvider></I18nextProvider>);return {client,router};
 }
@@ -27,8 +29,8 @@ it('retains the previous identity with commands locked and rejects a late select
  const {router}=mount(url=>url.pathname.endsWith('/collection')&&url.searchParams.get('symbol')==='ETHUSDT'?new Promise<Response>(r=>{finish=r;}):undefined);
  await screen.findByRole('heading',{name:'BTCUSDT'});
  await act(()=>router.navigate('/data?market=1&symbol=ETHUSDT'+suffix));await waitFor(()=>expect(finish).toBeDefined());
- expect(screen.getByRole('heading',{name:'BTCUSDT'})).toBeVisible();expect(screen.getByRole('switch',{name:'Streaming'})).toBeDisabled();
- expect(screen.getByRole('button',{name:'Download period'})).toBeDisabled();
+ expect(screen.getByRole('heading',{name:'BTCUSDT'})).toBeVisible();expect(screen.getByRole('switch',{name:'Candle stream'})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Fill missing history'})).toBeDisabled();
  await act(()=>router.navigate('/data?market=1&symbol=BTCUSDT'+suffix));await act(async()=>finish(Response.json(collection('ETHUSDT'))));
  expect(screen.getByRole('heading',{name:'BTCUSDT'})).toBeVisible();expect(screen.queryByRole('heading',{name:'ETHUSDT'})).not.toBeInTheDocument();
 });
@@ -57,7 +59,8 @@ it('keeps an unknown stream command disabled until explicit read reconciliation'
 it('keeps server filters/sort in the URL and chooses exchanges rather than instruments in the library',async()=>{
  const {router}=mount();await screen.findByRole('heading',{name:'BTCUSDT'});
  expect(within(screen.getByRole('navigation',{name:'Exchanges'})).getAllByRole('link')).toHaveLength(2);
- fireEvent.change(screen.getByRole('combobox',{name:'History'}),{target:{value:'empty'}});
+ fireEvent.click(screen.getByRole('button',{name:'History'}));
+ fireEvent.click(screen.getByRole('radio',{name:'No data'}));
  await waitFor(()=>expect(router.state.location.search).toContain('history=empty'));
  fireEvent.click(screen.getByRole('button',{name:'History / download'}));await waitFor(()=>expect(router.state.location.search).toContain('sort=coverage'));
  fireEvent.click(within(screen.getByRole('navigation',{name:'Exchanges'})).getByRole('link',{name:'Bybit'}));
@@ -67,35 +70,35 @@ it('validates the total download range before sending a command',async()=>{
  let writes=0;mount((url,options)=>{if(options.method==='POST')writes++;return undefined;});
  await screen.findByRole('heading',{name:'BTCUSDT'});
  fireEvent.change(within(screen.getByRole('complementary',{name:'Instrument settings'})).getByLabelText('From · UTC'),{target:{value:'2016-01-01T00:00'}});
- fireEvent.click(screen.getByRole('button',{name:'Download period'}));expect(screen.getByRole('button',{name:'Download period'})).toBeDisabled();expect(writes).toBe(0);
+ fireEvent.click(screen.getByRole('button',{name:'Fill missing history'}));expect(screen.getByRole('button',{name:'Fill missing history'})).toBeDisabled();expect(writes).toBe(0);
 });
 const jobResult=(state='succeeded')=>({job_id:'bounded-job',kind:'candle_ingestion',market_id:1,symbols:['BTCUSDT'],timeframe:'1m',start_at:'2024-01-01T00:00Z',end_at:'2024-01-01T00:05Z',state,attempt:1,completed_units:state==='queued'?0:5,total_units:5,rows_read:5,rows_written:5,error_code:null,created_at:'2026-10-02T00:00Z',updated_at:'2026-10-02T00:00Z',started_at:state==='queued'?null:'2026-10-02T00:00Z',finished_at:['succeeded','failed','cancelled'].includes(state)?'2026-10-02T00:00Z':null,can_cancel:false,can_retry:false,attempts:[]});
 it('submits exactly one bounded historical download and exposes completion',async()=>{
  const writes:unknown[]=[];mount((url,options)=>{if(options.method==='POST'){writes.push(JSON.parse(String(options.body)));return Response.json(jobResult('queued'));}if(url.pathname.endsWith('/bounded-job'))return Response.json(jobResult());});
- await screen.findByRole('heading',{name:'BTCUSDT'});await waitFor(()=>expect(screen.getByRole('button',{name:'Download period'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Download period'}));
+ await screen.findByRole('heading',{name:'BTCUSDT'});await waitFor(()=>expect(screen.getByRole('button',{name:'Fill missing history'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Fill missing history'}));
  await screen.findByRole('region',{name:'Download request'},{timeout:3500});
- expect(writes).toHaveLength(1);expect(writes[0]).toMatchObject({kind:'candle_ingestion',market_id:1,symbols:['BTCUSDT'],start_at:'2024-01-01T00:00:00.000Z',end_at:'2024-01-01T00:05:00.000Z'});
+ expect(writes).toHaveLength(1);expect(writes[0]).toMatchObject({kind:'candle_ingestion',market_id:1,symbols:['BTCUSDT'],start_at:'2024-01-01T00:00:00.000Z',end_at:new Date(Math.floor(Date.now()/60000)*60000).toISOString(),full_history:true});
 });
 it.each(['command','progress'])('hides protected instruments after a denied %s',async(kind)=>{
  mount((url,options)=>{if(options.method==='POST')return kind==='command'?Response.json({}, {status:403}):Response.json(jobResult('queued'));if(url.pathname.endsWith('/bounded-job'))return Response.json({}, {status:403});});
- await screen.findByRole('heading',{name:'BTCUSDT'});await waitFor(()=>expect(screen.getByRole('button',{name:'Download period'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Download period'}));
+ await screen.findByRole('heading',{name:'BTCUSDT'});await waitFor(()=>expect(screen.getByRole('button',{name:'Fill missing history'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Fill missing history'}));
  await waitFor(()=>expect(screen.queryByRole('switch')).not.toBeInTheDocument(),{timeout:3500});expect(document.querySelectorAll('.data-catalog-table tbody tr')).toHaveLength(0);
 });
 it('keeps the download default independent of the catalog coverage period',async()=>{
- const {router}=mount(url=>url.pathname.endsWith('/coverage')?Response.json({...coverage('BTCUSDT'),start_at:url.searchParams.get('start_at'),end_at:url.searchParams.get('end_at')}):undefined);
+ const {router}=mount(url=>url.pathname.endsWith('/history')?Response.json({...coverage('BTCUSDT'),start_at:url.searchParams.get('start_at'),end_at:url.searchParams.get('end_at')}):undefined);
  await screen.findByRole('heading',{name:'BTCUSDT'});
  await act(()=>router.navigate('/data?market=1&symbol=BTCUSDT&from=2024-02-01T00:00&to=2024-02-01T00:05'));
  await waitFor(()=>expect(within(screen.getByRole('complementary',{name:'Instrument settings'})).getByLabelText('From · UTC')).toHaveValue('2024-01-01T00:00'));
- expect(document.querySelector<HTMLFormElement>('.data-range-picker input')?.value).toBe('2024-02-01T00:00');
+ expect(document.querySelector('.data-range-picker')).not.toBeInTheDocument();
  await act(()=>router.navigate(-1));await waitFor(()=>expect(within(screen.getByRole('complementary',{name:'Instrument settings'})).getByLabelText('From · UTC')).toHaveValue('2024-01-01T00:00'));
 });
 it('clears a batch when Back moves to an instrument in another market',async()=>{
  const writes:unknown[]=[];
- const {router}=mount((url,options)=>{const market=Number(url.searchParams.get('market_id')??1),symbol=url.searchParams.get('symbol')??url.searchParams.get('q')??'BTCUSDT';if(options.method==='POST'){writes.push(JSON.parse(String(options.body)));return Response.json(jobResult());}if(url.pathname.endsWith('/bounded-job'))return Response.json(jobResult());if(url.pathname.endsWith('/collection'))return Response.json({...collection(symbol),market_id:market});if(url.pathname.endsWith('/catalog'))return Response.json({...catalog(symbol),items:[{...item(symbol),market_id:market}]});if(url.pathname.endsWith('/coverage'))return Response.json({...coverage(symbol),market_id:market});if(url.pathname.endsWith('/instruments')&&url.searchParams.get('exchange')==='bybit')return Response.json({...exchangeCatalog('','bybit'),items:[{...rows[1],market_id:3,exchange_name:'bybit'}]});});
+ const {router}=mount((url,options)=>{const market=Number(url.searchParams.get('market_id')??1),symbol=url.searchParams.get('symbol')??url.searchParams.get('q')??'BTCUSDT';if(options.method==='POST'){writes.push(JSON.parse(String(options.body)));return Response.json(jobResult());}if(url.pathname.endsWith('/bounded-job'))return Response.json(jobResult());if(url.pathname.endsWith('/collection'))return Response.json({...collection(symbol),market_id:market});if(url.pathname.endsWith('/catalog'))return Response.json({...catalog(symbol),items:[{...item(symbol),market_id:market}]});if(url.pathname.endsWith('/history'))return Response.json({...coverage(symbol),market_id:market});if(url.pathname.endsWith('/instruments')&&url.searchParams.get('exchange')==='bybit')return Response.json({...exchangeCatalog('','bybit'),items:[{...rows[1],market_id:3,exchange_name:'bybit'}]});});
  await screen.findByRole('heading',{name:'BTCUSDT'});await act(()=>router.navigate('/data?exchange=bybit&market=3&symbol=ETHUSDT'+suffix));await screen.findByRole('heading',{name:'ETHUSDT'});
  fireEvent.click(screen.getByRole('checkbox',{name:'Download ETHUSDT · Spot'}));expect(screen.getByText(/Selected: 1/)).toBeVisible();
  await act(()=>router.navigate('/data?market=1&symbol=BTCUSDT'+suffix));await screen.findByRole('heading',{name:'BTCUSDT'});expect(screen.queryByText(/Selected: 1/)).not.toBeInTheDocument();
- await waitFor(()=>expect(screen.getByRole('button',{name:'Download period'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Download period'}));await screen.findByRole('region',{name:'Download request'},{timeout:3500});expect(writes[0]).toMatchObject({market_id:1,symbols:['BTCUSDT']});
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Fill missing history'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Fill missing history'}));await screen.findByRole('region',{name:'Download request'},{timeout:3500});expect(writes[0]).toMatchObject({market_id:1,symbols:['BTCUSDT']});
 });
 it('shows a failed download even when no candles have been stored',async()=>{
  mount(url=>url.pathname.endsWith('/instruments')?Response.json({...exchangeCatalog(),items:[{...rows[0],coverage_state:'empty',coverage_percent:0,actual_candles:0,job:{job_id:'failed-job',state:'failed',progress_percent:0}}]}):undefined);
@@ -103,16 +106,16 @@ it('shows a failed download even when no candles have been stored',async()=>{
 });
 
 it('submits native datetime input events and commits the accepted range without restoring a recovery key',async()=>{
- const writes:Record<string,unknown>[]=[];const {router}=mount((url,options)=>{if(options.method==='POST'){const body=JSON.parse(String(options.body));writes.push(body);return Response.json({...jobResult(),start_at:body.start_at,end_at:body.end_at});}if(url.pathname.endsWith('/bounded-job'))return Response.json(jobResult());if(url.pathname.endsWith('/coverage'))return Response.json({...coverage('BTCUSDT'),start_at:url.searchParams.get('start_at'),end_at:url.searchParams.get('end_at')});});
+ const writes:Record<string,unknown>[]=[];const {router}=mount((url,options)=>{if(options.method==='POST'){const body=JSON.parse(String(options.body));writes.push(body);return Response.json({...jobResult(),start_at:body.start_at,end_at:body.end_at});}if(url.pathname.endsWith('/bounded-job'))return Response.json(jobResult());if(url.pathname.endsWith('/history'))return Response.json({...coverage('BTCUSDT'),start_at:url.searchParams.get('start_at'),end_at:url.searchParams.get('end_at')});});
  await screen.findByRole('heading',{name:'BTCUSDT'});const inspector=within(screen.getByRole('complementary',{name:'Instrument settings'}));
  fireEvent.input(inspector.getByLabelText('From · UTC'),{target:{value:'2024-02-01T00:00'}});fireEvent.input(inspector.getByLabelText('To · UTC'),{target:{value:'2024-02-01T00:03'}});
- await waitFor(()=>expect(screen.getByRole('button',{name:'Download period'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Download period'}));await screen.findByRole('region',{name:'Download request'});
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Fill missing history'})).toBeEnabled());fireEvent.click(screen.getByRole('button',{name:'Fill missing history'}));await screen.findByRole('region',{name:'Download request'});
  expect(writes[0]).toMatchObject({start_at:'2024-02-01T00:00:00.000Z',end_at:'2024-02-01T00:03:00.000Z'});await waitFor(()=>expect(new URLSearchParams(router.state.location.search).get('from')).toBe('2024-02-01T00:00'));expect(router.state.location.search).not.toContain('requestkey');
 });
 
 it('uses one recovery action after reload and never resubmits a recovered request',async()=>{
  let posts=0;const {router}=mount((url,options)=>{if(options.method==='POST')posts++;if(url.pathname.endsWith('/lookup')||url.pathname.endsWith('/bounded-job'))return Response.json(jobResult());},'/data?market=1&symbol=BTCUSDT&requestkey=lost-response'+suffix);
- await screen.findByRole('heading',{name:'BTCUSDT'});expect(screen.getAllByRole('button',{name:'Check request'})).toHaveLength(1);expect(screen.getByRole('button',{name:'Download period'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Check request'}));await screen.findByRole('region',{name:'Download request'});expect(router.state.location.search).not.toContain('requestkey');expect(posts).toBe(0);expect(screen.getByRole('button',{name:'Download period'})).toBeEnabled();
+ await screen.findByRole('heading',{name:'BTCUSDT'});expect(screen.getAllByRole('button',{name:'Check request'})).toHaveLength(1);expect(screen.getByRole('button',{name:'Fill missing history'})).toBeDisabled();fireEvent.click(screen.getByRole('button',{name:'Check request'}));await screen.findByRole('region',{name:'Download request'});expect(router.state.location.search).not.toContain('requestkey');expect(posts).toBe(0);expect(screen.getByRole('button',{name:'Fill missing history'})).toBeEnabled();
 });
 
 
@@ -129,7 +132,7 @@ it('defaults to the entire confirmed history, preserves a manual draft, and keep
  fireEvent.input(inspector.getByLabelText('From · UTC'),{target:{value:'2018-01-01T00:00'}});
  await act(()=>client.refetchQueries({queryKey:['history-bounds','owner']}));
  expect(inspector.getByLabelText('From · UTC')).toHaveValue('2018-01-01T00:00');
- fireEvent.click(screen.getByRole('button',{name:'Download period'}));
+ fireEvent.click(screen.getByRole('button',{name:'Fill missing history'}));
  await waitFor(()=>expect(writes).toHaveLength(1));
  expect(writes[0]).toMatchObject({start_at:'2018-01-01T00:00:00.000Z',end_at:'2026-10-02T12:00:00.000Z'});
  expect(new URLSearchParams(router.state.location.search).get('from')).toBe('2024-01-01T00:00');
@@ -141,7 +144,7 @@ it('uses a named icon button and waits for the selected instrument history bound
  const button=await screen.findByRole('button',{name:'Download ETHUSDT · Spot'});
  expect(button.querySelector('svg')).not.toBeNull();expect(button.textContent).toBe('');
  fireEvent.click(button);await screen.findByRole('heading',{name:'ETHUSDT'});
- expect(screen.getByRole('button',{name:'Download period'})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Fill missing history'})).toBeDisabled();
  await act(async()=>finish(Response.json({market_id:1,symbol:'ETHUSDT',state:'ready',first_open_at:'2019-03-01T00:00Z',end_at:'2026-10-02T12:00Z',observed_at:'2026-10-02T12:00Z'})));
  await waitFor(()=>expect(document.getElementById('data-download-from')).toHaveFocus());
  expect(document.getElementById('data-download-from')).toHaveValue('2019-03-01T00:00');
@@ -156,30 +159,31 @@ it('allows manual dates while history discovery is queued and never overwrites t
  fireEvent.input(inspector.getByLabelText('From · UTC'),{target:{value:'2020-01-01T00:00'}});
  ready=true;await act(()=>client.refetchQueries({queryKey:['history-bounds','owner']}));
  expect(inspector.getByLabelText('From · UTC')).toHaveValue('2020-01-01T00:00');
- expect(screen.getByRole('button',{name:'Download period'})).toBeEnabled();
+ expect(screen.getByRole('button',{name:'Fill missing history'})).toBeEnabled();
 });
 
-it('uses explicit monthly dates for a batch without starting history discovery for every instrument',async()=>{
+it('resolves each batch instrument origin for full-history gap repair',async()=>{
  let batch=false,reads=0;
  mount(url=>{if(batch&&url.pathname.endsWith('/history-bounds'))reads++;return undefined;});
  await screen.findByRole('heading',{name:'BTCUSDT'});
  fireEvent.click(await screen.findByRole('checkbox',{name:'Download BTCUSDT · Spot'}));
  batch=true;fireEvent.click(screen.getByRole('checkbox',{name:'Download ETHUSDT · Spot'}));
  const inspector=within(screen.getByRole('complementary',{name:'Instrument settings'}));
- expect(inspector.getByLabelText('From · UTC')).not.toHaveValue('');
+ await waitFor(()=>expect(inspector.getByLabelText('From · UTC')).not.toHaveValue(''));
  expect(inspector.getByLabelText('To · UTC')).not.toHaveValue('');
- expect(reads).toBe(0);
+ expect(reads).toBeGreaterThan(0);
 });
 
 it('loads the journal only on demand, keeps the catalog mounted, and restores trigger focus on Escape',async()=>{
  let historyReads=0;
  mount(url=>url.pathname.endsWith('/work-requests')?(historyReads++,Response.json({items:[jobResult()],next_cursor:null})):undefined,'/data?market=1'+suffix);
- await screen.findByRole('link',{name:'BTCUSDT'});expect(historyReads).toBe(0);
+ await screen.findByText('BTCUSDT',{selector:'.data-instrument-name'});expect(historyReads).toBe(0);
  const table=document.querySelector('.data-catalog-table');
- const trigger=screen.getByRole('button',{name:'Download log'});fireEvent.click(trigger);
+ const trigger=screen.getByRole('button',{name:'Show log'});fireEvent.click(trigger);
+ expect(trigger).toHaveAccessibleName('Hide log');
  const journal=await screen.findByRole('region',{name:'Download log'});await within(journal).findByText('Completed');
  expect(document.querySelector('.data-catalog-table')).toBe(table);expect(historyReads).toBe(1);
- fireEvent.keyDown(journal,{key:'Escape'});await waitFor(()=>expect(trigger).toHaveFocus());expect(screen.queryByRole('region',{name:'Download log'})).not.toBeInTheDocument();
+ fireEvent.keyDown(journal,{key:'Escape'});await waitFor(()=>expect(trigger).toHaveFocus());expect(screen.queryByRole('region',{name:'Download log'})).not.toBeInTheDocument();expect(trigger).toHaveAccessibleName('Show log');
 });
 
 it('opens a failed catalog-row job inside its instrument and retries once with the correct attempt',async()=>{
@@ -207,7 +211,7 @@ it('cancels an active download through confirmation without navigating away',asy
  const cancel=await screen.findByRole('button',{name:'Cancel download'});await waitFor(()=>expect(cancel).toBeEnabled());fireEvent.click(cancel);expect(posts).toBe(0);
  fireEvent.click(within(screen.getByRole('dialog',{name:'Cancel this download?'})).getByRole('button',{name:'Cancel download'}));
  await screen.findByText('Cancellation requested');expect(posts).toBe(1);expect(screen.getByText(/Stopping after the current write/)).toBeVisible();
- expect(screen.getByRole('progressbar',{name:'Job progress'})).toBeVisible();expect(screen.getByRole('progressbar',{name:'Selected period coverage'})).toBeVisible();
+ expect(screen.getByRole('progressbar',{name:'Job progress'})).toBeVisible();expect(screen.getByRole('progressbar',{name:'Full history coverage'})).toBeVisible();
 });
 
 it('reconciles an unknown retry without replay and retains recovery when reopening the same job',async()=>{
@@ -257,7 +261,7 @@ it('loads journal cursor pages, marks retained rows noninteractive, and hides in
 
 it('does not allow a second download while inspecting an older request for an actively loading instrument',async()=>{
  mount(url=>url.pathname.endsWith('/instruments')?Response.json({...exchangeCatalog(),items:[{...rows[0],job:{job_id:'current-job',state:'running',progress_percent:10}}]}):url.pathname.endsWith('/bounded-job')?Response.json(jobResult()):undefined,'/data?market=1&symbol=BTCUSDT&job=bounded-job'+suffix);
- await screen.findByRole('region',{name:'Download request'});expect(screen.getByRole('button',{name:'Download period'})).toBeDisabled();expect(screen.getByRole('link',{name:'Open current download'})).toHaveAttribute('href','/data?market=1&symbol=BTCUSDT&job=current-job');
+ await screen.findByRole('region',{name:'Download request'});expect(screen.getByRole('button',{name:'Fill missing history'})).toBeDisabled();expect(screen.getByRole('link',{name:'Open current download'})).toHaveAttribute('href','/data?market=1&symbol=BTCUSDT&job=current-job');
 });
 
 it('opens a newly submitted catalog refresh in the inspector even if an instrument was selected',async()=>{
@@ -270,7 +274,7 @@ it('opens a newly submitted catalog refresh in the inspector even if an instrume
  await screen.findByRole('heading',{name:'Request details'});await screen.findByRole('heading',{name:'Catalog refresh'});expect(router.state.location.search).not.toContain('symbol=');expect(screen.queryByRole('switch')).not.toBeInTheDocument();
 });
 
-it('shares one progress poll across the row, journal and inspector without reloading other data or disabling cancellation',async()=>{
+it('shares progress polling and refreshes visible coverage at a bounded cadence without disabling cancellation',async()=>{
  vi.useFakeTimers();
  let state='running',units=600,reads=0,delay=false,finish!:(r:Response)=>void;
  const counts=new Map<string,number>();
@@ -292,10 +296,17 @@ it('shares one progress poll across the row, journal and inspector without reloa
   expect(reads).toBe(initialReads+i+1);
   expect(document.querySelector('.data-job-state.queued')).not.toBeInTheDocument();
   expect(screen.queryByText('Updating…')).not.toBeInTheDocument();
-  expect(screen.getAllByText('Downloading')).toHaveLength(3);
+  expect(screen.getAllByText('Downloading')).toHaveLength(2);
+  expect(within(table as HTMLElement).getByRole('img',{name:'Downloading'})).toHaveAttribute('title','Downloading');
   expect(cancel).toBeEnabled();expect(cancel).toHaveFocus();
  }
- for(const [path,count] of initialCounts)if(!path.endsWith('/bounded-job'))expect(counts.get(path),path).toBe(count);
+ for(const [path,count] of initialCounts){
+  if(path.endsWith('/bounded-job'))continue;
+  if(['/instruments','/catalog','/collection','/history'].some(suffix=>path.endsWith(suffix))){
+   expect(counts.get(path),path).toBeGreaterThan(count);
+   expect((counts.get(path)??0)-count,path).toBeLessThanOrEqual(5);
+  }else expect(counts.get(path),path).toBe(count);
+ }
  expect(document.querySelector('.data-catalog-table')).toBe(table);expect(inspector.scrollTop).toBe(120);
  expect(document.querySelectorAll('.data-download-eta')).toHaveLength(3);
  const labels=[...document.querySelectorAll('.data-download-eta')].map(el=>el.textContent);
@@ -336,7 +347,7 @@ it('pauses and resumes the same job with a version fence and preserves the manua
  fireEvent.click(pause);
  await screen.findByRole('button',{name:'Resume'});
  expect(screen.getByText('Progress is saved. Resume when ready.')).toBeVisible();
- expect(screen.getByRole('button',{name:'Download period'})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'Fill missing history'})).toBeDisabled();
  expect(screen.getByText('2%')).toBeVisible();
  fireEvent.click(screen.getByRole('button',{name:'Resume'}));
  await screen.findByRole('button',{name:'Pause'});
@@ -411,4 +422,308 @@ it('renders temporary memory failure, saved progress and paginated events withou
  expect(screen.getByText('storage_memory_pressure · fill_window',{selector:'code'})).not.toBeVisible();
  fireEvent.click(screen.getByRole('button',{name:'Earlier events'}));
  await screen.findByText('Download started');expect(reads.some(s=>s.includes('before=2'))).toBe(true);
+});
+
+it('selects instruments from passive row areas while preserving the catalog and URL filters',async()=>{
+ const {router}=mount();await screen.findByRole('heading',{name:'BTCUSDT'});await screen.findByText('ETHUSDT',{selector:'.data-instrument-name'});
+ const table=document.querySelector('.data-catalog-table'),eth=screen.getByText('ETHUSDT',{selector:'.data-instrument-name'}).closest('tr')!,btc=screen.getByText('BTCUSDT',{selector:'.data-instrument-name'}).closest('tr')!;
+ for(const target of [eth.cells[1].firstElementChild!,btc.cells[4],eth.cells[2],btc.cells[0],eth]){
+  fireEvent.click(target);
+  const symbol=target.closest('tr')===eth?'ETHUSDT':'BTCUSDT';
+  await screen.findByRole('heading',{name:symbol});
+  expect(router.state.location.search).toContain(`symbol=${symbol}`);
+  expect(router.state.location.search).toContain('from=2024-01-01T00%3A00');
+  expect(document.querySelector('.data-catalog-table')).toBe(table);
+ }
+});
+it('focuses and selects the whole instrument row from the keyboard',async()=>{
+ const {router}=mount();await screen.findByRole('heading',{name:'BTCUSDT'});
+ const eth=(await screen.findByText('ETHUSDT',{selector:'.data-instrument-name'})).closest('tr')!;
+ expect(within(eth).queryByRole('link',{name:'ETHUSDT'})).not.toBeInTheDocument();
+ expect(eth).toHaveAttribute('tabindex','0');
+ eth.focus();expect(eth).toHaveFocus();fireEvent.keyDown(eth,{key:'Enter'});
+ await screen.findByRole('heading',{name:'ETHUSDT'});expect(eth).toHaveClass('selected');
+ expect(eth).toHaveAttribute('aria-current','true');
+ const btc=screen.getByText('BTCUSDT',{selector:'.data-instrument-name'}).closest('tr')!;
+ fireEvent.keyDown(btc,{key:' '});await screen.findByRole('heading',{name:'BTCUSDT'});
+ expect(btc).toHaveClass('selected');expect(eth).not.toHaveClass('selected');
+ fireEvent.keyDown(within(eth).getByRole('checkbox'),{key:' '});
+ expect(router.state.location.search).toContain('symbol=BTCUSDT');
+});
+it('does not let row selection consume checkboxes, download buttons or modified clicks',async()=>{
+ const {router}=mount(url=>url.pathname.endsWith('/instruments')?Response.json({...exchangeCatalog(),items:rows.map(row=>({...row,coverage_state:'empty',coverage_percent:0}))}):undefined);
+ await screen.findByRole('heading',{name:'BTCUSDT'});await screen.findByText('ETHUSDT',{selector:'.data-instrument-name'});
+ const eth=screen.getByText('ETHUSDT',{selector:'.data-instrument-name'}).closest('tr')!;
+ for(const modifier of [{ctrlKey:true},{metaKey:true},{shiftKey:true},{altKey:true},{button:1}]){
+  fireEvent.click(eth.cells[2],modifier);expect(router.state.location.search).toContain('symbol=BTCUSDT');
+ }
+ fireEvent.click(within(eth).getByRole('checkbox'));
+ await screen.findByRole('heading',{name:'ETHUSDT'});
+ expect(within(eth).getByRole('checkbox')).toBeChecked();
+ const btc=screen.getByText('BTCUSDT',{selector:'.data-instrument-name'}).closest('tr')!;
+ fireEvent.click(within(btc).getByRole('checkbox'));
+ expect(within(eth).getByRole('checkbox')).toBeChecked();expect(within(btc).getByRole('checkbox')).toBeChecked();
+ fireEvent.click(within(eth).getByRole('button',{name:'Download ETHUSDT · Spot'}).querySelector('svg')!);
+ await screen.findByRole('heading',{name:'ETHUSDT'});
+ await waitFor(()=>expect(document.getElementById('data-download-from')).toHaveFocus());
+ expect(within(eth).getByRole('checkbox')).not.toBeChecked();
+ expect(vi.mocked(fetch).mock.calls.every(([,options])=>!options?.method||options.method==='GET')).toBe(true);
+});
+it('does not select a retained catalog row while the next filter is loading',async()=>{
+ const {router}=mount(url=>url.pathname.endsWith('/instruments')&&url.searchParams.get('q')==='pending'?new Promise<Response>(()=>{}):undefined);
+ await screen.findByRole('heading',{name:'BTCUSDT'});await screen.findByText('ETHUSDT',{selector:'.data-instrument-name'});
+ await act(()=>router.navigate('/data?market=1&symbol=BTCUSDT&q=pending'+suffix));
+ const eth=screen.getByText('ETHUSDT',{selector:'.data-instrument-name'});
+ await waitFor(()=>expect(eth.closest('tr')).toHaveAttribute('aria-disabled','true'));
+ fireEvent.click(eth.closest('tr')!.cells[2]);
+ expect(router.state.location.search).toContain('symbol=BTCUSDT');
+});
+
+it('shows one full-history indicator with job status and keeps task progress in the inspector',async()=>{
+ let state='running';
+ const {client}=mount(url=>{
+  if(url.pathname.endsWith('/bounded-job'))return Response.json({...jobResult(state),completed_units:state==='running'?2:5,can_pause:state==='running'});
+  if(url.pathname.endsWith('/history'))return Response.json({...coverage('BTCUSDT'),state:'partial',coverage_percent:59.24,actual_candles:853,expected_candles:1440,missing_candles:587});
+  if(url.pathname.endsWith('/instruments'))return Response.json({...exchangeCatalog(),items:[{...rows[0],coverage_state:'partial',coverage_percent:59.24,actual_candles:853,expected_candles:1440,job:{job_id:'bounded-job',state,progress_percent:state==='running'?40:100}}]});
+ },'/data?market=1&symbol=BTCUSDT&job=bounded-job'+suffix);
+ const row=(await screen.findByText('BTCUSDT',{selector:'.data-instrument-name'})).closest('tr')!;
+ expect(within(row).getByText('Full history: 59.24%')).toBeVisible();
+ await within(row).findByRole('img',{name:'Downloading'});
+ expect(within(row).queryByText('Downloading')).not.toBeInTheDocument();
+ expect(within(row).queryByText('40%')).not.toBeInTheDocument();
+ expect(within(row).getAllByRole('progressbar')).toHaveLength(1);
+ expect(within(row).getByRole('progressbar',{name:'Candle coverage'})).toHaveAttribute('value','59.24');
+ expect(within(screen.getByRole('region',{name:'Download request'})).getByRole('progressbar',{name:'Job progress'})).toHaveAttribute('value','40');
+ state='succeeded';await act(()=>client.refetchQueries({queryKey:['data-job','owner','bounded-job']}));
+ const details=within(screen.getByRole('region',{name:'Download request'}));
+ await details.findByText('Download completed up to Jan 1, 2024, 12:05 AM · UTC');
+ expect(details.queryByRole('progressbar')).not.toBeInTheDocument();
+ expect(details.queryByText('100%')).not.toBeInTheDocument();
+ expect(within(row).getByText('Full history: 59.24%')).toBeVisible();
+ await waitFor(()=>expect(within(row).queryByRole('progressbar',{name:'Download progress'})).not.toBeInTheDocument());
+});
+it('explains disabled streaming and updates the explanation after enabling it',async()=>{
+ let enabled=false;
+ const {client}=mount(url=>url.pathname.endsWith('/collection')?Response.json({...collection('BTCUSDT'),effective:enabled,selected:enabled,stream_state:'running'}):undefined);
+ await screen.findByText('New candles are not added automatically. Stored history is preserved.');
+ enabled=true;await act(()=>client.refetchQueries({queryKey:['data-inspector','owner']}));
+ await screen.findByText('New closed candles are saved automatically. History is up to date.');
+ expect(screen.queryByText('New candles are not added automatically. Stored history is preserved.')).not.toBeInTheDocument();
+});
+it('allows streaming with incomplete history and still supports an explicit full-history repair',async()=>{
+ const writes:Record<string,unknown>[]=[];
+ mount((url,options)=>{
+  if(url.pathname.endsWith('/history'))return Response.json({...coverage('BTCUSDT'),state:'partial',actual_candles:999999,expected_candles:1000000,missing_candles:1,coverage_percent:99.99});
+  if(options.method==='POST'){writes.push(JSON.parse(String(options.body)));return Response.json(jobResult('queued'));}
+  if(url.pathname.endsWith('/bounded-job'))return Response.json(jobResult('queued'));
+ });
+ await screen.findByRole('heading',{name:'BTCUSDT'});
+ expect(screen.getByRole('switch',{name:'Candle stream'})).toBeEnabled();
+ expect(screen.getByText('Enable streaming to fill missing history automatically, then collect new candles.')).toBeVisible();
+ expect(screen.queryByText('Change period')).not.toBeInTheDocument();
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Fill missing history'})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button',{name:'Fill missing history'}));
+ await waitFor(()=>expect(writes).toHaveLength(1));
+ expect(writes[0].full_history).toBe(true);
+ expect(Date.parse(String(writes[0].end_at))).toBe(Math.floor(Date.now()/60000)*60000);
+ expect(vi.mocked(fetch).mock.calls.some(([url,options])=>String(url).includes('/selections/')&&options?.method==='PUT')).toBe(false);
+});
+
+
+it('shows an offline collector despite enabled intent and hides redundant history commands',async()=>{
+ mount(url=>url.pathname.endsWith('/collection')?Response.json({...collection('BTCUSDT'),effective:true,selected:true,stream_state:'offline'}):undefined);
+ await screen.findByText('Collector is offline. Streaming is requested, but new candles are not being collected.');
+ expect(screen.getByRole('switch',{name:'Candle stream'})).toHaveAttribute('aria-checked','true');
+ expect(screen.queryByRole('button',{name:'Fill missing history'})).not.toBeInTheDocument();
+});
+
+it('shows a pending candle as updating and restores exact completeness without manual fill',async()=>{
+ let missing=true;
+ const {client}=mount(url=>{
+  if(url.pathname.endsWith('/collection'))return Response.json({...collection('BTCUSDT'),effective:true,selected:true,stream_state:'running'});
+  if(url.pathname.endsWith('/history'))return Response.json({...coverage('BTCUSDT'),state:missing?'partial':'complete',expected_candles:1000000,actual_candles:missing?999999:1000000,missing_candles:missing?1:0,coverage_percent:missing?99.99:100});
+ });
+ await screen.findByText('Updating…');
+ expect(screen.queryByRole('button',{name:'Fill missing history'})).not.toBeInTheDocument();
+ expect(screen.queryByText('99.99%')).not.toBeInTheDocument();
+ missing=false;await act(()=>client.refetchQueries({queryKey:['data-inspector']}));
+ await screen.findByText('New closed candles are saved automatically. History is up to date.');
+ expect(screen.queryByText('Updating…')).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Fill missing history'})).not.toBeInTheDocument();
+});
+
+
+it('keeps Refresh steady during background reads and only shows pending for a manual refresh',async()=>{
+ let hold=false,finish!:(r:Response)=>void;
+ const {client}=mount(url=>url.pathname.endsWith('/instruments')&&hold?new Promise<Response>(r=>{finish=r;}):undefined);
+ await screen.findByRole('heading',{name:'BTCUSDT'});
+ const button=screen.getByRole('button',{name:'Refresh'});
+ hold=true;
+ let background!:Promise<void>;
+ act(()=>{background=client.refetchQueries({queryKey:['exchange-catalog','owner']});});
+ await waitFor(()=>expect(finish).toBeDefined());
+ expect(button).toBeEnabled();
+ await act(async()=>{finish(Response.json(exchangeCatalog()));await background;});
+ fireEvent.click(button);
+ await waitFor(()=>expect(button).toBeDisabled());
+ await act(async()=>finish(Response.json(exchangeCatalog())));
+ await waitFor(()=>expect(button).toBeEnabled());
+ fireEvent.click(button);
+ await waitFor(()=>expect(button).toBeDisabled());
+ await act(async()=>finish(Response.json({}, {status:503})));
+ await waitFor(()=>expect(button).toBeEnabled());
+});
+
+it('keeps manual Refresh pending while replacing a paginated catalog snapshot',async()=>{
+ let finish!:(r:Response)=>void;
+ const {router}=mount(url=>url.pathname.endsWith('/instruments')&&!url.searchParams.has('snapshot')?new Promise<Response>(r=>{finish=r;}):undefined,'/data?market=1&catalog=snapshot&offset=50'+suffix);
+ await screen.findByText('BTCUSDT',{selector:'.data-instrument-name'});
+ const button=screen.getByRole('button',{name:'Refresh'});fireEvent.click(button);
+ await waitFor(()=>expect(finish).toBeDefined());expect(button).toBeDisabled();
+ expect(router.state.location.search).not.toContain('catalog=');expect(router.state.location.search).not.toContain('offset=');
+ await act(async()=>finish(Response.json(exchangeCatalog())));
+ await waitFor(()=>expect(button).toBeEnabled());
+});
+
+
+it('uses platform filter popups with keyboard selection, Escape and retained URL values',async()=>{
+ const {router}=mount();await screen.findByRole('heading',{name:'BTCUSDT'});
+ expect(screen.queryByRole('combobox',{name:'Market'})).not.toBeInTheDocument();
+ const filters=within(document.querySelector('.data-catalog-tools') as HTMLElement);
+ const market=filters.getByRole('button',{name:'Market'});fireEvent.click(market);
+ const all=screen.getByRole('radio',{name:'All markets'});expect(all).toHaveFocus();
+ fireEvent.keyDown(all,{key:'ArrowDown'});
+ await waitFor(()=>expect(router.state.location.search).toContain('type=1'));
+ const spot=screen.getByRole('radio',{name:'Spot'});expect(spot).toHaveFocus();expect(spot).toHaveAttribute('aria-checked','true');
+ fireEvent.keyDown(spot,{key:'Escape'});expect(market).toHaveFocus();expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+ const stream=filters.getByRole('button',{name:'Stream'});fireEvent.click(stream);
+ fireEvent.click(screen.getByRole('radio',{name:'Stream: enabled'}));
+ await waitFor(()=>expect(router.state.location.search).toContain('stream=on'));
+ expect(stream).toHaveTextContent('Stream: enabled');expect(stream).toHaveFocus();
+ fireEvent.click(stream);fireEvent.pointerDown(document.body);
+ expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+});
+
+it('offers immediate Resume and serializes latest pause/resume intent across both surfaces',async()=>{
+ let saved={...jobResult('running'),can_pause:true,can_resume:false,can_cancel:true,control_version:0};
+ const calls:{name:string;version:number;finish:(r:Response)=>void}[]=[];
+ mount((url,options)=>{
+  if(url.pathname.endsWith('/instruments'))return Response.json({...exchangeCatalog(),items:[{...rows[0],job:{job_id:'bounded-job',state:saved.state,progress_percent:2}}]});
+  if(url.pathname.endsWith('/bounded-job'))return Response.json(saved);
+  if(options.method==='POST'&&/\/(pause|resume)$/.test(url.pathname))return new Promise<Response>(finish=>calls.push({name:url.pathname.split('/').pop()!,version:JSON.parse(options.body as string).control_version,finish}));
+ },'/data?market=1&symbol=BTCUSDT&job=bounded-job'+suffix);
+ fireEvent.click(await screen.findByRole('button',{name:'Pause'}));
+ expect(await screen.findByRole('button',{name:'Resume'})).toBeEnabled();
+ fireEvent.click(screen.getByRole('button',{name:'Resume · BTCUSDT'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Pause'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Resume'}));
+ expect(calls.map(c=>c.name)).toEqual(['pause']);
+ saved={...saved,state:'pause_requested',can_pause:false,can_resume:true,control_version:1};
+ await act(async()=>calls[0].finish(Response.json(saved)));
+ await waitFor(()=>expect(calls.map(c=>c.name)).toEqual(['pause','resume']));
+ expect(calls[1].version).toBe(1);
+ saved={...saved,state:'running',can_pause:true,can_resume:false,control_version:2};
+ await act(async()=>calls[1].finish(Response.json(saved)));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'Pause'})).toBeEnabled());
+ expect(calls).toHaveLength(2);
+});
+
+it('starts preparation from zero candles and can disable the saved streaming intent',async()=>{
+ let enabled=false;const commands:string[]=[];
+ mount((url,options)=>{
+  if(url.pathname.includes('/selections/')){commands.push(options.method!);enabled=options.method==='PUT';return Response.json({market_id:1,symbol:'BTCUSDT',effective:enabled,strategy_pinned:false});}
+  if(url.pathname.endsWith('/collection'))return Response.json({...collection('BTCUSDT'),effective:enabled,selected:enabled,stream_state:enabled?'recovering':'disabled'});
+  if(url.pathname.endsWith('/history'))return Response.json({...coverage('BTCUSDT'),state:'empty',actual_candles:0,expected_candles:1000,missing_candles:1000,coverage_percent:0});
+ });
+ await screen.findByRole('heading',{name:'BTCUSDT'});
+ const control=screen.getByRole('switch',{name:'Candle stream'});
+ expect(control).toBeEnabled();fireEvent.click(control);
+ await waitFor(()=>expect(control).toHaveAttribute('aria-checked','true'));
+ expect(screen.getByText('Preparing history · missing candles: 1,000')).toBeVisible();
+ await waitFor(()=>expect(control).toBeEnabled());fireEvent.click(control);
+ await waitFor(()=>expect(control).toHaveAttribute('aria-checked','false'));
+ expect(commands).toEqual(['PUT','DELETE']);
+});
+
+it('shows a connection error instead of healthy collection or progress after disconnection',async()=>{
+ mount(url=>url.pathname.endsWith('/collection')?Response.json({...collection('BTCUSDT'),effective:true,stream_state:'disconnected'}):url.pathname.endsWith('/history')?Response.json({...coverage('BTCUSDT'),state:'partial',missing_candles:14}):undefined);
+ expect(await screen.findByRole('alert')).toHaveTextContent('No connection to the exchange');
+ expect(screen.queryByText(/Collector is running/)).not.toBeInTheDocument();
+ expect(screen.queryByText(/Preparing history · missing candles/)).not.toBeInTheDocument();
+ expect(screen.queryByText('Updating…')).not.toBeInTheDocument();
+});
+
+it.each([['blocked','Error'],['retry_wait','Retry pending'],['recovering','Recovering'],['offline','Stopped'],['unknown','Checking'],['disconnected','No connection'],['running','Running']])('shows the actual %s stream state in the catalog',async(state,label)=>{
+ mount(url=>url.pathname.endsWith('/instruments')?Response.json({...exchangeCatalog(),items:rows.map(row=>({...row,effective:true,stream_state:state}))}):url.pathname.endsWith('/collection')?Response.json({...collection('BTCUSDT'),effective:true,stream_state:state}):undefined);
+ const row=await screen.findByRole('row',{name:/BTCUSDT Spot/});
+ expect(within(row).getByText(label)).toBeVisible();
+ expect(within(row).queryByText('On')).not.toBeInTheDocument();
+});
+it('explains source omissions without adding synthetic candles to the count',async()=>{
+ mount(url=>url.pathname.endsWith('/history')?Response.json({...coverage('BTCUSDT'),source_absent_minutes:60}):undefined);
+ await screen.findByText('No candles on the exchange: 60 min. Excluded from expected history.');
+});
+
+it('automatically recovers a failed catalog GET without replaying commands',async()=>{
+ let fail=false,reads=0,writes=0;
+ const {client}=mount((url,options)=>{
+  if(options.method!=='GET')writes++;
+  if(url.pathname.endsWith('/instruments')){reads++;return fail?Response.json({}, {status:503}):Response.json(exchangeCatalog());}
+ });
+ await screen.findByRole('heading',{name:'BTCUSDT'});
+ await screen.findByRole('row',{name:/BTCUSDT Spot/});
+ vi.useFakeTimers();fail=true;await act(async()=>{await client.refetchQueries({queryKey:['exchange-catalog','owner']});await vi.advanceTimersByTimeAsync(10);});
+ expect(screen.getByRole('alert')).toHaveTextContent('instrument list');
+ const failedReads=reads;fail=false;
+ await act(()=>vi.advanceTimersByTimeAsync(5000));
+ expect(reads).toBeGreaterThan(failedReads);expect(writes).toBe(0);
+ expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+it('uses fresh selected-instrument facts in a retained catalog and marks other stream states stale',async()=>{
+ let fail=false,live=false;
+ const {client}=mount(url=>{
+  if(url.pathname.endsWith('/instruments'))return fail?Response.json({}, {status:503}):Response.json({...exchangeCatalog(),items:rows.map(row=>({...row,coverage_state:'partial',coverage_percent:99.96}))});
+  if(url.pathname.endsWith('/collection'))return Response.json({...collection('BTCUSDT'),effective:live,stream_state:live?'running':'disabled'});
+ });
+ await screen.findByRole('heading',{name:'BTCUSDT'});
+ await screen.findByRole('row',{name:/BTCUSDT Spot/});
+ fail=true;live=true;
+ await act(()=>Promise.all([client.refetchQueries({queryKey:['exchange-catalog','owner']}),client.refetchQueries({queryKey:['data-inspector','owner']})]));
+ await waitFor(()=>expect(screen.getByRole('switch')).toHaveAttribute('aria-checked','true'));
+ await screen.findByRole('alert');
+ const selected=screen.getByRole('row',{name:/BTCUSDT Spot/}),other=screen.getByRole('row',{name:/ETHUSDT Spot/});
+ expect(within(selected).getByText('Full history: 100%')).toBeVisible();
+ expect(within(selected).getByText('Running')).toBeVisible();
+ expect(within(other).getByText('Out of date')).toBeVisible();
+ expect(screen.getByRole('switch')).toHaveAttribute('aria-checked','true');
+ expect(within(selected).getByRole('checkbox')).toBeDisabled();
+});
+
+it('backs off transient reads, honors Retry-After, resets after success and stops on access/protocol errors',()=>{
+ const next=createDataReadRecovery();
+ const transient=new ApiError('unavailable',503,'failed');
+ expect(next({error:transient,errorUpdatedAt:1},2000)).toBe(2000);
+ expect(next({error:transient,errorUpdatedAt:1},2000)).toBe(2000);
+ for(let n=2;n<=7;n++)expect(next({error:transient,errorUpdatedAt:n},2000)).toBe(Math.min(30000,2000*2**(n-1)));
+ expect(next({error:new ApiError('rate-limited',429,'failed',60),errorUpdatedAt:8},2000)).toBe(60000);
+ expect(next({error:null,errorUpdatedAt:8},5000)).toBe(5000);
+ expect(next({error:transient,errorUpdatedAt:9},5000)).toBe(2000);
+ for(const [kind,status] of [['unauthenticated',401],['forbidden',403],['not-found',404],['conflict',409],['invalid-response',200]] as const){
+  expect(next({error:new ApiError(kind,status,'failed'),errorUpdatedAt:10},2000)).toBe(false);
+ }
+});
+
+it('automatically recovers inspector reads while keeping unknown stream state explicit',async()=>{
+ let fail=false;
+ const {client}=mount(url=>url.pathname.endsWith('/collection')?fail?Response.json({}, {status:503}):Response.json({...collection('BTCUSDT'),effective:true,stream_state:'running'}):undefined);
+ await screen.findByText('New closed candles are saved automatically. History is up to date.');
+ vi.useFakeTimers();fail=true;
+ await act(async()=>{await client.refetchQueries({queryKey:['data-inspector','owner']});await vi.advanceTimersByTimeAsync(10);});
+ const panel=within(screen.getByRole('complementary',{name:'Instrument settings'}));
+ expect(panel.getByRole('alert')).toHaveTextContent('this instrument');
+ expect(panel.getByText('Out of date')).toBeVisible();expect(panel.getByRole('switch')).toBeDisabled();
+ fail=false;await act(()=>vi.advanceTimersByTimeAsync(5000));
+ expect(panel.queryByRole('alert')).not.toBeInTheDocument();
+ expect(panel.getByText('Running')).toBeVisible();expect(panel.getByRole('switch')).toBeEnabled();
 });

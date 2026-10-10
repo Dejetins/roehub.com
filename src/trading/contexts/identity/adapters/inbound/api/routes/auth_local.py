@@ -8,6 +8,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, ConfigDict, Field
 
+from trading.contexts.identity.adapters.inbound.api.browser_device import register_browser
 from trading.contexts.identity.adapters.inbound.api.csrf import (
     same_origin_rejection_reason,
 )
@@ -132,6 +133,9 @@ def build_auth_local_router(
         except LocalAuthError as error:
             raise _public_error(error) from error
         _set_auth_cookies(
+            request=request,
+            repository=session_repository,
+            clock=clock,
             response=response,
             result=result,
             cookie_name=cookie_name,
@@ -161,6 +165,9 @@ def build_auth_local_router(
         except LocalAuthError as error:
             raise _public_error(error) from error
         _set_auth_cookies(
+            request=request,
+            repository=session_repository,
+            clock=clock,
             response=response,
             result=result,
             cookie_name=cookie_name,
@@ -181,6 +188,9 @@ def build_auth_local_router(
         except LocalAuthError as error:
             raise _public_error(error) from error
         _set_auth_cookies(
+            request=request,
+            repository=session_repository,
+            clock=clock,
             response=response,
             result=result,
             cookie_name=cookie_name,
@@ -201,6 +211,9 @@ def build_auth_local_router(
         except LocalAuthError as error:
             raise _public_error(error) from error
         _set_auth_cookies(
+            request=request,
+            repository=session_repository,
+            clock=clock,
             response=response,
             result=result,
             cookie_name=cookie_name,
@@ -276,6 +289,9 @@ def build_auth_local_router(
         except LocalAuthError as error:
             raise _public_error(error) from error
         _set_auth_cookies(
+            request=request,
+            repository=session_repository,
+            clock=clock,
             response=response,
             result=result,
             cookie_name=cookie_name,
@@ -311,6 +327,9 @@ def _options_response(value: LocalAuthOptions) -> LocalAuthOptionsResponse:
 
 def _set_auth_cookies(
     *,
+    request: Request,
+    repository: SessionRepository,
+    clock: IdentityClock,
     response: Response,
     result: LocalAuthResult,
     cookie_name: str,
@@ -319,6 +338,18 @@ def _set_auth_cookies(
     cookie_path: str,
     session_absolute_ttl_seconds: int,
 ) -> None:
+    try:
+        register_browser(
+            request=request,
+            response=response,
+            repository=repository,
+            session_id=result.session.session_id,
+            now=clock.now(),
+            secure=cookie_secure,
+        )
+    except Exception:
+        repository.revoke_session(session_id=result.session.session_id, revoked_at=clock.now())
+        raise
     response.set_cookie(
         key=cookie_name,
         value=str(result.session.session_id),

@@ -39,7 +39,7 @@ export const builderCatalogSchema = z.object({ generated_at: z.string(),
   indicator_catalog: z.object({ state: z.string(), items: z.array(z.object({ indicator_id: z.string(), label: z.string(), status: z.string() })) }) });
 export type Catalog = z.infer<typeof builderCatalogSchema>;
 const issue = z.object({ path: z.string(), code: z.string(), message: z.string() });
-export const preflightSchema = z.object({ normalized_request: researchSchema, request_hash: z.string(), result_config_hash: z.string(), artifact_metadata: metadataSchema,
+export const preflightSchema = z.object({ input_readiness:z.object({status:z.enum(['ready','requires_materialization']),requested_signal_rows:z.number().nonnegative(),missing_signal_rows:z.number().nonnegative(),requested_risk_levels:z.number().nonnegative(),risk_coverage:z.enum(['not_required','worker_verification_required','covered']),estimated_generated_bytes_upper_bound:z.number().nonnegative(),payload_validation:z.literal('pending')}).nullable().optional(), normalized_request: researchSchema, request_hash: z.string(), result_config_hash: z.string(), artifact_metadata: metadataSchema,
   cost_estimate: z.object({ indicator_rows: z.number(), candidate_combinations: z.number(), tp_sl_cells: z.number(), cost_class: z.string(), scheduling_class: z.string().optional() }),
   warnings: z.array(issue), errors: z.array(issue), funding_readiness: z.object({ status: z.string(), coverage_policy: z.string(), coverage_ratio: z.number().nullable(), rows_count: z.number(), expected_event_count: z.number(), missing_event_count: z.number(), warning_codes: strings }),
   direction_market_compatibility: z.object({ compatible: z.boolean(), market_type: z.string(), direction_mode: z.string() }) });

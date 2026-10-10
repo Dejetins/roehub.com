@@ -1,0 +1,104 @@
+- link "Skip to content":
+  - /url: "#workspace-heading"
+- complementary:
+  - generic "RoeHub": R
+  - navigation "Navigation":
+    - link "Overview":
+      - /url: /dashboard
+      - generic: Overview
+    - link "Backtests":
+      - /url: /backtests
+      - generic: Backtests
+    - link "Strategies":
+      - /url: /strategies
+      - generic: Strategies
+    - link "Data":
+      - /url: /data
+      - generic: Data
+    - link "Connections":
+      - /url: /connections
+      - generic: Connections
+    - link "Monitoring":
+      - /url: /monitoring
+      - generic: Monitoring
+    - link "Settings":
+      - /url: /settings/profile
+      - generic: Settings
+  - generic "Language": 文
+  - link "Sign out":
+    - /url: /logout
+    - generic: Sign out
+- main:
+  - text: Settings
+  - generic: Navigator
+  - complementary:
+    - heading "Settings" [level=2]
+    - navigation "Settings categories":
+      - link "Profile":
+        - /url: /settings/profile
+        - text: Profile
+      - link "Interface":
+        - /url: /settings/preferences
+        - text: Interface
+      - link "Notifications":
+        - /url: /settings/notifications
+        - text: Notifications
+      - link "Security":
+        - /url: /settings/security
+        - text: Security
+      - link "Storage":
+        - /url: /settings/storage
+        - text: Storage
+  - heading "Storage" [level=1]
+  - heading "Backtest artifacts" [level=2]
+  - paragraph: Stored on the server. One root contains automatically managed instrument folders.
+  - paragraph: Backtest artifacts · ready
+  - status:
+    - generic: Showing previous data
+  - alert: The service could not be read. Try refreshing.
+  - button "Refresh storage" [disabled]
+  - term: Server path
+  - definition: /private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/s08-storage-o52turrn/root
+  - term: Root
+  - definition: backtest-primary · revision 1
+  - term: Configuration
+  - definition: Existing installation configuration
+  - term: Free space
+  - definition: 1 527 175 213 056 B
+  - term: Used space
+  - definition: 290 B
+  - term: Current budget
+  - definition: 10 737 418 240 B
+  - group "Storage configuration":
+    - generic: Storage configuration
+    - paragraph: "Trusted root: backtest-primary. Saving does not activate the scheduler. Existing-data relocation is a separate operation."
+    - generic: Budget · bytes
+    - spinbutton "Budget · bytes" [disabled]: "10737418240"
+    - generic: Default refresh · days
+    - combobox "Default refresh · days" [disabled]:
+      - option "1" [disabled] [selected]
+      - option "3" [disabled]
+      - option "7" [disabled]
+    - generic: Time zone
+    - textbox "Time zone" [disabled]: Europe/Moscow
+    - generic: Local time
+    - textbox "Local time" [disabled]: 02:00:00
+    - paragraph: "Schedule anchor: 2026-10-08"
+    - button "Probe server root" [disabled]
+    - button "Save storage" [disabled]
+  - heading "Cleanup" [level=3]
+  - paragraph: "Explicit cleanup only: one inactive, unpinned slot. Current inputs and reader pins are protected. Turning precompute off keeps files."
+  - group "Preview target":
+    - generic: Preview target
+    - generic: Exchange
+    - textbox "Exchange" [disabled]: binance
+    - generic: Market type
+    - textbox "Market type" [disabled]: spot
+    - generic: Symbol
+    - textbox "Symbol" [disabled]
+    - generic: Inactive slot
+    - combobox "Inactive slot" [disabled]:
+      - option "slot_a" [disabled]
+      - option "slot_b" [disabled] [selected]
+    - button "Preview cleanup" [disabled]
+  - status

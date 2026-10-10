@@ -109,7 +109,12 @@ query and polling timer across the catalogue cell, optional journal and inspecto
 Same-identity progress reads are silent and leave command controls, focus, scroll
 and reserved geometry stable. Initial/retained/error/access-loss states remain
 explicit. Derived catalogue, coverage and history snapshots refresh on commands,
-manual refresh or job completion rather than on every progress checkpoint. A worker
+manual refresh or job completion. Since the 2026-10-10 correction, an active
+manual download also refreshes its visible catalogue and selected inspector
+coverage every five seconds, independently of each job checkpoint. This avoids
+showing hours-old coverage beside live progress. Stream views retain their
+two-second reads. Refreshes preserve the coherent bundle, mounted content, focus
+and scroll; read/access errors retain the existing stop/hide rules. A worker
 yield to its internal queue does not reset the public Downloading state after the
 job has started. The adjacent ETA is based on recent observed work, includes internal
 scheduler yields, and becomes unavailable on read loss or shows stalled progress
@@ -184,3 +189,31 @@ to explicit requests in the selected requests-only runtime.
 5. Browser proof on current desktop and narrow layouts, supported locale labels,
    keyboard navigation and absence of new console errors. Mocks supplement browser
    evidence and do not prove server/provider behavior.
+
+### Navigator Data read recovery and stream vocabulary (2026-10-10)
+
+- Catalog and inspector GET failures caused by transport, HTTP 408/429 or 5xx
+  remain visible and retry after 2, 4, 8, 16, then at most 30 seconds. A longer
+  Retry-After wins. Success resets backoff. Access loss, expired snapshots (409),
+  invalid responses and other non-transient failures require their existing
+  access/manual-refresh paths. No mutation is retried by this mechanism.
+- The catalog error identifies the instrument list, history coverage and stream
+  states that could not be refreshed. It does not claim candle ingestion failed.
+  Inspector read errors identify the selected instrument's history and stream.
+- The selected row uses the inspector's complete, successful instrument/coverage
+  bundle for the same identity and current catalog key. It never overlays another
+  filter's retained page. Catalog membership, order, pagination and command locks
+  remain owned by the server snapshot. Thus a successfully refreshed inspector
+  cannot say 100% / enabled beside the same row's old 99.96% / disabled facts.
+- Retained rows without fresh selected-instrument facts show `Out of date` /
+  `Нет обновления` for stream status, without a healthy green indicator. A retained
+  inspector also stops claiming current stream health; its switch remains locked.
+- The filter says `Stream: enabled` / `Поток: включён` (saved intent), while a
+  confirmed healthy stream says `Running` / `Работает`. The inspector heading is
+  `Candle stream` / `Поток свечей` and repeats the same runtime status. Disabled,
+  recovering, disconnected, stopped, blocked, retry-wait and unknown remain
+  distinct; no new backend state or filter meaning is introduced.
+
+Compatibility: `compatible-change` for Navigator read recovery and visible copy;
+API DTOs, authorization boundaries, cache keys, command semantics and persistence
+are unchanged (`none`). Catalog/inspector access-denial tests remain applicable.

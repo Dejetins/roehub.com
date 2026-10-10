@@ -83,7 +83,13 @@ def test_same_origin_api_proxy_strips_prefix_and_forwards_cookie() -> None:
     assert captured["forwarded_proto"] == "http"
 
 
-def test_same_origin_api_proxy_preserves_versioned_api_namespace() -> None:
+@pytest.mark.parametrize("path", [
+    "/api/v1/organizations",
+    "/api/backtest-artifacts/defaults",
+    "/api/backtest-artifacts/inventory",
+    "/api/backtest-artifacts/commands/example-key",
+])
+def test_same_origin_api_proxy_preserves_api_namespace(path: str) -> None:
     captured: dict[str, str] = {}
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -98,10 +104,10 @@ def test_same_origin_api_proxy_preserves_versioned_api_namespace() -> None:
     )
     app.state.api_proxy_transport = httpx.MockTransport(handler)
 
-    response = TestClient(app).get("/api/v1/organizations")
+    response = TestClient(app).get(path)
 
     assert response.status_code == 200
-    assert captured["path"] == "/api/v1/organizations"
+    assert captured["path"] == path
 
 
 def test_public_root_renders_login_only_workbench_gateway_and_local_assets() -> None:

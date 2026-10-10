@@ -1,0 +1,66 @@
+{
+  "executor": "s03-r2-20261008-01a11c61-recovery",
+  "source_bindings_matched": 14,
+  "accepted_dependencies": {
+    "S01": true,
+    "S02": true
+  },
+  "entry_validation": "pass",
+  "projected_S04_entry": "pass",
+  "preserved_S03": "blocked row unchanged except reciprocal replacement_stage",
+  "baseline_files": 4773,
+  "baseline_changes": [
+    ".codex/agents/generated/data-artifact-management-v1/iteration-ledger.md"
+  ],
+  "evidence": [
+    {
+      "path": "reports/S03.md",
+      "sha256": "d188e25ff9418f1cfaf53533e9a98175820f597799b68f6609770f58f779f4fa"
+    },
+    {
+      "path": "reports/S03-review.md",
+      "sha256": "6cb2366bde0bd0c8dd16bed1f27d4ab0b71b29a2357e336b1318f597e7830b91"
+    },
+    {
+      "path": "reports/S03-verification.md",
+      "sha256": "5b561c9c568a8abe03648c1a6f4806f301d20086eda2539e53f177303626bd14"
+    },
+    {
+      "path": "reports/S03-source-bindings.json",
+      "sha256": "5aee1535cf51bac3b40e7cc3089ea375b1b27bb486336bc037e4043fa9132a04"
+    },
+    {
+      "path": "reports/S03-routed-checks.json",
+      "sha256": "d71c60b60fb50c678af45b7f3cbc59a70112ce7029fb29ad580891b19f41f1b3"
+    },
+    {
+      "path": "reports/S03-real-infra-checks.json",
+      "sha256": "ec262b7159f6dcdef3bc8377d2dd2424aa902ef26fc3e57c61cb2cf2b7cbbf9c"
+    },
+    {
+      "path": "reports/S03-static-checks.json",
+      "sha256": "c0ecbbd077b99913634807a228e5349d27eacaed1f4214596a0b359a1247a9fd"
+    },
+    {
+      "path": "reports/S03-final-checks.json",
+      "sha256": "87dea3682ae0b83c0d8736f8464961f74b720cb91403579f2f7f3abfa3c8ad6e"
+    },
+    {
+      "path": "reports/S03-ownership-check.json",
+      "sha256": "fbe211344c0c0d86d5911d8fa6d9d1b6a58b705fa47b3ab9a2d9dad1b731ef57"
+    },
+    {
+      "path": "reports/pack-entry-repair.md",
+      "sha256": "c9c5c5e834b80d2e6424dc5875bce9bad3638676a3937bba39ef4714eba82aeb"
+    },
+    {
+      "path": "reports/pack-entry-repair-review.md",
+      "sha256": "be6e591467df8ce0b7a0646c65958d7f18029c0b5b1a050069f5e683d2a187b0"
+    },
+    {
+      "path": "reports/pack-entry-repair-checks.md",
+      "sha256": "359e732be61be4f2f0073c46ee0605fce920d2f1f82bc6ac9b3fcb8cb9e4c86d"
+    }
+  ],
+  "product_tests": "Reused saved exit-0 evidence: 583 unit and 72 real-infra, 3 recorded fork warnings; no rerun. All pre-existing repository files except ledger unchanged since recovery baseline; 14 exact source bindings and reviewed evidence verified. No observed changed test conditions."
+}

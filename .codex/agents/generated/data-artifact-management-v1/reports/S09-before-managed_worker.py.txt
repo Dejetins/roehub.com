@@ -1,0 +1,552 @@
+"""Single managed worker: real native compute, durable ownership and measured observations."""
+
+from __future__ import annotations
+
+import errno
+import hashlib
+import json
+from dataclasses import asdict, dataclass, replace
+from datetime import UTC, datetime
+from typing import Callable
+from uuid import UUID, uuid4
+
+from apps.scheduler.backtest_artifact_publisher.wiring.managed_recovery import (
+    lifetime,
+    save_receipt,
+)
+from trading.contexts.backtest_artifacts.adapters.outbound.artifacts_fs.base_storage_admission import (  # noqa: E501
+    BaseStorageAdmission,
+)
+from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.dispatch_repository import (  # noqa: E501
+    PostgresArtifactDispatchRepository,
+)
+from trading.contexts.backtest_artifacts.application.services.automatic_base import (
+    AutomaticBasePublisher,
+    BasePrepublicationError,
+    FrozenFunding,
+    freeze_source,
+)
+from trading.contexts.backtest_artifacts.application.services.derivative_profiles import (
+    DerivativeDemand,
+    ManagedDerivativePublisher,
+    plan_derivatives,
+)
+from trading.contexts.backtest_artifacts.application.services.legacy_dispatch import legacy_profiles
+from trading.contexts.backtest_artifacts.application.services.management import (
+    Coordinate,
+    ManagementError,
+    Profile,
+    Progress,
+    SourceTarget,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_publisher import (
+    ArtifactPublicationNotStarted,
+)
+from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+    ArtifactCoordinatesV2,
+)
+from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
+
+
+@dataclass
+class ManagedArtifactWorker:
+    repository: PostgresArtifactDispatchRepository
+    publisher: AutomaticBasePublisher
+    storage: BaseStorageAdmission
+    now: Callable[[], datetime] = lambda: datetime.now(UTC)
+
+    def run_once(self, installation: UUID):
+        request = self.repository.next_request(installation)
+        if request is None:
+            return None
+        target = SourceTarget.model_validate(request["snapshot"]["source"])
+        start, end = target.history.start_utc, target.history.end_utc
+        assert start is not None and end is not None
+        minutes = int((end - start).total_seconds() // 60)
+        if minutes > 5_000_000:
+            self.reject(request, "resource_conflict")
+            return None
+        # Native planning supplies a tighter derivative bound after source freeze; reserve
+        # the configured finite maximum initially. No data is truncated to fit a budget.
+        reservation = max(4096, minutes * 512 + 16_777_216)
+        owner, incarnation = uuid4(), uuid4()
+        claimed = False
+        try:
+            self.storage(request["snapshot"], reservation)
+            # Establish process lifetime before the durable claim becomes visible.
+            with lifetime(self.storage.root, {"owner_token": owner}):
+                build = self.repository.claim_group(
+                    installation=installation,
+                    request=request,
+                    owner=owner,
+                    incarnation=incarnation,
+                    reservation=reservation,
+                )
+                if build is None:
+                    return None
+                claimed = True
+                return self.execute(build)
+        except OSError:
+            if claimed:
+                raise
+            self.reject(request, "storage_inventory_unavailable")
+            return None
+        except ManagementError as error:
+            if str(error) != "management_unavailable":
+                self.reject(request, str(error))
+            return None
+
+    def reject(self, request, reason):
+        self.repository._exec(
+            (
+                "UPDATE backtest_artifact_requests SET "
+                "state='error',reason=%(why)s,control_version=control_version+1 WHERE "
+                "request_id=%(r)s AND state='queued'"
+            ),
+            why=reason,
+            r=request["request_id"],
+        )
+
+    def execute(self, build):
+        repo = self.repository
+        snapshot = build["snapshot"]
+        target = SourceTarget.model_validate(snapshot["source"])
+        start, end = target.history.start_utc, target.history.end_utc
+        assert start is not None and end is not None
+        coordinates = ArtifactCoordinatesV2(
+            build["exchange"], build["market_type"], build["symbol"]
+        )
+        entered = False
+        base_reservation = max(4096, int((end - start).total_seconds() // 60) * 512 + 16_777_216)
+
+        def measured(phase, tf, done, total, unit, checkpoint=None):
+            observed = datetime.now(UTC)
+            repo.observe(
+                build=build,
+                progress=Progress(
+                    phase=phase,
+                    timeframe=tf,
+                    completed_units=done,
+                    total_units=total,
+                    unit=unit,
+                    observed_at=observed,
+                    last_checkpoint=checkpoint or {},
+                ),
+            )
+
+        def native_event(event):
+            if event.event not in (
+                "artifact_precompute_stage_started",
+                "artifact_precompute_stage_finished",
+            ):
+                return
+            finished = event.event.endswith("_finished")
+            details = event.details
+            if event.stage == "canonical_prices":
+                done = int(details.get("rewritten_tail_bars", 0)) if finished else 0
+                measured("base", "1m", done, done if finished else None, "bars")
+            elif event.stage == "timeframe_session":
+                detail = details.get("details", {}) if finished else details
+                for phase, key in [
+                    ("base", "mapping_rewritten_tail_bars"),
+                    ("derivatives", "signal_rewritten_tail_bars"),
+                ]:
+                    done = int(detail.get(key, 0)) if finished else 0
+                    measured(
+                        phase,
+                        event.current_timeframe,
+                        done,
+                        done if finished else None,
+                        "bars",
+                        {"stage": event.stage},
+                    )
+            else:
+                measured(
+                    event.stage, None, 1 if finished else 0, 1, "stages", {"stage": event.stage}
+                )
+
+        try:
+            self.storage(snapshot, base_reservation)
+            actual = self.publisher.publisher.artifact_loader.resolve_current_pointer_path(
+                coordinates
+            ).resolve()
+            expected = (
+                self.storage.root
+                / coordinates.exchange
+                / coordinates.market_type
+                / coordinates.symbol
+                / "current.yaml"
+            ).resolve()
+            if actual != expected:
+                raise ManagementError("root_revision_changed")
+            runner = self.publisher.runner
+            if runner.canonical_candle_reader is None:
+                raise ManagementError("source_unavailable")
+            source = freeze_source(
+                reader=runner.canonical_candle_reader,
+                coordinates=coordinates,
+                time_range=TimeRange(UtcTimestamp(start), UtcTimestamp(end)),
+                checkpoint=lambda d, t: measured(
+                    "source_snapshot", None, d, t, "source_minutes", {"completed_minutes": d}
+                ),
+            )
+            funding = None
+            payload_hash = source.sha256
+            if coordinates.market_type == "futures":
+                if runner.funding_rate_coverage_reader is None:
+                    raise BasePrepublicationError("funding_unavailable")
+                fs = runner.funding_rate_coverage_reader.read_funding_coverage(
+                    instrument_id=source.instrument, time_range=source.time_range
+                )
+                funding = FrozenFunding(source.instrument, fs)
+                payload_hash = hashlib.sha256(
+                    (
+                        source.sha256
+                        + json.dumps(asdict(fs), sort_keys=True, default=str, allow_nan=False)
+                    ).encode()
+                ).hexdigest()
+            if (
+                len(target.revision) == 64
+                and all(c in "0123456789abcdef" for c in target.revision)
+                and target.revision != payload_hash
+            ):
+                raise ManagementError("source_changed")
+            if target.compute_identity not in ("native-base-v2", "signals/v1|numba/v1|f32-f64/v1"):
+                raise ManagementError("unsupported_compute_identity")
+            expected_funding = (
+                ("spot", "not_applicable")
+                if coordinates.market_type == "spot"
+                else ("futures", "canonical_funding/v1")
+            )
+            if target.funding_identity not in expected_funding:
+                raise ManagementError("unsupported_funding_identity")
+            native_source = target.model_copy(
+                update=dict(
+                    revision=payload_hash,
+                    compute_identity="signals/v1|numba/v1|f32-f64/v1",
+                    funding_identity="not_applicable"
+                    if coordinates.market_type == "spot"
+                    else "canonical_funding/v1",
+                )
+            )
+            frozen_identity = native_source.model_dump(mode="json")
+            with repo.db.transaction():
+                current = repo._fence(build)
+                previous = current["snapshot"].get("frozen_source")
+                if previous is not None and previous != frozen_identity:
+                    raise ManagementError("source_changed")
+                from psycopg.types.json import Jsonb
+
+                repo._exec(
+                    (
+                        "UPDATE backtest_artifact_builds SET "
+                        "snapshot=jsonb_set(snapshot,'{frozen_source}',%(s)s) "
+                        "WHERE build_id=%(b)s"
+                    ),
+                    s=Jsonb(frozen_identity),
+                    b=build["build_id"],
+                )
+            demands = []
+            for request in snapshot["requests"]:
+                raw = request["snapshot"].get("profile")
+                profiles = (Profile.model_validate(raw),) if raw else ()
+                if request["snapshot"].get("legacy_demand"):
+                    profiles = legacy_profiles(request["snapshot"]["legacy_demand"])
+                for index, profile in enumerate(profiles):
+                    if profile.mode == "precompute":
+                        demands.append(
+                            DerivativeDemand.freeze(
+                                request_id=request["request_id"] + ":" + str(index),
+                                coordinate=Coordinate(
+                                    exchange=coordinates.exchange,
+                                    market_type=coordinates.market_type,
+                                    symbol=coordinates.symbol,
+                                ),
+                                source=native_source,
+                                source_sha256=payload_hash,
+                                root_id=snapshot["root_id"],
+                                root_revision=snapshot["root_revision"],
+                                profile=profile,
+                            )
+                        )
+            if demands and runner.indicator_grid_builder is None:
+                raise ManagementError("compute_unavailable")
+            plan = None
+            if demands:
+                assert runner.indicator_grid_builder is not None
+                from trading.contexts.backtest_artifacts.application.services.v2 import (
+                    artifact_precompute_runner as native,
+                )
+
+                arrays = native._canonical_price_arrays_from_batch_v2(
+                    batch=source.batch, source_time_range=source.time_range
+                )
+                eligible = {
+                    tf
+                    for tf in native.ARTIFACT_MAPPING_TIMEFRAMES_V2
+                    if native._rollup_price_arrays_from_one_minute_v2(
+                        source_arrays=arrays, timeframe=tf, allow_empty=True
+                    )
+                    is not None
+                }
+                valid = []
+                for demand in demands:
+                    try:
+                        single = plan_derivatives(
+                            (demand,), grid_builder=runner.indicator_grid_builder
+                        )
+                        if not {tf for tf, _, _ in single.selected_rows} <= eligible or (
+                            (single.tp or single.sl) and "15m" not in eligible
+                        ):
+                            raise ManagementError("derivative_insufficient_history")
+                        valid.append(demand)
+                    except ManagementError as error:
+                        request_id = UUID(demand.request_id.split(":")[0])
+                        with repo.db.transaction():
+                            repo._fence(build)
+                            repo._exec(
+                                (
+                                    "UPDATE backtest_artifact_requests SET "
+                                    "state=%(state)s,reason=%(reason)s, "
+                                    "control_version=control_version+1 WHERE "
+                                    "request_id=%(r)s AND state='running'"
+                                ),
+                                state="waiting_for_source"
+                                if str(error) == "derivative_insufficient_history"
+                                else "error",
+                                reason=str(error),
+                                r=request_id,
+                            )
+                # All parts of a legacy request succeed together; never mark a subset ready.
+                excluded = {
+                    str(r["request_id"])
+                    for r in repo.rows(
+                        """SELECT r.request_id FROM backtest_artifact_requests r
+                    JOIN backtest_artifact_build_requests b USING(request_id)
+                    WHERE b.build_id=%(b)s AND r.state<>'running'""",
+                        b=build["build_id"],
+                    )
+                }
+                valid = [d for d in valid if d.request_id.split(":")[0] not in excluded]
+                if valid:
+                    plan = plan_derivatives(
+                        tuple(valid), grid_builder=runner.indicator_grid_builder
+                    )
+            # Output matrices/risk plus base; native allocation caps still apply.
+            derivative_bytes = 0
+            if plan:
+                derivative_bytes = sum(
+                    len(rows) * (int((end - start).total_seconds() // 60) * 4 + 4096)
+                    for _, _, rows in plan.selected_rows
+                )
+                derivative_bytes += (
+                    (len(plan.tp) + len(plan.sl)) * int((end - start).total_seconds() // 60) * 8
+                )
+            reservation = base_reservation + derivative_bytes
+            self.storage(snapshot, reservation)
+            with repo.db.transaction():
+                repo._fence(build)
+                settings = repo._settings(build["installation_id"], active=True)
+                if (settings["root_id"], settings["root_revision"]) != (
+                    snapshot["root_id"],
+                    snapshot["root_revision"],
+                ):
+                    raise ManagementError("root_revision_changed")
+                if reservation + 1073741824 > settings["budget_bytes"]:
+                    raise ManagementError("resource_conflict")
+                repo._exec(
+                    (
+                        "UPDATE backtest_artifact_builds SET "
+                        "reservation_bytes=%(n)s WHERE build_id=%(b)s"
+                    ),
+                    n=reservation,
+                    b=build["build_id"],
+                )
+            base = replace(
+                self.publisher,
+                runner=replace(
+                    runner, funding_rate_coverage_reader=funding, progress_observer=native_event
+                ),
+            )
+            entered = True
+            if plan and plan.active:
+                result = ManagedDerivativePublisher(
+                    base, self.storage.root_id, self.storage.root_revision, self.storage.root
+                ).publish(
+                    plan=plan, coordinates=coordinates, source=source, generated_at=self.now()
+                )
+            else:
+                result = base.publish(
+                    coordinates=coordinates, source=source, generated_at=self.now()
+                )
+            if result is None or result.publication is None:
+                repo.finish(build=build, outcome="error", reason="source_unavailable")
+                return result
+            p = result.publication.published_pointer
+            publication = dict(
+                generation=p.slot_generation, slot=p.active_slot, manifest_sha256=p.manifest_sha256
+            )
+            coverage = dict(
+                state=result.state,
+                source_sha256=result.source_sha256,
+                timeframes=dict(result.timeframes),
+                source=target.model_dump(mode="json"),
+            )
+            save_receipt(
+                self.storage.root / ".managed-attempts" / str(build["owner_token"]),
+                build,
+                publication,
+                coverage,
+            )
+            repo.finish_base(
+                build=build,
+                publication=publication,
+                coverage=dict(
+                    state=result.state,
+                    source_sha256=result.source_sha256,
+                    timeframes=dict(result.timeframes),
+                    source=target.model_dump(mode="json"),
+                ),
+            )
+            return result
+        except (BasePrepublicationError, ArtifactPublicationNotStarted) as error:
+            repo.finish(
+                build=build,
+                outcome="error",
+                reason=str(error)
+                if isinstance(error, BasePrepublicationError)
+                else "publisher_busy",
+            )
+            raise
+        except Exception as error:
+            transient = isinstance(error, OSError) and error.errno in (
+                errno.EAGAIN,
+                errno.EINTR,
+                errno.ETIMEDOUT,
+            )
+            reason = (
+                "publication_reconciliation_required"
+                if entered
+                else (
+                    "transient_io"
+                    if transient
+                    else str(error)
+                    if isinstance(error, ManagementError)
+                    else "source_or_storage_unavailable"
+                )
+            )
+            repo.finish(
+                build=build,
+                outcome="quarantined" if entered else "retry_wait" if transient else "error",
+                reason=reason,
+            )
+            raise
+
+    def reconcile(self, installation: UUID) -> int:
+        """Only an acquired lifetime lock plus exact committed receipt can complete work.
+
+        Missing/partial receipt never licenses a new attempt: retain quarantine for explicit
+        physical outcome investigation. Safe committed receipts heal PG completion outages.
+        """
+        from trading.contexts.backtest_artifacts.application.services.v2.artifact_manifest_validator import (  # noqa: E501
+            BacktestArtifactManifestValidatorV2,
+        )
+        from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+            ArtifactSignalValidationSpecV2,
+            ArtifactSlotValidationSpecV2,
+        )
+
+        count = 0
+        for build in self.repository.rows(
+            (
+                "SELECT * FROM backtest_artifact_builds WHERE installation_id=%(i)s AND state "
+                "IN ('running','quarantined') ORDER BY created_at LIMIT 50"
+            ),
+            i=installation,
+        ):
+            directory = self.storage.root / ".managed-attempts" / str(build["owner_token"])
+            if not (directory / "lifetime.lock").is_file():
+                continue
+            try:
+                with lifetime(self.storage.root, build):
+                    if build["state"] == "running":
+                        self.repository.finish(
+                            build=build,
+                            outcome="quarantined",
+                            reason="publication_reconciliation_required",
+                        )
+                    receipt_path = directory / "receipt.json"
+                    if not receipt_path.is_file() or receipt_path.is_symlink():
+                        continue
+                    data = json.loads(receipt_path.read_text())
+                    if any(
+                        str(data[k]) != str(build[k])
+                        for k in (
+                            "build_id",
+                            "owner_token",
+                            "parent_incarnation",
+                            "attempt",
+                            "epoch",
+                        )
+                    ):
+                        continue
+                    coordinates = ArtifactCoordinatesV2(
+                        build["exchange"], build["market_type"], build["symbol"]
+                    )
+                    loader = self.publisher.publisher.artifact_loader
+                    pointer = loader.load_current_pointer(coordinates)
+                    expected = data["publication"]
+                    if (pointer.active_slot, pointer.slot_generation, pointer.manifest_sha256) != (
+                        expected["slot"],
+                        expected["generation"],
+                        expected["manifest_sha256"],
+                    ):
+                        continue
+                    manifest = loader.load_slot_manifest(coordinates, pointer.active_slot)
+                    spec = ArtifactSlotValidationSpecV2(
+                        price_timeframes=tuple(x.timeframe for x in manifest.prices),
+                        mapping_timeframes=tuple(x.timeframe for x in manifest.mappings),
+                        signal_artifacts=tuple(
+                            ArtifactSignalValidationSpecV2(
+                                timeframe=x.timeframe, indicator_id=x.indicator_id
+                            )
+                            for x in manifest.signals.manifests
+                        ),
+                        require_hit_times_manifest=manifest.hit_times is not None,
+                    )
+                    manifest_path = loader.resolve_slot_manifest_path(
+                        coordinates, pointer.active_slot
+                    )
+                    if (
+                        hashlib.sha256(manifest_path.read_bytes()).hexdigest()
+                        != expected["manifest_sha256"]
+                    ):
+                        continue
+                    validation = BacktestArtifactManifestValidatorV2(
+                        artifact_loader=loader
+                    ).validate_slot(
+                        coordinates=coordinates, slot=pointer.active_slot, validation_spec=spec
+                    )
+                    if validation.diagnostics:
+                        continue
+                    # The physical publisher performs its canonical validator/recovery before
+                    # queue completion. It never releases a live physical owner by elapsed time.
+                    self.publisher.publisher.recover_publications(
+                        coordinates=coordinates, validation_spec=spec
+                    )
+                    with self.repository.db.transaction():
+                        self.repository._fence(build, state="quarantined")
+                        self.repository._exec(
+                            (
+                                "UPDATE backtest_artifact_builds SET "
+                                "state='running' WHERE build_id=%(b)s"
+                            ),
+                            b=build["build_id"],
+                        )
+                        self.repository.finish_base(
+                            build=build, publication=expected, coverage=data["coverage"]
+                        )
+                    count += 1
+            except (BlockingIOError, ValueError, KeyError, OSError):
+                continue
+        return count

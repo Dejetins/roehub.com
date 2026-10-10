@@ -1,0 +1,6 @@
+{
+  "attempt": "baseline-M2-01.json",
+  "reason": "Methodology review found incomplete family CPU, cgroup delta and admission/retry counters. Interrupted first baseline; all outputs retained and excluded, rather than mix instrumentation within the required six paired runs.",
+  "replacement": "M3 full six-run series; production source unchanged freeze02, harness expanded before freeze03",
+  "not_performance_selection": true
+}

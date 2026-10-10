@@ -292,8 +292,7 @@ def test_run_cycle_records_lock_held_metrics() -> None:
 
     assert metrics.backtest_artifact_publish_runs_total.labels(status="lock_held")._value.get() == 1
     assert (
-        metrics.backtest_artifact_publish_blocked_total.labels(reason="lock_held")._value.get()
-        == 1
+        metrics.backtest_artifact_publish_blocked_total.labels(reason="lock_held")._value.get() == 1
     )
     assert fake_use_case.requests == []
     assert metrics.backtest_artifact_publish_last_success_unixtime._value.get() == 0
@@ -358,22 +357,43 @@ def test_run_cycle_records_validation_failed_counts_and_last_success() -> None:
         scheduled_for_utc=datetime(2026, 3, 30, 0, 5, tzinfo=timezone.utc),
     )
 
-    assert metrics.backtest_artifact_publish_runs_total.labels(status="validation_failed")._value.get() == 1  # noqa: E501
-    assert metrics.backtest_artifact_publish_symbols_total.labels(status="planned")._value.get() == 2  # noqa: E501
-    assert metrics.backtest_artifact_publish_symbols_total.labels(status="succeeded")._value.get() == 1  # noqa: E501
-    assert metrics.backtest_artifact_publish_symbols_total.labels(
-        status="validation_failed"
-    )._value.get() == 1
-    assert metrics.backtest_artifact_publish_blocked_total.labels(
-        reason="validation_failed"
-    )._value.get() == 1
-    assert metrics.backtest_artifact_tail_rebuild_bars_total.labels(stage="prices")._value.get() == 2  # noqa: E501
-    assert metrics.backtest_artifact_tail_rebuild_bars_total.labels(stage="mappings")._value.get() == 3  # noqa: E501
-    assert metrics.backtest_artifact_tail_rebuild_bars_total.labels(stage="signals")._value.get() == 4  # noqa: E501
-    assert metrics.backtest_artifact_tail_rebuild_bars_total.labels(stage="hit_times")._value.get() == 5  # noqa: E501
     assert (
-        metrics.backtest_artifact_publish_last_success_unixtime._value.get()
-        == now_utc.timestamp()
+        metrics.backtest_artifact_publish_runs_total.labels(status="validation_failed")._value.get()
+        == 1
+    )  # noqa: E501
+    assert (
+        metrics.backtest_artifact_publish_symbols_total.labels(status="planned")._value.get() == 2
+    )  # noqa: E501
+    assert (
+        metrics.backtest_artifact_publish_symbols_total.labels(status="succeeded")._value.get() == 1
+    )  # noqa: E501
+    assert (
+        metrics.backtest_artifact_publish_symbols_total.labels(
+            status="validation_failed"
+        )._value.get()
+        == 1
+    )
+    assert (
+        metrics.backtest_artifact_publish_blocked_total.labels(
+            reason="validation_failed"
+        )._value.get()
+        == 1
+    )
+    assert (
+        metrics.backtest_artifact_tail_rebuild_bars_total.labels(stage="prices")._value.get() == 2
+    )  # noqa: E501
+    assert (
+        metrics.backtest_artifact_tail_rebuild_bars_total.labels(stage="mappings")._value.get() == 3
+    )  # noqa: E501
+    assert (
+        metrics.backtest_artifact_tail_rebuild_bars_total.labels(stage="signals")._value.get() == 4
+    )  # noqa: E501
+    assert (
+        metrics.backtest_artifact_tail_rebuild_bars_total.labels(stage="hit_times")._value.get()
+        == 5
+    )  # noqa: E501
+    assert (
+        metrics.backtest_artifact_publish_last_success_unixtime._value.get() == now_utc.timestamp()
     )
     assert fake_lock.release_calls == 1
 
@@ -418,8 +438,36 @@ def test_run_cycle_records_unexpected_error_status() -> None:
         scheduled_for_utc=datetime(2026, 3, 30, 0, 5, tzinfo=timezone.utc),
     )
 
-    assert metrics.backtest_artifact_publish_runs_total.labels(status="unexpected_error")._value.get() == 1  # noqa: E501
-    assert metrics.backtest_artifact_publish_symbols_total.labels(
-        status="unexpected_error"
-    )._value.get() == 1
+    assert (
+        metrics.backtest_artifact_publish_runs_total.labels(status="unexpected_error")._value.get()
+        == 1
+    )  # noqa: E501
+    assert (
+        metrics.backtest_artifact_publish_symbols_total.labels(
+            status="unexpected_error"
+        )._value.get()
+        == 1
+    )
     assert metrics.backtest_artifact_publish_last_success_unixtime._value.get() == 0
+
+
+def test_managed_metrics_show_disabled_capability_and_durable_counts():
+    from apps.scheduler.backtest_artifact_publisher.wiring.managed_metrics import (
+        ManagedArtifactMetrics,
+    )
+
+    registry = CollectorRegistry()
+    metrics = ManagedArtifactMetrics(registry)
+
+    class Repository:
+        def rows(self, query, **params):
+            if "settings" in query:
+                return [{"capability_enabled": False, "paused": True, "legacy_handoff": "complete"}]
+            return [{"state": "running", "n": 2}]
+
+    metrics.sample(Repository(), None)
+    assert registry.get_sample_value("backtest_artifact_managed_available") == 0
+    assert (
+        registry.get_sample_value("backtest_artifact_managed_requests", {"state": "running"}) == 2
+    )
+    assert registry.get_sample_value("backtest_artifact_managed_requests", {"state": "ready"}) == 0

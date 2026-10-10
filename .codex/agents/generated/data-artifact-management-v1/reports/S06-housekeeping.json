@@ -1,0 +1,13 @@
+{
+  "container": "roehub-s06-postgres",
+  "id": "8e14092d3236545cbeada6198b962651909481e74f3e0da08ed8b6908fe44e96",
+  "command": [
+    "docker",
+    "rm",
+    "-fv",
+    "roehub-s06-postgres"
+  ],
+  "exit_code": 0,
+  "stdout": "roehub-s06-postgres\n",
+  "stderr": ""
+}

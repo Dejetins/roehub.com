@@ -13,6 +13,7 @@ from apps.api.operational_health_client import (
     OperationalHealthClient,
     OperationalHealthClientError,
 )
+from apps.api.worker_control import worker_commands
 from trading.contexts.extensions.application import PluginLifecycleError, PluginLifecycleService
 from trading.contexts.extensions.domain import (
     PluginEvent,
@@ -51,6 +52,8 @@ _IDEMPOTENCY_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$")
 _RECENT_AUTH_WINDOW = timedelta(minutes=10)
 _INSTALLATION_ACTIONS = frozenset(
     {
+        OperationAction.START,
+        OperationAction.STOP,
         OperationAction.RECOVER,
         OperationAction.INSTALL,
         OperationAction.UPDATE,
@@ -412,6 +415,23 @@ def _enforce_operational_action(
 ) -> None:
     if action == OperationAction.DIAGNOSTICS:
         return
+    if action in {OperationAction.START, OperationAction.STOP}:
+        try:
+            snapshot = client.snapshot() if client is not None else None
+        except OperationalHealthClientError:
+            snapshot = None
+        by_service = {item.service_id: item for item in snapshot.services} if snapshot else {}
+        now = datetime.now(UTC)
+        if services and all(
+            service in by_service
+            and action.value in worker_commands(by_service[service], now)
+            for service in services
+        ):
+            return
+        raise RoehubError(
+            code="admin.operation_not_allowlisted",
+            message="Worker lifecycle control is not configured or observation is stale",
+        )
     if action != OperationAction.RESTART or not services or client is None:
         if services or action == OperationAction.RESTART:
             raise RoehubError(

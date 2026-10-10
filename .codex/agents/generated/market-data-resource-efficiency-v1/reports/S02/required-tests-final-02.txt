@@ -1,0 +1,389 @@
+..............................FFF................................F.FFFF. [100%]
+=================================== FAILURES ===================================
+____________ test_real_cap_overrides_are_denied[SET async_insert=1] ____________
+
+workloads = (<clickhouse_connect.driver.httpclient.HttpClient object at 0x117674230>, 'resource_s02_grants_4929e66fbace4982924b723....HttpClient object at 0x11759dca0>, 'stream': <clickhouse_connect.driver.httpclient.HttpClient object at 0x1175ef890>})
+query = 'SET async_insert=1'
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "SET async_insert=1",
+            "SET wait_for_async_insert=0",
+            "SELECT 1 SETTINGS async_insert=1",
+            "SET profile='default'",
+            "SELECT 1 SETTINGS profile='default'",
+            "SET max_memory_usage=0",
+            "SET max_memory_usage_for_user=0",
+            "SET max_concurrent_queries_for_user=0",
+            "SET max_threads=100",
+            "SET max_execution_time=0",
+            "SET timeout_overflow_mode='break'",
+        ],
+    )
+    def test_real_cap_overrides_are_denied(workloads, query):
+        _, _, clients = workloads
+        for c in clients.values():
+>           with pytest.raises(DatabaseError, match="452"):
+E           Failed: DID NOT RAISE <class 'clickhouse_connect.driver.exceptions.DatabaseError'>
+
+tests/real_infra/market_data/test_clickhouse_workloads.py:153: Failed
+_______ test_real_cap_overrides_are_denied[SET wait_for_async_insert=0] ________
+
+workloads = (<clickhouse_connect.driver.httpclient.HttpClient object at 0x1176c2f90>, 'resource_s02_grants_f361faa6dbb2486d96543b7....HttpClient object at 0x11782acf0>, 'stream': <clickhouse_connect.driver.httpclient.HttpClient object at 0x1176c3650>})
+query = 'SET wait_for_async_insert=0'
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "SET async_insert=1",
+            "SET wait_for_async_insert=0",
+            "SELECT 1 SETTINGS async_insert=1",
+            "SET profile='default'",
+            "SELECT 1 SETTINGS profile='default'",
+            "SET max_memory_usage=0",
+            "SET max_memory_usage_for_user=0",
+            "SET max_concurrent_queries_for_user=0",
+            "SET max_threads=100",
+            "SET max_execution_time=0",
+            "SET timeout_overflow_mode='break'",
+        ],
+    )
+    def test_real_cap_overrides_are_denied(workloads, query):
+        _, _, clients = workloads
+        for c in clients.values():
+>           with pytest.raises(DatabaseError, match="452"):
+E           Failed: DID NOT RAISE <class 'clickhouse_connect.driver.exceptions.DatabaseError'>
+
+tests/real_infra/market_data/test_clickhouse_workloads.py:153: Failed
+_____ test_real_cap_overrides_are_denied[SELECT 1 SETTINGS async_insert=1] _____
+
+workloads = (<clickhouse_connect.driver.httpclient.HttpClient object at 0x108c0dd30>, 'resource_s02_grants_2611995d36fa4248bee683e....HttpClient object at 0x11771a420>, 'stream': <clickhouse_connect.driver.httpclient.HttpClient object at 0x11761b4a0>})
+query = 'SELECT 1 SETTINGS async_insert=1'
+
+    @pytest.mark.parametrize(
+        "query",
+        [
+            "SET async_insert=1",
+            "SET wait_for_async_insert=0",
+            "SELECT 1 SETTINGS async_insert=1",
+            "SET profile='default'",
+            "SELECT 1 SETTINGS profile='default'",
+            "SET max_memory_usage=0",
+            "SET max_memory_usage_for_user=0",
+            "SET max_concurrent_queries_for_user=0",
+            "SET max_threads=100",
+            "SET max_execution_time=0",
+            "SET timeout_overflow_mode='break'",
+        ],
+    )
+    def test_real_cap_overrides_are_denied(workloads, query):
+        _, _, clients = workloads
+        for c in clients.values():
+>           with pytest.raises(DatabaseError, match="452"):
+E           Failed: DID NOT RAISE <class 'clickhouse_connect.driver.exceptions.DatabaseError'>
+
+tests/real_infra/market_data/test_clickhouse_workloads.py:153: Failed
+_ test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_siblings _
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('ace59f97-044c-4d02-944c-8d1c7fd2a4e3'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x1178a3d70>)
+
+    def test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_siblings(store):
+        from dataclasses import dataclass
+        from threading import Barrier, Event
+        from types import SimpleNamespace
+    
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+    
+        repo, org, actor, gateway = store
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        jobs = [repo.submit(
+            organization_id=org, actor_user_id=actor, key=uuid4(),
+            request=WorkRequest('candle_ingestion', 1, (symbol,), now-timedelta(hours=2), now),
+            now=now+timedelta(microseconds=i),
+        ) for i, symbol in enumerate(('BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT'))]
+        entered, release = Barrier(5), Event()
+    
+        @dataclass
+        class Fill:
+            writer: Any = None
+    
+            def run(self, task):
+                entered.wait(timeout=10)
+                assert release.wait(timeout=10)
+                return SimpleNamespace(rows_read=60, rows_written=60)
+    
+        runner = MarketDataWorkRequestRunner(repo, cast(Any, Fill()), lambda *_: None,
+                                            now=lambda: now, max_windows=1)
+        with ThreadPoolExecutor(max_workers=4) as workers, ThreadPoolExecutor(1) as coordinator:
+            future = coordinator.submit(runner.run_batch, executor=workers, concurrency=4)
+            try:
+>               entered.wait(timeout=10)
+
+tests/real_infra/market_data/test_work_requests_postgres.py:649: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/threading.py:725: in wait
+    self._wait(timeout)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <threading.Barrier at 0x118c90f80: broken>, timeout = 10
+
+    def _wait(self, timeout):
+        if not self._cond.wait_for(lambda : self._state != 0, timeout):
+            #timed out.  Break the barrier
+            self._break()
+>           raise BrokenBarrierError
+E           threading.BrokenBarrierError
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/threading.py:763: BrokenBarrierError
+------------------------------ Captured log call -------------------------------
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+_ test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[submit] _
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('93906da4-32e0-4e98-9626-560bb5179f91'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x118f1d0a0>)
+failure = 'submit'
+
+    @pytest.mark.parametrize('failure', ['submit', 'worker'])
+    def test_parallel_batch_drains_siblings_before_releasing_lease_on_failure(store, failure):
+        from concurrent.futures import Executor
+        from dataclasses import dataclass
+        from threading import Event
+        from types import SimpleNamespace
+    
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+    
+        repo, org, actor, _ = store
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        jobs = [repo.submit(
+            organization_id=org, actor_user_id=actor, key=uuid4(),
+            request=WorkRequest('candle_ingestion', 1, (symbol,), now-timedelta(hours=2), now),
+            now=now+timedelta(microseconds=i),
+        ) for i, symbol in enumerate(('BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT'))]
+        entered, release, failed = Event(), Event(), Event()
+    
+        @dataclass
+        class Fill:
+            writer: Any = None
+    
+            def run(self, task):
+                entered.set()
+                assert release.wait(timeout=10)
+                return SimpleNamespace(rows_read=60, rows_written=60)
+    
+        runner = MarketDataWorkRequestRunner(repo, cast(Any, Fill()), lambda *_: None,
+                                            now=lambda: now, max_windows=1)
+    
+        class FaultExecutor(Executor):
+            calls = 0
+    
+            def submit(self, fn, /, *args, **kwargs):
+                self.calls += 1
+                if failure == 'submit' and self.calls == 3:
+                    failed.set()
+                    raise RuntimeError('injected submit failure')
+                if failure == 'worker' and self.calls == 1:
+                    def fail():
+                        failed.set()
+                        raise RuntimeError('injected worker failure')
+                    return workers.submit(fail)
+                return workers.submit(fn, *args, **kwargs)
+    
+        with ThreadPoolExecutor(4) as workers, ThreadPoolExecutor(1) as coordinator:
+            future = coordinator.submit(runner.run_batch, executor=FaultExecutor(), concurrency=4)
+            try:
+>               assert entered.wait(timeout=10) and failed.wait(timeout=10)
+E               assert (False)
+E                +  where False = wait(timeout=10)
+E                +    where wait = <threading.Event at 0x118f1c050: unset>.wait
+
+tests/real_infra/market_data/test_work_requests_postgres.py:750: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+_ test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[worker] _
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('dcd5bdc3-91ab-4f46-b40e-12052ee5db96'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x1178a0860>)
+failure = 'worker'
+
+    @pytest.mark.parametrize('failure', ['submit', 'worker'])
+    def test_parallel_batch_drains_siblings_before_releasing_lease_on_failure(store, failure):
+        from concurrent.futures import Executor
+        from dataclasses import dataclass
+        from threading import Event
+        from types import SimpleNamespace
+    
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+    
+        repo, org, actor, _ = store
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        jobs = [repo.submit(
+            organization_id=org, actor_user_id=actor, key=uuid4(),
+            request=WorkRequest('candle_ingestion', 1, (symbol,), now-timedelta(hours=2), now),
+            now=now+timedelta(microseconds=i),
+        ) for i, symbol in enumerate(('BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT'))]
+        entered, release, failed = Event(), Event(), Event()
+    
+        @dataclass
+        class Fill:
+            writer: Any = None
+    
+            def run(self, task):
+                entered.set()
+                assert release.wait(timeout=10)
+                return SimpleNamespace(rows_read=60, rows_written=60)
+    
+        runner = MarketDataWorkRequestRunner(repo, cast(Any, Fill()), lambda *_: None,
+                                            now=lambda: now, max_windows=1)
+    
+        class FaultExecutor(Executor):
+            calls = 0
+    
+            def submit(self, fn, /, *args, **kwargs):
+                self.calls += 1
+                if failure == 'submit' and self.calls == 3:
+                    failed.set()
+                    raise RuntimeError('injected submit failure')
+                if failure == 'worker' and self.calls == 1:
+                    def fail():
+                        failed.set()
+                        raise RuntimeError('injected worker failure')
+                    return workers.submit(fail)
+                return workers.submit(fn, *args, **kwargs)
+    
+        with ThreadPoolExecutor(4) as workers, ThreadPoolExecutor(1) as coordinator:
+            future = coordinator.submit(runner.run_batch, executor=FaultExecutor(), concurrency=4)
+            try:
+>               assert entered.wait(timeout=10) and failed.wait(timeout=10)
+E               assert (False)
+E                +  where False = wait(timeout=10)
+E                +    where wait = <threading.Event at 0x117910470: unset>.wait
+
+tests/real_infra/market_data/test_work_requests_postgres.py:750: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+____________ test_parallel_batch_lost_lease_fences_all_four_writers ____________
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('02b54712-5d3d-499a-a1c4-0f557ab96aa7'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x118d14080>)
+
+    def test_parallel_batch_lost_lease_fences_all_four_writers(store):
+        from dataclasses import dataclass
+        from threading import Barrier, Event
+        from types import SimpleNamespace
+    
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+    
+        repo, org, actor, gateway = store
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        jobs = [repo.submit(
+            organization_id=org, actor_user_id=actor, key=uuid4(),
+            request=WorkRequest('candle_ingestion', 1, (symbol,), now-timedelta(hours=1), now),
+            now=now+timedelta(microseconds=i),
+        ) for i, symbol in enumerate(('BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT'))]
+        entered, release, writes = Barrier(5), Event(), []
+    
+        class Writer:
+            def write_1m(self, rows):
+                writes.append(rows)
+    
+        @dataclass
+        class Fill:
+            writer: Any
+    
+            def run(self, task):
+                entered.wait(timeout=10)
+                assert release.wait(timeout=10)
+                self.writer.write_1m([])
+                return SimpleNamespace(rows_read=60, rows_written=60)
+    
+        runner = MarketDataWorkRequestRunner(
+            repo, cast(Any, Fill(Writer())), lambda *_: None, now=lambda: now,
+            retryable_storage_error=lambda error: isinstance(error, psycopg.OperationalError),
+        )
+        with ThreadPoolExecutor(4) as workers, ThreadPoolExecutor(1) as coordinator:
+            future = coordinator.submit(runner.run_batch, executor=workers, concurrency=4)
+            try:
+>               entered.wait(timeout=10)
+
+tests/real_infra/market_data/test_work_requests_postgres.py:805: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/threading.py:725: in wait
+    self._wait(timeout)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <threading.Barrier at 0x1178b3860: broken>, timeout = 10
+
+    def _wait(self, timeout):
+        if not self._cond.wait_for(lambda : self._state != 0, timeout):
+            #timed out.  Break the barrier
+            self._break()
+>           raise BrokenBarrierError
+E           threading.BrokenBarrierError
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/threading.py:763: BrokenBarrierError
+------------------------------ Captured log call -------------------------------
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+_____ test_incomplete_history_retry_streak_uses_persisted_previous_reason ______
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('3d18e041-13f9-4bc9-9f52-a2d117de56d0'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x1178dbb90>)
+
+    def test_incomplete_history_retry_streak_uses_persisted_previous_reason(store):
+        from dataclasses import dataclass
+        from types import SimpleNamespace
+    
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+        repo, org, actor, _ = store
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        start = now - timedelta(minutes=1)
+        row = repo.submit(organization_id=org, actor_user_id=actor, key=uuid4(),
+                          request=WorkRequest('candle_ingestion', 1, ('ACTUSDT',), start, now), now=now)
+        @dataclass
+        class EmptyFill:
+            writer: object = None
+            def run(self, task):
+                return SimpleNamespace(rows_read=0, rows_written=0)
+        runner = MarketDataWorkRequestRunner(
+            repo, cast(RestFillRange1mUseCase, EmptyFill()),
+            lambda *_: None, now=lambda: now,
+            repair_index=cast(
+                HistoryCoverageReader, SimpleNamespace(first_gap=lambda **kw: kw['time_range']),
+            ))
+        for expected in (1,2,3):
+            assert runner.run_once()
+            waiting = repo.get(organization_id=org, job_id=row['job_id'])
+>           assert waiting['state'] == 'retry_wait'
+E           AssertionError: assert 'failed' == 'retry_wait'
+E             
+E             - retry_wait
+E             + failed
+
+tests/real_infra/market_data/test_work_requests_postgres.py:848: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+=========================== short test summary info ============================
+FAILED tests/real_infra/market_data/test_clickhouse_workloads.py::test_real_cap_overrides_are_denied[SET async_insert=1]
+FAILED tests/real_infra/market_data/test_clickhouse_workloads.py::test_real_cap_overrides_are_denied[SET wait_for_async_insert=0]
+FAILED tests/real_infra/market_data/test_clickhouse_workloads.py::test_real_cap_overrides_are_denied[SELECT 1 SETTINGS async_insert=1]
+FAILED tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_siblings
+FAILED tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[submit]
+FAILED tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[worker]
+FAILED tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_lost_lease_fences_all_four_writers
+FAILED tests/real_infra/market_data/test_work_requests_postgres.py::test_incomplete_history_retry_streak_uses_persisted_previous_reason
+8 failed, 64 passed in 79.61s (0:01:19)

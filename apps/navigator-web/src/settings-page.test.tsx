@@ -49,18 +49,30 @@ it('hides form data after a mutation revokes access',async()=>{
 it('keeps security tabs keyboard-operable without expansion or stale rows from the other tab',async()=>{
  vi.stubGlobal('IntersectionObserver',class {observe(){} disconnect(){}});
  let finish!:(r:Response)=>void;
- vi.stubGlobal('fetch',vi.fn(url=>String(url).includes('audit-events')?new Promise<Response>(resolve=>{finish=resolve;}):Promise.resolve(Response.json({items:[{session_id:'view-only-id',created_at:'2026-10-03T00:00:00Z',last_seen_at:'2026-10-03T00:00:00Z',idle_expires_at:'2050-01-01T00:00:00Z',absolute_expires_at:'2050-01-01T00:00:00Z',revoked_at:null,is_current:true}],next_cursor:null}))));
- mount('/settings/security');await screen.findByText('Active');
+ vi.stubGlobal('fetch',vi.fn(url=>String(url).includes('audit-events')?new Promise<Response>(resolve=>{finish=resolve;}):Promise.resolve(Response.json({items:[{device_id:'device-1',label:'Chrome · macOS',last_seen_at:'2026-10-03T00:00:00Z',expires_at:'2050-01-01T00:00:00Z',active:true,is_current:true}],next_cursor:null,legacy_active_count:0}))));
+ mount('/settings/security');await screen.findByText('Valid');
  expect(screen.queryByRole('button',{name:'Expand tables'})).not.toBeInTheDocument();expect(screen.queryByRole('button',{name:'Refresh'})).not.toBeInTheDocument();
- fireEvent.keyDown(screen.getByRole('tab',{name:'Sessions'}),{key:'ArrowRight'});
- expect(screen.getByRole('tab',{name:'Activity'})).toHaveFocus();expect(screen.queryByText('Active')).not.toBeInTheDocument();
+ fireEvent.keyDown(screen.getByRole('tab',{name:'Devices'}),{key:'ArrowRight'});
+ expect(screen.getByRole('tab',{name:'Activity'})).toHaveFocus();expect(screen.queryByText('Valid')).not.toBeInTheDocument();
  await act(async()=>finish(Response.json({items:[{event_id:'event',created_at:'2026-10-03T00:00:00Z',event_type:'profile_updated',summary:'Profile updated'}],next_cursor:null})));
  await screen.findByText('Profile updated');
- fireEvent.keyDown(screen.getByRole('tab',{name:'Activity'}),{key:'Home'});await screen.findByText('Active');expect(screen.queryByText('Profile updated')).not.toBeInTheDocument();
+ fireEvent.keyDown(screen.getByRole('tab',{name:'Activity'}),{key:'Home'});await screen.findByText('Valid');expect(screen.queryByText('Profile updated')).not.toBeInTheDocument();
 });
 it('accepts only opted-in canonical work page routes',()=>{
  const bootstrap={subject:'owner',locale:'en' as const,client_routes:['/settings','/connections','/data','/monitoring']};
  for(const path of ['/settings/profile','/settings/preferences','/settings/notifications','/settings/security','/connections','/data','/data/ingestion','/monitoring','/monitoring/api'])expect(clientRoute(path,bootstrap)).toBe(true);
  for(const path of ['/settings/arbitrary','/data/unknown','https://evil.invalid/data','/admin'])expect(clientRoute(path,bootstrap)).toBe(false);
  expect(clientRoute('/settings/profile',{...bootstrap,client_routes:[]})).toBe(false);
+});
+it('uses platform popups for preferences with keyboard dismissal and cancellation',async()=>{
+ const preferences={theme:'graphite',locale:'en',density:'compact',autorefresh:{preset_key:'15s',refresh_interval_seconds:15,allowed_presets:['off','10s','15s','30s','1m','5m'],min_custom_interval_seconds:10,max_custom_interval_seconds:1800},updated_at:'2026-10-03T00:00:00Z'};
+ vi.stubGlobal('fetch',vi.fn(()=>Promise.resolve(Response.json(preferences))));
+ mount('/settings/preferences');const language=await screen.findByRole('button',{name:'Language'});
+ expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+ fireEvent.click(language);expect(screen.getByRole('radiogroup',{name:'Language'})).toBeVisible();
+ fireEvent.click(screen.getByRole('radio',{name:'Русский'}));expect(language).toHaveTextContent('Русский');expect(language).toHaveFocus();
+ fireEvent.click(screen.getByRole('button',{name:'Table density'}));fireEvent.keyDown(screen.getByRole('radio',{name:'Compact'}),{key:'ArrowDown'});expect(screen.getByRole('radio',{name:'Comfortable'})).toHaveFocus();
+ fireEvent.keyDown(screen.getByRole('radio',{name:'Comfortable'}),{key:'Escape'});expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();expect(screen.getByRole('button',{name:'Table density'})).toHaveFocus();
+ fireEvent.click(screen.getByRole('button',{name:'Automatic refresh'}));fireEvent.click(screen.getByRole('radio',{name:'Custom'}));expect(screen.getByLabelText('Interval · seconds')).toBeVisible();
+ fireEvent.click(screen.getByRole('button',{name:'Cancel'}));expect(language).toHaveTextContent('English');expect(screen.getByRole('button',{name:'Table density'})).toHaveTextContent('Compact');expect(screen.queryByLabelText('Interval · seconds')).not.toBeInTheDocument();
 });

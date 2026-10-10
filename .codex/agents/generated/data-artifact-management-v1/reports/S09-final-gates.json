@@ -1,0 +1,77 @@
+[
+  {
+    "command": [
+      ".venv/bin/ruff",
+      "check",
+      "apps/api/wiring/artifact_service.py",
+      "apps/navigator-web/e2e/artifact_fixture.py",
+      "apps/navigator-web/e2e/artifact_scenarios.py",
+      "apps/navigator-web/e2e/integrated_fixture.py",
+      "apps/navigator-web/e2e/storage_fixture.py",
+      "apps/navigator-web/e2e/storage_preflight.py",
+      "apps/scheduler/backtest_artifact_publisher/wiring/managed_app.py",
+      "apps/scheduler/backtest_artifact_publisher/wiring/managed_worker.py",
+      "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/base_storage_admission.py",
+      "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+      "tests/real_infra/backtest/test_artifact_dispatch.py",
+      "tests/real_infra/backtest/test_artifact_http_storage.py",
+      "tests/real_infra/backtest/test_artifact_integrated.py",
+      "tests/real_infra/backtest/test_automatic_base_lifecycle.py",
+      "tests/real_infra/backtest/test_managed_derivative_publication.py",
+      "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+      "tests/unit/contexts/backtest_artifacts/test_automatic_base.py",
+      "tests/unit/contexts/backtest_artifacts/test_derivative_profiles.py"
+    ],
+    "exit_code": 0,
+    "output": "All checks passed!\n"
+  },
+  {
+    "command": [
+      "apps/navigator-web/node_modules/.bin/tsc",
+      "--noEmit",
+      "-p",
+      "apps/navigator-web/tsconfig.json"
+    ],
+    "exit_code": 0,
+    "output": ""
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_docs_index",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "OK: /Users/daniildegtyarev/Projects/roehub.com/docs/architecture/README.md is up-to-date.\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_project_map",
+      "--check"
+    ],
+    "exit_code": 1,
+    "output": "Project map is out-of-date: docs/architecture/project-map/PROJECT_MAP.md, docs/architecture/project-map/project-map.json\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_runbooks",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "OK: runbooks up-to-date (9 Russian docs + JSON index)\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      ".codex/agents/generated/data-artifact-management-v1/test_ledger_update.py",
+      "-v"
+    ],
+    "exit_code": 0,
+    "output": "test_accept_requires_real_readable_evidence_and_report (__main__.LedgerUpdateTests.test_accept_requires_real_readable_evidence_and_report) ... ok\ntest_changed_plan_invalidates_accepted_dependency (__main__.LedgerUpdateTests.test_changed_plan_invalidates_accepted_dependency) ... ok\ntest_changed_updater_and_missing_entry_fail (__main__.LedgerUpdateTests.test_changed_updater_and_missing_entry_fail) ... ok\ntest_directory_lock_rejects_concurrent_transaction (__main__.LedgerUpdateTests.test_directory_lock_rejects_concurrent_transaction) ... ok\ntest_foreign_owner_and_out_of_order_fail_without_mutation (__main__.LedgerUpdateTests.test_foreign_owner_and_out_of_order_fail_without_mutation) ... ok\ntest_missing_future_input_preserves_executing_stage (__main__.LedgerUpdateTests.test_missing_future_input_preserves_executing_stage) ... ok\ntest_need_input_resume_and_terminal_block (__main__.LedgerUpdateTests.test_need_input_resume_and_terminal_block) ... ok\ntest_reconcile_preserves_terminal_history_and_completes_replacement (__main__.LedgerUpdateTests.test_reconcile_preserves_terminal_history_and_completes_replacement) ... ok\ntest_reconcile_rejects_changed_acceptance_even_with_bound_prompt (__main__.LedgerUpdateTests.test_reconcile_rejects_changed_acceptance_even_with_bound_prompt) ... ok\ntest_reconcile_rejects_missing_old_updater_and_changed_prompt (__main__.LedgerUpdateTests.test_reconcile_rejects_missing_old_updater_and_changed_prompt) ... ok\ntest_reconcile_rejects_stale_baseline_without_write (__main__.LedgerUpdateTests.test_reconcile_rejects_stale_baseline_without_write) ... ok\ntest_reconcile_uses_same_directory_lock_and_cannot_repeat_claim (__main__.LedgerUpdateTests.test_reconcile_uses_same_directory_lock_and_cannot_repeat_claim) ... ok\ntest_sequential_receipts_and_final_completion (__main__.LedgerUpdateTests.test_sequential_receipts_and_final_completion) ... ok\ntest_two_competing_claims_have_one_winner (__main__.LedgerUpdateTests.test_two_competing_claims_have_one_winner) ... ok\n\n----------------------------------------------------------------------\nRan 14 tests in 1.510s\n\nOK\n"
+  }
+]

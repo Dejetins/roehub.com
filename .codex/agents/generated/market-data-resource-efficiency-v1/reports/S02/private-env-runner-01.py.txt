@@ -1,0 +1,6 @@
+import os,sys,runpy
+from pathlib import Path
+os.environ.update(CH_HOST='127.0.0.1',CH_PORT='38123',CH_USER='s02_admin',CH_PASSWORD=Path('.cache/market-data-s02/private/admin').read_text(),ROEHUB_HISTORY_CH_TEST='1',ROEHUB_BASE_TEST_CLICKHOUSE_PORT='38123')
+for w in ('stream','interactive','backfill','artifacts'):
+ os.environ['ROEHUB_CH_'+w.upper()+'_PASSWORD_FILE']=str(Path('.cache/market-data-s02/private/classes/'+w+'.password').resolve())
+f=sys.argv.pop(1);sys.argv[0]=f;runpy.run_path(f,run_name='__main__')

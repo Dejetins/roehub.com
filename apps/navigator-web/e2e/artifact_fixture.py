@@ -1,0 +1,273 @@
+"""S07 disposable browser proof. Real artifact HTTP/service/PG; synthetic auth/candles.
+
+Run only against the task-owned roehub-s07-pg container on port 25437.
+No scheduler, installed configuration, provider or user DB is accessed.
+"""
+
+import asyncio
+import json
+from contextlib import asynccontextmanager
+from inspect import unwrap
+from pathlib import Path
+from types import SimpleNamespace
+
+from fastapi import FastAPI, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.staticfiles import StaticFiles
+
+from apps.api.dto.backtest_artifacts import Command, CommandItem, PolicyPatch
+from apps.api.routes.backtest_artifacts import build_artifact_router
+from apps.api.wiring.artifact_service import ArtifactHttpService
+from tests.real_infra.backtest import test_artifact_management as fixture
+from tests.unit.contexts.backtest_artifacts.test_management_profiles import catalog
+from trading.contexts.backtest_artifacts.application.services.management import Coordinate
+from trading.shared_kernel.primitives import OrganizationId, UserId
+
+ROOT = Path(__file__).resolve().parents[3]
+DIST = ROOT / ".cache/s07-dist"
+fixture.DSN = "host=127.0.0.1 port=25437 dbname=postgres user=postgres"
+generator = unwrap(fixture.managed)(unwrap(catalog)())
+m = next(generator)
+service = ArtifactHttpService(m["repo"], m["installation"])
+state = {"identity": "owner", "fault": "none"}
+
+for symbol in ("BTCUSDT", "ETHUSDT"):
+    c = Coordinate(exchange="binance", market_type="spot", symbol=symbol)
+    service.submit(
+        m["org"],
+        m["actor"],
+        "fixture-seed-" + symbol,
+        Command(
+            items=(
+                CommandItem(coordinate=c, expected_version=0, patch=PolicyPatch(mode="on_demand")),
+            )
+        ),
+        "policy",
+    )
+
+
+@asynccontextmanager
+async def lifespan(app):
+    yield
+    generator.close()
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+def principal():
+    return SimpleNamespace(
+        user_id=UserId(m["viewer"] if state["identity"] == "viewer" else m["actor"])
+    )
+
+
+scope = SimpleNamespace(
+    resolve=lambda **kw: SimpleNamespace(
+        organization_id=OrganizationId(m["other"] if state["identity"] == "other" else m["org"])
+    )
+)
+app.include_router(
+    build_artifact_router(service=service, current_user_dependency=principal, scope_resolver=scope)
+)
+
+
+@app.middleware("http")
+async def faults(request, call_next):
+    path = request.url.path
+    if path.startswith("/api/backtest-artifacts"):
+        if state["fault"] == "denied":
+            return JSONResponse({"detail": {"code": "forbidden"}}, status_code=403)
+        if state["fault"] == "unavailable" and request.method == "GET":
+            return JSONResponse(
+                {"detail": {"code": "service_unavailable"}},
+                status_code=503,
+                headers={"Retry-After": "3"},
+            )
+        if state["fault"] == "delay" and request.method == "GET":
+            await asyncio.sleep(2)
+        response = await call_next(request)
+        if state["fault"] == "lost" and request.method == "POST" and response.status_code == 202:
+            state["fault"] = "none"
+            return JSONResponse({}, status_code=503, headers={"Retry-After": "1"})
+        return response
+    return await call_next(request)
+
+
+@app.get("/__fixture", response_class=HTMLResponse)
+def controls():
+    return (
+        "<h1>S07 disposable fixture</h1><p>Artifact HTTP and PostgreSQL "
+        "are real. Authentication and candle data are synthetic. No "
+        'workers run.</p><form method="post" '
+        'action="/__fixture"><label>Identity<select name="identity"><optio'
+        "n>owner</option><option>viewer</option><option>other</option></se"
+        'lect></label><label>Fault<select name="fault"><option>none</optio'
+        "n><option>delay</option><option>unavailable</option><option>denie"
+        "d</option><option>lost</option></select></label><button>Apply "
+        "fixture state</button></form><a "
+        'href="/data?view=artifacts&market=1&symbol=BTCUSDT">Open Data</a>'
+    )
+
+
+@app.post("/__fixture")
+async def configure(request: Request):
+    from urllib.parse import parse_qs
+
+    form = parse_qs((await request.body()).decode())
+    for key, choices in [
+        ("identity", {"owner", "viewer", "other"}),
+        ("fault", {"none", "delay", "unavailable", "denied", "lost"}),
+    ]:
+        value = form.get(key, [""])[0]
+        if value in choices:
+            state[key] = value
+    return RedirectResponse("/data?view=artifacts&market=1&symbol=BTCUSDT", status_code=303)
+
+
+@app.get("/api/auth/current-user")
+def session():
+    return {"user_id": str(principal().user_id.value), "paid_level": "paid"}
+
+
+@app.get("/api/market-data/markets")
+def markets():
+    return {
+        "items": [
+            {
+                "market_id": 1,
+                "exchange_name": "binance",
+                "market_type": "spot",
+                "market_code": "binance:spot",
+            }
+        ]
+    }
+
+
+@app.get("/data", response_class=HTMLResponse)
+def page():
+    manifest = json.loads((DIST / ".vite/manifest.json").read_text())["src/main.tsx"]
+    styles = "".join(
+        f'<link rel="stylesheet" href="/platform-assets/{p}">' for p in manifest.get("css", [])
+    )
+    bootstrap = json.dumps(
+        {"locale": "en", "subject": str(principal().user_id.value), "client_routes": ["/data"]}
+    )
+    return (
+        '<!doctype html><html><head>'
+        '<meta name="viewport" content="width=device-width, initial-scale=1">'
+        f'{styles}</head><body><div id="platform-root"></div>'
+        f'<script id="platform-bootstrap" type="application/json">{bootstrap}</script>'
+        f'<script type="module" src="/platform-assets/{manifest["file"]}"></script>'
+        '</body></html>'
+    )
+
+
+app.mount("/platform-assets", StaticFiles(directory=DIST), name="assets")
+
+# Existing candle UI regression double. It does not claim ingestion/provider proof.
+candle_state = {"stream": False}
+NOW = "2026-10-08T00:00:00Z"
+
+
+def candle_item(symbol):
+    return dict(
+        market_id=1,
+        symbol=symbol,
+        base_asset=symbol[:3],
+        quote_asset="USDT",
+        price_step=0.01,
+        qty_step=0.001,
+        min_notional=5,
+        selected=candle_state["stream"],
+        effective=candle_state["stream"],
+        strategy_pinned=False,
+    )
+
+
+@app.get("/api/market-data/workspace/{kind}")
+def candle_read(kind: str, request: Request):
+    p = request.query_params
+    symbol = p.get("symbol", "BTCUSDT")
+    if kind == "catalog":
+        return dict(
+            snapshot_id="s07-candles",
+            refreshed_at=NOW,
+            catalog_state="fresh",
+            total=2,
+            items=[candle_item(p.get("q", "BTCUSDT"))],
+            next_cursor=None,
+        )
+    if kind == "collection":
+        return dict(
+            **candle_item(symbol),
+            strategies=[],
+            last_candle_at=NOW,
+            observed_at=NOW,
+            stream_state="running" if candle_state["stream"] else "disabled",
+        )
+    if kind == "history":
+        return dict(
+            market_id=1,
+            symbol=symbol,
+            timeframe="1m",
+            start_at="2026-10-01T00:00:00Z",
+            end_at=NOW,
+            state="complete",
+            origin_state="ready",
+            expected_candles=10080,
+            actual_candles=10080,
+            missing_candles=0,
+            coverage_percent=100,
+            observed_at=NOW,
+        )
+    if kind == "history-bounds":
+        return dict(
+            market_id=1,
+            symbol=symbol,
+            state="ready",
+            first_open_at="2026-10-01T00:00:00Z",
+            end_at=NOW,
+            observed_at=NOW,
+        )
+    if kind == "instruments":
+        return dict(
+            exchange="binance",
+            start_at="2026-10-01T00:00:00Z",
+            end_at=NOW,
+            observed_at=NOW,
+            total=2,
+            offset=0,
+            limit=50,
+            snapshot="s07-candles",
+            missing_market_ids=[],
+            items=[
+                dict(
+                    **candle_item(s),
+                    exchange_name="binance",
+                    market_type="spot",
+                    refreshed_at=NOW,
+                    strategies=[],
+                    coverage_state="complete",
+                    coverage_percent=100,
+                    actual_candles=10080,
+                    expected_candles=10080,
+                    job=None,
+                )
+                for s in ("BTCUSDT", "ETHUSDT")
+                if p.get("q", "") in s
+            ],
+        )
+    return JSONResponse({}, status_code=404)
+
+
+@app.api_route("/api/market-data/selections/{market}/{symbol}", methods=["PUT", "DELETE"])
+def candle_switch(market: int, symbol: str, request: Request):
+    candle_state["stream"] = request.method == "PUT"
+    return dict(
+        market_id=market, symbol=symbol, effective=candle_state["stream"], strategy_pinned=False
+    )
+
+
+@app.get("/api/market-data/work-requests")
+def candle_requests():
+    return dict(items=[], next_cursor=None)

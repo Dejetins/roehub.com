@@ -1,0 +1,53 @@
+{
+  "command": "apply_postgres_migrations twice on disposable fresh DB roehub_s05_migrations",
+  "elapsed_seconds": 3.0525009632110596,
+  "tables": [
+    [
+      "backtest_artifact_attempts"
+    ],
+    [
+      "backtest_artifact_build_requests"
+    ],
+    [
+      "backtest_artifact_builds"
+    ],
+    [
+      "backtest_artifact_cadence"
+    ],
+    [
+      "backtest_artifact_commands"
+    ],
+    [
+      "backtest_artifact_dispatch_state"
+    ],
+    [
+      "backtest_artifact_events"
+    ],
+    [
+      "backtest_artifact_installation_settings"
+    ],
+    [
+      "backtest_artifact_legacy_demands"
+    ],
+    [
+      "backtest_artifact_policies"
+    ],
+    [
+      "backtest_artifact_profiles"
+    ],
+    [
+      "backtest_artifact_requests"
+    ],
+    [
+      "backtest_artifact_slot_ownership"
+    ],
+    [
+      "backtest_artifact_slot_readers"
+    ],
+    [
+      "backtest_artifact_source_state"
+    ]
+  ],
+  "installation_rows": 0,
+  "exit_code": 0
+}

@@ -1,0 +1,7 @@
+# Uniform chart timeline — 2026-10-07
+
+Navigator only: all four slider-producing components (OverviewChart, OperationsChart, PriceChart, results performance chart) now share chart-timeline.ts geometry: height32px, bottom4px, handleSize100%, moveHandleSize7px. Previous sliders were18px. Existing grid bottom62px and plot/container sizes unchanged; extra slider height uses existing footer whitespace. Existing colors, zoom semantics, ranges and ownership retained. platform-web untouched.
+
+Checks: pnpm typecheck/build passed; report-ui suite15 tests passed. Build retains existing chunk-size warning. IAB exercised Overview Equity/Return/Drawdown, Strategy Equity/Price & executions/Drawdown, Backtests Equity/Price & trades/Drawdown. Strategy price slider left handle dragged successfully (visible selected range and candle interval changed). Screenshots show larger handles without axis-label overlap. Overview390×844 no document horizontal overflow; expanded mobile slider visible and usable, screenshot saved. Viewport reset and browser returned to Strategies. Browser error log empty. No new tests for static geometry; existing behavior suite reused. Local preview rebuilt/restarted, collector preserved.
+
+Focused self-review. Compatibility: compatible-change for visual sizing, none for API/storage. All slider definitions discovered by rg now use the shared geometry; charts without timelines were not given new ones. Every data/locale combination was not separately exercised. No publication.

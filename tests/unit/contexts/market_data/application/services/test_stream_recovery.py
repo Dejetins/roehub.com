@@ -17,7 +17,10 @@ from trading.contexts.market_data.application.services.insert_buffer import (
     AsyncRawInsertBuffer,
     UnflushedBufferError,
 )
-from trading.contexts.market_data.application.services.rest_fill_queue import AsyncRestFillQueue
+from trading.contexts.market_data.application.services.rest_fill_queue import (
+    AsyncRestFillQueue,
+    RestFillQueueHooks,
+)
 from trading.contexts.market_data.application.services.source_retry import TemporarySourceError
 from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, TimeRange, UtcTimestamp
 
@@ -378,13 +381,16 @@ def test_empty_rest_result_cannot_acknowledge_received_ws_minute():
     from trading.contexts.market_data.application.services.ingestion_retry import (
         TemporaryIngestionError,
     )
+
     class Index:
         def __init__(self, rows):
             self.rows = rows
+
         def distinct_ts_opens(self, **kwargs):
             return self.rows
-    received = replace(task(), reason='ws_recovery')
-    with pytest.raises(TemporaryIngestionError, match='source_incomplete'):
+
+    received = replace(task(), reason="ws_recovery")
+    with pytest.raises(TemporaryIngestionError, match="source_incomplete"):
         verify_received_range(received, Index([]))
     verify_received_range(received, Index([received.time_range.start]))
 
@@ -394,19 +400,29 @@ def test_insert_success_with_ack_failure_keeps_receipt_for_idempotent_restart():
         class FailingAck(MemoryReceipts):
             def complete_many(self, entries):
                 raise ConnectionError()
+
         store = FailingAck()
         saved = []
+
         async def write(rows):
             saved.extend(rows)
-        buffer = AsyncRawInsertBuffer(writer=_RecordingWriter(), clock=_MonotonicClock(NOW),
-                                      flush_interval_ms=5, max_buffer_rows=2, store=store,
-                                      async_writer=write, retry_base_s=10)
+
+        buffer = AsyncRawInsertBuffer(
+            writer=_RecordingWriter(),
+            clock=_MonotonicClock(NOW),
+            flush_interval_ms=5,
+            max_buffer_rows=2,
+            store=store,
+            async_writer=write,
+            retry_base_s=10,
+        )
         await buffer.start()
         buffer.submit(_row(NOW, NOW))
-        await asyncio.sleep(.04)
+        await asyncio.sleep(0.04)
         with pytest.raises(UnflushedBufferError):
             await buffer.close()
         assert saved and len(store.pending()) == 1
+
     asyncio.run(scenario())
 
 
@@ -426,8 +442,11 @@ def test_buffer_coalesces_first_arrival_and_drains_inflight_arrivals():
                 drained.set()
 
         buffer = AsyncRawInsertBuffer(
-            writer=_RecordingWriter(), clock=_MonotonicClock(NOW),
-            flush_interval_ms=300, max_buffer_rows=10, async_writer=write,
+            writer=_RecordingWriter(),
+            clock=_MonotonicClock(NOW),
+            flush_interval_ms=300,
+            max_buffer_rows=10,
+            async_writer=write,
         )
         await buffer.start()
         # No global timer phase should split two arrivals within one batch interval.
@@ -444,5 +463,92 @@ def test_buffer_coalesces_first_arrival_and_drains_inflight_arrivals():
         await asyncio.wait_for(drained.wait(), 0.15)
         await buffer.close()
         assert [len(batch) for batch in batches] == [2, 1]
+
+    asyncio.run(scenario())
+
+
+def test_history_admission_cooldown_dedup_and_terminal_isolation_survive_restart():
+    from trading.contexts.market_data.application.services.source_retry import (
+        IncompleteHistoryError,
+    )
+
+    async def scenario():
+        instrument = InstrumentId(MarketId(1), Symbol("ACTUSDT"))
+        task = RestFillTask(
+            instrument,
+            TimeRange(UtcTimestamp(NOW), UtcTimestamp(NOW + timedelta(minutes=1))),
+            "stream_history_repair",
+        )
+        calls = []
+
+        async def unavailable(work):
+            calls.append(work)
+            raise IncompleteHistoryError()
+
+        store = MemoryReceipts()
+        queue = AsyncRestFillQueue(async_executor=unavailable, worker_count=1, store=store)
+        assert await queue.enqueue(task)
+        entry = store.pending()[0]
+        key = entry.task_key
+        await queue._run_task(key, entry)
+        longer = replace(
+            task,
+            time_range=TimeRange(task.time_range.start, UtcTimestamp(NOW + timedelta(minutes=2))),
+        )
+        assert not await queue.enqueue(longer)  # fresh now cannot bypass cooldown
+        for _ in range(3):
+            await queue._run_task(key, store.pending()[0])
+        assert len(calls) == 4 and not store.pending()
+        assert not await queue.enqueue(longer)
+        restarted = AsyncRestFillQueue(
+            async_executor=unavailable,
+            worker_count=1,
+            store=store,
+            failed_history_repairs=queue._blocked_history,
+        )
+        assert not await restarted.enqueue(longer)
+        other = replace(task, instrument_id=InstrumentId(MarketId(1), Symbol("ADAUSDT")))
+        assert await restarted.enqueue(other)  # one permanent gap never stops siblings
+        later = replace(
+            task,
+            time_range=TimeRange(
+                UtcTimestamp(NOW + timedelta(minutes=3)), UtcTimestamp(NOW + timedelta(minutes=4))
+            ),
+        )
+        assert await restarted.enqueue(later)  # manual repair can move beyond blocked interval
+
+    asyncio.run(scenario())
+
+
+def test_disable_history_preparation_finishes_current_window_only():
+    async def scenario():
+        store = MemoryReceipts()
+        wanted = True
+        windows = []
+        cancelled = asyncio.Event()
+        original = replace(task(), reason="stream_history_repair", time_range=TimeRange(
+            UtcTimestamp(NOW), UtcTimestamp(NOW + timedelta(minutes=5))))
+
+        async def should_run(_):
+            return wanted
+
+        async def fill(window):
+            nonlocal wanted
+            windows.append(window)
+            wanted = False
+            return result(window)
+
+        queue = AsyncRestFillQueue(async_executor=fill, worker_count=1, store=store,
+                                  window_minutes=1, should_run=should_run,
+                                  hooks=RestFillQueueHooks(
+                                      on_task_cancelled=lambda _: cancelled.set()))
+        await queue.start()
+        await queue.enqueue(original)
+        assert not await queue.enqueue(original)
+        await asyncio.wait_for(cancelled.wait(), 1)
+        await queue.close()
+        assert len(windows) == 1
+        assert not store.rows
+        assert queue.failure is None
 
     asyncio.run(scenario())

@@ -1,0 +1,77 @@
+...............FF.................                                       [100%]
+=================================== FAILURES ===================================
+_________________________ test_bounds_returns_min_max __________________________
+
+    def test_bounds_returns_min_max():
+        """
+        Ensure bounds query requests minute-normalized first/last values.
+    
+        Parameters:
+        - None.
+    
+        Returns:
+        - None.
+        """
+        dt1 = datetime(2026, 2, 1, 0, 0, tzinfo=timezone.utc)
+        dt2 = datetime(2026, 2, 2, 0, 0, tzinfo=timezone.utc)
+    
+        minute1 = int(dt1.timestamp() // 60)
+        minute2 = int(dt2.timestamp() // 60)
+        gw = FakeGateway([{"first_minute_key": minute1, "last_minute_key": minute2}])
+        r = ClickHouseCanonicalCandleIndexReader(gateway=gw, database="market_data")
+    
+        inst = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+        b = r.bounds(inst)
+    
+        assert b is not None
+        assert str(b[0]) == str(UtcTimestamp(dt1))
+        assert str(b[1]) == str(UtcTimestamp(dt2))
+    
+        assert gw.last_query is not None
+>       assert "min(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
+E       AssertionError: assert 'min(intDiv(toUnixTimestamp64Milli(ts_open), 60000))' in '\n        SELECT\n            minOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,\n       ...market_data.canonical_candles_1m\n        WHERE market_id = %(market_id)s\n          AND symbol = %(symbol)s\n        '
+E        +  where '\n        SELECT\n            minOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,\n       ...market_data.canonical_candles_1m\n        WHERE market_id = %(market_id)s\n          AND symbol = %(symbol)s\n        ' = <test_clickhouse_canonical_candle_index_reader.FakeGateway object at 0x11673c260>.last_query
+
+tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py:53: AssertionError
+_____________________________ test_max_ts_open_lt ______________________________
+
+    def test_max_ts_open_lt():
+        """
+        Ensure latest-ts query uses minute-normalized max expression.
+    
+        Parameters:
+        - None.
+    
+        Returns:
+        - None.
+        """
+        dt = datetime(2026, 2, 1, 12, 0, tzinfo=timezone.utc)
+        minute_key = int(dt.timestamp() // 60)
+        gw = FakeGateway([{"last_minute_key": minute_key}])
+        r = ClickHouseCanonicalCandleIndexReader(gateway=gw, database="market_data")
+    
+        inst = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+        before = UtcTimestamp(datetime(2026, 2, 1, 13, 0, tzinfo=timezone.utc))
+        out = r.max_ts_open_lt(instrument_id=inst, before=before)
+    
+        assert out is not None
+        assert str(out) == str(UtcTimestamp(dt))
+    
+        assert gw.last_query is not None
+>       assert "max(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
+E       assert 'max(intDiv(toUnixTimestamp64Milli(ts_open), 60000))' in "\n        SELECT\n            maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key\n        F... AND symbol = %(symbol)s\n          \n          AND ts_open < fromUnixTimestamp64Milli(%(before_ms)s, 'UTC')\n        "
+E        +  where "\n        SELECT\n            maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key\n        F... AND symbol = %(symbol)s\n          \n          AND ts_open < fromUnixTimestamp64Milli(%(before_ms)s, 'UTC')\n        " = <test_clickhouse_canonical_candle_index_reader.FakeGateway object at 0x11673d1c0>.last_query
+
+tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py:83: AssertionError
+=============================== warnings summary ===============================
+tests/real_infra/backtest/test_automatic_base_lifecycle.py::test_real_failure_windows_keep_valid_pointer_and_recover_ownership[disk_full]
+tests/real_infra/backtest/test_automatic_base_lifecycle.py::test_real_failure_windows_keep_valid_pointer_and_recover_ownership[crash_before]
+tests/real_infra/backtest/test_automatic_base_lifecycle.py::test_real_failure_windows_keep_valid_pointer_and_recover_ownership[crash_after]
+  /Users/daniildegtyarev/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/multiprocessing/popen_fork.py:66: DeprecationWarning: This process (pid=13213) is multi-threaded, use of fork() may lead to deadlocks in the child.
+    self.pid = os.fork()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py::test_bounds_returns_min_max
+FAILED tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py::test_max_ts_open_lt
+2 failed, 32 passed, 3 warnings in 14.22s

@@ -1,0 +1,10 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "tools.docs.generate_docs_index",
+    "--check"
+  ],
+  "exit_code": 0,
+  "output": "OK: /Users/daniildegtyarev/Projects/roehub.com/docs/architecture/README.md is up-to-date.\n"
+}

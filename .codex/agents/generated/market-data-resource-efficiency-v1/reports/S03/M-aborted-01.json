@@ -1,0 +1,6 @@
+{
+  "attempt": "baseline-M-01.json",
+  "reason": "Required Bybit 403 Retry-After preservation correction discovered after freeze; interrupted first baseline by SIGINT; all raw result/log retained. Excluded from final comparable series.",
+  "replacement": "full six-run series M2 on fresh equivalent fixtures and candidate freeze02",
+  "not_a_performance_selection": true
+}

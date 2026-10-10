@@ -1,0 +1,200 @@
+{
+  "schema_version": "market-data-resource-comparison/v1",
+  "stage": "S04",
+  "label": "candidate",
+  "fixture": {
+    "streams": 4,
+    "stored_coordinates": 102,
+    "seed_minutes": 2880,
+    "sparse_every": 7,
+    "bursts": 2,
+    "cadence_s": 0.2,
+    "buffer_rows": 1000,
+    "flush_ms": 100,
+    "warmup_bursts": 3,
+    "post_drain_s": 5
+  },
+  "fixture_sha256": "fc515190d3e172311c18836703b376e8d736594350bc5b92cfa64e33a24b3a67",
+  "harness_sha256": "ec60aec4306c119ab361fc3d67b87418ab27e46264d55eed4e25673ac0e5f08e",
+  "python": "3.12.12",
+  "platform": "macOS-26.7-arm64-arm-64bit",
+  "source": ".",
+  "samples": [
+    {
+      "elapsed_s": 1.0498313330463134,
+      "worker_child_rss_bytes": 478216192,
+      "ch": {
+        "jemalloc.allocated": 152360840.0,
+        "MemoryResident": 338264064.0,
+        "MemoryTracking": 106475397
+      },
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 480882688,
+      "pg_cgroup_bytes": 90894336
+    },
+    {
+      "elapsed_s": 2.1630504580098204,
+      "worker_child_rss_bytes": 478248960,
+      "ch": {
+        "jemalloc.allocated": 152263528.0,
+        "MemoryResident": 339705856.0,
+        "MemoryTracking": 106529903
+      },
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 481415168,
+      "pg_cgroup_bytes": 91717632
+    },
+    {
+      "elapsed_s": 3.2637975410325453,
+      "worker_child_rss_bytes": 478232576,
+      "ch": {
+        "jemalloc.allocated": 152375712.0,
+        "MemoryResident": 336666624.0,
+        "MemoryTracking": 106581079
+      },
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 478498816,
+      "pg_cgroup_bytes": 90808320
+    },
+    {
+      "elapsed_s": 4.375671791029163,
+      "worker_child_rss_bytes": 478232576,
+      "ch": {
+        "jemalloc.allocated": 152375104.0,
+        "MemoryResident": 335245312.0,
+        "MemoryTracking": 106632255
+      },
+      "pg_connections": 1,
+      "ch_cgroup_bytes": 476119040,
+      "pg_cgroup_bytes": 91619328
+    },
+    {
+      "elapsed_s": 5.477890375012066,
+      "worker_child_rss_bytes": 478232576,
+      "ch": {
+        "jemalloc.allocated": 152367520.0,
+        "MemoryResident": 335335424.0,
+        "MemoryTracking": 106683623
+      },
+      "pg_connections": 0,
+      "ch_cgroup_bytes": 476184576,
+      "pg_cgroup_bytes": 90824704
+    }
+  ],
+  "failures": [],
+  "before_memory": {
+    "jemalloc.allocated": 164281984.0,
+    "MemoryResident": 508366848.0
+  },
+  "before_cgroups": {
+    "roehub-s04-pg": {
+      "memory.current": "88825856",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "cpu.stat": "usage_usec 784620\nuser_usec 400612\nsystem_usec 384007\nnice_usec 0\nnr_periods 108\nnr_throttled 2\nthrottled_usec 7132\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=270336 wbytes=55066624 rios=6 wios=2207 dbytes=0 dios=0"
+    },
+    "roehub-s04-clickhouse-1": {
+      "memory.current": "473964544",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "cpu.stat": "usage_usec 10395671\nuser_usec 5758905\nsystem_usec 4636765\nnice_usec 0\nnr_periods 2156\nnr_throttled 3\nthrottled_usec 224554\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=244568064 wbytes=3641344 rios=4916 wios=642 dbytes=0 dios=0"
+    }
+  },
+  "pg_before": [
+    11,
+    0,
+    2
+  ],
+  "started_epoch": 1791668509,
+  "cpu_before": 1.064628,
+  "completion_s": 0.21991662500659004,
+  "occupancy_peak": [
+    4,
+    4,
+    29200
+  ],
+  "loop": {
+    "p50_ms": 0.1569580053910613,
+    "p95_ms": 0.18091598758473992,
+    "p99_ms": 0.2127080224454403
+  },
+  "loop_max_ms": 0.29720901511609554,
+  "parent_cpu_s": 0.06804800000000011,
+  "post_drain_memory": {
+    "jemalloc.allocated": 152311760.0,
+    "MemoryResident": 331825152.0
+  },
+  "pg_after": [
+    15,
+    0,
+    2
+  ],
+  "accepted": 8,
+  "acknowledged": 8,
+  "pg_transactions": 4,
+  "pg_sessions_created": 0,
+  "pg_tx_per_candle": 0.5,
+  "pg_sessions_per_candle": 0.0,
+  "receive_to_ack": {
+    "p50_ms": 17.730249965097755,
+    "p95_ms": 118.15762502374128,
+    "p99_ms": 118.15762502374128
+  },
+  "receipt_to_ack": {
+    "p50_ms": 10.517624963540584,
+    "p95_ms": 112.01962502673268,
+    "p99_ms": 112.01962502673268
+  },
+  "scheduled_to_ack": {
+    "p50_ms": 17.991375003475696,
+    "p95_ms": 120.11333304690197,
+    "p99_ms": 120.11333304690197
+  },
+  "dispatch_lag": {
+    "p50_ms": 0.515083025675267,
+    "p95_ms": 1.9977500196546316,
+    "p99_ms": 1.9977500196546316
+  },
+  "canonical_count": 8,
+  "canonical_sha256": "cd43fb7429cdac9b25e0496bea12e3c1c2cf862d82817bdd4b5733b1a2277f8e",
+  "pending_after": 0,
+  "after_cgroups": {
+    "roehub-s04-pg": {
+      "memory.current": "87404544",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "cpu.stat": "usage_usec 883223\nuser_usec 453547\nsystem_usec 429676\nnice_usec 0\nnr_periods 132\nnr_throttled 2\nthrottled_usec 7132\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=270336 wbytes=55107584 rios=6 wios=2215 dbytes=0 dios=0"
+    },
+    "roehub-s04-clickhouse-1": {
+      "memory.current": "488366080",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+      "cpu.stat": "usage_usec 10754704\nuser_usec 5975812\nsystem_usec 4778892\nnice_usec 0\nnr_periods 2233\nnr_throttled 3\nthrottled_usec 224554\nnr_bursts 0\nburst_usec 0",
+      "io.stat": "254:0 rbytes=260431872 wbytes=3649536 rios=5023 wios=644 dbytes=0 dios=0"
+    }
+  },
+  "query_metrics": [
+    [
+      "QueryStart",
+      4,
+      0,
+      0,
+      0
+    ],
+    [
+      "QueryFinish",
+      4,
+      58,
+      5624,
+      5744117
+    ]
+  ],
+  "checks": {
+    "all_accepted": true,
+    "all_acknowledged": true,
+    "all_canonical": true,
+    "empty_journal": true,
+    "bounded_rows": true,
+    "bounded_bytes": true,
+    "samples_ok": true
+  }
+}

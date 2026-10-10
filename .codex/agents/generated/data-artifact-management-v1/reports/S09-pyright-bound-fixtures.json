@@ -1,0 +1,78 @@
+{
+    "version": "1.1.408",
+    "time": "1791491845452",
+    "generalDiagnostics": [
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_fixture.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"__wrapped__\" for class \"FunctionType\"\n  Attribute \"__wrapped__\" is unknown",
+            "range": {
+                "start": {
+                    "line": 40,
+                    "character": 28
+                },
+                "end": {
+                    "line": 40,
+                    "character": 39
+                }
+            },
+            "rule": "reportFunctionMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_fixture.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"__wrapped__\" for class \"FunctionType\"\n  Attribute \"__wrapped__\" is unknown",
+            "range": {
+                "start": {
+                    "line": 40,
+                    "character": 48
+                },
+                "end": {
+                    "line": 40,
+                    "character": 59
+                }
+            },
+            "rule": "reportFunctionMemberAccess"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_fixture.py",
+            "severity": "error",
+            "message": "Argument of type \"str\" cannot be assigned to parameter \"obj\" of type \"LiteralString\" in function \"__init__\"\n  \"str\" is not assignable to \"LiteralString\"",
+            "range": {
+                "start": {
+                    "line": 309,
+                    "character": 16
+                },
+                "end": {
+                    "line": 309,
+                    "character": 96
+                }
+            },
+            "rule": "reportArgumentType"
+        },
+        {
+            "file": "/Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web/e2e/storage_preflight.py",
+            "severity": "error",
+            "message": "Cannot access attribute \"__wrapped__\" for class \"FunctionType\"\n  Attribute \"__wrapped__\" is unknown",
+            "range": {
+                "start": {
+                    "line": 31,
+                    "character": 48
+                },
+                "end": {
+                    "line": 31,
+                    "character": 59
+                }
+            },
+            "rule": "reportFunctionMemberAccess"
+        }
+    ],
+    "summary": {
+        "filesAnalyzed": 1598,
+        "errorCount": 4,
+        "warningCount": 0,
+        "informationCount": 0,
+        "timeInSec": 17.302
+    }
+}
+

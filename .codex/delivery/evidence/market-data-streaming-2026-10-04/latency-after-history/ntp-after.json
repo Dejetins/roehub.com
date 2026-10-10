@@ -1,0 +1,28 @@
+[
+  {
+    "at": "2026-10-04T19:17:06.238834+00:00",
+    "server": "time.cloudflare.com",
+    "stratum": 3,
+    "round_trip_ms": 136.60430908203125,
+    "offset_ms": 155.79986572265625,
+    "offset_lower_ms": 87.49771118164062,
+    "offset_upper_ms": 224.10202026367188
+  },
+  {
+    "at": "2026-10-04T19:17:06.367365+00:00",
+    "server": "time.cloudflare.com",
+    "stratum": 3,
+    "round_trip_ms": 127.9304027557373,
+    "offset_ms": 150.34449100494385,
+    "offset_lower_ms": 86.3792896270752,
+    "offset_upper_ms": 214.3096923828125
+  },
+  {
+    "server": "time.apple.com",
+    "error_type": "TimeoutError"
+  },
+  {
+    "server": "time.apple.com",
+    "error_type": "TimeoutError"
+  }
+]

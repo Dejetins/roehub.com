@@ -1,0 +1,24 @@
+/Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:184:32 - error: "query" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:200:32 - error: "query" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:230:16 - error: "close" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:283:31 - error: "command" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:295:20 - error: "command" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:307:41 - error: "command" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:322:28 - error: "command" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:349:35 - error: "query" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:353:40 - error: "command" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:356:39 - error: "query" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:359:38 - error: "command" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:362:39 - error: "command" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:384:46 - error: "query" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:388:40 - error: "query" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:392:16 - error: "command" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:393:42 - error: "query" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:400:31 - error: "query" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:412:16 - error: "command" is not a known attribute of "None" (reportOptionalMemberAccess)
+  /Users/daniildegtyarev/Projects/roehub.com/tools/qa/market_data_mixed_load.py:413:16 - error: "close" is not a known attribute of "None" (reportOptionalMemberAccess)
+19 errors, 0 warnings, 0 informations
+WARNING: there is a new pyright version available (v1.1.408 -> v1.1.414).
+Please install the new version or set PYRIGHT_PYTHON_FORCE_VERSION to `latest`
+

@@ -1,0 +1,13 @@
+{
+  "command": [
+    "uv",
+    "build",
+    "--wheel",
+    "--offline",
+    "--no-build-isolation",
+    "--out-dir",
+    "/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/s09-wheel-qak_e5pq"
+  ],
+  "exit_code": 2,
+  "output": "Building wheel...\nTraceback (most recent call last):\n  File \"<string>\", line 8, in <module>\nModuleNotFoundError: No module named 'hatchling'\n  \u00d7 Failed to build `/Users/daniildegtyarev/Projects/roehub.com`\n  \u251c\u2500\u25b6 The build backend returned an error\n  \u2570\u2500\u25b6 Call to `hatchling.build.build_wheel` failed (exit status: 1)\n\n      hint: This error likely indicates that `roehub@0.1.0` depends\n      on `hatchling`, but doesn't declare it as a build dependency. If\n      `roehub` is a first-party package, consider adding `hatchling`\n      to its `build-system.requires`. Otherwise, either add it to your\n      `pyproject.toml` under:\n\n      [tool.uv.extra-build-dependencies]\n      roehub = [\"hatchling\"]\n\n      or `uv pip install hatchling` into the environment and re-run with\n      `--no-build-isolation`.\n"
+}

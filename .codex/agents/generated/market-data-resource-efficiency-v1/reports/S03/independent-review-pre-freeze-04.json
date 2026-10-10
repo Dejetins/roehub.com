@@ -1,0 +1,19 @@
+{
+  "time": "2026-10-10T20:25:02.312284+00:00",
+  "reviewer": "/root/s03_review",
+  "verdict": "No new blockers to full M4 after final gates; short smokes are not performance evidence.",
+  "fix": "lean leaf subprocess and exclusive bounded transport pool; absolute deadline and owner EOF maintained",
+  "memory": "6/26 callers, pool4, peak<=240689152 at384MiB; noOOM/permits/children; no CH write working-set claim",
+  "method": "same fixed harness/source/config; 6 alternating paired runs; no concurrent fault/capacity checks",
+  "gates": "focused unit/realPG/ruff pass; pyright54 baseline-equivalent no new multisetdiagnostics",
+  "artifacts": {
+    "candidate-freeze-04.json": "f7c06fd42c3902534d4db1ea600c7ab38767dcec374f3c1b8dd0a9d2775f2ed9",
+    "linux-memory-probe-02.json": "1feb346846802c614a3ec74afa04a630b718c1b06aa189086181705072c4e006",
+    "unit-final-08.txt": "aa9006a2f91c9ef753cf86b5652370edde43c33d7630208517002a89969e198f",
+    "real-pg-final-08.txt": "87324ade47b9c936acad5f4e28ffcd7fe2a2ad3c360e6b760542576c893f6af3",
+    "ruff-final-08.txt": "82b3e6a6c090a57601d22943bd23fca9218d1031dbe5a7b754092f9a156b4f18",
+    "pyright-comparison-07.json": "72749d6c0a4042fc11a63acf985c05b291e52ecd5a7e084f29ed0fed972f79e1",
+    "exploratory-baseline-03.json": "f29f31174f0f27cdf19ffcbbf71d965c8648a22c9c401f7776dfed95c4a37bde",
+    "exploratory-candidate-06.json": "cccd259f76b494886649b2f66baa0b88851cfeb89ae40206e533164679cb3f39"
+  }
+}

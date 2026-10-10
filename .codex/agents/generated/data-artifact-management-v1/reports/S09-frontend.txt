@@ -1,0 +1,13 @@
+
+ RUN  v5.0.0 /Users/daniildegtyarev/Projects/roehub.com/apps/navigator-web
+
+
+ Test Files  32 passed (32)
+      Tests  323 passed (323)
+   Start at  23:24:47
+   Duration  8.49s (tests 40%, environment 34%, import 18%, transform 8%)
+
+Environment  jsdom was created 32 times · 16.98s total, 34% of tracked time
+             create it once per worker with pool: 'vmThreads' (keeps per-file isolation) or isolate: false (shares it across files)
+             learn more: https://vitest.dev/guide/improving-performance#test-environments
+

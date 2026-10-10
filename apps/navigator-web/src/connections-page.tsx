@@ -6,7 +6,7 @@ import {useTranslation} from 'react-i18next';
 import {ApiError} from './api';
 import {connectionCommand,readConnection,readConnections,readConnectionBindings,readMarkets,type Connection,type Market} from './connections-api';
 import {useReadSnapshot} from './read-snapshot';
-import {CollectionLibrary,deniesRead,DirtyGuard,Field,formatTime,ReadFeedback,RefreshButton,useWords,WorkError,WorkHeading} from './workspace-ui';
+import {CollectionLibrary,deniesRead,DirtyGuard,Field,formatTime,ReadFeedback,RefreshButton,useWords,WorkError} from './workspace-ui';
 import {Confirm} from './results';
 import {NavigatorTable} from './navigator-table';
 import {readCatalog} from './market-data-api';
@@ -21,16 +21,18 @@ export function ConnectionsPage({subject}:{subject:string}) {
   const query=useInfiniteQuery({queryKey:['connections',subject,q,status,environment],initialPageParam:'',maxPages:5,retry:false,
     queryFn:({signal,pageParam})=>readConnections(new URLSearchParams({status,q,limit:'50',...(environment?{environment}:{}),...(pageParam?{cursor:pageParam}:{})}),signal),getNextPageParam:p=>p.next_cursor??undefined});
   const markets=useQuery({queryKey:['market-sources',subject],queryFn:({signal})=>readMarkets(signal),retry:false});
-  const selected=useQuery({queryKey:['connection-detail',subject,selection],enabled:!!selection&&!creating,retry:false,
-    queryFn:async({signal}):Promise<Detail>=>{if(id)return {kind:'private',connection:await readConnection(id,signal)};
-      const result=await readMarkets(signal),market=result.items.find(m=>String(m.market_id)===source);
-      if(!market)throw new ApiError('not-found',404,'failed');return {kind:'public',market};}});
-  const view=useReadSnapshot(subject,selection,selected.isSuccess?selected.data:undefined,deniesRead(selected.error)||deniesRead(id?query.error:markets.error)||!selection||creating);
+  const selected=useQuery({queryKey:['connection-detail',subject,selection],enabled:!!id&&!creating,retry:false,
+    queryFn:async({signal}):Promise<Detail>=>({kind:'private',connection:await readConnection(id!,signal)})});
+  const publicMarket=markets.data?.items.find(m=>String(m.market_id)===source);
+  const selectionError=id?selected.error:source?(markets.error??(markets.isSuccess&&!publicMarket?new ApiError('not-found',404,'failed'):null)):null;
+  const selectionPending=id?selected.isFetching:!!source&&markets.isFetching;
+  const candidate:Detail|undefined=id?(selected.isSuccess?selected.data:undefined):markets.isSuccess&&publicMarket?{kind:'public',market:publicMarket}:undefined;
+  const view=useReadSnapshot(subject,selection,candidate,deniesRead(selectionError)||deniesRead(id?query.error:markets.error)||!selection||creating);
   const collection=useReadSnapshot(subject,`${q}:${status}:${environment}`,query.isSuccess?query.data:undefined,deniesRead(query.error)||deniesRead(selected.error));
   const list=collection.data?.pages.flatMap(p=>p.items)??[];
   function filter(name:string,value:string){const next=new URLSearchParams(params);value?next.set(name,value):next.delete(name);setParams(next,{replace:true});}
   function href(name:string,value:string){const next=new URLSearchParams(params);['connection','source','new'].forEach(k=>next.delete(k));next.set(name,value);return `/connections?${next}`;}
-  function refresh(){void query.refetch();void markets.refetch();if(selection)void selected.refetch();}
+  function refresh(){void query.refetch();void markets.refetch();if(id)void selected.refetch();}
   function changed(row:Connection){client.setQueryData(['connection-detail',subject,`private:${row.connection_id}`],{kind:'private',connection:row});void client.invalidateQueries({queryKey:['connections',subject]});setParams(new URLSearchParams({connection:row.connection_id,status:'all'}));}
   useEffect(()=>{const el=sentinel.current;if(!el)return;const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)&&query.hasNextPage&&!query.isFetching&&!query.error)void query.fetchNextPage();});observer.observe(el);return()=>observer.disconnect();},[query.hasNextPage,query.isFetching,query.error,query.fetchNextPage]);
   const detail=view.data;
@@ -45,10 +47,10 @@ export function ConnectionsPage({subject}:{subject:string}) {
       {kind!=='public'&&<><h3 className="work-list-group">{w('Private accounts','Приватные аккаунты')}</h3><ReadFeedback pending={query.isFetching} retained={collection.retained} initial={!collection.data} error={query.error}/>
         {list.map(c=><Link key={c.connection_id} className="work-object-row" to={href('connection',c.connection_id)} aria-current={id===c.connection_id?'true':undefined}><strong>{c.label||`${c.exchange_name} · ${c.market_type}`}</strong><span>{c.environment} · {stateLabel(c.status,w)}</span></Link>)}
         {!query.isPending&&!query.error&&!list.length&&<p className="work-empty">{w('No connections','Нет подключений')}</p>}<div ref={sentinel}/></>}
-    </CollectionLibrary><WorkHeading title={heading}/><div className="work-content">
+    </CollectionLibrary><h1 className="sr-only" id="workspace-heading" tabIndex={-1}>{heading}</h1><div className="work-content work-content-no-heading">
     {creating?<ConnectionForm subject={subject} onSaved={changed} onCancel={()=>setParams(new URLSearchParams())}/>:<>
-      <ReadFeedback pending={selected.isFetching} initial={!!selection&&!detail} retained={view.retained} error={selected.error}/>
-      {detail?.kind==='private'?<ConnectionDetail key={detail.connection.connection_id} subject={subject} row={detail.connection} locked={view.retained||selected.isFetching} onChanged={changed}/>:detail?.kind==='public'?<PublicSource key={detail.market.market_id} subject={subject} market={detail.market} locked={view.retained||selected.isFetching}/>:!selection?<section className="panel work-empty">{w('Select a connection or data source.','Выберите подключение или источник данных.')}</section>:null}
+      <ReadFeedback pending={!!id&&selectionPending} initial={!!id&&!detail} retained={view.retained} error={selectionError}/>
+      {detail?.kind==='private'?<ConnectionDetail key={detail.connection.connection_id} subject={subject} row={detail.connection} locked={view.retained||selectionPending} onChanged={changed}/>:detail?.kind==='public'?<PublicSource key={detail.market.market_id} subject={subject} market={detail.market} locked={view.retained||selectionPending}/>:!selection?<section className="panel work-empty">{w('Select a connection or data source.','Выберите подключение или источник данных.')}</section>:null}
     </>}</div></>;
 }
 
@@ -76,7 +78,7 @@ function PublicSource({subject,market,locked}:{subject:string;market:Market;lock
  const view=useReadSnapshot(subject,String(market.market_id),query.isSuccess?query.data:undefined,deniesRead(query.error));
  const command=useWorkSubmission(job=>navigate(`/data?market=${job.market_id}&journal=1&job=${encodeURIComponent(job.job_id)}`));
  const denied=deniesRead(query.error)||deniesRead(command.error);
- return <section className="panel"><ReadFeedback pending={query.isFetching} retained={view.retained} initial={!view.data} error={query.error}/>{!denied&&<><dl className="work-kv"><dt>{w('Provider','Провайдер')}</dt><dd>{market.exchange_name}</dd><dt>{w('Market','Рынок')}</dt><dd>{market.market_type}</dd><dt>{w('Access','Доступ')}</dt><dd>{w('Public · no private API key','Публичный · без приватного API-ключа')}</dd><dt>{w('Capabilities','Возможности')}</dt><dd>{w('Instrument catalog · historical 1m candles','Каталог инструментов · исторические свечи 1m')}</dd><dt>{w('Catalog','Каталог')}</dt><dd>{view.data?.snapshot_id?`${workState(view.data.catalog_state,w)} · ${view.data.total.toLocaleString(i18n.language)}`:w('Not loaded','Не загружен')}</dd><dt>{w('Last successful read · UTC','Успешное чтение · UTC')}</dt><dd>{formatTime(view.data?.refreshed_at,i18n.language)}</dd></dl>
+ return <section className="panel"><ReadFeedback pending={false} retained={view.retained} initial={false} error={query.error}/>{!denied&&<><dl className="work-kv"><dt>{w('Provider','Провайдер')}</dt><dd>{market.exchange_name}</dd><dt>{w('Market','Рынок')}</dt><dd>{market.market_type}</dd><dt>{w('Access','Доступ')}</dt><dd>{w('Public · no private API key','Публичный · без приватного API-ключа')}</dd><dt>{w('Capabilities','Возможности')}</dt><dd>{w('Instrument catalog · historical 1m candles','Каталог инструментов · исторические свечи 1m')}</dd><dt>{w('Catalog','Каталог')}</dt><dd>{view.data?.snapshot_id?`${workState(view.data.catalog_state,w)} · ${view.data.total.toLocaleString(i18n.language)}`:w('Not loaded','Не загружен')}</dd><dt>{w('Last successful read · UTC','Успешное чтение · UTC')}</dt><dd>{formatTime(view.data?.refreshed_at,i18n.language)}</dd></dl>
  <div className="work-actions work-section-actions"><button disabled={locked||query.isFetching||view.retained||command.pending||command.unresolved} onClick={()=>void command.submit({kind:'catalog_refresh',market_id:market.market_id})}>{command.pending?w('Requesting…','Отправка…'):w('Check source and refresh catalog','Проверить источник и обновить каталог')}</button><Link className="work-link-button" to={`/data?market=${market.market_id}`}>{w('Instruments','Инструменты')}</Link></div></>}<WorkError error={command.error}/>{command.unresolved&&<button disabled={command.pending} onClick={()=>void command.reconcile()}>{w('Check saved request','Проверить сохранённое задание')}</button>}</section>;
 }
 

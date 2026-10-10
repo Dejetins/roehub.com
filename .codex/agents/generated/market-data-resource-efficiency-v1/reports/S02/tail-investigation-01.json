@@ -1,0 +1,1009 @@
+{
+  "observed": [
+    {
+      "rep": 1,
+      "label": "baseline",
+      "stream_retries": 0,
+      "queue_wait_peak_ms": 5.926290992647409,
+      "max_latency_ms": 109.54512498574331,
+      "cgroup_full_delta": {
+        "usage_usec": 120235821,
+        "nr_periods": 3587,
+        "nr_throttled": 360,
+        "throttled_usec": 93364696
+      },
+      "top_operations": [
+        {
+          "n": 336,
+          "offered_s": 336.0,
+          "finished_s": 336.10954512498574,
+          "latency_s": 0.10954512498574331,
+          "service_s": 0.10863537498516962,
+          "attempts": 1,
+          "sample_span_s": 1.0517108750063926,
+          "cgroup_delta": {
+            "usage_usec": 503859,
+            "nr_periods": 11,
+            "nr_throttled": 2,
+            "throttled_usec": 488843
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 127,
+          "offered_s": 127.0,
+          "finished_s": 127.10830449999776,
+          "latency_s": 0.10830449999775738,
+          "service_s": 0.10373558400897309,
+          "attempts": 1,
+          "sample_span_s": 1.0665794580127113,
+          "cgroup_delta": {
+            "usage_usec": 434477,
+            "nr_periods": 10,
+            "nr_throttled": 1,
+            "throttled_usec": 282925
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 184,
+          "offered_s": 184.0,
+          "finished_s": 184.10829958302202,
+          "latency_s": 0.10829958302201703,
+          "service_s": 0.10410104203037918,
+          "attempts": 1,
+          "sample_span_s": 1.0576883750036359,
+          "cgroup_delta": {
+            "usage_usec": 458712,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 274365
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 281,
+          "offered_s": 281.0,
+          "finished_s": 281.10778187500546,
+          "latency_s": 0.10778187500545755,
+          "service_s": 0.10662079200847074,
+          "attempts": 1,
+          "sample_span_s": 1.0652328750002198,
+          "cgroup_delta": {
+            "usage_usec": 461947,
+            "nr_periods": 10,
+            "nr_throttled": 1,
+            "throttled_usec": 272194
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 245,
+          "offered_s": 245.0,
+          "finished_s": 245.1076451659901,
+          "latency_s": 0.10764516599010676,
+          "service_s": 0.10430891596479341,
+          "attempts": 1,
+          "sample_span_s": 1.071056791988667,
+          "cgroup_delta": {
+            "usage_usec": 448762,
+            "nr_periods": 8,
+            "nr_throttled": 1,
+            "throttled_usec": 263381
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 294,
+          "offered_s": 294.0,
+          "finished_s": 294.10756012500497,
+          "latency_s": 0.10756012500496581,
+          "service_s": 0.10422570898663253,
+          "attempts": 1,
+          "sample_span_s": 1.047506082977634,
+          "cgroup_delta": {
+            "usage_usec": 403322,
+            "nr_periods": 10,
+            "nr_throttled": 1,
+            "throttled_usec": 308512
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 353,
+          "offered_s": 353.0,
+          "finished_s": 353.107005916012,
+          "latency_s": 0.10700591601198539,
+          "service_s": 0.10495512501802295,
+          "attempts": 1,
+          "sample_span_s": 1.0682472920161672,
+          "cgroup_delta": {
+            "usage_usec": 441954,
+            "nr_periods": 10,
+            "nr_throttled": 1,
+            "throttled_usec": 340444
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 227,
+          "offered_s": 227.0,
+          "finished_s": 227.10692637501052,
+          "latency_s": 0.1069263750105165,
+          "service_s": 0.1030862089828588,
+          "attempts": 1,
+          "sample_span_s": 1.0551061669830233,
+          "cgroup_delta": {
+            "usage_usec": 428652,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 267026
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "rep": 1,
+      "label": "candidate",
+      "stream_retries": 0,
+      "queue_wait_peak_ms": 5.694166989997029,
+      "max_latency_ms": 55.400584009476006,
+      "cgroup_full_delta": {
+        "usage_usec": 111610074,
+        "nr_periods": 3615,
+        "nr_throttled": 13,
+        "throttled_usec": 120460
+      },
+      "top_operations": [
+        {
+          "n": 359,
+          "offered_s": 359.0,
+          "finished_s": 359.0554005840095,
+          "latency_s": 0.055400584009476006,
+          "service_s": 0.052361416979692876,
+          "attempts": 1,
+          "sample_span_s": 1.0448244579602033,
+          "cgroup_delta": {
+            "usage_usec": 459217,
+            "nr_periods": 10,
+            "nr_throttled": 1,
+            "throttled_usec": 10443
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 357,
+          "offered_s": 357.0,
+          "finished_s": 357.05101658403873,
+          "latency_s": 0.051016584038734436,
+          "service_s": 0.046137000026647,
+          "attempts": 1,
+          "sample_span_s": 2.1227584169828333,
+          "cgroup_delta": {
+            "usage_usec": 897666,
+            "nr_periods": 21,
+            "nr_throttled": 1,
+            "throttled_usec": 22894
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 289,
+          "offered_s": 289.0,
+          "finished_s": 289.0499284170219,
+          "latency_s": 0.04992841702187434,
+          "service_s": 0.04687258298508823,
+          "attempts": 1,
+          "sample_span_s": 1.0484849580097944,
+          "cgroup_delta": {
+            "usage_usec": 466459,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 3945
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 207,
+          "offered_s": 207.0,
+          "finished_s": 207.0496104999911,
+          "latency_s": 0.04961049999110401,
+          "service_s": 0.0451119999634102,
+          "attempts": 1,
+          "sample_span_s": 1.0467784160282463,
+          "cgroup_delta": {
+            "usage_usec": 395271,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 9134
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 343,
+          "offered_s": 343.0,
+          "finished_s": 343.04936366702896,
+          "latency_s": 0.049363667028956115,
+          "service_s": 0.046465500025078654,
+          "attempts": 1,
+          "sample_span_s": 1.04898800002411,
+          "cgroup_delta": {
+            "usage_usec": 463548,
+            "nr_periods": 10,
+            "nr_throttled": 1,
+            "throttled_usec": 7256
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 333,
+          "offered_s": 333.0,
+          "finished_s": 333.04887275001965,
+          "latency_s": 0.04887275001965463,
+          "service_s": 0.045884374994784594,
+          "attempts": 1,
+          "sample_span_s": 1.0827065000194125,
+          "cgroup_delta": {
+            "usage_usec": 358230,
+            "nr_periods": 10,
+            "nr_throttled": 0,
+            "throttled_usec": 0
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 79,
+          "offered_s": 79.0,
+          "finished_s": 79.04870870901505,
+          "latency_s": 0.048708709015045315,
+          "service_s": 0.04696645902004093,
+          "attempts": 1,
+          "sample_span_s": 1.068741291994229,
+          "cgroup_delta": {
+            "usage_usec": 438245,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 21402
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 292,
+          "offered_s": 292.0,
+          "finished_s": 292.047913959017,
+          "latency_s": 0.047913959017023444,
+          "service_s": 0.04416699998546392,
+          "attempts": 1,
+          "sample_span_s": 1.062590207962785,
+          "cgroup_delta": {
+            "usage_usec": 359809,
+            "nr_periods": 10,
+            "nr_throttled": 0,
+            "throttled_usec": 0
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "rep": 2,
+      "label": "baseline",
+      "stream_retries": 0,
+      "queue_wait_peak_ms": 5.647499987389892,
+      "max_latency_ms": 383.92116595059633,
+      "cgroup_full_delta": {
+        "usage_usec": 138078364,
+        "nr_periods": 3610,
+        "nr_throttled": 409,
+        "throttled_usec": 114489795
+      },
+      "top_operations": [
+        {
+          "n": 100,
+          "offered_s": 100.0,
+          "finished_s": 100.3839211659506,
+          "latency_s": 0.38392116595059633,
+          "service_s": 0.3813698749872856,
+          "attempts": 1,
+          "sample_span_s": 1.0713384589762427,
+          "cgroup_delta": {
+            "usage_usec": 2247516,
+            "nr_periods": 12,
+            "nr_throttled": 10,
+            "throttled_usec": 10137452
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 102,
+          "offered_s": 102.0,
+          "finished_s": 102.3823271659785,
+          "latency_s": 0.38232716597849503,
+          "service_s": 0.37811333301942796,
+          "attempts": 1,
+          "sample_span_s": 1.2972044170019217,
+          "cgroup_delta": {
+            "usage_usec": 1362059,
+            "nr_periods": 10,
+            "nr_throttled": 6,
+            "throttled_usec": 4801008
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 118,
+          "offered_s": 118.0,
+          "finished_s": 118.28811195795424,
+          "latency_s": 0.2881119579542428,
+          "service_s": 0.2839494170038961,
+          "attempts": 1,
+          "sample_span_s": 2.3321108749951236,
+          "cgroup_delta": {
+            "usage_usec": 1466592,
+            "nr_periods": 22,
+            "nr_throttled": 6,
+            "throttled_usec": 2099286
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 101,
+          "offered_s": 101.0,
+          "finished_s": 101.28014024998993,
+          "latency_s": 0.2801402499899268,
+          "service_s": 0.27571120898937806,
+          "attempts": 1,
+          "sample_span_s": 1.164752833021339,
+          "cgroup_delta": {
+            "usage_usec": 2552166,
+            "nr_periods": 13,
+            "nr_throttled": 13,
+            "throttled_usec": 13060018
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 117,
+          "offered_s": 117.0,
+          "finished_s": 117.10885787499137,
+          "latency_s": 0.10885787499137223,
+          "service_s": 0.10566679202020168,
+          "attempts": 1,
+          "sample_span_s": 1.1325263750040904,
+          "cgroup_delta": {
+            "usage_usec": 917911,
+            "nr_periods": 12,
+            "nr_throttled": 4,
+            "throttled_usec": 1851339
+          },
+          "nearby_merges": [
+            0,
+            2
+          ]
+        },
+        {
+          "n": 157,
+          "offered_s": 157.0,
+          "finished_s": 157.10598062496865,
+          "latency_s": 0.10598062496865168,
+          "service_s": 0.10281579196453094,
+          "attempts": 1,
+          "sample_span_s": 1.0665797499823384,
+          "cgroup_delta": {
+            "usage_usec": 493768,
+            "nr_periods": 11,
+            "nr_throttled": 2,
+            "throttled_usec": 463843
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 189,
+          "offered_s": 189.0,
+          "finished_s": 189.1050852079643,
+          "latency_s": 0.10508520796429366,
+          "service_s": 0.10182470799190924,
+          "attempts": 1,
+          "sample_span_s": 1.0541768339462578,
+          "cgroup_delta": {
+            "usage_usec": 504702,
+            "nr_periods": 11,
+            "nr_throttled": 2,
+            "throttled_usec": 344958
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 190,
+          "offered_s": 190.0,
+          "finished_s": 190.1046239999705,
+          "latency_s": 0.10462399997049943,
+          "service_s": 0.10052674997132272,
+          "attempts": 1,
+          "sample_span_s": 1.046234791050665,
+          "cgroup_delta": {
+            "usage_usec": 491471,
+            "nr_periods": 10,
+            "nr_throttled": 2,
+            "throttled_usec": 385870
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "rep": 2,
+      "label": "candidate",
+      "stream_retries": 0,
+      "queue_wait_peak_ms": 5.103999981656671,
+      "max_latency_ms": 318.2672080001794,
+      "cgroup_full_delta": {
+        "usage_usec": 122690923,
+        "nr_periods": 3632,
+        "nr_throttled": 28,
+        "throttled_usec": 21550679
+      },
+      "top_operations": [
+        {
+          "n": 102,
+          "offered_s": 102.0,
+          "finished_s": 102.31826720800018,
+          "latency_s": 0.3182672080001794,
+          "service_s": 0.31801520800217986,
+          "attempts": 1,
+          "sample_span_s": 1.1166108339675702,
+          "cgroup_delta": {
+            "usage_usec": 2370637,
+            "nr_periods": 12,
+            "nr_throttled": 12,
+            "throttled_usec": 11455675
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 101,
+          "offered_s": 101.0,
+          "finished_s": 101.22249783296138,
+          "latency_s": 0.22249783296138048,
+          "service_s": 0.22227749996818602,
+          "attempts": 1,
+          "sample_span_s": 1.0536895830300637,
+          "cgroup_delta": {
+            "usage_usec": 1720977,
+            "nr_periods": 12,
+            "nr_throttled": 8,
+            "throttled_usec": 7654011
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 103,
+          "offered_s": 103.0,
+          "finished_s": 103.21942899998976,
+          "latency_s": 0.21942899998975918,
+          "service_s": 0.21859287499682978,
+          "attempts": 1,
+          "sample_span_s": 1.2055019580293447,
+          "cgroup_delta": {
+            "usage_usec": 971898,
+            "nr_periods": 10,
+            "nr_throttled": 4,
+            "throttled_usec": 2158601
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 321,
+          "offered_s": 321.0,
+          "finished_s": 321.12255099997856,
+          "latency_s": 0.12255099997855723,
+          "service_s": 0.120076458028052,
+          "attempts": 1,
+          "sample_span_s": 1.0576539160101674,
+          "cgroup_delta": {
+            "usage_usec": 414602,
+            "nr_periods": 10,
+            "nr_throttled": 1,
+            "throttled_usec": 49198
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 345,
+          "offered_s": 345.0,
+          "finished_s": 345.08155254198937,
+          "latency_s": 0.08155254198936746,
+          "service_s": 0.07842679199529812,
+          "attempts": 1,
+          "sample_span_s": 1.0499427079921588,
+          "cgroup_delta": {
+            "usage_usec": 539970,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 13100
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 322,
+          "offered_s": 322.0,
+          "finished_s": 322.05808041698765,
+          "latency_s": 0.058080416987650096,
+          "service_s": 0.05688391701551154,
+          "attempts": 1,
+          "sample_span_s": 1.0609210839611478,
+          "cgroup_delta": {
+            "usage_usec": 459024,
+            "nr_periods": 11,
+            "nr_throttled": 0,
+            "throttled_usec": 0
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 301,
+          "offered_s": 301.0,
+          "finished_s": 301.0551502080052,
+          "latency_s": 0.05515020800521597,
+          "service_s": 0.05013287503970787,
+          "attempts": 1,
+          "sample_span_s": 1.0453616249724291,
+          "cgroup_delta": {
+            "usage_usec": 350208,
+            "nr_periods": 11,
+            "nr_throttled": 0,
+            "throttled_usec": 0
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 359,
+          "offered_s": 359.0,
+          "finished_s": 359.0542492499808,
+          "latency_s": 0.05424924998078495,
+          "service_s": 0.05148716701660305,
+          "attempts": 1,
+          "sample_span_s": 1.0472879580338486,
+          "cgroup_delta": {
+            "usage_usec": 425962,
+            "nr_periods": 10,
+            "nr_throttled": 0,
+            "throttled_usec": 0
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "rep": 3,
+      "label": "baseline",
+      "stream_retries": 0,
+      "queue_wait_peak_ms": 5.146541981957853,
+      "max_latency_ms": 479.3990830075927,
+      "cgroup_full_delta": {
+        "usage_usec": 141250550,
+        "nr_periods": 3601,
+        "nr_throttled": 415,
+        "throttled_usec": 98896848
+      },
+      "top_operations": [
+        {
+          "n": 102,
+          "offered_s": 102.0,
+          "finished_s": 102.47939908300759,
+          "latency_s": 0.4793990830075927,
+          "service_s": 0.47530574997654185,
+          "attempts": 1,
+          "sample_span_s": 1.1635013339691795,
+          "cgroup_delta": {
+            "usage_usec": 2546220,
+            "nr_periods": 13,
+            "nr_throttled": 13,
+            "throttled_usec": 12341839
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 103,
+          "offered_s": 103.0,
+          "finished_s": 103.3844913750072,
+          "latency_s": 0.384491375007201,
+          "service_s": 0.3801575829857029,
+          "attempts": 1,
+          "sample_span_s": 2.454740084009245,
+          "cgroup_delta": {
+            "usage_usec": 3882639,
+            "nr_periods": 23,
+            "nr_throttled": 19,
+            "throttled_usec": 15822920
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 202,
+          "offered_s": 202.0,
+          "finished_s": 202.10021366702858,
+          "latency_s": 0.10021366702858359,
+          "service_s": 0.0981842500041239,
+          "attempts": 1,
+          "sample_span_s": 1.1371159160044044,
+          "cgroup_delta": {
+            "usage_usec": 559667,
+            "nr_periods": 11,
+            "nr_throttled": 2,
+            "throttled_usec": 327018
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 272,
+          "offered_s": 272.0,
+          "finished_s": 272.0976915420033,
+          "latency_s": 0.09769154200330377,
+          "service_s": 0.09717237501172349,
+          "attempts": 1,
+          "sample_span_s": 2.209881749993656,
+          "cgroup_delta": {
+            "usage_usec": 924640,
+            "nr_periods": 20,
+            "nr_throttled": 3,
+            "throttled_usec": 664386
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 204,
+          "offered_s": 204.0,
+          "finished_s": 204.09767587500392,
+          "latency_s": 0.09767587500391528,
+          "service_s": 0.0941821250016801,
+          "attempts": 1,
+          "sample_span_s": 1.0892960000201128,
+          "cgroup_delta": {
+            "usage_usec": 498489,
+            "nr_periods": 10,
+            "nr_throttled": 2,
+            "throttled_usec": 268288
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 347,
+          "offered_s": 347.0,
+          "finished_s": 347.0970755830058,
+          "latency_s": 0.09707558300578967,
+          "service_s": 0.09432350000133738,
+          "attempts": 1,
+          "sample_span_s": 1.0494390829699114,
+          "cgroup_delta": {
+            "usage_usec": 472752,
+            "nr_periods": 11,
+            "nr_throttled": 2,
+            "throttled_usec": 391554
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 228,
+          "offered_s": 228.0,
+          "finished_s": 228.09684975002892,
+          "latency_s": 0.09684975002892315,
+          "service_s": 0.09353366703726351,
+          "attempts": 1,
+          "sample_span_s": 1.0573171660071239,
+          "cgroup_delta": {
+            "usage_usec": 513188,
+            "nr_periods": 10,
+            "nr_throttled": 2,
+            "throttled_usec": 269529
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 205,
+          "offered_s": 205.0,
+          "finished_s": 205.09622983302688,
+          "latency_s": 0.09622983302688226,
+          "service_s": 0.09230233303969726,
+          "attempts": 1,
+          "sample_span_s": 1.0595228339661844,
+          "cgroup_delta": {
+            "usage_usec": 450505,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 202156
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        }
+      ]
+    },
+    {
+      "rep": 3,
+      "label": "candidate",
+      "stream_retries": 0,
+      "queue_wait_peak_ms": 5.113708029966801,
+      "max_latency_ms": 222.97833301126957,
+      "cgroup_full_delta": {
+        "usage_usec": 125510396,
+        "nr_periods": 3633,
+        "nr_throttled": 49,
+        "throttled_usec": 19685001
+      },
+      "top_operations": [
+        {
+          "n": 101,
+          "offered_s": 101.0,
+          "finished_s": 101.22297833301127,
+          "latency_s": 0.22297833301126957,
+          "service_s": 0.21883833303581923,
+          "attempts": 1,
+          "sample_span_s": 1.048381042026449,
+          "cgroup_delta": {
+            "usage_usec": 1771190,
+            "nr_periods": 12,
+            "nr_throttled": 8,
+            "throttled_usec": 8074034
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 102,
+          "offered_s": 102.0,
+          "finished_s": 102.21150441700593,
+          "latency_s": 0.21150441700592637,
+          "service_s": 0.20912041701376438,
+          "attempts": 1,
+          "sample_span_s": 1.2040943329920992,
+          "cgroup_delta": {
+            "usage_usec": 2559168,
+            "nr_periods": 13,
+            "nr_throttled": 13,
+            "throttled_usec": 10616351
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 234,
+          "offered_s": 234.0,
+          "finished_s": 234.14327870798297,
+          "latency_s": 0.14327870798297226,
+          "service_s": 0.13952612498542294,
+          "attempts": 1,
+          "sample_span_s": 1.075407374999486,
+          "cgroup_delta": {
+            "usage_usec": 582757,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 107916
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 333,
+          "offered_s": 333.0,
+          "finished_s": 333.1336633330211,
+          "latency_s": 0.13366333302110434,
+          "service_s": 0.13222825003322214,
+          "attempts": 1,
+          "sample_span_s": 1.0914176250225864,
+          "cgroup_delta": {
+            "usage_usec": 505266,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 104940
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 209,
+          "offered_s": 209.0,
+          "finished_s": 209.13206770800753,
+          "latency_s": 0.13206770800752565,
+          "service_s": 0.12863504100823775,
+          "attempts": 1,
+          "sample_span_s": 1.0542831670027226,
+          "cgroup_delta": {
+            "usage_usec": 580666,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 107923
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 211,
+          "offered_s": 211.0,
+          "finished_s": 211.11935866699787,
+          "latency_s": 0.11935866699786857,
+          "service_s": 0.11432816699380055,
+          "attempts": 1,
+          "sample_span_s": 1.0938311659847386,
+          "cgroup_delta": {
+            "usage_usec": 514098,
+            "nr_periods": 10,
+            "nr_throttled": 1,
+            "throttled_usec": 100357
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 332,
+          "offered_s": 332.0,
+          "finished_s": 332.07447662501363,
+          "latency_s": 0.07447662501363084,
+          "service_s": 0.07064383302349597,
+          "attempts": 1,
+          "sample_span_s": 1.0465859160176478,
+          "cgroup_delta": {
+            "usage_usec": 508825,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 84688
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        },
+        {
+          "n": 210,
+          "offered_s": 210.0,
+          "finished_s": 210.07113762502559,
+          "latency_s": 0.0711376250255853,
+          "service_s": 0.0660953750484623,
+          "attempts": 1,
+          "sample_span_s": 1.0696011669933796,
+          "cgroup_delta": {
+            "usage_usec": 582352,
+            "nr_periods": 11,
+            "nr_throttled": 1,
+            "throttled_usec": 32205
+          },
+          "nearby_merges": [
+            0,
+            0
+          ]
+        }
+      ]
+    }
+  ],
+  "interpretation": "All stream operations succeed on attempt 1; tails are service-time events, not admission backoff. Candidate and baseline show short spikes near 100-103s. Cgroup throttle counters and 1s samples expose shared CPU pressure but cannot assign a subsecond cause. Do not claim isolated causal attribution or a live-p99 improvement.",
+  "resolution": "Median live p99 +14.6%, paired deltas -58.2/-156.7/+36.0ms and overlapping ranges: direction inconclusive. Retain measured regression, no universal latency claim/SLO pass. Accept only bounded resource isolation/correctness with explicit performance limitation; CPU/IO reservation and tail guarantee are outside D2.",
+  "sampling_limit": "Baseline workload uses s02_admin; active query sampler excludes that identity, so baseline per-user active counts are unavailable. Tagged query-log aggregates and global memory/CPU/IO remain comparable."
+}

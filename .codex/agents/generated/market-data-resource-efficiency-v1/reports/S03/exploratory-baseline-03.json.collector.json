@@ -1,0 +1,12 @@
+{
+  "completed": 2,
+  "retries": 0,
+  "latency_s": [
+    0.7871530830161646,
+    0.015620833029970527
+  ],
+  "maxrss": 233422848,
+  "cpu_s": 0.649207,
+  "provider_admission": {},
+  "process_family_cpu_s": 0.767727
+}

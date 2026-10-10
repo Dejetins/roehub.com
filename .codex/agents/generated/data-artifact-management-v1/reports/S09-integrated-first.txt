@@ -1,0 +1,116 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs ________
+
+dispatch = {'actor': UUID('8e23e5a9-1419-41d6-8284-803ad856ea79'), 'admin': UUID('4de80303-0365-41fd-863b-6135ae38f352'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x12587be60>, ...}
+tmp_path = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-373/test_raw_ingestion_scheduler_m0')
+
+    def test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs(dispatch, tmp_path):
+        import os
+        import re
+        from pathlib import Path
+    
+        import clickhouse_connect
+        import numpy as np
+    
+        from apps.scheduler.backtest_artifact_publisher.wiring.managed_app import compose_managed_app
+        from apps.scheduler.backtest_artifact_publisher.wiring.modules.backtest_artifact_publisher import FileBacktestArtifactPublisherHostLock
+        from tests.unit.contexts.backtest.application.services.v2 import test_prepare_pools_service as prep
+        from tests.unit.contexts.backtest_artifacts.test_automatic_base import DURATIONS
+        from tests.unit.contexts.backtest_artifacts.test_derivative_profiles import (
+            IndicatorsComputeNumbaConfig, NumbaIndicatorCompute, n, snapshot_for,
+        )
+        from trading.contexts.backtest.application.dto.input_recipe import BacktestInputRecipe
+        from trading.contexts.backtest_artifacts.adapters.outbound.persistence.clickhouse.stored_coordinates import ClickHouseStoredArtifactCoordinates
+        from trading.contexts.backtest_artifacts.application.services.v2.contracts import ArtifactRequestedRow
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_index_reader import ClickHouseCanonicalCandleIndexReader
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_reader import ClickHouseCanonicalCandleReader
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import ClickHouseConnectGateway
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import ClickHouseRawKlineWriter
+        from trading.contexts.market_data.application.services.stored_candle_signal import StoredCandleSignalWriter
+    
+        port = os.environ.get('ROEHUB_BASE_TEST_CLICKHOUSE_PORT')
+        if not port:
+            pytest.skip('explicit disposable ClickHouse required')
+        m = dispatch
+        client = clickhouse_connect.get_client(host='127.0.0.1', port=int(port))
+        db = 's09_' + uuid4().hex
+        try:
+            ddl = Path('migrations/clickhouse/market_data_ddl.sql').read_text().replace('market_data', db)
+            ddl = re.sub(r'/\*.*?\*/', '', ddl, flags=re.S)
+            ddl = re.sub(r'--[^\n]*', '', ddl)
+            for statement in ddl.split(';'):
+                if statement.strip() and not statement.strip().startswith('USE '):
+                    client.command(statement)
+            gateway = ClickHouseConnectGateway(client)
+            f, w = worker(m, tmp_path)
+            defaults = n.YamlBacktestGridDefaultsProvider.from_yaml(config_path=Path('configs/dev/indicators.yaml'))
+            runner = replace(w.publisher.runner,
+                canonical_candle_reader=ClickHouseCanonicalCandleReader(gateway, db),
+                indicator_grid_builder=n._signal_grid_builder_v2(), defaults_provider=defaults,
+                signal_rules_engine=n.BacktestSignalRulesEngineV2(defaults_provider=defaults),
+                indicator_compute=NumbaIndicatorCompute(defs=n.all_defs(), config=IndicatorsComputeNumbaConfig(numba_num_threads=1, numba_cache_dir=tmp_path / 'jit')))
+            clock = [NOW]
+            app = compose_managed_app(installation_id=m['installation'], gateway=m['db'],
+                catalog=m['catalog'], access=m['repo'].access, publisher=replace(w.publisher, runner=runner),
+                stored_coordinates=ClickHouseStoredArtifactCoordinates(gateway, db),
+                candle_index=ClickHouseCanonicalCandleIndexReader(gateway, db), root=f.builder.root,
+                root_id='backtest-primary', root_revision=1, budget_bytes=10737418240,
+                host_lock=FileBacktestArtifactPublisherHostLock(tmp_path / 'host.lock'), now=lambda: clock[0])
+            writer = StoredCandleSignalWriter(ClickHouseRawKlineWriter(gateway, db),
+                lambda instrument: app.reconciler.observe(instrument, now=clock[0]))
+            rows = n._build_canonical_rows_v2(bar_indexes=tuple(i for i in range(10080) if i != 1007))
+            writer.write_1m(rows)
+            assert client.query(f'SELECT count() FROM {db}.canonical_candles_1m FINAL').first_row[0] == 10079
+            assert app.cycle() == 'observed'
+            r = app.worker.repository
+            assert {x['state'] for x in r.rows('SELECT state FROM backtest_artifact_requests')} == {'ready'}
+            pointer = f.loader.load_current_pointer(f.coordinates)
+            manifest = f.loader.load_slot_manifest(f.coordinates, pointer.active_slot)
+            assert {p.timeframe for p in manifest.prices} == set(DURATIONS)
+            assert not manifest.signals.manifests
+            # Each materialized timeframe is checked against an independent scalar rollup.
+            one = next(p for p in manifest.prices if p.timeframe == '1m')
+            opens = np.load(manifest.path.parent / one.open_time.path)
+            values = np.load(manifest.path.parent / one.ohlcv.path)
+            for section in manifest.prices:
+                duration = DURATIONS[section.timeframe] * 60000
+                expected = []
+                for bucket in sorted(set(opens // duration)):
+                    ix = np.flatnonzero(opens // duration == bucket)
+                    if len(ix) == DURATIONS[section.timeframe] and opens[ix[0]] == bucket * duration:
+                        v = values[ix]
+                        expected.append([v[0,0], max(v[:,1]), min(v[:,2]), v[-1,3], sum(v[:,4])])
+>               np.testing.assert_allclose(np.load(manifest.path.parent / section.ohlcv.path), expected, rtol=1e-6)
+
+tests/real_infra/backtest/test_artifact_integrated.py:149: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+args = (<function assert_allclose.<locals>.compare at 0x126864220>, array([[2.881000e+03, 5.760500e+03, 2.880750e+03, 5.76025...8960e+07],
+       [5.7610000e+03, 8.6405000e+03, 5.7607500e+03, 8.6402500e+03,
+        2.0763124e+07]], dtype=float32))
+kwds = {'equal_nan': True, 'err_msg': '', 'header': 'Not equal to tolerance rtol=1e-06, atol=0', 'strict': False, ...}
+
+    @wraps(func)
+    def inner(*args, **kwds):
+        with self._recreate_cm():
+>           return func(*args, **kwds)
+E           AssertionError: 
+E           Not equal to tolerance rtol=1e-06, atol=0
+E           
+E           Mismatched elements: 1 / 10 (10%)
+E           Max absolute difference among violations: 236.
+E           Max relative difference among violations: 1.1366305e-05
+E            ACTUAL: array([[2.881000e+03, 5.760500e+03, 2.880750e+03, 5.760250e+03,
+E                   1.246896e+07],
+E                  [5.761000e+03, 8.640500e+03, 5.760750e+03, 8.640250e+03,
+E                   2.076336e+07]], dtype=float32)
+E            DESIRED: array([[2.881000e+03, 5.760500e+03, 2.880750e+03, 5.760250e+03,
+E                   1.246896e+07],
+E                  [5.761000e+03, 8.640500e+03, 5.760750e+03, 8.640250e+03,
+E                   2.076312e+07]], dtype=float32)
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/contextlib.py:81: AssertionError
+=========================== short test summary info ============================
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs
+1 failed, 3 deselected in 3.69s

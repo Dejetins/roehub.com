@@ -1,3 +1,4 @@
+import {chartTimeline} from './chart-timeline';
 import {DateRangeControl} from './date-range-control';
 import {chartPeriods,periodStart,type ChartPeriod,type TimeWindow} from './chart-period';
 import {useChartInstance} from './chart-instance';
@@ -68,7 +69,7 @@ export function OperationsChart({candles,sourceTimeframe,data,view,selected,onSe
      xAxis:view==='price'?{type:'category',data:bars.map(c=>c.timestamp),axisLabel:{formatter:(value:string|number)=>date(value).slice(0,10),hideOverlap:true,color:muted},axisPointer:{label:{formatter:(p:any)=>date(p.value)}}}:{type:'time',axisLabel:{formatter:(value:string|number)=>date(value).slice(0,10),color:muted,hideOverlap:true}},
      yAxis:{type:'value',scale:true,axisLabel:{color:muted},splitLine:{lineStyle:{color:'#293139'}}},
      dataZoom:[view==='price'?candleZoom(bars.length,zoom.current[view==='price'?timeframe:view]):{type:'inside',filterMode:'filter',zoomOnMouseWheel:'ctrl',...zoom.current[view==='price'?timeframe:view]},
-       {type:'slider',bottom:4,height:18,...zoom.current[view==='price'?timeframe:view],...(view==='price'?{labelFormatter:(_:number,value:string)=>date(value)}:{}),textStyle:{color:muted}}],
+       {...chartTimeline,...zoom.current[view==='price'?timeframe:view],...(view==='price'?{labelFormatter:(_:number,value:string)=>date(value)}:{}),textStyle:{color:muted}}],
      series:view==='price'?[
        {name:t('results.price'),type:'candlestick',barMinWidth:2,data:bars.map(c=>[c.open,c.close,c.low,c.high]),itemStyle:{color:'#65d69b',color0:'#ed958b',borderColor:'#65d69b',borderColor0:'#ed958b'},
          markLine:{symbol:'none',silent:true,label:{position:'insideEndTop',formatter:'{b}',color:muted,textBorderWidth:0,backgroundColor:'#171d23',padding:[2,4],fontSize:10},data:lines,lineStyle:{type:'dashed',color:'#a58aff'}}},

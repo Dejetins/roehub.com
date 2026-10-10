@@ -1,0 +1,25 @@
+market data work error phase=fill_window error_type=OperationalError
+market data work error phase=fill_window error_type=OperationalError
+market data work error phase=fill_window error_type=OperationalError
+market data work error phase=fill_window error_type=OperationalError
+Traceback (most recent call last):
+  File "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03/run.py", line 8, in <module>
+    f=sys.argv.pop(1);sys.argv[0]=f;runpy.run_path(f,run_name='__main__')
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-01a1273a/tools/qa/market_data_ingestion_comparison.py", line 659, in <module>
+    main()
+  File "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-candidate-01a1273a/tools/qa/market_data_ingestion_comparison.py", line 541, in main
+    runner.run_batch(executor=pool, concurrency=4)
+  File "/Users/daniildegtyarev/Projects/roehub.com/.cache/market-data-s03-baseline-01a1273a/src/trading/contexts/market_data/application/services/work_requests.py", line 142, in run_batch
+    wait(futures)
+  File "/Users/daniildegtyarev/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/concurrent/futures/_base.py", line 305, in wait
+    waiter.event.wait(timeout)
+  File "/Users/daniildegtyarev/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/threading.py", line 655, in wait
+    signaled = self._cond.wait(timeout)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/daniildegtyarev/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/threading.py", line 355, in wait
+    waiter.acquire()
+KeyboardInterrupt

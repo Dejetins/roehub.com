@@ -1,4 +1,7 @@
 .git
+.local_artifacts
+.codex
+**/node_modules
 .venv
 .pytest_cache
 .ruff_cache

@@ -1,0 +1,24 @@
+{
+  "reviewer": "/root/s04_review",
+  "mode": "independent read-only; no recursion",
+  "verdict": "no blocking correctness/performance-evidence finding; local S04 evidence acceptable within reported bounds",
+  "verified": [
+    "all 12 raw hashes",
+    "three pairs per scale",
+    "same fixture/harness/canonical content hashes",
+    "35 unit tests",
+    "15 real PG/CH tests",
+    "final Ruff pass",
+    "Pyright 54 equivalent",
+    "M.7 latency and CH write/parts regressions",
+    "legacy total-capacity sentinel N/A",
+    "source vs installed and S03 quota boundaries"
+  ],
+  "correction": "S01 summary exact read rows corrected to 2,829,312; no rerun",
+  "remaining_transition_checks": [
+    "map refresh/check",
+    "disposable cleanup",
+    "unchanged installed identity"
+  ],
+  "proof_boundary": "finite replay and injected crash boundaries on real disposable PG/CH; not installed delivery or full release readiness"
+}

@@ -1,0 +1,45 @@
+..............ss.....F.                                                  [100%]
+=================================== FAILURES ===================================
+_____ test_incomplete_history_retry_streak_uses_persisted_previous_reason ______
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('a6b43e34-21af-423d-b1e8-60b65f6b9dd9'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x10e4a7bc0>)
+
+    def test_incomplete_history_retry_streak_uses_persisted_previous_reason(store):
+        from dataclasses import dataclass
+        from types import SimpleNamespace
+    
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+        repo, org, actor, _ = store
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        start = now - timedelta(minutes=1)
+        row = repo.submit(organization_id=org, actor_user_id=actor, key=uuid4(),
+                          request=WorkRequest('candle_ingestion', 1, ('ACTUSDT',), start, now), now=now)
+        @dataclass
+        class EmptyFill:
+            writer: object = None
+            def run(self, task):
+                return SimpleNamespace(rows_read=0, rows_written=0)
+        runner = MarketDataWorkRequestRunner(
+            repo, cast(RestFillRange1mUseCase, EmptyFill()),
+            lambda *_: None, now=lambda: now,
+            repair_index=cast(
+                HistoryCoverageReader, SimpleNamespace(first_gap=lambda **kw: kw['time_range']),
+            ))
+        for expected in (1,2,3):
+            assert runner.run_once()
+            waiting = repo.get(organization_id=org, job_id=row['job_id'])
+>           assert waiting['state'] == 'retry_wait'
+E           AssertionError: assert 'failed' == 'retry_wait'
+E             
+E             - retry_wait
+E             + failed
+
+tests/real_infra/market_data/test_work_requests_postgres.py:861: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:290 market data work error phase=lease_check error_type=TypeError
+=========================== short test summary info ============================
+SKIPPED [2] tests/real_infra/market_data/test_work_requests_postgres.py:524: explicit disposable ClickHouse target required
+FAILED tests/real_infra/market_data/test_work_requests_postgres.py::test_incomplete_history_retry_streak_uses_persisted_previous_reason
+1 failed, 20 passed, 2 skipped in 8.25s

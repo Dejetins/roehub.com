@@ -1,0 +1,19 @@
+{
+  "reviewer": "/root/security_review",
+  "mode": "independent read-only production/security review; no recursive reviewer",
+  "outcome": "no unresolved blocking security finding",
+  "closed": [
+    "least-privilege funding/ref/raw SELECT grants validated against actual MV writes",
+    "provisioned rollback retains identities",
+    "remote-default rollout excluded and installed prior identity verified",
+    "async_insert=0 and wait_for_async_insert=1 locked server-side"
+  ],
+  "proof": [
+    "required-tests-final-03.txt",
+    "recreate-03.json",
+    "cross-process-caps-02.json",
+    "security-probes-01.json",
+    "prior-identities-01.json"
+  ],
+  "limits": "Real disposable ClickHouse lifecycle; application mounts/modes unit tests; installed runtime unchanged; overall stage/performance acceptance not assessed by reviewer."
+}

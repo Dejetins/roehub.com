@@ -592,7 +592,7 @@ button,a.button-link { transition:background-color var(--motion-duration) ease-o
 
 .operations-view-tools #operations-events {position:relative;padding-right:40px;}
 #operations-events .events-unread {position:absolute;right:7px;top:50%;transform:translateY(-50%);box-sizing:border-box;width:28px;margin:0;padding:1px 2px;font-variant-numeric:tabular-nums;}
-.library-pagination select,.operations-secondary select,.operations-mini-toolbar .chart-timeframe select {appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b1b8c0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:12px;padding-right:30px;}
+.library-pagination select,.operations-secondary select,.operations-mini-toolbar .chart-timeframe select,.work-preferences-panel select {appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23b1b8c0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;background-size:12px;padding-right:30px;}
 .operation-dialog {box-sizing:border-box;padding:20px;}
 .operation-dialog form {display:flex;flex-direction:column;gap:16px;}
 .operation-dialog form>h3,.operation-dialog form>p {margin:0;}
@@ -611,8 +611,8 @@ button,a.button-link { transition:background-color var(--motion-duration) ease-o
 .operations-workspace .overview-expand:focus:not(:focus-visible) {outline:none;box-shadow:none;}
 
 .chart-display-menu {position:relative;flex:none;}
-.operations-mini-toolbar .chart-display-trigger {display:flex;align-items:center;justify-content:center;width:28px;height:28px;min-height:28px;padding:0;border-radius:999px;color:var(--muted);}
-.operations-mini-toolbar .chart-display-trigger[aria-expanded=true] {color:var(--text);background:#252c34;border-color:#56616d;}
+.operations-mini-toolbar .chart-display-trigger, .report-chart-ranges .chart-display-trigger {display:flex;align-items:center;justify-content:center;width:28px;height:28px;min-height:28px;padding:0;border-radius:999px;color:var(--muted);}
+.operations-mini-toolbar .chart-display-trigger[aria-expanded=true], .report-chart-ranges .chart-display-trigger[aria-expanded=true] {color:var(--text);background:#252c34;border-color:#56616d;}
 .chart-display-trigger:focus:not(:focus-visible) {outline:none;box-shadow:none;}
 .chart-display-popup {position:absolute;top:calc(100% + 8px);left:0;z-index:30;width:max-content;max-width:calc(100vw - 40px);padding:4px;background:#1c2129;border:1px solid #303942;border-radius:10px;box-shadow:0 8px 24px #0005;}
 .chart-display-popup .chart-display-option {display:flex;flex-direction:row;align-items:center;gap:8px;min-height:32px;padding:5px 8px;border-radius:6px;font-size:.85rem;white-space:nowrap;cursor:pointer;color:#e6e9ee;}

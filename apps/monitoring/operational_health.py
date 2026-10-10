@@ -157,7 +157,8 @@ class OperationalHealthService:
                     runbook_id=spec.runbook_id,
                     action_ref=(
                         spec.action_ref
-                        if state == "stopped" and spec.action_ref == "restart_service"
+                        if spec.action_ref == "manage_worker"
+                        or (state == "stopped" and spec.action_ref == "restart_service")
                         else "diagnostics"
                     ),
                     required=spec.required,

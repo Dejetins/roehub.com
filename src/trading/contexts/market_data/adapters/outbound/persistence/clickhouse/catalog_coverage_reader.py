@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from math import ceil
 from typing import Mapping, Sequence
 
 from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
@@ -38,15 +39,21 @@ class ClickHouseCatalogCoverageReader:
         return {(int(r["market_id"]), str(r["symbol"])): int(r["candles"]) for r in rows}
 
     def latest(self, *, market_id: int, symbol: str, before: datetime) -> datetime | None:
+        # The exact actual-candle index is shared with history coverage. Do not
+        # rescan every daily canonical part on each two-second inspector poll.
         rows = self.gateway.select(
             f"""
-            SELECT maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS minute
-            FROM {self.database}.canonical_candles_1m
-            WHERE market_id = %(market)s AND symbol = %(symbol)s
-              AND ts_open < fromUnixTimestamp64Milli(%(before)s, 'UTC')
-            SETTINGS max_threads = 1, max_execution_time = 10
+            SELECT if(bitmapCardinality(minutes) = 0, NULL, bitmapMax(minutes)) AS minute
+            FROM (
+                SELECT bitmapSubsetInRange(groupBitmapMergeState(minute_bitmap_state),
+                    toUInt32(0), toUInt32(%(before_minute)s)) AS minutes
+                FROM {self.database}.canonical_candles_1m_stats
+                WHERE market_id = %(market)s AND symbol = %(symbol)s
+            )
+            SETTINGS max_threads = 1, max_execution_time = 10, max_memory_usage = 134217728
             """,
-            {"market": market_id, "symbol": symbol, "before": int(before.timestamp() * 1000)},
+            {"market": market_id, "symbol": symbol,
+             "before_minute": ceil(before.timestamp() / 60)},
         )
         minute = rows[0].get("minute") if rows else None
         return datetime.fromtimestamp(int(minute) * 60, UTC) if minute is not None else None

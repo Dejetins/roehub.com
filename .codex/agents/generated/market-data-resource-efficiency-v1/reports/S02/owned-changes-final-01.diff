@@ -1,0 +1,1749 @@
+--- baseline/apps/api/wiring/modules/market_data_reference.py
++++ apps/api/wiring/modules/market_data_reference.py
+@@ -86,7 +86,7 @@
+ def build_market_data_reference_use_cases(
+     *, environ: Mapping[str, str]
+ ) -> MarketDataReferenceUseCases:
+-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
++    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="interactive")
+     clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
+         client_factory=lambda: _clickhouse_client(clickhouse_settings)
+     )
+@@ -152,7 +152,7 @@
+ 
+     history_readiness = None
+     if environ.get("STRATEGY_PG_DSN"):
+-        history_settings = ClickHouseSettingsLoader(environ).load()
++        history_settings = ClickHouseSettingsLoader(environ).load(workload="interactive")
+         history_readiness = HistoryReadiness(
+             origins=PostgresHistoryBoundsRepository(
+                 gateway=PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
+@@ -180,7 +180,7 @@
+         if selections is None:
+             raise ValueError("STRATEGY_PG_DSN is required for market data work requests")
+         gateway = PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
+-        settings = ClickHouseSettingsLoader(environ).load()
++        settings = ClickHouseSettingsLoader(environ).load(workload="interactive")
+         router.include_router(
+             build_catalog_workspace_router(
+                 collector_status=PostgresStreamRecoveryStore(
+--- baseline/apps/api/wiring/modules/ui_strategies_dashboard.py
++++ apps/api/wiring/modules/ui_strategies_dashboard.py
+@@ -2425,7 +2425,7 @@
+     from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_reader import (  # noqa: E501
+         ClickHouseCanonicalCandleReader,
+     )
+-    config = ClickHouseSettingsLoader(environ).load()
++    config = ClickHouseSettingsLoader(environ).load(workload="interactive")
+     gateway = ThreadLocalClickHouseConnectGateway(client_factory=lambda: _clickhouse_client(config))
+     return StrategyOperationReads(
+         PostgresStrategyOperationReader(_build_live_execution_gateway(settings=settings)),
+--- baseline/apps/cli/commands/backtest_artifact_publish.py
++++ apps/cli/commands/backtest_artifact_publish.py
+@@ -345,7 +345,7 @@
+     path_builder = BacktestArtifactPathBuilderV2(root=artifact_runtime_config.artifact_root_path())
+     artifact_loader = YamlBacktestArtifactLoaderV2(path_resolver=path_builder)
+     pointer_writer = AtomicArtifactCurrentPointerWriterV2(path_resolver=path_builder)
+-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
++    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="artifacts")
+     clickhouse_gateway = ClickHouseConnectGateway(_clickhouse_client(clickhouse_settings))
+     strategy_postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
+     if not strategy_postgres_dsn:
+--- baseline/apps/cli/commands/rest_catchup_1m.py
++++ apps/cli/commands/rest_catchup_1m.py
+@@ -82,7 +82,7 @@
+         http = RequestsHttpClient()
+ 
+         # ClickHouse
+-        settings = ClickHouseSettingsLoader(os.environ).load()
++        settings = ClickHouseSettingsLoader(os.environ).load(workload="backfill")
+         client = _clickhouse_client(settings)
+         gw = ClickHouseConnectGateway(client)
+ 
+--- baseline/apps/cli/wiring/db/clickhouse.py
++++ apps/cli/wiring/db/clickhouse.py
+@@ -1,8 +1,10 @@
+ from __future__ import annotations
+ 
++import random
++import time
+ from dataclasses import dataclass
+ from pathlib import Path
+-from typing import Mapping, Protocol
++from typing import Literal, Mapping, Protocol
+ 
+ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
+     ClickHouseConnectGateway,
+@@ -10,6 +12,8 @@
+ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (
+     ClickHouseRawKlineWriter,
+ )
++
++ClickHouseWorkload = Literal["stream", "interactive", "backfill", "artifacts"]
+ 
+ 
+ class RawKlineWriter(Protocol):
+@@ -54,7 +58,7 @@
+     def __init__(self, environ: Mapping[str, str]) -> None:
+         self._env = environ
+ 
+-    def load(self) -> ClickHouseSettings:
++    def load(self, *, workload: ClickHouseWorkload | None = None) -> ClickHouseSettings:
+         file_env: dict[str, str] = {}
+         env_file = str(self._env.get("ROEHUB_ENV_FILE", "")).strip()
+         if env_file:
+@@ -75,19 +79,35 @@
+         host = pick("CH_HOST", default="localhost")
+         port = int(pick("CH_PORT", default="8123"))
+ 
+-        # алиасы: CH_* приоритетнее, потом CLICKHOUSE_*
+-        user = pick("CH_USER", "CLICKHOUSE_USER", default="default")
+-        password = (
+-            pick("CH_PASSWORD", "CLICKHOUSE_PASSWORD", default="")
+-            or _read_optional_credential_file(
+-                pick(
+-                    "ROEHUB_CLICKHOUSE_PASSWORD_FILE",
+-                    "CH_PASSWORD_FILE",
+-                    "CLICKHOUSE_PASSWORD_FILE",
+-                    default="",
++        # The composition root selects the class; no HTTP/request input controls it.
++        # Legacy mode supports ordered migration. Enabled installations mount only the
++        # selected secret and must never fall back to the old shared/admin identity.
++        required = pick("ROEHUB_CH_WORKLOADS_REQUIRED", default="0")
++        if required not in {"0", "1"}:
++            raise ValueError("invalid ClickHouse workload activation")
++        if required == "1":
++            if workload not in {"stream", "interactive", "backfill", "artifacts"}:
++                raise ValueError("ClickHouse workload is required")
++            user = "roehub_" + workload
++            credential = pick(f"ROEHUB_CH_{workload.upper()}_PASSWORD_FILE", default="")
++            if not credential:
++                raise ValueError("ClickHouse workload credential is required")
++            password = _read_optional_credential_file(credential)
++
++        else:
++            # алиасы: CH_* приоритетнее, потом CLICKHOUSE_*
++            user = pick("CH_USER", "CLICKHOUSE_USER", default="default")
++            password = (
++                pick("CH_PASSWORD", "CLICKHOUSE_PASSWORD", default="")
++                or _read_optional_credential_file(
++                    pick(
++                        "ROEHUB_CLICKHOUSE_PASSWORD_FILE",
++                        "CH_PASSWORD_FILE",
++                        "CLICKHOUSE_PASSWORD_FILE",
++                        default="",
++                    )
+                 )
+             )
+-        )
+ 
+         # ВАЖНО: по умолчанию используем market_data (ваш DDL),
+         # не берём CLICKHOUSE_DB автоматически, чтобы не уехать в 'roehub'.
+@@ -112,7 +132,7 @@
+     environ: Mapping[str, str]
+ 
+     def writer(self) -> RawKlineWriter:
+-        settings = ClickHouseSettingsLoader(self.environ).load()
++        settings = ClickHouseSettingsLoader(self.environ).load(workload="backfill")
+         client = _clickhouse_client(settings)
+         gateway = ClickHouseConnectGateway(client)
+         return ClickHouseRawKlineWriter(gateway=gateway, database=settings.database)
+@@ -124,14 +144,29 @@
+     except Exception as e:  # noqa: BLE001
+         raise RuntimeError("clickhouse-connect is required to run CLI commands") from e
+ 
+-    return clickhouse_connect.get_client(
+-        host=settings.host,
+-        port=settings.port,
+-        username=settings.user,
+-        password=settings.password,
+-        secure=settings.secure,
+-        verify=settings.verify,
++    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
++        transient_clickhouse_error,
+     )
++
++    # Driver initialization performs read-only metadata queries. Retry only classified
++    # admission pressure here, never replay an application INSERT/command implicitly.
++    for attempt in range(6):
++        try:
++            return clickhouse_connect.get_client(
++                host=settings.host,
++                port=settings.port,
++                username=settings.user,
++                password=settings.password,
++                secure=settings.secure,
++                verify=settings.verify,
++            )
++        except Exception as error:
++            if attempt == 5 or transient_clickhouse_error(error) not in {
++                "storage_unavailable", "storage_memory_pressure",
++            }:
++                raise
++            time.sleep(min(1.0, 0.1 * 2 ** attempt) + random.uniform(0, 0.05))
++    raise AssertionError("unreachable client initialization")
+ 
+ 
+ def _parse_bool01(value: str) -> bool:
+--- baseline/apps/scheduler/backtest_artifact_publisher/wiring/managed_worker.py
++++ apps/scheduler/backtest_artifact_publisher/wiring/managed_worker.py
+@@ -44,6 +44,9 @@
+ )
+ from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+     ArtifactCoordinatesV2,
++)
++from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
++    transient_clickhouse_error,
+ )
+ from trading.shared_kernel.primitives import TimeRange, UtcTimestamp
+ 
+@@ -442,16 +445,18 @@
+             )
+             raise
+         except Exception as error:
+-            transient = isinstance(error, OSError) and error.errno in (
++            resource_error = transient_clickhouse_error(error)
++            transient = resource_error is not None or (isinstance(error, OSError)
++                and error.errno in (
+                 errno.EAGAIN,
+                 errno.EINTR,
+                 errno.ETIMEDOUT,
+-            )
++            ))
+             reason = (
+                 "publication_reconciliation_required"
+                 if entered
+                 else (
+-                    "transient_io"
++                    ("transient_database" if resource_error else "transient_io")
+                     if transient
+                     else str(error)
+                     if isinstance(error, ManagementError)
+--- baseline/apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
++++ apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
+@@ -884,7 +884,7 @@
+     path_builder = BacktestArtifactPathBuilderV2(root=artifact_runtime_config.artifact_root_path())
+     artifact_loader = YamlBacktestArtifactLoaderV2(path_resolver=path_builder)
+     pointer_writer = AtomicArtifactCurrentPointerWriterV2(path_resolver=path_builder)
+-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
++    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="artifacts")
+     clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
+         client_factory=lambda: _clickhouse_client(clickhouse_settings)
+     )
+--- baseline/apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py
++++ apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py
+@@ -1123,7 +1123,7 @@
+     - Creates ClickHouse client and Prometheus metric objects.
+     """
+     config = load_market_data_runtime_config(Path(config_path))
+-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
++    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="backfill")
+     gateway = ThreadLocalClickHouseConnectGateway(
+         client_factory=lambda: _clickhouse_client(clickhouse_settings)
+     )
+--- baseline/apps/worker/market_data_ws/wiring/io_process.py
++++ apps/worker/market_data_ws/wiring/io_process.py
+@@ -84,7 +84,7 @@
+     threading.Thread(target=watch_parent, args=(connection,), daemon=True).start()
+     try:
+         cfg = load_market_data_runtime_config(Path(config_path))
+-        settings = ClickHouseSettingsLoader(environ).load()
++        settings = ClickHouseSettingsLoader(environ).load(workload="stream")
+         gateway = ThreadLocalClickHouseConnectGateway(
+             client_factory=lambda: _clickhouse_client(settings)
+         )
+--- baseline/apps/worker/market_data_ws/wiring/modules/market_data_ws.py
++++ apps/worker/market_data_ws/wiring/modules/market_data_ws.py
+@@ -945,7 +945,7 @@
+     - Creates ClickHouse client and Prometheus metric objects.
+     """
+     config = load_market_data_runtime_config(Path(config_path))
+-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
++    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="stream")
+     gateway = ThreadLocalClickHouseConnectGateway(
+         client_factory=lambda: _clickhouse_client(clickhouse_settings)
+     )
+--- baseline/apps/worker/market_data_ws/wiring/persistent_writer.py
++++ apps/worker/market_data_ws/wiring/persistent_writer.py
+@@ -68,7 +68,7 @@
+     threading.Thread(target=_read_commands, args=(sock, commands), daemon=True).start()
+     client = None
+     try:
+-        settings = ClickHouseSettingsLoader(environ).load()
++        settings = ClickHouseSettingsLoader(environ).load(workload="stream")
+         client = _clickhouse_client(settings)
+         gateway = ThreadLocalClickHouseConnectGateway(client_factory=lambda: client)
+         writer = ClickHouseRawKlineWriter(gateway=gateway, database=settings.database)
+--- baseline/apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py
++++ apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py
+@@ -786,7 +786,7 @@
+         on_paper_accounting=metrics.observe_strategy_paper_accounting,
+     )
+ 
+-    clickhouse_settings = ClickHouseSettingsLoader(environ).load()
++    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="stream")
+     clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
+         client_factory=lambda: _clickhouse_client(clickhouse_settings)
+     )
+--- baseline/configs/dev/clickhouse-local-profiles.xml
++++ configs/dev/clickhouse-local-profiles.xml
+@@ -10,5 +10,198 @@
+             <query_profiler_cpu_time_period_ns>0</query_profiler_cpu_time_period_ns>
+             <log_processors_profiles>0</log_processors_profiles>
+         </default>
++
++        <roehub_stream>
++          <profile>default</profile>
++          <max_memory_usage>134217728</max_memory_usage>
++          <max_memory_usage_for_user>201326592</max_memory_usage_for_user>
++          <max_concurrent_queries_for_user>2</max_concurrent_queries_for_user>
++          <max_threads>2</max_threads>
++          <max_execution_time>30</max_execution_time>
++          <async_insert>0</async_insert>
++          <wait_for_async_insert>1</wait_for_async_insert>
++          <timeout_before_checking_execution_speed>0</timeout_before_checking_execution_speed>
++          <timeout_overflow_mode>throw</timeout_overflow_mode>
++          <memory_overcommit_ratio_denominator>0</memory_overcommit_ratio_denominator>
++          <memory_overcommit_ratio_denominator_for_user>0</memory_overcommit_ratio_denominator_for_user>
++          <constraints>
++            <async_insert><readonly /></async_insert>
++            <wait_for_async_insert><readonly /></wait_for_async_insert>
++            <max_memory_usage>
++              <min>1</min>
++              <max>134217728</max>
++            </max_memory_usage>
++            <max_memory_usage_for_user>
++              <readonly />
++            </max_memory_usage_for_user>
++            <max_concurrent_queries_for_user>
++              <readonly />
++            </max_concurrent_queries_for_user>
++            <max_threads>
++              <min>1</min>
++              <max>2</max>
++            </max_threads>
++            <max_execution_time>
++              <min>1</min>
++              <max>30</max>
++            </max_execution_time>
++            <timeout_before_checking_execution_speed>
++              <readonly />
++            </timeout_before_checking_execution_speed>
++            <timeout_overflow_mode>
++              <readonly />
++            </timeout_overflow_mode>
++            <memory_overcommit_ratio_denominator>
++              <readonly />
++            </memory_overcommit_ratio_denominator>
++            <memory_overcommit_ratio_denominator_for_user>
++              <readonly />
++            </memory_overcommit_ratio_denominator_for_user>
++          </constraints>
++        </roehub_stream>
++        <roehub_interactive>
++          <profile>default</profile>
++          <max_memory_usage>134217728</max_memory_usage>
++          <max_memory_usage_for_user>201326592</max_memory_usage_for_user>
++          <max_concurrent_queries_for_user>4</max_concurrent_queries_for_user>
++          <max_threads>2</max_threads>
++          <max_execution_time>30</max_execution_time>
++          <async_insert>0</async_insert>
++          <wait_for_async_insert>1</wait_for_async_insert>
++          <timeout_before_checking_execution_speed>0</timeout_before_checking_execution_speed>
++          <timeout_overflow_mode>throw</timeout_overflow_mode>
++          <memory_overcommit_ratio_denominator>0</memory_overcommit_ratio_denominator>
++          <memory_overcommit_ratio_denominator_for_user>0</memory_overcommit_ratio_denominator_for_user>
++          <constraints>
++            <async_insert><readonly /></async_insert>
++            <wait_for_async_insert><readonly /></wait_for_async_insert>
++            <max_memory_usage>
++              <min>1</min>
++              <max>134217728</max>
++            </max_memory_usage>
++            <max_memory_usage_for_user>
++              <readonly />
++            </max_memory_usage_for_user>
++            <max_concurrent_queries_for_user>
++              <readonly />
++            </max_concurrent_queries_for_user>
++            <max_threads>
++              <min>1</min>
++              <max>2</max>
++            </max_threads>
++            <max_execution_time>
++              <min>1</min>
++              <max>30</max>
++            </max_execution_time>
++            <timeout_before_checking_execution_speed>
++              <readonly />
++            </timeout_before_checking_execution_speed>
++            <timeout_overflow_mode>
++              <readonly />
++            </timeout_overflow_mode>
++            <memory_overcommit_ratio_denominator>
++              <readonly />
++            </memory_overcommit_ratio_denominator>
++            <memory_overcommit_ratio_denominator_for_user>
++              <readonly />
++            </memory_overcommit_ratio_denominator_for_user>
++          </constraints>
++        </roehub_interactive>
++        <roehub_backfill>
++          <profile>default</profile>
++          <max_memory_usage>134217728</max_memory_usage>
++          <max_memory_usage_for_user>134217728</max_memory_usage_for_user>
++          <max_concurrent_queries_for_user>1</max_concurrent_queries_for_user>
++          <max_threads>1</max_threads>
++          <max_execution_time>30</max_execution_time>
++          <async_insert>0</async_insert>
++          <wait_for_async_insert>1</wait_for_async_insert>
++          <timeout_before_checking_execution_speed>0</timeout_before_checking_execution_speed>
++          <timeout_overflow_mode>throw</timeout_overflow_mode>
++          <memory_overcommit_ratio_denominator>0</memory_overcommit_ratio_denominator>
++          <memory_overcommit_ratio_denominator_for_user>0</memory_overcommit_ratio_denominator_for_user>
++          <constraints>
++            <async_insert><readonly /></async_insert>
++            <wait_for_async_insert><readonly /></wait_for_async_insert>
++            <max_memory_usage>
++              <min>1</min>
++              <max>134217728</max>
++            </max_memory_usage>
++            <max_memory_usage_for_user>
++              <readonly />
++            </max_memory_usage_for_user>
++            <max_concurrent_queries_for_user>
++              <readonly />
++            </max_concurrent_queries_for_user>
++            <max_threads>
++              <min>1</min>
++              <max>1</max>
++            </max_threads>
++            <max_execution_time>
++              <min>1</min>
++              <max>30</max>
++            </max_execution_time>
++            <timeout_before_checking_execution_speed>
++              <readonly />
++            </timeout_before_checking_execution_speed>
++            <timeout_overflow_mode>
++              <readonly />
++            </timeout_overflow_mode>
++            <memory_overcommit_ratio_denominator>
++              <readonly />
++            </memory_overcommit_ratio_denominator>
++            <memory_overcommit_ratio_denominator_for_user>
++              <readonly />
++            </memory_overcommit_ratio_denominator_for_user>
++          </constraints>
++        </roehub_backfill>
++        <roehub_artifacts>
++          <profile>default</profile>
++          <max_memory_usage>134217728</max_memory_usage>
++          <max_memory_usage_for_user>134217728</max_memory_usage_for_user>
++          <max_concurrent_queries_for_user>1</max_concurrent_queries_for_user>
++          <max_threads>1</max_threads>
++          <max_execution_time>30</max_execution_time>
++          <async_insert>0</async_insert>
++          <wait_for_async_insert>1</wait_for_async_insert>
++          <timeout_before_checking_execution_speed>0</timeout_before_checking_execution_speed>
++          <timeout_overflow_mode>throw</timeout_overflow_mode>
++          <memory_overcommit_ratio_denominator>0</memory_overcommit_ratio_denominator>
++          <memory_overcommit_ratio_denominator_for_user>0</memory_overcommit_ratio_denominator_for_user>
++          <constraints>
++            <async_insert><readonly /></async_insert>
++            <wait_for_async_insert><readonly /></wait_for_async_insert>
++            <max_memory_usage>
++              <min>1</min>
++              <max>134217728</max>
++            </max_memory_usage>
++            <max_memory_usage_for_user>
++              <readonly />
++            </max_memory_usage_for_user>
++            <max_concurrent_queries_for_user>
++              <readonly />
++            </max_concurrent_queries_for_user>
++            <max_threads>
++              <min>1</min>
++              <max>1</max>
++            </max_threads>
++            <max_execution_time>
++              <min>1</min>
++              <max>30</max>
++            </max_execution_time>
++            <timeout_before_checking_execution_speed>
++              <readonly />
++            </timeout_before_checking_execution_speed>
++            <timeout_overflow_mode>
++              <readonly />
++            </timeout_overflow_mode>
++            <memory_overcommit_ratio_denominator>
++              <readonly />
++            </memory_overcommit_ratio_denominator>
++            <memory_overcommit_ratio_denominator_for_user>
++              <readonly />
++            </memory_overcommit_ratio_denominator_for_user>
++          </constraints>
++        </roehub_artifacts>
+     </profiles>
+ </clickhouse>
+--- baseline/docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md
++++ docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md
+@@ -2499,3 +2499,22 @@
+ policy control_version. Изменение schedule не повторяет прошедший occurrence.
+ Manual Update now сохраняет anchor. Эти изменения совместимы с принятыми R07/R08;
+ уже admitted snapshots сохраняют свою прежнюю семантику.
++
++
++## ClickHouse budget publisher (S02, 2026-10-10)
++
++Publisher и его CLI выбирают `artifacts` в composition: discovery по индексу S01,
++чтение canonical/funding и подготовка native source разделяют одну server identity
++между процессами. Профиль ограничивает запрос 128 MiB, суммарную tracked memory
++пользователя 128 MiB, одновременный запрос одним и query threads одним; timeout
++30 секунд проверяется сервером кооперативно. Это не резервирование CPU/IO.
++Табличные права только SELECT; DDL, запись candles и смена caps запрещены.
++
++Class admission/memory refusal до начала публикации сохраняет durable attempt в
++существующем `retry_wait` с `transient_database`, backoff и пределом попыток.
++После начала публикации сохраняется `quarantined` и проверка receipt/pointer;
++ресурсный отказ не выдаётся за отсутствие source и не разрешает новую запись поверх
++неизвестного результата. Retry не меняет snapshot, ownership, authorization или
++reconciliation контракт. Установка/откат выполняются по S02 recovery runbook:
++сначала profiles/identities, затем drain и переключение клиентов; rollback
++оставляет additive identities неиспользуемыми и сохраняет свечи и артефакты.
+--- baseline/docs/architecture/market_data/market-data-reference-api-v1.md
++++ docs/architecture/market_data/market-data-reference-api-v1.md
+@@ -373,3 +373,18 @@
+ uses the current policy. Explicit Update now remains immediate and does not move the
+ anchor. A retry rechecks the submitting actor's current membership and coordinate
+ access; a revoked request is not promoted to ready by another shared request's success.
++
++
++### ClickHouse admission and API compatibility (S02, 2026-10-10)
++
++Reference, catalog, workspace and dashboard ClickHouse reads select the
++`interactive` identity in trusted composition. HTTP inputs cannot select a class
++or settings profile. Public response schemas, authorization, source absence and
++read retry/loading contracts are unchanged. Missing/unreadable class credentials
++fail startup; they never fall back to shared credentials in an activated install.
++Read failures remain failures, not successful empty catalogs or exchange absence.
++Native admission code 202 reuses the existing safe `storage_unavailable` reason
++for durable ingestion retries; 241 retains `storage_memory_pressure`. Worker
++checkpoints, backoff and pending recovery metadata survive both conditions.
++No new public state or UI retry policy is introduced. Server enforcement and
++upgrade/rollback are specified in the S02 section of the local recovery runbook.
+--- baseline/docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md
++++ docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md
+@@ -81,3 +81,22 @@
+ ## Критерий завершения
+ 
+ Этапы `00`–`05` приняты или содержат явный owner-custody handoff для OpenBao; локальный Docker Desktop демонстрирует рабочий `BTCUSDT` path и UI. Финальный production OpenBao bootstrap и native `linux/amd64` остаются отдельными строго контролируемыми действиями.
++
++
++## Локальные ClickHouse workload identities (S02, 2026-10-10)
++
++Текущий managed local renderer владеет четырьмя классами `stream`, `interactive`,
++`backfill`, `artifacts`; назначение находится в composition roots, включая
++дочерние процессы collector. Все процессы класса используют одну серверную
++identity, поэтому per-user memory/concurrency caps действуют совместно на одном
++ClickHouse server. Смена профиля и снятие caps обычным клиентом запрещены.
++
++Жизненный цикл `legacy` → `provisioned` → `active` отделяет подготовку серверных
++профилей/секретов от переключения клиентов. Private credentials сохраняются при
++повторной генерации, отдельный workload получает только свой password file.
++Rollback после drain возвращает клиентов в `provisioned`, сохраняя additive
++identities и данные. Existing credentials не ротируются и не удаляются. Точные
++лимиты, grants/MV, административные исключения и команды приведены в разделе
++S02 `docs/runbooks/navigator-local-market-data-recovery.md`; состояние фактической
++активации фиксирует отчёт S02. Выбор инструментов и полномочия организаций не
++изменены. Generic offline topology не включается этим локальным переключателем.
+--- baseline/docs/runbooks/navigator-local-market-data-recovery.md
++++ docs/runbooks/navigator-local-market-data-recovery.md
+@@ -27,7 +27,7 @@
+   release the worker. Storage outages also set a shared cooldown to prevent a burst
+   of failing inserts across the queue. Retries use 15/30/60/120/240/300 seconds and
+   preserve a longer provider Retry-After. Pause and cancellation take priority.
+-- ClickHouse codes 241, 159, 209 and 210 are retryable; arbitrary DatabaseError is
++- ClickHouse codes 202, 241, 159, 209 and 210 are retryable; arbitrary DatabaseError is
+   not. Only sanitized reason/phase codes are persisted. Permanent errors stop and
+   require explicit continuation after the cause is resolved.
+ - Events are capped at 512 per job and expired after 30 days by worker maintenance.
+@@ -500,3 +500,95 @@
+ Only after activation can runtime query logs prove that the installed publisher
+ uses the new page path. The S01 report records fixture verification and installed
+ runtime state separately; a source checkout or receipt is not deployment evidence.
++
++
++## ClickHouse workload budgets — S02 (2026-10-10)
++
++The managed local renderer supports `clickhouse_workload_budgets` values `legacy`
++(default, existing clients), `provisioned` (server identities installed; legacy
++clients retained), and `active` (composition-owned class clients). This is an
++ordered installation contract, not proof that this installation was activated.
++See the pack's `reports/S02.md` for measured source/runtime identities and limits.
++
++| Class / server identity | Participating clients | Query / aggregate tracked memory | Concurrent queries | Threads |
++|---|---|---|---|---|
++| `stream` / `roehub_stream` | Collector main, persistent writer, killable REST/prepare/plan children; strategy live reader | 128 / 192 MiB | 2 | 2 |
++| `interactive` / `roehub_interactive` | Reference/catalog/workspace API, strategy dashboard reads | 128 / 192 MiB | 4 | 2 |
++| `backfill` / `roehub_backfill` | Requests and normal scheduler, CLI catchup/raw writer | 128 / 128 MiB | 1 | 1 |
++| `artifacts` / `roehub_artifacts` | Publisher source discovery, canonical/funding readers, builder and CLI publisher | 128 / 128 MiB | 1 | 1 |
++
++All classes have a 30-second query limit (`throw`, clock-based checks). Native
++checks are cooperative, not a transport cancellation deadline. Lower nonzero
++query limits remain legal; aggregate/concurrency limits cannot be changed by
++runtime users, including by switching profile. INSERT and chained materialized
++views execute in the submitting identity. Limits aggregate across application
++processes using the same user on one ClickHouse server; separate servers require
++separate accounting. These are tracked-memory/admission limits, not CPU/IO or OS
++memory reservations. The 1 GiB server and 1.5 GiB/2 CPU container limits remain.
++The sum of class ceilings is 640 MiB; this is a configuration bound, not observed
++simultaneous usage. Background merges, caches, untracked memory and allocator
++retention still need headroom.
++
++Provision only with installation authority and a verified absent/unowned-name
++preflight for the four `roehub_*` users. Before `provisioned`, verify every prior
++remote application uses an authenticated non-`default` identity and confirm that
++identity can still access its required tables. A remote-`default` installation
++is not eligible for this rollout: first perform a separately authorized identity
++migration; an admin account alone does not preserve its application access. Prepare the class files through:
++
++```sh
++uv run python -m tools.installation.clickhouse_workloads \
++  --private-directory .local_artifacts/platform-local/private/clickhouse-workloads
++```
++
++The mode-0700 directory contains mode-0600 credentials and private `users.xml`.
++Existing passwords are reused; conflicting XML/symlinks/unsafe modes fail closed.
++Verify the configured application `runtime_user` can read its own mode-0600 file;
++provision under that authorized host identity rather than broadening permissions.
++This command prepares files only. No credentials enter public generated outputs.
++The server's generated bootstrap copies password-hash XML with the image's
++ClickHouse ownership and mode 0600, then invokes the official entrypoint, which
++drops privileges. Each application mounts only its class password; Compose clears
++legacy shared credentials in its environment. Keep admin credentials outside
++application mounts and do not put them in `/etc/roehub/roehub.env` or an arbitrary
++`ROEHUB_ENV_FILE`. Remote passwordless `default` is denied; local bounded storage
++health checks and separately authorized migrations/diagnostics are admin exclusions.
++Catalog/funding administrative CLI commands also remain explicitly admin-only;
++they fail if run with workload-required mode without their intended class.
++
++Upgrade: prepare credentials → regenerate the owned bundle in `provisioned` mode
++using the existing renderer → restart/recreate ClickHouse through the managed
++controller → verify effective settings, grants, raw→canonical→stats and private
++file ownership → drain application workers → regenerate `active` → activate a
++proper image-bound candidate through the same lifecycle. Preserve selections,
++leases, receipts, source obligations and all data. Do not use one-off `docker cp`.
++The generic signed offline topology is not silently activated by this local flag.
++
++Rollback: drain the class clients, restore the prior known application image and
++`provisioned` renderer mode, retaining the same server identities/profiles and
++private files. Restore the prior authorized application environment; do not
++remove/rotate any account or drop data. A prior default-user remote deployment
++is outside this rollout precondition; do not reopen anonymous remote access. Credential cleanup requires separate authorization.
++
++Class profiles lock `async_insert=0` and `wait_for_async_insert=1`: INSERT work
++completes synchronously inside the measured admission and memory boundary.
++
++Diagnosis: native 202 is a class admission rejection and maps to existing
++`storage_unavailable`; 241 maps to `storage_memory_pressure`. Neither implies
++exchange absence. Collector receipts and Market Data checkpoints retain their
++bounded backoff; client metadata initialization retries at most six times.
++Application INSERTs are not blindly retried inside the gateway. Artifact failures
++before publication use existing `retry_wait` / `transient_database`; after entry
++they retain quarantine/reconciliation. Existing attempt ceilings remain in force.
++Missing credentials/auth/grant errors fail visibly without default-user fallback.
++Use query-log user/code aggregates for admitted/rejected work, per-class client
++wait/retry counts and durable progress/oldest eligible jobs; check starvation
++separately from an idle queue. Do not raise limits to hide pressure.
++
++The reproducible mixed-load harness is `tools/qa/market_data_mixed_load.py`, extending
++`market-data-resource-comparison/v1`. It requires `ROEHUB_S02_DISPOSABLE=1` and a
++separate disposable server, never the user's installation. Supply private CH
++admin credentials and class password-file references without printing them, then
++run `--source <preserved-S01-source-or-candidate> --label baseline|candidate
++--output <new-unique-file>`. The report fixes the six-run order, 60-second warmup,
++300-second window, fixture/hash, caps and real catalog API route boundary.
+--- baseline/docs/runbooks/offline-release-installation.md
++++ docs/runbooks/offline-release-installation.md
+@@ -254,3 +254,23 @@
+ confirmation, and refuses current/pinned/active targets. Disable submissions and drain
+ owned work for rollback; retain schema-aware readers after sparse schema-2 publication.
+ Local tests do not certify shared production mounts, S3, providers or full-market load.
++
++
++### Managed local ClickHouse budgets (S02, 2026-10-10)
++
++Для существующей managed local установки `tools/installation/local_platform.py`
++имеет явные режимы `clickhouse_workload_budgets`: `legacy`, `provisioned`, `active`.
++Это отдельный локальный installation lifecycle, не изменение подписанного
++комплекта или автоматическое включение generic offline topology. Включение требует
++совместимого image-bound candidate и сохранения текущего trust binding.
++
++Сначала `tools.installation.clickhouse_workloads` готовит additive private
++credentials (0700 directory / 0600 files), не заменяя существующие. Публичные
++outputs содержат profiles, paths и bootstrap, но не пароли. Bootstrap передаёт
++private password-hash XML ClickHouse с корректным UID/mode, затем запускает
++официальный entrypoint. После проверки `provisioned` server следует drain и
++переключение `active` clients. Rollback возвращает prior application image и
++`provisioned`, оставляя identities и данные; cleanup/rotation не подразумеваются.
++Таблица caps, grants/MV, исключения admin, диагностика отказов и воспроизводимые
++проверки находятся в разделе S02 local market-data recovery runbook. Существующие
++storage migration manifests не меняются: candle/index/PG schemas сохранены.
+--- baseline/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/work_errors.py
++++ src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/work_errors.py
+@@ -13,6 +13,8 @@
+     match = re.search(r"(?:ClickHouse error code |(?:^|\n)\s*Code:\s*)(\d+)\b", str(error))
+     if match:
+         code = int(match.group(1))
++        if code == 202:
++            return "storage_unavailable"
+         if code == 241:
+             return "storage_memory_pressure"
+         if code in {159, 209, 210}:
+--- baseline/tests/real_infra/backtest/test_artifact_integrated.py
++++ tests/real_infra/backtest/test_artifact_integrated.py
+@@ -188,7 +188,11 @@
+     if not port:
+         pytest.skip("explicit disposable ClickHouse required")
+     m = dispatch
+-    client = clickhouse_connect.get_client(host="127.0.0.1", port=int(port))
++    client = clickhouse_connect.get_client(
++        host="127.0.0.1", port=int(port),
++        username=os.environ.get("CH_USER", "default"),
++        password=os.environ.get("CH_PASSWORD", ""),
++    )
+     db = "s09_" + uuid4().hex
+     try:
+         ddl = (
+@@ -523,3 +527,30 @@
+     result = w.run_once(m["installation"])
+     assert result is not None and result.publication is not None
+     assert m["repo"].rows("SELECT state FROM backtest_artifact_builds")[0]["state"] == "ready"
++
++
++@pytest.mark.parametrize('code,reason', [(202,'transient_database'),
++                                       (241,'transient_database')])
++def test_clickhouse_pressure_keeps_artifact_attempt_retryable(dispatch, tmp_path, code, reason):
++    """Real PG lifecycle, adapter-classified failure before publication; no source absence."""
++    from clickhouse_connect.driver.exceptions import DatabaseError
++
++    from tests.unit.contexts.backtest_artifacts.test_automatic_base import Source
++    m=dispatch
++    submit(m,(item(m),))
++    _,w=worker(m,tmp_path)
++    class Pressure(Source):
++        def read_1m_arrays(self, instrument_id, time_range):
++            raise DatabaseError(f'Code: {code}. synthetic admission refusal')
++    runner=replace(w.publisher.runner,canonical_candle_reader=Pressure(180))
++    failing=replace(w,publisher=replace(w.publisher,runner=runner))
++    try:
++        failing.run_once(m['installation'])
++    except DatabaseError:
++        pass
++    else:
++        pytest.fail(str(m['repo'].rows('SELECT state,reason FROM backtest_artifact_requests')))
++    assert list(m['repo'].rows('SELECT state FROM backtest_artifact_builds')) == [
++        {'state':'retry_wait'}]
++    assert list(m['repo'].rows('SELECT state,reason FROM backtest_artifact_requests')) == [
++        {'state':'retry_wait','reason':reason}]
+--- baseline/tests/real_infra/market_data/test_clickhouse_workloads.py
++++ tests/real_infra/market_data/test_clickhouse_workloads.py
+@@ -0,0 +1,154 @@
++"""Explicit disposable server proof of class grants, MV writes and forbidden overrides."""
++
++import os
++from datetime import UTC, datetime
++from pathlib import Path
++from uuid import uuid4
++
++import clickhouse_connect
++import pytest
++from clickhouse_connect.driver.exceptions import DatabaseError
++
++from apps.migrations.storage import split_clickhouse_sql
++from tools.installation.clickhouse_workloads import WORKLOADS, grants
++from tools.qa.market_data_mixed_load import raw_insert
++from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.funding_rate_store import (  # noqa: E501
++    ClickHouseFundingRateStore,
++)
++from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
++    ClickHouseConnectGateway,
++)
++from trading.contexts.market_data.application.dto import FundingInstrument, FundingRateRecord
++from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, UtcTimestamp
++
++pytestmark = pytest.mark.skipif(
++    os.environ.get("ROEHUB_S02_DISPOSABLE") != "1",
++    reason="explicit disposable class identities required",
++)
++
++
++@pytest.fixture
++def workloads():
++    admin = clickhouse_connect.get_client(
++        host=os.environ["CH_HOST"],
++        port=int(os.environ["CH_PORT"]),
++        username=os.environ["CH_USER"],
++        password=os.environ["CH_PASSWORD"],
++    )
++    db = "resource_s02_grants_" + uuid4().hex
++    for filename in (
++        "market_data_ddl.sql",
++        "funding_rates_ddl.sql",
++        "history_source_absences_ddl.sql",
++    ):
++        for sql in split_clickhouse_sql(
++            (Path("migrations/clickhouse") / filename).read_text().replace("market_data", db)
++        ):
++            admin.command(sql)
++    clients = {}
++    try:
++        for w in WORKLOADS:
++            for grant in grants(w, db):
++                admin.command(grant + " TO roehub_" + w)
++            clients[w] = clickhouse_connect.get_client(
++                host=os.environ["CH_HOST"],
++                port=int(os.environ["CH_PORT"]),
++                username="roehub_" + w,
++                password=Path(os.environ["ROEHUB_CH_" + w.upper() + "_PASSWORD_FILE"]).read_text(),
++            )
++        yield admin, db, clients
++    finally:
++        for client in clients.values():
++            client.close()
++        admin.command(f"DROP DATABASE {db}")
++        admin.close()
++
++
++def test_real_grants_mv_and_normal_scheduler_funding(workloads):
++    admin, db, clients = workloads
++    for w in ("stream", "backfill"):
++        raw_insert(clients[w], db, "BTCUSDT", 29453760, 2, "s02_grants")
++    assert admin.query(f"SELECT uniqExact(ts_open) FROM {db}.canonical_candles_1m").result_rows == [
++        (2,)
++    ]
++    assert admin.query(
++        f"SELECT groupBitmapMerge(minute_bitmap_state) FROM {db}.canonical_candles_1m_stats"
++    ).result_rows == [(2,)]
++    backfill = clients["backfill"]
++    backfill.insert(
++        f"{db}.ref_market",
++        [(1, "binance", "spot", "binance:spot")],
++        column_names=["market_id", "exchange_name", "market_type", "market_code"],
++    )
++    backfill.insert(f"{db}.ref_instruments", [(1, "BTCUSDT")], column_names=["market_id", "symbol"])
++    store = ClickHouseFundingRateStore(gateway=ClickHouseConnectGateway(backfill), database=db)
++    ts = UtcTimestamp(datetime(2026, 1, 1, tzinfo=UTC))
++    for market, exchange in [(2, "binance"), (4, "bybit")]:
++        instrument = InstrumentId(MarketId(market), Symbol("BTCUSDT"))
++        store.upsert_funding_instruments(
++            [
++                FundingInstrument(
++                    instrument_id=instrument,
++                    instrument_key=f"{exchange}:futures:BTCUSDT",
++                    exchange=exchange,
++                    market_type="futures",
++                    status="TRADING",
++                    is_tradable=1,
++                    base_asset="BTC",
++                    quote_asset="USDT",
++                    funding_interval_minutes=480,
++                    funding_interval_source="test",
++                    funding_cap=None,
++                    funding_floor=None,
++                    updated_at=ts,
++                )
++            ]
++        )
++        store.write_funding_rates(
++            [
++                FundingRateRecord(
++                    instrument_id=instrument,
++                    instrument_key=f"{exchange}:futures:BTCUSDT",
++                    funding_time=ts,
++                    funding_rate=0.001,
++                    funding_interval_minutes=480,
++                    funding_interval_source="test",
++                    source="test",
++                    ingested_at=ts,
++                    ingest_id=str(uuid4()),
++                    bybit_category="linear" if market == 4 else None,
++                )
++            ]
++        )
++        read = ClickHouseFundingRateStore(
++            gateway=ClickHouseConnectGateway(clients["artifacts"]), database=db
++        )
++        assert read.latest_funding_time(instrument) == ts
++    for w in ("interactive", "artifacts"):
++        with pytest.raises(DatabaseError, match="497"):
++            raw_insert(clients[w], db, "BTCUSDT", 29453762, 1, "denied")
++    with pytest.raises(DatabaseError, match="497"):
++        clients["stream"].command(f"INSERT INTO {db}.ref_market (market_id) VALUES (4)")
++
++
++@pytest.mark.parametrize(
++    "query",
++    [
++        "SET async_insert=1",
++        "SET wait_for_async_insert=0",
++        "SELECT 1 SETTINGS async_insert=1",
++        "SET profile='default'",
++        "SELECT 1 SETTINGS profile='default'",
++        "SET max_memory_usage=0",
++        "SET max_memory_usage_for_user=0",
++        "SET max_concurrent_queries_for_user=0",
++        "SET max_threads=100",
++        "SET max_execution_time=0",
++        "SET timeout_overflow_mode='break'",
++    ],
++)
++def test_real_cap_overrides_are_denied(workloads, query):
++    _, _, clients = workloads
++    for c in clients.values():
++        with pytest.raises(DatabaseError, match="452"):
++            c.command(query)
+--- baseline/tests/real_infra/market_data/test_work_requests_postgres.py
++++ tests/real_infra/market_data/test_work_requests_postgres.py
+@@ -521,7 +521,8 @@
+ 
+ @pytest.mark.skipif(not os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_PORT'),
+                     reason='explicit disposable ClickHouse target required')
+-def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store):
++@pytest.mark.parametrize("pressure_code", [241, 202])
++def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store, pressure_code):
+     from dataclasses import dataclass
+     from types import SimpleNamespace
+ 
+@@ -536,7 +537,8 @@
+     repo, org, actor, _ = store
+     ch = clickhouse_connect.get_client(
+         host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
+-        username='proof', password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
++        username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
++        password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
+     table = 'market_data.work_recovery_test_'+uuid4().hex
+     clock = [datetime.now(UTC).replace(second=0, microsecond=0)]
+     start = clock[0]-timedelta(hours=3)
+@@ -551,14 +553,31 @@
+             offset = rows[0][0]
+             if offset == 60 and fault[0]:
+                 fault[0] = False
+-                ch.command(f'INSERT INTO {table} SELECT number FROM numbers(100000)',
+-                           settings={'max_memory_usage':1,'max_threads':1,'max_execution_time':5})
+-                pytest.fail('ClickHouse did not enforce the per-query memory limit')
++                if pressure_code == 241:
++                    ch.command(f'INSERT INTO {table} SELECT number FROM numbers(100000)',
++                               settings={'max_memory_usage':1,'max_threads':1,'max_execution_time':5})
++                else:
++                    import time
++                    other = clickhouse_connect.get_client(
++                        host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
++                        username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
++                        password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
++                    try:
++                        with ThreadPoolExecutor(max_workers=1) as pool:
++                            running = pool.submit(other.command, 'SELECT sleep(2)')
++                            time.sleep(.2)
++                            ch.command(f'INSERT INTO {table} SELECT number FROM numbers(60)',
++                                       settings={'max_concurrent_queries_for_user':1})
++                            running.result()
++                    finally:
++                        other.close()
++                pytest.fail('ClickHouse did not enforce resource pressure')
+             ch.insert(table, rows, column_names=['minute'])
+ 
+     @dataclass
+     class Fill:
+         writer: Any
++        check_lease: Any = lambda: None
+ 
+         def run(self, task):
+             offset = int((task.time_range.start.value-start).total_seconds()//60)
+@@ -576,7 +595,8 @@
+         waiting = repo.get(organization_id=org, job_id=job['job_id'])
+         assert (waiting['state'], waiting['completed_units'], waiting['rows_written']) == (
+             'retry_wait', 60, 60)
+-        assert waiting['error_code'] == 'storage_memory_pressure'
++        assert waiting['error_code'] == (
++            'storage_memory_pressure' if pressure_code == 241 else 'storage_unavailable')
+         assert waiting['error_phase'] == 'fill_window'
+         assert not runner.run_once()
+         clock[0] = waiting['next_retry_at']
+--- baseline/tests/unit/apps/api/test_market_data_reference_wiring_module.py
++++ tests/unit/apps/api/test_market_data_reference_wiring_module.py
+@@ -41,7 +41,7 @@
+         """
+         self._environ = environ
+ 
+-    def load(self):  # noqa: ANN001
++    def load(self, *, workload=None):  # noqa: ANN001
+         """
+         Return minimal settings namespace expected by wiring module.
+ 
+--- baseline/tests/unit/apps/cli/test_backtest_artifact_publish_cli.py
++++ tests/unit/apps/cli/test_backtest_artifact_publish_cli.py
+@@ -461,7 +461,7 @@
+             """
+             self._environ = dict(environ)
+ 
+-        def load(self) -> object:
++        def load(self, *, workload=None) -> object:
+             """
+             Return a deterministic settings object with a database attribute.
+ 
+--- baseline/tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py
++++ tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py
+@@ -471,7 +471,7 @@
+             """
+             self._environ = dict(environ)
+ 
+-        def load(self) -> object:
++        def load(self, *, workload=None) -> object:
+             """
+             Return a deterministic settings object with a database attribute.
+ 
+--- baseline/tests/unit/apps/worker/test_persistent_writer.py
++++ tests/unit/apps/worker/test_persistent_writer.py
+@@ -235,3 +235,16 @@
+         app._run.assert_not_called()
+ 
+     asyncio.run(scenario())
++
++
++@pytest.mark.parametrize('code,expected', [(202,'storage_unavailable'),
++                                         (241,'storage_memory_pressure'),
++                                         (516,None), (497,None)])
++def test_only_resource_errors_enter_bounded_ingestion_retry(code, expected):
++    from clickhouse_connect.driver.exceptions import DatabaseError
++
++    from apps.worker.market_data_ws.wiring.io_process import classify_io_error
++    from trading.contexts.market_data.application.services.ingestion_retry import retry_delay
++    error=DatabaseError(f'Code: {code}. synthetic test')
++    assert classify_io_error(error)==expected
++    assert retry_delay(error, 100) == 300
+--- baseline/tests/unit/tools/test_clickhouse_workload_installation.py
++++ tests/unit/tools/test_clickhouse_workload_installation.py
+@@ -0,0 +1,54 @@
++from pathlib import Path
++from xml.etree import ElementTree as ET
++
++import pytest
++
++from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader
++from tools.installation.clickhouse_workloads import WORKLOADS, private_users, provision
++
++
++@pytest.mark.parametrize("workload", WORKLOADS)
++def test_class_identity_is_composition_owned_and_missing_secret_fails_closed(tmp_path, workload):
++    credential = tmp_path / "password"
++    credential.write_text("x" * 64)
++    env = {
++        "ROEHUB_CH_WORKLOADS_REQUIRED": "1",
++        "CH_USER": "default",
++        "CH_PASSWORD": "admin",
++        "CH_PASSWORD_FILE": "/does/not/exist",
++        f"ROEHUB_CH_{workload.upper()}_PASSWORD_FILE": str(credential),
++    }
++    settings = ClickHouseSettingsLoader(env).load(workload=workload)
++    assert settings.user == "roehub_" + workload and settings.password == "x" * 64
++    credential.unlink()
++    with pytest.raises(ValueError, match="unreadable"):
++        ClickHouseSettingsLoader(env).load(workload=workload)
++    with pytest.raises(ValueError, match="workload is required"):
++        ClickHouseSettingsLoader(env).load()
++
++
++def test_additive_provisioning_preserves_credentials_and_refuses_unsafe_paths(tmp_path):
++    root = tmp_path / "private"
++    provision(root)
++    first = {p.name: p.read_bytes() for p in root.iterdir()}
++    provision(root)
++    assert first == {p.name: p.read_bytes() for p in root.iterdir()}
++    assert all(p.stat().st_mode & 0o077 == 0 for p in root.iterdir())
++    (root / "stream.password").chmod(0o644)
++    with pytest.raises(ValueError, match="0600"):
++        provision(root)
++    (root / "stream.password").chmod(0o600)
++    (root / "users.xml").write_text("foreign configuration")
++    with pytest.raises(ValueError, match="explicit migration"):
++        provision(root)
++
++
++def test_scoped_grants_do_not_give_interactive_or_artifacts_writes():
++    users = ET.fromstring(private_users({w: "x" * 64 for w in WORKLOADS})).find("users")
++    assert users is not None
++    for name in ("interactive", "artifacts"):
++        queries = [node.text or "" for node in users.findall(f"roehub_{name}/grants/query")]
++        assert queries and all(q.startswith("GRANT SELECT ON market_data.") for q in queries)
++        assert not any("*" in q for q in queries)
++    xml = Path("configs/dev/clickhouse-local-profiles.xml").read_text()
++    assert "<roehub_stream>" in xml
+--- baseline/tests/unit/tools/test_local_platform.py
++++ tests/unit/tools/test_local_platform.py
+@@ -79,3 +79,29 @@
+     with pytest.raises(ControlOperationError):
+         DockerComposeControlBackend(profile_root=tmp_path, project='local-test',
+                                     trusted_release_manifest=tmp_path/'release.json')
++
++
++@pytest.mark.parametrize('mode', ['provisioned', 'active'])
++def test_workload_activation_and_rollback_keep_additive_server_identities(tmp_path, mode):
++    config=dict(root=str(tmp_path),runtime_image='local-runtime:test',runtime_user='501:20',
++                artifact_root='/owned/artifacts', network='test',postgres_volume='existing-pg',
++                clickhouse_volume='existing-ch',socket_volume='socket',
++                clickhouse_workload_budgets=mode)
++    release=dict(schema='io.roehub.release/v1alpha1',version='0.1.0',images={
++        key:{'reference':key+'@sha256:'+'a'*64} for key in ('runtime','postgresql','clickhouse')})
++    outputs=render(config,release,source=json.dumps(config).encode(),release_source=json.dumps(release).encode())
++    services=yaml.safe_load(outputs['compose.yaml'])['services']
++    assert any('/users.xml:' in m for m in services['clickhouse']['volumes'])
++    for name,workload in {'api':'interactive','market-data-ws':'stream',
++                          'market-data-scheduler':'backfill',
++                          'backtest-artifact-publisher':'artifacts'}.items():
++        service=services[name]
++        if mode=='active':
++            assert service['environment']['ROEHUB_CH_WORKLOADS_REQUIRED']=='1'
++            assert service['environment']['CH_PASSWORD']==''
++            assert service['environment']['CLICKHOUSE_PASSWORD']==''
++            assert any(f'/{workload}.password:' in m for m in service['volumes'])
++            assert not any('/private:' in m or '/private/clickhouse-workloads:' in m
++                           for m in service['volumes'])
++        else:
++            assert 'environment' not in service
+--- baseline/tools/installation/clickhouse_workloads.py
++++ tools/installation/clickhouse_workloads.py
+@@ -0,0 +1,137 @@
++"""Installation-owned ClickHouse workload identities, grants and private provisioning.
++
++Provisioning is explicit and additive. Existing passwords are reused byte-for-byte;
++no existing user is altered or deleted. Server users are mounted from a private file.
++"""
++
++from __future__ import annotations
++
++import argparse
++import hashlib
++import os
++import re
++import secrets
++from pathlib import Path
++from xml.etree import ElementTree as ET
++
++WORKLOADS = ("stream", "interactive", "backfill", "artifacts")
++READ_TABLES = (
++    "ref_market",
++    "ref_instruments",
++    "canonical_candles_1m",
++    "canonical_candles_1m_stats",
++    "source_absent_candles_1m",
++)
++WRITE_TABLES = (
++    "raw_binance_klines_1m",
++    "raw_bybit_klines_1m",
++    "canonical_candles_1m",
++    "canonical_candles_1m_stats",
++    "source_absent_candles_1m",
++)
++
++
++def grants(workload: str, database: str = "market_data") -> tuple[str, ...]:
++    """Exact application table grants, no DDL, access management or wildcard database."""
++    if workload not in WORKLOADS or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", database):
++        raise ValueError("invalid workload/database")
++    result = [f"GRANT SELECT ON {database}.{table}" for table in READ_TABLES]
++    if workload in {"stream", "backfill"}:
++        result += [
++            f"GRANT SELECT ON {database}.{table}"
++            for table in ("raw_binance_klines_1m", "raw_bybit_klines_1m")
++        ]
++        result += [f"GRANT INSERT ON {database}.{table}" for table in WRITE_TABLES]
++    if workload in {"backfill", "artifacts"}:
++        result += [
++            f"GRANT SELECT ON {database}.{table}"
++            for table in ("canonical_funding_rates", "funding_instrument_universe")
++        ]
++    if workload == "backfill":
++        result += [
++            f"GRANT INSERT ON {database}.{table}"
++            for table in (
++                "ref_market",
++                "ref_instruments",
++                "canonical_funding_rates",
++                "raw_binance_funding_rates",
++                "raw_bybit_funding_rates",
++                "funding_instrument_universe",
++            )
++        ]
++    return tuple(result)
++
++
++def private_users(passwords: dict[str, str], database: str = "market_data") -> bytes:
++    """Render only into the private installation directory, never public outputs."""
++    root = ET.Element("clickhouse")
++    users = ET.SubElement(root, "users")
++    default = ET.SubElement(users, "default")
++    networks = ET.SubElement(default, "networks", {"replace": "replace"})
++    for ip in ("127.0.0.1", "::1"):
++        ET.SubElement(networks, "ip").text = ip
++    for workload in WORKLOADS:
++        password = passwords[workload]
++        if len(password) < 32 or password.strip() != password:
++            raise ValueError("workload credential must contain at least 32 characters")
++        user = ET.SubElement(users, "roehub_" + workload)
++        ET.SubElement(user, "password_sha256_hex").text = hashlib.sha256(
++            password.encode()
++        ).hexdigest()
++        ET.SubElement(ET.SubElement(user, "networks"), "ip").text = "::/0"
++        ET.SubElement(user, "profile").text = "roehub_" + workload
++        ET.SubElement(user, "quota").text = "default"
++        grant_nodes = ET.SubElement(user, "grants")
++        for grant in grants(workload, database):
++            ET.SubElement(grant_nodes, "query").text = grant
++    ET.indent(root)
++    return ET.tostring(root, encoding="utf-8") + b"\n"
++
++
++def provision(directory: Path, *, database: str = "market_data") -> None:
++    """Create only absent class credentials; refuse unsafe existing files/directories."""
++    if directory.is_symlink():
++        raise ValueError("private directory symlink is forbidden")
++    directory.mkdir(mode=0o700, parents=True, exist_ok=True)
++    if directory.stat().st_mode & 0o077:
++        raise ValueError("private directory must be mode 0700")
++    passwords = {}
++    for workload in WORKLOADS:
++        path = directory / (workload + ".password")
++        if path.is_symlink():
++            raise ValueError("credential symlink is forbidden")
++        if not path.exists():
++            fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
++            with os.fdopen(fd, "w") as output:
++                output.write(secrets.token_hex(32))
++                output.flush()
++                os.fsync(output.fileno())
++        if path.stat().st_mode & 0o077:
++            raise ValueError("credential must be mode 0600")
++        passwords[workload] = path.read_text()
++    payload = private_users(passwords, database)
++    path = directory / "users.xml"
++    if path.is_symlink():
++        raise ValueError("users file symlink is forbidden")
++    if path.exists():
++        if path.read_bytes() != payload or path.stat().st_mode & 0o077:
++            raise ValueError("existing users configuration differs; explicit migration required")
++        return
++    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
++    with os.fdopen(fd, "wb") as output:
++        output.write(payload)
++        output.flush()
++        os.fsync(output.fileno())
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--private-directory", required=True, type=Path)
++    parser.add_argument("--database", default="market_data")
++    args = parser.parse_args()
++    provision(args.private_directory, database=args.database)
++    print("Additive workload credentials prepared; no server or client activated")
++
++
++if __name__ == "__main__":
++    main()
+--- baseline/tools/installation/local_platform.py
++++ tools/installation/local_platform.py
+@@ -192,6 +192,37 @@
+         health="http://127.0.0.1:9300/health/live",
+     )
+     services["operational-health"]["volumes"] = [f"{root}/config:/etc/roehub:ro"]
++    workload_mode = config.get("clickhouse_workload_budgets", "legacy")
++    if workload_mode not in {"legacy", "provisioned", "active"}:
++        raise ValueError("invalid clickhouse_workload_budgets lifecycle")
++    if workload_mode in {"provisioned", "active"}:
++        # Provision profiles/users first, then switch application clients. Class files
++        # contain no admin credential, and each service receives only its own identity.
++        services["clickhouse"]["volumes"].append(
++            f"{root}/private/clickhouse-workloads/users.xml:"
++            "/run/roehub-private/workloads.xml:ro"
++        )
++        services["clickhouse"]["volumes"].append(
++            f"{root}/config/clickhouse-workloads-entrypoint.sh:/workloads-entrypoint.sh:ro"
++        )
++        services["clickhouse"]["entrypoint"] = ["/bin/sh", "/workloads-entrypoint.sh"]
++    if workload_mode == "active":
++        for service, workload in {
++            "api": "interactive", "market-data-ws": "stream",
++            "market-data-scheduler": "backfill", "backtest-artifact-publisher": "artifacts",
++        }.items():
++            services[service]["environment"] = {
++                "ROEHUB_CH_WORKLOADS_REQUIRED": "1",
++                f"ROEHUB_CH_{workload.upper()}_PASSWORD_FILE": "/run/roehub-ch/password",
++                # Compose environment replaces legacy shared credentials from env_file.
++                "CH_USER": "", "CLICKHOUSE_USER": "", "CH_PASSWORD": "",
++                "CLICKHOUSE_PASSWORD": "", "ROEHUB_CLICKHOUSE_PASSWORD_FILE": "",
++                "CH_PASSWORD_FILE": "", "CLICKHOUSE_PASSWORD_FILE": "",
++            }
++            services[service]["volumes"].append(
++                f"{root}/private/clickhouse-workloads/{workload}.password:"
++                "/run/roehub-ch/password:ro"
++            )
+     compose = {
+         "services": services,
+         "networks": {"platform": {"name": config["network"], "external": True}},
+@@ -305,6 +336,17 @@
+             }
+         ),
+     }
++    if workload_mode in {"provisioned", "active"}:
++        # Root bootstrap copies only the password-hash config into the container with
++        # the image's database UID. Host secrets stay 0600; the official entrypoint
++        # still drops privileges, and recreation repeats this deterministic step.
++        outputs["config/clickhouse-workloads-entrypoint.sh"] = (
++            b"#!/bin/sh\nset -eu\n"
++            b"test -s /run/roehub-private/workloads.xml\n"
++            b"install -m 600 -o clickhouse -g clickhouse "
++            b"/run/roehub-private/workloads.xml /etc/clickhouse-server/users.d/workloads.xml\n"
++            b'exec /entrypoint.sh "$@"\n'
++        )
+     if "control_image" in config:
+         outputs["control-compose.yaml"] = yaml_bytes(render_controller(config))
+     outputs["generation-manifest.json"] = json_bytes(
+--- baseline/tools/qa/market_data_mixed_load.py
++++ tools/qa/market_data_mixed_load.py
+@@ -0,0 +1,434 @@
++"""S02 fixed offered mixed load on an explicitly disposable ClickHouse server.
++
++Extends market-data-resource-comparison/v1; uses the accepted S01 source reader.
++Each lane owns a client in a separate process. No work is discarded: every scheduled
++operation is retried or reported as failed, and finite queues drain after measurement.
++"""
++
++from __future__ import annotations
++
++import argparse
++import hashlib
++import importlib.util
++import json
++import multiprocessing as mp
++import os
++import platform
++import resource
++import subprocess
++import sys
++import time
++from datetime import timedelta
++from pathlib import Path
++from typing import Any, cast
++from uuid import uuid4
++
++from fastapi import Request
++
++from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
++from apps.migrations.storage import split_clickhouse_sql
++from tools.qa.market_data_resource_comparison import BASE_MINUTE, CUTOFF, MeasuredGateway, classes
++from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.catalog_coverage_reader import (  # noqa: E501
++    ClickHouseCatalogCoverageReader,
++)
++from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
++    transient_clickhouse_error,
++)
++from trading.shared_kernel.primitives import UtcTimestamp
++
++LANES = (
++    ("stream", 0, 1.0),
++    ("interactive", 0, 0.5),
++    ("backfill", 0, 1.0),
++    ("backfill", 1, 1.0),
++    ("artifacts", 0, 1.0),
++    ("artifacts", 1, 1.0),
++)
++
++
++def api_surface(coverage):
++    """Real catalog HTTP/ASGI route and CH reader; fixed auth/catalog/PG projections."""
++    from types import SimpleNamespace as N
++    from uuid import UUID
++
++    from fastapi import FastAPI
++    from fastapi.testclient import TestClient
++
++    from apps.api.routes.market_data_catalog import build_catalog_workspace_router
++    from trading.contexts.identity.application.ports.current_user import CurrentUserPrincipal
++    from trading.shared_kernel.primitives import MarketId, OrganizationId, PaidLevel, UserId
++
++    app = FastAPI()
++    principal = CurrentUserPrincipal(UserId(UUID(int=2)), PaidLevel.free())
++
++    def current(request: Request):
++        return principal
++
++    app.include_router(
++        build_catalog_workspace_router(
++            current_user_dependency=current,
++            scope_resolver=cast(
++                Any, N(resolve=lambda **kw: N(organization_id=OrganizationId(UUID(int=1))))
++            ),
++            selections=cast(
++                Any, N(list_for_organization=lambda **kw: [], strategy_pins=lambda **kw: [])
++            ),
++            snapshots=cast(
++                Any,
++                N(
++                    current_catalogs=lambda **kw: [
++                        dict(
++                            snapshot_id=UUID(int=3),
++                            market_id=1,
++                            refreshed_at=CUTOFF,
++                            items=[
++                                dict(
++                                    symbol=f"S{i:04d}USDT",
++                                    base_asset="S",
++                                    quote_asset="USDT",
++                                    price_step=0.01,
++                                    qty_step=0.01,
++                                    min_notional=5,
++                                )
++                                for i in range(102)
++                            ],
++                        )
++                    ]
++                ),
++            ),
++            jobs=cast(Any, N(instrument_jobs=lambda **kw: [])),
++            markets=cast(
++                Any,
++                N(
++                    execute=lambda: [
++                        N(
++                            market_id=MarketId(1),
++                            exchange_name="binance",
++                            market_type="spot",
++                            market_code="binance:spot",
++                        )
++                    ]
++                ),
++            ),
++            coverage=coverage,
++        )
++    )
++    return TestClient(app)
++
++
++def raw_insert(client, db, symbol, minute, count, tag, *, sparse=False):
++    client.command(
++        f"INSERT INTO {db}.raw_binance_klines_1m "
++        "(market_id,symbol,instrument_key,open_time,close_time,open,high,low,close,volume,"
++        "quote_asset_volume,number_of_trades,taker_buy_base_asset_volume,"
++        "taker_buy_quote_asset_volume,source) SELECT 1,%(symbol)s,concat('binance:spot:',"
++        "%(symbol)s),toDateTime64((%(minute)s+number)*60,3,'UTC'),"
++        "toDateTime64((%(minute)s+number+1)*60,3,'UTC'),1,1,1,1,1,1,1,1,1,'rest' "
++        "FROM numbers(%(count)s) WHERE %(sparse)s=0 OR modulo(number,7)!=0",
++        parameters=dict(symbol=symbol, minute=minute, count=count, sparse=int(sparse)),
++        settings={"log_comment": tag},
++    )
++
++
++def lane(environ, db, label, workload, index, interval, start, duration, root, output):
++    try:
++        if label == "candidate":
++            environ["ROEHUB_CH_WORKLOADS_REQUIRED"] = "1"
++            settings = ClickHouseSettingsLoader(environ).load(workload=workload)
++            client = _clickhouse_client(settings)
++        else:
++            spec = importlib.util.spec_from_file_location(
++                "baseline_ch_wiring", Path(root) / "apps/cli/wiring/db/clickhouse.py"
++            )
++            assert spec is not None and spec.loader is not None
++            module = importlib.util.module_from_spec(spec)
++            sys.modules[spec.name] = module
++            spec.loader.exec_module(module)
++            client = module._clickhouse_client(module.ClickHouseSettingsLoader(environ).load())
++        tag = f"s02_{label}_{workload}_{index}"
++        gateway = MeasuredGateway(client, tag)
++        impl, _ = classes(Path(root), workload + str(index))
++        stored = impl["stored"](gateway, db)
++        coverage = ClickHouseCatalogCoverageReader(cast(Any, gateway), db)
++        api = api_surface(coverage) if workload == "interactive" else None
++        count = int(duration / interval)
++        operations, failures, retries = [], [], []
++        tag = f"s02_{label}_{workload}_{index}"
++        for n in range(count):
++            offered = start + n * interval
++            time.sleep(max(0, offered - time.monotonic()))
++            attempts = 0
++            began = time.monotonic()
++            while True:
++                attempts += 1
++                try:
++                    if workload == "stream":
++                        for s in range(4):
++                            raw_insert(client, db, f"S{s:04d}USDT", BASE_MINUTE + 2880 + n, 1, tag)
++                    elif workload == "interactive":
++                        assert api is not None
++                        response = api.get(
++                            "/market-data/workspace/instruments",
++                            params={
++                                "exchange": "binance",
++                                "start_at": (CUTOFF - timedelta(days=2)).isoformat(),
++                                "end_at": CUTOFF.isoformat(),
++                                "limit": 100,
++                            },
++                        )
++                        if response.status_code != 200:
++                            raise RuntimeError("api_response_" + str(response.status_code))
++                    elif workload == "backfill":
++                        # An exact bounded verification scan accompanies each 1,440-minute write.
++                        # Amplify scan work with the same fixed 16-pass checksum in both variants.
++                        client.query(
++                            f"SELECT sum(cityHash64(symbol,ts_open,number)) FROM "
++                            f"{db}.canonical_candles_1m CROSS JOIN numbers(16) AS passes "
++                            f"WHERE ts_open < %(cutoff)s",
++                            parameters={"cutoff": CUTOFF},
++                            settings={"log_comment": tag},
++                        )
++                        raw_insert(
++                            client,
++                            db,
++                            f"S{4+index:04d}USDT",
++                            BASE_MINUTE + 2880 + n * 1440,
++                            1440,
++                            tag,
++                        )
++                    else:
++                        stored.observation_page(before=UtcTimestamp(CUTOFF), limit=50, after=None)
++                        client.query(
++                            f"SELECT sum(close),count() FROM {db}.canonical_candles_1m "
++                            "WHERE symbol=%(symbol)s AND ts_open < %(cutoff)s",
++                            parameters={"symbol": f"S{4+index:04d}USDT", "cutoff": CUTOFF},
++                            settings={"log_comment": tag},
++                        )
++                    break
++                except Exception as error:
++                    code = transient_clickhouse_error(error)
++                    # 202 is measured on the baseline too before its classifier is extended.
++                    if code is None and "Code: 202." in str(error):
++                        code = "storage_concurrency_pressure"
++                    retries.append(dict(operation=n, code=code or type(error).__name__))
++                    if code is None or attempts >= 30:
++                        failures.append(dict(operation=n, error=code or type(error).__name__))
++                        break
++                    time.sleep(min(2, 0.1 * attempts) + index * 0.037)
++            finished = time.monotonic()
++            operations.append(
++                dict(
++                    n=n,
++                    offered_s=offered - start,
++                    finished_s=finished - start,
++                    latency_s=finished - offered,
++                    service_s=finished - began,
++                    attempts=attempts,
++                )
++            )
++        if api is not None:
++            api.close()
++        client.close()
++        record = dict(
++            workload=workload,
++            index=index,
++            offered=count,
++            operations=operations,
++            retries=retries,
++            failures=failures,
++            client_maxrss=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
++            client_cpu_s=time.process_time(),
++        )
++    except Exception as error:
++        record = dict(workload=workload, index=index, fatal=type(error).__name__)
++    Path(output).write_text(json.dumps(record, indent=2) + "\n")
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--source", type=Path, required=True)
++    parser.add_argument("--label", choices=["baseline", "candidate"], required=True)
++    parser.add_argument("--output", type=Path, required=True)
++    parser.add_argument("--container", default="roehub-s02-ch")
++    parser.add_argument("--duration", type=int, default=360)
++    args = parser.parse_args()
++    if os.environ.get("ROEHUB_S02_DISPOSABLE") != "1":
++        raise ValueError("explicit disposable server opt-in required")
++    client = _clickhouse_client(ClickHouseSettingsLoader(os.environ).load())
++    runtime = json.loads(
++        subprocess.check_output(
++            [
++                "docker",
++                "inspect",
++                "--format",
++                '{"image":{{json '
++                '.Image}},"memory":{{.HostConfig.Memory}},"nano_cpus":{{.HostConfig.NanoCpus}}}',
++                args.container,
++            ],
++            text=True,
++        )
++    )
++    db = "resource_s02_" + uuid4().hex
++    record = dict(
++        schema_version="market-data-resource-comparison/v1",
++        stage="S02",
++        label=args.label,
++        runtime=runtime,
++        harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
++        duration_s=args.duration,
++        warmup_s=60,
++        steady_s=300,
++        source=classes(args.source, "identity")[1],
++        python=platform.python_version(),
++        fixture_coordinates=102,
++        live_streams=4,
++        server_version=client.command("SELECT version()"),
++        samples=[],
++        lanes=[],
++        failures=[],
++    )
++    args.output.parent.mkdir(parents=True, exist_ok=True)
++    work = args.output.parent / (args.output.stem + "-lanes")
++    work.mkdir(exist_ok=False)
++    try:
++        for sql in split_clickhouse_sql(
++            Path("migrations/clickhouse/market_data_ddl.sql").read_text().replace("market_data", db)
++        ):
++            client.command(sql)
++        for coordinate in range(102):
++            # Seed a small representative history with actual missing minutes.
++            raw_insert(
++                client,
++                db,
++                f"S{coordinate:04d}USDT",
++                BASE_MINUTE,
++                2880,
++                "s02_seed",
++                sparse=coordinate >= 4,
++            )
++        record["fixture_rows"] = client.command(f"SELECT count() FROM {db}.canonical_candles_1m")
++        record["container_limits"] = {
++            "memory_bytes": 1610612736,
++            "cpus": 2,
++            "server_memory_bytes": 1073741824,
++        }
++        record["fixture_sha256"] = hashlib.sha256(
++            b"102 coordinates;4x2880 contiguous;98x2880 missing every seventh;v2"
++        ).hexdigest()
++        # Workload privileges are database-specific on the disposable fixture.
++        if args.label == "candidate":
++            from tools.installation.clickhouse_workloads import grants
++
++            for workload in ("stream", "interactive", "backfill", "artifacts"):
++                for grant in grants(workload, db):
++                    client.command(grant + " TO roehub_" + workload)
++        ctx = mp.get_context("spawn")
++        children = []
++        start = time.monotonic() + 5
++        for workload, index, interval in LANES:
++            path = work / f"{workload}-{index}.json"
++            process = ctx.Process(
++                target=lane,
++                args=(
++                    dict(os.environ),
++                    db,
++                    args.label,
++                    workload,
++                    index,
++                    interval,
++                    start,
++                    args.duration,
++                    str(args.source),
++                    str(path),
++                ),
++            )
++            process.start()
++            children.append((process, path))
++        while any(p.is_alive() for p, _ in children):
++            sample: dict[str, Any] = dict(at_s=time.monotonic() - start)
++            sample["memory"] = {
++                str(row[0]): row[1]
++                for row in client.query(
++                    "SELECT metric,value FROM system.asynchronous_metrics WHERE metric IN "
++                    "('jemalloc.allocated','MemoryResident')"
++                ).result_rows
++            }
++            sample["tracked"] = client.command(
++                "SELECT value FROM system.metrics WHERE metric='MemoryTracking'"
++            )
++            sample["active"] = client.query(
++                "SELECT user,count(),sum(memory_usage) FROM system.processes WHERE "
++                "user!='s02_admin' GROUP BY user"
++            ).result_rows
++            sample["parts"] = client.command(
++                f"SELECT count() FROM system.parts WHERE active AND database='{db}'"
++            )
++            sample["merges"] = client.command(
++                f"SELECT count() FROM system.merges WHERE database='{db}'"
++            )
++            sample["cgroup"] = subprocess.check_output(
++                [
++                    "docker",
++                    "exec",
++                    args.container,
++                    "sh",
++                    "-c",
++                    "cat /sys/fs/cgroup/memory.current /sys/fs/cgroup/cpu.stat "
++                    "/sys/fs/cgroup/io.stat",
++                ],
++                text=True,
++            ).splitlines()
++            record["samples"].append(sample)
++            time.sleep(1)
++            if time.monotonic() - start > args.duration + 600:
++                raise RuntimeError("drain deadline exceeded")
++        for p, path in children:
++            p.join()
++            record["lanes"].append(json.loads(path.read_text()))
++        record["full_completion_s"] = time.monotonic() - start
++        record["background_counts"] = client.query(
++            f"SELECT symbol,uniqExact(ts_open) FROM {db}.canonical_candles_1m WHERE "
++            f"ts_open >= %(cutoff)s AND symbol IN ('S0004USDT','S0005USDT') GROUP BY symbol",
++            parameters={"cutoff": CUTOFF},
++        ).result_rows
++        record["live_counts"] = client.query(
++            f"SELECT symbol,uniqExact(ts_open) FROM {db}.canonical_candles_1m WHERE "
++            f"ts_open >= %(cutoff)s AND symbol IN "
++            f"('S0000USDT','S0001USDT','S0002USDT','S0003USDT') GROUP BY symbol",
++            parameters={"cutoff": CUTOFF},
++        ).result_rows
++        client.command("SYSTEM FLUSH LOGS")
++        record["query_metrics"] = client.query(
++            "SELECT "
++            "user,log_comment,type,count(),sum(read_rows),sum(read_bytes),"
++            "max(memory_usage),sum(ProfileEvents['UserTimeMicroseconds']),"
++            "sum(ProfileEvents['ReadBufferFromFileDescriptorReadBytes']) FROM "
++            "system.query_log WHERE event_time>=now()-INTERVAL 30 MINUTE AND "
++            "has(databases,%(db)s) GROUP BY user,log_comment,type",
++            parameters={"db": db},
++        ).result_rows
++        time.sleep(5)
++        record["post_drain_memory"] = {
++            str(row[0]): row[1]
++            for row in client.query(
++                "SELECT metric,value FROM system.asynchronous_metrics WHERE metric IN "
++                "('jemalloc.allocated','MemoryResident')"
++            ).result_rows
++        }
++    except Exception as error:
++        record["failures"].append(type(error).__name__)
++        raise
++    finally:
++        for p, _ in locals().get("children", []):
++            if p.is_alive():
++                p.terminate()
++                p.join()
++        client.command(f"DROP DATABASE IF EXISTS {db}")
++        client.close()
++        with args.output.open("x") as f:
++            json.dump(record, f, indent=2, default=str)
++            f.write("\n")
++
++
++if __name__ == "__main__":
++    main()

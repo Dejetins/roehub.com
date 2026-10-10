@@ -9,7 +9,7 @@ export const workHistorySchema=z.object({items:z.array(workJobSchema),next_curso
 export type Instrument=z.infer<typeof instrumentSchema>;
 export type WorkJob=z.infer<typeof workJobSchema>;
 export type Coverage=z.infer<typeof coverageSchema>;
-export type WorkCommand={kind:'catalog_refresh'|'candle_ingestion';market_id:number;symbols?:string[];start_at?:string;end_at?:string;timeframe?:'1m'};
+export type WorkCommand={full_history?:boolean;kind:'catalog_refresh'|'candle_ingestion';market_id:number;symbols?:string[];start_at?:string;end_at?:string;timeframe?:'1m'};
 export const marketRead=async<T>(path:string,schema:z.ZodType<T>,signal?:AbortSignal)=>(await requestJson(`/api/market-data/${path}`,schema,{signal})).data;
 export const readCatalog=(params:URLSearchParams,signal?:AbortSignal)=>marketRead(`workspace/catalog?${params}`,catalogSchema,signal);
 export async function readInstrument(market:number,symbol:string,signal?:AbortSignal){const page=await readCatalog(new URLSearchParams({market_id:String(market),q:symbol,limit:'1'}),signal);const item=page.items.find(r=>r.symbol===symbol);if(!item)throw new ApiError('not-found',404,'failed');return {...item,snapshot_id:page.snapshot_id,refreshed_at:page.refreshed_at,catalog_state:page.catalog_state};}

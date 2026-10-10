@@ -1,0 +1,1902 @@
+--- a/apps/worker/market_data_ws/wiring/modules/market_data_ws.py
++++ b/apps/worker/market_data_ws/wiring/modules/market_data_ws.py
+@@ -2,7 +2,7 @@
+ 
+ import asyncio
+ import logging
+-from contextlib import AbstractContextManager, nullcontext
++from contextlib import AbstractContextManager, AsyncExitStack, nullcontext
+ from dataclasses import dataclass
+ from pathlib import Path
+ from typing import Awaitable, Callable, Mapping, Sequence
+@@ -51,6 +51,9 @@
+ from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
+     PostgresInstrumentSelectionRepository,
+ )
++from trading.contexts.market_data.adapters.outbound.persistence.postgres.async_stream_recovery_store import (  # noqa: E501
++    AsyncPostgresStreamRecoveryStore,
++)
+ from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_bounds_repository import (  # noqa: E501
+     PostgresHistoryBoundsRepository,
+ )
+@@ -69,6 +72,9 @@
+     ReconnectTailFillPlanner,
+     RestFillQueueHooks,
+     WsMinuteGapTracker,
++)
++from trading.contexts.market_data.application.services.batched_recovery import (
++    BatchedRecoveryAdmission,
+ )
+ from trading.contexts.market_data.application.services.history_readiness import HistoryReadiness
+ from trading.contexts.market_data.application.services.history_stream_gate import (
+@@ -440,6 +446,8 @@
+         subscription_refresh_seconds: float = 15.0,
+         plan_recovery: Callable[..., Awaitable[list[RestFillTask]]] | None = None,
+         recovery_lease: Callable[[], AbstractContextManager] = nullcontext,
++        async_recovery_lease=None,
++        async_publish_connections=None,
+         start_io: Callable[[], Awaitable[None]] | None = None,
+         close_io: Callable[[], Awaitable[None]] | None = None,
+         read_desired=None,
+@@ -488,12 +496,18 @@
+         self._subscription_refresh_seconds = subscription_refresh_seconds
+         self._plan_recovery = plan_recovery
+         self._recovery_lease = recovery_lease
++        self._async_recovery_lease = async_recovery_lease
++        self._async_publish_connections = async_publish_connections
+         self._ingestion_failure: Exception | None = None
+         self._start_io = start_io
+         self._close_io = close_io
+ 
+     async def run(self, stop_event: asyncio.Event) -> None:
+-        with self._recovery_lease():
++        async with AsyncExitStack() as stack:
++            if self._async_recovery_lease is not None:
++                await stack.enter_async_context(self._async_recovery_lease())
++            else:
++                stack.enter_context(self._recovery_lease())
+             status_task = asyncio.create_task(self._report_connections(stop_event))
+             try:
+                 if self._start_io is not None:
+@@ -525,12 +539,17 @@
+ 
+     async def _report_connections(self, stop_event: asyncio.Event) -> None:
+         """Publish bounded snapshots outside the event loop, including initial failures."""
+-        if self._publish_connections is None:
++        if self._publish_connections is None and self._async_publish_connections is None:
+             return
+         while not stop_event.is_set():
+             try:
+-                publication = asyncio.create_task(
+-                    asyncio.to_thread(self._publish_connections, dict(self._connections)))
++                if self._async_publish_connections is not None:
++                    publication = asyncio.create_task(
++                        self._async_publish_connections(dict(self._connections)))
++                else:
++                    assert self._publish_connections is not None
++                    publication = asyncio.create_task(
++                        asyncio.to_thread(self._publish_connections, dict(self._connections)))
+                 try:
+                     await asyncio.shield(publication)
+                 except asyncio.CancelledError:
+@@ -538,7 +557,7 @@
+                     raise
+             except Exception:
+                 # Expired observations become unknown; never retain a false healthy state.
+-                log.exception("stream connection status publication failed")
++                log.error("stream connection status publication failed")
+             try:
+                 await asyncio.wait_for(stop_event.wait(), timeout=5)
+             except TimeoutError:
+@@ -956,6 +975,8 @@
+         database=clickhouse_settings.database,
+     )
+     recovery_store = PostgresStreamRecoveryStore(environ.get("STRATEGY_PG_DSN", ""))
++    async_recovery = AsyncPostgresStreamRecoveryStore(environ.get("STRATEGY_PG_DSN", ""))
++    admission = BatchedRecoveryAdmission(async_recovery)
+     instrument_reader = HistoryReadyInstrumentReader(
+         on_ready=recovery_store.clear_history_failures,
+         source=_effective_instrument_reader(environ=environ),
+@@ -1030,7 +1051,8 @@
+                 StoredCandleSignalWriter(raw_writer, stored_candle_observer)),
+         async_writer=observed_live_write,
+         on_deferred=defer_received,
+-        store=recovery_store,
++        async_store=async_recovery,
++        admission=admission,
+         classify_error=classify_io_error,
+         clock=clock,
+         flush_interval_ms=config.raw_write.flush_interval_ms,
+@@ -1052,9 +1074,9 @@
+     rest_queue = AsyncRestFillQueue(
+         async_executor=io.fill,
+         should_run=preparation_still_requested,
+-        failed_history_repairs=recovery_store.failed_history_repairs(),
+         window_minutes=60,
+-        store=recovery_store,
++        async_store=async_recovery,
++        admission=admission,
+         classify_error=classify_io_error,
+         worker_count=config.ingestion.rest_concurrency_instruments,
+         hooks=RestFillQueueHooks(
+@@ -1079,6 +1101,12 @@
+         tail_lookback_minutes=config.ingestion.tail_lookback_minutes,
+     )
+ 
++    async def close_io() -> None:
++        try:
++            await admission.close()
++        finally:
++            await live_writer.close()
++
+     return MarketDataWsApp(
+         config=config,
+         instrument_reader=instrument_reader,
+@@ -1092,10 +1120,10 @@
+         metrics=metrics,
+         metrics_port=metrics_port,
+         plan_recovery=io.plan,
+-        recovery_lease=recovery_store.lease,
+-        publish_connections=recovery_store.publish_connections,
++        async_recovery_lease=async_recovery.lease,
++        async_publish_connections=async_recovery.publish_connections,
+         start_io=live_writer.start,
+-        close_io=live_writer.close,
++        close_io=close_io,
+         read_desired=lambda: io.run("selected", None),
+         prepare_history=lambda pending: io.run("prepare", pending),
+     )
+--- a/docs/architecture/market_data/market-data-application-ports.md
++++ b/docs/architecture/market_data/market-data-application-ports.md
+@@ -200,3 +200,35 @@
+ scope (`breaking-change` для старой конфигурации без scope). Координированный
+ upgrade/rollback и cleanup только после подтверждённого drain описаны в local
+ Market Data recovery runbook, раздел S03.
++
++## Async recovery admission (S04, 2026-10-11)
++
++`AsyncStreamRecoveryStore` дополняет синхронный порт: `remember_many` возвращает
++receipts в порядке входных ключей только после commit; `complete_many` удаляет
++только совпадающие `(task_key, token)`. `BatchedRecoveryAdmission` объединяет
++не более 256 записей за 2 ms, ограничивает очередь вместе с in-flight batch
++20 000 записями и длины symbol/reason 128 символами. Failed receipt требует
++явного rearm; автоматическая смена token запрещена. Синхронные потребители
++сохраняют прежний порт и persisted schema.
++
++Collector использует одну async PG session для advisory lease, admission,
++pending/retry/fail/advance/completion и socket health. Операции сериализованы;
++транзакция не охватывает CH/REST. Deadline 3 s закрывает session перед отменой
++ожидания, включая потерянный сетевой ответ. Неизвестный commit не считается
++откатом: lifecycle прекращается, restart получает lease и сверяет прежние ключи.
++Неизвестная receipt сохраняется; exactly-once между PG и CH не обещается.
++
++Buffer резервирует capacity до persistence. В общий row budget входят buffer,
++DB admissions и ожидающие producers: максимум `2 * max_buffer_rows`, из них
++не более `max_buffer_rows` уже допущены к persistence/write. Дополнительно
++применяется 64 MiB budget учтённых retained bytes (консервативная оценка объекта
++и служебных структур, не RSS). При переполнении intake получает backpressure/
++QueueFull, не durable acceptance; reconnect/tail repair покрывает такие arrivals.
++Отмена до persistence свободна; начатая owned admission завершается независимо
++от повторных отмен caller. После commit row принадлежит buffer либо остаётся
++в journal для restart. Только реальная canonical свеча разрешает закрыть
++`ws_recovery`; absence marker этого права не даёт.
++
++Совместимость additive async port — `compatible-change`; persisted shape,
++recovery keys/tokens и API DTO — `none`. Upgrade/rollback требует drain collector
++и сохранения journal; прежняя версия читает оставленные pending receipts.
+--- a/docs/architecture/market_data/market-data-reference-api-v1.md
++++ b/docs/architecture/market_data/market-data-reference-api-v1.md
+@@ -417,3 +417,21 @@
+ quota guarantee. Upgrade, rollback and exact-token confirmed-drain recovery are
+ specified in the S03 section of `docs/runbooks/navigator-local-market-data-recovery.md`.
+ This describes the source candidate, not installed-runtime acceptance.
++
++### Asynchronous durable collector admission (S04, 2026-10-11)
++
++Collector acceptance follows capacity reservation → batched PG commit → buffer
++admission → synchronous canonical/MV write acknowledgement → token-fenced receipt
++completion. Pending producers, in-flight batches and retries share bounded row
++and accounted-byte budgets. Awaiting capacity is not acceptance. Cancellation
++cannot cancel another producer's shared commit or delete an uncertain receipt.
++A lost PG reply closes the lease session; restart reconciles stable keys, keeping
++failed/rearm semantics and actual-candle-only WS recovery. No exactly-once claim
++is made across the two databases.
++
++All collector recovery and health operations use the lifecycle-owned async PG
++session. Synchronous administrative/history consumers retain their existing port.
++The internal async port is additive; journal schema, public DTOs, authorization,
++source-absence semantics and UI loading behavior are unchanged. This source
++contract is not an installed-runtime rollout receipt. Drain/rollback and observed
++proof boundaries are in the S04 section of the local recovery runbook.
+--- a/docs/runbooks/navigator-local-market-data-recovery.md
++++ b/docs/runbooks/navigator-local-market-data-recovery.md
+@@ -788,3 +788,55 @@
+ for 26 callers, but did not include the full ClickHouse write working set.
+ See the S03 report for ranges, failures, proof boundaries and upgrade checks.
+ Numerical performance acceptance: `not assessed — numerical threshold not specified`.
++
++## Asynchronous batched stream recovery — S04 (2026-10-11)
++
++This is a source behavior contract; installed activation is separate. The
++collector uses one lifecycle-owned async PostgreSQL session for both its advisory
++lease and all recovery/health transactions. A 2 ms admission coalescer commits at
++most 256 receipts together. Existing keys, tokens, failed/rearm states and schema
++remain unchanged. The warmed, killable CH writer and S03 provider permit lifecycle
++are retained. This does not optimize S03 quota-admission transactions.
++
++Reserve capacity before persistence; acceptance requires PG commit. The buffer
++accounts for waiting producers, in-flight admission, buffered rows and retries:
++`2 * max_buffer_rows` total retained rows, at most `max_buffer_rows` admitted to
++persistence/write, and 64 MiB accounted bytes. Byte accounting is a conservative
++object/metadata reservation, not an OS RSS limit. The metadata coalescer separately
++caps 20 000 tasks, 256 per transaction, symbol/reason at 128 characters. The REST
++queue caps pending+admitting keys and never holds its condition lock across PG.
++On capacity exhaustion, an unaccepted arrival relies on reconnect/tail recovery;
++never clear receipts to make capacity available.
++
++A 3 s PG deadline closes the socket **before** cancelling, because rollback can
++otherwise wait forever for a lost reply. Unknown commit poisons the session and
++requires collector restart. Do not assume the transaction rolled back or delete
++its key. After lease reacquisition, stable keys return committed receipts with
++their original tokens. Per-caller cancellation never cancels a shared batch.
++Before persistence, a capacity waiter is cancellable without a receipt; afterward,
++the owned admission completes and either the buffer drains or metadata remains
++for restart. CH acknowledgement and receipt completion are separate crash
++boundaries; only verified actual candles satisfy a received `ws_recovery` range.
++
++Upgrade and rollback: stop intake, drain owned admissions and the writer, retain
++all pending/failed receipts, release the collector lease last, then switch source
++through the managed installation lifecycle. No new migration/config key is needed
++for S04; S02/S03 prerequisites still apply. Old source reads the same journal
++shape. Do not run two collectors, rearm failures automatically, reclaim tokens
++by TTL, or activate source using one-off copies into an installed container.
++
++Diagnose growing backlog by separating capacity wait, PG deadline/session failure,
++CH retry and failed receipts. Inspect canonical progress and oldest pending work;
++a connected socket is not delivery. Stop/restart a poisoned collector through the
++managed lifecycle without deleting journal data. Retained failed receipts require
++root-cause repair before the existing explicit rearm operation.
++
++`tools/qa/market_data_recovery_comparison.py` extends the comparison schema with
++finite, accelerated synchronized bursts at 4 and 100 streams, fixed scheduling,
++real PG/CH, one warmed writer, full drain and canonical content parity. It requires
++`ROEHUB_S04_DISPOSABLE=1`, the named dedicated loopback targets and a new output
++path for every attempt. It measures scheduled/receive/receipt-to-writer-ACK;
++synchronous CH/MV settings and final canonical verification bound that ACK proof.
++It is not a service steady-state, provider scale or API-latency measurement.
++One-second RSS samples miss short peaks; post-drain observations are short and do
++not exclude leaks. The final S04 report owns measured results and limitations.
+--- a/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/async_stream_recovery_store.py
++++ b/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/async_stream_recovery_store.py
+@@ -0,0 +1,220 @@
++"""One lifecycle-owned async session: journal transactions and lease cannot diverge.
++
++A transport/unknown-commit failure poisons this lifecycle. Reopening obtains the
++exclusive lease and reconciles the same stable keys; it never deletes uncertain
++receipts. No schema change, connection-per-candle, or concurrent session use.
++"""
++
++import asyncio
++from contextlib import asynccontextmanager
++from datetime import datetime
++from typing import Any, LiteralString, cast
++from uuid import uuid4
++
++import psycopg
++from psycopg.rows import dict_row
++
++from trading.contexts.market_data.adapters.outbound.persistence.postgres.stream_recovery_store import (  # noqa: E501
++    PostgresStreamRecoveryStore,
++    _entry,
++)
++from trading.contexts.market_data.application.dto import RestFillTask
++from trading.contexts.market_data.application.ports.stores.stream_recovery_store import (
++    RecoveryEntry,
++    recovery_key,
++)
++
++
++class AsyncPostgresStreamRecoveryStore:
++    def __init__(self, dsn: str, *, max_entries: int = 20000) -> None:
++        self._dsn = PostgresStreamRecoveryStore(dsn, max_entries=max_entries).dsn
++        self.max_entries = max_entries
++        self._conn: psycopg.AsyncConnection[dict[str, Any]] | None = None
++        self._lock = asyncio.Lock()
++        self._failed = False
++
++    @asynccontextmanager
++    async def lease(self):
++        if self._conn is not None:
++            raise RuntimeError("collector lease already entered")
++        async with await psycopg.AsyncConnection[dict[str, Any]].connect(
++            self._dsn, autocommit=True, row_factory=dict_row
++        ) as conn:
++            async with self._deadline(conn):
++                row = await (
++                    await conn.execute("SELECT pg_try_advisory_lock(744948345628) AS locked")
++                ).fetchone()
++            if not row or not row["locked"]:
++                raise RuntimeError("stream collector is already running")
++            self._conn, self._failed = conn, False
++            try:
++                yield self
++            finally:
++                # Caller must drain producers before exiting; lock fences remaining commands.
++                async with self._lock:
++                    self._conn = None
++
++    @asynccontextmanager
++    async def _deadline(self, conn):
++        # Close the socket BEFORE cancelling: psycopg rollback/cancel otherwise
++        # waits for a blackholed reply despite a server statement timeout.
++        owner = asyncio.current_task()
++        expired = False
++
++        async def expire():
++            nonlocal expired
++            await asyncio.sleep(3)
++            expired = True
++            self._failed = True
++            await conn.close()
++            assert owner is not None
++            owner.cancel()
++
++        watchdog = asyncio.create_task(expire(), name="recovery-pg-deadline")
++        try:
++            yield
++        except BaseException:
++            if expired:
++                raise TimeoutError("recovery PG deadline; restart required") from None
++            raise
++        finally:
++            watchdog.cancel()
++            await asyncio.gather(watchdog, return_exceptions=True)
++
++    @asynccontextmanager
++    async def _transaction(self):
++        async with self._lock:
++            if self._conn is None or self._failed:
++                raise RuntimeError("collector lease unavailable; restart required")
++            try:
++                async with self._deadline(self._conn):
++                    async with self._conn.transaction():
++                        yield self._conn
++            except (psycopg.OperationalError, asyncio.CancelledError, TimeoutError):
++                self._failed = True
++                raise
++
++    async def remember_many(self, tasks: list[RestFillTask]) -> list[RecoveryEntry]:
++        if not tasks:
++            return []
++        if len(tasks) > 256:
++            raise ValueError("recovery batch exceeds 256")
++        keys = [recovery_key(task) for task in tasks]
++        unique = dict(zip(keys, tasks))
++        async with self._transaction() as conn:
++            await conn.execute("SELECT pg_advisory_xact_lock(744948345627)")
++            rows = await (
++                await conn.execute(
++                    "SELECT * FROM market_data_stream_recovery WHERE task_key=ANY(%s)",
++                    (list(unique),),
++                )
++            ).fetchall()
++            by_key = {row["task_key"]: row for row in rows}
++            if any(row["state"] == "failed" for row in rows):
++                raise RuntimeError("stream_recovery_requires_rearm")
++            missing = [(key, task) for key, task in unique.items() if key not in by_key]
++            if missing:
++                count = await (
++                    await conn.execute("SELECT count(*) AS n FROM market_data_stream_recovery")
++                ).fetchone()
++                assert count is not None
++                if count["n"] + len(missing) > self.max_entries:
++                    raise RuntimeError("stream_recovery_capacity_exceeded")
++                rows = await (
++                    await conn.execute(
++                        "INSERT INTO market_data_stream_recovery "
++                        "(task_key,token,market_id,symbol,start_at,end_at,reason) "
++                        "SELECT * FROM unnest(%s::text[],%s::uuid[],%s::int[],%s::text[],"
++                        "%s::timestamptz[],%s::timestamptz[],%s::text[]) RETURNING *",
++                        (
++                            [key for key, _ in missing],
++                            [uuid4() for _ in missing],
++                            [task.instrument_id.market_id.value for _, task in missing],
++                            [str(task.instrument_id.symbol) for _, task in missing],
++                            [task.time_range.start.value for _, task in missing],
++                            [task.time_range.end.value for _, task in missing],
++                            [task.reason for _, task in missing],
++                        ),
++                    )
++                ).fetchall()
++                by_key.update({row["task_key"]: row for row in rows})
++            result = [_entry(by_key[key]) for key in keys]
++        return result  # transaction exit confirmed commit
++
++    async def pending(self) -> list[RecoveryEntry]:
++        return await self._read(False)
++
++    async def failed_history_repairs(self) -> list[RecoveryEntry]:
++        return await self._read(True)
++
++    async def _read(self, failed: bool) -> list[RecoveryEntry]:
++        async with self._transaction() as conn:
++            rows = await (
++                await conn.execute(
++                    "SELECT * FROM market_data_stream_recovery WHERE state=%s "
++                    "AND (NOT %s OR reason='stream_history_repair') "
++                    "ORDER BY start_at,task_key LIMIT %s",
++                    ("failed" if failed else "pending", failed, self.max_entries),
++                )
++            ).fetchall()
++            return [_entry(row) for row in rows]
++
++    async def _execute(self, query: str, params: tuple) -> None:
++        async with self._transaction() as conn:
++            await conn.execute(cast(LiteralString, query), params)
++
++    async def complete(self, entry: RecoveryEntry) -> None:
++        await self.complete_many([entry])
++
++    async def complete_many(self, entries: list[RecoveryEntry]) -> None:
++        if entries:
++            await self._execute(
++                "DELETE FROM market_data_stream_recovery WHERE (task_key,token) IN "
++                "(SELECT * FROM unnest(%s::text[],%s::uuid[]))",
++                ([e.task_key for e in entries], [e.token for e in entries]),
++            )
++
++    async def advance(self, entry: RecoveryEntry, *, start_at: datetime) -> None:
++        await self._execute(
++            "UPDATE market_data_stream_recovery SET start_at=%s,attempt=0,"
++            "next_retry_at=NULL,error_code=NULL,updated_at=now() "
++            "WHERE task_key=%s AND token=%s AND start_at<%s AND end_at>%s",
++            (start_at, entry.task_key, entry.token, start_at, start_at),
++        )
++
++    async def retry(self, entry: RecoveryEntry, *, next_retry_at: datetime, code: str) -> None:
++        await self._execute(
++            "UPDATE market_data_stream_recovery SET attempt=%s,next_retry_at=%s,"
++            "error_code=%s,updated_at=now() WHERE task_key=%s AND token=%s",
++            (entry.attempt, next_retry_at, code, entry.task_key, entry.token),
++        )
++
++    async def fail(self, entry: RecoveryEntry, *, code: str) -> None:
++        await self.fail_many([entry], code=code)
++
++    async def fail_many(self, entries: list[RecoveryEntry], *, code: str) -> None:
++        if entries:
++            await self._execute(
++                "UPDATE market_data_stream_recovery SET state='failed',error_code=%s,"
++                "updated_at=now() WHERE (task_key,token) IN "
++                "(SELECT * FROM unnest(%s::text[],%s::uuid[]))",
++                (code, [e.task_key for e in entries], [e.token for e in entries]),
++            )
++
++    async def publish_connections(self, snapshot: dict[tuple[int, str], bool]) -> None:
++        if len(snapshot) > self.max_entries:
++            raise RuntimeError("stream_connection_capacity_exceeded")
++        async with self._transaction() as conn:
++            await conn.execute("DELETE FROM market_data_stream_connections")
++            if snapshot:
++                await conn.execute(
++                    "INSERT INTO market_data_stream_connections "
++                    "(market_id,symbol,connected,collector_pid) "
++                    "SELECT m,s,c,pg_backend_pid() FROM unnest(%s::int[],%s::text[],"
++                    "%s::bool[]) AS x(m,s,c)",
++                    (
++                        [key[0] for key in snapshot],
++                        [key[1] for key in snapshot],
++                        list(snapshot.values()),
++                    ),
++                )
+--- a/src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py
++++ b/src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py
+@@ -41,3 +41,17 @@
+     def retry(self, entry: RecoveryEntry, *, next_retry_at: datetime, code: str) -> None: ...
+     def fail_many(self, entries: list[RecoveryEntry], *, code: str) -> None: ...
+     def fail(self, entry: RecoveryEntry, *, code: str) -> None: ...
++
++
++class AsyncStreamRecoveryStore(Protocol):
++    """Commit-before-return; batch ownership is independent of awaiting producers."""
++
++    async def remember_many(self, tasks: list[RestFillTask]) -> list[RecoveryEntry]: ...
++    async def pending(self) -> list[RecoveryEntry]: ...
++    async def failed_history_repairs(self) -> list[RecoveryEntry]: ...
++    async def advance(self, entry: RecoveryEntry, *, start_at: datetime) -> None: ...
++    async def complete(self, entry: RecoveryEntry) -> None: ...
++    async def complete_many(self, entries: list[RecoveryEntry]) -> None: ...
++    async def retry(self, entry: RecoveryEntry, *, next_retry_at: datetime, code: str) -> None: ...
++    async def fail_many(self, entries: list[RecoveryEntry], *, code: str) -> None: ...
++    async def fail(self, entry: RecoveryEntry, *, code: str) -> None: ...
+--- a/src/trading/contexts/market_data/application/services/batched_recovery.py
++++ b/src/trading/contexts/market_data/application/services/batched_recovery.py
+@@ -0,0 +1,95 @@
++"""Bounded admission coalescer. One task owns each shared commit, never a caller."""
++
++import asyncio
++from collections import deque
++from typing import TypeVar
++
++from trading.contexts.market_data.application.dto import RestFillTask
++from trading.contexts.market_data.application.ports.stores.stream_recovery_store import (
++    AsyncStreamRecoveryStore,
++    RecoveryEntry,
++)
++
++T = TypeVar("T")
++
++
++async def await_owned(future: asyncio.Future[T]) -> T:
++    """Repeated caller cancellation cannot propagate into owned durable work."""
++    cancelled = False
++    while not future.done():
++        try:
++            await asyncio.shield(future)
++        except asyncio.CancelledError:
++            cancelled = True
++        except Exception:
++            break
++    try:
++        result = future.result()
++    except BaseException:
++        if cancelled:
++            raise asyncio.CancelledError from None
++        raise
++    if cancelled:
++        raise asyncio.CancelledError
++    return result
++
++
++class BatchedRecoveryAdmission:
++    def __init__(
++        self,
++        store: AsyncStreamRecoveryStore,
++        *,
++        capacity: int = 20000,
++        batch_size: int = 256,
++        delay_s: float = 0.002,
++    ) -> None:
++        if not 0 < batch_size <= 256 or capacity <= 0 or delay_s < 0:
++            raise ValueError("invalid recovery admission bounds")
++        self.store = store
++        self.capacity = capacity
++        self.batch_size = batch_size
++        self.delay_s = delay_s
++        self._pending: deque[tuple[RestFillTask, asyncio.Future[RecoveryEntry]]] = deque()
++        self._count = 0
++        self._runner: asyncio.Task[None] | None = None
++        self._closed = False
++
++    async def remember(self, task: RestFillTask) -> RecoveryEntry:
++        if self._closed or self._count >= self.capacity:
++            raise RuntimeError("recovery admission closed or capacity exceeded")
++        # Bounded strings prevent an unbounded metadata payload inside a row budget.
++        if len(str(task.instrument_id.symbol)) > 128 or len(task.reason) > 128:
++            raise ValueError("recovery metadata exceeds byte bound")
++        future = asyncio.get_running_loop().create_future()
++        self._pending.append((task, future))
++        self._count += 1
++        if self._runner is None:
++            self._runner = asyncio.create_task(self._run(), name="recovery-batch-admission")
++        return await await_owned(future)
++
++    async def _run(self) -> None:
++        try:
++            while self._pending:
++                await asyncio.sleep(self.delay_s)
++                batch = [
++                    self._pending.popleft() for _ in range(min(self.batch_size, len(self._pending)))
++                ]
++                try:
++                    entries = await self.store.remember_many([task for task, _ in batch])
++                    if len(entries) != len(batch):
++                        raise RuntimeError("recovery batch response length mismatch")
++                except Exception as exc:
++                    for _, future in batch:
++                        future.set_exception(exc)
++                else:
++                    for (_, future), entry in zip(batch, entries):
++                        future.set_result(entry)
++                finally:
++                    self._count -= len(batch)
++        finally:
++            self._runner = None
++
++    async def close(self) -> None:
++        self._closed = True
++        if self._runner is not None:
++            await await_owned(self._runner)
+--- a/src/trading/contexts/market_data/application/services/insert_buffer.py
++++ b/src/trading/contexts/market_data/application/services/insert_buffer.py
+@@ -10,8 +10,13 @@
+ from trading.contexts.market_data.application.ports.clock.clock import Clock
+ from trading.contexts.market_data.application.ports.stores.raw_kline_writer import RawKlineWriter
+ from trading.contexts.market_data.application.ports.stores.stream_recovery_store import (
++    AsyncStreamRecoveryStore,
+     RecoveryEntry,
+     StreamRecoveryStore,
++)
++from trading.contexts.market_data.application.services.batched_recovery import (
++    BatchedRecoveryAdmission,
++    await_owned,
+ )
+ from trading.contexts.market_data.application.services.ingestion_retry import (
+     ErrorClassifier,
+@@ -65,6 +70,9 @@
+         hooks: InsertBufferHooks | None = None,
+         async_writer: Callable[[Sequence[CandleWithMeta]], Awaitable[None]] | None = None,
+         store: StreamRecoveryStore | None = None,
++        async_store: AsyncStreamRecoveryStore | None = None,
++        admission: BatchedRecoveryAdmission | None = None,
++        max_retained_bytes: int = 64 * 1024 * 1024,
+         classify_error: ErrorClassifier = transient_ingestion_error,
+         retry_base_s: float = 15,
+         shutdown_timeout_s: float = 3,
+@@ -79,6 +87,18 @@
+         self._max_buffer_rows = max_buffer_rows
+         self._hooks = hooks or InsertBufferHooks()
+         self._store = store
++        self._async_store = async_store
++        self._admission = admission
++        if (async_store is None) != (admission is None) or (store and async_store):
++            raise ValueError("async store requires its admission coordinator")
++        self._admitting = 0
++        self._retained_rows = 0
++        self._retained_bytes = 0
++        if max_retained_bytes <= 0:
++            raise ValueError("max_retained_bytes must be positive")
++        self._max_retained_bytes = max_retained_bytes
++        self._sizes: list[int] = []
++        self._producers: set[asyncio.Task[None]] = set()
+         self._classify_error = classify_error
+         self._retry_base_s = retry_base_s
+         self._shutdown_timeout_s = shutdown_timeout_s
+@@ -129,6 +149,8 @@
+             self._wake.set()
+ 
+     def submit(self, row: CandleWithMeta) -> None:
++        if self._async_store is not None:
++            raise RuntimeError("async recovery requires submit_wait")
+         if self._stopping or self.failure:
+             raise RuntimeError("insert buffer is stopping or failed")
+         if len(self._buffer) >= self._max_buffer_rows:
+@@ -136,6 +158,9 @@
+         self._accept(row, self._remember(row))
+ 
+     async def submit_wait(self, row: CandleWithMeta) -> None:
++        if self._async_store is not None:
++            await self._submit_durable(row)
++            return
+         if self._stopping or self.failure:
+             raise RuntimeError("insert buffer is stopping or failed")
+         receipt = self._remember(row)
+@@ -151,6 +176,60 @@
+             if receipt is not None and self._on_deferred is not None:
+                 await self._on_deferred(receipt)
+             raise
++
++    async def _submit_durable(self, row: CandleWithMeta) -> None:
++        # Reserve for waiting producer, DB batch, retained row and retry together.
++        # At most max_buffer_rows additional producers can wait for write capacity.
++        import pickle
++        size = 4096 + len(pickle.dumps(row)) * 4
++        if self._stopping or self.failure:
++            raise RuntimeError("insert buffer is stopping or failed")
++        if (self._retained_rows >= self._max_buffer_rows * 2
++                or self._retained_bytes + size > self._max_retained_bytes):
++            raise asyncio.QueueFull
++        self._retained_rows += 1
++        self._retained_bytes += size
++
++        # Waiting for capacity is not accepted and is freely cancellable.
++        try:
++            while len(self._buffer) + self._admitting >= self._max_buffer_rows:
++                if self._stopping or self.failure:
++                    raise RuntimeError("insert buffer is stopping or failed")
++                self._space.clear()
++                await self._space.wait()
++            if self._stopping or self.failure:
++                raise RuntimeError("insert buffer is stopping or failed")
++        except BaseException:
++            self._retained_rows -= 1
++            self._retained_bytes -= size
++            raise
++        self._admitting += 1
++
++        async def admit() -> None:
++            accepted = False
++            try:
++                assert self._admission is not None
++                receipt = await self._admission.remember(RestFillTask(
++                    row.candle.instrument_id,
++                    TimeRange(row.candle.ts_open, UtcTimestamp(
++                        row.candle.ts_open.value + timedelta(minutes=1))), "ws_recovery"))
++                # A stopping/cancelled caller cannot erase a committed receipt.
++                self._accept(row, receipt)
++                self._sizes.append(size)
++                accepted = True
++            finally:
++                self._admitting -= 1
++                if not accepted:
++                    self._retained_rows -= 1
++                    self._retained_bytes -= size
++
++        producer = asyncio.create_task(admit(), name="durable-candle-admission")
++        self._producers.add(producer)
++        try:
++            await await_owned(producer)
++        finally:
++            self._producers.discard(producer)
++            self._space.set()
+ 
+     async def _run(self) -> None:
+         while not self._stopping and self.failure is None:
+@@ -189,6 +268,10 @@
+                     await self._async_writer(batch)
+                 else:
+                     await asyncio.to_thread(self._writer.write_1m, batch)
++                if self._async_store:
++                    await self._async_store.complete_many(
++                        [e for e in self._receipts[: len(batch)] if e is not None]
++                    )
+                 if self._store:
+                     self._store.complete_many(
+                         [e for e in self._receipts[: len(batch)] if e is not None]
+@@ -201,6 +284,11 @@
+                 if code is None:
+                     self.failure = exc
+                     self._space.set()
++                    if self._async_store:
++                        await self._async_store.fail_many(
++                            [e for e in self._receipts[: len(batch)] if e is not None],
++                            code="non_retryable_ingestion_error",
++                        )
+                     if self._store:
+                         self._store.fail_many(
+                             [e for e in self._receipts[: len(batch)] if e is not None],
+@@ -217,6 +305,10 @@
+                         "raw insert waiting code=%s retry_in_s=%s rows=%s", code, delay, len(batch)
+                     )
+                 return
++            if self._async_store:
++                self._retained_rows -= len(batch)
++                self._retained_bytes -= sum(self._sizes[: len(batch)])
++                del self._sizes[: len(batch)]
+             del self._receipts[: len(batch)]
+             del self._buffer[: len(batch)]
+             self._space.set()
+@@ -239,6 +331,9 @@
+         self._space.set()
+         self._wake.set()
+ 
++        if self._producers:
++            await await_owned(asyncio.gather(*self._producers, return_exceptions=True))
++
+         async def drain() -> None:
+             if self._task:
+                 await self._task
+--- a/src/trading/contexts/market_data/application/services/rest_fill_queue.py
++++ b/src/trading/contexts/market_data/application/services/rest_fill_queue.py
+@@ -9,9 +9,14 @@
+ 
+ from trading.contexts.market_data.application.dto import RestFillResult, RestFillTask
+ from trading.contexts.market_data.application.ports.stores.stream_recovery_store import (
++    AsyncStreamRecoveryStore,
+     RecoveryEntry,
+     StreamRecoveryStore,
+     recovery_key,
++)
++from trading.contexts.market_data.application.services.batched_recovery import (
++    BatchedRecoveryAdmission,
++    await_owned,
+ )
+ from trading.contexts.market_data.application.services.ingestion_retry import (
+     ErrorClassifier,
+@@ -61,6 +66,8 @@
+         hooks: RestFillQueueHooks | None = None,
+         async_executor: Callable[[RestFillTask], Awaitable[RestFillResult]] | None = None,
+         store: StreamRecoveryStore | None = None,
++        async_store: AsyncStreamRecoveryStore | None = None,
++        admission: BatchedRecoveryAdmission | None = None,
+         classify_error: ErrorClassifier = transient_ingestion_error,
+         retry_base_s: float = 15,
+         max_pending: int = 20000,
+@@ -80,6 +87,12 @@
+         self._worker_count = worker_count
+         self._hooks = hooks or RestFillQueueHooks()
+         self._store = store
++        self._async_store = async_store
++        self._admission = admission
++        self._enqueuing: dict[str, RestFillTask] = {}
++        self._admissions: set[asyncio.Task[bool]] = set()
++        if (async_store is None) != (admission is None) or (store and async_store):
++            raise ValueError("async store requires admission coordinator")
+         self._classify_error = classify_error
+         self._retry_base_s = retry_base_s
+         self._max_pending = max_pending
+@@ -95,6 +108,10 @@
+     async def start(self) -> None:
+         if self._workers:
+             return
++        if self._async_store is not None:
++            self._blocked_history = await self._async_store.failed_history_repairs()
++            for entry in await self._async_store.pending():
++                self._pending[entry.task_key] = entry
+         if self._store is not None:
+             for entry in self._store.pending():
+                 self._pending[entry.task_key] = entry
+@@ -104,6 +121,8 @@
+         ]
+ 
+     async def enqueue(self, task: RestFillTask) -> bool:
++        if self._async_store is not None:
++            return await self._enqueue_async(task)
+         async with self._condition:
+             if self._stopping:
+                 raise RuntimeError("rest fill queue is stopping")
+@@ -129,10 +148,53 @@
+         _emit_enqueued(self._hooks.on_task_enqueued, task)
+         return True
+ 
++    async def _enqueue_async(self, task: RestFillTask) -> bool:
++        key = recovery_key(task)
++        # No await between checking and reserving; never hold Condition over PG.
++        if self._stopping:
++            raise RuntimeError("rest fill queue is stopping")
++        if key in self._pending or key in self._enqueuing:
++            return False
++        if task.reason == "stream_history_repair":
++            if any(e.task.instrument_id == task.instrument_id for e in self._pending.values()):
++                return False
++            if any(t.instrument_id == task.instrument_id for t in self._enqueuing.values()):
++                return False
++            if any(e.task.instrument_id == task.instrument_id
++                   and e.task.time_range.start.value < task.time_range.end.value
++                   and task.time_range.start.value < e.task.time_range.end.value
++                   for e in self._blocked_history):
++                return False
++        if len(self._pending) + len(self._enqueuing) >= self._max_pending:
++            raise RuntimeError("rest fill queue capacity exceeded")
++        self._enqueuing[key] = task
++
++        async def persist() -> bool:
++            try:
++                assert self._admission is not None
++                entry = await self._admission.remember(task)
++                async with self._condition:
++                    if not self._stopping:
++                        self._pending[key] = entry
++                        self._condition.notify_all()
++                _emit_enqueued(self._hooks.on_task_enqueued, task)
++                return True
++            finally:
++                self._enqueuing.pop(key, None)
++
++        owned = asyncio.create_task(persist(), name="durable-repair-admission")
++        self._admissions.add(owned)
++        try:
++            return await await_owned(owned)
++        finally:
++            self._admissions.discard(owned)
++
+     async def close(self) -> None:
+         async with self._condition:
+             self._stopping = True
+             self._condition.notify_all()
++        if self._admissions:
++            await await_owned(asyncio.gather(*self._admissions, return_exceptions=True))
+         if self._async_executor is not None:
+             # Receipts have already been saved; cancel also joins each managed child.
+             for worker in self._workers:
+@@ -209,6 +271,8 @@
+         _emit_started(self._hooks.on_task_started, task)
+         try:
+             if self._should_run is not None and not await self._should_run(work):
++                if self._async_store:
++                    await self._async_store.complete(entry)
+                 if self._store:
+                     self._store.complete(entry)
+                 self._pending.pop(key, None)
+@@ -249,6 +313,8 @@
+                 next_at = datetime.now(UTC) + timedelta(
+                     seconds=retry_delay(exc, entry.attempt, base=self._retry_base_s)
+                 )
++                if self._async_store:
++                    await self._async_store.retry(entry, next_retry_at=next_at, code=code)
+                 if self._store:
+                     self._store.retry(entry, next_retry_at=next_at, code=code)
+                 self._pending[key] = replace(entry, next_retry_at=next_at, error_code=code)
+@@ -264,6 +330,8 @@
+                     if exhausted_history
+                     else "non_retryable_ingestion_error"
+                 )
++                if self._async_store:
++                    await self._async_store.fail(entry, code=terminal_code)
+                 if self._store:
+                     self._store.fail(entry, code=terminal_code)
+                 if task.reason == "stream_history_repair":
+@@ -272,6 +340,8 @@
+                 log.error("rest fill terminal error_type=%s", type(exc).__name__)
+         else:
+             if work.time_range.end.value < task.time_range.end.value:
++                if self._async_store:
++                    await self._async_store.advance(entry, start_at=work.time_range.end.value)
+                 if self._store:
+                     self._store.advance(entry, start_at=work.time_range.end.value)
+                 continued = RestFillTask(
+@@ -289,6 +359,8 @@
+                     error_code=None,
+                 )
+             else:
++                if self._async_store:
++                    await self._async_store.complete(entry)
+                 if self._store:
+                     self._store.complete(entry)
+                 self._pending.pop(key, None)
+--- a/tests/real_infra/market_data/test_stream_recovery_postgres.py
++++ b/tests/real_infra/market_data/test_stream_recovery_postgres.py
+@@ -166,3 +166,280 @@
+     with store.lease():
+         # A new collector lease cannot inherit a previous collector's healthy state.
+         assert store.collector_status()["connections"] == {}
++
++
++def test_async_batch_reconcile_tokens_lease_and_health(store):
++    import asyncio
++    from dataclasses import replace
++
++    from trading.contexts.market_data.adapters.outbound.persistence.postgres.async_stream_recovery_store import (  # noqa: E501
++        AsyncPostgresStreamRecoveryStore,
++    )
++
++    async def scenario():
++        repo = AsyncPostgresStreamRecoveryStore(store.dsn, max_entries=2)
++        async with repo.lease():
++            entries = await repo.remember_many([item(), item(), item('ADAUSDT')])
++            assert entries[0] == entries[1]
++            assert len(await repo.pending()) == 2
++            with pytest.raises(RuntimeError, match='capacity'):
++                await repo.remember_many([item('ALGOUSDT')])
++            await repo.publish_connections({(1, 'AAVEUSDT'): True})
++            assert store.collector_status()['connections'] == {(1, 'AAVEUSDT'): True}
++            other = AsyncPostgresStreamRecoveryStore(store.dsn)
++            with pytest.raises(RuntimeError, match='already running'):
++                async with other.lease():
++                    pass
++            await repo.fail(entries[0], code='terminal')
++            with pytest.raises(RuntimeError, match='requires_rearm'):
++                await repo.remember_many([item()])
++        # Reopen reconciles a commit whose response the former caller never received.
++        store.rearm_failed()
++        async with repo.lease():
++            current = (await repo.remember_many([item()]))[0]
++            assert current.token != entries[0].token
++            await repo.complete(entries[0])
++            await repo.fail(entries[0], code='stale')
++            await repo.retry(replace(entries[0], attempt=9),
++                             next_retry_at=datetime.now(UTC), code='stale')
++            assert current in await repo.pending()
++            await repo.complete_many([current, entries[2]])
++            assert not await repo.pending()
++
++    asyncio.run(scenario())
++
++
++def test_async_unknown_commit_and_session_loss_fail_closed(store):
++    import asyncio
++    from contextlib import asynccontextmanager
++
++    from trading.contexts.market_data.adapters.outbound.persistence.postgres.async_stream_recovery_store import (  # noqa: E501
++        AsyncPostgresStreamRecoveryStore,
++    )
++
++    class LostAcknowledgement(AsyncPostgresStreamRecoveryStore):
++        @asynccontextmanager
++        async def _transaction(self):
++            async with super()._transaction() as conn:
++                yield conn
++            self._failed = True
++            raise psycopg.OperationalError('injected lost commit acknowledgement')
++
++    async def scenario():
++        repo = LostAcknowledgement(store.dsn)
++        async with repo.lease():
++            with pytest.raises(psycopg.OperationalError):
++                await repo.remember_many([item()])
++        committed = store.pending()[0]
++        healthy = AsyncPostgresStreamRecoveryStore(store.dsn)
++        async with healthy.lease():
++            assert await healthy.remember_many([item(), item()]) == [committed, committed]
++            assert healthy._conn is not None
++            with psycopg.connect(store.dsn) as admin:
++                admin.execute('SELECT pg_terminate_backend(%s)', (healthy._conn.info.backend_pid,))
++            with pytest.raises(psycopg.OperationalError):
++                await healthy.complete(committed)
++            with pytest.raises(RuntimeError, match='restart required'):
++                await healthy.publish_connections({(1, 'AAVEUSDT'): True})
++        assert store.pending() == [committed]
++        assert not store.collector_status()['connections']
++
++    asyncio.run(scenario())
++
++
++def test_async_precommit_failure_rolls_back_entire_batch(store):
++    import asyncio
++    from contextlib import asynccontextmanager
++
++    from trading.contexts.market_data.adapters.outbound.persistence.postgres.async_stream_recovery_store import (  # noqa: E501
++        AsyncPostgresStreamRecoveryStore,
++    )
++
++    class BeforeCommit(AsyncPostgresStreamRecoveryStore):
++        @asynccontextmanager
++        async def _transaction(self):
++            async with super()._transaction() as conn:
++                yield conn
++                raise ValueError('injected before commit')
++
++    async def scenario():
++        repo = BeforeCommit(store.dsn)
++        async with repo.lease():
++            with pytest.raises(ValueError, match='before commit'):
++                await repo.remember_many([item(), item('ADAUSDT')])
++        assert not store.pending()
++    asyncio.run(scenario())
++
++
++def test_async_network_reply_blackhole_is_bounded(store):
++    import asyncio
++    import time
++
++    from psycopg.conninfo import conninfo_to_dict
++
++    from trading.contexts.market_data.adapters.outbound.persistence.postgres.async_stream_recovery_store import (  # noqa: E501
++        AsyncPostgresStreamRecoveryStore,
++    )
++
++    async def scenario():
++        address = conninfo_to_dict(store.dsn)
++        drop = asyncio.Event()
++        connections = set()
++        workers = set()
++        async def proxy(reader, writer):
++            current = asyncio.current_task()
++            workers.add(current)
++            upstream_reader, upstream_writer = await asyncio.open_connection(
++                str(address['host']), int(str(address['port'])))
++            connections.update((writer, upstream_writer))
++            async def forward(source, target, downstream):
++                while data := await source.read(65536):
++                    if downstream and drop.is_set():
++                        continue
++                    target.write(data)
++                    await target.drain()
++            try:
++                await asyncio.gather(forward(reader, upstream_writer, False),
++                                     forward(upstream_reader, writer, True))
++            finally:
++                writer.close()
++                upstream_writer.close()
++                workers.discard(current)
++        server = await asyncio.start_server(proxy, '127.0.0.1', 0)
++        port = server.sockets[0].getsockname()[1]
++        repo = AsyncPostgresStreamRecoveryStore(
++            make_conninfo(store.dsn, port=port, sslmode='disable'))
++        try:
++            async with repo.lease():
++                drop.set()
++                begin = time.monotonic()
++                with pytest.raises((TimeoutError, psycopg.OperationalError)):
++                    await asyncio.wait_for(repo.remember_many([item()]), 12)
++                assert time.monotonic()-begin < 10
++                assert repo._failed
++        finally:
++            server.close()
++            await server.wait_closed()
++            for conn in connections:
++                conn.close()
++            for worker in list(workers):
++                worker.cancel()
++            await asyncio.gather(*workers, return_exceptions=True)
++    asyncio.run(scenario())
++
++
++@pytest.mark.parametrize('boundary', ['before_ch', 'after_ch', 'before_completion'])
++def test_async_real_ch_fault_restart_requires_actual_candle(store, boundary):
++    import asyncio
++
++    import clickhouse_connect
++
++    from apps.migrations.storage import split_clickhouse_sql
++    from apps.worker.market_data_ws.wiring.io_process import verify_received_range
++    from tools.qa.market_data_recovery_comparison import row
++    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
++        ClickHouseCanonicalCandleIndexReader,
++        ClickHouseRawKlineWriter,
++    )
++    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
++        ClickHouseConnectGateway,
++    )
++    from trading.contexts.market_data.adapters.outbound.persistence.postgres.async_stream_recovery_store import (  # noqa: E501
++        AsyncPostgresStreamRecoveryStore,
++    )
++    from trading.contexts.market_data.application.services.batched_recovery import (
++        BatchedRecoveryAdmission,
++    )
++    from trading.contexts.market_data.application.services.insert_buffer import (
++        AsyncRawInsertBuffer,
++        UnflushedBufferError,
++    )
++    from trading.platform.time.system_clock import SystemClock
++
++    password = os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_PASSWORD')
++    if password is None:
++        pytest.skip('explicit disposable ClickHouse target required')
++    client = clickhouse_connect.get_client(host='127.0.0.1',
++        port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
++        username=os.environ['ROEHUB_MARKET_DATA_TEST_CH_USER'], password=password)
++    db = 's04_fault_' + uuid4().hex
++    client.command(f'CREATE DATABASE {db}')
++    try:
++        for statement in split_clickhouse_sql(Path(
++                'migrations/clickhouse/market_data_ddl.sql'
++        ).read_text().replace('market_data', db)):
++            client.command(statement)
++        gateway = ClickHouseConnectGateway(client)
++        writer = ClickHouseRawKlineWriter(gateway, db)
++        index = ClickHouseCanonicalCandleIndexReader(gateway, db)
++        async def scenario():
++            class FailingCompletion(AsyncPostgresStreamRecoveryStore):
++                async def complete_many(self, entries):
++                    raise ConnectionError('injected before completion')
++            repo = (FailingCompletion if boundary == 'before_completion'
++                    else AsyncPostgresStreamRecoveryStore)(store.dsn)
++            async with repo.lease():
++                admission = BatchedRecoveryAdmission(repo)
++                async def write(rows):
++                    if boundary != 'before_ch':
++                        await asyncio.to_thread(writer.write_1m, rows)
++                    if boundary != 'before_completion':
++                        raise ConnectionError('injected CH boundary')
++                buffer = AsyncRawInsertBuffer(writer=writer, clock=SystemClock(),
++                    flush_interval_ms=100, max_buffer_rows=2, async_store=repo,
++                    admission=admission, async_writer=write, retry_base_s=10)
++                await buffer.start()
++                await buffer.submit_wait(row(0, 0))
++                with pytest.raises(UnflushedBufferError):
++                    await buffer.close()
++                await admission.close()
++            pending = store.pending()
++            assert len(pending) == 1
++            # An empty source response/absence alone cannot satisfy received-candle repair.
++            if boundary == 'before_ch':
++                with pytest.raises(Exception, match='source_incomplete'):
++                    verify_received_range(pending[0].task, index)
++                writer.write_1m([row(0, 0)])
++            verify_received_range(pending[0].task, index)
++            reopened = AsyncPostgresStreamRecoveryStore(store.dsn)
++            async with reopened.lease():
++                assert await reopened.remember_many([pending[0].task]) == pending
++                await reopened.complete_many(pending)
++                assert not await reopened.pending()
++            assert client.command(f'SELECT count() FROM {db}.canonical_candles_1m') == 1
++        asyncio.run(scenario())
++    finally:
++        client.command(f'DROP DATABASE {db} SYNC')
++        client.close()
++
++
++def test_real_pg_shared_batch_survives_repeated_producer_cancel(store):
++    import asyncio
++
++    from trading.contexts.market_data.adapters.outbound.persistence.postgres.async_stream_recovery_store import (  # noqa: E501
++        AsyncPostgresStreamRecoveryStore,
++    )
++    from trading.contexts.market_data.application.services.batched_recovery import (
++        BatchedRecoveryAdmission,
++    )
++
++    async def scenario():
++        repo = AsyncPostgresStreamRecoveryStore(store.dsn)
++        async with repo.lease():
++            blocker = await psycopg.AsyncConnection.connect(store.dsn)
++            await blocker.execute('SELECT pg_advisory_xact_lock(744948345627)')
++            admission = BatchedRecoveryAdmission(repo)
++            first = asyncio.create_task(admission.remember(item()))
++            second = asyncio.create_task(admission.remember(item('ADAUSDT')))
++            await asyncio.sleep(.03)
++            first.cancel()
++            await asyncio.sleep(0)
++            first.cancel()
++            await blocker.commit()
++            await blocker.close()
++            with pytest.raises(asyncio.CancelledError):
++                await first
++            assert (await second).task == item('ADAUSDT')
++            await admission.close()
++            assert len(await repo.pending()) == 2
++    asyncio.run(scenario())
+--- a/tests/unit/apps/worker/test_persistent_writer.py
++++ b/tests/unit/apps/worker/test_persistent_writer.py
+@@ -222,6 +222,7 @@
+         )
+         app = object.__new__(MarketDataWsApp)
+         app._recovery_lease = nullcontext
++        app._async_recovery_lease = None
+         app._start_io = writer.start
+         app._close_io = writer.close
+         app._run = AsyncMock()
+--- a/tests/unit/contexts/market_data/application/services/test_async_recovery_admission.py
++++ b/tests/unit/contexts/market_data/application/services/test_async_recovery_admission.py
+@@ -0,0 +1,152 @@
++"""Ownership and bounded-memory tests for asynchronous recovery admission."""
++
++import asyncio
++
++import pytest
++from test_insert_buffer import _MonotonicClock, _RecordingWriter, _row
++from test_stream_recovery import NOW, MemoryReceipts, task
++
++from trading.contexts.market_data.application.services.batched_recovery import (
++    BatchedRecoveryAdmission,
++)
++from trading.contexts.market_data.application.services.insert_buffer import (
++    AsyncRawInsertBuffer,
++    UnflushedBufferError,
++)
++
++
++class AsyncMemory:
++    def __init__(self):
++        self.sync = MemoryReceipts()
++        self.entered = asyncio.Event()
++        self.release = asyncio.Event()
++        self.batches = []
++
++    def __getattr__(self, name):
++        return getattr(self.sync, name)
++
++    async def pending(self):
++        return self.sync.pending()
++
++    async def failed_history_repairs(self):
++        return []
++
++    async def advance(self, entry, *, start_at):
++        self.sync.advance(entry, start_at=start_at)
++
++    async def complete(self, entry):
++        self.sync.complete(entry)
++
++    async def retry(self, entry, *, next_retry_at, code):
++        self.sync.retry(entry, next_retry_at=next_retry_at, code=code)
++
++    async def fail(self, entry, *, code):
++        self.sync.fail(entry, code=code)
++
++    async def remember_many(self, tasks):
++        self.batches.append(tasks)
++        self.entered.set()
++        await self.release.wait()
++        return [self.remember(t) for t in tasks]
++
++    async def complete_many(self, entries):
++        for entry in entries:
++            self.sync.complete(entry)
++
++    async def fail_many(self, entries, *, code):
++        for entry in entries:
++            self.sync.fail(entry, code=code)
++
++
++def test_double_cancellation_does_not_cancel_shared_commit():
++    async def scenario():
++        store = AsyncMemory()
++        admission = BatchedRecoveryAdmission(store)
++        first = asyncio.create_task(admission.remember(task()))
++        second = asyncio.create_task(admission.remember(task("ADAUSDT")))
++        await store.entered.wait()
++        first.cancel()
++        await asyncio.sleep(0)
++        first.cancel()
++        await asyncio.sleep(0)
++        assert not second.done()
++        store.release.set()
++        with pytest.raises(asyncio.CancelledError):
++            await first
++        assert (await second).task == task("ADAUSDT")
++        await admission.close()
++        assert len(store.rows) == 2 and len(store.batches) == 1
++
++    asyncio.run(scenario())
++
++
++def test_capacity_wait_cancels_without_receipt_or_shutdown_deadlock():
++    async def scenario():
++        store = AsyncMemory()
++        store.release.set()
++        admission = BatchedRecoveryAdmission(store)
++
++        async def unavailable(rows):
++            raise ConnectionError()
++
++        buffer = AsyncRawInsertBuffer(
++            writer=_RecordingWriter(),
++            clock=_MonotonicClock(NOW),
++            flush_interval_ms=5,
++            max_buffer_rows=1,
++            async_store=store,
++            admission=admission,
++            async_writer=unavailable,
++            shutdown_timeout_s=0.05,
++        )
++        await buffer.start()
++        await buffer.submit_wait(_row(NOW, NOW))
++        waiting = asyncio.create_task(buffer.submit_wait(_row(NOW, NOW)))
++        await asyncio.sleep(0.02)
++        assert buffer._retained_rows == 2
++        with pytest.raises(asyncio.QueueFull):
++            await buffer.submit_wait(_row(NOW, NOW))
++        waiting.cancel()
++        with pytest.raises(asyncio.CancelledError):
++            await asyncio.wait_for(waiting, 0.2)
++        assert buffer._retained_rows == 1 and len(store.rows) == 1
++        with pytest.raises(UnflushedBufferError):
++            await asyncio.wait_for(buffer.close(), 0.3)
++        await admission.close()
++
++    asyncio.run(scenario())
++
++
++def test_cancel_after_commit_keeps_row_owned_until_canonical_write():
++    async def scenario():
++        store = AsyncMemory()
++        admission = BatchedRecoveryAdmission(store)
++        written = []
++
++        async def write(rows):
++            written.extend(rows)
++
++        buffer = AsyncRawInsertBuffer(
++            writer=_RecordingWriter(),
++            clock=_MonotonicClock(NOW),
++            flush_interval_ms=5,
++            max_buffer_rows=2,
++            async_store=store,
++            admission=admission,
++            async_writer=write,
++        )
++        await buffer.start()
++        producer = asyncio.create_task(buffer.submit_wait(_row(NOW, NOW)))
++        await store.entered.wait()
++        producer.cancel()
++        await asyncio.sleep(0)
++        producer.cancel()
++        store.release.set()
++        with pytest.raises(asyncio.CancelledError):
++            await producer
++        await buffer.close()
++        await admission.close()
++        assert len(written) == 1 and not store.rows
++        assert buffer._retained_rows == buffer._retained_bytes == 0
++
++    asyncio.run(scenario())
+--- a/tools/qa/market_data_recovery_comparison.py
++++ b/tools/qa/market_data_recovery_comparison.py
+@@ -0,0 +1,515 @@
++"""S04 finite synchronized bursts. Dedicated disposable PG/CH only, immutable reports.
++
++Run via a private environment injector. --source selects the entire Python import
++root before importing this harness. Baseline is final S03, candidate final S04.
++"""
++
++from __future__ import annotations
++
++import argparse
++import asyncio
++import hashlib
++import json
++import os
++import platform
++import resource
++import subprocess
++import threading
++import time
++from contextlib import AsyncExitStack
++from datetime import UTC, datetime, timedelta
++from pathlib import Path
++from typing import Any, LiteralString, cast
++from uuid import UUID, uuid4
++
++import clickhouse_connect
++import psycopg
++from psycopg import sql
++from psycopg.conninfo import make_conninfo
++
++from apps.migrations.storage import split_clickhouse_sql
++from apps.worker.market_data_ws.wiring.persistent_writer import PersistentRawWriterProcess
++from tools.qa.market_data_mixed_load import raw_insert
++from tools.qa.market_data_resource_comparison import BASE_MINUTE, memory
++from trading.contexts.market_data.adapters.outbound.persistence.postgres.stream_recovery_store import (  # noqa: E501
++    PostgresStreamRecoveryStore,
++)
++from trading.contexts.market_data.application.dto import CandleWithMeta
++from trading.contexts.market_data.application.services.insert_buffer import AsyncRawInsertBuffer
++from trading.platform.time.system_clock import SystemClock
++from trading.shared_kernel.primitives import (
++    Candle,
++    CandleMeta,
++    InstrumentId,
++    MarketId,
++    Symbol,
++    UtcTimestamp,
++)
++
++
++def row(index, minute):
++    stamp = datetime(2026, 2, 1, tzinfo=UTC) + timedelta(minutes=minute)
++    instrument = InstrumentId(MarketId(1), Symbol(f"S{index:04d}USDT"))
++    return CandleWithMeta(
++        Candle(
++            instrument,
++            UtcTimestamp(stamp),
++            UtcTimestamp(stamp + timedelta(minutes=1)),
++            100.0,
++            101.0,
++            99.0,
++            100.5,
++            1.0,
++            100.0,
++        ),
++        CandleMeta(
++            "ws",
++            UtcTimestamp(datetime.now(UTC)),
++            UUID(int=1),
++            f"binance:spot:{instrument.symbol}",
++            1,
++            0.1,
++            10.0,
++        ),
++    )
++
++
++def key(candle):
++    return str(candle.instrument_id.symbol), candle.ts_open.value
++
++
++def quantiles(values):
++    ordered = sorted(values)
++    return (
++        {
++            f"p{p}_ms": ordered[min(len(ordered) - 1, int((len(ordered) - 1) * p / 100))] * 1000
++            for p in [50, 95, 99]
++        }
++        if ordered
++        else {}
++    )
++
++
++def cgroup(container):
++    result = {}
++    for name in ["memory.current", "memory.events", "cpu.stat", "io.stat"]:
++        result[name] = subprocess.check_output(
++            ["docker", "exec", container, "cat", "/sys/fs/cgroup/" + name], text=True
++        ).strip()
++    return result
++
++
++def child_cpu(writer):
++    total = 0.0
++    for pid in writer.active_pids:
++        value = subprocess.check_output(["ps", "-p", str(pid), "-o", "time="], text=True).strip()
++        factors = [1, 60, 3600]
++        total += sum(
++            float(part) * factor for part, factor in zip(reversed(value.split(":")), factors)
++        )
++    return total
++
++
++def main():
++    parser = argparse.ArgumentParser()
++    parser.add_argument("--source", type=Path, required=True)
++    parser.add_argument("--label", choices=["baseline", "candidate"], required=True)
++    parser.add_argument("--streams", type=int, choices=[4, 100], required=True)
++    parser.add_argument("--bursts", type=int, default=60)
++    parser.add_argument("--output", type=Path, required=True)
++    args = parser.parse_args()
++    if os.environ.get("ROEHUB_S04_DISPOSABLE") != "1":
++        raise RuntimeError("explicit disposable opt-in required")
++    # Refuse user installation even if credentials/environment were mixed up.
++    for container, port, expected in [
++        ("roehub-s04-pg", "5432/tcp", "36432"),
++        ("roehub-s04-clickhouse-1", "8123/tcp", "39123"),
++    ]:
++        info = json.loads(subprocess.check_output(["docker", "inspect", container]))[0]
++        assert info["NetworkSettings"]["Ports"][port] == [
++            {"HostIp": "127.0.0.1", "HostPort": expected}
++        ]
++    with args.output.open("x") as out:
++        out.write("{}\n")
++    db = "s04_" + uuid4().hex
++    dsn = os.environ["ROEHUB_MARKET_DATA_TEST_DSN"]
++    pgdsn = make_conninfo(dsn, dbname=db)
++    admin = clickhouse_connect.get_client(
++        host="127.0.0.1",
++        port=39123,
++        username="s02_admin",
++        password=Path(".cache/market-data-s02/private/admin").read_text(),
++    )
++    fixture = dict(
++        streams=args.streams,
++        stored_coordinates=102,
++        seed_minutes=2880,
++        sparse_every=7,
++        bursts=args.bursts,
++        cadence_s=0.2,
++        buffer_rows=1000,
++        flush_ms=100,
++        warmup_bursts=3,
++        post_drain_s=5,
++    )
++    record: dict[str, Any] = dict(
++        schema_version="market-data-resource-comparison/v1",
++        stage="S04",
++        label=args.label,
++        fixture=fixture,
++        fixture_sha256=hashlib.sha256(json.dumps(fixture, sort_keys=True).encode()).hexdigest(),
++        harness_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
++        python=platform.python_version(),
++        platform=platform.platform(),
++        source=str(args.source),
++        samples=[],
++        failures=[],
++    )
++    finished = threading.Event()
++    writer = None
++    sampler = None
++    created = False
++    try:
++        with psycopg.connect(dsn, autocommit=True) as pg:
++            pg.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(db)))
++            created = True
++        with psycopg.connect(pgdsn) as pg:
++            for migration in [
++                "0027_market_data_stream_recovery_v1.sql",
++                "0033_market_data_stream_connections_v1.sql",
++            ]:
++                pg.execute(
++                    sql.SQL(
++                        cast(
++                            LiteralString,
++                            (args.source / "migrations/postgres" / migration).read_text(),
++                        )
++                    )
++                )
++        admin.command("CREATE DATABASE market_data")
++        for statement in split_clickhouse_sql(
++            (args.source / "migrations/clickhouse/market_data_ddl.sql").read_text()
++        ):
++            admin.command(statement)
++        for i in range(102):
++            raw_insert(
++                admin, "market_data", f"S{i:04d}USDT", BASE_MINUTE, 2880, "s04_seed", sparse=i >= 4
++            )
++        env = dict(
++            CH_HOST="127.0.0.1",
++            CH_PORT="39123",
++            CH_DATABASE="market_data",
++            ROEHUB_CH_WORKLOADS_REQUIRED="1",
++            ROEHUB_CH_STREAM_PASSWORD_FILE=str(
++                Path(".cache/market-data-s02/private/classes/stream.password").resolve()
++            ),
++        )
++        writer = PersistentRawWriterProcess(environ=env)
++        receipts, received, scheduled, acknowledgements = {}, {}, {}, {}
++        successful = set()
++        loop_delays = []
++        occupancy = []
++
++        class SyncStore(PostgresStreamRecoveryStore):
++            def remember(self, task):
++                entry = super().remember(task)
++                receipts[(str(task.instrument_id.symbol), task.time_range.start.value)] = (
++                    time.perf_counter()
++                )
++                return entry
++
++        async def execute():
++            nonlocal sampler
++            async with AsyncExitStack() as stack:
++                admission = None
++                store: Any
++                kwargs: dict[str, Any]
++                if args.label == "candidate":
++                    from trading.contexts.market_data.adapters.outbound.persistence.postgres.async_stream_recovery_store import (  # noqa: E501
++                        AsyncPostgresStreamRecoveryStore,
++                    )
++                    from trading.contexts.market_data.application.services.batched_recovery import (
++                        BatchedRecoveryAdmission,
++                    )
++
++                    class AsyncStore(AsyncPostgresStreamRecoveryStore):
++                        async def remember_many(self, tasks):
++                            result = await super().remember_many(tasks)
++                            stamp = time.perf_counter()
++                            for task in tasks:
++                                receipts[
++                                    (str(task.instrument_id.symbol), task.time_range.start.value)
++                                ] = stamp
++                            return result
++
++                    store = AsyncStore(pgdsn)
++                    await stack.enter_async_context(store.lease())
++                    admission = BatchedRecoveryAdmission(store)
++                    kwargs = dict(async_store=store, admission=admission)
++                else:
++                    store = SyncStore(pgdsn)
++                    stack.enter_context(store.lease())
++                    kwargs = dict(store=store)
++
++                async def write(rows):
++                    await writer.write(rows)
++                    stamp = time.perf_counter()
++                    for item in rows:
++                        acknowledgements[key(item.candle)] = stamp
++
++                buffer = AsyncRawInsertBuffer(
++                    writer=cast(Any, None),
++                    clock=SystemClock(),
++                    flush_interval_ms=100,
++                    max_buffer_rows=1000,
++                    async_writer=write,
++                    **kwargs,
++                )
++                await writer.start()
++                await buffer.start()
++                for warm in range(3):
++                    await asyncio.gather(
++                        *(buffer.submit_wait(row(i, -3 + warm)) for i in range(args.streams))
++                    )
++                    await buffer.flush(force=True)
++                record["before_memory"] = memory(admin)
++                record["before_cgroups"] = {
++                    c: cgroup(c) for c in ["roehub-s04-pg", "roehub-s04-clickhouse-1"]
++                }
++                # Force flush only before measurement; sampler uses postgres DB, not measured DB.
++                if args.label == "candidate":
++                    await store._conn.execute("SELECT pg_stat_force_next_flush()")
++                else:
++                    store._lease.execute("SELECT pg_stat_force_next_flush()")
++                await asyncio.sleep(1.1)
++                with psycopg.connect(dsn, autocommit=True) as pg:
++                    record["pg_before"] = pg.execute(
++                        "SELECT xact_commit,xact_rollback,sessions FROM pg_stat_database "
++                        "WHERE datname=%s",
++                        (db,),
++                    ).fetchone()
++                receipts.clear()
++                acknowledgements.clear()
++                record["started_at"] = datetime.now(UTC).isoformat()
++                record["child_cpu_before"] = child_cpu(writer)
++                begin = time.perf_counter()
++                cpu = resource.getrusage(resource.RUSAGE_SELF)
++                record["cpu_before"] = cpu.ru_utime + cpu.ru_stime
++
++                def sample():
++                    with psycopg.connect(dsn, autocommit=True) as pg:
++                        while not finished.wait(1):
++                            try:
++                                ids = {os.getpid()} | writer.active_pids
++                                rss = sum(
++                                    int(line.split()[1])
++                                    for line in subprocess.check_output(
++                                        ["ps", "-axo", "pid=,rss="], text=True
++                                    ).splitlines()
++                                    if line.split() and int(line.split()[0]) in ids
++                                )
++                                mem = memory(admin)
++                                mem["MemoryTracking"] = admin.command(
++                                    "SELECT value FROM system.metrics WHERE metric='MemoryTracking'"
++                                )
++                                connection_row = pg.execute(
++                                    "SELECT count(*) FROM pg_stat_activity " "WHERE datname=%s",
++                                    (db,),
++                                ).fetchone()
++                                assert connection_row is not None
++                                connections = connection_row[0]
++                                record["samples"].append(
++                                    dict(
++                                        elapsed_s=time.perf_counter() - begin,
++                                        worker_child_rss_bytes=rss * 1024,
++                                        ch=mem,
++                                        parts=admin.command(
++                                            "SELECT count() FROM system.parts "
++                                            "WHERE active AND database='market_data'"
++                                        ),
++                                        merges=admin.command(
++                                            "SELECT count() FROM system.merges "
++                                            "WHERE database='market_data'"
++                                        ),
++                                        pg_connections=connections,
++                                        ch_cgroup_bytes=int(
++                                            subprocess.check_output(
++                                                [
++                                                    "docker",
++                                                    "exec",
++                                                    "roehub-s04-clickhouse-1",
++                                                    "cat",
++                                                    "/sys/fs/cgroup/memory.current",
++                                                ]
++                                            )
++                                        ),
++                                        pg_cgroup_bytes=int(
++                                            subprocess.check_output(
++                                                [
++                                                    "docker",
++                                                    "exec",
++                                                    "roehub-s04-pg",
++                                                    "cat",
++                                                    "/sys/fs/cgroup/memory.current",
++                                                ]
++                                            )
++                                        ),
++                                    )
++                                )
++                            except Exception as error:
++                                record["failures"].append(type(error).__name__)
++
++                sampler = threading.Thread(target=sample)
++                sampler.start()
++                running = True
++
++                async def heartbeat():
++                    target = time.perf_counter() + 0.001
++                    while running:
++                        await asyncio.sleep(max(0, target - time.perf_counter()))
++                        now = time.perf_counter()
++                        loop_delays.append(max(0, now - target))
++                        target = now + 0.001
++                        occupancy.append(
++                            (
++                                len(buffer._buffer),
++                                getattr(buffer, "_retained_rows", 0),
++                                getattr(buffer, "_retained_bytes", 0),
++                            )
++                        )
++
++                pulse = asyncio.create_task(heartbeat())
++                producers = []
++
++                async def send(i, minute, due):
++                    item = row(i, minute)
++                    k = key(item.candle)
++                    scheduled[k] = due
++                    received[k] = time.perf_counter()
++                    await buffer.submit_wait(item)
++                    successful.add(k)
++
++                try:
++                    for burst in range(args.bursts):
++                        due = begin + burst * 0.2
++                        await asyncio.sleep(max(0, due - time.perf_counter()))
++                        producers.extend(
++                            asyncio.create_task(send(i, burst, due)) for i in range(args.streams)
++                        )
++                    await asyncio.gather(*producers)
++                    await buffer.close()
++                    if admission:
++                        await admission.close()
++                    record["completion_s"] = time.perf_counter() - begin
++                    record["occupancy_peak"] = [max(v[i] for v in occupancy) for i in range(3)]
++                    record["loop"] = quantiles(loop_delays)
++                    record["loop_max_ms"] = max(loop_delays) * 1000
++                finally:
++                    running = False
++                    await pulse
++                await asyncio.sleep(5)
++                cpu = resource.getrusage(resource.RUSAGE_SELF)
++                record["parent_cpu_s"] = cpu.ru_utime + cpu.ru_stime - record["cpu_before"]
++                record["child_cpu_s"] = child_cpu(writer) - record["child_cpu_before"]
++                record["family_cpu_s"] = record["parent_cpu_s"] + record["child_cpu_s"]
++                record["ended_at"] = datetime.now(UTC).isoformat()
++                record["post_drain_memory"] = memory(admin) if sampler is None else None
++            # Closing lease flushes its session statistics; independent reads cannot add its tx.
++            await asyncio.sleep(1.1)
++
++        asyncio.run(execute())
++        finished.set()
++        assert sampler is not None
++        sampler.join()
++        with psycopg.connect(dsn, autocommit=True) as pg:
++            record["pg_after"] = pg.execute(
++                "SELECT xact_commit,xact_rollback,sessions FROM pg_stat_database WHERE datname=%s",
++                (db,),
++            ).fetchone()
++            pg.execute(sql.SQL("SELECT 1"))
++        assert record["pg_after"] is not None and record["pg_before"] is not None
++        n = args.streams * args.bursts
++        record["arrived"] = len(received)
++        record["accepted"] = len(successful)
++        record["acknowledged"] = len(acknowledgements)
++        record["pg_transactions"] = sum(record["pg_after"][:2]) - sum(record["pg_before"][:2])
++        record["pg_sessions_created"] = record["pg_after"][2] - record["pg_before"][2]
++        record["pg_tx_per_candle"] = record["pg_transactions"] / n
++        record["pg_sessions_per_candle"] = record["pg_sessions_created"] / n
++        for name, starts in [
++            ("receive_to_ack", received),
++            ("receipt_to_ack", receipts),
++            ("scheduled_to_ack", scheduled),
++        ]:
++            record[name] = quantiles([acknowledgements[k] - start for k, start in starts.items()])
++        record["dispatch_lag"] = quantiles([received[k] - start for k, start in scheduled.items()])
++        canonical = admin.query(
++            "SELECT symbol,toUnixTimestamp64Milli(ts_open),open,high,low,close,"
++            "volume_base,volume_quote "
++            "FROM market_data.canonical_candles_1m "
++            "WHERE ts_open>=toDateTime('2026-02-01 00:00:00') ORDER BY symbol,ts_open"
++        ).result_rows
++        expected = [
++            (
++                f"S{i:04d}USDT",
++                int((datetime(2026, 2, 1, tzinfo=UTC) + timedelta(minutes=m)).timestamp()*1000),
++                100.0,
++                101.0,
++                99.0,
++                100.5,
++                1.0,
++                100.0,
++            )
++            for i in range(args.streams)
++            for m in range(args.bursts)
++        ]
++        record["canonical_count"] = len(canonical)
++        record["canonical_sha256"] = hashlib.sha256(
++            json.dumps(canonical, default=str).encode()
++        ).hexdigest()
++        with psycopg.connect(pgdsn) as pg:
++            pending_row = pg.execute("SELECT count(*) FROM market_data_stream_recovery").fetchone()
++            assert pending_row is not None
++            record["pending_after"] = pending_row[0]
++        record["post_drain_memory"] = memory(admin)
++        record["after_cgroups"] = {
++            c: cgroup(c) for c in ["roehub-s04-pg", "roehub-s04-clickhouse-1"]
++        }
++        admin.command("SYSTEM FLUSH LOGS")
++        record["query_metrics"] = admin.query(
++            "SELECT type,count(),sum(read_rows),sum(read_bytes),"
++            "max(memory_usage) FROM system.query_log WHERE user='roehub_stream' "
++            "AND event_time_microseconds>=parseDateTime64BestEffort(%(start)s) "
++            "AND event_time_microseconds<=parseDateTime64BestEffort(%(end)s) GROUP BY type",
++            parameters={"start": record["started_at"], "end": record["ended_at"]},
++        ).result_rows
++        record["checks"] = dict(
++            all_accepted=len(successful) == n,
++            canonical_content=[tuple(r) for r in canonical] == expected,
++            all_acknowledged=len(acknowledgements) == n,
++            all_canonical=len(canonical) == n,
++            empty_journal=record["pending_after"] == 0,
++            bounded_rows=record["occupancy_peak"][1] <= 2000,
++            bounded_bytes=record["occupancy_peak"][2] <= 64 * 1024 * 1024,
++            samples_ok=not record["failures"],
++        )
++        assert all(record["checks"].values())
++    except BaseException as error:
++        record["failures"].append(type(error).__name__)
++        raise
++    finally:
++        finished.set()
++        if sampler:
++            sampler.join()
++        if writer:
++            asyncio.run(writer.close())
++        admin.command("DROP DATABASE IF EXISTS market_data SYNC")
++        admin.close()
++        if created:
++            with psycopg.connect(dsn, autocommit=True) as pg:
++                pg.execute(sql.SQL("DROP DATABASE {}").format(sql.Identifier(db)))
++        args.output.write_text(json.dumps(record, indent=2, default=str) + "\n")
++
++
++if __name__ == "__main__":
++    main()

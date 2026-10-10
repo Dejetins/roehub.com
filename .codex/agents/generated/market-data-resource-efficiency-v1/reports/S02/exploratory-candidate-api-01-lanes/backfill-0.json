@@ -1,0 +1,5 @@
+{
+  "workload": "backfill",
+  "index": 0,
+  "fatal": "DatabaseError"
+}

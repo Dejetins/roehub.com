@@ -1,0 +1,83 @@
+- link "Skip to content":
+  - /url: "#workspace-heading"
+- complementary:
+  - generic "RoeHub": R
+  - navigation "Navigation":
+    - link "Overview":
+      - /url: /dashboard
+      - generic: Overview
+    - link "Backtests":
+      - /url: /backtests
+      - generic: Backtests
+    - link "Strategies":
+      - /url: /strategies
+      - generic: Strategies
+    - link "Data":
+      - /url: /data
+      - generic: Data
+    - link "Connections":
+      - /url: /connections
+      - generic: Connections
+    - link "Monitoring":
+      - /url: /monitoring
+      - generic: Monitoring
+    - link "Settings":
+      - /url: /settings/profile
+      - generic: Settings
+  - generic "Language": 文
+  - link "Sign out":
+    - /url: /logout
+    - generic: Sign out
+- main:
+  - text: Backtests
+  - generic: Navigator
+  - heading "Backtests" [level=1]
+  - region "Jobs":
+    - heading "Jobs" [level=2]
+    - generic "Jobs on this page": "1"
+    - link "New backtest":
+      - /url: /backtests/new?limit=10
+    - button "Search jobs":
+    - button "Refresh" [disabled]:
+    - button "Filters":
+    - tablist "Jobs":
+      - tab "New backtest"
+      - tab "History" [active] [selected]
+    - tabpanel "History":
+      - region "Job history table":
+        - table "Jobs on this page":
+          - caption: Jobs on this page
+          - rowgroup:
+            - row "f7296cbc-e3a4-4ce3-97eb-018fb8e59841 BTCUSDT · spot · 15m Queued":
+              - cell "f7296cbc-e3a4-4ce3-97eb-018fb8e59841 BTCUSDT · spot · 15m":
+                - link "f7296cbc-e3a4-4ce3-97eb-018fb8e59841":
+                  - /url: /backtests/f7296cbc-e3a4-4ce3-97eb-018fb8e59841?limit=10
+                - generic: BTCUSDT · spot · 15m
+              - cell "Queued":
+                - img "Queued":
+      - navigation "Job pages":
+        - generic: 1 jobs
+        - button "First page" [disabled]:
+        - button "Next page" [disabled]:
+  - region "Backtest detail":
+    - heading "f7296cbc-e3a4-4ce3-97eb-018fb8e59841" [level=2]
+    - status: Queued
+    - region "Measured progress":
+      - paragraph: 0 / 1 units processed
+      - progressbar "Measured progress"
+      - paragraph: Measured at · Oct 8, 2026, 7:58 PM UTC
+      - paragraph: Completion estimate unavailable
+      - paragraph: Active job state refreshes automatically after the server delay.
+      - button "Cancel backtest"
+    - heading "Research workspace" [level=3]
+    - term: Instrument
+    - definition: BTCUSDT · spot
+    - term: Timeframe
+    - definition: 15m
+    - term: Research period · [start, end)
+    - definition: 2026-03-26 — 2026-03-31
+    - term: Risk mode
+    - definition: No TP/SL
+    - generic "Job information"
+    - region "Delete history":
+      - button "Delete history" [disabled]:

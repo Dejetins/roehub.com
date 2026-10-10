@@ -1,0 +1,241 @@
+{
+  "schema_version": "market-data-resource-comparison/v1",
+  "stage": "S01",
+  "mode": "finite-replay",
+  "cache": "warm; one complete sweep per implementation",
+  "clock": "fixed closed cutoff",
+  "cutoff": "2026-01-03T00:00:00+00:00",
+  "coordinates": 1020,
+  "live_streams": 4,
+  "page_limit": 50,
+  "publisher_cadence_s": 30,
+  "cadence_simulation": "finite replay with configured page delay",
+  "measured_page_delay_s": 0,
+  "baseline": {
+    "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py": "e6085d70849d2379199f7e3db297d98f6fbefa5bf55bcd9c43a6ffd98552b730",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py": "c867cc9dd09ee15bd04a3e79cb7b3f7757831ae45edd73d6fac12e28b8785782",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py": "ba7a2f663cdfe1e8319869cebb5549260ae6edda9b0542131b651a65c3fa1dec"
+  },
+  "candidate": {
+    "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py": "2735e1c9522a7abfaad2868d99c1d549ce1c3c6e11f32110a269fa583f653b97",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py": "f14f0a1b44a774efac5fcbe168845552c43ae03fa8a98df080a460151d3ae164",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py": "4804741430cef5a2f0a2857cd69ba2ef06c09f511d094539822f2d5af7e0989e"
+  },
+  "python": "3.12.12",
+  "hardware": "macOS-26.7-arm64-arm-64bit",
+  "db_version": {
+    "version()": "25.8.33.6"
+  },
+  "runs": [
+    {
+      "label": "candidate",
+      "pages": 21,
+      "coordinates": 1020,
+      "elapsed_s": 0.12371945899212733,
+      "client_cpu_s": 0.03548499999999999,
+      "client_maxrss": 201539584,
+      "db_memory_before": {
+        "jemalloc.allocated": 517861944.0,
+        "MemoryResident": 953356288.0
+      },
+      "db_memory_after": {
+        "jemalloc.allocated": 517861944.0,
+        "MemoryResident": 953356288.0
+      },
+      "query_ids": [
+        "bead1809-2e92-4cb9-8554-51a939336d71",
+        "c11daa83-05be-4f8d-aa25-bc9c20800c32",
+        "e967c344-7815-44e7-b6c3-3b0ac34f67f7",
+        "43e03e3f-17fa-4d18-92a0-9e880c618fb2",
+        "4f8c81cd-708c-49d8-bfee-de171dfe33f9",
+        "8f1662e6-cce9-4413-bf94-fca89251aa47",
+        "7b009bc2-ee37-4dcd-88af-8c766c259126",
+        "a868437c-7bb8-4e96-96fa-56b699201572",
+        "f18983e8-01e7-483a-8108-1e89d8752b61",
+        "4b8c47fb-55f7-4c1e-b8ce-5aef5322ca7e",
+        "ea7c72d8-24e9-4bb1-9bf9-df594863ed95",
+        "c64f0f30-5c46-4a7c-bd80-28df1ed36e3a",
+        "a304d62a-4e20-482e-8b5d-c6687410b411",
+        "9dcffc73-30b8-4d30-998a-a9d949453ceb",
+        "88b2ed5b-c746-456e-98ed-6378672b5758",
+        "fef732ea-4b28-4233-9a5c-40d6187d2046",
+        "e79b62b5-b8a8-4214-bd77-7d57c0351b92",
+        "bf636019-f2a2-4f42-b9d3-7f2dd25806e7",
+        "86bd651e-6681-417f-a2ff-55df9a935219",
+        "4a444c22-a2f2-4bde-b351-1f47370dcf66",
+        "3a7c52cd-68ad-4eb0-9423-0abdea5b66f4"
+      ],
+      "observations_sha256": "7f416adf47228c9494d530d31ef953a9584e7610c8a5dc1f1628b69f4505ab88",
+      "queries": 21,
+      "read_rows": 42840,
+      "read_bytes": 8353800,
+      "max_query_memory": 8399716,
+      "server_ms": 69,
+      "cpu_us": 65422,
+      "file_read_bytes": 3777422,
+      "canonical_queries": 0,
+      "repetition": 1
+    },
+    {
+      "label": "candidate",
+      "pages": 21,
+      "coordinates": 1020,
+      "elapsed_s": 0.14016137504950166,
+      "client_cpu_s": 0.047692999999999985,
+      "client_maxrss": 201621504,
+      "db_memory_before": {
+        "jemalloc.allocated": 564634392.0,
+        "MemoryResident": 997384192.0
+      },
+      "db_memory_after": {
+        "jemalloc.allocated": 564634392.0,
+        "MemoryResident": 997384192.0
+      },
+      "query_ids": [
+        "541df179-2c7a-4e9a-b7fb-0504d5888e95",
+        "6c9ab7e3-9aeb-436e-84b7-a637d2939320",
+        "7afd980c-2368-4f48-ba36-3b231fcd950e",
+        "1e4b7e33-7670-4b0b-8577-38a3321e1d32",
+        "7c8c88ea-0ede-4f8e-bf52-c5f6c9a608c8",
+        "a6d9566c-2c29-4c63-beb7-3767488f3a5d",
+        "6925bb5a-ff8d-48f0-87f6-e441ce8f5633",
+        "1d057831-30bb-4553-a4a8-d5891614e1cc",
+        "022dce0e-994b-451e-8f74-b1b1085869fd",
+        "fdd2cc63-3ae5-49fd-bbff-32dfcf81fe07",
+        "b88b5367-fcd9-465c-b161-37f6967a01ad",
+        "def9a217-4524-4697-a02e-0621570f5997",
+        "68bb2266-fe88-4750-aa0a-af296318fb0a",
+        "b1ae7138-2797-4889-8388-fb9628b9c8e8",
+        "97fe1823-228b-4949-8ffd-57cf5cd16878",
+        "e82a1e7c-6d67-4d72-84bb-c0e5ad966253",
+        "aad062af-a148-4c14-8bc1-4fd282d03ac2",
+        "fad7200f-f567-4e28-ade0-bea2760b88c0",
+        "9329b4e2-161b-4bef-b851-a069be705726",
+        "6d3e9cca-23db-438e-bb31-881cf485bc1f",
+        "601d7777-6ad9-4645-8535-f5cec439e5f4"
+      ],
+      "observations_sha256": "7f416adf47228c9494d530d31ef953a9584e7610c8a5dc1f1628b69f4505ab88",
+      "queries": 21,
+      "read_rows": 42840,
+      "read_bytes": 8353800,
+      "max_query_memory": 8399716,
+      "server_ms": 69,
+      "cpu_us": 66097,
+      "file_read_bytes": 3777422,
+      "canonical_queries": 0,
+      "repetition": 2
+    },
+    {
+      "label": "candidate",
+      "pages": 21,
+      "coordinates": 1020,
+      "elapsed_s": 0.13131804199656472,
+      "client_cpu_s": 0.04404600000000003,
+      "client_maxrss": 201621504,
+      "db_memory_before": {
+        "jemalloc.allocated": 521655768.0,
+        "MemoryResident": 949239808.0
+      },
+      "db_memory_after": {
+        "jemalloc.allocated": 521655768.0,
+        "MemoryResident": 949239808.0
+      },
+      "query_ids": [
+        "50f38ef3-7eb9-4d5d-a839-c5c21771d811",
+        "9f25b17b-9293-4a56-8026-8f5e60a6e659",
+        "0351586f-a9b3-40cb-b63a-8f7dc1f8c809",
+        "c3cb040e-d9d2-42b9-94d9-33b8a317d331",
+        "3d87d208-46eb-47d5-806c-3b85f1c3db86",
+        "6127b627-c817-48f3-b6ce-cdd9808189aa",
+        "9c623fa1-395b-45fe-b2fe-3b2a587fbdc4",
+        "4b43fcd1-ec02-4dfd-b940-9b1db0c37dd8",
+        "9df6e704-d68f-458d-a293-ea8d9d7a5eb5",
+        "145ac535-19ae-45fb-a44c-d64d0b38ce32",
+        "f484fdd4-7c47-4dcc-872c-c1271647ee91",
+        "47c1a9c6-fb2a-40f6-85d9-30d61f457912",
+        "8f45d536-a58e-4071-8065-2c97b347c9c2",
+        "1ca40729-0697-49c9-a417-c47a9b589485",
+        "0c4f7a7d-3cd4-4b4d-ad73-8496716c46db",
+        "a578ce01-2dc2-4da6-b45a-74911a352aa0",
+        "0b14c661-a52f-4bc1-9508-857176c6f927",
+        "9dedd233-0868-41f2-84de-83f4a09b2dde",
+        "0563a6bf-af36-43e0-9906-715da63177c7",
+        "2e772119-b0c4-44f6-853b-004141086693",
+        "7e4671ab-817d-4bb0-9945-dfa57a5c815a"
+      ],
+      "observations_sha256": "7f416adf47228c9494d530d31ef953a9584e7610c8a5dc1f1628b69f4505ab88",
+      "queries": 21,
+      "read_rows": 42840,
+      "read_bytes": 8353800,
+      "max_query_memory": 8399716,
+      "server_ms": 66,
+      "cpu_us": 61814,
+      "file_read_bytes": 3777422,
+      "canonical_queries": 0,
+      "repetition": 3
+    }
+  ],
+  "failures": [],
+  "fixture_merges": "disabled only on disposable fixture tables",
+  "settings": {
+    "max_threads": "2",
+    "max_memory_usage": "268435456",
+    "use_query_condition_cache": "0"
+  },
+  "fixture_sha256": "601ca3a4ceee3a6bfb2828f97efade73a2b96934ee5eb6f55e4faabd98daa480",
+  "fixture_rows": {
+    "count()": 2519588
+  },
+  "canonical_table": "absent during all measured index-only reads",
+  "warmups": [
+    {
+      "label": "candidate_warmup",
+      "pages": 21,
+      "coordinates": 1020,
+      "elapsed_s": 0.1343067089910619,
+      "client_cpu_s": 0.04765900000000001,
+      "client_maxrss": 201261056,
+      "db_memory_before": {
+        "jemalloc.allocated": 515647640.0,
+        "MemoryResident": 945786880.0
+      },
+      "db_memory_after": {
+        "jemalloc.allocated": 515647640.0,
+        "MemoryResident": 945786880.0
+      },
+      "query_ids": [
+        "95028ec3-5152-4cc7-afab-26fb9e3d38e4",
+        "edd332e1-32ef-42de-bb2c-87457a750f00",
+        "a8d288ba-34de-476c-bd14-2c85ac753f43",
+        "0fcf11aa-a7f4-41bc-ba7f-3b2ac79e4e30",
+        "fb56041a-cd80-439e-8eb6-607de3829610",
+        "7d611818-13b1-4c5c-97bb-0bad968dda09",
+        "89665dc1-0048-4f38-924e-19f90e91541c",
+        "009e36bc-2f99-47a2-af1d-ace0c404ff75",
+        "656fb60d-0c2f-434d-b10e-3b15cbabeca4",
+        "77a292b3-9ec3-4173-9e61-09d5339cb16c",
+        "a8c1a441-72aa-4410-8b2b-5abe75596d3d",
+        "0645d2d1-ca4a-46d4-8ef6-4d43f71755fb",
+        "e62123a6-b129-4b7e-93f7-a91bd3361d7f",
+        "baa5a492-e32d-41a1-aaf1-fda38d4dd090",
+        "f15104fb-9f0d-4eb9-bce2-12499da4edfc",
+        "17e4ee4d-d56d-4fc1-b30a-4d9f8e0755ff",
+        "81345ebc-01a2-4678-825d-f74b3c51c4ce",
+        "3ab96d00-8594-42dc-a429-985f75b53dc4",
+        "c291a5ee-8bec-432c-b67a-239ff0a419fd",
+        "3cefbb31-39a7-4ca8-a6e9-27eda0e3ea5b",
+        "ea9e3a19-81ce-4f36-87b4-e638469f45c8"
+      ],
+      "observations_sha256": "7f416adf47228c9494d530d31ef953a9584e7610c8a5dc1f1628b69f4505ab88",
+      "queries": 21,
+      "read_rows": 42840,
+      "read_bytes": 8353800,
+      "max_query_memory": 11053834,
+      "server_ms": 62,
+      "cpu_us": 62536,
+      "file_read_bytes": 3777572,
+      "canonical_queries": 0
+    }
+  ],
+  "expected_observations_sha256": "7f416adf47228c9494d530d31ef953a9584e7610c8a5dc1f1628b69f4505ab88"
+}

@@ -1,0 +1,21 @@
+{
+  "at": "2026-10-04T19:27:41.775873+00:00",
+  "collector_pid": 64660,
+  "collector_running": true,
+  "repairs": [],
+  "metrics": {
+    "ws_connected": 1.0,
+    "ws_errors_total": 0.0,
+    "insert_rows_total": 4.0,
+    "insert_errors_total": 0.0,
+    "rest_fill_active": 0.0,
+    "rest_fill_errors_total": 0.0
+  },
+  "selections": [
+    [
+      1,
+      "ACTUSDT"
+    ]
+  ],
+  "left_running": true
+}

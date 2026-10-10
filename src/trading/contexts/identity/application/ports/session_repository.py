@@ -55,9 +55,7 @@ class IdentitySession:
         if self.idle_expires_at < self.last_seen_at:
             raise ValueError("IdentitySession.idle_expires_at cannot be before last_seen_at")
         if self.absolute_expires_at < self.idle_expires_at:
-            raise ValueError(
-                "IdentitySession.absolute_expires_at cannot be before idle_expires_at"
-            )
+            raise ValueError("IdentitySession.absolute_expires_at cannot be before idle_expires_at")
         if self.revoked_at is not None and self.revoked_at < self.created_at:
             raise ValueError("IdentitySession.revoked_at cannot be before created_at")
 
@@ -86,6 +84,16 @@ class IdentitySession:
         return True
 
 
+@dataclass(frozen=True, slots=True)
+class BrowserDevice:
+    device_id: UUID
+    label: str
+    session_id: UUID  # Internal credential reference. Never serialize this field.
+    last_seen_at: datetime
+    expires_at: datetime
+    active: bool
+
+
 class SessionRepository(Protocol):
     """
     SessionRepository — port for persisted Roehub browser sessions.
@@ -97,6 +105,28 @@ class SessionRepository(Protocol):
       - src/trading/contexts/identity/adapters/outbound/persistence/postgres/session_repository.py
       - src/trading/contexts/identity/adapters/outbound/persistence/in_memory/session_repository.py
     """
+
+    def bind_device(self, *, session_id: UUID, device_key: str, label: str, now: datetime) -> UUID:
+        """Atomically bind a live session and revoke prior logins in that browser profile."""
+        ...
+
+    def list_devices(
+        self, *, user_id: UserId, now: datetime, before: UUID | None, limit: int
+    ) -> tuple[BrowserDevice, ...]:
+        """One row per browser profile, ordered by stable device ID descending."""
+        ...
+
+    def legacy_session_count(self, *, user_id: UserId, now: datetime) -> int:
+        """Count valid sessions whose browser was never observed."""
+        ...
+
+    def revoke_device(self, *, user_id: UserId, device_id: UUID | None, now: datetime) -> None:
+        """Owner-scoped, idempotent revocation; None targets unassigned legacy logins."""
+        ...
+
+    def touch_session(self, *, session_id: UUID, now: datetime) -> None:
+        """Record authenticated activity at most once per minute; never extend expiry."""
+        ...
 
     def create_session(
         self,

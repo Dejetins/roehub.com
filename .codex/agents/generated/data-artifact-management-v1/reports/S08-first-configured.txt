@@ -1,0 +1,101 @@
+- link "Skip to content":
+  - /url: "#workspace-heading"
+- complementary:
+  - generic "RoeHub": R
+  - navigation "Navigation":
+    - link "Overview":
+      - /url: /dashboard
+      - generic: Overview
+    - link "Backtests":
+      - /url: /backtests
+      - generic: Backtests
+    - link "Strategies":
+      - /url: /strategies
+      - generic: Strategies
+    - link "Data":
+      - /url: /data
+      - generic: Data
+    - link "Connections":
+      - /url: /connections
+      - generic: Connections
+    - link "Monitoring":
+      - /url: /monitoring
+      - generic: Monitoring
+    - link "Settings":
+      - /url: /settings/profile
+      - generic: Settings
+  - generic "Language": 文
+  - link "Sign out":
+    - /url: /logout
+    - generic: Sign out
+- main:
+  - text: Settings
+  - generic: Navigator
+  - complementary:
+    - heading "Settings" [level=2]
+    - navigation "Settings categories":
+      - link "Profile":
+        - /url: /settings/profile
+        - text: Profile
+      - link "Interface":
+        - /url: /settings/preferences
+        - text: Interface
+      - link "Notifications":
+        - /url: /settings/notifications
+        - text: Notifications
+      - link "Security":
+        - /url: /settings/security
+        - text: Security
+      - link "Storage":
+        - /url: /settings/storage
+        - text: Storage
+  - heading "Storage" [level=1]
+  - heading "Backtest artifacts" [level=2]
+  - paragraph: Stored on the server. One root contains automatically managed instrument folders.
+  - paragraph: Backtest artifacts · paused
+  - button "Refresh storage"
+  - term: Server path
+  - definition: /private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/s08-storage-o52turrn/root
+  - term: Root
+  - definition: backtest-primary · revision 1
+  - term: Configuration
+  - definition: Existing installation configuration
+  - term: Free space
+  - definition: 1 527 140 777 984 B
+  - term: Used space
+  - definition: 0 B
+  - term: Current budget
+  - definition: 10 737 418 240 B
+  - group "Storage configuration":
+    - generic: Storage configuration
+    - paragraph: "Trusted root: backtest-primary. Saving does not activate the scheduler. Existing-data relocation is a separate operation."
+    - generic: Budget · bytes
+    - spinbutton "Budget · bytes": "10737418240"
+    - generic: Default refresh · days
+    - combobox "Default refresh · days":
+      - option "1" [selected]
+      - option "3"
+      - option "7"
+    - generic: Time zone
+    - textbox "Time zone": Europe/Moscow
+    - generic: Local time
+    - textbox "Local time": 02:00:00
+    - paragraph: "Schedule anchor: 2026-10-08"
+    - button "Probe server root"
+    - button "Save storage" [disabled]
+  - heading "Cleanup" [level=3]
+  - paragraph: "Explicit cleanup only: one inactive, unpinned slot. Current inputs and reader pins are protected. Turning precompute off keeps files."
+  - group "Preview target":
+    - generic: Preview target
+    - generic: Exchange
+    - textbox "Exchange": binance
+    - generic: Market type
+    - textbox "Market type": spot
+    - generic: Symbol
+    - textbox "Symbol"
+    - generic: Inactive slot
+    - combobox "Inactive slot":
+      - option "slot_a"
+      - option "slot_b" [selected]
+    - button "Preview cleanup" [disabled]
+  - status: Storage saved

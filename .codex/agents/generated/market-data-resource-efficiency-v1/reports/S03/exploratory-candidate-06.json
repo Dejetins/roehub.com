@@ -1,0 +1,626 @@
+{
+  "schema_version": "market-data-resource-comparison/v1",
+  "stage": "S03",
+  "label": "candidate",
+  "source": {
+    "src/trading/contexts/market_data/application/services/work_requests.py": "d53e89510b4da63b6881ce8bbd864eaeaa953cccd6e119850b05e3bdbd09f06f",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py": "07fd1946c329ab5ac2c4f43924a3d4faf46e1f925b7c1808bd2d7bee8f9196e9",
+    "src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py": "9b3dd6d1d7ed90c6014540b5d15a641b43b6fd267a84cdbf74a18830e2be61e1"
+  },
+  "runtime": {
+    "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+    "memory": 1610612736,
+    "nano_cpus": 2000000000
+  },
+  "harness_sha256": "db895ba94b501736201ef5e28a8c122530521e902eceda329072eb4aeb90f2fc",
+  "python": "3.12.12",
+  "hardware": "macOS-26.7-arm64-arm-64bit",
+  "fixture": {
+    "coordinates": 102,
+    "streams": 4,
+    "seed_minutes": 2880,
+    "sparse_every": 7,
+    "jobs": 102,
+    "windows": 1,
+    "window_minutes": 1440,
+    "concurrency": 4,
+    "fast_seconds": 0.01,
+    "slow_seconds": 0.1,
+    "collector": 2,
+    "quotas": [
+      [
+        1,
+        100,
+        2
+      ],
+      [
+        60,
+        6000,
+        2
+      ]
+    ],
+    "quota_concurrency": 4
+  },
+  "warmup_s": 60,
+  "steady_s": 300,
+  "samples": [
+    {
+      "elapsed": 1.0209425410139374,
+      "active": 2,
+      "queued": 81,
+      "idle_ready_slot_seconds": 2.041885082027875,
+      "memory": {
+        "jemalloc.allocated": 336352768.0,
+        "MemoryResident": 606633984.0,
+        "MemoryTracking": 145029736
+      },
+      "parts": [
+        29,
+        1691979
+      ],
+      "merges": 0,
+      "pg": [
+        125726,
+        944,
+        4
+      ],
+      "worker_and_child_rss_kib": 642320,
+      "cgroup_memory_bytes": 772931584
+    },
+    {
+      "elapsed": 2.0893639160203747,
+      "active": 2,
+      "queued": 57,
+      "idle_ready_slot_seconds": 2.1368427500128746,
+      "memory": {
+        "jemalloc.allocated": 334749360.0,
+        "MemoryResident": 640110592.0,
+        "MemoryTracking": 151696113
+      },
+      "parts": [
+        24,
+        1817551
+      ],
+      "merges": 0,
+      "pg": [
+        126441,
+        944,
+        3
+      ],
+      "worker_and_child_rss_kib": 643648,
+      "cgroup_memory_bytes": 824246272
+    },
+    {
+      "elapsed": 3.1610803750227205,
+      "active": 2,
+      "queued": 32,
+      "idle_ready_slot_seconds": 2.1434329180046916,
+      "memory": {
+        "jemalloc.allocated": 346659136.0,
+        "MemoryResident": 671608832.0,
+        "MemoryTracking": 155811921
+      },
+      "parts": [
+        23,
+        1987511
+      ],
+      "merges": 0,
+      "pg": [
+        127197,
+        944,
+        5
+      ],
+      "worker_and_child_rss_kib": 372816,
+      "cgroup_memory_bytes": 856694784
+    },
+    {
+      "elapsed": 4.23680150002474,
+      "active": 2,
+      "queued": 10,
+      "idle_ready_slot_seconds": 2.151442250004038,
+      "memory": {
+        "jemalloc.allocated": 342481600.0,
+        "MemoryResident": 687738880.0,
+        "MemoryTracking": 162622158
+      },
+      "parts": [
+        20,
+        2134136
+      ],
+      "merges": 0,
+      "pg": [
+        127903,
+        944,
+        3
+      ],
+      "worker_and_child_rss_kib": 373376,
+      "cgroup_memory_bytes": 887115776
+    },
+    {
+      "elapsed": 5.316834666009527,
+      "active": 0,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 345842408.0,
+        "MemoryResident": 705904640.0,
+        "MemoryTracking": 162906354
+      },
+      "parts": [
+        20,
+        2223104
+      ],
+      "merges": 0,
+      "pg": [
+        129308,
+        944,
+        1
+      ],
+      "worker_and_child_rss_kib": 373968,
+      "cgroup_memory_bytes": 794877952
+    },
+    {
+      "elapsed": 6.40303229104029,
+      "active": 0,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 351294456.0,
+        "MemoryResident": 592674816.0,
+        "MemoryTracking": 145796424
+      },
+      "parts": [
+        20,
+        2223104
+      ],
+      "merges": 0,
+      "pg": [
+        129310,
+        944,
+        1
+      ],
+      "worker_and_child_rss_kib": 373968,
+      "cgroup_memory_bytes": 794275840
+    },
+    {
+      "elapsed": 7.495331208046991,
+      "active": 0,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 323281904.0,
+        "MemoryResident": 596512768.0,
+        "MemoryTracking": 145898192
+      },
+      "parts": [
+        20,
+        2223104
+      ],
+      "merges": 0,
+      "pg": [
+        129330,
+        944,
+        1
+      ],
+      "worker_and_child_rss_kib": 373968,
+      "cgroup_memory_bytes": 795754496
+    },
+    {
+      "elapsed": 8.577731625002343,
+      "active": 0,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 322974088.0,
+        "MemoryResident": 596869120.0,
+        "MemoryTracking": 146025736
+      },
+      "parts": [
+        20,
+        2223104
+      ],
+      "merges": 0,
+      "pg": [
+        129332,
+        944,
+        1
+      ],
+      "worker_and_child_rss_kib": 373968,
+      "cgroup_memory_bytes": 793112576
+    },
+    {
+      "elapsed": 9.667022500012536,
+      "active": 0,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 322727176.0,
+        "MemoryResident": 594886656.0,
+        "MemoryTracking": 146127632
+      },
+      "parts": [
+        20,
+        2223104
+      ],
+      "merges": 0,
+      "pg": [
+        129350,
+        944,
+        1
+      ],
+      "worker_and_child_rss_kib": 373968,
+      "cgroup_memory_bytes": 793948160
+    },
+    {
+      "elapsed": 10.763766666001175,
+      "active": 0,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 322386000.0,
+        "MemoryResident": 595222528.0,
+        "MemoryTracking": 146229336
+      },
+      "parts": [
+        20,
+        2223104
+      ],
+      "merges": 0,
+      "pg": [
+        129352,
+        944,
+        1
+      ],
+      "worker_and_child_rss_kib": 373968,
+      "cgroup_memory_bytes": 792608768
+    },
+    {
+      "elapsed": 11.849253875028808,
+      "active": 0,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 322121784.0,
+        "MemoryResident": 594034688.0,
+        "MemoryTracking": 146331040
+      },
+      "parts": [
+        20,
+        2223104
+      ],
+      "merges": 0,
+      "pg": [
+        129370,
+        944,
+        1
+      ],
+      "worker_and_child_rss_kib": 350656,
+      "cgroup_memory_bytes": 781848576
+    },
+    {
+      "elapsed": 12.949333750002552,
+      "active": 0,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 321983920.0,
+        "MemoryResident": 583532544.0,
+        "MemoryTracking": 146432808
+      },
+      "parts": [
+        20,
+        2223104
+      ],
+      "merges": 0,
+      "pg": [
+        129372,
+        944,
+        1
+      ],
+      "worker_and_child_rss_kib": 350656,
+      "cgroup_memory_bytes": 782118912
+    },
+    {
+      "elapsed": 14.047620208002627,
+      "active": 0,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 321351392.0,
+        "MemoryResident": 581275648.0,
+        "MemoryTracking": 146559448
+      },
+      "parts": [
+        20,
+        2223104
+      ],
+      "merges": 0,
+      "pg": [
+        129390,
+        944,
+        1
+      ],
+      "worker_and_child_rss_kib": 350672,
+      "cgroup_memory_bytes": 781279232
+    },
+    {
+      "elapsed": 15.129785875033122,
+      "active": 0,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 320880384.0,
+        "MemoryResident": 583073792.0,
+        "MemoryTracking": 146661280
+      },
+      "parts": [
+        20,
+        2223104
+      ],
+      "merges": 0,
+      "pg": [
+        129393,
+        944,
+        2
+      ],
+      "worker_and_child_rss_kib": 350672,
+      "cgroup_memory_bytes": 784306176
+    },
+    {
+      "elapsed": 16.20186608302174,
+      "active": 0,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 320450960.0,
+        "MemoryResident": 586276864.0,
+        "MemoryTracking": 143550491
+      },
+      "parts": [
+        20,
+        2223104
+      ],
+      "merges": 0,
+      "pg": [
+        129410,
+        944,
+        1
+      ],
+      "worker_and_child_rss_kib": 350672,
+      "cgroup_memory_bytes": 784056320
+    },
+    {
+      "elapsed": 17.27028420800343,
+      "active": 1,
+      "queued": 0,
+      "idle_ready_slot_seconds": 0,
+      "memory": {
+        "jemalloc.allocated": 318288832.0,
+        "MemoryResident": 585084928.0,
+        "MemoryTracking": 143680211
+      },
+      "parts": [
+        23,
+        2262921
+      ],
+      "merges": 0,
+      "pg": [
+        129435,
+        944,
+        3
+      ],
+      "worker_and_child_rss_kib": 351200,
+      "cgroup_memory_bytes": 783081472
+    }
+  ],
+  "failures": [
+    "AssertionError"
+  ],
+  "fixture_sha256": "17e165beb703518ef6f138977fe69d5d20e4d4a86d30d278b26e284043e9f457",
+  "pg_stats_before": [
+    124857,
+    943,
+    1
+  ],
+  "pre_work_memory": {
+    "jemalloc.allocated": 325746224.0,
+    "MemoryResident": 729862144.0
+  },
+  "container_before": "usage_usec 224831310\nuser_usec 136258034\nsystem_usec 88573276\nnice_usec 0\nnr_periods 36935\nnr_throttled 81\nthrottled_usec 25949092\nnr_bursts 0\nburst_usec 0\n254:0 rbytes=395464704 wbytes=1973022720 rios=8663 wios=315451 dbytes=0 dios=0\n",
+  "provider_admission": {
+    "attempts": 206,
+    "admitted": 205,
+    "source_rate_limited": 1,
+    "source_unavailable": 0
+  },
+  "process_family_cpu_s": 8.620858,
+  "pg_states": {
+    "succeeded": 102
+  },
+  "pg_counters": [
+    146880,
+    "146880",
+    "146880"
+  ],
+  "permits_after_drain": 0,
+  "scheduler_events": [
+    [
+      "queued",
+      null,
+      102
+    ],
+    [
+      "recovered",
+      null,
+      1
+    ],
+    [
+      "retry_scheduled",
+      "source_rate_limited",
+      1
+    ],
+    [
+      "started",
+      null,
+      102
+    ],
+    [
+      "succeeded",
+      null,
+      102
+    ]
+  ],
+  "completion_s": 17.355381458008196,
+  "windows": 102,
+  "steady_windows": 0,
+  "windows_per_second": 0.0,
+  "idle_ready_slot_seconds": 0,
+  "full_windows_per_second": 5.877139620744821,
+  "completion_times_s": [
+    0.260020625020843,
+    0.27457624999806285,
+    0.286701750010252,
+    0.4166542910388671,
+    0.46473795804195106,
+    0.4755632500164211,
+    0.48508050001692027,
+    0.6061435000156052,
+    0.6157371250446886,
+    0.6322724160272628,
+    0.6488676660228521,
+    0.784792083024513,
+    0.8042795830406249,
+    0.8140501659945585,
+    0.8251504159998149,
+    0.9439474579994567,
+    0.9950721660279669,
+    1.005290833010804,
+    1.07764670799952,
+    1.1650724160135724,
+    1.206658375042025,
+    1.2241855000029318,
+    1.2650956659927033,
+    1.3179170830408111,
+    1.3582427910296246,
+    1.3745902079972439,
+    1.4411855000071228,
+    1.4987257909961045,
+    1.5325230000307783,
+    1.548212166002486,
+    1.5867491660173982,
+    1.650275791005697,
+    1.7234405410126783,
+    1.7420559580205008,
+    1.7831484579946846,
+    1.8510790000436828,
+    1.8960755000007339,
+    1.9152672910131514,
+    1.959173625044059,
+    2.02964012499433,
+    2.0823299160110764,
+    2.1068700830219314,
+    2.1617205000366084,
+    2.2262769160442986,
+    2.24860566604184,
+    2.2721185000264086,
+    2.3117981660179794,
+    2.4104459999944083,
+    2.4259176250197925,
+    2.454931750020478,
+    2.4934298750013113,
+    2.5555844160262495,
+    2.5776683750445955,
+    2.614058000035584,
+    2.6382049160311,
+    2.734229125024285,
+    2.752690875029657,
+    2.7945946250110865,
+    2.822095125040505,
+    2.9072847079951316,
+    2.919005041010678,
+    2.963594541011844,
+    3.001878833048977,
+    3.0876123750349507,
+    3.117542958003469,
+    3.1287925000069663,
+    3.1631826660013758,
+    3.269765750039369,
+    3.3293151250109076,
+    3.3389574580360204,
+    3.3661730409949087,
+    3.4632050410145894,
+    3.48135545803234,
+    3.500985833001323,
+    3.5182194160297513,
+    3.653192416008096,
+    3.669113625015598,
+    3.6812588330358267,
+    3.7114595000166446,
+    3.826591874996666,
+    3.8365547910216264,
+    3.846891041030176,
+    3.8736439580097795,
+    4.015857624995988,
+    4.028827625035774,
+    4.040048708033282,
+    4.056561041041277,
+    4.183879374992102,
+    4.195317375008017,
+    4.24660179100465,
+    4.259370875020977,
+    4.411067291046493,
+    4.425809416046832,
+    4.438983833009843,
+    4.452807583031245,
+    4.620415250014048,
+    4.637782458041329,
+    4.650461915996857,
+    4.669181625009514,
+    4.777868458011653,
+    4.790111125039402,
+    17.321949333010707
+  ],
+  "http_requests": 207,
+  "http_connections": 5,
+  "http_peak": 4,
+  "http_rejected": 0,
+  "storage_calls": 205,
+  "inserted_rows": 146880,
+  "maxrss": 251543552,
+  "child_maxrss": 247332864,
+  "cpu_s": 5.296436,
+  "canonical_new": 146880,
+  "query_metrics": [
+    [
+      "QueryStart",
+      205,
+      0,
+      0,
+      0
+    ],
+    [
+      "QueryFinish",
+      205,
+      449280,
+      43712850,
+      4908838
+    ]
+  ],
+  "post_drain_memory": {
+    "jemalloc.allocated": 318288832.0,
+    "MemoryResident": 585084928.0
+  },
+  "container_after": "1009512448\nusage_usec 227060323\nuser_usec 137906478\nsystem_usec 89153845\nnice_usec 0\nnr_periods 37109\nnr_throttled 81\nthrottled_usec 25949092\nnr_bursts 0\nburst_usec 0\n254:0 rbytes=395702272 wbytes=2068381696 rios=8672 wios=332074 dbytes=0 dios=0\n",
+  "pg_stats_after": [
+    129483,
+    944,
+    1
+  ],
+  "checks": {
+    "all_windows": true,
+    "canonical_count": true,
+    "required_window": false,
+    "no_permit_leak": true,
+    "sampling_complete": true
+  }
+}

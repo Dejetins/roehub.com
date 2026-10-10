@@ -1,0 +1,174 @@
+{
+  "baseline_head": "718a1d8c2dcc28ccb2c0704de3b663785494e0c3",
+  "paths": [
+    {
+      "path": "apps/api/wiring/artifact_service.py",
+      "operation": "modified",
+      "baseline_sha256": "11cba13cb394db415cad1af0ae42716ad9452df5dbbff2fe19bc928610e3546d",
+      "final_sha256": "36937efb975e1a007c11c2d9c0af1985a1ded61a93dfe039ffe695d0374a05ed",
+      "note": ""
+    },
+    {
+      "path": "apps/navigator-web/README.md",
+      "operation": "modified",
+      "baseline_sha256": "f75a1c602711db63162627a9400b5ff0e02ccd330295f1b667e3005ed684202c",
+      "final_sha256": "883f0f9d0847a2b6ac7b05089dd27adf40d3aaecf3ffa7e08e471242708ee052",
+      "note": ""
+    },
+    {
+      "path": "apps/navigator-web/e2e/artifact_fixture.py",
+      "operation": "modified",
+      "baseline_sha256": "8f5bd8edf0448959d3e5d90df7f2bbe7694fcb0458893462c4c136780f3fd4b9",
+      "final_sha256": "d6d21768323dcc537cf8cd32e88dac838a9d95de2028c70060a05f02b229e5c5",
+      "note": ""
+    },
+    {
+      "path": "apps/navigator-web/e2e/artifact_scenarios.py",
+      "operation": "modified",
+      "baseline_sha256": "39fb0da3a5388175648a74b7537a168fd690c53fc3845159646e7b2a9f692db8",
+      "final_sha256": "4d8655fd39bef8220cbcdfa94241e7fa655484dbfe788dbf30d1435a1f05605c",
+      "note": ""
+    },
+    {
+      "path": "apps/navigator-web/e2e/integrated_fixture.py",
+      "operation": "created",
+      "baseline_sha256": null,
+      "final_sha256": "07af8de67c1e7abca6ee5d7cd01ba020f64b52faa9edaea2ccf25e42ea83427b",
+      "note": ""
+    },
+    {
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/managed_app.py",
+      "operation": "modified",
+      "baseline_sha256": "f3352768ec173c96279476d9e2c2138ccff75d05ee4b47eacf606a6e631afc25",
+      "final_sha256": "cafa9f8a910e888b4fe828dfc0439efc48672ea6d3e65fa982816035b5f47a6e",
+      "note": ""
+    },
+    {
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/managed_worker.py",
+      "operation": "modified",
+      "baseline_sha256": "89ca4389004c2a9c43ddbfae6d1c5a2aea438ee8b535956c164f4b95dfafd7b8",
+      "final_sha256": "e1bea7dc9180f290e80f31862b6e4544f7be50bf3227c2c399217a11889dbb5a",
+      "note": ""
+    },
+    {
+      "path": "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "operation": "modified",
+      "baseline_sha256": "906786639be5c125c7ad8aa39f84ddc7933ac48765454d58a188a502617119e5",
+      "final_sha256": "574d125e08dcd811da47a1b21270ec8a8305adbdc9063bd9a9384af231c6b797",
+      "note": ""
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-reference-api-v1.md",
+      "operation": "modified",
+      "baseline_sha256": "b22959924b035519f42216e9eceae5c1c53d7776894f2776b84da1fe6f47cc00",
+      "final_sha256": "acbbc38f27433665eb7978e648f6aef4adabb013eb6ee37b72d32a669b40d9d4",
+      "note": ""
+    },
+    {
+      "path": "docs/architecture/project-map/PROJECT_MAP.md",
+      "operation": "modified",
+      "baseline_sha256": "e1358795b9d707a5b3116499a7ef1e7f45069154f177eae995629f82ca179dfa",
+      "final_sha256": null,
+      "note": "Generated inventory refreshed after final receipt creation; hash excluded to avoid circular binding."
+    },
+    {
+      "path": "docs/architecture/project-map/component-map.mmd",
+      "operation": "modified",
+      "baseline_sha256": "f3046ad7657d1d474079d4bb66893b6eddf4b9e5202a9220025caa1f8c8a4d42",
+      "final_sha256": null,
+      "note": "Generated inventory refreshed after final receipt creation; hash excluded to avoid circular binding."
+    },
+    {
+      "path": "docs/architecture/project-map/project-map.json",
+      "operation": "modified",
+      "baseline_sha256": "a9daebd183ce564e9e93763857ccb43ab2d8b709c9c656ca693366fd10b30fda",
+      "final_sha256": null,
+      "note": "Generated inventory refreshed after final receipt creation; hash excluded to avoid circular binding."
+    },
+    {
+      "path": "docs/runbooks/offline-release-installation.md",
+      "operation": "modified",
+      "baseline_sha256": "e85a475f55467831b4bcc4aa8439e3fa59b8b7c61bf55bf0ba9a81f16c20fba6",
+      "final_sha256": "26afb6ecfc0eb652b4e1ed2e5a1ac514d4cfe6944aeaefc831cd8108cb3cc581",
+      "note": ""
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/base_storage_admission.py",
+      "operation": "modified",
+      "baseline_sha256": "c7fca685c5f112d735c876f1fd67c9d4cbefb4f128a68400592307042b2379b2",
+      "final_sha256": "a04d0b254e5b670a5f445d2105d74c88a2750ffe5899608f458458ad7736d303",
+      "note": ""
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+      "operation": "modified",
+      "baseline_sha256": "06eb5c7967b8007915c3ce590d1f3e973c82e9f0ec96a4e2276d5365426d1e35",
+      "final_sha256": "5499524885429598892f9da2e75f014ca8f7b120fdb1f94c28a17f41ff99eaac",
+      "note": ""
+    },
+    {
+      "path": "tests/real_infra/backtest/test_artifact_dispatch.py",
+      "operation": "modified",
+      "baseline_sha256": "e9b61d95ac3dce13786db668c492cc1a694b91ce59e5e502c698c774b44f086b",
+      "final_sha256": "aeccefadabb1bad4eb392232a96b87021a54ffb1856b95532fdad68bdd7ca274",
+      "note": ""
+    },
+    {
+      "path": "tests/real_infra/backtest/test_artifact_http_storage.py",
+      "operation": "modified",
+      "baseline_sha256": "3b87da29e4c0f569bfea07af09c4f625662341cf9431140ae4f0dcb046e7fb0a",
+      "final_sha256": "5c8e0298e81cf4dab18238b31dfae808d11702c8baf6793272ef72ff2c07fec0",
+      "note": ""
+    },
+    {
+      "path": "tests/real_infra/backtest/test_artifact_integrated.py",
+      "operation": "created",
+      "baseline_sha256": null,
+      "final_sha256": "e3503acbe1344dbdec176399f10539a00af12356cdeaf4790d3817067f423725",
+      "note": ""
+    },
+    {
+      "path": "tests/real_infra/backtest/test_automatic_base_lifecycle.py",
+      "operation": "modified",
+      "baseline_sha256": "c4919989e81058ac2001f0bca7775b9ca01d04dbf903b12a7e9a85f6c27f7860",
+      "final_sha256": "7929a77d531d239afdacb5c5437acfb310ae57fcd068fcf7192b4eb151dc1eb2",
+      "note": ""
+    },
+    {
+      "path": "tests/real_infra/backtest/test_managed_derivative_publication.py",
+      "operation": "modified",
+      "baseline_sha256": "f15432686008a60e2f3c4b2f5c5adb5f424aa5dd3f82b2effaa44f508f2c300b",
+      "final_sha256": "faac79887b510813083d8f948ecef458ca87bd17579b1a3affaa5aa8021e8d62",
+      "note": ""
+    },
+    {
+      "path": "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+      "operation": "modified",
+      "baseline_sha256": "dddc3d5e5b846cfeda7cc12e6eb59f64cebff7217cb85ae7ef58c94da7702e55",
+      "final_sha256": "34a17043c13e212735e2a8173e7f663523e2506b4abf609c949fe27c7561d23e",
+      "note": ""
+    },
+    {
+      "path": "tests/unit/contexts/backtest_artifacts/test_automatic_base.py",
+      "operation": "modified",
+      "baseline_sha256": "f2c33227c9e2235e1ff34a3b606ecdf1b31b407247cd0640a473308518c6b91b",
+      "final_sha256": "46edd536baa1eb8ebffe984ead8eb7d72c9433d5d66533f60fa49db763c12dae",
+      "note": ""
+    },
+    {
+      "path": "tests/unit/contexts/backtest_artifacts/test_derivative_profiles.py",
+      "operation": "modified",
+      "baseline_sha256": "eb151ce4cb6ee62837318821e3a96769ddd0508d04c1cf8849953a13fff9fae7",
+      "final_sha256": "e45b5e7eeb91d433703eb8f642dabc1cfe722b5e240f48647ffd1f33174b0dc0",
+      "note": ""
+    }
+  ],
+  "deleted_product_paths": [],
+  "foreign_paths_changed_since_baseline": [],
+  "evidence_outputs": "reports/S09* and receipts/S09/*",
+  "ledger": "iteration-ledger.md updated exclusively through ledger_update.py",
+  "restored_immutable_prior_stage_files": {
+    "apps/navigator-web/e2e/storage_fixture.py": "8d79bebcd15607c76b392359ad87c3e5aa755509a85c6d46c321360b10c93c39",
+    "apps/navigator-web/e2e/storage_preflight.py": "1a5529a1340cfe6c26eb410dd3d23d1aa7fc02a31a3e56af62d3d15265b71d47"
+  }
+}

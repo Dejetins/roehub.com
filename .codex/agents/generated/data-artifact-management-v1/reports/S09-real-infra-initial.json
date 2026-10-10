@@ -1,0 +1,15 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "-ra",
+    "tests/real_infra/backtest/test_artifact_input_lifecycle.py",
+    "tests/real_infra/backtest/test_artifact_management.py",
+    "tests/real_infra/backtest/test_automatic_base_lifecycle.py",
+    "tests/real_infra/backtest/test_managed_derivative_publication.py",
+    "tests/real_infra/backtest/test_artifact_dispatch.py",
+    "tests/real_infra/backtest/test_artifact_http_storage.py"
+  ],
+  "exit_code": 0,
+  "output": "........................................................................ [ 61%]\n.............................................                            [100%]\n=============================== warnings summary ===============================\ntests/real_infra/backtest/test_automatic_base_lifecycle.py::test_real_failure_windows_keep_valid_pointer_and_recover_ownership[disk_full]\ntests/real_infra/backtest/test_automatic_base_lifecycle.py::test_real_failure_windows_keep_valid_pointer_and_recover_ownership[crash_before]\ntests/real_infra/backtest/test_automatic_base_lifecycle.py::test_real_failure_windows_keep_valid_pointer_and_recover_ownership[crash_after]\n  /Users/daniildegtyarev/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/multiprocessing/popen_fork.py:66: DeprecationWarning: This process (pid=22250) is multi-threaded, use of fork() may lead to deadlocks in the child.\n    self.pid = os.fork()\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n117 passed, 3 warnings in 90.26s (0:01:30)\n"
+}

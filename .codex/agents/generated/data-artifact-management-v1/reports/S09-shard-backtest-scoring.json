@@ -1,0 +1,34 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "-ra",
+    "tests/unit/contexts/backtest/application/services/v2/test_cost_permutation.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_local_top_k.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_integer_trade_tape.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_prefix_guard.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_bitsets.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_row_signatures.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_result_candles.py",
+    "tests/unit/contexts/backtest/application/services/test_signals_from_indicators_v1.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_benchmark_accounting.py",
+    "tests/unit/scripts/backtest",
+    "tests/unit/contexts/backtest/application/services/v2/test_combo_planning_service.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_hit_times_compute_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_job_orchestration.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_lazy_trades_detail_service.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_no_risk_exact_scoring_service.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_prepare_pools_service.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_short_and_tp_sl_ranking.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_signal_rules_engine_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_top_result_assembly.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_tp_sl_exact_scoring_service.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_tp_sl_hit_times_service.py"
+  ],
+  "exit_code": 0,
+  "output": "........................................................................ [  5%]\n........................................................................ [ 11%]\n........................................................................ [ 17%]\n........................................................................ [ 22%]\n........................................................................ [ 28%]\n........................................................................ [ 34%]\n........................................................................ [ 40%]\n........................................................................ [ 45%]\n........................................................................ [ 51%]\n........................................................................ [ 57%]\n........................................................................ [ 63%]\n........................................................................ [ 68%]\n........................................................................ [ 74%]\n........................................................................ [ 80%]\n........................................................................ [ 86%]\n........................................................................ [ 91%]\n........................................................................ [ 97%]\n.............................                                            [100%]\n1253 passed in 16.62s\n",
+  "environment_overrides": {
+    "PYTHONPATH": ".",
+    "NUMBA_NUM_THREADS": "12"
+  }
+}

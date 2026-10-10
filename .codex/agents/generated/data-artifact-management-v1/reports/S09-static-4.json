@@ -1,0 +1,10 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "tools.docs.generate_runbooks",
+    "--check"
+  ],
+  "exit_code": 0,
+  "output": "OK: runbooks up-to-date (9 Russian docs + JSON index)\n"
+}

@@ -1,0 +1,156 @@
+.........F
+=================================== FAILURES ===================================
+____________ test_warmed_writer_reuses_process_and_serializes_calls ____________
+
+self = <apps.worker.market_data_ws.wiring.persistent_writer.PersistentRawWriterProcess object at 0x118d36390>
+rows = None
+
+    async def _call(self, rows: Sequence[CandleWithMeta] | None) -> None:
+        async with self._lock:
+            self._active_call = asyncio.current_task()
+            try:
+                # Includes startup and transport, not only server response time.
+                async with asyncio.timeout(self._timeout_s):
+>                   await self._ensure_started()
+
+apps/worker/market_data_ws/wiring/persistent_writer.py:187: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+apps/worker/market_data_ws/wiring/persistent_writer.py:162: in _ensure_started
+    await self._reply()
+apps/worker/market_data_ws/wiring/persistent_writer.py:136: in _reply
+    size = struct.unpack("!I", await self._receive_exact(4))[0]
+apps/worker/market_data_ws/wiring/persistent_writer.py:129: in _receive_exact
+    chunk = await loop.sock_recv(sock, size - len(result))
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <_UnixSelectorEventLoop running=False closed=True debug=False>
+sock = <socket.socket [closed] fd=-1, family=1, type=1, proto=0>, n = 4
+
+    async def sock_recv(self, sock, n):
+        """Receive data from the socket.
+    
+        The return value is a bytes object representing the data received.
+        The maximum amount of data to be received at once is specified by
+        nbytes.
+        """
+        base_events._check_ssl_socket(sock)
+        if self._debug and sock.gettimeout() != 0:
+            raise ValueError("the socket must be non-blocking")
+        try:
+            return sock.recv(n)
+        except (BlockingIOError, InterruptedError):
+            pass
+        fut = self.create_future()
+        fd = sock.fileno()
+        self._ensure_fd_no_transport(fd)
+        handle = self._add_reader(fd, self._sock_recv, fut, sock, n)
+        fut.add_done_callback(
+            functools.partial(self._sock_read_done, fd, handle=handle))
+>       return await fut
+E       asyncio.exceptions.CancelledError
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/asyncio/selector_events.py:394: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+self = <apps.worker.market_data_ws.wiring.persistent_writer.PersistentRawWriterProcess object at 0x118d36390>
+rows = None
+
+    async def _call(self, rows: Sequence[CandleWithMeta] | None) -> None:
+        async with self._lock:
+            self._active_call = asyncio.current_task()
+            try:
+                # Includes startup and transport, not only server response time.
+>               async with asyncio.timeout(self._timeout_s):
+
+apps/worker/market_data_ws/wiring/persistent_writer.py:186: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <Timeout [expired]>
+exc_type = <class 'asyncio.exceptions.CancelledError'>
+exc_val = CancelledError(), exc_tb = <traceback object at 0x1196b4140>
+
+    async def __aexit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> Optional[bool]:
+        assert self._state in (_State.ENTERED, _State.EXPIRING)
+    
+        if self._timeout_handler is not None:
+            self._timeout_handler.cancel()
+            self._timeout_handler = None
+    
+        if self._state is _State.EXPIRING:
+            self._state = _State.EXPIRED
+    
+            if self._task.uncancel() <= self._cancelling and exc_type is exceptions.CancelledError:
+                # Since there are no new cancel requests, we're
+                # handling this.
+>               raise TimeoutError from exc_val
+E               TimeoutError
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/asyncio/timeouts.py:115: TimeoutError
+
+The above exception was the direct cause of the following exception:
+
+    def test_warmed_writer_reuses_process_and_serializes_calls():
+        async def scenario():
+            writer = PersistentRawWriterProcess(environ={}, child_target=fake_writer)
+            try:
+                await writer.start()
+                pid = writer.active_pids.copy()
+                await asyncio.gather(*(writer.write([]) for _ in range(10)))
+                assert writer.active_pids == pid
+                assert getattr(asyncio.get_running_loop(), "_default_executor") is None
+            finally:
+                await writer.close()
+            assert not writer.active_pids
+            with pytest.raises(RuntimeError, match="closed"):
+                await writer.write([])
+    
+>       asyncio.run(scenario())
+
+tests/unit/apps/worker/test_persistent_writer.py:67: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/asyncio/runners.py:195: in run
+    return runner.run(main)
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/asyncio/runners.py:118: in run
+    return self._loop.run_until_complete(task)
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/asyncio/base_events.py:691: in run_until_complete
+    return future.result()
+tests/unit/apps/worker/test_persistent_writer.py:56: in scenario
+    await writer.start()
+apps/worker/market_data_ws/wiring/persistent_writer.py:205: in start
+    await self._call(None)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <apps.worker.market_data_ws.wiring.persistent_writer.PersistentRawWriterProcess object at 0x118d36390>
+rows = None
+
+    async def _call(self, rows: Sequence[CandleWithMeta] | None) -> None:
+        async with self._lock:
+            self._active_call = asyncio.current_task()
+            try:
+                # Includes startup and transport, not only server response time.
+                async with asyncio.timeout(self._timeout_s):
+                    await self._ensure_started()
+                    if rows is not None:
+                        assert self._socket is not None
+                        await asyncio.get_running_loop().sock_sendall(self._socket, _encode(rows))
+                        await self._reply()
+            except TimeoutError as exc:
+                self._discard()
+>               raise TemporaryIngestionError("ingestion_io_timeout") from exc
+E               trading.contexts.market_data.application.services.ingestion_retry.TemporaryIngestionError: ingestion_io_timeout
+
+apps/worker/market_data_ws/wiring/persistent_writer.py:194: TemporaryIngestionError
+----------------------------- Captured stdout call -----------------------------
+.........FFFFFFFFF
+=========================== short test summary info ============================
+FAILED tests/unit/apps/worker/test_persistent_writer.py::test_warmed_writer_reuses_process_and_serializes_calls
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+/Users/daniildegtyarev/.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/asyncio/runners.py:123: KeyboardInterrupt
+(to show a full traceback on KeyboardInterrupt use --full-trace)
+1 failed, 9 passed in 80.40s (0:01:20)

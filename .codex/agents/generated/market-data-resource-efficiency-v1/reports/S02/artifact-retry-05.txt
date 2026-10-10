@@ -1,0 +1,130 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_ test_clickhouse_pressure_keeps_artifact_attempt_retryable[202-transient_database] _
+
+dispatch = {'actor': UUID('741fad87-5eb3-404d-b8b5-24b4a758f25b'), 'admin': UUID('fb0fda34-454c-43e6-b2d1-ff374aaef938'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x118bd6db0>, ...}
+tmp_path = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-422/test_clickhouse_pressure_keeps0')
+code = 202, reason = 'transient_database'
+
+    @pytest.mark.parametrize('code,reason', [(202,'transient_database'),
+                                           (241,'transient_database')])
+    def test_clickhouse_pressure_keeps_artifact_attempt_retryable(dispatch, tmp_path, code, reason):
+        """Real PG lifecycle, adapter-classified failure before publication; no source absence."""
+        from clickhouse_connect.driver.exceptions import DatabaseError
+        from tests.unit.contexts.backtest_artifacts.test_automatic_base import Source
+        m=dispatch
+        submit(m,(item(m),))
+        _,w=worker(m,tmp_path)
+        class Pressure(Source):
+            def read_1m_arrays(self, instrument_id, time_range):
+                raise DatabaseError(f'Code: {code}. synthetic admission refusal')
+        runner=replace(w.publisher.runner,canonical_candle_reader=Pressure(180))
+        failing=replace(w,publisher=replace(w.publisher,runner=runner))
+        try:
+            failing.run_once(m['installation'])
+        except DatabaseError:
+            pass
+        else:
+            pytest.fail(str(m['repo'].rows('SELECT state,reason FROM backtest_artifact_requests')))
+>       rows=m['repo'].rows('SELECT state,reason FROM backtest_artifact_builds')
+
+tests/real_infra/backtest/test_artifact_integrated.py:552: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py:27: in rows
+    return self.db.fetch_all(query=query, parameters=params)
+src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/gateway.py:217: in fetch_all
+    cursor.execute(cast(Any, query), parameters)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Cursor [closed] [BAD] at 0x118c33d10>
+query = 'SELECT state,reason FROM backtest_artifact_builds', params = {}
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool | None = None,
+    ) -> Self:
+        """
+        Execute a query or command to the database.
+        """
+        try:
+            with self._conn.lock:
+                self._conn.wait(
+                    self._execute_gen(query, params, prepare=prepare, binary=binary)
+                )
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.UndefinedColumn: column "reason" does not exist
+E           LINE 1: SELECT state,reason FROM backtest_artifact_builds
+E                                ^
+
+.venv/lib/python3.12/site-packages/psycopg/cursor.py:97: UndefinedColumn
+_ test_clickhouse_pressure_keeps_artifact_attempt_retryable[241-transient_database] _
+
+dispatch = {'actor': UUID('7f9a0371-4741-4cd4-b5eb-3a37e6ac8625'), 'admin': UUID('a807c4d1-9f77-48f4-bade-e4f5f8fd5bd5'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x118d6bb00>, ...}
+tmp_path = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-422/test_clickhouse_pressure_keeps1')
+code = 241, reason = 'transient_database'
+
+    @pytest.mark.parametrize('code,reason', [(202,'transient_database'),
+                                           (241,'transient_database')])
+    def test_clickhouse_pressure_keeps_artifact_attempt_retryable(dispatch, tmp_path, code, reason):
+        """Real PG lifecycle, adapter-classified failure before publication; no source absence."""
+        from clickhouse_connect.driver.exceptions import DatabaseError
+        from tests.unit.contexts.backtest_artifacts.test_automatic_base import Source
+        m=dispatch
+        submit(m,(item(m),))
+        _,w=worker(m,tmp_path)
+        class Pressure(Source):
+            def read_1m_arrays(self, instrument_id, time_range):
+                raise DatabaseError(f'Code: {code}. synthetic admission refusal')
+        runner=replace(w.publisher.runner,canonical_candle_reader=Pressure(180))
+        failing=replace(w,publisher=replace(w.publisher,runner=runner))
+        try:
+            failing.run_once(m['installation'])
+        except DatabaseError:
+            pass
+        else:
+            pytest.fail(str(m['repo'].rows('SELECT state,reason FROM backtest_artifact_requests')))
+>       rows=m['repo'].rows('SELECT state,reason FROM backtest_artifact_builds')
+
+tests/real_infra/backtest/test_artifact_integrated.py:552: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py:27: in rows
+    return self.db.fetch_all(query=query, parameters=params)
+src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/gateway.py:217: in fetch_all
+    cursor.execute(cast(Any, query), parameters)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <psycopg.Cursor [closed] [BAD] at 0x118f201d0>
+query = 'SELECT state,reason FROM backtest_artifact_builds', params = {}
+
+    def execute(
+        self,
+        query: Query,
+        params: Params | None = None,
+        *,
+        prepare: bool | None = None,
+        binary: bool | None = None,
+    ) -> Self:
+        """
+        Execute a query or command to the database.
+        """
+        try:
+            with self._conn.lock:
+                self._conn.wait(
+                    self._execute_gen(query, params, prepare=prepare, binary=binary)
+                )
+        except e._NO_TRACEBACK as ex:
+>           raise ex.with_traceback(None)
+E           psycopg.errors.UndefinedColumn: column "reason" does not exist
+E           LINE 1: SELECT state,reason FROM backtest_artifact_builds
+E                                ^
+
+.venv/lib/python3.12/site-packages/psycopg/cursor.py:97: UndefinedColumn
+=========================== short test summary info ============================
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_clickhouse_pressure_keeps_artifact_attempt_retryable[202-transient_database]
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_clickhouse_pressure_keeps_artifact_attempt_retryable[241-transient_database]
+2 failed, 6 deselected in 1.85s

@@ -1,0 +1,32 @@
+{
+  "concurrency": [
+    {
+      "outcome": "error",
+      "code": 202,
+      "aggregate_user_limit": true
+    },
+    {
+      "outcome": "success"
+    }
+  ],
+  "aggregate": [
+    {
+      "outcome": "error",
+      "code": 241,
+      "aggregate_user_limit": false
+    },
+    {
+      "outcome": "error",
+      "code": 241,
+      "aggregate_user_limit": false
+    },
+    {
+      "outcome": "error",
+      "code": 241,
+      "aggregate_user_limit": false
+    },
+    {
+      "outcome": "success"
+    }
+  ]
+}

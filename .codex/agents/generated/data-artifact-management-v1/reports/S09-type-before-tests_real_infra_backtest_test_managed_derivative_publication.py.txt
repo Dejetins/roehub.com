@@ -1,0 +1,101 @@
+"""Actual PostgreSQL pins around native selective shared publication."""
+
+from datetime import timedelta
+from uuid import uuid4
+
+import pytest
+
+from tests.real_infra.backtest.test_artifact_input_lifecycle import DSN
+from tests.real_infra.backtest.test_artifact_input_lifecycle import ownership as ownership_fixture
+from tests.unit.contexts.backtest_artifacts.test_derivative_profiles import (
+    START,
+    build,
+    demand,
+    n,
+    profile,
+)
+from tests.unit.contexts.backtest_artifacts.test_management_profiles import (
+    catalog as catalog_fixture,
+)
+from trading.contexts.backtest.application.ports.backtest_job_repositories import (
+    ArtifactReaderReservation,
+)
+from trading.contexts.backtest_artifacts.application.services.derivative_profiles import (
+    ManagedDerivativePublisher,
+    plan_derivatives,
+)
+
+ownership = ownership_fixture
+catalog = catalog_fixture
+pytestmark = pytest.mark.skipif(not DSN, reason="explicit disposable PostgreSQL target required")
+
+
+def test_shared_union_retains_foreign_pin_and_mode_off(ownership, tmp_path, catalog):
+    physical, gateway, _ = ownership
+    gateway.execute(
+        query="""ALTER TABLE backtest_jobs
+        ADD COLUMN state text, ADD COLUMN execution_mode text, ADD COLUMN artifact_slot text,
+        ADD COLUMN artifact_manifest_hash text, ADD COLUMN market_id integer,
+        ADD COLUMN symbol text, ADD COLUMN request_json jsonb, ADD COLUMN spec_payload_json jsonb
+        """,
+        parameters={},
+    )
+    f, base, original, result, source = build(tmp_path, catalog, names=("ma.sma",), repo=physical)
+    old = result.publication.published_pointer
+    old_path = f.loader.resolve_slot_manifest_path(f.coordinates, old.active_slot)
+    old_bytes = old_path.read_bytes()
+    reservation = physical.reserve_artifact_reader(
+        reader=ArtifactReaderReservation(
+            "binance",
+            "spot",
+            "BTCUSDT",
+            old.active_slot,
+            old.slot_generation,
+            old.manifest_sha256,
+            "lazy",
+            uuid4(),
+            uuid4(),
+            uuid4(),
+            1,
+            uuid4(),
+        )
+    )
+    union = plan_derivatives(
+        (original.demands[0], demand(profile(catalog, names=("ma.ema",)), source.sha256)),
+        grid_builder=n._signal_grid_builder_v2(),
+    )
+    pub = ManagedDerivativePublisher(base, "local-test", 1, f.builder.root)
+    second = pub.publish(
+        plan=union,
+        coordinates=f.coordinates,
+        source=source,
+        generated_at=START + timedelta(days=20),
+    )
+    assert second.publication.published_pointer.active_slot != old.active_slot
+    assert old_path.read_bytes() == old_bytes
+    latest = f.loader.load_slot_manifest(
+        f.coordinates, second.publication.published_pointer.active_slot
+    )
+    assert {i.indicator_id for i in latest.signals.manifests} == {"ma.sma", "ma.ema"}
+    pointer_path = f.loader.resolve_current_pointer_path(f.coordinates)
+    pointer = pointer_path.read_bytes()
+    off = plan_derivatives(
+        (demand(catalog.default_profile(), source.sha256),),
+        grid_builder=n._signal_grid_builder_v2(),
+    )
+    assert pub.publish(plan=off) is None
+    assert pointer_path.read_bytes() == pointer and old_path.read_bytes() == old_bytes
+    # The next publication needs the pinned slot. No queue ownership can bypass this pin.
+    from trading.contexts.backtest_artifacts.application.services.v2.artifact_slot_publisher import (  # noqa: E501
+        ArtifactPublicationNotStarted,
+    )
+
+    with pytest.raises(ArtifactPublicationNotStarted, match="artifact_source_pinned"):
+        pub.publish(
+            plan=union,
+            coordinates=f.coordinates,
+            source=source,
+            generated_at=START + timedelta(days=20),
+        )
+    assert old_path.read_bytes() == old_bytes and pointer_path.read_bytes() == pointer
+    assert reservation is not None

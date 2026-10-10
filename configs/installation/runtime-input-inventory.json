@@ -6,7 +6,7 @@
     "user_installation_input": "configs/installation/roehub.yaml"
   },
   "counts": {
-    "explicit_legacy_runtime_handoff": 48,
+    "explicit_legacy_runtime_handoff": 49,
     "installation_generated_runtime": 56,
     "internal_runtime_tuning": 2,
     "openbao_secret_reference": 26,
@@ -647,6 +647,16 @@
       ]
     },
     {
+      "classification": "explicit_legacy_runtime_handoff",
+      "key": "ROEHUB_ARTIFACT_MANAGEMENT_INSTALLATION_ID",
+      "owner_stage": "17",
+      "sources": [
+        "apps/api/wiring/modules/backtest_artifacts.py",
+        "apps/control_agent/artifact_storage_wiring.py",
+        "apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py"
+      ]
+    },
+    {
       "classification": "product_config_postgresql",
       "key": "ROEHUB_BACKTEST_ADMISSION_CONFIG",
       "owner_stage": "04-16",
@@ -660,7 +670,9 @@
       "owner_stage": "04-16",
       "sources": [
         "apps/api/wiring/modules/backtest.py",
+        "apps/api/wiring/modules/backtest_artifacts.py",
         "apps/api/wiring/modules/market_data_reference.py",
+        "apps/control_agent/artifact_storage_wiring.py",
         "apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py",
         "src/trading/contexts/backtest_artifacts/adapters/outbound/config/backtest_artifacts_runtime_config.py"
       ]
@@ -1119,6 +1131,7 @@
       "key": "ROEHUB_INDICATORS_CONFIG",
       "owner_stage": "17",
       "sources": [
+        "apps/api/wiring/modules/backtest_artifacts.py",
         "src/trading/platform/config/indicators_compute_numba.py"
       ]
     },
@@ -1292,6 +1305,7 @@
       "key": "ROEHUB_STORAGE_POSTGRES_DSN",
       "owner_stage": "08",
       "sources": [
+        "apps/control_agent/artifact_storage_wiring.py",
         "apps/migrations/extensions_plugin_runtime_probe.py",
         "apps/migrations/notification_provider_runtime_probe.py",
         "apps/migrations/organization_runtime_probe.py",
@@ -1399,18 +1413,22 @@
       "owner_stage": "08",
       "sources": [
         "apps/api/wiring/modules/backtest.py",
+        "apps/api/wiring/modules/backtest_artifacts.py",
         "apps/api/wiring/modules/live_execution.py",
         "apps/api/wiring/modules/market_data_reference.py",
         "apps/api/wiring/modules/research_tenancy.py",
         "apps/api/wiring/modules/strategy.py",
         "apps/api/wiring/modules/ui_account.py",
         "apps/cli/commands/backtest_artifact_publish.py",
+        "apps/control_agent/artifact_storage_wiring.py",
         "apps/exchange_execution/main/app.py",
         "apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
         "apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py",
         "apps/worker/backtest_job_runner/main/lazy_trades_child.py",
+        "apps/worker/market_data_ws/wiring/io_process.py",
         "apps/worker/market_data_ws/wiring/modules/market_data_ws.py",
-        "apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py"
+        "apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py",
+        "src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py"
       ]
     },
     {
@@ -1669,5 +1687,5 @@
     "infra"
   ],
   "schema": "io.roehub.runtime-input-inventory/v1alpha1",
-  "total": 167
+  "total": 168
 }

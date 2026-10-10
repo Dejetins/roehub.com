@@ -1,0 +1,138 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs ________
+
+dispatch = {'actor': UUID('f0aa67b9-c0e8-4c33-a6a9-80dd097c033d'), 'admin': UUID('ffab194e-ce62-4ee7-a634-99d96c0db243'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x11eafe5d0>, ...}
+tmp_path = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-374/test_raw_ingestion_scheduler_m0')
+
+        with ballast.open("wb") as stream:
+            stream.truncate(100_000_000)
+        m["db"].execute(
+            query="UPDATE backtest_artifact_installation_settings SET budget_bytes=1150000000",
+            parameters={},
+        )
+        submit(m, (item(m),))
+        assert w.run_once(m["installation"]) is None
+        assert m["repo"].rows("SELECT state,reason FROM backtest_artifact_requests")[0] == {
+            "state": "error",
+            "reason": "resource_conflict",
+        }
+        assert not m["repo"].rows("SELECT * FROM backtest_artifact_builds")
+    
+    
+    def test_retry_rechecks_revoked_membership(dispatch, tmp_path):
+        m = dispatch
+        p = item(m)
+        submit(m, (p,))
+        r = m["repo"]
+        request = r.next_request(m["installation"])
+        build = r.claim_group(
+            installation=m["installation"],
+            request=request,
+            owner=uuid4(),
+            incarnation=uuid4(),
+            reservation=4096,
+        )
+        r.finish(build=build, outcome="retry_wait", reason="transient_io")
+        m["db"].execute(
+            query="UPDATE identity_memberships SET status='revoked' WHERE organization_id=%(o)s AND user_id=%(u)s",
+            parameters={"o": m["org"], "u": m["actor"]},
+        )
+        assert (
+            r.retry(
+                build=build,
+                owner_token=uuid4(),
+                parent_incarnation=uuid4(),
+                now=NOW + timedelta(days=365),
+            )
+            is None
+        )
+        assert r.rows("SELECT state FROM backtest_artifact_builds")[0]["state"] == "error"
+        assert r.rows("SELECT state FROM backtest_artifact_requests")[0]["state"] == "error"
+    
+    
+    def test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs(dispatch, tmp_path):
+        import os
+        import re
+        from pathlib import Path
+    
+        import clickhouse_connect
+        import numpy as np
+    
+        from apps.scheduler.backtest_artifact_publisher.wiring.managed_app import compose_managed_app
+        from apps.scheduler.backtest_artifact_publisher.wiring.modules.backtest_artifact_publisher import (
+            FileBacktestArtifactPublisherHostLock,
+        )
+        from tests.unit.contexts.backtest.application.services.v2 import (
+            test_prepare_pools_service as prep,
+        )
+        from tests.unit.contexts.backtest_artifacts.test_automatic_base import DURATIONS
+        from tests.unit.contexts.backtest_artifacts.test_derivative_profiles import (
+            IndicatorsComputeNumbaConfig,
+            NumbaIndicatorCompute,
+            n,
+            snapshot_for,
+        )
+        from trading.contexts.backtest.application.dto.input_recipe import BacktestInputRecipe
+        from trading.contexts.backtest_artifacts.adapters.outbound.persistence.clickhouse.stored_coordinates import (
+            ClickHouseStoredArtifactCoordinates,
+        )
+        from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+            ArtifactRequestedRow,
+        )
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_index_reader import (
+            ClickHouseCanonicalCandleIndexReader,
+        )
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_reader import (
+            ClickHouseCanonicalCandleReader,
+        )
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
+            ClickHouseConnectGateway,
+        )
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (
+            ClickHouseRawKlineWriter,
+        )
+        from trading.contexts.market_data.application.services.stored_candle_signal import (
+            StoredCandleSignalWriter,
+        )
+    
+        port = os.environ.get("ROEHUB_BASE_TEST_CLICKHOUSE_PORT")
+        if not port:
+            pytest.skip("explicit disposable ClickHouse required")
+        m = dispatch
+        client = clickhouse_connect.get_client(host="127.0.0.1", port=int(port))
+        db = "s09_" + uuid4().hex
+        try:
+            ddl = (
+                Path("migrations/clickhouse/market_data_ddl.sql").read_text().replace("market_data", db)
+            )
+            ddl = re.sub(r"/\*.*?\*/", "", ddl, flags=re.S)
+            ddl = re.sub(r"--[^\n]*", "", ddl)
+            for statement in ddl.split(";"):
+                if statement.strip() and not statement.strip().startswith("USE "):
+                    client.command(statement)
+            gateway = ClickHouseConnectGateway(client)
+            f, w = worker(m, tmp_path)
+            defaults = n.YamlBacktestGridDefaultsProvider.from_yaml(
+                config_path=Path("configs/dev/indicators.yaml")
+            )
+            runner = replace(
+                w.publisher.runner,
+                canonical_candle_reader=ClickHouseCanonicalCandleReader(gateway, db),
+                indicator_grid_builder=n._signal_grid_builder_v2(),
+                defaults_provider=defaults,
+                signal_rules_engine=n.BacktestSignalRulesEngineV2(defaults_provider=defaults),
+                indicator_compute=NumbaIndicatorCompute(
+>                   defs=n.all_defs(),
+                    config=IndicatorsComputeNumbaConfig(
+                        numba_num_threads=1, numba_cache_dir=tmp_path / "jit"
+                    ),
+                ),
+            )
+E           AssertionError: assert 'materialized' in ('generated', 'generated')
+E            +  where ('generated', 'generated') = BacktestPreparedArtifactSet(snapshot=ArtifactCandleSnapshot(coordinates=ArtifactCoordinatesV2(exchange='binance', mark...s=(1,), risk_values=())), provenance=('generated', 'generated'), schema_version=1, manifest_kind='job_prepared_inputs').provenance
+
+tests/real_infra/backtest/test_artifact_integrated.py:191: AssertionError
+=========================== short test summary info ============================
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs
+1 failed, 3 deselected in 12.85s

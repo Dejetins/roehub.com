@@ -2468,7 +2468,9 @@ units вместо выдуманного процента. Последняя �
 
 Privileged `/api/v1/admin/organizations/{organization_id}/backtest-artifacts/storage`
 использует отдельную installation-owner проверку и authenticated control-agent;
-org owner/admin недостаточно. Мутации требуют recent auth. Аддитивная миграция
+org owner/admin недостаточно. По решению владельца от 2026-10-09 мутации хранилища
+не требуют повторного входа (`recent auth`); действующая сессия, права владельца
+установки и проверка Origin остаются обязательными. Аддитивная миграция
 0031 сохраняет replay responses/short-lived validation и cleanup previews без
 изменения 0028 slot/pin protocol. Roots приходят из installation config registry;
 публичный storage ответ содержит только safe label/readiness. First-empty setup,

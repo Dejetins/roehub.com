@@ -1,0 +1,70 @@
+FFF                                                                      [100%]
+=================================== FAILURES ===================================
+________________ test_profile_edit_waits_for_future_occurrence _________________
+
+dispatch = {'actor': UUID('a770af6f-a194-454f-bb14-c6030981d6c8'), 'admin': UUID('cb50d684-c8cb-4d5b-ae46-af6588978a7f'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x11c88c3e0>, ...}
+
+    def test_profile_edit_waits_for_future_occurrence(dispatch):
+        m = dispatch
+        r = m['repo']
+        p = item(m, profile=profile(m['catalog'], tp=(), sl=()))
+        r.observe_source(installation_id=m['installation'], coordinate=p.coordinate,
+                         source=p.source, observed_at=NOW)
+        service = ArtifactHttpService(r, m['installation'])
+        def edit(version, selected, key):
+            return service.submit(m['org'], m['actor'], key, Command(items=(CommandItem(
+                coordinate=p.coordinate, expected_version=version,
+                patch=PolicyPatch(profile=selected)),)), 'policy')
+        first = edit(0, p.profile, 'enable-precompute')
+        assert first.items[0].request_id is not None
+        assert r.tick(installation=m['installation'], now=NOW) == 1
+        count = len(r.rows('SELECT * FROM backtest_artifact_requests'))
+        changed = p.profile.model_copy(update={'revision': 2, 'indicators': ()})
+        second = edit(1, changed, 'edit-profile')
+>       assert second.items[0].request_id is None
+E       AssertionError: assert UUID('91f43bc1-988c-4010-8c44-95eed5075342') is None
+E        +  where UUID('91f43bc1-988c-4010-8c44-95eed5075342') = CommandOutcome(coordinate=Coordinate(exchange='binance', market_type='spot', symbol='BTCUSDT'), request_id=UUID('91f43bc1-988c-4010-8c44-95eed5075342'), state='queued', outcome='submitted', control_version=2).request_id
+
+tests/real_infra/backtest/test_artifact_integrated.py:37: AssertionError
+_______________ test_live_budget_reduction_counts_existing_files _______________
+
+dispatch = {'actor': UUID('71defdd0-ba52-4664-8ec7-5bedfb8957bf'), 'admin': UUID('fdba034a-7021-45d7-a705-1064e8f1e360'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x11c9fd1c0>, ...}
+tmp_path = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-366/test_live_budget_reduction_cou0')
+
+    def test_live_budget_reduction_counts_existing_files(dispatch, tmp_path):
+        m = dispatch
+        f, w = worker(m, tmp_path)
+        # A sparse disposable file represents retained artifact bytes without allocating payload.
+        ballast = f.builder.root / 'retained.npy'
+        with ballast.open('wb') as stream:
+            stream.truncate(100_000_000)
+        m['db'].execute(query='UPDATE backtest_artifact_installation_settings SET budget_bytes=1150000000', parameters={})
+        submit(m, (item(m),))
+>       assert w.run_once(m['installation']) is None
+E       AssertionError: assert BasePublication(state='waiting_for_source', source_sha256='e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b785...': 'waiting_for_source', 'closed_bars': 0}, '3d': {'state': 'waiting_for_source', 'closed_bars': 0}}, publication=None) is None
+E        +  where BasePublication(state='waiting_for_source', source_sha256='e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b785...': 'waiting_for_source', 'closed_bars': 0}, '3d': {'state': 'waiting_for_source', 'closed_bars': 0}}, publication=None) = run_once(UUID('58b0f16a-d67b-43de-b97c-146bc0391135'))
+E        +    where run_once = ManagedArtifactWorker(repository=<trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.dispatch_...root_revision=1, budget_bytes=10737418240, max_entries=100000), now=<function worker.<locals>.<lambda> at 0x11c9e7b00>).run_once
+
+tests/real_infra/backtest/test_artifact_integrated.py:53: AssertionError
+____________________ test_retry_rechecks_revoked_membership ____________________
+
+dispatch = {'actor': UUID('daf42974-cb10-4ef9-ba99-c71f4555c858'), 'admin': UUID('e1c2d1cb-f1c2-44f1-a854-855ff81f50b6'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x11ca1c440>, ...}
+tmp_path = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-366/test_retry_rechecks_revoked_me0')
+
+    def test_retry_rechecks_revoked_membership(dispatch, tmp_path):
+        m = dispatch
+        p = item(m)
+        submit(m, (p,))
+        r = m['repo']
+        request = r.next_request(m['installation'])
+        build = r.claim_group(installation=m['installation'], request=request,
+                              owner=uuid4(), incarnation=uuid4(), reservation=4096)
+>       r.finish(build=build, outcome='retry_wait', reason='transient_io', next_retry_at=NOW)
+E       TypeError: PostgresArtifactManagementRepository.finish() got an unexpected keyword argument 'next_retry_at'
+
+tests/real_infra/backtest/test_artifact_integrated.py:66: TypeError
+=========================== short test summary info ============================
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_profile_edit_waits_for_future_occurrence
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_live_budget_reduction_counts_existing_files
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_retry_rechecks_revoked_membership
+3 failed in 1.98s

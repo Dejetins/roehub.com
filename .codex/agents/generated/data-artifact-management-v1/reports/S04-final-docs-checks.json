@@ -1,0 +1,31 @@
+[
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_docs_index",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "OK: /Users/daniildegtyarev/Projects/roehub.com/docs/architecture/README.md is up-to-date.\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_project_map"
+    ],
+    "exit_code": 0,
+    "output": "OK: project map generated (5 artifacts)\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_project_map",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "OK: project map up-to-date (5 artifacts)\n"
+  }
+]

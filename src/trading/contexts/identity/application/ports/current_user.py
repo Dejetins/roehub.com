@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Protocol
+from uuid import UUID
 
 from trading.shared_kernel.primitives import PaidLevel, UserId
 
@@ -24,6 +25,7 @@ class CurrentUserPrincipal:
     user_id: UserId
     paid_level: PaidLevel
     session_created_at: datetime | None = None
+    session_id: UUID | None = field(default=None, repr=False, compare=False)  # Never serialize.
 
 
 class CurrentUserUnauthorizedError(ValueError):

@@ -1,0 +1,54 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_ test_clickhouse_pressure_keeps_artifact_attempt_retryable[202-storage_concurrency_pressure] _
+
+dispatch = {'actor': UUID('18bac997-74a4-4210-a31c-42785ef08aa0'), 'admin': UUID('3b27423e-a6f6-42de-b0e9-ff5ec7b253d8'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x11b273140>, ...}
+tmp_path = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-420/test_clickhouse_pressure_keeps0')
+code = 202, reason = 'storage_concurrency_pressure'
+
+    @pytest.mark.parametrize('code,reason', [(202,'storage_concurrency_pressure'),
+                                           (241,'storage_memory_pressure')])
+    def test_clickhouse_pressure_keeps_artifact_attempt_retryable(dispatch, tmp_path, code, reason):
+        """Real PG lifecycle, adapter-classified failure before publication; no source absence."""
+        from clickhouse_connect.driver.exceptions import DatabaseError
+        from tests.unit.contexts.backtest_artifacts.test_automatic_base import Source
+        m=dispatch
+        submit(m,(item(m),))
+        _,w=worker(m,tmp_path)
+        class Pressure(Source):
+            def read_1m_arrays(self, instrument_id, time_range):
+                raise DatabaseError(f'Code: {code}. synthetic admission refusal')
+        runner=replace(w.publisher.runner,canonical_candle_reader=Pressure(180))
+        failing=replace(w,publisher=replace(w.publisher,runner=runner))
+>       with pytest.raises(DatabaseError):
+E       Failed: DID NOT RAISE <class 'clickhouse_connect.driver.exceptions.DatabaseError'>
+
+tests/real_infra/backtest/test_artifact_integrated.py:546: Failed
+_ test_clickhouse_pressure_keeps_artifact_attempt_retryable[241-storage_memory_pressure] _
+
+dispatch = {'actor': UUID('68c096d7-7091-4e67-9011-06a70d6d3fb5'), 'admin': UUID('6c909dbd-9509-426e-baa1-7c463bbb2fc0'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x11b297710>, ...}
+tmp_path = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-420/test_clickhouse_pressure_keeps1')
+code = 241, reason = 'storage_memory_pressure'
+
+    @pytest.mark.parametrize('code,reason', [(202,'storage_concurrency_pressure'),
+                                           (241,'storage_memory_pressure')])
+    def test_clickhouse_pressure_keeps_artifact_attempt_retryable(dispatch, tmp_path, code, reason):
+        """Real PG lifecycle, adapter-classified failure before publication; no source absence."""
+        from clickhouse_connect.driver.exceptions import DatabaseError
+        from tests.unit.contexts.backtest_artifacts.test_automatic_base import Source
+        m=dispatch
+        submit(m,(item(m),))
+        _,w=worker(m,tmp_path)
+        class Pressure(Source):
+            def read_1m_arrays(self, instrument_id, time_range):
+                raise DatabaseError(f'Code: {code}. synthetic admission refusal')
+        runner=replace(w.publisher.runner,canonical_candle_reader=Pressure(180))
+        failing=replace(w,publisher=replace(w.publisher,runner=runner))
+>       with pytest.raises(DatabaseError):
+E       Failed: DID NOT RAISE <class 'clickhouse_connect.driver.exceptions.DatabaseError'>
+
+tests/real_infra/backtest/test_artifact_integrated.py:546: Failed
+=========================== short test summary info ============================
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_clickhouse_pressure_keeps_artifact_attempt_retryable[202-storage_concurrency_pressure]
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_clickhouse_pressure_keeps_artifact_attempt_retryable[241-storage_memory_pressure]
+2 failed, 6 deselected in 1.73s

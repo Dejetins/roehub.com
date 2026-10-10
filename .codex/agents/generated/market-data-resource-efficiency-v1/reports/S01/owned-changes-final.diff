@@ -1,0 +1,860 @@
+--- pre-S01/src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py
++++ src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py
+@@ -18,11 +18,32 @@
+ from trading.contexts.market_data.application.ports.stores.canonical_candle_index_reader import (
+     CanonicalCandleIndexReader,
+ )
+-from trading.shared_kernel.primitives import InstrumentId, TimeRange, UtcTimestamp
++from trading.shared_kernel.primitives import InstrumentId, UtcTimestamp
++
++
++@dataclass(frozen=True)
++class StoredSourceObservation:
++    """One indexed coordinate, with actual minute bounds at a fixed exclusive cutoff.
++
++    Empty bounds are legitimate for future-only/empty index states. Keep such rows
++    in the page so keyset traversal always advances. Absence markers are excluded.
++    """
++
++    instrument: InstrumentId
++    first: UtcTimestamp | None
++    last: UtcTimestamp | None
+ 
+ 
+ class StoredCoordinates(Protocol):
+     def page(self, *, after: tuple[int, str] | None, limit: int) -> Sequence[InstrumentId]: ...
++
++    def observation_page(
++        self, *, after: tuple[int, str] | None, limit: int, before: UtcTimestamp,
++    ) -> Sequence[StoredSourceObservation]: ...
++
++    def observation(
++        self, *, instrument: InstrumentId, before: UtcTimestamp,
++    ) -> StoredSourceObservation: ...
+ 
+ 
+ class BaseObligations(Protocol):
+@@ -39,24 +60,27 @@
+ @dataclass(frozen=True)
+ class BaseSourceReconciler:
+     installation_id: UUID
++    # Retained constructor dependency for existing composition callers; sweep/hints
++    # use the consumer-owned batched source port, never this canonical reader.
+     index: CanonicalCandleIndexReader
+     stored: StoredCoordinates
+     obligations: BaseObligations
+ 
+     def observe(self, instrument: InstrumentId, *, now: datetime) -> UUID | None:
+-        if now.tzinfo is None:
++        before = self._closed_cutoff(now)
++        row = self.stored.observation(instrument=instrument, before=before)
++        return self._observe(row, now=now)
++
++    @staticmethod
++    def _closed_cutoff(now: datetime) -> UtcTimestamp:
++        if now.tzinfo is None or now.utcoffset() is None:
+             raise ValueError("utc_required")
+-        closed = now.astimezone(UTC).replace(second=0, microsecond=0)
+-        first, last = self.index.bounds_1m(instrument_id=instrument, before=UtcTimestamp(closed))
++        return UtcTimestamp(now.astimezone(UTC).replace(second=0, microsecond=0))
++
++    def _observe(self, row: StoredSourceObservation, *, now: datetime) -> UUID | None:
++        instrument, first, last = row.instrument, row.first, row.last
+         if first is None or last is None:
+-            return None  # Hint before canonical visibility; next bounded sweep heals it.
+-        # Aggregate adapters may return an epoch default for an empty ClickHouse group.
+-        # Verify only the first minute, never enumerate the entire source here.
+-        if not self.index.distinct_ts_opens(
+-            instrument_id=instrument,
+-            time_range=TimeRange(first, UtcTimestamp(first.value + timedelta(minutes=1))),
+-        ):
+-            return None
++            return None  # Missing index visibility: bounded verification repairs it.
+         coordinates = artifact_coordinates_from_market_id_v2(
+             market_id=instrument.market_id.value, symbol=str(instrument.symbol)
+         )
+@@ -83,11 +107,12 @@
+     ) -> tuple[int, str] | None:
+         if not 1 <= limit <= 50:
+             raise ValueError("invalid_reconciliation_limit")
+-        rows = self.stored.page(after=after, limit=limit)
++        before = self._closed_cutoff(now)
++        rows = self.stored.observation_page(after=after, limit=limit, before=before)
+         if len(rows) > limit:
+             raise ValueError("unbounded_source_page")
+-        for instrument in rows:
+-            self.observe(instrument, now=now)
++        for row in rows:
++            self._observe(row, now=now)
+         if len(rows) < limit:
+             return None
+-        return rows[-1].market_id.value, str(rows[-1].symbol)
++        return rows[-1].instrument.market_id.value, str(rows[-1].instrument.symbol)
+--- pre-S01/src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py
++++ src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py
+@@ -1,17 +1,27 @@
+-"""Keyset discovery over stored canonical data, never the exchange reference catalog."""
++"""Bounded keyset observations from the rebuildable actual-minute bitmap index.
++
++No canonical-scan fallback: unavailable index queries fail visibly; missing states
++require the existing bounded history verifier. Administrative deletes require rebuild.
++"""
+ 
+ from __future__ import annotations
+ 
+ import re
+ from dataclasses import dataclass
++from datetime import UTC, datetime
++from math import ceil
++from typing import Any, Mapping
+ 
++from trading.contexts.backtest_artifacts.application.services.base_source_reconciliation import (
++    StoredSourceObservation,
++)
+ from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+     SUPPORTED_ARTIFACT_MARKETS_BY_ID_V2,
+ )
+ from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
+     ClickHouseGateway,
+ )
+-from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol
++from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, UtcTimestamp
+ 
+ 
+ @dataclass(frozen=True)
+@@ -24,22 +34,76 @@
+             raise ValueError("invalid_database")
+ 
+     def page(self, *, after: tuple[int, str] | None, limit: int = 50):
++        """Compatibility coordinate-only view; normal reconciliation uses observation_page."""
++        self._validate_limit(limit)
++        market, symbol = after or (0, "")
++        rows = self.gateway.select(
++            f"""SELECT market_id,symbol FROM {self.database}.canonical_candles_1m_stats
++            WHERE (market_id,symbol) > (%(market)s,%(symbol)s)
++            AND market_id IN %(markets)s
++            GROUP BY market_id,symbol ORDER BY market_id,symbol LIMIT %(limit)s
++            SETTINGS max_threads=1, max_execution_time=10, max_memory_usage=134217728""",
++            dict(market=market, symbol=symbol, limit=limit,
++                 markets=tuple(SUPPORTED_ARTIFACT_MARKETS_BY_ID_V2)),
++        )
++        return tuple(self._instrument(row) for row in rows)
++
++    def observation_page(
++        self, *, after: tuple[int, str] | None, before: UtcTimestamp, limit: int = 50,
++    ) -> tuple[StoredSourceObservation, ...]:
++        self._validate_limit(limit)
++        market, symbol = after or (0, "")
++        return self._read(
++            predicate="(market_id,symbol) > (%(market)s,%(symbol)s)",
++            parameters=dict(market=market, symbol=symbol), before=before, limit=limit,
++        )
++
++    def observation(
++        self, *, instrument: InstrumentId, before: UtcTimestamp,
++    ) -> StoredSourceObservation:
++        rows = self._read(
++            predicate="market_id=%(market)s AND symbol=%(symbol)s",
++            parameters=dict(market=instrument.market_id.value, symbol=str(instrument.symbol)),
++            before=before, limit=1,
++        )
++        return rows[0] if rows else StoredSourceObservation(instrument, None, None)
++
++    def _read(
++        self, *, predicate: str, parameters: Mapping[str, Any],
++        before: UtcTimestamp, limit: int,
++    ) -> tuple[StoredSourceObservation, ...]:
++        # Clip the exact merged keys, not aggregate max timestamps. ceil preserves
++        # ts_open < before when before falls inside a minute, including epoch zero.
++        rows = self.gateway.select(
++            f"""SELECT market_id,symbol,
++                if(bitmapCardinality(minutes)=0,NULL,bitmapMin(minutes)) AS first_minute,
++                if(bitmapCardinality(minutes)=0,NULL,bitmapMax(minutes)) AS last_minute
++            FROM (
++                SELECT market_id,symbol,
++                    bitmapSubsetInRange(groupBitmapMergeState(minute_bitmap_state),
++                        toUInt32(0),toUInt32(%(before_minute)s)) AS minutes
++                FROM {self.database}.canonical_candles_1m_stats
++                WHERE {predicate} AND market_id IN %(markets)s
++                GROUP BY market_id,symbol ORDER BY market_id,symbol LIMIT %(limit)s
++            ) ORDER BY market_id,symbol
++            SETTINGS max_threads=1, max_execution_time=10, max_memory_usage=134217728""",
++            {**parameters, "before_minute": max(0, ceil(before.value.timestamp()/60)),
++             "limit": limit, "markets": tuple(SUPPORTED_ARTIFACT_MARKETS_BY_ID_V2)},
++        )
++        return tuple(StoredSourceObservation(
++            self._instrument(row), self._timestamp(row["first_minute"]),
++            self._timestamp(row["last_minute"]),
++        ) for row in rows)
++
++    @staticmethod
++    def _validate_limit(limit: int) -> None:
+         if not 1 <= limit <= 50:
+             raise ValueError("invalid_reconciliation_limit")
+-        market, symbol = after or (0, "")
+-        rows = self.gateway.select(
+-            f"""SELECT DISTINCT market_id,symbol FROM {self.database}.canonical_candles_1m
+-            WHERE (market_id,symbol) > (%(market)s,%(symbol)s)
+-            AND market_id IN %(markets)s
+-            ORDER BY market_id,symbol LIMIT %(limit)s""",
+-            {
+-                "market": market,
+-                "symbol": symbol,
+-                "limit": limit,
+-                "markets": tuple(SUPPORTED_ARTIFACT_MARKETS_BY_ID_V2),
+-            },
+-        )
+-        return tuple(
+-            InstrumentId(MarketId(int(row["market_id"])), Symbol(str(row["symbol"])))
+-            for row in rows
+-        )
++
++    @staticmethod
++    def _instrument(row: Mapping[str, Any]) -> InstrumentId:
++        return InstrumentId(MarketId(int(row["market_id"])), Symbol(str(row["symbol"])))
++
++    @staticmethod
++    def _timestamp(minute: Any) -> UtcTimestamp | None:
++        return None if minute is None else UtcTimestamp(datetime.fromtimestamp(int(minute)*60, UTC))
+--- pre-S01/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py
++++ src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py
+@@ -47,8 +47,8 @@
+         """
+         q = f"""
+         SELECT
+-            min(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,
+-            max(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
++            minOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,
++            maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
+         FROM {self._table()}
+         WHERE market_id = %(market_id)s
+           AND symbol = %(symbol)s
+@@ -93,8 +93,8 @@
+         """
+         q = f"""
+         SELECT
+-            min(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,
+-            max(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
++            minOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,
++            maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
+         FROM {self._table()}
+         WHERE market_id = %(market_id)s
+           AND symbol = %(symbol)s
+@@ -151,7 +151,7 @@
+         )
+         q = f"""
+         SELECT
+-            max(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
++            maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key
+         FROM {self._table()}
+         WHERE market_id = %(market_id)s
+           AND symbol = %(symbol)s
+--- pre-S01/tools/qa/market_data_resource_comparison.py
++++ tools/qa/market_data_resource_comparison.py
+@@ -0,0 +1,293 @@
++"""Bounded finite source-sweep replay on a disposable ClickHouse database.
++
++Uses current CH_* configuration; never mutates its configured application database.
++The baseline is a preserved dirty-source snapshot, not HEAD. Query IDs, aggregate
++metrics and hashes are retained; SQL, credentials and provider payloads are not.
++"""
++
++from __future__ import annotations
++
++import argparse
++import hashlib
++import importlib.util
++import json
++import os
++import platform
++import resource
++import sys
++import time
++from datetime import UTC, datetime
++from pathlib import Path
++from uuid import UUID, uuid4
++
++from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
++
++MODULES = {
++    "reconciler": (
++        "src/trading/contexts/backtest_artifacts/application/services/"
++        "base_source_reconciliation.py",
++        "BaseSourceReconciler",
++    ),
++    "stored": (
++        "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/"
++        "clickhouse/stored_coordinates.py",
++        "ClickHouseStoredArtifactCoordinates",
++    ),
++    "index": (
++        "src/trading/contexts/market_data/adapters/outbound/persistence/"
++        "clickhouse/canonical_candle_index_reader.py",
++        "ClickHouseCanonicalCandleIndexReader",
++    ),
++}
++CUTOFF = datetime(2026, 1, 3, tzinfo=UTC)
++BASE_MINUTE = 29453760  # 2026-01-01 UTC
++
++
++def classes(root, label):
++    result, hashes = {}, {}
++    for name, (relative, symbol) in MODULES.items():
++        path = root / relative
++        hashes[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
++        spec = importlib.util.spec_from_file_location(f"replay_{label}_{name}", path)
++        assert spec is not None and spec.loader is not None
++        module = importlib.util.module_from_spec(spec)
++        sys.modules[spec.name] = module
++        spec.loader.exec_module(module)
++        result[name] = getattr(module, symbol)
++    return result, hashes
++
++
++class MeasuredGateway:
++    def __init__(self, client, tag):
++        self.client, self.tag = client, tag
++        self.ids = []
++
++    def select(self, query, parameters):
++        result = self.client.query(query, parameters=parameters, settings={"log_comment": self.tag})
++        self.ids.append(result.query_id)
++        return list(result.named_results())
++
++
++class Observations:
++    def __init__(self):
++        self.rows = []
++
++    def observe_source(self, *, coordinate, source, **kwargs):
++        self.rows.append(
++            (
++                coordinate.exchange,
++                coordinate.market_type,
++                coordinate.symbol,
++                source.history.start_utc.isoformat(),
++                source.history.end_utc.isoformat(),
++            )
++        )
++
++
++def memory(client):
++    return dict(
++        client.query(
++            "SELECT metric,value FROM system.asynchronous_metrics WHERE metric IN "
++            "('jemalloc.allocated','MemoryResident')"
++        ).result_rows
++    )
++
++
++def sweep(client, db, impl, label, page_delay=0):
++    tag = "resource_s01_" + uuid4().hex
++    gateway, sink = MeasuredGateway(client, tag), Observations()
++    service = impl["reconciler"](
++        UUID(int=1), impl["index"](gateway, db), impl["stored"](gateway, db), sink
++    )
++    start_memory = memory(client)
++    start, cpu = time.perf_counter(), time.process_time()
++    cursor, pages = None, 0
++    while True:
++        cursor = service.reconcile_page(after=cursor, now=CUTOFF, limit=50)
++        pages += 1
++        if cursor is None:
++            break
++        if page_delay:
++            time.sleep(page_delay)
++        if pages > 100:
++            raise RuntimeError("unbounded_sweep")
++    elapsed, cpu_elapsed = time.perf_counter() - start, time.process_time() - cpu
++    end_memory = memory(client)
++    # Wait for configured ten-second query log flush; do not force live server flushes.
++    time.sleep(11)
++    stats = list(
++        client.query(
++            "SELECT count() AS queries,sum(read_rows) AS read_rows, "
++            "sum(read_bytes) AS read_bytes,max(memory_usage) AS max_query_memory, "
++            "sum(query_duration_ms) AS server_ms, "
++            "sum(ProfileEvents['UserTimeMicroseconds']) AS cpu_us, "
++            "sum(ProfileEvents['ReadBufferFromFileDescriptorReadBytes']) AS file_read_bytes, "
++            "countIf(has(tables,%(canonical)s)) AS canonical_queries "
++            "FROM system.query_log WHERE event_date>=today()-1 AND type='QueryFinish' "
++            "AND log_comment=%(tag)s",
++            parameters={"tag": tag, "canonical": db + ".canonical_candles_1m"},
++        ).named_results()
++    )[0]
++    if stats["queries"] != len(gateway.ids):
++        raise RuntimeError("incomplete_query_log")
++    return dict(
++        label=label,
++        pages=pages,
++        coordinates=len(sink.rows),
++        elapsed_s=elapsed,
++        client_cpu_s=cpu_elapsed,
++        client_maxrss=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
++        db_memory_before=start_memory,
++        db_memory_after=end_memory,
++        query_ids=gateway.ids,
++        observations_sha256=hashlib.sha256(json.dumps(sink.rows).encode()).hexdigest(),
++        **stats,
++    )
++
++
++def main():
++    parser = argparse.ArgumentParser(description=__doc__)
++    parser.add_argument("--baseline", type=Path, required=True)
++    parser.add_argument("--output", type=Path, required=True)
++    parser.add_argument("--mode", choices=["baseline", "compare", "index-only"], default="compare")
++    parser.add_argument("--coordinates", type=int, default=102)
++    parser.add_argument("--page-delay", type=float, default=0)
++    args = parser.parse_args()
++    if not 1 <= args.coordinates <= 1020:
++        raise ValueError("bounded_fixture_required")
++    base, base_hash = classes(args.baseline, "baseline")
++    candidate, candidate_hash = classes(Path.cwd(), "candidate")
++    client = _clickhouse_client(ClickHouseSettingsLoader(os.environ).load())
++    db = "resource_s01_" + uuid4().hex
++    record = dict(
++        schema_version="market-data-resource-comparison/v1",
++        stage="S01",
++        mode="finite-replay",
++        cache="warm; one complete sweep per implementation",
++        clock="fixed closed cutoff",
++        cutoff=CUTOFF.isoformat(),
++        coordinates=args.coordinates,
++        live_streams=4,
++        page_limit=50,
++        publisher_cadence_s=30,
++        cadence_simulation="finite replay with configured page delay",
++        measured_page_delay_s=args.page_delay,
++        baseline=base_hash,
++        candidate=candidate_hash,
++        python=platform.python_version(),
++        hardware=platform.platform(),
++        db_version=client.query("SELECT version()").first_item,
++        runs=[],
++        failures=[],
++    )
++    client.command(f"CREATE DATABASE {db}")
++    try:
++        client.command(
++            f"CREATE TABLE {db}.canonical_candles_1m (market_id UInt16, symbol String, "
++            "ts_open DateTime64(3,'UTC')) ENGINE=MergeTree ORDER BY (market_id,symbol,ts_open)"
++        )
++        client.command(
++            f"CREATE TABLE {db}.canonical_candles_1m_stats (market_id UInt16,symbol String, "
++            "rows_state AggregateFunction(sum,UInt64), "
++            "first_ts_state AggregateFunction(min,DateTime64(3,'UTC')), "
++            "last_ts_state AggregateFunction(max,DateTime64(3,'UTC')), "
++            "minute_bitmap_state AggregateFunction(groupBitmap,UInt32)) "
++            "ENGINE=AggregatingMergeTree ORDER BY (market_id,symbol)"
++        )
++        client.command(f"SYSTEM STOP MERGES {db}.canonical_candles_1m")
++        client.command(f"SYSTEM STOP MERGES {db}.canonical_candles_1m_stats")
++        record["fixture_merges"] = "disabled only on disposable fixture tables"
++        record["settings"] = {
++            str(row[0]): str(row[1])
++            for row in client.query(
++                "SELECT name,value FROM system.settings WHERE name IN "
++                "('max_threads','max_memory_usage','use_query_condition_cache')"
++            ).result_rows
++        }
++        # Four contiguous streams, remaining histories sparse; duplicate state inserts below.
++        seed = (
++            f"INSERT INTO {db}.canonical_candles_1m SELECT toUInt16(1), "
++            "concat('S',leftPad(toString(intDiv(number,2880)),4,'0'),'USDT'), "
++            f"toDateTime64(({BASE_MINUTE}+number%2880)*60,3,'UTC') "
++            f"FROM numbers({args.coordinates*2880}) "
++            "WHERE intDiv(number,2880)<4 OR number%7!=0"
++        )
++        record["fixture_sha256"] = hashlib.sha256(seed.replace(db, "FIXTURE").encode()).hexdigest()
++        client.command(seed)
++        index_sql = (
++            f"INSERT INTO {db}.canonical_candles_1m_stats SELECT market_id,symbol, "
++            "sumState(toUInt64(1)),minState(ts_open),maxState(ts_open), "
++            "groupBitmapState(toUInt32(intDiv(toUnixTimestamp(ts_open),60))) "
++            f"FROM {db}.canonical_candles_1m GROUP BY market_id,symbol"
++        )
++        client.command(index_sql)
++        client.command(index_sql)
++        record["fixture_rows"] = client.query(
++            f"SELECT count() FROM {db}.canonical_candles_1m"
++        ).first_item
++        if args.mode == "index-only":
++            # Preserve the same bitmap semantics, then make canonical fallback impossible.
++            client.command(f"DROP TABLE {db}.canonical_candles_1m")
++            record["canonical_table"] = "absent during all measured index-only reads"
++            record["warmups"] = [sweep(client, db, candidate, "candidate_warmup")]
++        else:
++            record["warmups"] = [sweep(client, db, base, "baseline_warmup", args.page_delay)]
++        if args.mode == "compare":
++            record["warmups"].append(
++                sweep(client, db, candidate, "candidate_warmup", args.page_delay)
++            )
++        for repetition in range(3):
++            order = (
++                [("candidate", candidate)]
++                if args.mode == "index-only"
++                else [("baseline", base)]
++                if args.mode == "baseline"
++                else (
++                    [("baseline", base), ("candidate", candidate)]
++                    if repetition % 2 == 0
++                    else [("candidate", candidate), ("baseline", base)]
++                )
++            )
++            for label, impl in order:
++                run = sweep(client, db, impl, label, args.page_delay)
++                run["repetition"] = repetition + 1
++                record["runs"].append(run)
++        assert len({r["observations_sha256"] for r in record["runs"]}) == 1
++        expected = []
++        for coordinate in range(args.coordinates):
++            minutes = [
++                minute
++                for minute in range(2880)
++                if coordinate < 4 or (coordinate * 2880 + minute) % 7 != 0
++            ]
++            expected.append(
++                (
++                    "binance",
++                    "spot",
++                    f"S{coordinate:04d}USDT",
++                    datetime.fromtimestamp((BASE_MINUTE + minutes[0]) * 60, UTC).isoformat(),
++                    datetime.fromtimestamp((BASE_MINUTE + minutes[-1] + 1) * 60, UTC).isoformat(),
++                )
++            )
++        record["expected_observations_sha256"] = hashlib.sha256(
++            json.dumps(expected).encode()
++        ).hexdigest()
++        assert all(
++            r["observations_sha256"] == record["expected_observations_sha256"]
++            for r in record["runs"]
++        )
++        assert all(r["coordinates"] == args.coordinates for r in record["runs"])
++    except Exception as error:
++        record["failures"].append(type(error).__name__)
++        raise
++    finally:
++        client.command(f"DROP DATABASE {db}")
++        client.close()
++        args.output.parent.mkdir(parents=True, exist_ok=True)
++        with args.output.open("x") as f:
++            json.dump(record, f, indent=2, default=str)
++            f.write("\n")
++
++
++if __name__ == "__main__":
++    main()
+--- pre-S01/tests/unit/contexts/backtest_artifacts/test_automatic_base.py
++++ tests/unit/contexts/backtest_artifacts/test_automatic_base.py
+@@ -357,3 +357,40 @@
+     (root / "link").symlink_to(tmp_path / "elsewhere")
+     with pytest.raises(ManagementError, match="untrusted_root"):
+         check({"root_id": "primary", "root_revision": 1}, 1)
++
++
++def test_reconciliation_consumes_batched_bounds_without_fanout_and_keeps_empty_cursor():
++    from types import SimpleNamespace
++    from uuid import uuid4
++
++    from trading.contexts.backtest_artifacts.application.services.base_source_reconciliation import (  # noqa: E501
++        BaseSourceReconciler,
++        StoredSourceObservation,
++    )
++    from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol
++
++    observed, cutoffs = [], []
++    instrument = InstrumentId(MarketId(1), Symbol('BTCUSDT'))
++    row = StoredSourceObservation(instrument, UtcTimestamp(START), UtcTimestamp(START))
++
++    def page(**kw):
++        cutoffs.append(kw['before'])
++        return (row,)
++
++    def forbidden(*args, **kwargs):
++        raise AssertionError('canonical fanout forbidden')
++
++    reconciler = BaseSourceReconciler(
++        uuid4(), cast(Any, SimpleNamespace(bounds_1m=forbidden,distinct_ts_opens=forbidden)),
++        cast(Any, SimpleNamespace(observation_page=page,observation=lambda **kw: row)),
++        cast(Any, SimpleNamespace(observe_source=lambda **kw: observed.append(kw))),
++    )
++    now = START + timedelta(minutes=2,seconds=17)
++    assert reconciler.reconcile_page(after=None, now=now,limit=1) == (1,'BTCUSDT')
++    assert cutoffs == [UtcTimestamp(START+timedelta(minutes=2))]
++    assert observed[0]['source'].history.end_utc == START+timedelta(minutes=1)
++    row = StoredSourceObservation(instrument,None,None)
++    assert reconciler.reconcile_page(after=None, now=now,limit=1) == (1,'BTCUSDT')
++    assert len(observed)==1
++    with pytest.raises(ValueError, match='utc_required'):
++        reconciler.reconcile_page(after=None,now=now.replace(tzinfo=None))
+--- pre-S01/tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py
++++ tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py
+@@ -50,8 +50,8 @@
+     assert str(b[1]) == str(UtcTimestamp(dt2))
+ 
+     assert gw.last_query is not None
+-    assert "min(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
+-    assert "max(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
++    assert "minOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
++    assert "maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
+ 
+     assert gw.last_params is not None
+     assert int(gw.last_params["market_id"]) == 1
+@@ -80,7 +80,7 @@
+     assert str(out) == str(UtcTimestamp(dt))
+ 
+     assert gw.last_query is not None
+-    assert "max(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
++    assert "maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000))" in gw.last_query
+     assert "ts_open < fromUnixTimestamp64Milli(%(before_ms)s, 'UTC')" in gw.last_query
+ 
+     assert gw.last_params is not None
+--- pre-S01/tests/real_infra/market_data/test_full_history_clickhouse.py
++++ tests/real_infra/market_data/test_full_history_clickhouse.py
+@@ -228,3 +228,62 @@
+         market_id=1, symbol="ACTUSDT", before=first + timedelta(minutes=20),
+     ) == first + timedelta(minutes=5)
+     assert reader.latest(market_id=2, symbol="ACTUSDT", before=first) is None
++
++
++def test_artifact_observation_exact_cutoff_empty_epoch_duplicates_and_repair(history_db):
++    from trading.contexts.backtest_artifacts.adapters.outbound.persistence.clickhouse.stored_coordinates import (  # noqa: E501
++        ClickHouseStoredArtifactCoordinates,
++    )
++    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_index_reader import (  # noqa: E501
++        ClickHouseCanonicalCandleIndexReader,
++    )
++    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_range_verifier import (  # noqa: E501
++        ClickHouseHistoryRangeVerifier,
++    )
++
++    db = history_db
++    gateway = ClickHouseConnectGateway(db.client)
++    stored = ClickHouseStoredArtifactCoordinates(gateway, db.database)
++    canonical = ClickHouseCanonicalCandleIndexReader(gateway, db.database)
++    epoch = datetime(1970, 1, 1, tzinfo=UTC)
++    end = epoch + timedelta(minutes=10)
++    instrument = InstrumentId(MarketId(1), Symbol('ACTUSDT'))
++    assert canonical.bounds(instrument) is None
++    assert canonical.max_ts_open_lt(instrument_id=instrument, before=UtcTimestamp(end)) is None
++    assert canonical.bounds_1m(instrument_id=instrument, before=UtcTimestamp(end)) == (None, None)
++    assert stored.observation_page(after=None, before=UtcTimestamp(end)) == ()
++    db.client.insert(f'{db.database}.canonical_candles_1m',
++                     [(1, 'ACTUSDT', epoch + timedelta(minutes=x)) for x in (0, 1, 1, 5)],
++                     column_names=['market_id','symbol','ts_open'])
++    # Deliberately missing index remains absent; it never triggers a hidden canonical scan.
++    assert stored.observation_page(after=None, before=UtcTimestamp(end)) == ()
++    verifier = ClickHouseHistoryRangeVerifier(gateway, db.database)
++    verifier.confirm(instrument_id=instrument, time_range=TimeRange(UtcTimestamp(epoch),
++                     UtcTimestamp(end)), observed_minutes={0, 1, 5}, observed_at=end,
++                     accept_absence=True, check_lease=lambda: None)
++    db.insert([0, 1, 5])  # duplicate states, exact bitmap union remains stable
++    for seconds, expected in [(0, (None,None)), (1,(epoch,epoch)), (60,(epoch,epoch)),
++                              (61,(epoch,epoch+timedelta(minutes=1))),
++                              (600,(epoch,epoch+timedelta(minutes=5)))]:
++        before = UtcTimestamp(epoch+timedelta(seconds=seconds))
++        row = stored.observation(instrument=instrument, before=before)
++        actual = tuple(t.value if t is not None else None for t in (row.first,row.last))
++        assert actual == expected
++        assert (row.first,row.last) == canonical.bounds_1m(instrument_id=instrument,before=before)
++    # Absence-only coordinates and unrelated markets never become artifact source bounds.
++    db.client.command(f"INSERT INTO {db.database}.source_absent_candles_1m VALUES "
++                      "(1,'ABSUSDT',8,now64(3))")
++    db.insert([100], symbol='FUTUSDT')
++    page = stored.observation_page(after=None, before=UtcTimestamp(end), limit=1)
++    assert str(page[0].instrument.symbol) == 'ACTUSDT'
++    future = stored.observation_page(after=(1,'ACTUSDT'), before=UtcTimestamp(end), limit=1)
++    assert str(future[0].instrument.symbol) == 'FUTUSDT'
++    assert future[0].first is None and future[0].last is None
++    assert stored.observation_page(after=(1,'FUTUSDT'), before=UtcTimestamp(end), limit=1) == ()
++
++    from clickhouse_connect.driver.exceptions import DatabaseError
++
++    # Missing schema must fail visibly, not silently return empty/fall back to canonical.
++    db.client.command(f'DROP TABLE {db.database}.canonical_candles_1m_stats')
++    with pytest.raises(DatabaseError):
++        stored.observation_page(after=None, before=UtcTimestamp(end))
+--- pre-S01/tests/real_infra/backtest/test_automatic_base_lifecycle.py
++++ tests/real_infra/backtest/test_automatic_base_lifecycle.py
+@@ -49,13 +49,26 @@
+ @pytest.fixture
+ def source_db():
+     assert PORT is not None
+-    client = clickhouse_connect.get_client(host="127.0.0.1", port=int(PORT))
++    client = clickhouse_connect.get_client(
++        host=os.environ.get("CH_HOST", "127.0.0.1"), port=int(PORT),
++        username=os.environ.get("CH_USER", "default"), password=os.environ.get("CH_PASSWORD", ""),
++    )
+     db = "s03_" + uuid4().hex
+     client.command(f"CREATE DATABASE {db}")
+     client.command(f"""CREATE TABLE {db}.canonical_candles_1m (
+         market_id UInt16, symbol String, ts_open DateTime64(3,'UTC'), ts_close DateTime64(3,'UTC'),
+         open Float32, high Float32, low Float32, close Float32, volume_base Float32,
+         version UInt64) ENGINE=ReplacingMergeTree(version) ORDER BY (market_id,symbol,ts_open)""")
++    # Use the production aggregate/MV definition; writes must make the exact index visible.
++    from pathlib import Path
++
++    from apps.migrations.storage import split_clickhouse_sql
++
++    ddl = Path("migrations/clickhouse/market_data_ddl.sql").read_text()
++    start = ddl.index("CREATE TABLE IF NOT EXISTS market_data.canonical_candles_1m_stats")
++    end = ddl.index("/*", ddl.index("GROUP BY", start))
++    for statement in split_clickhouse_sql(ddl[start:end].replace("market_data.", f"{db}.")):
++        client.command(statement)
+     try:
+         yield client, db, ClickHouseConnectGateway(client)
+     finally:
+@@ -390,7 +403,10 @@
+     m = managed
+     repo = repository(m)
+     assert PORT is not None
+-    client = clickhouse_connect.get_client(host="127.0.0.1", port=int(PORT))
++    client = clickhouse_connect.get_client(
++        host=os.environ.get("CH_HOST", "127.0.0.1"), port=int(PORT),
++        username=os.environ.get("CH_USER", "default"), password=os.environ.get("CH_PASSWORD", ""),
++    )
+     db = "s03_raw_" + uuid4().hex
+     try:
+         ddl = (
+--- pre-S01/docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md
++++ docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md
+@@ -35,8 +35,29 @@
+ останавливают публикацию, сохраняя last-good. Derivatives не строятся в этом
+ base-only потоке. Source scan ограничен окнами 20 000 минут и диапазоном
+ 5 000 000 минут; превышение даёт `resource_conflict`, без усечения истории.
+-Post-commit REST/WS hook опционален в composition; bounded reconciliation
+-читает только реально сохранённые координаты. Активация и календарный dispatch
++Post-commit REST/WS hook опционален в composition; повторные координаты внутри
++committed batch объединяются, ошибка hint не повторяет успешную запись свечей.
++`StoredCoordinates.observation_page` возвращает максимум 50 упорядоченных координат
++и first/last реальных minute keys до одного exclusive cutoff страницы. Адаптер
++читает `canonical_candles_1m_stats`, объединяет bitmap states и обрезает bitmap
++до cutoff; raw row counter и aggregate max timestamp не определяют эти bounds.
++Нормальный sweep выполняет один запрос на страницу, без canonical scan и без
++двух запросов на каждую координату. Epoch zero — допустимая свеча; пустой bitmap
++даёт `None`, поэтому дополнительная проверка первой минуты не нужна.
++
++Hint через `observe` читает тот же индекс для одной координаты. Периодический
++sweep сохраняет PG cursor и прежнюю паузу 30 секунд между managed cycles;
++потерянный hint восстанавливается следующим проходом. Координата с пустым bitmap
++до cutoff всё равно продвигает cursor. Полный sweep зависит от размера индекса
++и числа страниц, а длительность cycle включает работу publisher.
++
++Индекс производный: отсутствующая таблица/ошибка чтения останавливает observation
++с обычным failed cycle, без скрытого canonical fallback. Потерянные состояния
++могут временно скрывать source; существующий bounded `ClickHouseHistoryRangeVerifier`
++восстанавливает ключи из canonical (максимум семь дней за вызов, обычные окна
++60/1440 минут). Source-absence markers не входят в artifact bounds. После
++административного удаления свечей необходим отдельный rebuild индекса; периодический
++sweep сам не доказывает отсутствие drift. Активация и календарный dispatch
+ остаются отдельным managed coordinator, существующее расписание не включается.
+ 
+ 
+--- pre-S01/docs/architecture/market_data/market-data-reference-api-v1.md
++++ docs/architecture/market_data/market-data-reference-api-v1.md
+@@ -240,6 +240,34 @@
+ source absences and can block again at legitimate trading halts. Rebuilding the
+ bitmap after administrative deletion remains a separate operator operation.
+ 
++### Artifact source observations (S01, 2026-10-10)
++
++The consumer-owned `StoredCoordinates` port in Backtest Artifacts adds
++`observation_page(after, limit, before)` and a single-coordinate `observation`.
++The adapter merges actual-minute bitmap states, then clips keys to the exclusive
++cutoff. Non-aligned cutoffs include an existing minute whose opening time is
++strictly earlier; publisher calls use the last closed-minute boundary. Empty
++bitmaps return null bounds, while epoch minute zero remains valid. Source absence
++records never supply first/last artifact candles. The canonical scalar reader
++also uses nullable aggregates for its documented empty-result semantics.
++
++Ordered pages contain at most 50 coordinates, including future-only/empty states
++so their cursor advances. The existing coordinate-only method remains available.
++Normal publisher reconciliation reads the index once per page with bounded query
++resources; it does not scan canonical history or perform per-coordinate probes.
++REST/WS post-commit hints retain batch coalescing and failure isolation. Optional
++hints and the periodic sweep observe the same index; neither repairs drift by
++itself. Missing index keys use the bounded verification/repair procedure above;
++unavailable queries propagate failure instead of reporting a successful empty
++sweep. No canonical fallback, schema migration or absence-policy change is added.
++
++Compatibility: supported internal composition callers retain their constructors
++and coordinate-only reads (`compatible-change` under the existing index lifecycle).
++Public API, artifact identity, candle payloads, persisted schemas and configuration
++are unchanged (`none`). Source obligations, policy dispatch and installation
++activation remain independent. Deploy updated reader/adapter/application files
++together; rollback restores the prior code without rewriting data or cursors.
++
+ ### 4) Unit tests
+ 
+ Add unit tests (no external services):
+--- pre-S01/docs/architecture/market_data/market-data-application-ports.md
++++ docs/architecture/market_data/market-data-application-ports.md
+@@ -152,3 +152,20 @@
+ Чтобы это было совместимо:
+ - canonical reader и live источник должны отдавать одинаковую модель данных (`Candle` + `CandleMeta`)
+   и согласованный ключ дедупа: `(InstrumentId, ts_open)`.
++
++
++## Artifact consumer observations (2026-10-10)
++
++Backtest Artifacts owns `StoredCoordinates` in its application reconciliation
++service. Its `StoredSourceObservation` contains an instrument and nullable first/last
++actual minute; `observation_page` is a bounded ordered keyset page at one exclusive
++cutoff. Empty observations retain coordinate traversal. `observation` serves the
++existing optional post-write hint. The ClickHouse composition adapter reads the
++Market Data exact bitmap; the application imports no concrete persistence adapter.
++The previous coordinate-only `page` and reconciler constructor remain supported.
++
++This does not replace the Market Data canonical index port used by ingestion:
++its scalar bounds still read canonical data, with null rather than epoch defaults
++for empty input. Existing bounded history verification owns index repair. Exchange
++absence markers are never candle observations. See the reference API's “Artifact
++source observations” and “Verified source availability and index repair” sections.
+--- pre-S01/docs/runbooks/navigator-local-market-data-recovery.md
++++ docs/runbooks/navigator-local-market-data-recovery.md
+@@ -459,3 +459,44 @@
+ are saved, but container recreation requires an image containing the changes.
+ The bounded checks do not establish long-duration availability or absence of all
+ future server-wide memory pressure. No release, commit or remote publication.
++
++
++## Indexed artifact source reconciliation — S01 (2026-10-10)
++
++The publisher source adapter now uses the existing actual-minute bitmap in pages
++of at most 50 coordinates. A sweep has one index SELECT per page and retains the
++30-second managed-cycle pause and persisted cursor. Single-coordinate hints use
++the same index; repeated batch coordinates coalesce and hint failure cannot retry
++a committed candle write. Existing managed worker entrypoints leave hints optional;
++periodic reconciliation is required even when no observer is supplied.
++
++A source absent from the index is not evidence that canonical history is empty.
++For a suspected stale/missing state, use the preceding bounded canonical verifier
++and current lease/receipt recovery procedure. Inspect actual keys and source absence
++separately, then verify the next sweep observes the repaired range. Missing tables,
++query errors or memory-limit failures must remain failed cycles; do not add an
++unbounded fallback or reset cursors/jobs. Administrative deletion still needs a
++separately scoped index rebuild. Ping/process health alone proves none of this.
++
++The finite comparison harness is `tools/qa/market_data_resource_comparison.py`.
++It requires existing `CH_*` credentials supplied privately and creates/removes only
++its unique `resource_s01_*` database. `--baseline` points to the preserved pre-change
++source snapshot, never Git HEAD; `--output` must name a new evidence file.
++Use `--coordinates 102 --page-delay 30` for a representative cadence comparison,
++and `--mode index-only --coordinates 1020` only after checking headroom. The latter
++removes its disposable canonical table before reading, verifies generated expected
++bounds and proves the scale path cannot fall back to canonical. It warms both paths,
++alternates three pairs, verifies identical observations and gathers tagged query-log
++counts/rows/bytes/memory/CPU/IO without storing SQL or credentials. Merges are paused
++only for the disposable fixture tables. Existing caches and server limits remain
++unchanged. Finite sweep timing includes the selected inter-page delay; it does not
++measure artifact publication, provider capacity or API latency. Shared server
++memory samples cannot be attributed exclusively to this workload.
++
++Upgrade the source observation service and adapter together in an image-bound
++managed bundle using the current installation lifecycle; do not use `docker cp`
++as delivery. Restore the previous bound image/config for rollback, preserving
++volumes, source cursor, requests and selections. No schema migration is required.
++Only after activation can runtime query logs prove that the installed publisher
++uses the new page path. The S01 report records fixture verification and installed
++runtime state separately; a source checkout or receipt is not deployment evidence.

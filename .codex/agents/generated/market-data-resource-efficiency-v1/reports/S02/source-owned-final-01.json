@@ -1,0 +1,161 @@
+{
+  "baseline": ".cache/market-data-s02-baseline-01a126e9",
+  "owned": [
+    {
+      "path": "apps/api/wiring/modules/market_data_reference.py",
+      "baseline_sha256": "595516a0b21ab40c44d98fdf04576a3fcf5eb356f3c09b793b6e019fcfbc42b4",
+      "candidate_sha256": "7e33aa781d7118af826a8d1367390cfe9e198341fcdcf6ddc4b9b741d93bf217"
+    },
+    {
+      "path": "apps/api/wiring/modules/ui_strategies_dashboard.py",
+      "baseline_sha256": "a354baa6d57c6c0efa5f41e0d49d2fe12fa2621478c3444a652872780ad3c8a7",
+      "candidate_sha256": "f581a502aa4ea22e56a6456c8316f06e14d72a7c2edc1b15addc07da9458a1f5"
+    },
+    {
+      "path": "apps/cli/commands/backtest_artifact_publish.py",
+      "baseline_sha256": "1ebef8c2aab2a659354dacd636fac6afd3383994623770f9f367f513e2135f20",
+      "candidate_sha256": "441224f53f33d72e1841cf78a2a0ef701006c0b90fc84ed0999b1c987c327ba0"
+    },
+    {
+      "path": "apps/cli/commands/rest_catchup_1m.py",
+      "baseline_sha256": "68452c35944ad0979c39fdbd27d992ff94baf50e582375308473c6851d5973ba",
+      "candidate_sha256": "32fdbe3525e01d350ff265495c10aa81d2a171d2611852ad1af356f4e41b559c"
+    },
+    {
+      "path": "apps/cli/wiring/db/clickhouse.py",
+      "baseline_sha256": "58164c23c47e74a50cd831f326d648c54b30eb5e64f28679301232fb5009e102",
+      "candidate_sha256": "fa981b3ca8eb03d8793a9f7d4302b21de43ead11d872385791173e265c6f8b60"
+    },
+    {
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/managed_worker.py",
+      "baseline_sha256": "e1bea7dc9180f290e80f31862b6e4544f7be50bf3227c2c399217a11889dbb5a",
+      "candidate_sha256": "dca8e0df638349314733789e6a0bc845d434a27630a85acfadf7572999b582d1"
+    },
+    {
+      "path": "apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
+      "baseline_sha256": "f641ef950afe033baa0ce2c2a287ac801b660dcf266721cb60d8b878fe598956",
+      "candidate_sha256": "c11094d411ae7202c86f8d7335f2bc3fdbb30f318759ae8b1896696f7230c7d9"
+    },
+    {
+      "path": "apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py",
+      "baseline_sha256": "4e65e1c62ede265400253905e5e4643626f84b2a600291c39db2dd9e99bb78a0",
+      "candidate_sha256": "2beb1153ee1e5acc18bda93821c56d551e0e11994c7ecf274ee3df09cdd57208"
+    },
+    {
+      "path": "apps/worker/market_data_ws/wiring/io_process.py",
+      "baseline_sha256": "bb9a79089c6dc7ed243233fed8c9a796914279b82994b4e2ddaf106094c8cac0",
+      "candidate_sha256": "87d20e94a165ff556a58d2978ff780bf689ec8ae98b3450f7e27c2b7977a18b9"
+    },
+    {
+      "path": "apps/worker/market_data_ws/wiring/modules/market_data_ws.py",
+      "baseline_sha256": "39fbc1c051cfb2c8b7b49dab4acb8de362fc30bb0f04f8fdd9b0c3b5e59802db",
+      "candidate_sha256": "fa5ce44240ae0bc96766a3e93b8c3d8441bf9fba82ee836adf69a78040c867c5"
+    },
+    {
+      "path": "apps/worker/market_data_ws/wiring/persistent_writer.py",
+      "baseline_sha256": "a55295b63c54948ca67e381bcf064afb8d5a0f04cf9dffd87e2567296e892ece",
+      "candidate_sha256": "81993dff4bf798a30316a4b9219389cea4324d8f5c19d5ddb32c360207f74812"
+    },
+    {
+      "path": "apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py",
+      "baseline_sha256": "8540e0573b2bd926a2b0add08601e416c40b0e7d119b122ad2f96279b9d6a31f",
+      "candidate_sha256": "32885fd98aed2ed757913f08caf5f081284eb46b386a8bfa0593b8fad60df597"
+    },
+    {
+      "path": "configs/dev/clickhouse-local-profiles.xml",
+      "baseline_sha256": "a3cfeae041631603984a1957dcbbea5af7b8f0fbc3859e64d5b30993515e3f5b",
+      "candidate_sha256": "dd47892ff7081ad82f7daf8ea806d53330049d5114b325a8265aa6668ffb4ef4"
+    },
+    {
+      "path": "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "baseline_sha256": "5502e1e448231ab68651b0593126d229592cfe370fda45c708873dbc78863df8",
+      "candidate_sha256": "5c59779b106f37e301e90424b8425343dc7c3f72d59b5726f9ee8a2c0bfca437"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-reference-api-v1.md",
+      "baseline_sha256": "ee53b1c58496d50ff2728baa308a19eb08b82c238f3bebbf1572d25591dd33f2",
+      "candidate_sha256": "f9c403fd16e8e4a50d35b4e962a60f05aafaefd9ba7ecff3ed2e2dce9f1acd99"
+    },
+    {
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md",
+      "baseline_sha256": "84938e4fc9715ff2f98af0a1a5f64b01a3c8e283d1e025e3fc2dfb10f67f8d38",
+      "candidate_sha256": "4df08110f047522bc6256d4d663f358e86ac986b9f91f65d2100d29892b73514"
+    },
+    {
+      "path": "docs/runbooks/navigator-local-market-data-recovery.md",
+      "baseline_sha256": "7fe56551ad8f0442bee56d30c3511f009758c527961c10611433bd7c2785ef0d",
+      "candidate_sha256": "e0d9ff48b241178bfb0eec88cd1e9d59bd367fa8db554fe0efce3c92aac3ddc5"
+    },
+    {
+      "path": "docs/runbooks/offline-release-installation.md",
+      "baseline_sha256": "26afb6ecfc0eb652b4e1ed2e5a1ac514d4cfe6944aeaefc831cd8108cb3cc581",
+      "candidate_sha256": "e0e9254300a4d0518b00b37444276739e8120e84ea9f40fc08f487677584ddfb"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/work_errors.py",
+      "baseline_sha256": "9655096689473095d73123ea6240f0b7569746dc62d9efbb09e34f69c608f52d",
+      "candidate_sha256": "af6f24a7d4a9d26e29474f2f19be2fd089148b963080040d6002e7e5ae518a55"
+    },
+    {
+      "path": "tests/real_infra/backtest/test_artifact_integrated.py",
+      "baseline_sha256": "e3503acbe1344dbdec176399f10539a00af12356cdeaf4790d3817067f423725",
+      "candidate_sha256": "9262547d840992b2e241e02cc7eaa27c2883cbc89934176d695fbb601782dcd1"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_clickhouse_workloads.py",
+      "baseline_sha256": null,
+      "candidate_sha256": "cb9ab7c0dbd2fd8855bc6b32f525eb457b11f406a6d5a75a7447276199f7a1dd"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_work_requests_postgres.py",
+      "baseline_sha256": "12f462025e3e9b43fa35bdf1e56c3e0f093ec18bfce60cf8efe50b2bcb6d309a",
+      "candidate_sha256": "d6ec0c9035a5b34db7dc964fd23ffcddbe9dc22850f16e4e40418b21b8e51f2c"
+    },
+    {
+      "path": "tests/unit/apps/api/test_market_data_reference_wiring_module.py",
+      "baseline_sha256": "f052f51e173350ab70e1dfe7822677f64fe6a7838cf912cfe737c657b737f78c",
+      "candidate_sha256": "76f6e16465bf37b2b1d607ce03eb10016de24b9f67672989862c5095443409dc"
+    },
+    {
+      "path": "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py",
+      "baseline_sha256": "a8a3c9c5a5ddc8e4d84ab868275fde339ee1ba3163458b420d83fa27d5dabdc8",
+      "candidate_sha256": "17864aca576dfec25d113c0a5fc99ac319af3d0f254750008f0e79fdce2ca2cb"
+    },
+    {
+      "path": "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+      "baseline_sha256": "34a17043c13e212735e2a8173e7f663523e2506b4abf609c949fe27c7561d23e",
+      "candidate_sha256": "f30a54fd8af063e769e171d7334efa44dfddfc5317054af5ca681a405f611b03"
+    },
+    {
+      "path": "tests/unit/apps/worker/test_persistent_writer.py",
+      "baseline_sha256": "b9ff5e15093ce6cc677b671b21950d0e1624c01c9e9afe5ab0e6e382ed60be64",
+      "candidate_sha256": "97bd82893b96a4efb36b5cb13e6bba137508542c0f13ab080e4efadf4ade099b"
+    },
+    {
+      "path": "tests/unit/tools/test_clickhouse_workload_installation.py",
+      "baseline_sha256": null,
+      "candidate_sha256": "f197469f6ec948163edf6471d8ef49e7b0ecdf227724aadea3fd6bc553384e11"
+    },
+    {
+      "path": "tests/unit/tools/test_local_platform.py",
+      "baseline_sha256": "6538643ea505908a1911ce2f461e6e1a1e09dc73b45458651a2211df587a3e70",
+      "candidate_sha256": "b570f642c81128bede03927430fe9870941d343780c89f809bb668f7f039a91b"
+    },
+    {
+      "path": "tools/installation/clickhouse_workloads.py",
+      "baseline_sha256": null,
+      "candidate_sha256": "446af1290c567f15ee045254a6c0ad35cbccd7fb6074b3e577bb5ca24cfa95f4"
+    },
+    {
+      "path": "tools/installation/local_platform.py",
+      "baseline_sha256": "9c18220c5e8ef265a37989662708e01686de18afcfa2a0d86df914c0e8e25942",
+      "candidate_sha256": "d7f6fd62d60e480591535580b586bba0d453903004b147668d1e9eb4189a5b39"
+    },
+    {
+      "path": "tools/qa/market_data_mixed_load.py",
+      "baseline_sha256": null,
+      "candidate_sha256": "a4b333174196a4b4747b7a1f87004a11e4581330952a8a1025b6f60186848ab0"
+    }
+  ],
+  "generated_maps": "PROJECT_MAP.md/project-map.json are regenerated separately after evidence inventory stabilizes; their pre-S02 bytes are preserved in baseline. Other generated map changes already present at entry remain foreign."
+}

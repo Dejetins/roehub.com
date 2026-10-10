@@ -23,6 +23,9 @@ from trading.contexts.identity.adapters.inbound.api.routes import (
     build_exchange_keys_router,
     build_organizations_router,
 )
+from trading.contexts.identity.adapters.inbound.api.routes.browser_devices import (
+    build_browser_devices_router,
+)
 from trading.contexts.identity.application import (
     AccountSettingsRepository,
     IdentityClock,
@@ -97,6 +100,16 @@ def build_identity_router(
         None.
     """
     router = APIRouter()
+    router.include_router(
+        build_browser_devices_router(
+            repository=session_repository,
+            current_user_dependency=current_user_dependency,
+            clock=clock,
+            cookie_secure=cookie_secure,
+            cookie_name=cookie_name,
+            cookie_path=cookie_path,
+        )
+    )
     router.include_router(
         build_auth_current_user_router(
             current_user_dependency=current_user_dependency,

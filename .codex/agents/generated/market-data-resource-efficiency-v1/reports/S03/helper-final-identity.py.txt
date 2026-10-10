@@ -1,0 +1,21 @@
+from pathlib import Path
+import subprocess,json,hashlib,datetime
+r=Path('.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03')
+old=json.loads((r/'runtime-identity-02.json').read_text())
+res={'observed_at':datetime.datetime.now(datetime.UTC).isoformat(),'containers':[]}
+for a in old['containers']:
+ x=json.loads(subprocess.check_output(['docker','inspect',a['name']],text=True))[0]
+ b={'name':x['Name'],'image':x['Image'],'configured_image':x['Config']['Image'],'memory':x['HostConfig']['Memory'],'nano_cpus':x['HostConfig']['NanoCpus'],'started':x['State']['StartedAt']}
+ res['containers'].append(b)
+res['identities_unchanged']=res['containers']==old['containers']
+code="import hashlib,importlib.util,json; names={'http':'trading.contexts.market_data.adapters.outbound.clients.common_http.http_client','work_requests':'trading.contexts.market_data.application.services.work_requests'}; print(json.dumps({k:hashlib.sha256(open(importlib.util.find_spec(v).origin,'rb').read()).hexdigest() for k,v in names.items()}))"
+res['installed_source_hashes']=json.loads(subprocess.check_output(['docker','exec','roehub-local-market-data-scheduler-1','python','-c',code],text=True))
+res['installed_source_unchanged']=res['installed_source_hashes']==old['installed_source_hashes']
+res['postgres_lifetime_cgroup']={}
+for name in ['memory.peak','memory.events','cpu.stat']:
+ res['postgres_lifetime_cgroup'][name]=subprocess.check_output(['docker','exec','roehub-s03-postgres','cat','/sys/fs/cgroup/'+name],text=True).strip()
+res['postgres_cgroup_boundary']='cumulative since disposable container start; not per-run CPU or candidate/baseline attribution'
+res['postgres_version']=subprocess.check_output(['docker','exec','roehub-s03-postgres','postgres','--version'],text=True).strip()
+res['clickhouse_version']=subprocess.check_output(['docker','exec','roehub-s03-clickhouse-1','clickhouse','--version'],text=True).strip()
+(r/'runtime-identity-final-03.json').write_text(json.dumps(res,indent=2)+'\n')
+print(json.dumps(res,indent=2))

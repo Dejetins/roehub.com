@@ -1,0 +1,38 @@
+{
+  "label": "candidate_read_only_live_index",
+  "pages": 3,
+  "coordinates": 102,
+  "elapsed_s": 0.05980637500761077,
+  "client_cpu_s": 0.002942,
+  "client_maxrss": 200572928,
+  "db_memory_before": {
+    "jemalloc.allocated": 525352824.0,
+    "MemoryResident": 950620160.0
+  },
+  "db_memory_after": {
+    "jemalloc.allocated": 525352824.0,
+    "MemoryResident": 950620160.0
+  },
+  "query_ids": [
+    "6b0ee1ca-f9c2-42ff-b43f-4235d621d261",
+    "3ed84caa-83e0-4bd0-ac51-b0ccd269731a",
+    "bbbd49c0-3ca3-442d-91f7-e4c163107c7c"
+  ],
+  "observations_sha256": "3be9ed07bcfa18a2e0e70043ef3e1480aa0cf79977410eba6aa255310e3217e0",
+  "queries": 3,
+  "read_rows": 306,
+  "read_bytes": 59601,
+  "max_query_memory": 4203644,
+  "server_ms": 52,
+  "cpu_us": 53362,
+  "file_read_bytes": 10986,
+  "canonical_queries": 0,
+  "cutoff": "2026-10-10T17:38:00+00:00",
+  "source_hashes": {
+    "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py": "2735e1c9522a7abfaad2868d99c1d549ce1c3c6e11f32110a269fa583f653b97",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py": "f14f0a1b44a774efac5fcbe168845552c43ae03fa8a98df080a460151d3ae164",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py": "4804741430cef5a2f0a2857cd69ba2ef06c09f511d094539822f2d5af7e0989e"
+  },
+  "proof_boundary": "read-only observation sink, no live obligations or publication",
+  "installed": false
+}

@@ -1,0 +1,27 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "-ra",
+    "tests/unit/contexts/backtest_artifacts",
+    "tests/unit/contexts/backtest/adapters/outbound/cache_fs",
+    "tests/unit/contexts/backtest/adapters/outbound/artifacts_fs",
+    "tests/unit/contexts/backtest/adapters/test_backtest_artifacts_runtime_config.py",
+    "tests/unit/contexts/backtest/adapters/test_indicators_yaml_defaults_provider.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_yaml_backtest_artifact_loader_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py",
+    "tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py",
+    "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py",
+    "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+    "tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py"
+  ],
+  "exit_code": 0,
+  "output": "........................................................................ [ 21%]\n........................................................................ [ 42%]\n........................................................................ [ 63%]\n........................................................................ [ 84%]\n......................................................                   [100%]\n342 passed in 71.90s (0:01:11)\n",
+  "environment_overrides": {
+    "PYTHONPATH": ".",
+    "NUMBA_NUM_THREADS": "12"
+  }
+}

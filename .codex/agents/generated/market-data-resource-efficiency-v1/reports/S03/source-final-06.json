@@ -1,0 +1,73 @@
+{
+  "baseline_snapshot_mismatches": [],
+  "measured_snapshot": "candidate-freeze-04.json",
+  "post_measurement_production_delta": {
+    "apps/migrations/bootstrap.py": {
+      "measured": "d299e022846e94d7d433c0ee03cfaf83f05c4c73438f8ffd9a2cd8ef0c3476f6",
+      "final": "0499f257681eb23530661d4c62949f2309b9500ee986ecee4f90769d805af23a"
+    },
+    "apps/migrations/storage.py": {
+      "measured": "113bf096d7dde0de0275273de8c371c1fa682f09d0e417565989ba6f779f72ab",
+      "final": "287704f0d4d99069e367276cc20e3e91a8e50a2792784b4812a20d256a6dd4ca"
+    },
+    "migrations/postgres/0034_market_data_provider_admission_v1.sql": {
+      "measured": "562c4a131af51008dcbce177374c6dcbbd55d2a0c4e5703eca220f49e43877d3",
+      "final": "c3772dad10b9b3b14693028b827b16863847bbc8723e3e05e0c1de4451080c3f"
+    },
+    "migrations/postgres/manifest.json": {
+      "measured": "33282afd82bfa8a347810649d6ffbd09a8ceb1995453da722cfe33c95047c6ad",
+      "final": "8fdb59b789a0546443fda6258a6b0a573a70a6892709335ab258254f813d7db9"
+    }
+  },
+  "unchanged_benchmark_import": "split_clickhouse_sql AST identical",
+  "measurement_reuse_boundary": "Managed loader registration and idempotent ADD COLUMN replay only; same resulting schema, no hotpath/harness/config change. Measured source remains snapshot04; final source is explicitly different.",
+  "owned_final_hashes": {
+    "apps/cli/commands/funding_rate_catchup.py": "1be93b914aeb32dc4fffa0081478a547ba3fa2875ac67dd3c30264d51c7c249e",
+    "apps/cli/commands/rest_catchup_1m.py": "76902f9d9b55265d195b222edd067aa9200db7f602448a64bda74984819744de",
+    "apps/migrations/bootstrap.py": "0499f257681eb23530661d4c62949f2309b9500ee986ecee4f90769d805af23a",
+    "apps/migrations/storage.py": "287704f0d4d99069e367276cc20e3e91a8e50a2792784b4812a20d256a6dd4ca",
+    "apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py": "eab3280893f8355dc93d4dba31471be6f210c59e7af387c7e9cdd6e99905c966",
+    "apps/worker/market_data_ws/wiring/io_process.py": "1d7fd8f4e26643f54794412ff7245d5c3944e0ab3815f5e905aad6821a18d486",
+    "apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py": "5c20647ef854a6bf0fcade8342e8939c6842f68c13c9a564226b961c52ff0d8f",
+    "configs/dev/market_data.yaml": "b4b1fcd2c8e2f28bfb89d9fbf22472d61a5f27102bc7ce1846993b79c5f5abfb",
+    "configs/installation/generated/base/generation-manifest.json": "f1ebd6f9bb470c433e5361f955de8ba724e35e87909f93be1843a29baf1b24e3",
+    "configs/installation/generated/base/service-configs/market-data.yaml": "d69857c430e8a9cef892738ee26ddb3c258d89abdfa9889c052e31f83d89b82d",
+    "configs/installation/generated/base/service-configs/market_data.yaml": "d69857c430e8a9cef892738ee26ddb3c258d89abdfa9889c052e31f83d89b82d",
+    "configs/installation/generated/ml/generation-manifest.json": "7fec84713b1e0605258a5fdf038dad0f6c6ce2b9a1298d5d944a915655b10f0c",
+    "configs/installation/generated/ml/service-configs/market-data.yaml": "d69857c430e8a9cef892738ee26ddb3c258d89abdfa9889c052e31f83d89b82d",
+    "configs/installation/generated/ml/service-configs/market_data.yaml": "d69857c430e8a9cef892738ee26ddb3c258d89abdfa9889c052e31f83d89b82d",
+    "configs/installation/generated/trading/generation-manifest.json": "cd3736c31186644534e61fd6cf4692fff446837e89e5ec612db082149c3fb0f2",
+    "configs/installation/generated/trading/service-configs/market-data.yaml": "d69857c430e8a9cef892738ee26ddb3c258d89abdfa9889c052e31f83d89b82d",
+    "configs/installation/generated/trading/service-configs/market_data.yaml": "d69857c430e8a9cef892738ee26ddb3c258d89abdfa9889c052e31f83d89b82d",
+    "configs/prod/market_data.yaml": "89eb2ab72dc3e5f1c2d99b57aa13afddcbcd26c8780fe244d7d8adce55189c7f",
+    "configs/test/market_data.yaml": "1108a0c2946b46a036d89b51a1f89e3644ad009636c833757bce66e0aeed2dbc",
+    "docs/architecture/market_data/market-data-application-ports.md": "f0c5a9e487cd38c6bd66387e92e9148c06f68b38a35d42cc70cf9c7850995985",
+    "docs/architecture/market_data/market-data-reference-api-v1.md": "c4468952a37f10ecf06b07a55d82f5faac51c004b9b4ac78bfd74789369c5c9a",
+    "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md": "f3b563e8490520aed661743046a7895fef275d555bb2b1ac9f40ad120d2b0847",
+    "docs/runbooks/navigator-local-market-data-recovery.md": "1485561dada2b4ae03f05950fb438259d742286c6582a3d786bc7960394cf07b",
+    "docs/runbooks/offline-release-installation.md": "cc8891f3061f1d032df22de35f0cbb76f25fd42dd624fe91fa861346a4b5a2f2",
+    "migrations/postgres/0034_market_data_provider_admission_v1.sql": "c3772dad10b9b3b14693028b827b16863847bbc8723e3e05e0c1de4451080c3f",
+    "migrations/postgres/manifest.json": "8fdb59b789a0546443fda6258a6b0a573a70a6892709335ab258254f813d7db9",
+    "src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py": "9b3dd6d1d7ed90c6014540b5d15a641b43b6fd267a84cdbf74a18830e2be61e1",
+    "src/trading/contexts/market_data/adapters/outbound/clients/common_http/managed_transport.py": "9cd21ec7125bc84f92623f40bd8638c711b52c4447a1a8574817442087310486",
+    "src/trading/contexts/market_data/adapters/outbound/clients/common_http/provider_policy.py": "52d43b7127df8eb838fa2f270096f281bd34ff860d9d5f036ed8398820a51cbb",
+    "src/trading/contexts/market_data/adapters/outbound/clients/history_probe_http.py": "1b65aaa328e98f50f9fea423349f55d814462141a17d09b2718af87501125aa6",
+    "src/trading/contexts/market_data/adapters/outbound/clients/rest_instrument_history_start_source.py": "4af5a4bc7078691b3481e0d3b32ba81af4b10ca0aa887f4935e358c9aba34b48",
+    "src/trading/contexts/market_data/adapters/outbound/config/runtime_config.py": "3a7014cc412e104249dbcc4da5446cc5e6e72be6d82bc78b880e493833ce481b",
+    "src/trading/contexts/market_data/adapters/outbound/http_transport_worker.py": "72e27433d5b66c077963fe08c8c125b8b7838fd40246ee98750c118ed6ce734e",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/history_bounds_repository.py": "8a2dfe905c9f09022033809c5f94b65d14c4d00f8388181a1177df4970869349",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/provider_admission.py": "77b4773480e8a603fe31996258f0c48aa660773d0a1e37f8690fa429d49376f8",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py": "07fd1946c329ab5ac2c4f43924a3d4faf46e1f925b7c1808bd2d7bee8f9196e9",
+    "src/trading/contexts/market_data/application/ports/provider_admission.py": "3de9c251ac14f70f8486942f6d8327cdbab700284c62e4271e4596e8284c4b38",
+    "src/trading/contexts/market_data/application/services/history_bounds.py": "9d4a9a0b4adfee2c675bce37edf23808437dc0e8b83fffaf6b09cf7465e98eeb",
+    "src/trading/contexts/market_data/application/services/work_requests.py": "d53e89510b4da63b6881ce8bbd864eaeaa953cccd6e119850b05e3bdbd09f06f",
+    "tests/real_infra/market_data/test_provider_admission.py": "db4e0777cd0d9046797f00fb5696e3f410705fbaac191cbb9c8596ba2be09ed9",
+    "tests/real_infra/market_data/test_work_requests_postgres.py": "e7ce70e8fa780077a9b55357737e8f964bed5e3d88f8cb12dbd9062fc17075ef",
+    "tests/unit/apps/migrations/test_storage_lifecycle.py": "77887a3d9c360895abde6f5770e21baa299281125f5bd27a59ec24c25b4310ec",
+    "tests/unit/apps/scheduler/test_market_data_request_concurrency.py": "49fbd6048f7416e648088dc7d7711160eb17384c17c2c52a247485d5b0eeacbb",
+    "tests/unit/contexts/market_data/adapters/test_http_source_retry.py": "4a9b36eb0507d3e3d9cccdc398c451d59385eed721ff28bd00b9b37dc83f0069",
+    "tests/unit/contexts/market_data/adapters/test_http_transport_protocol.py": "6a38c10442fccbff431355a5d3f5e96e54e57c47ba41f4b40bc601db0b108f6d",
+    "tests/unit/contexts/market_data/adapters/test_provider_policy.py": "2d621d2a21eb8fb56e05d7411a7fc45786be4194a867f75d2099e93f3843bfbc",
+    "tools/qa/market_data_ingestion_comparison.py": "db895ba94b501736201ef5e28a8c122530521e902eceda329072eb4aeb90f2fc"
+  }
+}

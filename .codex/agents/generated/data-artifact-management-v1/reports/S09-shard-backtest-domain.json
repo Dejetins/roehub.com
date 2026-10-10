@@ -1,0 +1,22 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "-ra",
+    "tests/unit/contexts/backtest/adapters/outbound/test_postgres_research_organization_scope.py",
+    "tests/unit/contexts/backtest/application/services/test_organization_scoped_market_data.py",
+    "tests/unit/contexts/backtest/application/services/test_research_identity.py",
+    "tests/unit/contexts/backtest/application/test_backtest_errors.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_admission.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_input_recipe_contracts.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_input_recipe_replay.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_backtest_preflight_service.py",
+    "tests/unit/contexts/backtest/domain"
+  ],
+  "exit_code": 0,
+  "output": "........................................................................ [ 57%]\n......................................................                   [100%]\n126 passed in 5.50s\n",
+  "environment_overrides": {
+    "PYTHONPATH": ".",
+    "NUMBA_NUM_THREADS": "12"
+  }
+}

@@ -1,0 +1,50 @@
+import json,statistics,hashlib
+from pathlib import Path
+r=Path('.codex/agents/generated/market-data-resource-efficiency-v1/reports/S03')
+def quantile(values,p):
+ values=sorted(values); index=(len(values)-1)*p; low=int(index);high=min(low+1,len(values)-1)
+ return values[low]+(values[high]-values[low])*(index-low)
+def counters(text):
+ out={}
+ for line in text.splitlines():
+  parts=line.split()
+  if len(parts)==2 and '=' not in parts[1]: out[parts[0]]=int(parts[1])
+  elif len(parts)>2:
+   for item in parts[1:]:
+    k,v=item.split('=');out['io_'+k]=out.get('io_'+k,0)+int(v)
+ return out
+
+def extract(path):
+ x=json.loads(path.read_text());c=json.loads(Path(str(path)+'.collector.json').read_text());s=x['samples'];steady=[a for a in s if 60<=a['elapsed']<360]
+ q=next(a for a in x['query_metrics'] if a[0]=='QueryFinish')
+ completions=[index*3+latency for index,latency in enumerate(c['latency_s'])]
+ progress=[]
+ for t in range(0,361):
+  offered=min(len(completions),t//3+1); completed=sum(end<=t for end in completions)
+  progress.append({'t':t,'offered':offered,'completed':completed,'backlog':offered-completed,'oldest_pending_age_s':t-completed*3 if offered>completed else 0})
+ completion_bins=[sum(start<=end<start+60 for end in completions) for start in range(60,360,60)]
+ pg=(int(x['pg_stats_after'][0])-int(x['pg_stats_before'][0]))+(int(x['pg_stats_after'][1])-int(x['pg_stats_before'][1]))
+ metrics={k:x[k] for k in ['completion_s','windows_per_second','full_windows_per_second','idle_ready_slot_seconds','http_requests','http_connections','http_rejected','http_peak','storage_calls','inserted_rows','process_family_cpu_s']}
+ metrics.update(query_count=q[1],read_rows=q[2],read_bytes=q[3],query_peak_bytes=q[4],pg_transactions=pg,pg_tx_per_candle=pg/int(x['canonical_new']),pg_peak_connections=max(a['pg'][2] for a in s),worker_and_child_peak_mib=max(a['worker_and_child_rss_kib'] for a in s)/1024,cgroup_sampled_peak_mib=max(a['cgroup_memory_bytes'] for a in s)/1048576,parts_peak=max(a['parts'][0] for a in s),merges_peak=max(a['merges'] for a in s),collector_retries=c['retries'])
+ metrics.update(collector_last_completion_s=max(completions),collector_max_completion_gap_s=max(b-a for a,b in zip(completions,completions[1:])),collector_peak_backlog=max(a['backlog'] for a in progress),collector_peak_pending_age_s=max(a['oldest_pending_age_s'] for a in progress),collector_min_steady_60s_completions=min(completion_bins),collector_steady_max_ms=1000*max(c['latency_s'][20:120]))
+ before=counters(x['container_before']);after=counters(x['container_after'])
+ metrics['CH_cpu_s']=(after['usage_usec']-before['usage_usec'])/1000000
+ for k in ['io_rbytes','io_wbytes','io_rios','io_wios']:
+  metrics['CH_'+k]=after.get(k,0)-before.get(k,0)
+ metrics['scheduler_admission_rejections']=sum(v for k,v in x['provider_admission'].items() if k in ['source_rate_limited','source_unavailable'])
+ metrics['collector_admission_rejections']=sum(v for k,v in c['provider_admission'].items() if k in ['source_rate_limited','source_unavailable'])
+ metrics['scheduler_retry_events']=sum(n for kind,code,n in x['scheduler_events'] if kind=='retry_scheduled')
+ for name in ['jemalloc.allocated' ,'MemoryResident','MemoryTracking']:
+  metrics['CH_'+name+'_peak_mib']=max(float(a['memory'][name]) for a in s)/1048576
+ for p in [.50,.95,.99]:
+  metrics[f'collector_steady_p{int(p*100)}_ms']=1000*quantile(c['latency_s'][20:120],p)
+ return {'path':str(path),'sha256':hashlib.sha256(path.read_bytes()).hexdigest(),'metrics':metrics,'checks':x['checks'],'fixture_sha256':x['fixture_sha256'],'harness_sha256':x['harness_sha256'],'collector_progress':progress,'collector_steady_60s_completions':completion_bins,'collector_complete_before_work_drain':max(completions)<x['completion_s'],'post_drain_memory':x['post_drain_memory'],'pg_counters':x['pg_counters']}
+runs={side:[extract(r/f'{side}-M4-{n:02d}.json') for n in range(1,4)] for side in ['baseline','candidate']}
+comparisons={}
+for metric in runs['baseline'][0]['metrics']:
+ b=[x['metrics'][metric] for x in runs['baseline']];c=[x['metrics'][metric] for x in runs['candidate']];bm=statistics.median(b);cm=statistics.median(c)
+ comparisons[metric]={'baseline':b,'candidate':c,'baseline_median':bm,'candidate_median':cm,'absolute_delta':cm-bm,'percent_delta':100*(cm-bm)/bm if bm else None,'baseline_range':[min(b),max(b)],'candidate_range':[min(c),max(c)],'paired_deltas':[y-x for x,y in zip(b,c)]}
+record={'runs':runs,'comparisons':comparisons,'all_checks':all(all(x['checks'].values()) for side in runs.values() for x in side),'same_fixture':len({x['fixture_sha256'] for side in runs.values() for x in side})==1,'same_harness':len({x['harness_sha256'] for side in runs.values() for x in side})==1,'performance_acceptance':'not assessed — numerical threshold not specified','caveats':['1s memory sampling may miss short peaks','cgroup memory.peak cumulative; CPU/IO are before-after deltas; background writeback may cross boundaries','collector latency is HTTP-only, not live canonical/API latency; harness retry cadence differs from actual collector durable backoff','full-work PG transactions include sampler/read connections; no concurrent fault tests','service is fixed queued replay, not production capacity','CPU is whole harness process family, including setup/emulator/sampler/docker CLI; collector not added twice']}
+with (r/'M4-analysis-01.json').open('x') as out:json.dump(record,out,indent=2);out.write('\n')
+for k in ['completion_s','windows_per_second','idle_ready_slot_seconds','http_connections','http_rejected','collector_steady_p99_ms','worker_and_child_peak_mib','cgroup_sampled_peak_mib','pg_tx_per_candle']:
+ print(k,comparisons[k])

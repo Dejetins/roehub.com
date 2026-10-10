@@ -1,0 +1,60 @@
+[
+  {
+    "command": [
+      ".venv/bin/ruff",
+      "check",
+      "src/trading/contexts/backtest_artifacts/application/services/automatic_base.py",
+      "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+      "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/automatic_base_repository.py",
+      "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+      "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/base_storage_admission.py",
+      "src/trading/contexts/market_data/application/services/stored_candle_signal.py",
+      "apps/worker/backtest_job_runner/wiring/automatic_base.py",
+      "tests/unit/contexts/backtest_artifacts/test_automatic_base.py",
+      "tests/real_infra/backtest/test_automatic_base_lifecycle.py",
+      "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_slot_publisher.py",
+      "apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py",
+      "apps/worker/market_data_ws/wiring/modules/market_data_ws.py",
+      "tests/unit/contexts/market_data/test_stored_candle_signal.py"
+    ],
+    "exit_code": 0,
+    "output": "All checks passed!\n"
+  },
+  {
+    "command": [
+      ".venv/bin/pyright",
+      "src/trading/contexts/backtest_artifacts/application/services/automatic_base.py",
+      "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+      "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/automatic_base_repository.py",
+      "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+      "src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/base_storage_admission.py",
+      "src/trading/contexts/market_data/application/services/stored_candle_signal.py",
+      "apps/worker/backtest_job_runner/wiring/automatic_base.py",
+      "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_slot_publisher.py",
+      "apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py",
+      "apps/worker/market_data_ws/wiring/modules/market_data_ws.py"
+    ],
+    "exit_code": 0,
+    "output": "0 errors, 0 warnings, 0 informations\nWARNING: there is a new pyright version available (v1.1.408 -> v1.1.414).\nPlease install the new version or set PYRIGHT_PYTHON_FORCE_VERSION to `latest`\n\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_docs_index",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "OK: /Users/daniildegtyarev/Projects/roehub.com/docs/architecture/README.md is up-to-date.\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_project_map",
+      "--check"
+    ],
+    "exit_code": 1,
+    "output": "Project map is out-of-date: docs/architecture/project-map/PROJECT_MAP.md, docs/architecture/project-map/component-map.mmd, docs/architecture/project-map/project-map.json\n"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md": "84971c2d163d425d71bd9bbd6554f350394a8d12ab08919e281a1da85f253bfc",
+  "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py": "fb8587dd6b320559f46349a2a69f5062ca41e98f739675dd5340efe033262555",
+  "src/trading/contexts/backtest_artifacts/adapters/outbound/defaults/management_catalog.py": "af8e4b73ee992fab46fe6d19d86fe13b46f9de149a28b3602d1d5529f2b66bc4",
+  "src/trading/contexts/backtest_artifacts/application/services/automatic_base.py": "7d14eebdb08432af1a46ea5e2b37c3ad73a1d7ed511479c27f3a84b7454d1f44",
+  "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py": "9cae417b51dce995743e92d9fa154b9013b53674e437789ba7b26c2763e517d1",
+  "src/trading/contexts/backtest_artifacts/application/services/management.py": "75f0b78ce3e3718bde08bb03a3816b28285b994020bbc8ad6b46ff1a03b28024",
+  "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_loader.py": "e172b6a2e6924b51a600a0512b32d52d50d457e3e57c0e4d9814d0e0f6e3c6e3",
+  "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_validator.py": "639f2acabd15365c21d8b26699b82352bb2b3a24bdfea37252c9ed448969529a",
+  "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py": "040b26b17daa11ed5bf0dfd1441dd20ee27903be377ecc3fa9a80bff1c00b0a2",
+  "src/trading/contexts/backtest_artifacts/application/services/v2/contracts.py": "1c97f36b37cbf0bc08e517c962bc017e4af699fc24a6718e82f070362abdef70",
+  "src/trading/contexts/backtest_artifacts/application/services/v2/hit_times_compute_v2.py": "059743a38baae3041f7dd9f54a9013d44c73521dd993f320df5c12283f8e81c0",
+  "tests/real_infra/backtest/test_managed_derivative_publication.py": "f15432686008a60e2f3c4b2f5c5adb5f424aa5dd3f82b2effaa44f508f2c300b",
+  "tests/unit/contexts/backtest_artifacts/test_derivative_profiles.py": "eb151ce4cb6ee62837318821e3a96769ddd0508d04c1cf8849953a13fff9fae7"
+}

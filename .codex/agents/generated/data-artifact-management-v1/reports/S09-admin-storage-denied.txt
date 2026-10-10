@@ -1,0 +1,56 @@
+- link "Skip to content":
+  - /url: "#workspace-heading"
+- complementary:
+  - generic "RoeHub": R
+  - navigation "Navigation":
+    - link "Overview":
+      - /url: /dashboard
+      - generic: Overview
+    - link "Backtests":
+      - /url: /backtests
+      - generic: Backtests
+    - link "Strategies":
+      - /url: /strategies
+      - generic: Strategies
+    - link "Data":
+      - /url: /data
+      - generic: Data
+    - link "Connections":
+      - /url: /connections
+      - generic: Connections
+    - link "Monitoring":
+      - /url: /monitoring
+      - generic: Monitoring
+    - link "Settings":
+      - /url: /settings/profile
+      - generic: Settings
+  - generic "Language": 文
+  - link "Sign out":
+    - /url: /logout
+    - generic: Sign out
+- main:
+  - text: Settings
+  - generic: Navigator
+  - complementary:
+    - heading "Settings" [level=2]
+    - navigation "Settings categories":
+      - link "Profile":
+        - /url: /settings/profile
+        - text: Profile
+      - link "Interface":
+        - /url: /settings/preferences
+        - text: Interface
+      - link "Notifications":
+        - /url: /settings/notifications
+        - text: Notifications
+      - link "Security":
+        - /url: /settings/security
+        - text: Security
+      - link "Storage":
+        - /url: /settings/storage
+        - text: Storage
+  - heading "Storage" [active] [level=1]
+  - heading "Backtest artifacts" [level=2]
+  - paragraph: Stored on the server. One root contains automatically managed instrument folders.
+  - paragraph: Backtest artifacts · ready
+  - paragraph: Installation-owner access is required to inspect the server path and manage storage. Organization ownership alone does not grant this access.

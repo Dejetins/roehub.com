@@ -1,0 +1,28 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/unit/contexts/backtest_artifacts",
+    "tests/unit/contexts/backtest/adapters/outbound/cache_fs",
+    "tests/unit/contexts/backtest/adapters/outbound/artifacts_fs",
+    "tests/unit/contexts/backtest/adapters/test_backtest_artifacts_runtime_config.py",
+    "tests/unit/contexts/backtest/adapters/test_indicators_yaml_defaults_provider.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_manifest_validator_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_precompute_runner_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_artifact_slot_publisher_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_yaml_backtest_artifact_loader_v2.py",
+    "tests/unit/contexts/backtest/application/services/v2/test_derived_artifact_materialization.py",
+    "tests/unit/contexts/backtest/application/use_cases/test_publish_backtest_artifacts_v2.py",
+    "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py",
+    "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+    "tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py",
+    "tests/unit/apps/migrations/test_storage_lifecycle.py",
+    "tests/unit/apps/migrations/test_backtest_input_recipe_sql.py"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 82.8287250995636,
+  "stdout": "........................................................................ [ 20%]\n........................................................................ [ 40%]\n........................................................................ [ 61%]\n........................................................................ [ 81%]\n.................................................................        [100%]\n353 passed in 82.39s (0:01:22)\n",
+  "stderr": ""
+}

@@ -1,0 +1,26 @@
+{
+  "command": [
+    ".venv/bin/pyright",
+    "apps/api/control_agent_client.py",
+    "apps/api/dto/backtest_artifacts.py",
+    "apps/api/main/app.py",
+    "apps/api/routes/artifact_storage.py",
+    "apps/api/routes/backtest_artifacts.py",
+    "apps/api/wiring/artifact_service.py",
+    "apps/api/wiring/modules/backtest_artifacts.py",
+    "apps/control_agent/artifact_storage.py",
+    "apps/control_agent/artifact_storage_wiring.py",
+    "apps/control_agent/main/main.py",
+    "apps/control_agent/server.py",
+    "apps/migrations/bootstrap.py",
+    "apps/migrations/storage.py",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "src/trading/contexts/operations/adapters/unix_client.py",
+    "src/trading/contexts/operations/artifact_storage_contracts.py",
+    "src/trading/contexts/operations/contracts.py"
+  ],
+  "exit_code": 0,
+  "stdout": "0 errors, 0 warnings, 0 informations\nWARNING: there is a new pyright version available (v1.1.408 -> v1.1.414).\nPlease install the new version or set PYRIGHT_PYTHON_FORCE_VERSION to `latest`\n\n",
+  "stderr": ""
+}

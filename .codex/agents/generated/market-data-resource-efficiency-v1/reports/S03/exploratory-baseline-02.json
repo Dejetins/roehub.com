@@ -1,0 +1,1439 @@
+{
+  "schema_version": "market-data-resource-comparison/v1",
+  "stage": "S03",
+  "label": "baseline",
+  "source": {
+    "src/trading/contexts/market_data/application/services/work_requests.py": "92306a6b56bad02ca6fc0837c910e868f6a95290f0f594773b8f242b2a48ee18",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py": "9855738abba5384d1b207bd0666c33592f978573e418d54b56f73270b1707ad9",
+    "src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py": "7072489aa0fc61a4dd885c38c79fd832d7ebdcb1432e5edf20739b59ab5d747d"
+  },
+  "runtime": {
+    "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+    "memory": 1610612736,
+    "nano_cpus": 2000000000
+  },
+  "harness_sha256": "db895ba94b501736201ef5e28a8c122530521e902eceda329072eb4aeb90f2fc",
+  "python": "3.12.12",
+  "hardware": "macOS-26.7-arm64-arm-64bit",
+  "fixture": {
+    "coordinates": 102,
+    "streams": 4,
+    "seed_minutes": 2880,
+    "sparse_every": 7,
+    "jobs": 102,
+    "windows": 1,
+    "window_minutes": 1440,
+    "concurrency": 4,
+    "fast_seconds": 0.01,
+    "slow_seconds": 0.1,
+    "collector": 2,
+    "quotas": [
+      [
+        1,
+        100,
+        2
+      ],
+      [
+        60,
+        6000,
+        2
+      ]
+    ],
+    "quota_concurrency": 4
+  },
+  "warmup_s": 60,
+  "steady_s": 300,
+  "samples": [
+    {
+      "elapsed": 1.0214936250122264,
+      "active": 0,
+      "queued": 98,
+      "idle_ready_slot_seconds": 4.085974500048906,
+      "memory": {
+        "jemalloc.allocated": 323157472.0,
+        "MemoryResident": 623828992.0,
+        "MemoryTracking": 136041087
+      },
+      "parts": [
+        29,
+        1594881
+      ],
+      "merges": 0,
+      "pg": [
+        45068,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 498448,
+      "cgroup_memory_bytes": 845287424
+    },
+    {
+      "elapsed": 2.117938709037844,
+      "active": 0,
+      "queued": 98,
+      "idle_ready_slot_seconds": 4.385780336102471,
+      "memory": {
+        "jemalloc.allocated": 322347136.0,
+        "MemoryResident": 626671616.0,
+        "MemoryTracking": 136142951
+      },
+      "parts": [
+        29,
+        1594881
+      ],
+      "merges": 0,
+      "pg": [
+        45070,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 498448,
+      "cgroup_memory_bytes": 845639680
+    },
+    {
+      "elapsed": 3.218946584034711,
+      "active": 0,
+      "queued": 94,
+      "idle_ready_slot_seconds": 4.404031499987468,
+      "memory": {
+        "jemalloc.allocated": 322168880.0,
+        "MemoryResident": 627081216.0,
+        "MemoryTracking": 137192650
+      },
+      "parts": [
+        26,
+        1563798
+      ],
+      "merges": 0,
+      "pg": [
+        45130,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 273184,
+      "cgroup_memory_bytes": 857960448
+    },
+    {
+      "elapsed": 4.293260959035251,
+      "active": 0,
+      "queued": 94,
+      "idle_ready_slot_seconds": 4.297257500002161,
+      "memory": {
+        "jemalloc.allocated": 323822264.0,
+        "MemoryResident": 636862464.0,
+        "MemoryTracking": 137223376
+      },
+      "parts": [
+        26,
+        1563798
+      ],
+      "merges": 0,
+      "pg": [
+        45132,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 273184,
+      "cgroup_memory_bytes": 849989632
+    },
+    {
+      "elapsed": 5.350189750024583,
+      "active": 0,
+      "queued": 90,
+      "idle_ready_slot_seconds": 4.227715163957328,
+      "memory": {
+        "jemalloc.allocated": 325727064.0,
+        "MemoryResident": 640667648.0,
+        "MemoryTracking": 138179337
+      },
+      "parts": [
+        23,
+        1568230
+      ],
+      "merges": 0,
+      "pg": [
+        45192,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 274928,
+      "cgroup_memory_bytes": 863174656
+    },
+    {
+      "elapsed": 6.430618209007662,
+      "active": 0,
+      "queued": 90,
+      "idle_ready_slot_seconds": 4.321713835932314,
+      "memory": {
+        "jemalloc.allocated": 315701864.0,
+        "MemoryResident": 640200704.0,
+        "MemoryTracking": 131639221
+      },
+      "parts": [
+        23,
+        1568230
+      ],
+      "merges": 0,
+      "pg": [
+        45194,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 274944,
+      "cgroup_memory_bytes": 863113216
+    },
+    {
+      "elapsed": 7.594228041998576,
+      "active": 0,
+      "queued": 86,
+      "idle_ready_slot_seconds": 4.654439331963658,
+      "memory": {
+        "jemalloc.allocated": 315646208.0,
+        "MemoryResident": 650379264.0,
+        "MemoryTracking": 132620340
+      },
+      "parts": [
+        20,
+        1572967
+      ],
+      "merges": 0,
+      "pg": [
+        45256,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 162304,
+      "cgroup_memory_bytes": 875315200
+    },
+    {
+      "elapsed": 8.663719292031601,
+      "active": 0,
+      "queued": 86,
+      "idle_ready_slot_seconds": 4.277965000132099,
+      "memory": {
+        "jemalloc.allocated": 314607776.0,
+        "MemoryResident": 649551872.0,
+        "MemoryTracking": 132676181
+      },
+      "parts": [
+        20,
+        1572967
+      ],
+      "merges": 0,
+      "pg": [
+        45258,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 162384,
+      "cgroup_memory_bytes": 864329728
+    },
+    {
+      "elapsed": 9.744119000039063,
+      "active": 0,
+      "queued": 82,
+      "idle_ready_slot_seconds": 4.321598832029849,
+      "memory": {
+        "jemalloc.allocated": 315331496.0,
+        "MemoryResident": 642629632.0,
+        "MemoryTracking": 133504543
+      },
+      "parts": [
+        27,
+        1730072
+      ],
+      "merges": 0,
+      "pg": [
+        45318,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 232208,
+      "cgroup_memory_bytes": 859025408
+    },
+    {
+      "elapsed": 10.830262334027793,
+      "active": 0,
+      "queued": 82,
+      "idle_ready_slot_seconds": 4.3445733359549195,
+      "memory": {
+        "jemalloc.allocated": 314776944.0,
+        "MemoryResident": 643133440.0,
+        "MemoryTracking": 133606567
+      },
+      "parts": [
+        27,
+        1730072
+      ],
+      "merges": 0,
+      "pg": [
+        45320,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 232160,
+      "cgroup_memory_bytes": 852422656
+    },
+    {
+      "elapsed": 11.91791695903521,
+      "active": 0,
+      "queued": 78,
+      "idle_ready_slot_seconds": 4.350618500029668,
+      "memory": {
+        "jemalloc.allocated": 314359432.0,
+        "MemoryResident": 635760640.0,
+        "MemoryTracking": 134537559
+      },
+      "parts": [
+        29,
+        1736961
+      ],
+      "merges": 0,
+      "pg": [
+        45380,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 232976,
+      "cgroup_memory_bytes": 870547456
+    },
+    {
+      "elapsed": 13.128438666986767,
+      "active": 0,
+      "queued": 78,
+      "idle_ready_slot_seconds": 4.842086831806228,
+      "memory": {
+        "jemalloc.allocated": 315090544.0,
+        "MemoryResident": 652681216.0,
+        "MemoryTracking": 134642075
+      },
+      "parts": [
+        29,
+        1736961
+      ],
+      "merges": 0,
+      "pg": [
+        45382,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 232816,
+      "cgroup_memory_bytes": 866340864
+    },
+    {
+      "elapsed": 14.226087709015701,
+      "active": 0,
+      "queued": 74,
+      "idle_ready_slot_seconds": 4.390596168115735,
+      "memory": {
+        "jemalloc.allocated": 314823360.0,
+        "MemoryResident": 648077312.0,
+        "MemoryTracking": 135574242
+      },
+      "parts": [
+        26,
+        1741554
+      ],
+      "merges": 0,
+      "pg": [
+        45442,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233056,
+      "cgroup_memory_bytes": 873857024
+    },
+    {
+      "elapsed": 15.316734792024363,
+      "active": 0,
+      "queued": 74,
+      "idle_ready_slot_seconds": 4.3625883320346475,
+      "memory": {
+        "jemalloc.allocated": 315794984.0,
+        "MemoryResident": 654151680.0,
+        "MemoryTracking": 135628652
+      },
+      "parts": [
+        26,
+        1741554
+      ],
+      "merges": 0,
+      "pg": [
+        45444,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233056,
+      "cgroup_memory_bytes": 873627648
+    },
+    {
+      "elapsed": 16.418107042030897,
+      "active": 0,
+      "queued": 70,
+      "idle_ready_slot_seconds": 4.405489000026137,
+      "memory": {
+        "jemalloc.allocated": 314008128.0,
+        "MemoryResident": 658604032.0,
+        "MemoryTracking": 132594550
+      },
+      "parts": [
+        23,
+        1746063
+      ],
+      "merges": 0,
+      "pg": [
+        45504,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233344,
+      "cgroup_memory_bytes": 879812608
+    },
+    {
+      "elapsed": 17.498766834032722,
+      "active": 0,
+      "queued": 70,
+      "idle_ready_slot_seconds": 4.322639168007299,
+      "memory": {
+        "jemalloc.allocated": 312994896.0,
+        "MemoryResident": 659251200.0,
+        "MemoryTracking": 132650230
+      },
+      "parts": [
+        23,
+        1746063
+      ],
+      "merges": 0,
+      "pg": [
+        45506,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233344,
+      "cgroup_memory_bytes": 879656960
+    },
+    {
+      "elapsed": 18.58891658403445,
+      "active": 4,
+      "queued": 66,
+      "idle_ready_slot_seconds": 0.0,
+      "memory": {
+        "jemalloc.allocated": 312072432.0,
+        "MemoryResident": 641683456.0,
+        "MemoryTracking": 133022707
+      },
+      "parts": [
+        20,
+        1715147
+      ],
+      "merges": 0,
+      "pg": [
+        45529,
+        103,
+        2
+      ],
+      "worker_and_child_rss_kib": 233424,
+      "cgroup_memory_bytes": 865636352
+    },
+    {
+      "elapsed": 19.673936959006824,
+      "active": 0,
+      "queued": 66,
+      "idle_ready_slot_seconds": 4.340081499889493,
+      "memory": {
+        "jemalloc.allocated": 312065000.0,
+        "MemoryResident": 661618688.0,
+        "MemoryTracking": 133639381
+      },
+      "parts": [
+        20,
+        1715147
+      ],
+      "merges": 0,
+      "pg": [
+        45568,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233424,
+      "cgroup_memory_bytes": 883662848
+    },
+    {
+      "elapsed": 20.754769249993842,
+      "active": 0,
+      "queued": 63,
+      "idle_ready_slot_seconds": 4.323329163948074,
+      "memory": {
+        "jemalloc.allocated": 311922960.0,
+        "MemoryResident": 661745664.0,
+        "MemoryTracking": 133741149
+      },
+      "parts": [
+        20,
+        1715147
+      ],
+      "merges": 0,
+      "pg": [
+        45582,
+        103,
+        3
+      ],
+      "worker_and_child_rss_kib": 233456,
+      "cgroup_memory_bytes": 872697856
+    },
+    {
+      "elapsed": 21.841961375030223,
+      "active": 0,
+      "queued": 62,
+      "idle_ready_slot_seconds": 4.348768500145525,
+      "memory": {
+        "jemalloc.allocated": 312476680.0,
+        "MemoryResident": 652677120.0,
+        "MemoryTracking": 134615830
+      },
+      "parts": [
+        27,
+        1872275
+      ],
+      "merges": 0,
+      "pg": [
+        45630,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233472,
+      "cgroup_memory_bytes": 876003328
+    },
+    {
+      "elapsed": 22.924282249994576,
+      "active": 0,
+      "queued": 62,
+      "idle_ready_slot_seconds": 4.329283499857411,
+      "memory": {
+        "jemalloc.allocated": 311665240.0,
+        "MemoryResident": 653111296.0,
+        "MemoryTracking": 134720528
+      },
+      "parts": [
+        27,
+        1872275
+      ],
+      "merges": 0,
+      "pg": [
+        45632,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233264,
+      "cgroup_memory_bytes": 876675072
+    },
+    {
+      "elapsed": 24.016991875017993,
+      "active": 0,
+      "queued": 58,
+      "idle_ready_slot_seconds": 4.370838500093669,
+      "memory": {
+        "jemalloc.allocated": 313210584.0,
+        "MemoryResident": 663547904.0,
+        "MemoryTracking": 135651714
+      },
+      "parts": [
+        29,
+        1878950
+      ],
+      "merges": 0,
+      "pg": [
+        45692,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233392,
+      "cgroup_memory_bytes": 870596608
+    },
+    {
+      "elapsed": 25.09089520899579,
+      "active": 0,
+      "queued": 58,
+      "idle_ready_slot_seconds": 4.2956133359111845,
+      "memory": {
+        "jemalloc.allocated": 312148528.0,
+        "MemoryResident": 646873088.0,
+        "MemoryTracking": 135706080
+      },
+      "parts": [
+        29,
+        1878950
+      ],
+      "merges": 0,
+      "pg": [
+        45694,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233392,
+      "cgroup_memory_bytes": 871149568
+    },
+    {
+      "elapsed": 26.157574874989223,
+      "active": 0,
+      "queued": 54,
+      "idle_ready_slot_seconds": 4.266718663973734,
+      "memory": {
+        "jemalloc.allocated": 312408392.0,
+        "MemoryResident": 647118848.0,
+        "MemoryTracking": 134115423
+      },
+      "parts": [
+        26,
+        1884976
+      ],
+      "merges": 0,
+      "pg": [
+        45754,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233632,
+      "cgroup_memory_bytes": 890601472
+    },
+    {
+      "elapsed": 27.225893084018026,
+      "active": 0,
+      "queued": 54,
+      "idle_ready_slot_seconds": 4.273272836115211,
+      "memory": {
+        "jemalloc.allocated": 308716432.0,
+        "MemoryResident": 660770816.0,
+        "MemoryTracking": 134147105
+      },
+      "parts": [
+        26,
+        1884976
+      ],
+      "merges": 0,
+      "pg": [
+        45756,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233632,
+      "cgroup_memory_bytes": 874827776
+    },
+    {
+      "elapsed": 28.291933458996937,
+      "active": 0,
+      "queued": 50,
+      "idle_ready_slot_seconds": 4.2641614999156445,
+      "memory": {
+        "jemalloc.allocated": 308090368.0,
+        "MemoryResident": 660688896.0,
+        "MemoryTracking": 135121502
+      },
+      "parts": [
+        23,
+        1889375
+      ],
+      "merges": 0,
+      "pg": [
+        45839,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233792,
+      "cgroup_memory_bytes": 866066432
+    },
+    {
+      "elapsed": 29.3570324589964,
+      "active": 0,
+      "queued": 50,
+      "idle_ready_slot_seconds": 4.260395999997854,
+      "memory": {
+        "jemalloc.allocated": 309062752.0,
+        "MemoryResident": 648552448.0,
+        "MemoryTracking": 135153362
+      },
+      "parts": [
+        23,
+        1889375
+      ],
+      "merges": 0,
+      "pg": [
+        45841,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233792,
+      "cgroup_memory_bytes": 847826944
+    },
+    {
+      "elapsed": 30.421893000020646,
+      "active": 0,
+      "queued": 46,
+      "idle_ready_slot_seconds": 4.259442164096981,
+      "memory": {
+        "jemalloc.allocated": 309168656.0,
+        "MemoryResident": 649658368.0,
+        "MemoryTracking": 136123109
+      },
+      "parts": [
+        20,
+        1897406
+      ],
+      "merges": 0,
+      "pg": [
+        45901,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233904,
+      "cgroup_memory_bytes": 849960960
+    },
+    {
+      "elapsed": 31.486970417026896,
+      "active": 0,
+      "queued": 46,
+      "idle_ready_slot_seconds": 4.260309668025002,
+      "memory": {
+        "jemalloc.allocated": 308317304.0,
+        "MemoryResident": 642887680.0,
+        "MemoryTracking": 136154747
+      },
+      "parts": [
+        20,
+        1897406
+      ],
+      "merges": 0,
+      "pg": [
+        45903,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233904,
+      "cgroup_memory_bytes": 843923456
+    },
+    {
+      "elapsed": 32.55091649998212,
+      "active": 0,
+      "queued": 42,
+      "idle_ready_slot_seconds": 4.255784331820905,
+      "memory": {
+        "jemalloc.allocated": 309770088.0,
+        "MemoryResident": 647888896.0,
+        "MemoryTracking": 137029428
+      },
+      "parts": [
+        27,
+        2054299
+      ],
+      "merges": 0,
+      "pg": [
+        45963,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233952,
+      "cgroup_memory_bytes": 850800640
+    },
+    {
+      "elapsed": 33.61593379202532,
+      "active": 0,
+      "queued": 42,
+      "idle_ready_slot_seconds": 4.260069168172777,
+      "memory": {
+        "jemalloc.allocated": 308953624.0,
+        "MemoryResident": 637472768.0,
+        "MemoryTracking": 137133998
+      },
+      "parts": [
+        27,
+        2054299
+      ],
+      "merges": 0,
+      "pg": [
+        45965,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233952,
+      "cgroup_memory_bytes": 839487488
+    },
+    {
+      "elapsed": 34.68088587501552,
+      "active": 0,
+      "queued": 38,
+      "idle_ready_slot_seconds": 4.259808331960812,
+      "memory": {
+        "jemalloc.allocated": 323381008.0,
+        "MemoryResident": 646369280.0,
+        "MemoryTracking": 138079834
+      },
+      "parts": [
+        29,
+        2061378
+      ],
+      "merges": 0,
+      "pg": [
+        46025,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233968,
+      "cgroup_memory_bytes": 851349504
+    },
+    {
+      "elapsed": 35.74664525000844,
+      "active": 0,
+      "queued": 38,
+      "idle_ready_slot_seconds": 4.263037499971688,
+      "memory": {
+        "jemalloc.allocated": 307670016.0,
+        "MemoryResident": 647901184.0,
+        "MemoryTracking": 134703270
+      },
+      "parts": [
+        29,
+        2061378
+      ],
+      "merges": 0,
+      "pg": [
+        46027,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233968,
+      "cgroup_memory_bytes": 844283904
+    },
+    {
+      "elapsed": 36.81005133403232,
+      "active": 0,
+      "queued": 34,
+      "idle_ready_slot_seconds": 4.253624336095527,
+      "memory": {
+        "jemalloc.allocated": 304828472.0,
+        "MemoryResident": 641241088.0,
+        "MemoryTracking": 135673781
+      },
+      "parts": [
+        26,
+        2031178
+      ],
+      "merges": 0,
+      "pg": [
+        46087,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233968,
+      "cgroup_memory_bytes": 849256448
+    },
+    {
+      "elapsed": 37.87397466698894,
+      "active": 0,
+      "queued": 34,
+      "idle_ready_slot_seconds": 4.255693331826478,
+      "memory": {
+        "jemalloc.allocated": 305446632.0,
+        "MemoryResident": 647434240.0,
+        "MemoryTracking": 135754362
+      },
+      "parts": [
+        26,
+        2031178
+      ],
+      "merges": 0,
+      "pg": [
+        46089,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233968,
+      "cgroup_memory_bytes": 854278144
+    },
+    {
+      "elapsed": 38.95795208401978,
+      "active": 0,
+      "queued": 30,
+      "idle_ready_slot_seconds": 4.3359096681233495,
+      "memory": {
+        "jemalloc.allocated": 304736336.0,
+        "MemoryResident": 636067840.0,
+        "MemoryTracking": 136700554
+      },
+      "parts": [
+        23,
+        2035841
+      ],
+      "merges": 0,
+      "pg": [
+        46149,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233968,
+      "cgroup_memory_bytes": 844877824
+    },
+    {
+      "elapsed": 40.02692258398747,
+      "active": 0,
+      "queued": 30,
+      "idle_ready_slot_seconds": 4.275881999870762,
+      "memory": {
+        "jemalloc.allocated": 305934600.0,
+        "MemoryResident": 638345216.0,
+        "MemoryTracking": 136493304
+      },
+      "parts": [
+        23,
+        2035841
+      ],
+      "merges": 0,
+      "pg": [
+        46151,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233952,
+      "cgroup_memory_bytes": 846372864
+    },
+    {
+      "elapsed": 41.09428245900199,
+      "active": 0,
+      "queued": 26,
+      "idle_ready_slot_seconds": 4.26943950005807,
+      "memory": {
+        "jemalloc.allocated": 304837008.0,
+        "MemoryResident": 640266240.0,
+        "MemoryTracking": 164575669
+      },
+      "parts": [
+        20,
+        2040146
+      ],
+      "merges": 0,
+      "pg": [
+        46186,
+        103,
+        2
+      ],
+      "worker_and_child_rss_kib": 233968,
+      "cgroup_memory_bytes": 852357120
+    },
+    {
+      "elapsed": 42.15110499999719,
+      "active": 0,
+      "queued": 26,
+      "idle_ready_slot_seconds": 4.227290163980797,
+      "memory": {
+        "jemalloc.allocated": 305682032.0,
+        "MemoryResident": 643145728.0,
+        "MemoryTracking": 136723843
+      },
+      "parts": [
+        20,
+        2040146
+      ],
+      "merges": 0,
+      "pg": [
+        46213,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233968,
+      "cgroup_memory_bytes": 851947520
+    },
+    {
+      "elapsed": 43.258298542001285,
+      "active": 4,
+      "queued": 22,
+      "idle_ready_slot_seconds": 0.0,
+      "memory": {
+        "jemalloc.allocated": 305684896.0,
+        "MemoryResident": 643260416.0,
+        "MemoryTracking": 136887063
+      },
+      "parts": [
+        23,
+        2079931
+      ],
+      "merges": 0,
+      "pg": [
+        46236,
+        103,
+        2
+      ],
+      "worker_and_child_rss_kib": 233984,
+      "cgroup_memory_bytes": 840597504
+    },
+    {
+      "elapsed": 44.346993209037464,
+      "active": 0,
+      "queued": 22,
+      "idle_ready_slot_seconds": 4.354778668144718,
+      "memory": {
+        "jemalloc.allocated": 306002952.0,
+        "MemoryResident": 626233344.0,
+        "MemoryTracking": 137630634
+      },
+      "parts": [
+        27,
+        2197031
+      ],
+      "merges": 0,
+      "pg": [
+        46275,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 233984,
+      "cgroup_memory_bytes": 838025216
+    },
+    {
+      "elapsed": 45.40898312500212,
+      "active": 0,
+      "queued": 22,
+      "idle_ready_slot_seconds": 4.247959663858637,
+      "memory": {
+        "jemalloc.allocated": 304885032.0,
+        "MemoryResident": 629800960.0,
+        "MemoryTracking": 138060146
+      },
+      "parts": [
+        27,
+        2197031
+      ],
+      "merges": 0,
+      "pg": [
+        46280,
+        103,
+        2
+      ],
+      "worker_and_child_rss_kib": 233984,
+      "cgroup_memory_bytes": 841580544
+    },
+    {
+      "elapsed": 46.47730579203926,
+      "active": 0,
+      "queued": 18,
+      "idle_ready_slot_seconds": 4.273290668148547,
+      "memory": {
+        "jemalloc.allocated": 301866280.0,
+        "MemoryResident": 636604416.0,
+        "MemoryTracking": 132297427
+      },
+      "parts": [
+        29,
+        2203364
+      ],
+      "merges": 0,
+      "pg": [
+        46337,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 234176,
+      "cgroup_memory_bytes": 848916480
+    },
+    {
+      "elapsed": 47.54336087498814,
+      "active": 0,
+      "queued": 18,
+      "idle_ready_slot_seconds": 4.264220331795514,
+      "memory": {
+        "jemalloc.allocated": 300759120.0,
+        "MemoryResident": 636985344.0,
+        "MemoryTracking": 132349431
+      },
+      "parts": [
+        29,
+        2203364
+      ],
+      "merges": 0,
+      "pg": [
+        46339,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 234176,
+      "cgroup_memory_bytes": 850288640
+    },
+    {
+      "elapsed": 48.608655749994796,
+      "active": 0,
+      "queued": 14,
+      "idle_ready_slot_seconds": 4.261179500026628,
+      "memory": {
+        "jemalloc.allocated": 302249192.0,
+        "MemoryResident": 638418944.0,
+        "MemoryTracking": 133323621
+      },
+      "parts": [
+        26,
+        2207552
+      ],
+      "merges": 0,
+      "pg": [
+        46399,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 234240,
+      "cgroup_memory_bytes": 850194432
+    },
+    {
+      "elapsed": 49.693007624999154,
+      "active": 0,
+      "queued": 14,
+      "idle_ready_slot_seconds": 4.337407500017434,
+      "memory": {
+        "jemalloc.allocated": 300634696.0,
+        "MemoryResident": 624627712.0,
+        "MemoryTracking": 133378022
+      },
+      "parts": [
+        26,
+        2207552
+      ],
+      "merges": 0,
+      "pg": [
+        46401,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 234240,
+      "cgroup_memory_bytes": 841838592
+    },
+    {
+      "elapsed": 50.77849162503844,
+      "active": 0,
+      "queued": 10,
+      "idle_ready_slot_seconds": 4.341936000157148,
+      "memory": {
+        "jemalloc.allocated": 300881416.0,
+        "MemoryResident": 635703296.0,
+        "MemoryTracking": 134352667
+      },
+      "parts": [
+        23,
+        2212277
+      ],
+      "merges": 0,
+      "pg": [
+        46461,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 234256,
+      "cgroup_memory_bytes": 850362368
+    },
+    {
+      "elapsed": 51.85391141701257,
+      "active": 0,
+      "queued": 10,
+      "idle_ready_slot_seconds": 4.301679167896509,
+      "memory": {
+        "jemalloc.allocated": 299842584.0,
+        "MemoryResident": 634277888.0,
+        "MemoryTracking": 134378845
+      },
+      "parts": [
+        23,
+        2212277
+      ],
+      "merges": 0,
+      "pg": [
+        46463,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 234256,
+      "cgroup_memory_bytes": 850292736
+    },
+    {
+      "elapsed": 52.951703209022526,
+      "active": 0,
+      "queued": 6,
+      "idle_ready_slot_seconds": 4.3911671680398285,
+      "memory": {
+        "jemalloc.allocated": 300879576.0,
+        "MemoryResident": 641347584.0,
+        "MemoryTracking": 135352857
+      },
+      "parts": [
+        20,
+        2182261
+      ],
+      "merges": 0,
+      "pg": [
+        46523,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 234288,
+      "cgroup_memory_bytes": 860655616
+    },
+    {
+      "elapsed": 54.02669012499973,
+      "active": 0,
+      "queued": 6,
+      "idle_ready_slot_seconds": 4.299947663908824,
+      "memory": {
+        "jemalloc.allocated": 299599032.0,
+        "MemoryResident": 634687488.0,
+        "MemoryTracking": 135405516
+      },
+      "parts": [
+        20,
+        2182261
+      ],
+      "merges": 0,
+      "pg": [
+        46525,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 234288,
+      "cgroup_memory_bytes": 848945152
+    },
+    {
+      "elapsed": 55.11705216701375,
+      "active": 0,
+      "queued": 2,
+      "idle_ready_slot_seconds": 4.361448168056086,
+      "memory": {
+        "jemalloc.allocated": 299461440.0,
+        "MemoryResident": 630763520.0,
+        "MemoryTracking": 136280261
+      },
+      "parts": [
+        27,
+        2339280
+      ],
+      "merges": 0,
+      "pg": [
+        46585,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 234288,
+      "cgroup_memory_bytes": 852418560
+    },
+    {
+      "elapsed": 56.18114629201591,
+      "active": 0,
+      "queued": 2,
+      "idle_ready_slot_seconds": 4.256376500008628,
+      "memory": {
+        "jemalloc.allocated": 300372472.0,
+        "MemoryResident": 633929728.0,
+        "MemoryTracking": 137066428
+      },
+      "parts": [
+        27,
+        2339280
+      ],
+      "merges": 0,
+      "pg": [
+        46587,
+        103,
+        1
+      ],
+      "worker_and_child_rss_kib": 234288,
+      "cgroup_memory_bytes": 865366016
+    }
+  ],
+  "failures": [
+    "AssertionError"
+  ],
+  "fixture_sha256": "17e165beb703518ef6f138977fe69d5d20e4d4a86d30d278b26e284043e9f457",
+  "pg_stats_before": [
+    45007,
+    103,
+    1
+  ],
+  "pre_work_memory": {
+    "jemalloc.allocated": 322490080.0,
+    "MemoryResident": 619261952.0
+  },
+  "container_before": "usage_usec 101197979\nuser_usec 60613181\nsystem_usec 40584798\nnice_usec 0\nnr_periods 16210\nnr_throttled 51\nthrottled_usec 14498776\nnr_bursts 0\nburst_usec 0\n254:0 rbytes=318164992 wbytes=792772608 rios=6600 wios=139464 dbytes=0 dios=0\n",
+  "provider_admission": {},
+  "process_family_cpu_s": 9.329377,
+  "pg_states": {
+    "succeeded": 102
+  },
+  "pg_counters": [
+    146880,
+    "146880",
+    "146880"
+  ],
+  "permits_after_drain": 0,
+  "scheduler_events": [
+    [
+      "queued",
+      null,
+      102
+    ],
+    [
+      "started",
+      null,
+      102
+    ],
+    [
+      "succeeded",
+      null,
+      102
+    ]
+  ],
+  "completion_s": 56.676510374993086,
+  "windows": 102,
+  "steady_windows": 0,
+  "windows_per_second": 0.0,
+  "idle_ready_slot_seconds": 0,
+  "full_windows_per_second": 1.7996873718076445,
+  "completion_times_s": [
+    0.14415075001306832,
+    0.15315708401612937,
+    0.16299899999285117,
+    0.31470229203114286,
+    2.5443093340145424,
+    2.55378841701895,
+    2.5644328339840285,
+    2.5745163750252686,
+    4.731300875020679,
+    4.740518292004708,
+    4.7516510839923285,
+    4.761446334014181,
+    7.06591375003336,
+    7.084923124988563,
+    7.100915667018853,
+    7.114917750004679,
+    9.394288584007882,
+    9.4076693750103,
+    9.420248374983203,
+    9.43386783398455,
+    11.647722584020812,
+    11.661047500034329,
+    11.675209792039823,
+    11.68831554200733,
+    13.959142042032909,
+    13.975641000026371,
+    13.99103145900881,
+    14.00608258403372,
+    16.22619825002039,
+    16.239867875003256,
+    16.25483529199846,
+    16.268442458997015,
+    18.593898500024807,
+    18.612634374992922,
+    18.625888209033292,
+    18.642563458997756,
+    20.97542779200012,
+    20.988440459012054,
+    21.00329570902977,
+    21.016483541985508,
+    23.203815041983034,
+    23.215015041991137,
+    23.22628420899855,
+    23.238114375039004,
+    25.434498208982404,
+    25.444009167025797,
+    25.45528762502363,
+    25.468303167028353,
+    27.642992167035118,
+    27.65252658398822,
+    27.66492616699543,
+    27.675057458982337,
+    29.887305042007938,
+    29.89678804203868,
+    29.907581000006758,
+    29.917725459032226,
+    32.12716533400817,
+    32.137058084015734,
+    32.14871612499701,
+    32.160754167009145,
+    34.334425500012,
+    34.34511420899071,
+    34.35605983401183,
+    34.36759316700045,
+    36.56583725003293,
+    36.57564220903441,
+    36.58842400001595,
+    36.599256000015885,
+    38.80995895899832,
+    38.820153667009436,
+    38.83153204200789,
+    38.842079791997094,
+    41.05945529200835,
+    41.070302749983966,
+    41.08116912498372,
+    41.093382959021255,
+    43.335352374997456,
+    43.34726670902455,
+    43.35707895900123,
+    43.368180666991975,
+    45.54502358403988,
+    45.55449483403936,
+    45.56448995898245,
+    45.57456383400131,
+    47.746933999995235,
+    47.76520208403235,
+    47.774870500026736,
+    47.783766000007745,
+    49.95040366699686,
+    49.961771542031784,
+    49.972894125035964,
+    49.98201883403817,
+    52.18429316702532,
+    52.19341295899358,
+    52.20425658399472,
+    52.21346308401553,
+    54.451907542010304,
+    54.46131487499224,
+    54.47186212503584,
+    54.4820805839845,
+    56.643882125034,
+    56.65450404200237
+  ],
+  "http_requests": 206,
+  "http_connections": 206,
+  "http_peak": 4,
+  "http_rejected": 0,
+  "storage_calls": 204,
+  "inserted_rows": 146880,
+  "maxrss": 260161536,
+  "child_maxrss": 234356736,
+  "cpu_s": 5.214976,
+  "canonical_new": 146880,
+  "query_metrics": [
+    [
+      "QueryStart",
+      204,
+      0,
+      0,
+      0
+    ],
+    [
+      "QueryFinish",
+      204,
+      440640,
+      43635090,
+      4908838
+    ]
+  ],
+  "post_drain_memory": {
+    "jemalloc.allocated": 298251432.0,
+    "MemoryResident": 644755456.0
+  },
+  "container_after": "983150592\nusage_usec 105661965\nuser_usec 63624835\nsystem_usec 42037129\nnice_usec 0\nnr_periods 16771\nnr_throttled 51\nthrottled_usec 14498776\nnr_bursts 0\nburst_usec 0\n254:0 rbytes=318558208 wbytes=865443840 rios=6672 wios=152400 dbytes=0 dios=0\n",
+  "pg_stats_after": [
+    46628,
+    103,
+    1
+  ],
+  "checks": {
+    "all_windows": true,
+    "canonical_count": true,
+    "required_window": false,
+    "no_permit_leak": true,
+    "sampling_complete": true
+  }
+}

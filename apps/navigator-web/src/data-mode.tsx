@@ -1,0 +1,3 @@
+import {Link,useSearchParams} from 'react-router';
+import {useWords} from './workspace-ui';
+export function DataMode(){const [params]=useSearchParams(),w=useWords();return <nav className="artifact-mode" aria-label={w('Data view','Вид данных')}>{[['candles',w('Candles','Свечи')],['artifacts',w('Artifacts','Артефакты')]].map(([mode,label])=>{const next=new URLSearchParams(params);mode==='candles'?next.delete('view'):next.set('view',mode);return <Link key={mode} to={`/data?${next}`} aria-current={(params.get('view')==='artifacts'?'artifacts':'candles')===mode?'page':undefined}>{label}</Link>;})}</nav>;}

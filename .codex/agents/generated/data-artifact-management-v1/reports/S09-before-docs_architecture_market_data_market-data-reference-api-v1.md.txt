@@ -1,0 +1,263 @@
+# Market Data -- Reference API v1 (markets + instruments)
+
+Validation boundary: a local Docker `runtime smoke` and real browser proof are
+required in addition to `pytest`, `ruff`, and `pyright` for browser-visible or
+persistence-affecting changes to this contract.
+
+> Статус: дополнен в `roehub-market-data-activation-and-instrument-selection-v1`.
+> CSV whitelist больше не является runtime-политикой. Каталог остаётся глобальным
+> справочником, а пользовательский выбор хранится и проверяется в PostgreSQL по
+> организации. Браузер обращается к этим маршрутам через `/api/market-data/*`;
+> пути API-router ниже приведены без proxy-префикса.
+
+This document fixes WEB-EPIC-03 architecture: auth-only JSON API endpoints for UI dropdown/search,
+backed by ClickHouse reference tables `market_data.ref_market` and `market_data.ref_instruments`.
+
+## Goal
+
+- Let Web UI load enabled markets and search enabled/tradable instruments without direct ClickHouse access.
+- Keep responses deterministic (stable ordering) and storage reads explicit (no ORM, no hidden FINAL).
+- Reuse existing identity auth (opaque Roehub session cookie) via API `current_user_dependency`.
+
+## Context
+
+- Reference data source-of-truth lives in ClickHouse (DDL):
+  - `migrations/clickhouse/market_data_ddl.sql`
+  - tables:
+    - `market_data.ref_market` (ReplacingMergeTree(updated_at), key `market_id`)
+    - `market_data.ref_instruments` (ReplacingMergeTree(updated_at), key `(market_id, symbol)`)
+
+- UI runs same-origin behind edge/web proxy (WEB-EPIC-02): browser calls JSON API via `/api/*`,
+  but API router paths remain without `/api` prefix.
+
+Docs:
+- `docs/architecture/roadmap/milestone-6-epics-v1.md` (WEB-EPIC-03)
+- `docs/architecture/apps/web/web-ui-skeleton-ssr-htmx-auth-v1.md` (UI uses these endpoints)
+- `docs/architecture/market_data/market-data-reference-data-sync-v2.md` (how ref tables are populated)
+- `docs/architecture/shared-kernel-primitives.md` (MarketId/Symbol/InstrumentId semantics)
+
+## Scope
+
+### 1) Application ports + use-cases (market_data context)
+
+Add read-only ports and use-cases for reference lookup:
+
+- `ListEnabledMarketsUseCase`:
+  - reads latest-state enabled markets from `ref_market`
+  - deterministic ordering: `market_id ASC`
+
+- `SearchEnabledTradableInstrumentsUseCase`:
+  - searches latest-state instruments within one `market_id`
+  - filter: `status='ENABLED' AND is_tradable=1`
+  - prefix search by `symbol` (`q`), deterministic ordering: `symbol ASC`
+  - `limit` validated (`default=50`, `max=200`)
+
+### 2) ClickHouse adapters (explicit SQL)
+
+Implement ClickHouse adapters that:
+
+- use explicit SQL and deterministic `ORDER BY`.
+- implement latest-state reads without `FINAL` via:
+  - `ORDER BY updated_at DESC`
+  - `LIMIT 1 BY <key>`
+
+### 3) API router (auth-only)
+
+Add a new router `market-data reference` with endpoints:
+
+- `GET /market-data/markets`
+  - auth-only (requires identity principal)
+  - returns enabled markets only
+  - ordering: `market_id ASC`
+  - response shape:
+    - `{"items": [{"market_id": 1, "exchange_name": "binance", "market_type": "spot", "market_code": "binance:spot"}, ...]}`
+
+- `GET /market-data/instruments?market_id=&q=&limit=`
+  - auth-only
+  - query params:
+    - `market_id` required (int)
+    - `q` optional prefix filter (string; blank treated as "no filter")
+    - `limit` optional, default 50, max 200
+  - behavior:
+    - unknown/disabled `market_id` => `200 {"items": []}`
+  - deterministic ordering: `symbol ASC`
+  - response shape:
+    - `{"items": [{"market_id": 1, "symbol": "BTCUSDT"}, ...]}`
+
+- `GET /market-data/catalog?market_id=&q=&limit=`
+  - auth-only and organization-scoped for `selected`, `strategy_pinned` and `effective`
+  - returns public catalog rows plus `catalog_state`, `coverage_state`,
+    `coverage_percent`, `artifact_state` and actual `artifact_bytes`
+  - `coverage_state=unknown` remains explicit until a symbol-specific exchange
+    history lower bound is confirmed; the API must never infer `100%`
+
+- `PUT|DELETE /market-data/selections/{market_id}/{symbol}`
+  - auth-only, idempotent organization-owned intent with an audit event
+  - deletion remains allowed while the instrument is pinned by an active strategy;
+    the response reports `strategy_pinned=true` and `effective=true` rather than
+    stopping the strategy or deleting market data
+
+### Navigator full-history semantics (2026-10-04)
+
+The candidate `apps/navigator-web` measures history from the instrument's confirmed
+`market_data_history_bounds.first_open_at` to the latest closed UTC minute. The
+start is discovered once through the existing provider-boundary inbox; an unknown
+start is explicit and cannot imply zero or complete coverage. The accepted
+`apps/platform-web` client is unchanged.
+
+- `GET /market-data/workspace/instruments?history_scope=full` adds full-history
+  coverage, per-instrument `history_start_at` and `history_end_at`. The default
+  `history_scope=range` and existing bounded coverage endpoint stay compatible.
+- `GET /market-data/workspace/history` validates authenticated catalog access and
+  returns exact unique/expected/missing minute counts, bounds and discovery state.
+  Counts use the existing canonical minute bitmap, not raw row totals. Incomplete
+  coverage never rounds up to 100 percent.
+- Work requests and batches accept additive `full_history=true`. Each instrument
+  uses its own confirmed start. The requested end remains part of the idempotent
+  command; Navigator captures a fresh closed-minute end when the user submits.
+  Custom ranges remain supported, but cannot precede a known exchange origin.
+- Existing work runners find the first missing interval, skip confirmed history,
+  and fetch only absent minute runs. They verify each written window before
+  acknowledging progress. Provider omissions use `source_history_incomplete`;
+  three retries without confirmed progress end in an explicit failure. Normal
+  source/storage backoff, fencing, pause/cancel priority and four-worker admission
+  are retained. No candle deletion, checkpoint reset or new storage migration.
+- Streaming selection persists desired collection immediately, including unknown,
+  empty or partial history. PUT no longer returns `409 full_history_required` and
+  does not synchronously read history storage. Authentication, organization scope,
+  same-origin and catalog eligibility remain enforced. `effective` means intent,
+  not verified live delivery. Navigator permits disabling during preparation.
+- The existing collector discovers history origin and queues the first missing
+  interval. Its durable REST queue checkpoints 60-minute windows without waiting
+  for the next subscription refresh between windows. Each window rechecks global
+  effective selections (including strategy pins); disabling all consumers stops
+  preparation after the in-flight window. Receipts for actual received candles
+  are still repaired independently. Only verified history admits a new WS stream;
+  normal reconnect/tail repair handles minutes closing during the handoff.
+- Existing selection audit rows persist requested/disabled actions. Sanitized
+  collector transition logs record origin discovery, preparation, history ready
+  and disable; durable recovery receipts expose retry time and terminal cause.
+  Temporary readiness reads retry with bounded backoff without tearing down
+  unaffected active streams. This is not a browser-error telemetry service.
+- Existing selected instruments are verified on collector startup. The existing
+  durable REST queue fills gaps before WebSocket admission. Unknown origins enter
+  the discovery inbox. Pending repairs deduplicate by instrument so a moving
+  clock cannot bypass backoff. A persistent provider omission blocks that
+  instrument after three retries, without stopping siblings. Failed admission
+  receipts survive restart and expose only a sanitized `history_repair_error`.
+  Manual history repair can unblock admission; verified completeness acknowledges
+  stale failure receipts before live collection starts. Existing live reconnect
+  and tail repair continue after admission.
+
+Navigator collection status also distinguishes the saved intent from the live
+collector lease and durable repair receipts. Additive `stream_state` values are
+`disabled`, `unknown`, `offline`, `running`, `recovering`, `retry_wait` and `blocked`.
+The lease proves that the collector process owns ingestion, not an open provider
+socket. Current coverage and last stored candle remain separate evidence. Pending
+repairs may expose their safe `next_retry_at`; internal tokens are never returned.
+Selected stream views poll every two seconds independently of general page refresh
+preferences. A pending candle is shown as history updating, not a fabricated 100%.
+Manual fill controls are suppressed while streaming owns recovery, except an
+explicitly blocked history repair. The enabled switch uses the existing violet
+state token.
+
+History coverage, completed job range and collection intent are distinct:
+`effective=true` is a requested/strategy-required collection intent, not proof of
+an open WebSocket. A completed job guarantees its fixed requested interval; later
+closed minutes can make current full-history coverage incomplete when streaming
+is disabled. Canonical bitmap aggregates assume the existing append-only candle
+lifecycle; administrative deletion requires rebuilding that aggregate index.
+
+### 4) Unit tests
+
+Add unit tests (no external services):
+
+- deterministic ordering guarantees
+- enabled/tradable filters
+- `q`/`limit` behavior
+- SQL shape assertions for adapters (query contains deterministic clauses)
+
+## Non-goals
+
+- Enrich `ref_instruments` from exchange REST metadata (base/quote/steps/min_notional).
+- Public unauth endpoints.
+- Caching layer (can be added later if needed).
+
+## Key decisions
+
+### 1) Auth-only via existing identity dependency
+
+Endpoints are protected and require a valid identity cookie.
+
+Reason:
+- UI operates only after login; reference data should not be publicly scraped by default.
+
+### 2) Deterministic ordering is part of the contract
+
+- markets: `market_id ASC`
+- instruments: `symbol ASC`
+
+Reason:
+- UI dropdown/search must be stable and testable.
+
+### 3) Latest-state reads without ClickHouse `FINAL`
+
+We treat reference tables as versioned rows and read the latest version deterministically:
+
+- `ORDER BY updated_at DESC LIMIT 1 BY <key>`
+
+Reason:
+- avoids expensive `FINAL` on ReplacingMergeTree.
+
+### 4) Unknown/disabled market_id returns empty list (HTTP 200)
+
+`GET /market-data/instruments` returns `items=[]` for unknown/disabled markets.
+
+Reason:
+- simplifies UI: markets are sourced from `/market-data/markets` anyway;
+- prevents error popups for edge-cases (stale UI state).
+
+## Contracts & invariants
+
+- `GET /market-data/markets` returns enabled markets only.
+- `GET /market-data/instruments` returns enabled+tradable instruments only.
+- All outputs are deterministically ordered.
+- `q` is prefix search by normalized `symbol` semantics (UI SHOULD send uppercase).
+- `limit` default is 50, maximum is 200.
+
+## Related files
+
+- `docs/architecture/roadmap/milestone-6-epics-v1.md` -- WEB-EPIC-03.
+- `migrations/clickhouse/market_data_ddl.sql` -- ClickHouse DDL for `ref_market`/`ref_instruments`.
+
+- `src/trading/contexts/market_data/application/dto/reference_data.py` -- existing reference DTOs.
+- `src/trading/contexts/market_data/application/ports/stores/*` -- existing ports patterns.
+- `src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py` -- ClickHouseGateway abstraction.
+
+- `apps/api/main/app.py` -- API composition root (will include new router).
+- `apps/api/wiring/modules/*` -- wiring module for new router.
+- `apps/api/routes/*` -- new router implementation.
+
+## How to verify
+
+```bash
+uv run ruff check .
+uv run pyright
+uv run pytest -q
+
+python -m tools.docs.generate_docs_index
+python -m tools.docs.generate_docs_index --check
+```
+
+For every runtime-visible change, run a local Docker `runtime smoke` and real
+browser proof: apply the PostgreSQL migration in a clean Compose environment,
+open `/settings#market_data`, find `BTCUSDT`, make both mutations through the
+UI, and confirm `/api/market-data/*` returns `200`. This does not replace the
+future `linux/amd64` matrix.
+
+## Risks / open questions
+
+- Risk: `q` omitted (no filter) may be slow if `ref_instruments` becomes large.
+  Mitigation v1: UI uses typeahead and should pass `q` for search.
+- Risk: reference tables might be empty if market-data sync has not been run.
+  Mitigation: run seed/sync jobs (see `docs/architecture/market_data/market-data-reference-data-sync-v2.md`).

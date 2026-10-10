@@ -142,6 +142,9 @@ class ApiControlAgentClient:
     def __init__(self, *, transport: ControlAgentUnixClient) -> None:
         self._transport = transport
 
+    def artifact_storage(self, envelope):
+        return self._transport.artifact_storage(envelope)
+
     def submit(self, request: OperationRequest) -> OperationResult:
         return self._transport.submit(request)
 

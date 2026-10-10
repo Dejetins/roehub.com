@@ -26,6 +26,8 @@ export function WorkError({error}: {error: unknown}) {
     'rate-limited': w('Too many requests. Wait before refreshing.', 'Слишком много запросов. Подождите перед обновлением.'),
   };
   const codes:Record<string,string>={
+    full_history_required:w('Fill all missing history before enabling streaming.','Перед включением стриминга дозагрузите всю недостающую историю.'),
+    history_origin_unknown:w('Wait for the exchange history start to be determined.','Дождитесь определения начала истории на бирже.'),
     duplicate_work:w('This instrument already has a download for an overlapping period. Open that request to continue.','Для этого инструмента уже есть загрузка пересекающегося периода. Откройте её, чтобы продолжить.'),
     queue_full:w('The queue has reached 200 unfinished requests. Finish or cancel some before adding more.','В очереди уже 200 незавершённых заданий. Завершите или отмените часть перед добавлением новых.'),
     stale_work_control:w('The download state changed. Refresh it before issuing another command.','Состояние загрузки изменилось. Обновите его перед следующей командой.'),

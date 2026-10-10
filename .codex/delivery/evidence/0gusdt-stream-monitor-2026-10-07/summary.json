@@ -1,0 +1,169 @@
+{
+  "started_at": "2026-10-06 21:51:05.931506+00:00",
+  "finished_at": "2026-10-06 21:56:05.954677+00:00",
+  "duration_s": 300.0225117080008,
+  "samples": [
+    {
+      "open_at": "2026-10-06 21:51:00",
+      "closed_at": "2026-10-06 21:52:00+00:00",
+      "received_at_local": "2026-10-06 21:52:00.136000+00:00",
+      "versions_observed": 1,
+      "close_to_receive_local_ms": 136.0,
+      "first_observed_in_canonical": "2026-10-06 21:52:02.359868+00:00",
+      "query_matches": 1,
+      "db_done_local": "2026-10-06 21:52:00.408636+00:00",
+      "receive_to_db_done_ms": 272.63599999999997,
+      "insert_query_ms": 17,
+      "close_to_db_done_local_ms": 408.636,
+      "close_to_db_done_clock_estimate_ms": 502.16140969848635
+    },
+    {
+      "open_at": "2026-10-06 21:52:00",
+      "closed_at": "2026-10-06 21:53:00+00:00",
+      "received_at_local": "2026-10-06 21:53:00.128000+00:00",
+      "versions_observed": 1,
+      "close_to_receive_local_ms": 128.0,
+      "first_observed_in_canonical": "2026-10-06 21:53:00.813455+00:00",
+      "query_matches": 1,
+      "db_done_local": "2026-10-06 21:53:00.398816+00:00",
+      "receive_to_db_done_ms": 270.816,
+      "insert_query_ms": 15,
+      "close_to_db_done_local_ms": 398.81600000000003,
+      "close_to_db_done_clock_estimate_ms": 492.34140969848636
+    },
+    {
+      "open_at": "2026-10-06 21:53:00",
+      "closed_at": "2026-10-06 21:54:00+00:00",
+      "received_at_local": "2026-10-06 21:54:00.129000+00:00",
+      "versions_observed": 1,
+      "close_to_receive_local_ms": 129.0,
+      "first_observed_in_canonical": "2026-10-06 21:54:01.298833+00:00",
+      "query_matches": 1,
+      "db_done_local": "2026-10-06 21:54:00.403374+00:00",
+      "receive_to_db_done_ms": 274.374,
+      "insert_query_ms": 15,
+      "close_to_db_done_local_ms": 403.374,
+      "close_to_db_done_clock_estimate_ms": 496.89940969848635
+    },
+    {
+      "open_at": "2026-10-06 21:54:00",
+      "closed_at": "2026-10-06 21:55:00+00:00",
+      "received_at_local": "2026-10-06 21:55:00.125000+00:00",
+      "versions_observed": 1,
+      "close_to_receive_local_ms": 125.0,
+      "first_observed_in_canonical": "2026-10-06 21:55:01.798677+00:00",
+      "query_matches": 1,
+      "db_done_local": "2026-10-06 21:55:00.398061+00:00",
+      "receive_to_db_done_ms": 273.061,
+      "insert_query_ms": 16,
+      "close_to_db_done_local_ms": 398.061,
+      "close_to_db_done_clock_estimate_ms": 491.5864096984863
+    },
+    {
+      "open_at": "2026-10-06 21:55:00",
+      "closed_at": "2026-10-06 21:56:00+00:00",
+      "received_at_local": "2026-10-06 21:56:00.115000+00:00",
+      "versions_observed": 1,
+      "close_to_receive_local_ms": 115.0,
+      "first_observed_in_canonical": "2026-10-06 21:56:02.238556+00:00",
+      "query_matches": 1,
+      "db_done_local": "2026-10-06 21:56:00.388489+00:00",
+      "receive_to_db_done_ms": 273.489,
+      "insert_query_ms": 16,
+      "close_to_db_done_local_ms": 388.489,
+      "close_to_db_done_clock_estimate_ms": 482.0144096984863
+    }
+  ],
+  "clock_offset_bounds_ms": [
+    27.649402618408203,
+    159.40141677856445
+  ],
+  "clock_correction_midpoint_ms": 93.52540969848633,
+  "collector_metric_deltas": {
+    "ws_reconnects_total": 0.0,
+    "ws_messages_total": 35.0,
+    "ws_errors_total": 0.0,
+    "ignored_non_closed_total": 25.0,
+    "insert_rows_total": 10.0,
+    "insert_batches_total": 5.0,
+    "insert_duration_seconds_bucket{le=\"0.01\"}": 0.0,
+    "insert_duration_seconds_bucket{le=\"0.05\"}": 5.0,
+    "insert_duration_seconds_bucket{le=\"0.1\"}": 5.0,
+    "insert_duration_seconds_bucket{le=\"0.25\"}": 5.0,
+    "insert_duration_seconds_bucket{le=\"0.5\"}": 5.0,
+    "insert_duration_seconds_bucket{le=\"1.0\"}": 5.0,
+    "insert_duration_seconds_bucket{le=\"2.0\"}": 5.0,
+    "insert_duration_seconds_bucket{le=\"5.0\"}": 5.0,
+    "insert_duration_seconds_bucket{le=\"+Inf\"}": 5.0,
+    "insert_duration_seconds_count": 5.0,
+    "insert_duration_seconds_sum": 0.193,
+    "insert_errors_total": 0.0,
+    "ws_closed_to_insert_start_seconds_bucket{le=\"0.01\"}": 0.0,
+    "ws_closed_to_insert_start_seconds_bucket{le=\"0.05\"}": 0.0,
+    "ws_closed_to_insert_start_seconds_bucket{le=\"0.1\"}": 0.0,
+    "ws_closed_to_insert_start_seconds_bucket{le=\"0.2\"}": 0.0,
+    "ws_closed_to_insert_start_seconds_bucket{le=\"0.35\"}": 10.0,
+    "ws_closed_to_insert_start_seconds_bucket{le=\"0.5\"}": 10.0,
+    "ws_closed_to_insert_start_seconds_bucket{le=\"0.75\"}": 10.0,
+    "ws_closed_to_insert_start_seconds_bucket{le=\"1.0\"}": 10.0,
+    "ws_closed_to_insert_start_seconds_bucket{le=\"2.0\"}": 10.0,
+    "ws_closed_to_insert_start_seconds_bucket{le=\"+Inf\"}": 10.0,
+    "ws_closed_to_insert_start_seconds_count": 10.0,
+    "ws_closed_to_insert_start_seconds_sum": 2.6029999999999998,
+    "ws_closed_to_insert_done_seconds_bucket{le=\"0.05\"}": 0.0,
+    "ws_closed_to_insert_done_seconds_bucket{le=\"0.1\"}": 0.0,
+    "ws_closed_to_insert_done_seconds_bucket{le=\"0.2\"}": 0.0,
+    "ws_closed_to_insert_done_seconds_bucket{le=\"0.35\"}": 10.0,
+    "ws_closed_to_insert_done_seconds_bucket{le=\"0.5\"}": 10.0,
+    "ws_closed_to_insert_done_seconds_bucket{le=\"0.75\"}": 10.0,
+    "ws_closed_to_insert_done_seconds_bucket{le=\"1.0\"}": 10.0,
+    "ws_closed_to_insert_done_seconds_bucket{le=\"2.0\"}": 10.0,
+    "ws_closed_to_insert_done_seconds_bucket{le=\"5.0\"}": 10.0,
+    "ws_closed_to_insert_done_seconds_bucket{le=\"+Inf\"}": 10.0,
+    "ws_closed_to_insert_done_seconds_count": 10.0,
+    "ws_closed_to_insert_done_seconds_sum": 2.989,
+    "ws_out_of_order_total": 0.0,
+    "ws_duplicates_total": 0.0
+  },
+  "collector_log_counts": {
+    "ERROR": 0,
+    "WARNING": 0,
+    "Traceback": 0,
+    "retry": 0,
+    "reconnect": 0
+  },
+  "monitor_errors": [],
+  "clickhouse_exceptions": [],
+  "query_log": [
+    {
+      "query_start_time_microseconds": "2026-10-06 21:52:00.391636",
+      "query_duration_ms": 17,
+      "written_rows": 6,
+      "memory_usage": 6364176
+    },
+    {
+      "query_start_time_microseconds": "2026-10-06 21:53:00.383816",
+      "query_duration_ms": 15,
+      "written_rows": 6,
+      "memory_usage": 6362992
+    },
+    {
+      "query_start_time_microseconds": "2026-10-06 21:54:00.388374",
+      "query_duration_ms": 15,
+      "written_rows": 6,
+      "memory_usage": 6362992
+    },
+    {
+      "query_start_time_microseconds": "2026-10-06 21:55:00.382061",
+      "query_duration_ms": 16,
+      "written_rows": 6,
+      "memory_usage": 6362992
+    },
+    {
+      "query_start_time_microseconds": "2026-10-06 21:56:00.372489",
+      "query_duration_ms": 16,
+      "written_rows": 6,
+      "memory_usage": 6362992
+    }
+  ]
+}

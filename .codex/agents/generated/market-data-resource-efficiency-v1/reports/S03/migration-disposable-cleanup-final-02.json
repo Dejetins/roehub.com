@@ -1,0 +1,12 @@
+{
+  "time": "2026-10-10T21:32:32.049864+00:00",
+  "name": "/roehub-s03-postgres-final",
+  "image": "sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d",
+  "memory": 536870912,
+  "nano_cpus": 1000000000,
+  "purpose": "final migration committed-DDL/missing-marker replay only",
+  "known_available_secret_scan_matches": 0,
+  "scan_boundary": "current final-PG and available S02 private values; earlier removed PG credential no longer available, prior artifacts were already redacted",
+  "removed": true,
+  "remaining_s03_containers": []
+}

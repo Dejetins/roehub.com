@@ -81,6 +81,8 @@ def surface():
                     queued=1, running=0, cancel_requested=0, oldest_queued_at=end)))
     app = FastAPI()
     app.state.jobs = jobs
+    app.state.origins = {}
+    app.state.search = stub(execute=lambda **kwargs: [instrument])
     app.include_router(
         build_market_data_workspace_router(
             current_user_dependency=current,
@@ -89,7 +91,8 @@ def surface():
             snapshots=stub(),
             jobs=jobs,
             markets=stub(execute=lambda: [stub(market_id=MarketId(2))]),
-            search=stub(execute=lambda **kwargs: [instrument]),
+            search=app.state.search,
+            history_readiness=stub(origins=stub(ready_starts=lambda **kwargs: app.state.origins)),
             index=stub(
                 distinct_ts_opens=lambda **kwargs: [UtcTimestamp(end - timedelta(minutes=2))]
             ),
@@ -307,3 +310,55 @@ def test_batch_and_events_origin_scope_projection_and_conflicts(surface):
     assert result.status_code == 200 and seen[-1]['organization_id'] == org
     assert 'worker_token' not in result.text
     assert client.get(events_route+'?limit=101', headers=headers).status_code == 422
+
+
+def test_full_history_batch_uses_each_origin_and_rejects_prelisting_range(surface):
+    client, seen, org, end = surface
+    headers = {"x-user":"allowed", "origin":"http://testserver"}
+    client.app.state.origins = {
+        (2, "BTCUSDT"): end - timedelta(days=100),
+        (2, "ETHUSDT"): end - timedelta(days=30),
+    }
+    client.app.state.search.execute = lambda **kwargs: [
+        InstrumentId(MarketId(2), Symbol(s)) for s in ("BTCUSDT", "ETHUSDT")
+    ]
+    jobs = client.app.state.jobs
+    captured=[]
+    def batch(**kwargs):
+        captured.extend(kwargs["requests"])
+        return [jobs.submit(request=c,now=kwargs["now"]) for c in kwargs["requests"]]
+    jobs.submit_batch=batch
+    body=dict(idempotency_key=str(uuid4()),market_id=2,symbols=["BTCUSDT","ETHUSDT"],
+              start_at=(end-timedelta(days=1)).isoformat(),end_at=end.isoformat(),full_history=True)
+    reply=client.post("/market-data/work-batches",headers=headers,json=body)
+    assert reply.status_code==200
+    assert [c.start_at for c in captured]==[end-timedelta(days=100),end-timedelta(days=30)]
+    assert all(c.end_at==end for c in captured)
+    before=len(seen)
+    bad={**body,"idempotency_key":str(uuid4()),"full_history":False,"start_at":(end-timedelta(days=101)).isoformat()}
+    assert client.post("/market-data/work-batches",headers=headers,json=bad).status_code==422
+    assert len(seen)==before
+    client.app.state.origins={}
+    assert (
+        client.post(
+            "/market-data/work-batches",
+            headers=headers,
+            json={**body, "idempotency_key": str(uuid4())},
+        ).status_code
+        == 409
+    )
+    assert len(seen)==before
+
+
+def test_pause_requested_exposes_resume_before_worker_acknowledges(surface):
+    client, _, _, _ = surface
+    headers = {'x-user': 'allowed', 'origin': 'http://testserver'}
+    saved = client.post('/market-data/work-requests', headers=headers,
+                        json=dict(idempotency_key=str(uuid4()), kind='catalog_refresh',
+                                  market_id=2)).json()
+    saved.update(state='pause_requested', control_version=1)
+    client.app.state.jobs.pause = lambda **kwargs: saved
+    response = client.post(f"/market-data/work-requests/{saved['job_id']}/pause",
+                           headers=headers, json={'control_version': 0})
+    assert response.status_code == 200
+    assert response.json()['can_resume'] and not response.json()['can_pause']

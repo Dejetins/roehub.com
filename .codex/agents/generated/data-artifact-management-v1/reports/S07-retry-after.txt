@@ -1,0 +1,142 @@
+- link "Skip to content":
+  - /url: "#workspace-heading"
+- complementary:
+  - generic "RoeHub": R
+  - navigation "Navigation":
+    - link "Overview":
+      - /url: /dashboard
+      - generic: Overview
+    - link "Backtests":
+      - /url: /backtests
+      - generic: Backtests
+    - link "Strategies":
+      - /url: /strategies
+      - generic: Strategies
+    - link "Data":
+      - /url: /data
+      - generic: Data
+    - link "Connections":
+      - /url: /connections
+      - generic: Connections
+    - link "Monitoring":
+      - /url: /monitoring
+      - generic: Monitoring
+    - link "Settings":
+      - /url: /settings/profile
+      - generic: Settings
+  - generic "Language": 文
+  - link "Sign out":
+    - /url: /logout
+    - generic: Sign out
+- main:
+  - text: Data
+  - generic: Navigator
+  - complementary:
+    - heading "Exchanges" [level=2]
+    - navigation "Exchanges":
+      - link "Binance":
+        - /url: /data?market=1&view=artifacts&exchange=binance
+  - heading "Data" [level=1]
+  - region "Artifact catalog":
+    - navigation "Data view":
+      - link "Candles":
+        - /url: /data?market=1&symbol=BTCUSDT
+      - link "Artifacts":
+        - /url: /data?market=1&symbol=BTCUSDT&view=artifacts
+    - text: Search instruments
+    - searchbox "Search instruments"
+    - text: Market
+    - combobox "Market":
+      - option "All markets" [selected]
+      - option "spot"
+    - generic: Mandatory base · optional derivative precompute
+    - button "Refresh" [disabled]:
+    - status:
+      - generic: Showing previous data
+    - alert: The service could not be read. Try refreshing.
+    - generic "Artifact rows":
+      - table:
+        - rowgroup:
+          - row "Select page Instrument Base NPY Derivatives Coverage · UTC Refresh":
+            - columnheader "Select page":
+              - checkbox "Select page" [disabled]
+            - columnheader "Instrument"
+            - columnheader "Base NPY"
+            - columnheader "Derivatives"
+            - columnheader "Coverage · UTC"
+            - columnheader "Refresh"
+        - rowgroup:
+          - row "Select BTCUSDT spot BTCUSDT spot Failed base · 1h · 7 / 10 bars 7 Attempt 2 Source unavailable On demand Running derivatives · Total unknown Attempt 2 Oct 7, 2026, 12:00 AM 7 day(s)":
+            - cell "Select BTCUSDT spot":
+              - checkbox "Select BTCUSDT spot" [disabled]
+            - cell "BTCUSDT spot":
+              - button "BTCUSDT"
+              - generic: spot
+            - cell "Failed base · 1h · 7 / 10 bars 7 Attempt 2 Source unavailable":
+              - generic: Failed
+              - generic: base · 1h · 7 / 10 bars
+              - progressbar "BTCUSDT Base · base · 1h"
+              - generic: Attempt 2
+              - generic: Source unavailable
+            - cell "On demand Running derivatives · Total unknown Attempt 2":
+              - text: On demand
+              - generic: Running
+              - generic: derivatives · Total unknown
+              - generic: Attempt 2
+            - cell "Oct 7, 2026, 12:00 AM"
+            - cell "7 day(s)"
+          - row "Select ETHUSDT spot ETHUSDT spot Waiting for source On demand Waiting for source — 1 day(s)":
+            - cell "Select ETHUSDT spot":
+              - checkbox "Select ETHUSDT spot" [disabled]
+            - cell "ETHUSDT spot":
+              - button "ETHUSDT"
+              - generic: spot
+            - cell "Waiting for source":
+              - generic: Waiting for source
+            - cell "On demand Waiting for source":
+              - text: On demand
+              - generic: Waiting for source
+            - cell "—"
+            - cell "1 day(s)"
+    - generic: Up to 50 rows per market
+  - complementary "Artifact settings":
+    - status:
+      - generic: Showing previous data
+    - alert: The service could not be read. Try refreshing.
+    - heading "BTCUSDT" [level=2]
+    - paragraph: binance · spot
+    - button "Close instrument":
+    - button "Update now" [disabled]
+    - button "Edit profile and schedule" [disabled]
+    - heading "Base NPY" [level=3]
+    - generic: Failed
+    - generic: base · 1h · 7 / 10 bars
+    - progressbar "Base NPY · base · 1h"
+    - generic: Attempt 2
+    - generic: Source unavailable
+    - term: Source through · UTC
+    - definition: Oct 8, 2026, 12:00 AM
+    - term: Ready through · UTC
+    - definition: Oct 7, 2026, 12:00 AM
+    - term: Last run · UTC
+    - definition: Oct 8, 2026, 7:39 PM
+    - term: Last successful run · UTC
+    - definition: Oct 7, 2026, 12:10 AM
+    - term: Next run · UTC
+    - definition: Oct 14, 2026, 11:00 PM
+    - paragraph: 7 day(s) · Europe/Moscow · 02:00:00
+    - paragraph: "Size: Unknown"
+    - generic "Timeframe coverage"
+    - heading "Derivatives" [level=3]
+    - paragraph: On demand · 39 / 40 indicators
+    - generic: Running
+    - generic: derivatives · Total unknown
+    - generic: Attempt 2
+    - paragraph: 15m, 1d, 1h, 2d, 2h, 30m, 3d, 4h, 6h, 8h
+    - paragraph: All loaded history
+    - generic "Risk levels · TP 100 / SL 50"
+    - paragraph: Turning precompute off retains existing files.
+    - status: Retry allowed after Oct 8, 2026, 7:42 PM
+    - button "Refresh changed state" [disabled]
+    - status
+    - button "Request history"

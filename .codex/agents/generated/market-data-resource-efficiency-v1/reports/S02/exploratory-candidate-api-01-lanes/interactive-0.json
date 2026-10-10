@@ -1,0 +1,5 @@
+{
+  "workload": "interactive",
+  "index": 0,
+  "fatal": "PydanticUndefinedAnnotation"
+}

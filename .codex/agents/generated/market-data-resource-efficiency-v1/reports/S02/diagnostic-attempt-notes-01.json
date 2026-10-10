@@ -1,0 +1,7 @@
+{
+  "required-tests-final-01": "Interrupted private runner: pytest.main lacked __main__ guard, causing multiprocessing children to enter pytest again. Current raw file retained; coordination reported possible previous overwrite, so any earlier raw contents are unavailable and are not reconstructed or used as evidence.",
+  "required-tests-final-02": "Initial async negatives ran against stale mounted profiles: preparation copied to profiles.xml instead of actual bind source clickhouse-profiles.xml. Correct source updated; await suite and rerun failing boundary.",
+  "recreate-01": "Private smoke passed bare image sha; renderer correctly rejected non digest-pinned release reference.",
+  "recreate-02": "Disposable users.xml was stale before corrected raw SELECT grants; native MV denied 497. Regenerated temporary XML from current grant generator with identical passwords.",
+  "recreate-03": "Complete legacy -> provisioned -> active -> provisioned sequence using generated service; raw MV/data/credentials/settings retained."
+}

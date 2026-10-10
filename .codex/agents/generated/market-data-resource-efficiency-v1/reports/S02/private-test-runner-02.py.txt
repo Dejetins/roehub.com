@@ -1,0 +1,14 @@
+import os,sys
+from pathlib import Path
+from psycopg.conninfo import make_conninfo
+from apps.cli.wiring.db.clickhouse import _read_env_file
+import pytest
+v=_read_env_file(Path('.cache/market-data-s02/private/postgres.env'))
+os.environ.update(ROEHUB_HISTORY_CH_TEST='1', CH_HOST='127.0.0.1',CH_PORT='38123',CH_USER='s02_admin',CH_PASSWORD=Path('.cache/market-data-s02/private/admin').read_text(),ROEHUB_BASE_TEST_CLICKHOUSE_PORT='38123')
+os.environ['ROEHUB_BACKTEST_TEST_DSN']=make_conninfo(host='127.0.0.1',port=35432,user=v['POSTGRES_USER'],password=v['POSTGRES_PASSWORD'],dbname='postgres')
+os.environ['ROEHUB_MARKET_DATA_TEST_DSN']=os.environ['ROEHUB_BACKTEST_TEST_DSN']
+for w in ('stream','interactive','backfill','artifacts'):
+ os.environ['ROEHUB_CH_'+w.upper()+'_PASSWORD_FILE']=str(Path('.cache/market-data-s02/private/classes/'+w+'.password').resolve())
+os.environ.update(ROEHUB_MARKET_DATA_TEST_CH_PORT='38123',ROEHUB_MARKET_DATA_TEST_CH_USER='s02_admin',ROEHUB_MARKET_DATA_TEST_CH_PASSWORD=os.environ['CH_PASSWORD'])
+if __name__ == "__main__":
+ sys.exit(pytest.main(sys.argv[1:]))

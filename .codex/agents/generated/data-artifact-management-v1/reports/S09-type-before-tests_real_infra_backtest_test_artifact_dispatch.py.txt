@@ -1,0 +1,862 @@
+# ruff: noqa: F811
+"""Controlled clocks and actual disposable PG/native filesystem dispatch."""
+
+from dataclasses import replace
+from datetime import timedelta
+from pathlib import Path
+from typing import LiteralString, cast
+from uuid import UUID
+
+import psycopg
+import pytest
+from psycopg import sql
+
+from apps.scheduler.backtest_artifact_publisher.wiring.managed_worker import ManagedArtifactWorker
+from tests.real_infra.backtest.test_artifact_management import (
+    DSN,
+    NOW,
+    catalog,  # noqa: F401
+    item,
+    managed,  # noqa: F401
+    submit,
+)  # noqa: F401
+from tests.real_infra.backtest.test_automatic_base_lifecycle import repository as base_repository
+from tests.unit.contexts.backtest_artifacts.test_automatic_base import START, Source, setup
+from trading.contexts.backtest.adapters.outbound.persistence.postgres import (
+    PostgresBacktestJobRepository,
+)
+from trading.contexts.backtest_artifacts.adapters.outbound.artifacts_fs.base_storage_admission import (  # noqa: E501
+    BaseStorageAdmission,
+)
+from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.dispatch_repository import (  # noqa: E501
+    PostgresArtifactDispatchRepository,
+)
+from trading.contexts.backtest_artifacts.application.services.management import History
+
+pytestmark = pytest.mark.skipif(not DSN, reason="explicit disposable PG required")
+
+
+original_item = item
+
+
+def item(*args, **kwargs):
+    result = original_item(*args, **kwargs)
+    if result.source is not None:
+        result = result.model_copy(
+            update={
+                "source": result.source.model_copy(update={"compute_identity": "native-base-v2"})
+            }
+        )
+    return result
+
+
+@pytest.fixture
+def dispatch(managed):
+    m = managed
+    with psycopg.connect(m["dsn"]) as conn:
+        conn.execute(
+            sql.SQL(
+                cast(
+                    LiteralString,
+                    Path("migrations/postgres/0030_backtest_artifact_dispatch_v1.sql").read_text(),
+                )
+            )
+        )
+    base_repository(m)
+    m["repo"] = PostgresArtifactDispatchRepository(
+        gateway=m["db"], catalog=m["catalog"], access=m["repo"].access
+    )
+    return m
+
+
+def test_occurrence_restart_manual_anchor_and_coalescing(dispatch):
+    m = dispatch
+    r = m["repo"]
+    p = item(m)
+    r.observe_source(
+        installation_id=m["installation"], coordinate=p.coordinate, source=p.source, observed_at=NOW
+    )
+    assert r.tick(installation=m["installation"], now=NOW) == 1
+    assert r.tick(installation=m["installation"], now=NOW) == 0
+    later = NOW + timedelta(days=30)
+    assert r.tick(installation=m["installation"], now=later) == 1
+    requests = r.rows("SELECT * FROM backtest_artifact_requests ORDER BY created_at")
+    assert len(requests) == 3
+    out = submit(m, (p,))
+    assert out["items"][0]["state"] == "queued"
+    submit(m, (item(m, version=1, profile=p.profile),), key="manual-0002")
+    policy = r.rows("SELECT * FROM backtest_artifact_policies")[0]
+    assert policy["schedule"] == p.schedule.model_dump(mode="json")
+
+
+def worker(m, tmp_path):
+    f, p = setup(tmp_path, repo=PostgresBacktestJobRepository(gateway=m["db"]))
+    p = replace(p, runner=replace(p.runner, canonical_candle_reader=Source(180)))
+    return f, ManagedArtifactWorker(
+        m["repo"],
+        p,
+        BaseStorageAdmission(f.builder.root, "backtest-primary", 1, 10_737_418_240),
+        now=lambda: NOW,
+    )
+
+
+def test_native_dedup_progress_and_committed_recovery(dispatch, tmp_path, monkeypatch):
+    m = dispatch
+    r = m["repo"]
+    p = item(m)
+    target = p.source.model_copy(
+        update=dict(
+            history=History(kind="range", start_utc=START, end_utc=START + timedelta(minutes=180)),
+            watermark=START + timedelta(minutes=180),
+        )
+    )
+    p = p.model_copy(update={"source": target})
+    first = submit(m, (p,))
+    second = submit(m, (p,), key="other-0001", organization_id=m["other"])
+    f, w = worker(m, tmp_path)
+    original = r.finish_base
+
+    def lost(**kwargs):
+        raise RuntimeError("injected PG completion outage")
+
+    monkeypatch.setattr(r, "finish_base", lost)
+    with pytest.raises(RuntimeError, match="injected"):
+        w.run_once(m["installation"])
+    assert r.rows("SELECT state FROM backtest_artifact_builds")[0]["state"] == "quarantined"
+    assert len(r.rows("SELECT * FROM backtest_artifact_build_requests")) == 2
+    monkeypatch.setattr(r, "finish_base", original)
+    assert w.reconcile(m["installation"]) == 1
+    assert {x["state"] for x in r.rows("SELECT state FROM backtest_artifact_requests")} == {"ready"}
+    assert len(r.rows("SELECT * FROM backtest_artifact_builds")) == 1
+    assert r.events(
+        organization_id=m["org"],
+        actor_id=m["actor"],
+        request_id=UUID(first["items"][0]["request_id"]),
+    )
+    assert second["items"][0]["request_id"] != first["items"][0]["request_id"]
+
+
+@pytest.mark.parametrize("insufficient", [False, True])
+def test_actual_precompute_union_and_native_progress(dispatch, tmp_path, insufficient):
+    from tests.unit.contexts.backtest_artifacts.test_derivative_profiles import (
+        IndicatorsComputeNumbaConfig,
+        NumbaIndicatorCompute,
+        n,
+        profile,
+    )
+
+    m = dispatch
+    r = m["repo"]
+    f, w = worker(m, tmp_path)
+    runner = replace(
+        w.publisher.runner,
+        indicator_grid_builder=n._signal_grid_builder_v2(),
+        defaults_provider=n.YamlBacktestGridDefaultsProvider.from_yaml(
+            config_path=Path("configs/dev/indicators.yaml")
+        ),
+        signal_rules_engine=n.BacktestSignalRulesEngineV2(
+            defaults_provider=n.YamlBacktestGridDefaultsProvider.from_yaml(
+                config_path=Path("configs/dev/indicators.yaml")
+            )
+        ),
+        indicator_compute=NumbaIndicatorCompute(
+            defs=n.all_defs(),
+            config=IndicatorsComputeNumbaConfig(
+                numba_num_threads=1, numba_cache_dir=tmp_path / "jit"
+            ),
+        ),
+    )
+    w.publisher = replace(w.publisher, runner=runner)
+    p = item(m, profile=profile(m["catalog"], names=("ma.sma",), tp=(), sl=()))
+    if insufficient:
+        p = p.model_copy(
+            update={"profile": p.profile.model_copy(update={"derivative_timeframes": ("3d",)})}
+        )
+    source = p.source.model_copy(
+        update=dict(
+            history=History(kind="range", start_utc=START, end_utc=START + timedelta(minutes=180)),
+            watermark=START + timedelta(minutes=180),
+        )
+    )
+    p = p.model_copy(update={"source": source})
+    submit(m, (p,))
+    submit(
+        m,
+        (p.model_copy(update={"profile": profile(m["catalog"], names=("ma.ema",), tp=(), sl=())}),),
+        key="other-precompute",
+        organization_id=m["other"],
+    )
+    result = w.run_once(m["installation"])
+    assert result.publication is not None
+    manifest = f.loader.load_slot_manifest(
+        f.coordinates, result.publication.published_pointer.active_slot
+    )
+    assert {x.indicator_id for x in manifest.signals.manifests} == (
+        {"ma.ema"} if insufficient else {"ma.sma", "ma.ema"}
+    )
+    build = r.rows("SELECT * FROM backtest_artifact_builds")[0]
+    assert build["state"] == "ready"
+    assert build["progress"]["series"]["base:15m:bars"]["completed_units"] > 0
+    assert build["progress"]["series"]["derivatives:15m:bars"]["completed_units"] > 0
+    assert {x["state"] for x in r.rows("SELECT state FROM backtest_artifact_requests")} == (
+        {"ready", "waiting_for_source"} if insufficient else {"ready"}
+    )
+    if insufficient:
+        assert (
+            r.rows(
+                "SELECT reason FROM backtest_artifact_requests WHERE state='waiting_for_source'"
+            )[0]["reason"]
+            == "derivative_insufficient_history"
+        )
+
+
+def test_inherited_default_and_override_days(dispatch):
+    m = dispatch
+    r = m["repo"]
+    p = item(m)
+    submit(m, (p.model_copy(update={"schedule": None}),))
+    r.observe_source(
+        installation_id=m["installation"], coordinate=p.coordinate, source=p.source, observed_at=NOW
+    )
+    r.tick(installation=m["installation"], now=NOW)
+    own = r.rows("SELECT * FROM backtest_artifact_cadence WHERE lane<>'internal'")[0]
+    schedule = m["schedule"].model_copy(update={"interval_days": 7})
+    r.update_defaults(
+        organization_id=m["org"],
+        actor_id=m["actor"],
+        expected_version=1,
+        schedule=schedule,
+        budget_bytes=10737418240,
+    )
+    r.tick(installation=m["installation"], now=NOW)
+    latest = r.rows("SELECT * FROM backtest_artifact_cadence WHERE lane<>'internal'")[0]
+    assert latest["next_due"] - own["next_due"] == timedelta(days=6)
+    manual = p.model_copy(update={"expected_version": 1, "schedule": None})
+    submit(m, (manual,), key="manual-inherit")
+    assert r.rows("SELECT * FROM backtest_artifact_policies")[0]["inherits_schedule"]
+
+
+def test_fair_lanes_poison_request_and_quota_independence(dispatch, tmp_path):
+    from uuid import uuid4
+
+    m = dispatch
+    r = m["repo"]
+    p = item(m)
+    a = submit(m, (p,))["items"][0]["request_id"]
+    b = submit(m, (p,), key="other-roundrobin", organization_id=m["other"])["items"][0][
+        "request_id"
+    ]
+    # An invalid frozen catalog never poisons a mandatory base request.
+    r._exec(
+        "UPDATE backtest_artifact_requests SET "
+        "snapshot=jsonb_set(snapshot,'{profile,mode}','\"precompute\"') WHERE request_id=%(r)s",
+        r=UUID(a),
+    )
+    r._exec(
+        "UPDATE backtest_artifact_requests SET "
+        "snapshot=jsonb_set(snapshot,'{profile,catalog_indicators}','[]') WHERE request_id=%(r)s",
+        r=UUID(a),
+    )
+    selected = r.next_request(m["installation"])
+    build = r.claim_group(
+        installation=m["installation"],
+        request=selected,
+        owner=uuid4(),
+        incarnation=uuid4(),
+        reservation=100,
+    )
+    assert build is not None
+    assert r.rows(
+        "SELECT state,reason FROM backtest_artifact_requests WHERE request_id=%(r)s", r=UUID(a)
+    )[0] == {"state": "error", "reason": "catalog_snapshot_required"}
+    assert (
+        r.rows("SELECT state FROM backtest_artifact_requests WHERE request_id=%(r)s", r=UUID(b))[0][
+            "state"
+        ]
+        == "running"
+    )
+    r.finish(build=build, outcome="error", reason="test_finished")
+    # Failed requests do not leave a permanently selected poisoned FIFO head.
+    assert r.next_request(m["installation"]) is None
+
+
+def test_source_wait_pause_restart_cursor_and_budget(dispatch, tmp_path):
+    from trading.contexts.backtest_artifacts.application.services.management import ManagementError
+
+    m = dispatch
+    r = m["repo"]
+    p = item(m, source=False)
+    request = submit(m, (p,))["items"][0]["request_id"]
+    r.save_source_cursor(m["installation"], (1, "BTCUSDT"))
+    restarted = PostgresArtifactDispatchRepository(
+        gateway=m["db"], catalog=m["catalog"], access=r.access
+    )
+    assert restarted.source_cursor(m["installation"]) == (1, "BTCUSDT")
+    r._exec("UPDATE backtest_artifact_installation_settings SET paused=TRUE")
+    with pytest.raises(ManagementError, match="management_unavailable"):
+        r.tick(installation=m["installation"], now=NOW)
+    assert (
+        r.rows("SELECT state FROM backtest_artifact_requests")[0]["state"] == "waiting_for_source"
+    )
+    r._exec("UPDATE backtest_artifact_installation_settings SET paused=FALSE")
+    source = item(m).source
+    r.observe_source(
+        installation_id=m["installation"], coordinate=p.coordinate, source=source, observed_at=NOW
+    )
+    r.tick(installation=m["installation"], now=NOW)
+    assert (
+        r.rows(
+            "SELECT state FROM backtest_artifact_requests WHERE request_id=%(r)s", r=UUID(request)
+        )[0]["state"]
+        == "queued"
+    )
+    _, w = worker(m, tmp_path)
+    r._exec("UPDATE backtest_artifact_installation_settings SET budget_bytes=1")
+    assert w.run_once(m["installation"]) is None
+    assert (
+        r.rows("SELECT reason FROM backtest_artifact_requests WHERE state='error'")[0]["reason"]
+        == "resource_conflict"
+    )
+
+
+def test_progress_series_cannot_regress_after_another_phase(dispatch):
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from trading.contexts.backtest_artifacts.application.services.management import (
+        ManagementError,
+        Progress,
+    )
+
+    m = dispatch
+    r = m["repo"]
+    submit(m, (item(m),))
+    build = r.claim_group(
+        installation=m["installation"],
+        request=r.next_request(m["installation"]),
+        owner=uuid4(),
+        incarnation=uuid4(),
+        reservation=100,
+    )
+    p = Progress(
+        phase="base",
+        timeframe="15m",
+        completed_units=4,
+        total_units=None,
+        unit="bars",
+        observed_at=NOW,
+    )
+    r.observe(build=build, progress=p)
+    r.observe(
+        build=build,
+        progress=p.model_copy(
+            update={"phase": "derivatives", "observed_at": NOW + timedelta(seconds=1)}
+        ),
+    )
+    with pytest.raises(ManagementError, match="progress_regression"):
+        r.observe(
+            build=build,
+            progress=p.model_copy(
+                update={"completed_units": 3, "observed_at": NOW + timedelta(seconds=2)}
+            ),
+        )
+    r.finish(build=build, outcome="retry_wait", reason="transient_io")
+    fresh = r.retry(
+        build=build,
+        owner_token=uuid4(),
+        parent_incarnation=uuid4(),
+        now=datetime.now(UTC) + timedelta(days=1),
+    )
+    assert fresh["epoch"] == 2 and fresh["progress"] == {}
+    r.observe(build=fresh, progress=p.model_copy(update={"completed_units": 0}))
+    assert (
+        r.rows("SELECT progress FROM backtest_artifact_builds")[0]["progress"]["progress_epoch"]
+        == 2
+    )
+
+
+def test_handoff_requires_owner_and_legacy_drain(dispatch, tmp_path):
+    from apps.scheduler.backtest_artifact_publisher.wiring.modules.backtest_artifact_publisher import (  # noqa: E501
+        FileBacktestArtifactPublisherHostLock,
+    )
+    from trading.contexts.backtest_artifacts.application.services.management import ManagementError
+
+    m = dispatch
+    r = m["repo"]
+    lock = FileBacktestArtifactPublisherHostLock(tmp_path / "legacy.lock")
+    r._exec(
+        "UPDATE backtest_artifact_installation_settings SET capability_enabled=FALSE,"
+        "paused=TRUE,legacy_handoff='pending'"
+    )
+    args = dict(
+        organization_id=m["org"], actor_id=m["actor"], expected_version=1, host_lock=lock, now=NOW
+    )
+    with pytest.raises(ManagementError, match="legacy_scheduler_enabled"):
+        r.record_handoff(**args, legacy_disabled=False)
+    with pytest.raises(ManagementError, match="installation_forbidden"):
+        r.record_handoff(**dict(args, actor_id=m["admin"]), legacy_disabled=True)
+    r.record_handoff(**args, legacy_disabled=True)
+    state = r.rows("SELECT * FROM backtest_artifact_installation_settings")[0]
+    assert state["legacy_handoff"] == "complete" and state["capability_enabled"]
+    r._exec("UPDATE backtest_artifact_installation_settings SET capability_enabled=FALSE")
+    # Rollback of submission does not implicitly hand ownership back to the legacy writer.
+    assert (
+        r.rows("SELECT legacy_handoff FROM backtest_artifact_installation_settings")[0][
+            "legacy_handoff"
+        ]
+        == "complete"
+    )
+
+
+def test_metrics_disabled_and_lifetime_does_not_steal(dispatch, tmp_path):
+    from uuid import uuid4
+
+    from prometheus_client import CollectorRegistry
+
+    from apps.scheduler.backtest_artifact_publisher.wiring.managed_metrics import (
+        ManagedArtifactMetrics,
+    )
+    from apps.scheduler.backtest_artifact_publisher.wiring.managed_recovery import lifetime
+
+    m = dispatch
+    r = m["repo"]
+    submit(m, (item(m),))
+    registry = CollectorRegistry()
+    metrics = ManagedArtifactMetrics(registry)
+    metrics.sample(r, m["installation"])
+    assert registry.get_sample_value("backtest_artifact_managed_requests", {"state": "queued"}) == 1
+    owner = uuid4()
+    _, w = worker(m, tmp_path)
+    with lifetime(w.storage.root, {"owner_token": owner}):
+        build = r.claim_group(
+            installation=m["installation"],
+            request=r.next_request(m["installation"]),
+            owner=owner,
+            incarnation=uuid4(),
+            reservation=100,
+        )
+        assert build is not None
+        assert w.reconcile(m["installation"]) == 0
+        assert r.rows("SELECT state FROM backtest_artifact_builds")[0]["state"] == "running"
+    assert w.reconcile(m["installation"]) == 0
+    assert r.rows("SELECT state FROM backtest_artifact_builds")[0]["state"] == "quarantined"
+    r._exec("UPDATE backtest_artifact_installation_settings SET capability_enabled=FALSE")
+    metrics.sample(r, m["installation"])
+    assert registry.get_sample_value("backtest_artifact_managed_available") == 0
+
+
+def test_concurrent_claims_and_fifo_round_robin(dispatch):
+    from concurrent.futures import ThreadPoolExecutor
+    from uuid import uuid4
+
+    m = dispatch
+    r = m["repo"]
+    p = item(m)
+    submit(m, (p,))
+    submit(m, (item(m, "ETHUSDT"),), key="fifo-second")
+    submit(m, (p,), key="tenant-other", organization_id=m["other"])
+    selected = r.next_request(m["installation"])
+
+    def claim_one():
+        return r.claim_group(
+            installation=m["installation"],
+            request=selected,
+            owner=uuid4(),
+            incarnation=uuid4(),
+            reservation=100,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: claim_one(), range(2)))
+    assert sum(x is not None for x in results) == 1
+    build = next(x for x in results if x)
+    assert len(r.rows("SELECT * FROM backtest_artifact_builds")) == 1
+    assert {
+        x["organization_id"]
+        for x in r.rows(
+            "SELECT organization_id FROM backtest_artifact_requests WHERE state='running'"
+        )
+    } == {m["org"], m["other"]}
+    r.finish(build=build, outcome="error", reason="test_finished")
+    assert r.next_request(m["installation"])["symbol"] == "ETHUSDT"
+
+
+def test_override_does_not_get_internal_daily_refresh(dispatch):
+    m = dispatch
+    r = m["repo"]
+    p = item(m)
+    p = p.model_copy(update={"schedule": p.schedule.model_copy(update={"interval_days": 7})})
+    submit(m, (p,))
+    r.observe_source(
+        installation_id=m["installation"], coordinate=p.coordinate, source=p.source, observed_at=NOW
+    )
+    r.tick(installation=m["installation"], now=NOW)
+    rows = r.rows("SELECT * FROM backtest_artifact_cadence")
+    assert len(rows) == 1 and rows[0]["lane"] == str(m["org"])
+    assert r.tick(installation=m["installation"], now=NOW + timedelta(days=1)) == 0
+    assert r.tick(installation=m["installation"], now=NOW + timedelta(days=7)) == 1
+
+
+def test_real_composed_cycle_and_source_cursor(dispatch, tmp_path):
+    from apps.scheduler.backtest_artifact_publisher.wiring.managed_app import compose_managed_app
+    from apps.scheduler.backtest_artifact_publisher.wiring.modules.backtest_artifact_publisher import (  # noqa: E501
+        FileBacktestArtifactPublisherHostLock,
+    )
+    from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, UtcTimestamp
+
+    m = dispatch
+    f, w = worker(m, tmp_path)
+
+    class Stored:
+        def page(self, **kwargs):
+            return (InstrumentId(MarketId(1), Symbol("BTCUSDT")),)
+
+    class Index:
+        def bounds_1m(self, **kwargs):
+            return UtcTimestamp(START), UtcTimestamp(START + timedelta(minutes=179))
+
+        def distinct_ts_opens(self, **kwargs):
+            return (UtcTimestamp(START),)
+
+    app = compose_managed_app(
+        installation_id=m["installation"],
+        gateway=m["db"],
+        catalog=m["catalog"],
+        access=m["repo"].access,
+        publisher=w.publisher,
+        stored_coordinates=Stored(),
+        candle_index=Index(),
+        root=f.builder.root,
+        root_id="backtest-primary",
+        root_revision=1,
+        budget_bytes=10737418240,
+        host_lock=FileBacktestArtifactPublisherHostLock(tmp_path / "host.lock"),
+        now=lambda: NOW,
+    )
+    assert app.cycle() == "observed"
+    assert {x["state"] for x in m["repo"].rows("SELECT state FROM backtest_artifact_requests")} == {
+        "ready"
+    }
+    assert len(m["repo"].rows("SELECT * FROM backtest_artifact_builds")) == 1
+    assert app.cycle() == "observed"
+    assert len(m["repo"].rows("SELECT * FROM backtest_artifact_builds")) == 1
+
+
+def _claim_and_hold(dsn, root, installation, ready):
+    from time import sleep
+    from uuid import uuid4
+
+    from apps.scheduler.backtest_artifact_publisher.wiring.managed_recovery import lifetime
+    from tests.real_infra.backtest.test_artifact_management import Access
+    from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.gateway import (
+        PsycopgBacktestPostgresGateway,
+    )
+
+    repo = PostgresArtifactDispatchRepository(
+        gateway=PsycopgBacktestPostgresGateway(dsn=dsn), catalog=None, access=Access()
+    )
+    owner = uuid4()
+    with lifetime(Path(root), {"owner_token": owner}):
+        build = repo.claim_group(
+            installation=installation,
+            request=repo.next_request(installation),
+            owner=owner,
+            incarnation=uuid4(),
+            reservation=100,
+        )
+        ready.put(str(build["build_id"]))
+        sleep(60)
+
+
+def test_actual_process_death_retains_unknown_pointer_quarantine(dispatch, tmp_path):
+    import multiprocessing
+
+    m = dispatch
+    r = m["repo"]
+    submit(m, (item(m),))
+    _, w = worker(m, tmp_path)
+    ctx = multiprocessing.get_context("spawn")
+    ready = ctx.Queue()
+    child = ctx.Process(
+        target=_claim_and_hold, args=(m["dsn"], str(w.storage.root), m["installation"], ready)
+    )
+    child.start()
+    try:
+        build_id = ready.get(timeout=30)
+        assert w.reconcile(m["installation"]) == 0
+        assert r.rows("SELECT state FROM backtest_artifact_builds")[0]["state"] == "running"
+        child.terminate()
+        child.join(timeout=10)
+        assert not child.is_alive()
+        assert w.reconcile(m["installation"]) == 0
+        assert r.rows("SELECT state FROM backtest_artifact_builds")[0]["state"] == "quarantined"
+        directory = (
+            w.storage.root
+            / ".managed-attempts"
+            / str(r.rows("SELECT owner_token FROM backtest_artifact_builds")[0]["owner_token"])
+        )
+        (directory / "receipt.json").write_text("{broken")
+        assert w.reconcile(m["installation"]) == 0
+        assert (
+            str(r.rows("SELECT build_id FROM backtest_artifact_builds")[0]["build_id"]) == build_id
+        )
+    finally:
+        if child.is_alive():
+            child.terminate()
+            child.join(timeout=10)
+        ready.close()
+
+
+def test_existing_scheduler_factory_selects_managed_only_explicitly(
+    dispatch, tmp_path, monkeypatch
+):
+    import yaml
+    from prometheus_client import CollectorRegistry
+
+    from apps.scheduler.backtest_artifact_publisher.wiring.managed_app import (
+        ManagedArtifactPublisherApp,
+    )
+    from apps.scheduler.backtest_artifact_publisher.wiring.modules import (
+        backtest_artifact_publisher as module,
+    )
+
+    m = dispatch
+    payload = yaml.safe_load(Path("configs/dev/backtest_artifacts.yaml").read_text())
+    payload["backtest_artifacts"]["artifact_root"] = str(tmp_path / "artifacts")
+    config = tmp_path / "backtest_artifacts.yaml"
+    config.write_text(yaml.safe_dump(payload))
+    (tmp_path / "indicators.yaml").write_bytes(Path("configs/dev/indicators.yaml").read_bytes())
+    monkeypatch.setattr(module, "REGISTRY", CollectorRegistry())
+    app = module.build_backtest_artifact_publisher_app(
+        config_path=str(config),
+        environ={
+            "STRATEGY_PG_DSN": m["dsn"],
+            "ROEHUB_ARTIFACT_MANAGEMENT_INSTALLATION_ID": str(m["installation"]),
+            "CH_HOST": "127.0.0.1",
+            "CH_PORT": "1",
+            "CH_PASSWORD": "disposable-only",
+            "INDICATORS_CONFIG": str(Path("configs/dev/indicators.yaml").resolve()),
+        },
+        metrics_port=19999,
+    )
+    assert isinstance(app, ManagedArtifactPublisherApp)
+    assert app.worker.storage.root == tmp_path / "artifacts"
+    assert app.worker.publisher.runner.funding_rate_coverage_reader is not None
+    assert not (tmp_path / "artifacts").exists()
+
+
+def test_reject_retry_releases_logical_capacity_without_ttl(dispatch):
+    from uuid import uuid4
+
+    m = dispatch
+    r = m["repo"]
+    submit(m, (item(m),))
+    build = r.claim_group(
+        installation=m["installation"],
+        request=r.next_request(m["installation"]),
+        owner=uuid4(),
+        incarnation=uuid4(),
+        reservation=100,
+    )
+    r.finish(build=build, outcome="retry_wait", reason="transient_io")
+    r.reject_retry(build=build, reason="root_revision_changed")
+    assert r.rows("SELECT state FROM backtest_artifact_builds")[0]["state"] == "error"
+    assert (
+        r.rows("SELECT reason FROM backtest_artifact_requests")[0]["reason"]
+        == "root_revision_changed"
+    )
+
+
+def test_missed_targets_coalesce_without_mutating_requests(dispatch):
+    from uuid import uuid4
+
+    m = dispatch
+    r = m["repo"]
+    p = item(m)
+    older = p.source.model_copy(update={"revision": "content_unverified"})
+    r.observe_source(
+        installation_id=m["installation"], coordinate=p.coordinate, source=older, observed_at=NOW
+    )
+    newer = older.model_copy(
+        update={
+            "history": older.history.model_copy(update={"end_utc": NOW + timedelta(days=3)}),
+            "watermark": NOW + timedelta(days=3),
+        }
+    )
+    r.observe_source(
+        installation_id=m["installation"],
+        coordinate=p.coordinate,
+        source=newer,
+        observed_at=NOW + timedelta(days=3),
+    )
+    r.tick(installation=m["installation"], now=NOW + timedelta(days=3))
+    before = {
+        str(row["request_id"]): row["snapshot"]
+        for row in r.rows("SELECT * FROM backtest_artifact_requests")
+    }
+    build = r.claim_group(
+        installation=m["installation"],
+        request=r.next_request(m["installation"]),
+        owner=uuid4(),
+        incarnation=uuid4(),
+        reservation=100,
+    )
+    assert build["snapshot"]["source"] == newer.model_dump(mode="json")
+    assert len(build["snapshot"]["requests"]) == 2
+    assert {
+        str(row["request_id"]): row["snapshot"]
+        for row in r.rows("SELECT * FROM backtest_artifact_requests")
+    } == before
+
+
+def test_composed_retry_uses_new_epoch_and_finishes_real_work(dispatch, tmp_path):
+    import errno
+    from datetime import UTC, datetime
+
+    from apps.scheduler.backtest_artifact_publisher.wiring.managed_app import (
+        ManagedArtifactPublisherApp,
+    )
+    from apps.scheduler.backtest_artifact_publisher.wiring.modules.backtest_artifact_publisher import (  # noqa: E501
+        FileBacktestArtifactPublisherHostLock,
+    )
+
+    m = dispatch
+    r = m["repo"]
+    p = item(m)
+    p = p.model_copy(
+        update={
+            "source": p.source.model_copy(
+                update={
+                    "history": History(
+                        kind="range", start_utc=START, end_utc=START + timedelta(minutes=180)
+                    ),
+                    "watermark": START + timedelta(minutes=180),
+                }
+            )
+        }
+    )
+    submit(m, (p,))
+    _, w = worker(m, tmp_path)
+
+    class Once:
+        def __init__(self):
+            self.failed = False
+
+        def read_1m_arrays(self, **kwargs):
+            if not self.failed:
+                self.failed = True
+                raise OSError(errno.EAGAIN, "fixture transient source")
+            return Source(180).read_1m_arrays(**kwargs)
+
+    w.publisher = replace(
+        w.publisher, runner=replace(w.publisher.runner, canonical_candle_reader=Once())
+    )
+
+    class Reconciler:
+        def reconcile_page(self, **kwargs):
+            return None
+
+    clock = [datetime.now(UTC)]
+    app = ManagedArtifactPublisherApp(
+        m["installation"],
+        w,
+        Reconciler(),
+        FileBacktestArtifactPublisherHostLock(tmp_path / "host.lock"),
+        lambda: clock[0],
+    )
+    with pytest.raises(OSError):
+        app.cycle()
+    build = r.rows("SELECT * FROM backtest_artifact_builds")[0]
+    assert build["state"] == "retry_wait" and build["epoch"] == 1
+    assert app.cycle() == "observed"
+    assert r.rows("SELECT epoch FROM backtest_artifact_builds")[0]["epoch"] == 1
+    clock[0] += timedelta(minutes=6)
+    assert app.cycle() == "observed"
+    build = r.rows("SELECT * FROM backtest_artifact_builds")[0]
+    assert build["state"] == "ready" and build["epoch"] == 2
+    assert len(r.rows("SELECT * FROM backtest_artifact_attempts")) == 2
+
+
+def test_oversized_compatible_group_rejects_without_partial_build(dispatch):
+    from uuid import uuid4
+
+    m = dispatch
+    r = m["repo"]
+    p = item(m)
+    for i in range(52):
+        r.enqueue_system(
+            installation_id=m["installation"],
+            coordinate=p.coordinate,
+            source=p.source,
+            occurrence=str(i),
+        )
+    assert (
+        r.claim_group(
+            installation=m["installation"],
+            request=r.next_request(m["installation"]),
+            owner=uuid4(),
+            incarnation=uuid4(),
+            reservation=100,
+        )
+        is None
+    )
+    assert not r.rows("SELECT * FROM backtest_artifact_builds")
+    assert (
+        len(r.rows("SELECT * FROM backtest_artifact_requests WHERE reason='resource_conflict'"))
+        == 52
+    )
+
+
+def test_preclaim_storage_permission_failure_is_durable(dispatch, tmp_path):
+    m = dispatch
+    submit(m, (item(m),))
+    _, w = worker(m, tmp_path)
+
+    class Unavailable:
+        root = w.storage.root
+
+        def __call__(self, snapshot, reservation, **kwargs):
+            raise PermissionError("fixture inaccessible directory")
+
+    w.storage = Unavailable()
+    assert w.run_once(m["installation"]) is None
+    row = m["repo"].rows("SELECT state,reason FROM backtest_artifact_requests")[0]
+    assert row == {"state": "error", "reason": "storage_inventory_unavailable"}
+    assert not m["repo"].rows("SELECT * FROM backtest_artifact_builds")
+
+
+def test_coalesced_history_checks_effective_storage_before_freeze(dispatch, tmp_path):
+    m = dispatch
+    r = m["repo"]
+    p = item(m)
+    older = p.source.model_copy(
+        update={
+            "revision": "content_unverified",
+            "history": History(
+                kind="range", start_utc=START, end_utc=START + timedelta(minutes=180)
+            ),
+            "watermark": START + timedelta(minutes=180),
+        }
+    )
+    newer = older.model_copy(
+        update={
+            "history": older.history.model_copy(update={"end_utc": START + timedelta(days=100)}),
+            "watermark": START + timedelta(days=100),
+        }
+    )
+    r.observe_source(
+        installation_id=m["installation"], coordinate=p.coordinate, source=older, observed_at=NOW
+    )
+    r.observe_source(
+        installation_id=m["installation"], coordinate=p.coordinate, source=newer, observed_at=NOW
+    )
+    _, w = worker(m, tmp_path)
+    r._exec("UPDATE backtest_artifact_installation_settings SET budget_bytes=1103741824")
+    assert w.run_once(m["installation"]) is None
+    build = r.rows("SELECT * FROM backtest_artifact_builds")[0]
+    assert build["state"] == "error"
+    assert (
+        r.rows("SELECT reason FROM backtest_artifact_requests")[0]["reason"] == "resource_conflict"
+    )
+    assert build["snapshot"]["source"] == newer.model_dump(mode="json")
+    assert "frozen_source" not in build["snapshot"]

@@ -1,0 +1,225 @@
+ M .dockerignore
+ M apps/api/control_agent_client.py
+ M apps/api/main/app.py
+ M apps/api/routes/admin.py
+ M apps/api/routes/identity.py
+ M apps/api/routes/market_data_catalog.py
+ M apps/api/routes/market_data_reference.py
+ M apps/api/routes/market_data_workspace.py
+ M apps/api/routes/monitoring.py
+ M apps/api/wiring/modules/market_data_reference.py
+ M apps/control_agent/main/main.py
+ M apps/control_agent/server.py
+ M apps/migrations/bootstrap.py
+ M apps/migrations/storage.py
+ M apps/monitoring/operational_health.py
+ M apps/navigator-web/README.md
+ M apps/navigator-web/src/app.tsx
+ M apps/navigator-web/src/builder-api.ts
+ M apps/navigator-web/src/builder.tsx
+ M apps/navigator-web/src/chart-display-menu.tsx
+ M apps/navigator-web/src/client-routes.ts
+ M apps/navigator-web/src/connections-page.test.tsx
+ M apps/navigator-web/src/connections-page.tsx
+ M apps/navigator-web/src/data-downloads.tsx
+ M apps/navigator-web/src/data-page.test.tsx
+ M apps/navigator-web/src/data-page.tsx
+ M apps/navigator-web/src/data-workspace-api.ts
+ M apps/navigator-web/src/data-workspace.css
+ M apps/navigator-web/src/market-data-api.ts
+ M apps/navigator-web/src/monitoring-page.tsx
+ M apps/navigator-web/src/navigator.css
+ M apps/navigator-web/src/overview-chart.tsx
+ M apps/navigator-web/src/overview-page.tsx
+ M apps/navigator-web/src/price-chart.tsx
+ M apps/navigator-web/src/report-ui.test.tsx
+ M apps/navigator-web/src/results.tsx
+ M apps/navigator-web/src/settings-page.test.tsx
+ M apps/navigator-web/src/settings-page.tsx
+ M apps/navigator-web/src/strategy-operations-chart.tsx
+ M apps/navigator-web/src/style.css
+ M apps/navigator-web/src/workpages.css
+ M apps/navigator-web/src/workspace-ui.tsx
+ M apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
+ M apps/scheduler/market_data_scheduler/main/main.py
+ M apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py
+ M apps/web/main/app.py
+ M apps/worker/market_data_ws/wiring/io_process.py
+ M apps/worker/market_data_ws/wiring/modules/market_data_ws.py
+ M configs/dev/clickhouse-local-observability.xml
+ M configs/dev/clickhouse-local-profiles.xml
+ M configs/dev/market_data.yaml
+ M configs/test/market_data.yaml
+ M docs/architecture/README.md
+ M docs/architecture/apps/web/roehub-data-loading-contract-v1.md
+ M docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md
+ M docs/architecture/identity/local-auth-sessions-recovery-v1.md
+ M docs/architecture/identity/oidc-authentication-provider-v1.md
+ M docs/architecture/market_data/market-data-reference-api-v1.md
+ M docs/architecture/ml/roehub-ml-research-platform-requirements-draft-v1.md
+ M docs/architecture/ml/roehub-ml-research-product-plan-v1.md
+ M docs/architecture/project-map/PROJECT_MAP.md
+ M docs/architecture/project-map/component-map.mmd
+ M docs/architecture/project-map/project-map.json
+ M docs/runbooks/navigator-local-market-data-recovery.md
+ M docs/runbooks/offline-release-installation.md
+ M migrations/clickhouse/manifest.json
+ M migrations/postgres/manifest.json
+ M src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py
+ M src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_loader.py
+ M src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_validator.py
+ M src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_coordinator.py
+ M src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py
+ M src/trading/contexts/backtest_artifacts/application/services/v2/artifact_slot_publisher.py
+ M src/trading/contexts/backtest_artifacts/application/services/v2/contracts.py
+ M src/trading/contexts/backtest_artifacts/application/services/v2/hit_times_compute_v2.py
+ M src/trading/contexts/backtest_artifacts/application/services/v2/signal_rules_engine_v2.py
+ M src/trading/contexts/identity/adapters/inbound/api/routes/auth_local.py
+ M src/trading/contexts/identity/adapters/inbound/api/routes/auth_oidc.py
+ M src/trading/contexts/identity/adapters/outbound/persistence/in_memory/session_repository.py
+ M src/trading/contexts/identity/adapters/outbound/persistence/postgres/session_repository.py
+ M src/trading/contexts/identity/adapters/outbound/security/current_user/roehub_session_current_user.py
+ M src/trading/contexts/identity/application/ports/current_user.py
+ M src/trading/contexts/identity/application/ports/session_repository.py
+ M src/trading/contexts/market_data/adapters/outbound/clients/binance/ws_client.py
+ M src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/catalog_coverage_reader.py
+ M src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py
+ M src/trading/contexts/market_data/adapters/outbound/persistence/postgres/history_bounds_repository.py
+ M src/trading/contexts/market_data/adapters/outbound/persistence/postgres/instrument_selection_repository.py
+ M src/trading/contexts/market_data/adapters/outbound/persistence/postgres/stream_recovery_store.py
+ M src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py
+ M src/trading/contexts/market_data/application/services/rest_fill_queue.py
+ M src/trading/contexts/market_data/application/services/source_retry.py
+ M src/trading/contexts/market_data/application/services/work_requests.py
+ M src/trading/contexts/market_data/application/use_cases/rest_fill_range_1m.py
+ M src/trading/contexts/operations/adapters/unix_client.py
+ M src/trading/contexts/operations/contracts.py
+ M tests/real_infra/market_data/test_stream_recovery_postgres.py
+ M tests/real_infra/market_data/test_work_requests_postgres.py
+ M tests/unit/apps/api/test_admin_routes.py
+ M tests/unit/apps/api/test_market_data_catalog.py
+ M tests/unit/apps/api/test_market_data_reference_routes.py
+ M tests/unit/apps/api/test_market_data_workspace.py
+ M tests/unit/apps/migrations/test_backtest_input_recipe_sql.py
+ M tests/unit/apps/migrations/test_storage_lifecycle.py
+ M tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py
+ M tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py
+ M tests/unit/apps/scheduler/test_market_data_request_concurrency.py
+ M tests/unit/apps/web/test_app_routes.py
+ M tests/unit/apps/worker/test_market_data_io_process.py
+ M tests/unit/contexts/identity/application/test_local_auth.py
+ M tests/unit/contexts/market_data/adapters/test_postgres_instrument_selection_repository.py
+ M tests/unit/contexts/market_data/adapters/test_ws_binance_client.py
+ M tests/unit/contexts/market_data/application/services/test_stream_recovery.py
+ M tests/unit/contexts/market_data/application/services/test_work_requests.py
+ M tests/unit/contexts/market_data/application/services/test_ws_worker_publishes_redis.py
+ M tests/unit/contexts/market_data/application/use_cases/test_rest_fill_range_1m.py
+ M tools/qa/backtests_client_fixture.py
+ M tools/qa/navigator_preview.py
+?? .cache/
+?? .codex/agents/generated/data-artifact-management-v1/
+?? .codex/agents/generated/market-data-resource-efficiency-v1/
+?? .codex/delivery/evidence/0gusdt-stream-monitor-2026-10-07/
+?? .codex/delivery/evidence/backtest-chart-display-2026-10-07/
+?? .codex/delivery/evidence/chart-timeline-2026-10-07/
+?? .codex/delivery/evidence/compact-summary-2026-10-07/
+?? .codex/delivery/evidence/full-history-repair-2026-10-04/
+?? .codex/delivery/evidence/market-data-streaming-2026-10-04/latency-after-history/
+?? .codex/delivery/evidence/navigator-coverage-labels-2026-10-04/
+?? .codex/delivery/evidence/navigator-row-selection-2026-10-04/
+?? .codex/delivery/evidence/pnl-disclosure-2026-10-07/
+?? .codex/delivery/evidence/remove-title-strip-2026-10-07/
+?? .codex/delivery/evidence/streaming-intent-2026-10-07/
+?? .codex/delivery/evidence/streaming-status-2026-10-04/
+?? apps/api/dto/backtest_artifacts.py
+?? apps/api/routes/artifact_storage.py
+?? apps/api/routes/backtest_artifacts.py
+?? apps/api/wiring/artifact_service.py
+?? apps/api/wiring/modules/backtest_artifacts.py
+?? apps/api/worker_control.py
+?? apps/control_agent/artifact_storage.py
+?? apps/control_agent/artifact_storage_wiring.py
+?? apps/navigator-web/e2e/
+?? apps/navigator-web/src/artifact-journal.tsx
+?? apps/navigator-web/src/artifact-profile.tsx
+?? apps/navigator-web/src/artifacts-api.ts
+?? apps/navigator-web/src/assets/
+?? apps/navigator-web/src/backtest-readiness.test.tsx
+?? apps/navigator-web/src/backtest-readiness.tsx
+?? apps/navigator-web/src/chart-timeline.ts
+?? apps/navigator-web/src/data-artifacts.css
+?? apps/navigator-web/src/data-artifacts.test.tsx
+?? apps/navigator-web/src/data-artifacts.tsx
+?? apps/navigator-web/src/data-exchange-link.tsx
+?? apps/navigator-web/src/data-mode.tsx
+?? apps/navigator-web/src/metric-disclosure.test.tsx
+?? apps/navigator-web/src/metric-disclosure.tsx
+?? apps/navigator-web/src/service-controls.test.tsx
+?? apps/navigator-web/src/service-controls.tsx
+?? apps/navigator-web/src/session-devices.test.tsx
+?? apps/navigator-web/src/session-devices.tsx
+?? apps/navigator-web/src/storage-activity.tsx
+?? apps/navigator-web/src/storage-api.ts
+?? apps/navigator-web/src/storage-settings.css
+?? apps/navigator-web/src/storage-settings.test.tsx
+?? apps/navigator-web/src/storage-settings.tsx
+?? apps/scheduler/backtest_artifact_publisher/wiring/managed_access.py
+?? apps/scheduler/backtest_artifact_publisher/wiring/managed_app.py
+?? apps/scheduler/backtest_artifact_publisher/wiring/managed_metrics.py
+?? apps/scheduler/backtest_artifact_publisher/wiring/managed_recovery.py
+?? apps/scheduler/backtest_artifact_publisher/wiring/managed_worker.py
+?? apps/worker/backtest_job_runner/wiring/automatic_base.py
+?? docs/architecture/identity/browser-devices-verification-2026-10-10.md
+?? infra/docker/Dockerfile.local-control
+?? migrations/clickhouse/history_source_absences_ddl.sql
+?? migrations/postgres/0029_backtest_artifact_management_v1.sql
+?? migrations/postgres/0030_backtest_artifact_dispatch_v1.sql
+?? migrations/postgres/0031_backtest_artifact_storage_v1.sql
+?? migrations/postgres/0032_identity_browser_devices_v1.sql
+?? migrations/postgres/0033_market_data_stream_connections_v1.sql
+?? src/trading/contexts/backtest_artifacts/adapters/outbound/artifacts_fs/base_storage_admission.py
+?? src/trading/contexts/backtest_artifacts/adapters/outbound/config/legacy_management_import.py
+?? src/trading/contexts/backtest_artifacts/adapters/outbound/defaults/management_catalog.py
+?? src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/
+?? src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/automatic_base_repository.py
+?? src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py
+?? src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py
+?? src/trading/contexts/backtest_artifacts/application/ports/management.py
+?? src/trading/contexts/backtest_artifacts/application/services/artifact_cadence.py
+?? src/trading/contexts/backtest_artifacts/application/services/automatic_base.py
+?? src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py
+?? src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py
+?? src/trading/contexts/backtest_artifacts/application/services/legacy_dispatch.py
+?? src/trading/contexts/backtest_artifacts/application/services/management.py
+?? src/trading/contexts/identity/adapters/inbound/api/browser_device.py
+?? src/trading/contexts/identity/adapters/inbound/api/routes/browser_devices.py
+?? src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_coverage_reader.py
+?? src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_range_verifier.py
+?? src/trading/contexts/market_data/application/ports/stores/history_coverage_reader.py
+?? src/trading/contexts/market_data/application/ports/stores/history_range_verifier.py
+?? src/trading/contexts/market_data/application/services/history_readiness.py
+?? src/trading/contexts/market_data/application/services/history_stream_gate.py
+?? src/trading/contexts/market_data/application/services/stored_candle_signal.py
+?? src/trading/contexts/operations/artifact_storage_contracts.py
+?? tests/real_infra/backtest/test_artifact_dispatch.py
+?? tests/real_infra/backtest/test_artifact_http_storage.py
+?? tests/real_infra/backtest/test_artifact_integrated.py
+?? tests/real_infra/backtest/test_artifact_management.py
+?? tests/real_infra/backtest/test_automatic_base_lifecycle.py
+?? tests/real_infra/backtest/test_managed_derivative_publication.py
+?? tests/real_infra/market_data/test_full_history_clickhouse.py
+?? tests/runtime/
+?? tests/unit/apps/api/test_artifact_journal.py
+?? tests/unit/apps/api/test_artifact_storage_routes.py
+?? tests/unit/apps/api/test_browser_devices.py
+?? tests/unit/apps/api/test_worker_control.py
+?? tests/unit/apps/worker/test_stream_intent_control.py
+?? tests/unit/contexts/backtest_artifacts/test_automatic_base.py
+?? tests/unit/contexts/backtest_artifacts/test_derivative_profiles.py
+?? tests/unit/contexts/backtest_artifacts/test_management_profiles.py
+?? tests/unit/contexts/market_data/application/services/test_full_history.py
+?? tests/unit/contexts/market_data/test_stored_candle_signal.py
+?? tests/unit/tools/test_local_platform.py
+?? tools/installation/
+?? tools/qa/navigator_artifact_control.py
+?? tools/qa/navigator_artifact_publisher.py

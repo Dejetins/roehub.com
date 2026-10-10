@@ -9,6 +9,12 @@ from tools.installation.local_platform import WORKERS, render
 from trading.contexts.operations import ControlOperationError
 
 
+def _required_text(element: ElementTree.Element, path: str) -> str:
+    value = element.findtext(path)
+    assert value is not None, path
+    return value
+
+
 def test_adoption_bundle_preserves_storage_and_binds_controller_policy(tmp_path):
     config = dict(root=str(tmp_path), runtime_image='local-runtime:test', runtime_user='501:20',
         control_image='sha256:'+'b'*64,
@@ -20,33 +26,39 @@ def test_adoption_bundle_preserves_storage_and_binds_controller_policy(tmp_path)
     source, release_source = json.dumps(config).encode(), json.dumps(release).encode()
     outputs = render(config, release, source=source, release_source=release_source)
     capacity = ElementTree.fromstring(outputs['config/clickhouse-capacity.xml'])
-    assert int(capacity.findtext('max_server_memory_usage')) == 1073741824
-    assert int(capacity.findtext('query_condition_cache_size')) == 1048576
+    assert int(_required_text(capacity, 'max_server_memory_usage')) == 1073741824
+    assert int(_required_text(capacity, 'query_condition_cache_size')) == 1048576
     logs = ElementTree.fromstring(outputs['config/clickhouse-observability.xml'])
     for name in ('metric_log', 'asynchronous_metric_log', 'query_metric_log',
                  'trace_log', 'processors_profile_log', 'query_views_log', 'query_thread_log'):
-        assert logs.find(name).attrib == {'remove': '1'}
+        item = logs.find(name)
+        assert item is not None
+        assert item.attrib == {'remove': '1'}
     for name in ('query_log', 'part_log', 'text_log', 'error_log'):
         log = logs.find(name)
-        assert int(log.findtext('reserved_size_rows')) < int(
-            log.findtext('buffer_size_rows_flush_threshold')) < int(log.findtext('max_size_rows'))
-        assert log.findtext('ttl') == 'event_date + INTERVAL 1 DAY DELETE'
+        assert log is not None
+        assert int(_required_text(log, 'reserved_size_rows')) < int(
+            _required_text(log, 'buffer_size_rows_flush_threshold')
+        ) < int(_required_text(log, 'max_size_rows'))
+        assert _required_text(log, 'ttl') == 'event_date + INTERVAL 1 DAY DELETE'
     for path in ('config/clickhouse-profiles.xml', 'config/clickhouse-query-limits.xml'):
         profile = ElementTree.fromstring(outputs[path])
         assert profile.findtext('profiles/default/use_query_condition_cache') == '0'
-    pool = int(capacity.findtext('background_pool_size'))
-    concurrency = int(capacity.findtext('background_merges_mutations_concurrency_ratio'))
+    pool = int(_required_text(capacity, 'background_pool_size'))
+    concurrency = int(_required_text(capacity, 'background_merges_mutations_concurrency_ratio'))
     assert pool * concurrency <= 4
-    assert int(capacity.findtext('merge_tree/merge_max_block_size')) <= 1024
-    assert int(capacity.findtext('merge_tree/merge_max_block_size_bytes')) <= 1048576
-    assert int(capacity.findtext('merge_tree/vertical_merge_algorithm_min_rows_to_activate')) == 1
+    assert int(_required_text(capacity, 'merge_tree/merge_max_block_size')) <= 1024
+    assert int(_required_text(capacity, 'merge_tree/merge_max_block_size_bytes')) <= 1048576
+    assert int(_required_text(
+        capacity, 'merge_tree/vertical_merge_algorithm_min_rows_to_activate'
+    )) == 1
     # ClickHouse rejects startup if any admission threshold exceeds its merge pool.
     for setting in (
         'number_of_free_entries_in_pool_to_execute_mutation',
         'number_of_free_entries_in_pool_to_lower_max_size_of_merge',
         'number_of_free_entries_in_pool_to_execute_optimize_entire_partition',
     ):
-        assert int(capacity.findtext('merge_tree/' + setting)) < pool * concurrency
+        assert int(_required_text(capacity, 'merge_tree/' + setting)) < pool * concurrency
     for name, value in outputs.items():
         path = tmp_path/name
         path.parent.mkdir(parents=True, exist_ok=True)

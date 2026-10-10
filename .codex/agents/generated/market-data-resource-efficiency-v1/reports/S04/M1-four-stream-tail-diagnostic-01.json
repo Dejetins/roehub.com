@@ -1,0 +1,194 @@
+[
+  {
+    "raw": "M1-4-baseline-01.json",
+    "columns": [
+      "kind",
+      "count",
+      "p50_ms",
+      "p99_ms",
+      "max_ms",
+      "os_cpu_wait_us",
+      "disk_read_us"
+    ],
+    "rows": [
+      [
+        "Describe",
+        60,
+        0,
+        0,
+        0,
+        0,
+        99
+      ],
+      [
+        "Insert",
+        60,
+        4,
+        8,
+        8,
+        289,
+        0
+      ]
+    ]
+  },
+  {
+    "raw": "M1-4-baseline-02.json",
+    "columns": [
+      "kind",
+      "count",
+      "p50_ms",
+      "p99_ms",
+      "max_ms",
+      "os_cpu_wait_us",
+      "disk_read_us"
+    ],
+    "rows": [
+      [
+        "Describe",
+        60,
+        0,
+        0,
+        0,
+        0,
+        99
+      ],
+      [
+        "Insert",
+        60,
+        4,
+        7,
+        7,
+        129,
+        0
+      ]
+    ]
+  },
+  {
+    "raw": "M1-4-baseline-03.json",
+    "columns": [
+      "kind",
+      "count",
+      "p50_ms",
+      "p99_ms",
+      "max_ms",
+      "os_cpu_wait_us",
+      "disk_read_us"
+    ],
+    "rows": [
+      [
+        "Describe",
+        60,
+        0,
+        0,
+        0,
+        0,
+        97
+      ],
+      [
+        "Insert",
+        60,
+        4,
+        10,
+        10,
+        91,
+        0
+      ]
+    ]
+  },
+  {
+    "raw": "M1-4-candidate-01.json",
+    "columns": [
+      "kind",
+      "count",
+      "p50_ms",
+      "p99_ms",
+      "max_ms",
+      "os_cpu_wait_us",
+      "disk_read_us"
+    ],
+    "rows": [
+      [
+        "Describe",
+        60,
+        0,
+        1,
+        1,
+        0,
+        132
+      ],
+      [
+        "Insert",
+        60,
+        4,
+        10,
+        10,
+        87,
+        0
+      ]
+    ]
+  },
+  {
+    "raw": "M1-4-candidate-02.json",
+    "columns": [
+      "kind",
+      "count",
+      "p50_ms",
+      "p99_ms",
+      "max_ms",
+      "os_cpu_wait_us",
+      "disk_read_us"
+    ],
+    "rows": [
+      [
+        "Describe",
+        60,
+        0,
+        3,
+        3,
+        0,
+        134
+      ],
+      [
+        "Insert",
+        60,
+        4,
+        10,
+        10,
+        170,
+        0
+      ]
+    ]
+  },
+  {
+    "raw": "M1-4-candidate-03.json",
+    "columns": [
+      "kind",
+      "count",
+      "p50_ms",
+      "p99_ms",
+      "max_ms",
+      "os_cpu_wait_us",
+      "disk_read_us"
+    ],
+    "rows": [
+      [
+        "Describe",
+        60,
+        0,
+        1,
+        1,
+        0,
+        132
+      ],
+      [
+        "Insert",
+        60,
+        4,
+        10,
+        10,
+        282,
+        0
+      ]
+    ]
+  }
+]

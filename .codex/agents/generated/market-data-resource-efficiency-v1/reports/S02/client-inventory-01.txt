@@ -1,0 +1,29 @@
+apps/cli/commands/backtest_artifact_publish.py:15:from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+apps/cli/commands/backtest_artifact_publish.py:348:    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="artifacts")
+apps/cli/commands/sync_instruments.py:12:    ClickHouseSettingsLoader,
+apps/cli/commands/sync_instruments.py:64:        settings = ClickHouseSettingsLoader(os.environ).load()
+apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py:27:from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py:887:    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="artifacts")
+apps/api/wiring/modules/ui_strategies_dashboard.py:2418:    from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+apps/api/wiring/modules/ui_strategies_dashboard.py:2428:    config = ClickHouseSettingsLoader(environ).load(workload="interactive")
+apps/worker/market_data_ws/wiring/modules/market_data_ws.py:15:    ClickHouseSettingsLoader,
+apps/worker/market_data_ws/wiring/modules/market_data_ws.py:948:    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="stream")
+apps/cli/commands/funding_rate_catchup.py:12:    ClickHouseSettingsLoader,
+apps/cli/commands/funding_rate_catchup.py:56:        settings = ClickHouseSettingsLoader(os.environ).load()
+apps/worker/market_data_ws/wiring/io_process.py:21:from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+apps/worker/market_data_ws/wiring/io_process.py:87:        settings = ClickHouseSettingsLoader(environ).load(workload="stream")
+apps/cli/commands/rest_catchup_1m.py:15:    ClickHouseSettingsLoader,
+apps/cli/commands/rest_catchup_1m.py:85:        settings = ClickHouseSettingsLoader(os.environ).load(workload="backfill")
+apps/worker/market_data_ws/wiring/persistent_writer.py:21:from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+apps/worker/market_data_ws/wiring/persistent_writer.py:71:        settings = ClickHouseSettingsLoader(environ).load(workload="stream")
+apps/api/wiring/modules/market_data_reference.py:21:from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+apps/api/wiring/modules/market_data_reference.py:89:    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="interactive")
+apps/api/wiring/modules/market_data_reference.py:155:        history_settings = ClickHouseSettingsLoader(environ).load(workload="interactive")
+apps/api/wiring/modules/market_data_reference.py:183:        settings = ClickHouseSettingsLoader(environ).load(workload="interactive")
+apps/cli/wiring/db/clickhouse.py:44:class ClickHouseSettingsLoader:
+apps/cli/wiring/db/clickhouse.py:135:        settings = ClickHouseSettingsLoader(self.environ).load(workload="backfill")
+apps/cli/wiring/db/clickhouse.py:155:            return clickhouse_connect.get_client(
+apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py:23:    ClickHouseSettingsLoader,
+apps/scheduler/market_data_scheduler/wiring/modules/market_data_scheduler.py:1126:    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="backfill")
+apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py:29:    ClickHouseSettingsLoader,
+apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py:789:    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="stream")

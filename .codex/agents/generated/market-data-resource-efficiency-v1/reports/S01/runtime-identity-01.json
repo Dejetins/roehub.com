@@ -1,0 +1,49 @@
+[
+  {
+    "name": "roehub-local-clickhouse-1",
+    "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+    "memory_limit": 1610612736,
+    "nano_cpus": 2000000000,
+    "started_at": "2026-10-09T22:24:58.955795211Z"
+  },
+  {
+    "name": "roehub-local-backtest-artifact-publisher-1",
+    "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+    "memory_limit": 805306368,
+    "nano_cpus": 1000000000,
+    "started_at": "2026-10-09T19:38:22.421682166Z"
+  },
+  {
+    "name": "roehub-local-market-data-ws-1",
+    "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+    "memory_limit": 1073741824,
+    "nano_cpus": 1000000000,
+    "started_at": "2026-10-10T11:43:18.545674009Z"
+  },
+  {
+    "name": "roehub-local-market-data-scheduler-1",
+    "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+    "memory_limit": 402653184,
+    "nano_cpus": 1000000000,
+    "started_at": "2026-10-10T11:39:22.132550636Z"
+  },
+  {
+    "db_version": {
+      "version()": "25.8.33.6"
+    },
+    "server_settings": [
+      [
+        "max_server_memory_usage",
+        "1073741824"
+      ],
+      [
+        "query_condition_cache_size",
+        "1048576"
+      ],
+      [
+        "background_pool_size",
+        "4"
+      ]
+    ]
+  }
+]

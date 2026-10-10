@@ -1,0 +1,38 @@
+src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py:55:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+53 |       @classmethod
+54 |       def from_config(cls, config, environ):
+55 | /         from .provider_policy import (
+56 | |             ProviderPolicy,
+57 | |         )
+58 | |         from trading.contexts.market_data.adapters.outbound.persistence.postgres.provider_admission import (  # noqa: E501
+59 | |             PostgresProviderAdmission,
+60 | |         )
+61 | |         return cls(admission=PostgresProviderAdmission(environ["STRATEGY_PG_DSN"]),
+   | |_^ I001
+62 |                      policy=ProviderPolicy(config))
+   |
+   = help: Organize imports
+
+src/trading/contexts/market_data/adapters/outbound/config/runtime_config.py:40:101: E501 Line too long (126 > 100)
+   |
+38 |     def __post_init__(self) -> None:
+39 |         if self.mode not in {"autodetect", "shared_conservative"}:
+40 |             raise ValueError(f"rest.limiter.mode must be shared_conservative (legacy autodetect accepted), got {self.mode!r}")
+   |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+41 |         if not (0.0 < self.safety_factor <= 1.0):
+42 |             raise ValueError(f"rest.limiter.safety_factor must be in (0, 1], got {self.safety_factor}") # noqa: E501
+   |
+
+tools/qa/market_data_ingestion_comparison.py:620:101: E501 Line too long (106 > 100)
+    |
+618 |             "required_window": completion >= 360,
+619 |             "no_permit_leak": record["permits_after_drain"] == 0,
+620 |             "sampling_complete": not record["failures"] and len(record["samples"]) >= int(completion / 3),
+    |                                                                                                     ^^^^^^ E501
+621 |         }
+622 |         assert all(record["checks"].values()), record["checks"]
+    |
+
+Found 3 errors.
+[*] 1 fixable with the `--fix` option.

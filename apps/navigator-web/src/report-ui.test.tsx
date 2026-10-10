@@ -1,3 +1,4 @@
+import {PriceChart} from './price-chart';
 import '@testing-library/jest-dom/vitest';
 import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -54,6 +55,7 @@ it('keeps distinct intraday points while formatting dates and toggles trade mark
  const timestamp='2026-02-27T23:45:00Z';
  expect(option.xAxis.axisLabel.formatter(timestamp)).toBe(chartDate(timestamp,'en'));
  expect(option.xAxis.axisLabel.formatter(timestamp)).not.toContain('23:45');
+ fireEvent.click(screen.getByRole('button',{name:'Chart display'}));
  fireEvent.click(screen.getByRole('checkbox',{name:'Trade exits'}));
  await waitFor(()=>expect(charts.options).toHaveLength(2));
  expect(charts.options[1].series[1].type).toBe('scatter');
@@ -218,4 +220,19 @@ it('keeps five KPI slots including an absent profit factor',async()=>{
  expect(cards).toHaveLength(5);
  expect(cards[2]).toHaveTextContent('Profit factor');
  expect(cards[2]).toHaveTextContent('—');
+});
+
+it('toggles historical entry segments independently of trade markers',async()=>{
+ vi.stubGlobal('ResizeObserver',class{observe(){} disconnect(){}});
+ charts.options=[];
+ vi.spyOn(HTMLElement.prototype,'clientWidth','get').mockReturnValue(900);
+ vi.spyOn(HTMLElement.prototype,'clientHeight','get').mockReturnValue(340);
+ const data={job_id:job,variant_key:'v1',timeframe:'1m',source_bars:2,group_size:1,candles:['2026-01-01T00:00:00Z','2026-01-01T00:01:00Z'].map(time=>({time,open:100,close:101,high:102,low:99}))};
+ const entries=[{trade_index:1,entry_timestamp:data.candles[0].time,exit_timestamp:data.candles[1].time,side:'long',entry_price:100,exit_price:101}];
+ const ui=(entryLevels:boolean)=><I18nextProvider i18n={createI18n('en')}><PriceChart data={data} entries={entries} timeframe="1m" markers={false} entryLevels={entryLevels}/></I18nextProvider>;
+ const view=render(ui(true));
+ await waitFor(()=>expect(charts.options.at(-1)?.series[0].markLine.data).toEqual([[{coord:[0,100]},{coord:[1,100]}]]));
+ expect(charts.options.at(-1).series).toHaveLength(1);
+ view.rerender(ui(false));
+ await waitFor(()=>expect(charts.options.at(-1).series[0].markLine.data).toEqual([]));
 });

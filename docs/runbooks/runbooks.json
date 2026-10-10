@@ -139,6 +139,13 @@
       ]
     },
     {
+      "path": "docs/runbooks/market-data-efficiency-local-activation-20261011.md",
+      "target_stages": [
+        "17",
+        "20"
+      ]
+    },
+    {
       "path": "docs/runbooks/market-data-metrics-reference-ru.md",
       "target_stages": [
         "17",

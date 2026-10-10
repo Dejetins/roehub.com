@@ -1,0 +1,15 @@
+{
+  "running_publisher_sources": {
+    "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py": "e6085d70849d2379199f7e3db297d98f6fbefa5bf55bcd9c43a6ffd98552b730",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py": "c867cc9dd09ee15bd04a3e79cb7b3f7757831ae45edd73d6fac12e28b8785782",
+    "src/trading/contexts/market_data/application/ports/stores/canonical_candle_index_reader.py": "9bfc3a08ea282ceacb4461d0cd3ff930707eee7f42097feef41b471c911f2c06",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py": "ba7a2f663cdfe1e8319869cebb5549260ae6edda9b0542131b651a65c3fa1dec"
+  },
+  "matches_pre_S01_checkout": {
+    "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py": true,
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py": true,
+    "src/trading/contexts/market_data/application/ports/stores/canonical_candle_index_reader.py": true,
+    "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py": true
+  },
+  "candidate_installed": false
+}

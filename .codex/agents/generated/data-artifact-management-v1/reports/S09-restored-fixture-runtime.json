@@ -1,0 +1,9 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "-c",
+    "import sys\nfrom tempfile import TemporaryDirectory\nfrom pathlib import Path\nsys.path.insert(0,\"apps/navigator-web/e2e\")\nimport storage_preflight\nfrom tests.real_infra.backtest import test_artifact_management as fixture\nfrom tests.unit.contexts.backtest_artifacts.test_derivative_profiles import catalog\nassert callable(fixture.managed.__wrapped__)\nassert callable(catalog.__wrapped__)\nwith TemporaryDirectory(prefix=\"s09-restored-preflight-\") as directory:\n    service, request, loader = storage_preflight.setup_preflight(Path(directory))\n    assert service is not None and loader is not None and request\nprint(\"Restored receipt-bound helper builds native NPY/preflight; pytest wrapped callbacks available.\")\n"
+  ],
+  "exit_code": 0,
+  "output": "Restored receipt-bound helper builds native NPY/preflight; pytest wrapped callbacks available.\n"
+}

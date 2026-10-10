@@ -1,0 +1,21 @@
+[
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_project_map"
+    ],
+    "exit_code": 0,
+    "output": "OK: project map generated (5 artifacts)\n"
+  },
+  {
+    "command": [
+      ".venv/bin/python",
+      "-m",
+      "tools.docs.generate_project_map",
+      "--check"
+    ],
+    "exit_code": 0,
+    "output": "OK: project map up-to-date (5 artifacts)\n"
+  }
+]

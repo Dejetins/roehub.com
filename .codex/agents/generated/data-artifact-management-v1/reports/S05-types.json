@@ -1,0 +1,24 @@
+{
+  "command": [
+    ".venv/bin/pyright",
+    "apps/migrations/bootstrap.py",
+    "apps/migrations/storage.py",
+    "apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
+    "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "src/trading/contexts/backtest_artifacts/application/services/artifact_cadence.py",
+    "src/trading/contexts/backtest_artifacts/application/services/legacy_dispatch.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_coordinator.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "apps/scheduler/backtest_artifact_publisher/wiring/managed_metrics.py",
+    "apps/scheduler/backtest_artifact_publisher/wiring/managed_recovery.py",
+    "apps/scheduler/backtest_artifact_publisher/wiring/managed_app.py",
+    "apps/scheduler/backtest_artifact_publisher/wiring/managed_access.py",
+    "apps/scheduler/backtest_artifact_publisher/wiring/managed_worker.py"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 2.717315673828125,
+  "stdout": "0 errors, 0 warnings, 0 informations\nWARNING: there is a new pyright version available (v1.1.408 -> v1.1.414).\nPlease install the new version or set PYRIGHT_PYTHON_FORCE_VERSION to `latest`\n\n",
+  "stderr": ""
+}

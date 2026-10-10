@@ -1,0 +1,5 @@
+All 182 evidence file hashes still match the accepted manifest.
+$ python3 /Users/daniildegtyarev/.codex/skills/prompt-manager/scripts/validate_pack.py --root /Users/daniildegtyarev/Projects/roehub.com --ledger /Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/iteration-ledger.md --check receipt --stage S02 --receipt /Users/daniildegtyarev/Projects/roehub.com/.codex/agents/generated/market-data-resource-efficiency-v1/receipts/S02/receipt-532ed40d08db475f9f468c928e14967d.md
+{"status": "fail", "check": "receipt", "errors": ["--stage and --executor are only valid for entry checks"], "proof_boundary": "artifact-structure-and-file-binding"}
+
+exit=1

@@ -1,0 +1,64 @@
+FF                                                                       [100%]
+=================================== FAILURES ===================================
+_ test_clickhouse_pressure_keeps_artifact_attempt_retryable[202-storage_unavailable] _
+
+dispatch = {'actor': UUID('063a37b4-6a67-460b-bdfc-f7d36efb7205'), 'admin': UUID('0dcebca2-907d-492f-ace5-0d90fea6f940'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x1148ec8c0>, ...}
+tmp_path = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-421/test_clickhouse_pressure_keeps0')
+code = 202, reason = 'storage_unavailable'
+
+    @pytest.mark.parametrize('code,reason', [(202,'storage_unavailable'),
+                                           (241,'storage_memory_pressure')])
+    def test_clickhouse_pressure_keeps_artifact_attempt_retryable(dispatch, tmp_path, code, reason):
+        """Real PG lifecycle, adapter-classified failure before publication; no source absence."""
+        from clickhouse_connect.driver.exceptions import DatabaseError
+        from tests.unit.contexts.backtest_artifacts.test_automatic_base import Source
+        m=dispatch
+        submit(m,(item(m),))
+        _,w=worker(m,tmp_path)
+        class Pressure(Source):
+            def read_1m_arrays(self, instrument_id, time_range):
+                raise DatabaseError(f'Code: {code}. synthetic admission refusal')
+        runner=replace(w.publisher.runner,canonical_candle_reader=Pressure(180))
+        failing=replace(w,publisher=replace(w.publisher,runner=runner))
+        try:
+            failing.run_once(m['installation'])
+        except DatabaseError:
+            pass
+        else:
+>           pytest.fail(str(m['repo'].rows('SELECT state,reason FROM backtest_artifact_requests')))
+E           Failed: ({'state': 'running', 'reason': None},)
+
+tests/real_infra/backtest/test_artifact_integrated.py:551: Failed
+_ test_clickhouse_pressure_keeps_artifact_attempt_retryable[241-storage_memory_pressure] _
+
+dispatch = {'actor': UUID('bcbc49b6-b628-49b7-b940-67dea91542a0'), 'admin': UUID('a981948a-229b-4306-bbf2-57610508fcbd'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x117033740>, ...}
+tmp_path = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-421/test_clickhouse_pressure_keeps1')
+code = 241, reason = 'storage_memory_pressure'
+
+    @pytest.mark.parametrize('code,reason', [(202,'storage_unavailable'),
+                                           (241,'storage_memory_pressure')])
+    def test_clickhouse_pressure_keeps_artifact_attempt_retryable(dispatch, tmp_path, code, reason):
+        """Real PG lifecycle, adapter-classified failure before publication; no source absence."""
+        from clickhouse_connect.driver.exceptions import DatabaseError
+        from tests.unit.contexts.backtest_artifacts.test_automatic_base import Source
+        m=dispatch
+        submit(m,(item(m),))
+        _,w=worker(m,tmp_path)
+        class Pressure(Source):
+            def read_1m_arrays(self, instrument_id, time_range):
+                raise DatabaseError(f'Code: {code}. synthetic admission refusal')
+        runner=replace(w.publisher.runner,canonical_candle_reader=Pressure(180))
+        failing=replace(w,publisher=replace(w.publisher,runner=runner))
+        try:
+            failing.run_once(m['installation'])
+        except DatabaseError:
+            pass
+        else:
+>           pytest.fail(str(m['repo'].rows('SELECT state,reason FROM backtest_artifact_requests')))
+E           Failed: ({'state': 'running', 'reason': None},)
+
+tests/real_infra/backtest/test_artifact_integrated.py:551: Failed
+=========================== short test summary info ============================
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_clickhouse_pressure_keeps_artifact_attempt_retryable[202-storage_unavailable]
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_clickhouse_pressure_keeps_artifact_attempt_retryable[241-storage_memory_pressure]
+2 failed, 6 deselected in 1.90s

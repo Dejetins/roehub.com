@@ -1,0 +1,302 @@
+FFFFF                                                                    [100%]
+=================================== FAILURES ===================================
+_ test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_siblings _
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('f76983a6-fd7d-446f-b05e-4958b20a1095'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x10d620170>)
+
+    def test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_siblings(store):
+        from dataclasses import dataclass
+        from threading import Barrier, Event
+        from types import SimpleNamespace
+    
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+    
+        repo, org, actor, gateway = store
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        jobs = [repo.submit(
+            organization_id=org, actor_user_id=actor, key=uuid4(),
+            request=WorkRequest('candle_ingestion', 1, (symbol,), now-timedelta(hours=2), now),
+            now=now+timedelta(microseconds=i),
+        ) for i, symbol in enumerate(('BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT'))]
+        entered, release = Barrier(5), Event()
+    
+        @dataclass
+        class Fill:
+            writer: Any = None
+    
+            def run(self, task):
+                entered.wait(timeout=10)
+                assert release.wait(timeout=10)
+                return SimpleNamespace(rows_read=60, rows_written=60)
+    
+        runner = MarketDataWorkRequestRunner(repo, cast(Any, Fill()), lambda *_: None,
+                                            now=lambda: now, max_windows=1)
+        with ThreadPoolExecutor(max_workers=4) as workers, ThreadPoolExecutor(1) as coordinator:
+            future = coordinator.submit(runner.run_batch, executor=workers, concurrency=4)
+            try:
+>               entered.wait(timeout=10)
+
+.cache/market-data-s02/fixture-baseline/tests/real_infra/market_data/test_work_requests_postgres.py:629: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/threading.py:725: in wait
+    self._wait(timeout)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <threading.Barrier at 0x10d6213d0: broken>, timeout = 10
+
+    def _wait(self, timeout):
+        if not self._cond.wait_for(lambda : self._state != 0, timeout):
+            #timed out.  Break the barrier
+            self._break()
+>           raise BrokenBarrierError
+E           threading.BrokenBarrierError
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/threading.py:763: BrokenBarrierError
+------------------------------ Captured log call -------------------------------
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+_ test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[submit] _
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('231108d3-4ac9-466f-be88-4317975c5e0b'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x10d6355e0>)
+failure = 'submit'
+
+    @pytest.mark.parametrize('failure', ['submit', 'worker'])
+    def test_parallel_batch_drains_siblings_before_releasing_lease_on_failure(store, failure):
+        from concurrent.futures import Executor
+        from dataclasses import dataclass
+        from threading import Event
+        from types import SimpleNamespace
+    
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+    
+        repo, org, actor, _ = store
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        jobs = [repo.submit(
+            organization_id=org, actor_user_id=actor, key=uuid4(),
+            request=WorkRequest('candle_ingestion', 1, (symbol,), now-timedelta(hours=2), now),
+            now=now+timedelta(microseconds=i),
+        ) for i, symbol in enumerate(('BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT'))]
+        entered, release, failed = Event(), Event(), Event()
+    
+        @dataclass
+        class Fill:
+            writer: Any = None
+    
+            def run(self, task):
+                entered.set()
+                assert release.wait(timeout=10)
+                return SimpleNamespace(rows_read=60, rows_written=60)
+    
+        runner = MarketDataWorkRequestRunner(repo, cast(Any, Fill()), lambda *_: None,
+                                            now=lambda: now, max_windows=1)
+    
+        class FaultExecutor(Executor):
+            calls = 0
+    
+            def submit(self, fn, /, *args, **kwargs):
+                self.calls += 1
+                if failure == 'submit' and self.calls == 3:
+                    failed.set()
+                    raise RuntimeError('injected submit failure')
+                if failure == 'worker' and self.calls == 1:
+                    def fail():
+                        failed.set()
+                        raise RuntimeError('injected worker failure')
+                    return workers.submit(fail)
+                return workers.submit(fn, *args, **kwargs)
+    
+        with ThreadPoolExecutor(4) as workers, ThreadPoolExecutor(1) as coordinator:
+            future = coordinator.submit(runner.run_batch, executor=FaultExecutor(), concurrency=4)
+            try:
+>               assert entered.wait(timeout=10) and failed.wait(timeout=10)
+E               assert (False)
+E                +  where False = wait(timeout=10)
+E                +    where wait = <threading.Event at 0x10d636000: unset>.wait
+
+.cache/market-data-s02/fixture-baseline/tests/real_infra/market_data/test_work_requests_postgres.py:730: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+_ test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[worker] _
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('66376ef4-fa4d-4e3d-a408-c6c576170e78'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x10d637e00>)
+failure = 'worker'
+
+    @pytest.mark.parametrize('failure', ['submit', 'worker'])
+    def test_parallel_batch_drains_siblings_before_releasing_lease_on_failure(store, failure):
+        from concurrent.futures import Executor
+        from dataclasses import dataclass
+        from threading import Event
+        from types import SimpleNamespace
+    
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+    
+        repo, org, actor, _ = store
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        jobs = [repo.submit(
+            organization_id=org, actor_user_id=actor, key=uuid4(),
+            request=WorkRequest('candle_ingestion', 1, (symbol,), now-timedelta(hours=2), now),
+            now=now+timedelta(microseconds=i),
+        ) for i, symbol in enumerate(('BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT'))]
+        entered, release, failed = Event(), Event(), Event()
+    
+        @dataclass
+        class Fill:
+            writer: Any = None
+    
+            def run(self, task):
+                entered.set()
+                assert release.wait(timeout=10)
+                return SimpleNamespace(rows_read=60, rows_written=60)
+    
+        runner = MarketDataWorkRequestRunner(repo, cast(Any, Fill()), lambda *_: None,
+                                            now=lambda: now, max_windows=1)
+    
+        class FaultExecutor(Executor):
+            calls = 0
+    
+            def submit(self, fn, /, *args, **kwargs):
+                self.calls += 1
+                if failure == 'submit' and self.calls == 3:
+                    failed.set()
+                    raise RuntimeError('injected submit failure')
+                if failure == 'worker' and self.calls == 1:
+                    def fail():
+                        failed.set()
+                        raise RuntimeError('injected worker failure')
+                    return workers.submit(fail)
+                return workers.submit(fn, *args, **kwargs)
+    
+        with ThreadPoolExecutor(4) as workers, ThreadPoolExecutor(1) as coordinator:
+            future = coordinator.submit(runner.run_batch, executor=FaultExecutor(), concurrency=4)
+            try:
+>               assert entered.wait(timeout=10) and failed.wait(timeout=10)
+E               assert (False)
+E                +  where False = wait(timeout=10)
+E                +    where wait = <threading.Event at 0x10c4e2720: unset>.wait
+
+.cache/market-data-s02/fixture-baseline/tests/real_infra/market_data/test_work_requests_postgres.py:730: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+____________ test_parallel_batch_lost_lease_fences_all_four_writers ____________
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('6e6aece7-91f0-4847-a983-e7b5eedbfb2d'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x10d637da0>)
+
+    def test_parallel_batch_lost_lease_fences_all_four_writers(store):
+        from dataclasses import dataclass
+        from threading import Barrier, Event
+        from types import SimpleNamespace
+    
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+    
+        repo, org, actor, gateway = store
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        jobs = [repo.submit(
+            organization_id=org, actor_user_id=actor, key=uuid4(),
+            request=WorkRequest('candle_ingestion', 1, (symbol,), now-timedelta(hours=1), now),
+            now=now+timedelta(microseconds=i),
+        ) for i, symbol in enumerate(('BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'XRPUSDT'))]
+        entered, release, writes = Barrier(5), Event(), []
+    
+        class Writer:
+            def write_1m(self, rows):
+                writes.append(rows)
+    
+        @dataclass
+        class Fill:
+            writer: Any
+    
+            def run(self, task):
+                entered.wait(timeout=10)
+                assert release.wait(timeout=10)
+                self.writer.write_1m([])
+                return SimpleNamespace(rows_read=60, rows_written=60)
+    
+        runner = MarketDataWorkRequestRunner(
+            repo, cast(Any, Fill(Writer())), lambda *_: None, now=lambda: now,
+            retryable_storage_error=lambda error: isinstance(error, psycopg.OperationalError),
+        )
+        with ThreadPoolExecutor(4) as workers, ThreadPoolExecutor(1) as coordinator:
+            future = coordinator.submit(runner.run_batch, executor=workers, concurrency=4)
+            try:
+>               entered.wait(timeout=10)
+
+.cache/market-data-s02/fixture-baseline/tests/real_infra/market_data/test_work_requests_postgres.py:785: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/threading.py:725: in wait
+    self._wait(timeout)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <threading.Barrier at 0x10d636630: broken>, timeout = 10
+
+    def _wait(self, timeout):
+        if not self._cond.wait_for(lambda : self._state != 0, timeout):
+            #timed out.  Break the barrier
+            self._break()
+>           raise BrokenBarrierError
+E           threading.BrokenBarrierError
+
+../../.local/share/uv/python/cpython-3.12.12-macos-aarch64-none/lib/python3.12/threading.py:763: BrokenBarrierError
+------------------------------ Captured log call -------------------------------
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+_____ test_incomplete_history_retry_streak_uses_persisted_previous_reason ______
+
+store = (<trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository.PostgresMarketDataWorkRe...ID('49dd1e9e-dd18-412b-9a2f-bc66f70ff780'), <test_work_requests_postgres.store.<locals>.Gateway object at 0x10d636bd0>)
+
+    def test_incomplete_history_retry_streak_uses_persisted_previous_reason(store):
+        from dataclasses import dataclass
+        from types import SimpleNamespace
+    
+        from trading.contexts.market_data.application.services.work_requests import (
+            MarketDataWorkRequestRunner,
+        )
+        repo, org, actor, _ = store
+        now = datetime.now(UTC).replace(second=0, microsecond=0)
+        start = now - timedelta(minutes=1)
+        row = repo.submit(organization_id=org, actor_user_id=actor, key=uuid4(),
+                          request=WorkRequest('candle_ingestion', 1, ('ACTUSDT',), start, now), now=now)
+        @dataclass
+        class EmptyFill:
+            writer: object = None
+            def run(self, task):
+                return SimpleNamespace(rows_read=0, rows_written=0)
+        runner = MarketDataWorkRequestRunner(
+            repo, cast(RestFillRange1mUseCase, EmptyFill()),
+            lambda *_: None, now=lambda: now,
+            repair_index=cast(
+                HistoryCoverageReader, SimpleNamespace(first_gap=lambda **kw: kw['time_range']),
+            ))
+        for expected in (1,2,3):
+            assert runner.run_once()
+            waiting = repo.get(organization_id=org, job_id=row['job_id'])
+>           assert waiting['state'] == 'retry_wait'
+E           AssertionError: assert 'failed' == 'retry_wait'
+E             
+E             - retry_wait
+E             + failed
+
+.cache/market-data-s02/fixture-baseline/tests/real_infra/market_data/test_work_requests_postgres.py:828: AssertionError
+------------------------------ Captured log call -------------------------------
+WARNING  trading.contexts.market_data.application.services.work_requests:work_requests.py:280 market data work error phase=lease_check error_type=TypeError
+=========================== short test summary info ============================
+FAILED .cache/market-data-s02/fixture-baseline/tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_siblings
+FAILED .cache/market-data-s02/fixture-baseline/tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[submit]
+FAILED .cache/market-data-s02/fixture-baseline/tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_drains_siblings_before_releasing_lease_on_failure[worker]
+FAILED .cache/market-data-s02/fixture-baseline/tests/real_infra/market_data/test_work_requests_postgres.py::test_parallel_batch_lost_lease_fences_all_four_writers
+FAILED .cache/market-data-s02/fixture-baseline/tests/real_infra/market_data/test_work_requests_postgres.py::test_incomplete_history_retry_streak_uses_persisted_previous_reason
+5 failed, 17 deselected in 41.20s

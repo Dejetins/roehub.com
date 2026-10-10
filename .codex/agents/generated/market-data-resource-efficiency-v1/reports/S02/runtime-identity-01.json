@@ -1,0 +1,56 @@
+{
+  "python": "3.14.7",
+  "machine": "arm64",
+  "platform": "macOS-26.7-arm64-arm-64bit-Mach-O",
+  "docker": "6207541248 18",
+  "containers": {
+    "roehub-s02-ch": {
+      "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+      "memory": 1610612736,
+      "nano_cpus": 2000000000,
+      "started_at": "2026-10-10T17:45:03.347096792Z"
+    },
+    "roehub-s02-pg": {
+      "image": "sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685",
+      "memory": 268435456,
+      "nano_cpus": 1000000000,
+      "started_at": "2026-10-10T17:49:18.180317966Z"
+    },
+    "roehub-local-clickhouse-1": {
+      "image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+      "memory": 1610612736,
+      "nano_cpus": 2000000000,
+      "started_at": "2026-10-09T22:24:58.955795211Z"
+    },
+    "roehub-local-api-1": {
+      "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "memory": 536870912,
+      "nano_cpus": 1000000000,
+      "started_at": "2026-10-10T16:48:34.50505071Z"
+    },
+    "roehub-local-market-data-ws-1": {
+      "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "memory": 1073741824,
+      "nano_cpus": 1000000000,
+      "started_at": "2026-10-10T11:43:18.545674009Z"
+    },
+    "roehub-local-market-data-scheduler-1": {
+      "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "memory": 402653184,
+      "nano_cpus": 1000000000,
+      "started_at": "2026-10-10T11:39:22.132550636Z"
+    },
+    "roehub-local-backtest-artifact-publisher-1": {
+      "image": "sha256:3e7f864da86de8c7a33192f59af4766687f9e76e7fd2da6e5d9bdcb3372aeb6c",
+      "memory": 805306368,
+      "nano_cpus": 1000000000,
+      "started_at": "2026-10-09T19:38:22.421682166Z"
+    }
+  },
+  "installed_config_sha256": {
+    ".local_artifacts/platform-local/config/clickhouse-capacity.xml": "43f6fff40fa4d3f40b03b46d1d6bd9957665fbc14e8b589f2524a34c17c8e2d5",
+    ".local_artifacts/platform-local/config/clickhouse-observability.xml": "f0dd55cc97bf61e587599c8640f6b44f08f5e21d1bf226f08d3595ac1ff4a507",
+    ".local_artifacts/platform-local/config/clickhouse-profiles.xml": "a3cfeae041631603984a1957dcbbea5af7b8f0fbc3859e64d5b30993515e3f5b",
+    ".local_artifacts/platform-local/config/clickhouse-query-limits.xml": "9a11a9080b04a94f85bd82673d8ae998dde1cbbc4460445837c39dd7e9b9d1a6"
+  }
+}

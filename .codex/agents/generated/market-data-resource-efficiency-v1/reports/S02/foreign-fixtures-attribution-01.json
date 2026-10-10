@@ -1,0 +1,33 @@
+{
+  "production_and_fixture_hashes": [
+    {
+      "path": "tests/real_infra/market_data/test_work_requests_postgres.py",
+      "baseline_sha256": "12f462025e3e9b43fa35bdf1e56c3e0f093ec18bfce60cf8efe50b2bcb6d309a",
+      "candidate_sha256": "d6ec0c9035a5b34db7dc964fd23ffcddbe9dc22850f16e4e40418b21b8e51f2c",
+      "identical": false
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/services/work_requests.py",
+      "baseline_sha256": "92306a6b56bad02ca6fc0837c910e868f6a95290f0f594773b8f242b2a48ee18",
+      "candidate_sha256": "92306a6b56bad02ca6fc0837c910e868f6a95290f0f594773b8f242b2a48ee18",
+      "identical": true
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/services/rest_fill_queue.py",
+      "baseline_sha256": "6f77cfa66491fbea73000635bc357bf7f1bf1310f07de44e324b6e20f8744349",
+      "candidate_sha256": "6f77cfa66491fbea73000635bc357bf7f1bf1310f07de44e324b6e20f8744349",
+      "identical": true
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py",
+      "baseline_sha256": "9855738abba5384d1b207bd0666c33592f978573e418d54b56f73270b1707ad9",
+      "candidate_sha256": "9855738abba5384d1b207bd0666c33592f978573e418d54b56f73270b1707ad9",
+      "identical": true
+    }
+  ],
+  "observed": "The five same tests fail with the same lease_check TypeError using byte-identical baseline test fixture and unchanged WorkRequestService/RestFillQueue/repository. Baseline fixture receives current unchanged SQL migrations through a read-only symlink; original snapshot omitted migrations.",
+  "baseline_run": "foreign-fixtures-baseline-02.txt",
+  "candidate_run": "required-tests-final-02.txt",
+  "boundary": "fixture/production causal comparison, not an independently deployed baseline environment; current work_errors has new 202 classification, unrelated to constructor TypeError",
+  "resolution": "Outside S02 behavior. Do not fix unrelated fixtures; required suites 49 pass and native durable pressure cases 2 pass."
+}

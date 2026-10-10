@@ -1,0 +1,13 @@
+{
+  "time": "2026-10-10T20:16:21.037119+00:00",
+  "completed": [
+    "baseline-M3-01",
+    "candidate-M3-01"
+  ],
+  "remaining_started": false,
+  "launcher_pid": 50166,
+  "signal": "SIGKILL after active child exited; only stopped launcher killed",
+  "reason": "Material confirmed Linux cap violation: memory probe OOMKilled=true exit137 while creating second retained HTTP process under384MiB/1CPU. Spawn imports full scheduler in each child.",
+  "evidence": "linux-memory-probe-01.json",
+  "status": "preserved exploratory pair, not final acceptance series; narrow transport fix and new freeze required"
+}

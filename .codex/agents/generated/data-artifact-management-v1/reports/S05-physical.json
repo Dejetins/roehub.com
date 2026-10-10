@@ -1,0 +1,13 @@
+{
+  "command": [
+    ".venv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/real_infra/backtest/test_artifact_input_lifecycle.py"
+  ],
+  "exit_code": 0,
+  "elapsed_seconds": 84.16922688484192,
+  "stdout": "................................................                         [100%]\n48 passed in 82.76s (0:01:22)\n",
+  "stderr": ""
+}

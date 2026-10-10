@@ -1,0 +1,91 @@
+tools/qa/market_data_mixed_load.py:186:101: E501 Line too long (117 > 100)
+    |
+184 |                         client.query(
+185 |                             f"SELECT sum(cityHash64(symbol,ts_open,number)) FROM "
+186 |                             f"{db}.canonical_candles_1m CROSS JOIN numbers(16) AS passes WHERE ts_open < %(cutoff)s",
+    |                                                                                                     ^^^^^^^^^^^^^^^^^ E501
+187 |                             parameters={"cutoff": CUTOFF},
+188 |                             settings={"log_comment": tag},
+    |
+
+tools/qa/market_data_mixed_load.py:263:101: E501 Line too long (113 > 100)
+    |
+261 |                 "inspect",
+262 |                 "--format",
+263 |                 '{"image":{{json .Image}},"memory":{{.HostConfig.Memory}},"nano_cpus":{{.HostConfig.NanoCpus}}}',
+    |                                                                                                     ^^^^^^^^^^^^^ E501
+264 |                 args.container,
+265 |             ],
+    |
+
+tools/qa/market_data_mixed_load.py:350:101: E501 Line too long (130 > 100)
+    |
+348 |                 str(row[0]): row[1]
+349 |                 for row in client.query(
+350 |                     "SELECT metric,value FROM system.asynchronous_metrics WHERE metric IN ('jemalloc.allocated','MemoryResident')"
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+351 |                 ).result_rows
+352 |             }
+    |
+
+tools/qa/market_data_mixed_load.py:357:101: E501 Line too long (115 > 100)
+    |
+355 |             )
+356 |             sample["active"] = client.query(
+357 |                 "SELECT user,count(),sum(memory_usage) FROM system.processes WHERE user!='s02_admin' GROUP BY user"
+    |                                                                                                     ^^^^^^^^^^^^^^^ E501
+358 |             ).result_rows
+359 |             sample["parts"] = client.command(
+    |
+
+tools/qa/market_data_mixed_load.py:372:101: E501 Line too long (103 > 100)
+    |
+370 |                     "sh",
+371 |                     "-c",
+372 |                     "cat /sys/fs/cgroup/memory.current /sys/fs/cgroup/cpu.stat /sys/fs/cgroup/io.stat",
+    |                                                                                                     ^^^ E501
+373 |                 ],
+374 |                 text=True,
+    |
+
+tools/qa/market_data_mixed_load.py:385:101: E501 Line too long (163 > 100)
+    |
+383 |         record["full_completion_s"] = time.monotonic() - start
+384 |         record["background_counts"] = client.query(
+385 |             f"SELECT symbol,uniqExact(ts_open) FROM {db}.canonical_candles_1m WHERE ts_open >= %(cutoff)s AND symbol IN ('S0004USDT','S0005USDT') GROUP BY symbol",
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+386 |             parameters={"cutoff": CUTOFF},
+387 |         ).result_rows
+    |
+
+tools/qa/market_data_mixed_load.py:389:101: E501 Line too long (187 > 100)
+    |
+387 |         ).result_rows
+388 |         record["live_counts"] = client.query(
+389 |             f"SELECT symbol,uniqExact(ts_open) FROM {db}.canonical_candles_1m WHERE ts_open >= %(cutoff)s AND symbol IN ('S0000USDT','S0001USDT','S0002USDT','S0003USDT') GROUP BY symbol",
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+390 |             parameters={"cutoff": CUTOFF},
+391 |         ).result_rows
+    |
+
+tools/qa/market_data_mixed_load.py:394:101: E501 Line too long (325 > 100)
+    |
+392 |         client.command("SYSTEM FLUSH LOGS")
+393 |         record["query_metrics"] = client.query(
+394 |             "SELECT user,log_comment,type,count(),sum(read_rows),sum(read_bytes),max(memory_usage),sum(ProfileEvents['UserTimeMicroseconds']),sum(ProfileEvents['ReadBufferFromFileDescriptorReadBytes']) FROM system.query_log WHERE event_time>=now()-INTERVAL 30 MINUTE AND has(databases,%(db)s) GROUP BY user,log_comment,type",
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+395 |             parameters={"db": db},
+396 |         ).result_rows
+    |
+
+tools/qa/market_data_mixed_load.py:401:101: E501 Line too long (126 > 100)
+    |
+399 |             str(row[0]): row[1]
+400 |             for row in client.query(
+401 |                 "SELECT metric,value FROM system.asynchronous_metrics WHERE metric IN ('jemalloc.allocated','MemoryResident')"
+    |                                                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+402 |             ).result_rows
+403 |         }
+    |
+
+Found 9 errors.

@@ -1,0 +1,19 @@
+{
+  "command": [
+    ".venv/bin/pytest",
+    "-q",
+    "-ra",
+    "tests/unit/contexts/extensions",
+    "tests/unit/contexts/operations",
+    "tests/unit/integration",
+    "tests/unit/sdk",
+    "tests/unit/docs",
+    "tests/unit/identity"
+  ],
+  "exit_code": 0,
+  "output": "........................................................................ [ 93%]\n.....                                                                    [100%]\n77 passed in 0.61s\n",
+  "environment_overrides": {
+    "PYTHONPATH": ".",
+    "NUMBA_NUM_THREADS": "12"
+  }
+}

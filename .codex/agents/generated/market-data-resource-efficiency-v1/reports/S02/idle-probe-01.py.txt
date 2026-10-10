@@ -1,0 +1,9 @@
+import json,time,subprocess
+from pathlib import Path
+import clickhouse_connect
+p=Path('.cache/market-data-s02/private/admin');c=clickhouse_connect.get_client(host='127.0.0.1',port=38123,username='s02_admin',password=p.read_text());rows=[];start=time.monotonic()
+try:
+ for _ in range(55):
+  rows.append({'at_s':time.monotonic()-start,'memory':dict(c.query("SELECT metric,value FROM system.asynchronous_metrics WHERE metric IN ('jemalloc.allocated','MemoryResident')").result_rows),'tracked':c.command("SELECT value FROM system.metrics WHERE metric='MemoryTracking'"),'active_fixture_merges':c.command("SELECT count() FROM system.merges WHERE startsWith(database,'resource_s02_')"),'cgroup_memory':int(subprocess.check_output(['docker','exec','roehub-s02-ch','cat','/sys/fs/cgroup/memory.current']))});time.sleep(1)
+finally:c.close()
+with Path('.codex/agents/generated/market-data-resource-efficiency-v1/reports/S02/post-series-idle-01.json').open('x') as f:json.dump({'boundary':'55 one-second idle samples after complete final series and fixture deletion; six runs each separately record a five-second post-drain snapshot. Not a long-term leak/stability test.','samples':rows},f,indent=2)

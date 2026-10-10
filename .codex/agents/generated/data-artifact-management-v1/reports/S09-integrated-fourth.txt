@@ -1,0 +1,318 @@
+F                                                                        [100%]
+=================================== FAILURES ===================================
+________ test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs ________
+
+dispatch = {'actor': UUID('0ad9ad02-0c21-4f32-8754-8277f793c6c4'), 'admin': UUID('d3501a27-599c-4c92-b851-a2ef7cf85e58'), 'catalo...st_artifacts.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x11e550da0>, ...}
+live_jobs = (BacktestJob(job_id=UUID('df0d59e9-44c0-460e-8bf4-60f9cb997ecc'), organization_id=OrganizationId(value=UUID('00000000-...contexts.backtest.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x11e5522d0>)
+tmp_path = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-375/test_raw_ingestion_scheduler_m0')
+
+    def test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs(dispatch, live_jobs, tmp_path):
+        import os
+        import re
+        from pathlib import Path
+    
+        import clickhouse_connect
+        import numpy as np
+    
+        from apps.scheduler.backtest_artifact_publisher.wiring.managed_app import compose_managed_app
+        from apps.scheduler.backtest_artifact_publisher.wiring.modules.backtest_artifact_publisher import (  # noqa: E501
+            FileBacktestArtifactPublisherHostLock,
+        )
+        from tests.unit.contexts.backtest.application.services.v2 import (
+            test_prepare_pools_service as prep,
+        )
+        from tests.unit.contexts.backtest_artifacts.test_automatic_base import DURATIONS
+        from tests.unit.contexts.backtest_artifacts.test_derivative_profiles import (
+            IndicatorsComputeNumbaConfig,
+            NumbaIndicatorCompute,
+            n,
+            snapshot_for,
+        )
+        from trading.contexts.backtest.application.dto.input_recipe import BacktestInputRecipe
+        from trading.contexts.backtest_artifacts.adapters.outbound.persistence.clickhouse.stored_coordinates import (  # noqa: E501
+            ClickHouseStoredArtifactCoordinates,
+        )
+        from trading.contexts.backtest_artifacts.application.services.v2.contracts import (
+            ArtifactRequestedRow,
+        )
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_index_reader import (  # noqa: E501
+            ClickHouseCanonicalCandleIndexReader,
+        )
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_reader import (  # noqa: E501
+            ClickHouseCanonicalCandleReader,
+        )
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
+            ClickHouseConnectGateway,
+        )
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (  # noqa: E501
+            ClickHouseRawKlineWriter,
+        )
+        from trading.contexts.market_data.application.services.stored_candle_signal import (
+            StoredCandleSignalWriter,
+        )
+    
+        port = os.environ.get("ROEHUB_BASE_TEST_CLICKHOUSE_PORT")
+        if not port:
+            pytest.skip("explicit disposable ClickHouse required")
+        m = dispatch
+        client = clickhouse_connect.get_client(host="127.0.0.1", port=int(port))
+        db = "s09_" + uuid4().hex
+        try:
+            ddl = (
+                Path("migrations/clickhouse/market_data_ddl.sql").read_text().replace("market_data", db)
+            )
+            ddl = re.sub(r"/\*.*?\*/", "", ddl, flags=re.S)
+            ddl = re.sub(r"--[^\n]*", "", ddl)
+            for statement in ddl.split(";"):
+                if statement.strip() and not statement.strip().startswith("USE "):
+                    client.command(statement)
+            gateway = ClickHouseConnectGateway(client)
+            f, w = worker(m, tmp_path)
+            defaults = n.YamlBacktestGridDefaultsProvider.from_yaml(
+                config_path=Path("configs/dev/indicators.yaml")
+            )
+            runner = replace(
+                w.publisher.runner,
+                canonical_candle_reader=ClickHouseCanonicalCandleReader(gateway, db),
+                indicator_grid_builder=n._signal_grid_builder_v2(),
+                defaults_provider=defaults,
+                signal_rules_engine=n.BacktestSignalRulesEngineV2(defaults_provider=defaults),
+                indicator_compute=NumbaIndicatorCompute(
+                    defs=n.all_defs(),
+                    config=IndicatorsComputeNumbaConfig(
+                        numba_num_threads=1, numba_cache_dir=tmp_path / "jit"
+                    ),
+                ),
+            )
+            clock = [NOW]
+            app = compose_managed_app(
+                installation_id=m["installation"],
+                gateway=m["db"],
+                catalog=m["catalog"],
+                access=m["repo"].access,
+                publisher=replace(w.publisher, runner=runner),
+                stored_coordinates=ClickHouseStoredArtifactCoordinates(gateway, db),
+                candle_index=ClickHouseCanonicalCandleIndexReader(gateway, db),
+                root=f.builder.root,
+                root_id="backtest-primary",
+                root_revision=1,
+                budget_bytes=10737418240,
+                host_lock=FileBacktestArtifactPublisherHostLock(tmp_path / "host.lock"),
+                now=lambda: clock[0],
+            )
+            writer = StoredCandleSignalWriter(
+                ClickHouseRawKlineWriter(gateway, db),
+                lambda instrument: app.reconciler.observe(instrument, now=clock[0]),
+            )
+            rows = n._build_canonical_rows_v2(bar_indexes=tuple(i for i in range(10080) if i != 1007))
+            writer.write_1m(rows)
+            assert (
+                client.query(f"SELECT count() FROM {db}.canonical_candles_1m FINAL").first_row[0]
+                == 10079
+            )
+            assert app.cycle() == "observed"
+            r = app.worker.repository
+            assert {x["state"] for x in r.rows("SELECT state FROM backtest_artifact_requests")} == {
+                "ready"
+            }
+            pointer = f.loader.load_current_pointer(f.coordinates)
+            manifest = f.loader.load_slot_manifest(f.coordinates, pointer.active_slot)
+            assert {p.timeframe for p in manifest.prices} == set(DURATIONS)
+            assert not manifest.signals.manifests
+            # Each materialized timeframe is checked against an independent scalar rollup.
+            one = next(p for p in manifest.prices if p.timeframe == "1m")
+            opens = np.load(manifest.path.parent / one.open_time.path)
+            values = np.load(manifest.path.parent / one.ohlcv.path)
+            for section in manifest.prices:
+                duration = DURATIONS[section.timeframe] * 60000
+                expected = []
+                for bucket in sorted(set(opens // duration)):
+                    ix = np.flatnonzero(opens // duration == bucket)
+                    if len(ix) == DURATIONS[section.timeframe] and opens[ix[0]] == bucket * duration:
+                        v = values[ix]
+                        expected.append(
+                            [
+                                v[0, 0],
+                                max(v[:, 1]),
+                                min(v[:, 2]),
+                                v[-1, 3],
+                                sum(float(x) for x in v[:, 4]),
+                            ]
+                        )
+                np.testing.assert_allclose(
+                    np.load(manifest.path.parent / section.ohlcv.path), expected, rtol=1e-6
+                )
+            service = ArtifactHttpService(r, m["installation"])
+            c = item(m).coordinate
+            selected = profile(m["catalog"], names=("ma.sma",), tp=(), sl=())
+            result = service.submit(
+                m["org"],
+                m["actor"],
+                "integrated-enable",
+                Command(
+                    items=(
+                        CommandItem(
+                            coordinate=c, expected_version=0, patch=PolicyPatch(profile=selected)
+                        ),
+                    )
+                ),
+                "policy",
+            )
+            assert result.items[0].request_id is not None
+            assert app.cycle() == "observed"
+            pointer = f.loader.load_current_pointer(f.coordinates)
+            manifest = f.loader.load_slot_manifest(f.coordinates, pointer.active_slot)
+            assert {x.indicator_id for x in manifest.signals.manifests} == {"ma.sma"}
+            original_hash = pointer.manifest_sha256
+            original_next = r.rows("SELECT next_due FROM backtest_artifact_policies")[0]["next_due"]
+            service.submit(
+                m["org"],
+                m["actor"],
+                "integrated-manual",
+                Command(items=(CommandItem(coordinate=c, expected_version=1),)),
+                "update_now",
+            )
+            assert app.cycle() == "observed"
+            assert (
+                r.rows("SELECT next_due FROM backtest_artifact_policies")[0]["next_due"]
+                == original_next
+            )
+            # New persisted tail is deferred until the next occurrence and survives reconstruction.
+            writer.write_1m(n._build_canonical_rows_v2(bar_indexes=tuple(range(10080, 10140))))
+            count = len(r.rows("SELECT * FROM backtest_artifact_builds"))
+            assert app.cycle() == "observed"
+            assert len(r.rows("SELECT * FROM backtest_artifact_builds")) == count
+            clock[0] += timedelta(days=1)
+            assert app.cycle() == "observed"
+            pointer = f.loader.load_current_pointer(f.coordinates)
+            assert pointer.manifest_sha256 != original_hash
+            snapshot = snapshot_for(f, pointer.active_slot)
+            _, context = prep._input_context(f, pointer.active_slot)
+            refs = tuple(
+                ref
+                for ref in context.references
+                if ref.domain.role.startswith(("prices.", "mappings."))
+                and ref.domain.timeframe in ("1m", "15m")
+            )
+            snapshot = replace(
+                snapshot,
+                source_file_identities=refs,
+                consumed_domains=tuple(ref.domain for ref in refs),
+            )
+            domain = next(ref.domain for ref in refs if ref.domain.role == "prices.15m.ohlcv")
+            for indicator, provenance in [("ma.sma", "reused"), ("ma.ema", "generated")]:
+                grid = runner.indicator_grid_builder.materialize_indicator(
+                    grid=defaults.compute_defaults(indicator_id=indicator)
+                )
+                chosen = selected.indicators[0].params["window"].expand()[0]
+                # Canonical native grid identity: source first axis, window second in this fixture.
+                axes = {a.name: a.values for a in grid.axes}
+                row_id = axes["source"].index("close") * len(axes["window"]) + axes["window"].index(
+                    chosen
+                )
+                requested = (ArtifactRequestedRow(indicator, "close", row_id, (("window", chosen),)),)
+                recipe = BacktestInputRecipe(
+                    snapshot=snapshot,
+                    requested_start_utc=domain.origin_utc,
+                    requested_end_utc=domain.end_utc,
+                    rows=requested,
+                    rule_version="signals/v1",
+                    defaults_sha256=runner.derivative_defaults_sha256(requested),
+                    compute_version="numba/v1",
+                    precision_version="f32-f64/v1",
+                    funding_policy="not_applicable",
+                    funding_fingerprint=None,
+                    tp_levels_pct=(),
+                    sl_levels_pct=(),
+                )
+                _, _, prepared = prep._prepare_inputs(
+                    (f, runner, snapshot, None), context, recipe, tmp_path / indicator
+                )
+                assert provenance in prepared.provenance
+                assert recipe.snapshot.manifest_sha256 == pointer.manifest_sha256
+                assert f.loader.load_current_pointer(f.coordinates) == pointer
+>           complete_backtest(live_jobs, f, runner, snapshot, tmp_path / "full-job")
+
+tests/real_infra/backtest/test_artifact_integrated.py:350: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+live_jobs = (BacktestJob(job_id=UUID('df0d59e9-44c0-460e-8bf4-60f9cb997ecc'), organization_id=OrganizationId(value=UUID('00000000-...contexts.backtest.adapters.outbound.persistence.postgres.gateway.PsycopgBacktestPostgresGateway object at 0x11e5522d0>)
+fixture = ArtifactPrecomputeFixtureV2(config_path=PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-...tCoordinatesV2(exchange='binance', market_type='spot', symbol='BTCUSDT'), active_slot='slot_a', inactive_slot='slot_b')
+runner = BacktestArtifactPrecomputeRunnerV2(runtime_settings=ArtifactPrecomputeRuntimeSettingsV2(price_tail_bars_1m=2, mapping_...ading.contexts.indicators.application.services.grid_builder.GridBuilder object at 0x11e5ab4d0>, progress_observer=None)
+snapshot = ArtifactCandleSnapshot(coordinates=ArtifactCoordinatesV2(exchange='binance', market_type='spot', symbol='BTCUSDT'), so...refixProof(state='pending', domains=(), role_digests=(), source_domain_sha256=None, schema='artifact-prefix-proof/v1'))
+directory = PosixPath('/private/var/folders/kp/51y83whn2s70ylfynwpgkwqw0000gn/T/pytest-of-daniildegtyarev/pytest-375/test_raw_ingestion_scheduler_m0/full-job')
+
+    def complete_backtest(live_jobs, fixture, runner, snapshot, directory):
+        """Production HTTP admission -> PG recipe/pin -> actual child -> persisted completion."""
+        import os
+        from dataclasses import asdict
+        from datetime import UTC, datetime
+        from pathlib import Path
+        from uuid import UUID
+    
+        import yaml
+    
+        from apps.worker.backtest_job_runner.wiring.modules.child_ipc import BacktestChildSuccessResult
+        from apps.worker.backtest_job_runner.wiring.modules.child_process import BacktestChildProcessExecutor
+        from tests.unit.apps.api import test_backtests_routes as api
+        from tests.unit.contexts.backtest.application.services.v2 import test_backtest_preflight_service as pf
+        from trading.contexts.backtest.adapters.outbound.artifacts_fs import FilesystemBacktestArtifactArrayLoader, FilesystemBacktestArtifactContextResolver
+        from trading.contexts.backtest.application.services.v2.preflight import BacktestPreflightService
+        from trading.contexts.backtest.application.use_cases import BacktestJobsUseCase
+    
+        base, repo, leases, gateway = live_jobs
+        directory.mkdir()
+        runtime = replace(pf._runtime_config(), artifact_config_hash=runner.runtime_settings.config_sha256)
+        preflight = BacktestPreflightService(defaults_provider=runner.defaults_provider,
+            artifact_context_resolver=FilesystemBacktestArtifactContextResolver(artifact_loader=fixture.loader),
+            runtime_config=runtime, artifact_array_loader=FilesystemBacktestArtifactArrayLoader(artifact_loader=fixture.loader),
+            indicator_grid_builder=runner.indicator_grid_builder)
+        use_case = BacktestJobsUseCase(job_repository=repo, preflight_service=preflight, runtime_config=runtime,
+            organization_scope_resolver=api._MappingScopeResolver({base.user_id: base.organization_id}))
+        client = api._build_client(jobs_use_case=use_case)
+        request = pf._valid_request()
+        request['coordinates'] = asdict(fixture.coordinates)
+        domain = next(d for d in snapshot.consumed_domains if d.role == 'prices.15m.ohlcv')
+        request['time_range'] = {'start': domain.origin_utc, 'end': domain.end_utc}
+        request['indicators'] = [{'indicator_id': name, 'sources': ['close'], 'window': {'start':21,'stop':21,'step':1}} for name in ('ma.sma','ma.ema','ma.wma')]
+        request['quality_constraints'] = {'min_closed_trades': 0}
+        headers = {'x-user-id': str(base.user_id.value), 'Idempotency-Key':'s09-complete'}
+        response = client.post('/backtests/preflight', headers=headers, json=request)
+>       assert response.status_code == 200, response.text
+E       AssertionError: {"error":{"code":"backtest.invalid_request","message":"Backtest preflight request is invalid","details":{"errors":[{"code":"invalid_value","message":"quality_constraints.min_closed_trades must be > 0","path":"quality_constraints.min_closed_trades"}],"retryable":false}}}
+E       assert 422 == 200
+E        +  where 422 = <Response [422 Unprocessable Entity]>.status_code
+
+tests/real_infra/backtest/test_artifact_integrated.py:395: AssertionError
+---------------------------- Captured stdout setup -----------------------------
+Applying identity baseline SQL: 0001_identity_v1.sql
+Applying identity baseline SQL: 0002_identity_2fa_totp_v1.sql
+Applying identity baseline SQL: 0003_identity_exchange_keys_v1.sql
+identity 0004 decision: apply (identity_exchange_keys is in v1 shape and empty; 0004 is safe to apply)
+Applied identity SQL: 0004_identity_exchange_keys_v2.sql
+Applying identity baseline SQL: 0005_identity_keycloak_cutover_v1.sql
+Applying identity baseline SQL: 0006_identity_account_settings_v1.sql
+Applying identity baseline SQL: 0007_identity_exchange_audit_events_v1.sql
+Applying identity baseline SQL: 0008_exchange_connections_v1.sql
+Applying identity baseline SQL: 0009_identity_exchange_reclassification_audit_v1.sql
+Running Alembic upgrade head for POSTGRES_DSN
+Acquiring pg_advisory_lock(56329814721)
+Running: alembic upgrade head
+Migration success
+Releasing pg_advisory_lock(56329814721)
+Applying post-Alembic identity SQL: 0010_strategy_exchange_bindings_v1.sql
+Applying post-Alembic identity SQL: 0011_identity_organizations_rbac_audit_v1.sql
+Applying post-Alembic identity SQL: 0012_identity_local_auth_v1.sql
+Applying post-Alembic identity SQL: 0013_identity_oidc_provider_v1.sql
+Applying post-Alembic identity SQL: 0014_research_organization_isolation_v1.sql
+Applying post-Alembic identity SQL: 0015_trading_organization_isolation_v1.sql
+Applying post-Alembic identity SQL: 0016_notification_provider_instances_v1.sql
+Applying post-Alembic identity SQL: 0017_extensions_plugin_platform_v1alpha1.sql
+Applying post-Alembic identity SQL: 0018_artifact_store_v1.sql
+Applying post-Alembic identity SQL: 0019_isolated_job_runtime_v1.sql
+Applying post-Alembic identity SQL: 0020_execution_gateway_mainnet_safety_v1.sql
+Applying post-Alembic identity SQL: 0021_control_operation_audit_v1.sql
+Applying post-Alembic identity SQL: 0022_market_data_instrument_selections_v1.sql
+=========================== short test summary info ============================
+FAILED tests/real_infra/backtest/test_artifact_integrated.py::test_raw_ingestion_scheduler_manual_and_actual_backtest_inputs
+1 failed, 3 deselected in 16.20s

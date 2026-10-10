@@ -1,0 +1,134 @@
+- link "Skip to content":
+  - /url: "#workspace-heading"
+- complementary:
+  - generic "RoeHub": R
+  - navigation "Navigation":
+    - link "Overview":
+      - /url: /dashboard
+      - generic: Overview
+    - link "Backtests":
+      - /url: /backtests
+      - generic: Backtests
+    - link "Strategies":
+      - /url: /strategies
+      - generic: Strategies
+    - link "Data":
+      - /url: /data
+      - generic: Data
+    - link "Connections":
+      - /url: /connections
+      - generic: Connections
+    - link "Monitoring":
+      - /url: /monitoring
+      - generic: Monitoring
+    - link "Settings":
+      - /url: /settings/profile
+      - generic: Settings
+  - generic "Language": 文
+  - link "Sign out":
+    - /url: /logout
+    - generic: Sign out
+- main:
+  - text: Data
+  - generic: Navigator
+  - complementary:
+    - heading "Exchanges" [level=2]
+    - navigation "Exchanges":
+      - link "Binance":
+        - /url: /data?exchange=binance&market=1
+        - text: Binance
+  - heading "Data" [level=1]
+  - region "Instrument catalog":
+    - navigation "Data view":
+      - link "Candles":
+        - /url: /data?market=1&symbol=BTCUSDT&job=8cf523dc-7ee6-4bf0-9304-c53c72ef1e1f
+      - link "Artifacts":
+        - /url: /data?market=1&symbol=BTCUSDT&job=8cf523dc-7ee6-4bf0-9304-c53c72ef1e1f&view=artifacts
+    - generic: Search instruments
+    - searchbox "Search instruments"
+    - button "Market":
+      - text: All markets
+    - button "History":
+      - text: "History: all"
+    - button "Stream":
+      - text: "Stream: all"
+    - generic: All available history · 1m · through the latest closed minute
+    - button "Show log"
+    - button "Refresh":
+    - generic "Catalog rows":
+      - table:
+        - rowgroup:
+          - row "Select this page for download Instrument Market History / download Stream":
+            - columnheader "Select this page for download":
+              - checkbox "Select this page for download"
+            - columnheader "Instrument":
+              - button "Instrument":
+                - text: Instrument
+            - columnheader "Market":
+              - button "Market":
+                - text: Market
+            - columnheader "History / download":
+              - button "History / download":
+                - text: History / download
+            - columnheader "Stream":
+              - button "Stream":
+                - text: Stream
+        - rowgroup:
+          - 'row "Download BTCUSDT · Spot BTCUSDT Spot Full history: 100% 100 Off · Disabled"':
+            - cell "Download BTCUSDT · Spot":
+              - checkbox "Download BTCUSDT · Spot"
+            - cell "BTCUSDT":
+              - generic: BTCUSDT
+            - cell "Spot"
+            - 'cell "Full history: 100% 100"':
+              - generic "10080 / 10080 · closed candles across the full available history":
+                - generic: "Full history: 100%"
+                - progressbar "Candle coverage"
+            - cell "Off · Disabled":
+              - generic "Off · Disabled":
+                - text: "Off"
+          - 'row "Download ETHUSDT · Spot ETHUSDT Spot Full history: 100% 100 Off · Disabled"':
+            - cell "Download ETHUSDT · Spot":
+              - checkbox "Download ETHUSDT · Spot"
+            - cell "ETHUSDT":
+              - generic: ETHUSDT
+            - cell "Spot"
+            - 'cell "Full history: 100% 100"':
+              - generic "10080 / 10080 · closed candles across the full available history":
+                - generic: "Full history: 100%"
+                - progressbar "Candle coverage"
+            - cell "Off · Disabled":
+              - generic "Off · Disabled":
+                - text: "Off"
+    - generic: 1–2 of 2
+    - button "Previous page" [disabled]:
+    - button "Next page" [disabled]:
+  - complementary "Instrument settings":
+    - heading "BTCUSDT" [level=2]
+    - paragraph: Binance · Spot · 1m
+    - button "Close instrument":
+    - region "Download request":
+      - heading "Download request" [level=3]
+      - paragraph: Binance · Spot
+      - paragraph: Download completed
+      - paragraph: "Job progress: 1 / 1 minutes"
+      - paragraph: "Attempt: 1 / 5"
+      - generic "Download controls"
+      - generic "Download events"
+    - heading "Streaming" [level=3]
+    - switch "Streaming"
+    - paragraph: New candles are not added automatically. Stored history is preserved.
+    - term: Last candle · UTC
+    - definition: Oct 8, 2026, 12:00 AM
+    - heading "Full history" [level=3]
+    - strong: 100%
+    - generic: 10,080 / 10,080
+    - progressbar "Full history coverage"
+    - paragraph: Oct 1, 2026, 12:00 AM – Oct 8, 2026, 12:00 AM · UTC
+    - paragraph: "Missing candles: 0"
+    - heading "Fill missing history" [level=3]
+    - generic "Custom period"
+    - button "Fill missing history":
+      - text: Fill missing history
+    - paragraph: Checks the full history and downloads only gaps and the missing tail. Existing candles are skipped.
+    - generic "Instrument details"

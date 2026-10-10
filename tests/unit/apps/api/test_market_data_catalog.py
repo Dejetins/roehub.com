@@ -25,6 +25,13 @@ from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_re
 from trading.contexts.market_data.application.ports.stores.catalog_coverage_reader import (
     CatalogCoverageReader,
 )
+from trading.contexts.market_data.application.ports.stores.history_coverage_reader import (
+    HistoryCoverageReader,
+)
+from trading.contexts.market_data.application.services.history_readiness import (
+    HistoryOrigins,
+    HistoryReadiness,
+)
 from trading.contexts.market_data.application.use_cases import ListEnabledMarketsUseCase
 from trading.shared_kernel.primitives import (
     InstrumentId,
@@ -96,50 +103,71 @@ def catalog_surface():
     )
     probes = []
     history_bounds = SimpleNamespace(
+        ready_starts=lambda **kw: {(1, "BTCUSDT"): datetime(2024, 1, 1, tzinfo=UTC)},
         read_or_request=lambda **kw: probes.append(kw)
         or dict(state="ready", first_open_at=datetime(2017, 8, 17, 4, tzinfo=UTC))
     )
     app.state.history_bounds = history_bounds
+    app.state.collector = {"running": False, "repairs": {}}
     app.include_router(
         build_catalog_workspace_router(
+            collector_status=lambda: app.state.collector,
             history_bounds=cast(PostgresHistoryBoundsRepository, history_bounds),
+            full_history=HistoryReadiness(
+                origins=cast(HistoryOrigins, history_bounds),
+                coverage=cast(
+                    HistoryCoverageReader,
+                    SimpleNamespace(source_absent_counts=lambda **kw: {},
+                                    counts=lambda **kw: {(1, "BTCUSDT"): 996409}),
+                ),
+            ),
             current_user_dependency=current,
-            scope_resolver=cast(ResearchOrganizationScopeResolver, SimpleNamespace(
-                resolve=lambda **kw: SimpleNamespace(organization_id=org)
-            )),
+            scope_resolver=cast(
+                ResearchOrganizationScopeResolver,
+                SimpleNamespace(resolve=lambda **kw: SimpleNamespace(organization_id=org)),
+            ),
             selections=cast(PostgresInstrumentSelectionRepository, selections),
             snapshots=cast(PostgresCatalogSnapshotRepository, snapshots),
-            jobs=cast(PostgresMarketDataWorkRequestRepository, SimpleNamespace(
-                instrument_jobs=lambda **kw: (
-                    scoped(**kw)
-                    or [
-                        dict(
-                            market_id=1,
-                            symbol="ETHUSDT",
-                            job_id=uuid4(),
-                            state="running",
-                            completed_units=2160,
-                            position=2,
-                            total_units=2880,
-                        )
-                    ]
-                )
-            )),
-            markets=cast(ListEnabledMarketsUseCase, SimpleNamespace(
-                execute=lambda: [
-                    SimpleNamespace(
-                        market_id=MarketId(m),
-                        exchange_name="binance",
-                        market_type="spot" if m == 1 else "futures",
-                        market_code="binance:spot" if m == 1 else "binance:futures",
+            jobs=cast(
+                PostgresMarketDataWorkRequestRepository,
+                SimpleNamespace(
+                    instrument_jobs=lambda **kw: (
+                        scoped(**kw)
+                        or [
+                            dict(
+                                market_id=1,
+                                symbol="ETHUSDT",
+                                job_id=uuid4(),
+                                state="running",
+                                completed_units=2160,
+                                position=2,
+                                total_units=2880,
+                            )
+                        ]
                     )
-                    for m in (1, 2)
-                ]
-            )),
-            coverage=cast(CatalogCoverageReader, SimpleNamespace(
-                counts=lambda **kw: {(1, "BTCUSDT"): 1440, (1, "ETHUSDT"): 720},
-                latest=lambda **kw: end,
-            )),
+                ),
+            ),
+            markets=cast(
+                ListEnabledMarketsUseCase,
+                SimpleNamespace(
+                    execute=lambda: [
+                        SimpleNamespace(
+                            market_id=MarketId(m),
+                            exchange_name="binance",
+                            market_type="spot" if m == 1 else "futures",
+                            market_code="binance:spot" if m == 1 else "binance:futures",
+                        )
+                        for m in (1, 2)
+                    ]
+                ),
+            ),
+            coverage=cast(
+                CatalogCoverageReader,
+                SimpleNamespace(
+                    counts=lambda **kw: {(1, "BTCUSDT"): 1440, (1, "ETHUSDT"): 720},
+                    latest=lambda **kw: end,
+                ),
+            ),
         )
     )
     app.state.probes = probes
@@ -262,3 +290,66 @@ def test_full_metadata_queue_is_an_explicit_failure_not_a_fake_queued_job(catalo
         headers={"x-user": "allowed"},
     )
     assert response.status_code == 503 and response.headers["Retry-After"] == "30"
+
+
+def test_full_history_uses_confirmed_origin_and_preserves_unknown_state(catalog_surface):
+    client, _, params, _ = catalog_surface
+    response = client.get(
+        "/market-data/workspace/instruments",
+        params={**params, "history_scope": "full"},
+        headers={"x-user": "allowed"},
+    )
+    assert response.status_code == 200
+    rows = response.json()['items']
+    btc = next(r for r in rows if r['market_id']==1 and r['symbol']=='BTCUSDT')
+    assert btc['actual_candles'] == 996409
+    assert btc['expected_candles'] > 996409
+    assert btc['history_start_at'].startswith('2024-01-01')
+    eth = next(r for r in rows if r['symbol']=='ETHUSDT')
+    assert eth['coverage_state'] == 'unknown'
+    assert eth['coverage_percent'] is None
+    assert (
+        client.get("/market-data/workspace/history?market_id=1&symbol=BTCUSDT").status_code == 401
+    )
+    detail = client.get(
+        "/market-data/workspace/history?market_id=1&symbol=BTCUSDT", headers={"x-user": "allowed"}
+    ).json()
+    assert detail['actual_candles'] == 996409
+    assert detail['missing_candles'] == detail['expected_candles']-996409
+
+
+def test_stream_intent_is_not_a_live_collector_and_repairs_are_scoped(catalog_surface):
+    client, _, params, _ = catalog_surface
+    headers = {"x-user": "allowed"}
+    path = "/market-data/workspace/collection?market_id=1&symbol=ETHUSDT"
+    assert client.get(path).status_code == 401
+    initial = client.get(path, headers=headers).json()
+    assert initial["effective"] is True and initial["stream_state"] == "offline"
+    rows = client.get("/market-data/workspace/instruments", params=params, headers=headers).json()[
+        "items"
+    ]
+    assert next(r for r in rows if r["symbol"] == "ETHUSDT")["stream_state"] == "offline"
+    client.app.state.collector["running"] = True
+    assert client.get(path, headers=headers).json()["stream_state"] == "unknown"
+    client.app.state.collector["connections"] = {(1, "OTHERUSDT"): True}
+    assert client.get(path, headers=headers).json()["stream_state"] == "unknown"
+    client.app.state.collector["connections"][(1, "ETHUSDT")] = False
+    assert client.get(path, headers=headers).json()["stream_state"] == "disconnected"
+    client.app.state.collector["connections"][(1, "ETHUSDT")] = True
+    assert client.get(path, headers=headers).json()["stream_state"] == "running"
+    retry_at = datetime.now(UTC)
+    client.app.state.collector["repairs"] = {
+        (1, "ETHUSDT"): dict(
+            state="pending", error_code="storage_memory_pressure", next_retry_at=retry_at
+        ),
+        (1, "OTHERUSDT"): dict(state="failed", error_code="must-not-leak"),
+    }
+    waiting = client.get(path, headers=headers).json()
+    assert waiting["stream_state"] == "retry_wait" and waiting["next_retry_at"]
+    assert "must-not-leak" not in str(waiting)
+    client.app.state.collector["repairs"][(1, "ETHUSDT")] = dict(
+        state="failed", error_code="source_history_incomplete", reason="stream_history_repair"
+    )
+    blocked = client.get(path, headers=headers).json()
+    assert blocked["stream_state"] == "blocked"
+    assert blocked["history_repair_error"] == "source_history_incomplete"

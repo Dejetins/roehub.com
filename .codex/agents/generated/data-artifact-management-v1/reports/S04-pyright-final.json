@@ -1,0 +1,17 @@
+{
+  "command": [
+    ".venv/bin/pyright",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/contracts.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_loader.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/hit_times_compute_v2.py",
+    "src/trading/contexts/backtest/adapters/outbound/artifacts_fs/artifact_array_loader.py",
+    "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "src/trading/contexts/backtest_artifacts/adapters/outbound/defaults/management_catalog.py",
+    "src/trading/contexts/backtest_artifacts/application/services/automatic_base.py",
+    "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_manifest_validator.py"
+  ],
+  "exit_code": 0,
+  "output": "0 errors, 0 warnings, 0 informations\nWARNING: there is a new pyright version available (v1.1.408 -> v1.1.414).\nPlease install the new version or set PYRIGHT_PYTHON_FORCE_VERSION to `latest`\n\n"
+}
