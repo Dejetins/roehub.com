@@ -223,7 +223,7 @@ Estimator **не** читает свечи.
 * для `timeframe=1m`:
 
   ```
-  T = dateDiff('minute', start, end)  // для полуинтервала [start, end)
+  T = (end - start).total_seconds() // 60  // для полуинтервала [start, end)
   ```
 * в терминах shared-kernel предпочтительно использовать `TimeRange`/`Timeframe`:
 

@@ -1,0 +1,83 @@
+{
+  "mode": "external",
+  "profile": "base",
+  "status": "passed",
+  "runtime_services": {
+    "operational-health": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 268435456,
+      "nano_cpus": 500000000,
+      "health": "healthy"
+    },
+    "api": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 805306368,
+      "nano_cpus": 1000000000,
+      "health": "healthy"
+    },
+    "web": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 402653184,
+      "nano_cpus": 500000000,
+      "health": "healthy"
+    },
+    "notification-dispatcher": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 402653184,
+      "nano_cpus": 500000000,
+      "health": "healthy"
+    },
+    "notification-report-scheduler": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 268435456,
+      "nano_cpus": 250000000,
+      "health": "healthy"
+    },
+    "telegram-bot-worker": {
+      "user": "65532:65532",
+      "read_only": true,
+      "memory_bytes": 268435456,
+      "nano_cpus": 250000000,
+      "health": "healthy"
+    }
+  },
+  "application_readiness": {
+    "operational-health": {
+      "proof": "application_health_endpoint",
+      "ready": true,
+      "mode": null
+    },
+    "api": {
+      "proof": "application_health_endpoint",
+      "ready": true,
+      "mode": null
+    },
+    "web": {
+      "proof": "application_health_endpoint",
+      "ready": true,
+      "mode": null
+    },
+    "notification-dispatcher": {
+      "proof": "initialized_operational_metric",
+      "marker": "notification_dispatcher_deliveries_claimed_total",
+      "ready": true
+    },
+    "notification-report-scheduler": {
+      "proof": "application_health_endpoint",
+      "ready": true,
+      "mode": "disabled"
+    },
+    "telegram-bot-worker": {
+      "proof": "application_health_endpoint",
+      "ready": true,
+      "mode": "disabled"
+    }
+  },
+  "storage_ready": true,
+  "scope": "actual source services; disposable stores; upstream same-version OpenBao; no provider delivery or release image claim"
+}

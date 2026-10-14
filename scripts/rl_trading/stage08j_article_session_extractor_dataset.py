@@ -103,7 +103,7 @@ def _run(args: argparse.Namespace) -> dict[str, Any]:
         expected_refresh_manifest_sha256=args.expected_refresh_manifest_sha256,
         raw_feature_manifest_path=args.raw_feature_manifest,
         output_root=args.output_root,
-        from_clickhouse=bool(args.from_clickhouse),
+        from_postgresql=bool(args.from_postgresql),
         symbols=args.symbol,
         all_symbols=bool(args.all_symbols),
         dataset_versions=args.dataset_version,
@@ -149,7 +149,7 @@ def build_article_sessionized_dataset(
     expected_refresh_manifest_sha256: str,
     raw_feature_manifest_path: Path,
     output_root: Path,
-    from_clickhouse: bool,
+    from_postgresql: bool,
     symbols: Sequence[str] | None,
     all_symbols: bool,
     dataset_versions: Sequence[str] | None,
@@ -170,7 +170,7 @@ def build_article_sessionized_dataset(
         )
     if not all_symbols and not symbols:
         raise SessionizedDatasetError(reason="symbol_selection_required", field="symbol")
-    if not from_clickhouse and not raw_feature_manifest_path.exists():
+    if not from_postgresql and not raw_feature_manifest_path.exists():
         raise SessionizedDatasetError(
             reason="raw_feature_manifest_not_found",
             field=str(raw_feature_manifest_path),
@@ -209,10 +209,10 @@ def build_article_sessionized_dataset(
     gateway = None
     database: str | None = None
     raw_entries: Mapping[tuple[str, str], Mapping[str, Any]] = {}
-    if from_clickhouse:
-        settings = stage06.ClickHouseSettingsLoader(stage06.os.environ).load()
-        gateway = stage06.ClickHouseConnectGateway(stage06._clickhouse_client(settings))
-        database = settings.database
+    if from_postgresql:
+        settings = stage06.market_gateway(stage06.os.environ, workload="bulk")
+        gateway = settings
+        database = "market_data"
     else:
         raw_entries = stage06._raw_slab_entries_by_key(_read_json(raw_feature_manifest_path))
 
@@ -239,10 +239,10 @@ def build_article_sessionized_dataset(
                 )
                 continue
 
-            if from_clickhouse:
+            if from_postgresql:
                 if gateway is None or database is None:
-                    raise SessionizedDatasetError(reason="clickhouse_gateway_not_initialized")
-                slab = stage06._read_slab_from_clickhouse(
+                    raise SessionizedDatasetError(reason="postgres_gateway_not_initialized")
+                slab = stage06._read_slab_from_postgresql(
                     gateway=gateway,
                     database=database,
                     market_id=source_window.market_id,
@@ -299,10 +299,10 @@ def build_article_sessionized_dataset(
     build_scope = {
         "all_symbols": all_symbols,
         "dataset_versions": sorted({window.dataset_version for window in source_windows}),
-        "from_clickhouse": from_clickhouse,
+        "from_postgresql": from_postgresql,
         "max_minutes_per_source_window": max_minutes_per_source_window,
         "max_symbols": max_symbols,
-        "raw_feature_manifest": None if from_clickhouse else str(raw_feature_manifest_path),
+        "raw_feature_manifest": None if from_postgresql else str(raw_feature_manifest_path),
         "selected_symbols": sorted({window.symbol for window in source_windows}),
         "effective_split_windows": [window.as_payload() for window in split_windows],
         "selector_id": SESSIONIZED_ARTICLE_POLICY_ID_V1,
@@ -604,9 +604,7 @@ def _load_sessionized_split(
         arrays.append(np.ascontiguousarray(features[:selected_count], dtype=np.float32))
         symbol = str(entry.get("symbol", "UNKNOWN")).upper()
         symbols.extend(symbol for _ in range(selected_count))
-        signal_times.extend(
-            _format_ms_utc(int(value)) for value in signal_time_ms[:selected_count]
-        )
+        signal_times.extend(_format_ms_utc(int(value)) for value in signal_time_ms[:selected_count])
         scores.extend(
             _optional_float(item.get("volatility_score")) for item in sessions[:selected_count]
         )
@@ -863,7 +861,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--hf-dataset-dir", type=Path, default=hf_eval_cli.DEFAULT_HF_DATASET_DIR)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--comparison-output-root", type=Path, default=DEFAULT_COMPARISON_ROOT)
-    parser.add_argument("--from-clickhouse", action="store_true")
+    parser.add_argument("--from-postgresql", action="store_true")
     parser.add_argument("--symbol", action="append", default=None)
     parser.add_argument("--all-symbols", action="store_true")
     parser.add_argument("--dataset-version", action="append", default=None)

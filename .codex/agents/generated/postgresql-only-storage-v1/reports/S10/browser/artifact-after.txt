@@ -1,0 +1,172 @@
+### Page
+- Page URL: http://127.0.0.1:20120/data?view=artifacts&market=1&symbol=AAVEUSDT
+- Page Title: Data · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f3e8]:
+  - link "Skip to content" [ref=f3e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - complementary [ref=f3e10]:
+    - generic "RoeHub" [ref=f3e11]: R
+    - navigation "Navigation" [ref=f3e12]:
+      - link "Overview" [ref=f3e13] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f3e20] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f3e24] [cursor=pointer]:
+        - /url: /strategies
+      - link "Data" [ref=f3e28] [cursor=pointer]:
+        - /url: /data
+      - link "Connections" [ref=f3e34] [cursor=pointer]:
+        - /url: /connections
+      - link "Monitoring" [ref=f3e38] [cursor=pointer]:
+        - /url: /monitoring
+      - link "Settings" [ref=f3e42] [cursor=pointer]:
+        - /url: /settings/profile
+    - group [ref=f3e47]:
+      - 'generic "Language: EN" [ref=f3e48] [cursor=pointer]': EN
+    - link "Sign out" [ref=f3e51] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f3e56]:
+    - generic [ref=f3e57]:
+      - text: Data
+      - generic [ref=f3e58]: Navigator
+    - generic [ref=f3e59]:
+      - complementary [ref=f3e60]:
+        - heading "Exchanges" [level=2] [ref=f3e63]
+        - navigation "Exchanges" [ref=f3e65]:
+          - link "Binance" [ref=f3e66] [cursor=pointer]:
+            - /url: /data?view=artifacts&market=1&exchange=binance
+          - link "Bybit" [ref=f3e70] [cursor=pointer]:
+            - /url: /data?view=artifacts&market=3&exchange=bybit
+      - heading "Data" [level=1] [ref=f3e74]
+      - region "Artifact catalog" [ref=f3e75]:
+        - navigation "Data view" [ref=f3e76]:
+          - link "Candles" [ref=f3e77] [cursor=pointer]:
+            - /url: /data?market=1&symbol=AAVEUSDT
+          - link "Artifacts" [ref=f3e78] [cursor=pointer]:
+            - /url: /data?view=artifacts&market=1&symbol=AAVEUSDT
+        - generic [ref=f3e79]:
+          - generic [ref=f3e80]:
+            - generic [ref=f3e81]: Search instruments
+            - searchbox "Search instruments" [ref=f3e82]
+          - button "Market" [ref=f3e84] [cursor=pointer]: All markets
+        - generic [ref=f3e87]:
+          - generic [ref=f3e88]: Backtest files · updated from candles
+          - generic [ref=f3e89]:
+            - button "Show journal" [ref=f3e90] [cursor=pointer]
+            - button "Refresh" [ref=f3e92] [cursor=pointer]
+        - generic "Artifact rows" [ref=f3e99]:
+          - table [ref=f3e100]:
+            - rowgroup [ref=f3e101]:
+              - row [ref=f3e102]:
+                - columnheader [ref=f3e103]:
+                  - checkbox "Select page" [ref=f3e104]
+                - columnheader "Instrument" [ref=f3e105]
+                - columnheader "Market" [ref=f3e106]
+                - columnheader "Base files" [ref=f3e107]
+                - columnheader "Precompute" [ref=f3e108]
+                - columnheader "Ready through · UTC" [ref=f3e109]
+            - rowgroup [ref=f3e110]:
+              - row [ref=f3e111] [cursor=pointer]:
+                - cell [ref=f3e112]:
+                  - checkbox "Select 0GUSDT spot" [ref=f3e113]
+                - cell [ref=f3e114]:
+                  - button "0GUSDT" [ref=f3e115]
+                - cell "Spot" [ref=f3e116]
+                - cell "Error · select instrument for details" [ref=f3e117]
+                - cell "Off" [ref=f3e122]
+                - cell [ref=f3e127]:
+                  - time [ref=f3e128]: —
+              - row [ref=f3e129] [cursor=pointer]:
+                - cell [ref=f3e130]:
+                  - checkbox "Select AAPLBUSDT spot" [ref=f3e131]
+                - cell [ref=f3e132]:
+                  - button "AAPLBUSDT" [ref=f3e133]
+                - cell "Spot" [ref=f3e134]
+                - cell "Error · select instrument for details" [ref=f3e135]
+                - cell "Off" [ref=f3e140]
+                - cell [ref=f3e145]:
+                  - time [ref=f3e146]: —
+              - row [ref=f3e253] [cursor=pointer]:
+                - cell [ref=f3e148]:
+                  - checkbox "Select AAVEUSDT spot" [ref=f3e149]
+                - cell [ref=f3e150]:
+                  - button "AAVEUSDT" [ref=f3e151]
+                - cell "Spot" [ref=f3e152]
+                - cell "Queued" [ref=f3e254]
+                - cell "Off" [ref=f3e158]
+                - cell [ref=f3e163]:
+                  - time [ref=f3e164]: —
+              - row [ref=f3e165] [cursor=pointer]:
+                - cell [ref=f3e166]:
+                  - checkbox "Select ACTUSDT spot" [ref=f3e167]
+                - cell [ref=f3e168]:
+                  - button "ACTUSDT" [ref=f3e169]
+                - cell "Spot" [ref=f3e170]
+                - cell "Error · select instrument for details" [ref=f3e171]
+                - cell "Off" [ref=f3e176]
+                - cell [ref=f3e181]:
+                  - time [ref=f3e182]: —
+              - row [ref=f3e183] [cursor=pointer]:
+                - cell [ref=f3e184]:
+                  - checkbox "Select 0GUSDT futures" [ref=f3e185]
+                - cell [ref=f3e186]:
+                  - button "0GUSDT" [ref=f3e187]
+                - cell "Futures" [ref=f3e188]
+                - cell "Error · select instrument for details" [ref=f3e189]
+                - cell "Off" [ref=f3e194]
+                - cell [ref=f3e199]:
+                  - time [ref=f3e200]: —
+        - generic [ref=f3e201]:
+          - generic [ref=f3e202]: Up to 50 rows per market
+          - generic [ref=f3e203]: Choose a market for more pages
+      - complementary "Artifact settings" [ref=f3e204]:
+        - generic [ref=f3e206]:
+          - generic [ref=f3e207]:
+            - heading "AAVEUSDT" [level=2] [ref=f3e208]
+            - paragraph [ref=f3e209]: binance · spot
+          - button "Close instrument" [ref=f3e210] [cursor=pointer]
+        - generic [ref=f3e214]:
+          - button "Update now" [ref=f3e215] [cursor=pointer]
+          - button "Edit profile and schedule" [ref=f3e216] [cursor=pointer]
+        - generic [ref=f3e217]:
+          - heading "Base NPY" [level=3] [ref=f3e218]
+          - generic "Base NPY" [ref=f3e219]: Queued
+          - generic [ref=f3e223]:
+            - generic [ref=f3e224]:
+              - text: Updates
+              - generic [ref=f3e225]: UTC
+            - generic [ref=f3e226]:
+              - generic [ref=f3e227]:
+                - term [ref=f3e228]: Data through
+                - definition [ref=f3e229]: —
+              - generic [ref=f3e230]:
+                - term [ref=f3e231]: Candles through
+                - definition [ref=f3e232]:
+                  - time [ref=f3e233]: 10/12/2026, 12:00 AM
+              - generic [ref=f3e234]:
+                - term [ref=f3e235]: Updated
+                - definition [ref=f3e236]: —
+              - generic [ref=f3e262]:
+                - term [ref=f3e263]: Last attempt
+                - definition [ref=f3e264]:
+                  - time [ref=f3e265]: 10/14/2026, 07:39 AM
+              - generic [ref=f3e237]:
+                - term [ref=f3e238]: Next update
+                - definition [ref=f3e239]:
+                  - time [ref=f3e240]: 10/15/2026, 02:00 AM
+            - paragraph [ref=f3e241]: Daily · 02:00 UTC
+          - group [ref=f3e242]:
+            - generic "Timeframe coverage" [ref=f3e243] [cursor=pointer]
+        - generic [ref=f3e244]:
+          - heading "Precompute" [level=3] [ref=f3e245]
+          - paragraph [ref=f3e246]: Calculates indicators and risk levels ahead of time for backtests. Optional; base files update automatically.
+          - paragraph [ref=f3e247]: Off · calculated when needed · 40 / 40 indicators
+          - paragraph [ref=f3e248]: 15m, 1d, 1h, 2d, 2h, 30m, 3d, 4h, 6h, 8h
+          - paragraph [ref=f3e249]: All loaded history
+          - group [ref=f3e250]:
+            - generic "Risk levels · TP 2 / SL 2" [ref=f3e251] [cursor=pointer]
+          - paragraph [ref=f3e252]: Turning precompute off retains existing files.
+        - status [ref=f3e266]: Changes saved. Scheduled anchor is unchanged.
+```

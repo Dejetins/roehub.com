@@ -1,0 +1,34 @@
+{
+  "physical": {
+    "connections": 48,
+    "classes": {
+      "market": 16,
+      "control": 24,
+      "admin": 8
+    },
+    "overflow_wait_s": {
+      "market": 2.0121152920037275,
+      "control": 2.02018375100306,
+      "admin": 2.026760959997773
+    },
+    "admin_dml_at_saturation": true
+  },
+  "admission": {
+    "bounded_rejection": true,
+    "active_request_completed": true
+  },
+  "cancellation": {
+    "expected_errors": [
+      {
+        "type": "QueryCanceled",
+        "sqlstate": "57014"
+      }
+    ],
+    "fresh_transaction_succeeded": true
+  },
+  "quarantine": {
+    "market": 0,
+    "control": 0,
+    "admin": 0
+  }
+}

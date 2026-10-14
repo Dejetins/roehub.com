@@ -26,7 +26,6 @@ DEFAULT_EVIDENCE = (
 )
 INFRASTRUCTURE_PORTS = {
     "postgresql": 5432,
-    "clickhouse": 8123,
     "redis": 6379,
     "openbao": 8200,
 }
@@ -37,7 +36,6 @@ _METRIC_READINESS_MARKERS = {
     "market-data-scheduler": "scheduler_job_runs_total",
     "backtest-artifact-publisher": "backtest_artifact_publish_runs_total",
     "backtest-job-runner": "backtest_runner_active",
-    "clickhouse-exporter": "clickhouse_exporter_scrape_success",
 }
 
 
@@ -332,16 +330,6 @@ def _actual_role_readiness(
                 raise RuntimeTopologyProofError(
                     f"application readiness metric is missing: {service}={marker}"
                 )
-            if service == "clickhouse-exporter":
-                success_rows = [
-                    row
-                    for row in metrics.splitlines()
-                    if row.startswith("clickhouse_exporter_scrape_success ")
-                ]
-                if not success_rows or float(success_rows[-1].split()[-1]) != 1.0:
-                    raise RuntimeTopologyProofError(
-                        "ClickHouse exporter has not completed a successful scrape"
-                    )
             readiness[service] = {
                 "proof": "initialized_operational_metric",
                 "marker": marker,
@@ -423,9 +411,7 @@ def _actual_role_readiness(
                 or payload.get("ready") is not False
                 or degraded_reasons != {"inference_disabled", "source_events_disabled"}
             ):
-                raise RuntimeTopologyProofError(
-                    "fresh rl-inference must remain safe-disabled"
-                )
+                raise RuntimeTopologyProofError("fresh rl-inference must remain safe-disabled")
             readiness[service] = {
                 "proof": "application_health_endpoint",
                 "ready": False,
@@ -530,41 +516,6 @@ def _persistent_state_sentinels(
         ]
     ).stdout.strip()
 
-    if profile != "base":
-        clickhouse_queries = []
-        if create:
-            clickhouse_queries.extend(
-                [
-                    "CREATE TABLE IF NOT EXISTS roehub.runtime_topology_sentinel "
-                    "(id UInt8, value String) ENGINE=ReplacingMergeTree ORDER BY id",
-                    "INSERT INTO roehub.runtime_topology_sentinel VALUES "
-                    f"(1, '{_PERSISTENCE_SENTINEL}')",
-                ]
-            )
-        clickhouse_queries.append(
-            "SELECT value FROM roehub.runtime_topology_sentinel "
-            "WHERE id=1 ORDER BY _part DESC LIMIT 1"
-        )
-        clickhouse_script = (
-            "import base64,json,urllib.request\n"
-            "from pathlib import Path\n"
-            "password=Path('/run/roehub-secrets/clickhouse-password').read_text().strip()\n"
-            "authorization='Basic '+base64.b64encode(('default:'+password).encode()).decode()\n"
-            "url='http://clickhouse:8123/?database=roehub'\n"
-            f"queries={json.dumps(clickhouse_queries)}\n"
-            "value=''\n"
-            "for query in queries:\n"
-            "    request=urllib.request.Request(url,data=query.encode(),"
-            "headers={'Authorization':authorization},method='POST')\n"
-            "    with urllib.request.urlopen(request,timeout=10) as response:\n"
-            "        value=response.read().decode().strip()\n"
-            "print(value)\n"
-        )
-        values["clickhouse"] = _run(
-            [*compose_command, "exec", "-T", "api", "python", "-c", clickhouse_script],
-            timeout=45,
-        ).stdout.strip()
-
     if profile == "ml":
         ml_script = (
             "from pathlib import Path; "
@@ -651,9 +602,7 @@ def _actual_on_demand_roles(*, project: str, compose: Path, topology: dict[str, 
         profile_flag = "tools" if lifecycle == "operator-tool" else "jobs"
         service = str(role["name"])
         smoke_command = (
-            [*(str(item) for item in role["command"]), "--help"]
-            if service == "domain-cli"
-            else []
+            [*(str(item) for item in role["command"]), "--help"] if service == "domain-cli" else []
         )
         _run(
             [

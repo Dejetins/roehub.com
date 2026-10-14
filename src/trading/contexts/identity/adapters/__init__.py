@@ -7,7 +7,6 @@ from .inbound import (
     CurrentUserResponse,
     ExchangeKeyResponse,
     RequireCurrentUserDependency,
-    build_auth_oidc_router,
     build_exchange_keys_router,
 )
 from .outbound import (
@@ -40,6 +39,5 @@ __all__ = [
     "RequireCurrentUserDependency",
     "RoehubSessionCurrentUser",
     "SystemIdentityClock",
-    "build_auth_oidc_router",
     "build_exchange_keys_router",
 ]

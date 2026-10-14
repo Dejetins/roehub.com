@@ -1,0 +1,9 @@
+{
+  "pg16": true,
+  "physical_budget": {
+    "market": 16,
+    "control": 24,
+    "admin": 8
+  },
+  "server_registry_mount": false
+}

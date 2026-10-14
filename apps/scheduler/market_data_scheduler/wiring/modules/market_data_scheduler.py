@@ -19,10 +19,7 @@ from prometheus_client import (
     start_http_server,
 )
 
-from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
-    ClickHouseSettingsLoader,
-    _clickhouse_client,
-)
+from apps.cli.wiring.db.postgres import market_gateway
 from trading.contexts.backtest.adapters.outbound import PsycopgBacktestPostgresGateway
 from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
 from trading.contexts.market_data.adapters.outbound.clients.funding_rate_history_source import (
@@ -44,31 +41,36 @@ from trading.contexts.market_data.adapters.outbound.config.runtime_config import
     MarketDataRuntimeConfig,
     load_market_data_runtime_config,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseCanonicalCandleIndexReader,
-    ClickHouseFundingRateStore,
-    ClickHouseInstrumentRefWriter,
-    ClickHouseMarketRefWriter,
-    ClickHouseRawKlineWriter,
-    ThreadLocalClickHouseConnectGateway,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_coverage_reader import (  # noqa: E501
-    ClickHouseHistoryCoverageReader,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_range_verifier import (  # noqa: E501
-    ClickHouseHistoryRangeVerifier,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
-    transient_clickhouse_error,
-)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresInstrumentSelectionRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_index_reader import (  # noqa: E501
+    PostgresCanonicalCandleIndexReader,
 )
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.catalog_snapshot_repository import (  # noqa: E501
     PostgresCatalogSnapshotRepository,
 )
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.funding_rate_store import (
+    PostgresFundingRateStore,
+)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_bounds_repository import (  # noqa: E501
     PostgresHistoryBoundsRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_coverage_reader import (  # noqa: E501
+    PostgresHistoryCoverageReader,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_range_verifier import (  # noqa: E501
+    PostgresHistoryRangeVerifier,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (
+    PostgresRawKlineWriter,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.reference_writers import (
+    PostgresInstrumentRefWriter,
+    PostgresMarketRefWriter,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_errors import (
+    transient_postgres_error,
 )
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_request_repository import (  # noqa: E501
     PostgresMarketDataWorkRequestRepository,
@@ -344,6 +346,7 @@ class MarketDataSchedulerApp:
             start_http_server(self._metrics_port)
         runner = self.work_request_runner
         concurrency = self._config.ingestion.rest_concurrency_instruments
+
         async def bounds_loop():
             while not stop_event.is_set():
                 if self.history_bounds_runner is not None:
@@ -361,7 +364,8 @@ class MarketDataSchedulerApp:
                 try:
                     await asyncio.to_thread(
                         runner.run_batch,
-                        executor=pool, concurrency=concurrency,
+                        executor=pool,
+                        concurrency=concurrency,
                         should_stop=stop_event.is_set,
                     )
                 except Exception:
@@ -381,7 +385,7 @@ class MarketDataSchedulerApp:
             finally:
                 stop_event.set()
                 await asyncio.shield(joined)
-                http = getattr(self, '_provider_http', None)
+                http = getattr(self, "_provider_http", None)
                 if http is not None and close_http:
                     http.close()
 
@@ -446,9 +450,9 @@ class MarketDataSchedulerApp:
             for job in jobs
         ]
         if self.work_request_runner is not None:
-            periodic_tasks.append(asyncio.create_task(
-                self.run_work_requests(stop_event, close_http=False)
-            ))
+            periodic_tasks.append(
+                asyncio.create_task(self.run_work_requests(stop_event, close_http=False))
+            )
         await stop_event.wait()
         await asyncio.gather(*periodic_tasks, return_exceptions=True)
         await self._rest_fill_queue.close()
@@ -1133,41 +1137,36 @@ def build_market_data_scheduler_app(
 
     Parameters:
     - config_path: path to `market_data.yaml`.
-    - environ: environment mapping with ClickHouse settings.
+    - environ: environment mapping with PostgreSQL settings.
     - metrics_port: Prometheus HTTP port.
 
     Returns:
     - Ready-to-run scheduler app instance.
 
     Assumptions/Invariants:
-    - ClickHouse credentials are available in environment mapping.
+    - PostgreSQL credentials are available in environment mapping.
 
     Errors/Exceptions:
     - Propagates config parsing and infrastructure wiring errors.
 
     Side effects:
-    - Creates ClickHouse client and Prometheus metric objects.
+    - Creates PostgreSQL client and Prometheus metric objects.
     """
     config = load_market_data_runtime_config(Path(config_path))
     http = RequestsHttpClient.from_config(config, environ)
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="backfill")
-    gateway = ThreadLocalClickHouseConnectGateway(
-        client_factory=lambda: _clickhouse_client(clickhouse_settings)
-    )
+    gateway = market_gateway(environ, workload="backfill")
+    reference_gateway = market_gateway(environ, workload="reference")
 
-    market_writer = ClickHouseMarketRefWriter(
-        gateway=gateway,
-        database=clickhouse_settings.database,
+    market_writer = PostgresMarketRefWriter(
+        gateway=reference_gateway,
     )
-    instrument_writer = ClickHouseInstrumentRefWriter(
-        gateway=gateway,
-        database=clickhouse_settings.database,
+    instrument_writer = PostgresInstrumentRefWriter(
+        gateway=reference_gateway,
     )
     seed_use_case = SeedRefMarketUseCase(writer=market_writer, clock=SystemClock())
 
-    index_reader = ClickHouseCanonicalCandleIndexReader(
+    index_reader = PostgresCanonicalCandleIndexReader(
         gateway=gateway,
-        database=clickhouse_settings.database,
     )
     instrument_reader = _effective_instrument_reader(environ=environ)
     rest_source = RestCandleIngestSource(
@@ -1176,17 +1175,20 @@ def build_market_data_scheduler_app(
         http=http,
         ingest_id=uuid4(),
     )
-    raw_writer = ClickHouseRawKlineWriter(gateway=gateway, database=clickhouse_settings.database)
-    observed_writer = (raw_writer if stored_candle_observer is None else
-                       StoredCandleSignalWriter(raw_writer, stored_candle_observer))
+    raw_writer = PostgresRawKlineWriter(gateway=gateway)
+    observed_writer = (
+        raw_writer
+        if stored_candle_observer is None
+        else StoredCandleSignalWriter(raw_writer, stored_candle_observer)
+    )
     rest_fill_use_case = RestFillRange1mUseCase(
         source=rest_source,
         writer=observed_writer,
         clock=SystemClock(),
         max_days_per_insert=config.backfill.max_days_per_insert,
-        batch_size=10_000,
+        batch_size=8192,
         index_reader=index_reader,
-        history_verifier=ClickHouseHistoryRangeVerifier(gateway, clickhouse_settings.database),
+        history_verifier=PostgresHistoryRangeVerifier(gateway),
     )
     rest_catchup_use_case = RestCatchUp1mUseCase(
         index=index_reader,
@@ -1194,12 +1196,11 @@ def build_market_data_scheduler_app(
         writer=observed_writer,
         clock=SystemClock(),
         max_days_per_insert=config.backfill.max_days_per_insert,
-        batch_size=10_000,
+        batch_size=8192,
         ingest_id=uuid4(),
     )
-    funding_store = ClickHouseFundingRateStore(
+    funding_store = PostgresFundingRateStore(
         gateway=gateway,
-        database=clickhouse_settings.database,
     )
     funding_source = RestFundingRateHistorySource(
         cfg=config,
@@ -1293,9 +1294,7 @@ def build_market_data_scheduler_app(
             instrument_reader.mark_catalog_fresh(market_ids=(market,), now=datetime.now(UTC))
 
         app.work_request_runner = MarketDataWorkRequestRunner(
-            repair_index=ClickHouseHistoryCoverageReader(
-                gateway=gateway, database=clickhouse_settings.database
-            ),
+            repair_index=PostgresHistoryCoverageReader(gateway=gateway),
             store=PostgresMarketDataWorkRequestRepository(
                 gateway=PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"]),
                 execution_dsn=environ["STRATEGY_PG_DSN"],
@@ -1312,7 +1311,8 @@ def build_market_data_scheduler_app(
             ),
             coordinator=PostgresMarketDataWorkRequestRepository(
                 gateway=PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"]),
-                execution_dsn=environ["STRATEGY_PG_DSN"], execution_lock_key=744948345612,
+                execution_dsn=environ["STRATEGY_PG_DSN"],
+                execution_lock_key=744948345612,
             ),
             source_factory=lambda: RestInstrumentHistoryStartSource(
                 cfg=config,
@@ -1327,13 +1327,16 @@ def build_market_data_scheduler_app(
 
 def _retryable_work_storage_error(error: Exception) -> bool | str:
     """Driver/network failures only; SQL, credentials and validation remain terminal."""
+    classified = transient_postgres_error(error)
+    if classified:
+        return classified
     if isinstance(error, psycopg.OperationalError):
         return (
             error.sqlstate is None
             or error.sqlstate.startswith("08")
             or error.sqlstate in {"57P01", "57P02", "57P03"}
         )
-    return transient_clickhouse_error(error) or isinstance(error, (ConnectionError, TimeoutError))
+    return transient_postgres_error(error) or isinstance(error, (ConnectionError, TimeoutError))
 
 
 def _effective_instrument_reader(

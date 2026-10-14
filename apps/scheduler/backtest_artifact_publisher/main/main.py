@@ -125,7 +125,7 @@ async def _run_async(
     Returns:
         int: Process exit code.
     Assumptions:
-        ClickHouse and Postgres settings are supplied through environment variables.
+        PostgreSQL market and control-plane settings are supplied through environment variables.
     Raises:
         Exception: Propagates fatal wiring/runtime exceptions to the caller.
     Side Effects:

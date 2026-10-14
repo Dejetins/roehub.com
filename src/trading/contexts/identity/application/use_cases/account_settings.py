@@ -126,13 +126,11 @@ class AccountSettingsUseCase:
         self,
         *,
         owner_user_id: UserId,
-        plan: str,
         exchange_connections_used: int,
         api_keys_used: int,
     ) -> dict[str, int | str]:
         _ = owner_user_id
         return {
-            "plan": plan,
             "exchange_connections_used": exchange_connections_used,
             "exchange_connections_limit": 10,
             "api_keys_used": api_keys_used,

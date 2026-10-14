@@ -1,0 +1,28 @@
+{
+  "test_id": "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_connect_handshake_absolute_deadline_without_background_thread",
+  "observed": "failed: expected connect_timeout; actual postgres_retry_exhausted",
+  "evidence": "semantic-suite.log",
+  "causal_path": "Test directly instantiates IngestionGateway and calls run -> _connect -> _connect_until -> connect_raw. psycopg OperationalError without SQLSTATE is retryable; outer run converts exhausted remaining deadline to postgres_retry_exhausted at line 196. S07 io_process.classify_io_error is not called or imported by this path.",
+  "baseline_hashes": [
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_gateway.py",
+      "baseline_sha256": "879d58676e6f457f73892c93cc0cc1e94ba8cf80fb053120cadee0f68f2cbcb9",
+      "current_sha256": "879d58676e6f457f73892c93cc0cc1e94ba8cf80fb053120cadee0f68f2cbcb9",
+      "unchanged": true
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/services/ingestion_retry.py",
+      "baseline_sha256": "838ac0ec56c72a895f9fc998a91b100524be0e3540c4566ae30e2afb73b50995",
+      "current_sha256": "838ac0ec56c72a895f9fc998a91b100524be0e3540c4566ae30e2afb73b50995",
+      "unchanged": true
+    },
+    {
+      "path": "src/trading/platform/postgres_budget.py",
+      "baseline_sha256": "e91ee804393e6014614a4105c29fd7f422b9e1767ae75db25c7049ba725ff566",
+      "current_sha256": "e91ee804393e6014614a4105c29fd7f422b9e1767ae75db25c7049ba725ff566",
+      "unchanged": true
+    }
+  ],
+  "classification": "Unresolved error-code contract from code present at S07 entry; not S07 classifier regression; not a passing functional check.",
+  "reviewer_reproducer": "Independent reviewer blackhole: postgres_retry_exhausted after 0.205s for deadline 0.2s, no surviving blackhole thread. This does not execute every assertion of the failed test."
+}

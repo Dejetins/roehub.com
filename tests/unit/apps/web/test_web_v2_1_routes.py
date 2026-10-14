@@ -24,7 +24,6 @@ def _authorized_client() -> TestClient:
             status_code=200,
             user=WebCurrentUser(
                 user_id="00000000-0000-0000-0000-000000000321",
-                paid_level="free",
             ),
             error_message=None,
         )
@@ -132,7 +131,7 @@ def _platform_client(tmp_path, monkeypatch, *, status=200, enabled=True, strateg
     app.state.current_user_api_client = SimpleNamespace(
         fetch_current_user=lambda **_: CurrentUserApiResult(
             status_code=status,
-            user=WebCurrentUser(user_id="local-subject", paid_level="free")
+            user=WebCurrentUser(user_id="local-subject")
             if status == 200
             else None,
             error_message=None if status == 200 else "Identity unavailable",

@@ -1,0 +1,15 @@
+{
+  "removed_containers": [
+    "roehub-s08-disk",
+    "roehub-s08-schema",
+    "roehub-s05-consumers",
+    "roehub-s08-redis",
+    "roehub-s03-s08-functional"
+  ],
+  "removed_registry_volume": "roehub-s08-handshake-registry",
+  "quarantine_note": "Removed only after owned blackhole peer terminated; no slot reuse or operator recovery claimed",
+  "private_tls_removed": true,
+  "browser_fixture": "SIGTERM lifecycle completed; children, own container, private credentials and artifacts removed",
+  "existing_installation": "untouched",
+  "build_cache_image_retained": "roehub/s08-proof:local"
+}

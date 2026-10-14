@@ -1,0 +1,2388 @@
+[
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+    "class": "ClickHouseStoredArtifactCoordinates",
+    "method": "__post_init__",
+    "line": 32,
+    "signature": "self",
+    "returns": null,
+    "body_sha256": "646f03893b7832fb7c6102a606ebe2feadeb7319fdf865976fb757b7c3465d0d",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+    "class": "ClickHouseStoredArtifactCoordinates",
+    "method": "page",
+    "line": 36,
+    "signature": "self, *, after: tuple[int, str] | None, limit: int=50",
+    "returns": null,
+    "body_sha256": "385ba7a9b3db1f170febd8b33022f718d2cfdaf317805ac50cf05885a81c6884",
+    "sql_fragments": [
+      "SELECT market_id,symbol FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+    "class": "ClickHouseStoredArtifactCoordinates",
+    "method": "observation_page",
+    "line": 51,
+    "signature": "self, *, after: tuple[int, str] | None, before: UtcTimestamp, limit: int=50",
+    "returns": "tuple[StoredSourceObservation, ...]",
+    "body_sha256": "4b2d89a508a16e2552a22b0914880410753735bcb3a7483ef2e5cdf49dcb0128",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+    "class": "ClickHouseStoredArtifactCoordinates",
+    "method": "observation",
+    "line": 61,
+    "signature": "self, *, instrument: InstrumentId, before: UtcTimestamp",
+    "returns": "StoredSourceObservation",
+    "body_sha256": "a2516c8cd789f53566b3031f6915dec8927bb147ddc52c33b31e775bd8caaf80",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+    "class": "ClickHouseStoredArtifactCoordinates",
+    "method": "_read",
+    "line": 71,
+    "signature": "self, *, predicate: str, parameters: Mapping[str, Any], before: UtcTimestamp, limit: int",
+    "returns": "tuple[StoredSourceObservation, ...]",
+    "body_sha256": "6b14eaf1dfcfd803e9fffa14c197ca17088dea47fc9d6709ecb18a5724ece87d",
+    "sql_fragments": [
+      "SELECT market_id,symbol,\n                if(bitmapCardinality(minutes)=0,NULL,bitmapMin(minutes)) AS first_minute,\n                if(bitmapCardinality(minutes)=0,NULL,bitmapMax(minutes)) AS last_minute\n            FROM (\n                SELECT market_id,symbol,\n                    bitmapSubsetInRange(groupBitmapMergeState(minute_bitmap_state),\n                        toUInt32(0),toUInt32(%(before_minute)s)) AS minutes\n                FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+    "class": "ClickHouseStoredArtifactCoordinates",
+    "method": "_validate_limit",
+    "line": 99,
+    "signature": "limit: int",
+    "returns": "None",
+    "body_sha256": "31c44af24e45efc7ec455252051279e0f1b3276b60ff2f78d8fb406c7929383e",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+    "class": "ClickHouseStoredArtifactCoordinates",
+    "method": "_instrument",
+    "line": 104,
+    "signature": "row: Mapping[str, Any]",
+    "returns": "InstrumentId",
+    "body_sha256": "f0847c529ff689ff798d3ae5912828260bc9a33406f3cb7ff63e41387159e246",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+    "class": "ClickHouseStoredArtifactCoordinates",
+    "method": "_timestamp",
+    "line": 108,
+    "signature": "minute: Any",
+    "returns": "UtcTimestamp | None",
+    "body_sha256": "af2d8c16889145dd35020c36cd929db41ee56d74788c2e56afe73a555c2ccf75",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/automatic_base_repository.py",
+    "class": "PostgresAutomaticBaseRepository",
+    "method": "base_request",
+    "line": 22,
+    "signature": "self, *, installation_id: UUID, request_id: UUID",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "3b774e145c4260101130d02477348bdb53fcc23b6c2930354e84289102f3c726",
+    "sql_fragments": [
+      "SELECT * FROM backtest_artifact_requests\n            WHERE installation_id=%(i)s AND request_id=%(r)s AND kind='base'"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/automatic_base_repository.py",
+    "class": "PostgresAutomaticBaseRepository",
+    "method": "observe_source",
+    "line": 33,
+    "signature": "self, *, installation_id: UUID, coordinate: Coordinate, source: SourceTarget, observed_at: datetime",
+    "returns": "UUID | None",
+    "body_sha256": "a6878f2af9915c4967a12672dfb50bfedc752a9e0a212ea3cd3cdf1d68b51af2",
+    "sql_fragments": [
+      "SELECT desired_target FROM backtest_artifact_source_state\n                WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s\n                FOR UPDATE",
+      "SELECT request_id FROM backtest_artifact_requests\n                WHERE installation_id=%(i)s AND exchange=%(exchange)s\n                AND market_type=%(market_type)s\n                AND symbol=%(symbol)s AND kind='base' AND snapshot->'source' != 'null'::jsonb\n                ORDER BY created_at LIMIT 1",
+      "INSERT INTO backtest_artifact_source_state\n                (exchange,market_type,symbol,desired_target) VALUES\n                (%(exchange)s,%(market_type)s,%(symbol)s,%(target)s)\n                ON CONFLICT (exchange,market_type,symbol) DO UPDATE\n                SET desired_target=EXCLUDED.desired_target"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/automatic_base_repository.py",
+    "class": "PostgresAutomaticBaseRepository",
+    "method": "finish_base",
+    "line": 96,
+    "signature": "self, *, build: Mapping[str, Any], publication: Mapping[str, Any], coverage: Mapping[str, Any]",
+    "returns": "None",
+    "body_sha256": "41e73c2517352cb62816b67f0e03149c88c76a6e5e84b1e40d8425b3e191ae04",
+    "sql_fragments": [
+      "UPDATE backtest_artifact_source_state SET published=published || %(data)s\n                WHERE exchange=%(e)s AND market_type=%(m)s AND symbol=%(s)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "rows",
+    "line": 26,
+    "signature": "self, query: str, **params: Any",
+    "returns": null,
+    "body_sha256": "69d4fd45690df1b5debaa59fc2807e65c2be46a86058104ea87a72b66067349e",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "source_cursor",
+    "line": 29,
+    "signature": "self, installation: UUID",
+    "returns": null,
+    "body_sha256": "3ed4c93672444c7836840aa37312c3d32c19655872ec6183017bc97a0f9afe5e",
+    "sql_fragments": [
+      "SELECT source_cursor FROM backtest_artifact_dispatch_state WHERE installation_id=%(i)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "save_source_cursor",
+    "line": 38,
+    "signature": "self, installation: UUID, cursor",
+    "returns": "None",
+    "body_sha256": "6960468e239eb402099666809bc3ec57ac7324641777f056872ded814a49306b",
+    "sql_fragments": [
+      "INSERT INTO backtest_artifact_dispatch_state(installation_id,source_cursor)\n        VALUES (%(i)s,%(c)s) ON CONFLICT (installation_id) DO UPDATE SET\n        source_cursor=EXCLUDED.source_cursor,updated_at=now()"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "tick",
+    "line": 47,
+    "signature": "self, *, installation: UUID, now: datetime, limit: int=50",
+    "returns": "int",
+    "body_sha256": "a223b953dce35296117767a9fc1444a7546b9ae828f7e0a4552322308d909041",
+    "sql_fragments": [
+      "SELECT schedule_cursor FROM backtest_artifact_dispatch_state WHERE installation_id=%(i)s",
+      "SELECT * FROM backtest_artifact_source_state\n                WHERE (exchange,market_type,symbol)>(%(e)s,%(m)s,%(s)s)\n                ORDER BY exchange,market_type,symbol LIMIT %(n)s",
+      "INSERT INTO backtest_artifact_dispatch_state(installation_id,schedule_cursor) VALUES (%(i)s,%(c)s) ON CONFLICT (installation_id) DO UPDATE SET schedule_cursor=EXCLUDED.schedule_cursor",
+      "UPDATE backtest_artifact_requests SET snapshot=jsonb_set(snapshot,'{source}',%(source)s),state='queued',reason=NULL WHERE installation_id=%(i)s AND exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s AND state='waiting_for_source' AND snapshot->'source' IS DISTINCT FROM %(source)s",
+      "SELECT p.*,f.profile,COALESCE(p.updated_by,f.created_by) AS created_by FROM backtest_artifact_policies p JOIN identity_organizations o USING(organization_id) JOIN backtest_artifact_profiles f ON f.organization_id=p.organization_id AND f.profile_id=p.profile_id AND f.revision=p.profile_revision WHERE o.installation_id=%(i)s AND o.status='active' AND exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s",
+      "SELECT snapshot FROM backtest_artifact_legacy_demands WHERE installation_id=%(i)s AND exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s",
+      "SELECT * FROM backtest_artifact_cadence WHERE installation_id=%(i)s AND exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s AND lane=%(lane)s",
+      "INSERT INTO backtest_artifact_cadence (installation_id,exchange,market_type,symbol,lane,schedule_hash,last_occurrence,next_due) VALUES (%(i)s,%(exchange)s,%(market_type)s,%(symbol)s,%(lane)s,%(h)s,%(due)s,%(next)s) ON CONFLICT (installation_id,exchange,market_type,symbol,lane) DO UPDATE SET schedule_hash=EXCLUDED.schedule_hash,last_occurrence=EXCLUDED.last_occurrence,next_due=EXCLUDED.next_due",
+      "UPDATE backtest_artifact_policies SET next_due=%(next)s WHERE organization_id=%(org)s AND exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s",
+      "SELECT request_id FROM backtest_artifact_requests WHERE installation_id=%(i)s AND ",
+      "SELECT snapshot FROM backtest_artifact_legacy_demands\n                                    WHERE installation_id=%(i)s AND exchange=%(exchange)s\n                                    AND market_type=%(market_type)s AND symbol=%(symbol)s",
+      "INSERT INTO backtest_artifact_requests\n                                (request_id,installation_id,organization_id,"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "next_request",
+    "line": 291,
+    "signature": "self, installation: UUID",
+    "returns": null,
+    "body_sha256": "ba1f0df5a1ac1f38c6d8cfa503b15f5ece1b5961af39491771c21d5efe05fc3e",
+    "sql_fragments": [
+      "WITH heads AS (\n            SELECT DISTINCT ON (COALESCE(organization_id::text,'')) *\n            FROM backtest_artifact_requests\n            WHERE installation_id=%(i)s AND state='queued'\n            ORDER BY COALESCE(organization_id::text,''),created_at,request_id)\n            SELECT h.* FROM heads h LEFT JOIN backtest_artifact_dispatch_state d\n            ON d.installation_id=%(i)s\n            ORDER BY (COALESCE(h.organization_id::text,'') <= COALESCE(d.last_lane,'')),\n            COALESCE(h.organization_id::text,''),h.created_at,h.request_id LIMIT 1"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "claim_group",
+    "line": 306,
+    "signature": "self, *, installation: UUID, request: Mapping[str, Any], owner: UUID, incarnation: UUID, reservation: int",
+    "returns": null,
+    "body_sha256": "0f64251536a5e0772cf814f2d56ab6696ddb9c0846f4a63d1d296032e3efbaa2",
+    "sql_fragments": [
+      "SELECT pg_advisory_xact_lock(290029)",
+      "SELECT * FROM backtest_artifact_requests WHERE request_id=%(r)s AND installation_id=%(i)s AND state='queued' FOR UPDATE",
+      "SELECT * FROM backtest_artifact_requests WHERE installation_id=%(i)s AND state='queued' AND exchange=%(e)s AND market_type=%(m)s AND symbol=%(s)s AND (snapshot->'source'=%(source)s OR (%(coalesce)s AND snapshot->'source'->>'revision'='content_unverified' AND snapshot->'source'->>'compute_identity'=%(compute)s AND snapshot->'source'->>'funding_identity'=%(funding)s AND snapshot->'source'->'history'->>'start_utc'>=%(start)s AND snapshot->'source'->>'watermark'<=%(end)s)) AND snapshot->'root_id'=%(root)s AND snapshot->'root_revision'=%(revision)s ORDER BY created_at,request_id LIMIT 2001 FOR UPDATE",
+      "UPDATE backtest_artifact_builds SET snapshot=%(s)s WHERE build_id=%(b)s",
+      "INSERT INTO backtest_artifact_dispatch_state(installation_id,last_lane) VALUES (%(i)s,%(lane)s) ON CONFLICT (installation_id) DO UPDATE SET last_lane=EXCLUDED.last_lane",
+      "SELECT desired_target FROM backtest_artifact_source_state\n                    WHERE exchange=%(e)s AND market_type=%(m)s AND symbol=%(s)s",
+      "INSERT INTO backtest_artifact_build_requests VALUES (%(b)s,%(r)s) ON CONFLICT DO NOTHING",
+      "UPDATE backtest_artifact_requests SET state='error',reason='resource_conflict' WHERE request_id=%(r)s",
+      "UPDATE backtest_artifact_requests SET state='running',control_version=control_version+1 WHERE request_id=%(r)s",
+      "UPDATE backtest_artifact_requests SET state='error',reason=%(reason)s WHERE request_id=%(r)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "authorize_request",
+    "line": 485,
+    "signature": "self, row",
+    "returns": null,
+    "body_sha256": "743ee855632b8a19ae0367d7cbcdc4b6839295359e3c82ec04e6b77e0945b65e",
+    "sql_fragments": [
+      "SELECT created_by FROM backtest_artifact_profiles WHERE organization_id=%(org)s AND profile_id=%(p)s AND revision=%(v)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "retry",
+    "line": 514,
+    "signature": "self, *, build, owner_token, parent_incarnation, now",
+    "returns": null,
+    "body_sha256": "8ada9d0d92b0b35bd385b00efde53c151df8bb43b95f1f9d6ea66d4a65f59085",
+    "sql_fragments": [
+      "SELECT r.* FROM backtest_artifact_requests r JOIN backtest_artifact_build_requests b USING(request_id) WHERE b.build_id=%(b)s AND r.state='running'",
+      "UPDATE backtest_artifact_requests SET state='error',reason=%(why)s, control_version=control_version+1 WHERE request_id=%(r)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "record_handoff",
+    "line": 543,
+    "signature": "self, *, organization_id: UUID, actor_id: UUID, expected_version: int, legacy_disabled: bool, host_lock, now: datetime",
+    "returns": "None",
+    "body_sha256": "4ed0c8474a9d30c9ca4ba28c75eedb6aabf7135b1a26664099f57ac5c0e09876",
+    "sql_fragments": [
+      "SELECT pg_advisory_xact_lock(290029)",
+      "SELECT build_id FROM backtest_artifact_builds WHERE state IN ('running','quarantined') LIMIT 1",
+      "SELECT exchange FROM backtest_artifact_slot_ownership WHERE owner_token IS NOT NULL LIMIT 1",
+      "SELECT s.symbol FROM backtest_artifact_source_state s\n                    LEFT JOIN backtest_artifact_legacy_demands d ON d.installation_id=%(i)s\n                    AND (d.exchange,d.market_type,d.symbol)=(s.exchange,s.market_type,s.symbol)\n                    WHERE d.symbol IS NULL LIMIT 1",
+      "INSERT INTO backtest_artifact_dispatch_state(installation_id,handoff) VALUES (%(i)s,%(h)s) ON CONFLICT (installation_id) DO UPDATE SET handoff=EXCLUDED.handoff",
+      "UPDATE backtest_artifact_installation_settings SET legacy_handoff='complete',\n                    capability_enabled=TRUE,paused=FALSE,control_version=control_version+1\n                    WHERE installation_id=%(i)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "finish_base",
+    "line": 620,
+    "signature": "self, *, build, publication, coverage",
+    "returns": null,
+    "body_sha256": "53c7ba37e6b0c3c77fecd3317961c1b279e6865fdd09a001f3d726208afe9078",
+    "sql_fragments": [
+      "UPDATE backtest_artifact_policies p SET last_success=now() FROM backtest_artifact_requests r JOIN backtest_artifact_build_requests b USING(request_id) WHERE b.build_id=%(b)s AND r.state='ready' AND p.organization_id=r.organization_id AND (p.exchange,p.market_type,p.symbol)=(r.exchange,r.market_type,r.symbol) AND p.control_version=(r.snapshot->>'policy_version')::bigint"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "observe_source",
+    "line": 636,
+    "signature": "self, *, installation_id, coordinate, source, observed_at",
+    "returns": null,
+    "body_sha256": "e62b7e37a096d602dad61a92664a34d749f67e5a927ea5224c99a3e736259014",
+    "sql_fragments": [
+      "INSERT INTO backtest_artifact_source_state(exchange,market_type,symbol,desired_target) VALUES (%(exchange)s,%(market_type)s,%(symbol)s,%(target)s) ON CONFLICT (exchange,market_type,symbol) DO UPDATE SET desired_target=EXCLUDED.desired_target WHERE backtest_artifact_source_state.desired_target->>'observed_at' IS NULL OR backtest_artifact_source_state.desired_target->>'observed_at'<=%(observed)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/dispatch_repository.py",
+    "class": "PostgresArtifactDispatchRepository",
+    "method": "reject_retry",
+    "line": 676,
+    "signature": "self, *, build, reason",
+    "returns": null,
+    "body_sha256": "8283e7fe8c4bd9685697b809c2d6d023a59c3c9d7469534b19d2cb788ab154cd",
+    "sql_fragments": [
+      "UPDATE backtest_artifact_builds SET state='error',next_retry_at=NULL WHERE build_id=%(b)s",
+      "UPDATE backtest_artifact_attempts SET state='error' WHERE build_id=%(b)s AND attempt=%(a)s",
+      "UPDATE backtest_artifact_requests SET state='error',reason=%(reason)s, control_version=control_version+1 WHERE state='retry_wait' AND request_id IN (SELECT request_id FROM backtest_artifact_build_requests WHERE build_id=%(b)s)"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "__init__",
+    "line": 37,
+    "signature": "self, *, gateway: BacktestPostgresGateway, catalog: ProfileCatalog, access: CoordinateAccess",
+    "returns": "None",
+    "body_sha256": "4e3e42e4d2fabf0d75f352b6c930ad621fb8466155fb02c8cd9950c99a9b9b11",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "_one",
+    "line": 42,
+    "signature": "self, query: str, **params: Any",
+    "returns": "Mapping[str, Any] | None",
+    "body_sha256": "bcd2fdee43be9f3a5a497f44ab3e82458a92af917f4fa76ec3bb64b8d6472438",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "_exec",
+    "line": 45,
+    "signature": "self, query: str, **params: Any",
+    "returns": "None",
+    "body_sha256": "0deee0b2f672c8e1853269be0caf044b14b38b167f196de9c61787624e7b2b49",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "_authorize",
+    "line": 48,
+    "signature": "self, org: UUID, actor: UUID, *, write: bool=False",
+    "returns": "UUID",
+    "body_sha256": "bdbd4f972f7715a74423078a5c17c4ca83df8bda86c182db0cb417375067c163",
+    "sql_fragments": [
+      "SELECT o.installation_id, m.role FROM identity_memberships m\n            JOIN identity_organizations o USING (organization_id)\n            WHERE m.organization_id=%(org)s AND m.user_id=%(actor)s\n              AND m.status='active' AND o.status='active' FOR SHARE OF m,o"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "_installation_owner",
+    "line": 61,
+    "signature": "self, org: UUID, actor: UUID",
+    "returns": "UUID",
+    "body_sha256": "82fbc2acb71ae303d94240a7178d4c0d7c285b455173020de124c5cd32d7ff87",
+    "sql_fragments": [
+      "SELECT user_id FROM identity_installation_owners\n                WHERE installation_id=%(i)s AND user_id=%(a)s FOR SHARE"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "_lock",
+    "line": 75,
+    "signature": "self, installation: UUID",
+    "returns": "None",
+    "body_sha256": "3aaf7453a69db07208e0acae1d63f0b3ee4b65c2d50bc08f795ece50eccfacd0",
+    "sql_fragments": [
+      "SELECT pg_advisory_xact_lock(hashtextextended(%(key)s,29))"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "initialize_settings",
+    "line": 81,
+    "signature": "self, *, organization_id: UUID, actor_id: UUID, root_id: str, schedule: Schedule",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "42bfa08d52837e834b2e9247be214ce6ae7f1ca70cf2187409b464c3f4cf6f26",
+    "sql_fragments": [
+      "INSERT INTO backtest_artifact_installation_settings\n                (installation_id,control_version,root_id,root_revision,schedule)\n                VALUES (%(i)s,1,%(root)s,1,%(schedule)s) ON CONFLICT DO NOTHING",
+      "SELECT * FROM backtest_artifact_installation_settings WHERE installation_id=%(i)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "update_defaults",
+    "line": 107,
+    "signature": "self, *, organization_id: UUID, actor_id: UUID, expected_version: int, schedule: Schedule, budget_bytes: int | None",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "4b9f3f9cfd685c6e7e6b5dff490132a38dbc9dc02bce906ef0d533ce007c2085",
+    "sql_fragments": [
+      "UPDATE backtest_artifact_installation_settings\n                SET schedule=%(s)s,budget_bytes=%(b)s,control_version=control_version+1,\n                    updated_at=now()\n                WHERE installation_id=%(i)s AND control_version=%(v)s RETURNING *"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "_settings",
+    "line": 137,
+    "signature": "self, installation: UUID, *, active: bool",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "9706dabdc30db2f0dfcd2eeb7040df0a4d5fd55bb4b458f30a1c1da5f3d97a8d",
+    "sql_fragments": [
+      "SELECT * FROM backtest_artifact_installation_settings\n            WHERE installation_id=%(i)s FOR UPDATE"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "_capacity",
+    "line": 153,
+    "signature": "self, installation: UUID, org: UUID | None, count: int, settings: Mapping[str, Any]",
+    "returns": "None",
+    "body_sha256": "bafd1baff1621d32a18eac1751d4324cf8f76a20a69d86492d2ac632920e6ffb",
+    "sql_fragments": [
+      "SELECT count(*) AS total,\n                count(*) FILTER (WHERE organization_id=%(org)s) AS own\n            FROM backtest_artifact_requests WHERE installation_id=%(i)s AND state IN "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "command",
+    "line": 169,
+    "signature": "self, *, organization_id: UUID, actor_id: UUID, key: str",
+    "returns": "Mapping[str, Any] | None",
+    "body_sha256": "41d1320222df0cb9cf82886fe74b95d8b1097ce0cb3218e2ed05c21248a60b0e",
+    "sql_fragments": [
+      "SELECT response,response_status FROM backtest_artifact_commands\n                WHERE organization_id=%(org)s AND idempotency_key=%(key)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "submit",
+    "line": 189,
+    "signature": "self, *, organization_id: UUID, actor_id: UUID, key: str, items: tuple[PolicyItem, ...], kind: str='update_now', command_body_digest: str | None=None",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "f38664bf241ce2d3cf4fb12a15f0421a70762b18dc110b96186a8f7988f00b89",
+    "sql_fragments": [
+      "SELECT body_hash,response FROM backtest_artifact_commands\n                WHERE organization_id=%(org)s AND idempotency_key=%(key)s",
+      "INSERT INTO backtest_artifact_commands\n                (command_id,organization_id,actor_id,idempotency_key,body_hash,kind,\n                 response,response_status) VALUES (%(id)s,%(org)s,%(actor)s,%(key)s,%(hash)s,\n                 %(kind)s,'{}',202)",
+      "UPDATE backtest_artifact_commands SET response=%(r)s WHERE command_id=%(id)s",
+      "SELECT * FROM backtest_artifact_policies\n                    WHERE organization_id=%(org)s AND exchange=%(exchange)s\n                    AND market_type=%(market_type)s AND symbol=%(symbol)s FOR UPDATE",
+      "SELECT profile FROM backtest_artifact_profiles\n                    WHERE organization_id=%(org)s AND profile_id=%(p)s AND revision=%(r)s",
+      "INSERT INTO backtest_artifact_profiles\n                    (organization_id,profile_id,revision,profile,created_by)\n                    VALUES (%(org)s,%(p)s,%(r)s,%(profile)s,%(actor)s) ON CONFLICT DO NOTHING",
+      "INSERT INTO backtest_artifact_requests\n                    (request_id,organization_id,installation_id,command_id,exchange,market_type,\n                     symbol,kind,trigger,snapshot,state)\n                    VALUES (%(id)s,%(org)s,%(i)s,%(command)s,%(exchange)s,%(market_type)s,\n                            %(symbol)s,%(kind)s,'manual',%(snapshot)s,%(state)s)",
+      "INSERT INTO backtest_artifact_policies\n                        (organization_id,exchange,market_type,symbol,control_version,\n                         profile_id,profile_revision,schedule,inherits_schedule,updated_by)\n                        VALUES (%(org)s,%(exchange)s,%(market_type)s,%(symbol)s,\n                                %(v)s,%(p)s,%(r)s,%(s)s,%(inherit)s,%(actor)s)\n                        ON CONFLICT (organization_id,exchange,market_type,symbol) DO UPDATE SET\n                        control_version=EXCLUDED.control_version,profile_id=EXCLUDED.profile_id,\n                        profile_revision=EXCLUDED.profile_revision,schedule=EXCLUDED.schedule,\n                        inherits_schedule=EXCLUDED.inherits_schedule,\n                        updated_by=EXCLUDED.updated_by,next_due=NULL"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "request",
+    "line": 386,
+    "signature": "self, *, organization_id: UUID, actor_id: UUID, request_id: UUID",
+    "returns": "Mapping[str, Any] | None",
+    "body_sha256": "a4d39f35263fc7115e12b0445816ed8cb046c8f823f025fca24ae0f75e5ae5d2",
+    "sql_fragments": [
+      "SELECT request_id,exchange,market_type,symbol,kind,trigger,\n                snapshot,state,reason,control_version,created_at FROM backtest_artifact_requests\n                WHERE organization_id=%(org)s AND request_id=%(id)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "events",
+    "line": 408,
+    "signature": "self, *, organization_id: UUID, actor_id: UUID, request_id: UUID, limit: int=30",
+    "returns": "tuple[Mapping[str, Any], ...]",
+    "body_sha256": "250e3b0596bd62b58ae8823bdaf9b3b8bf5d73c9e4201156c6c9d3f99eb2a82a",
+    "sql_fragments": [
+      "SELECT state,reason,progress,observed_at\n                FROM backtest_artifact_events WHERE request_id=%(id)s\n                ORDER BY event_id DESC LIMIT %(limit)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "enqueue_system",
+    "line": 428,
+    "signature": "self, *, installation_id: UUID, coordinate: Coordinate, source: SourceTarget | None, trigger: str='initial', occurrence: str=''",
+    "returns": "UUID",
+    "body_sha256": "b5929a8ae3250c13b19bec1d912fa65a39f7409ef1846e69980ae7c32f354e09",
+    "sql_fragments": [
+      "SELECT request_id FROM backtest_artifact_requests\n                WHERE installation_id=%(i)s AND internal_dedupe_key=%(key)s",
+      "INSERT INTO backtest_artifact_source_state\n                (exchange,market_type,symbol,desired_target) VALUES\n                (%(exchange)s,%(market_type)s,%(symbol)s,%(target)s)\n                ON CONFLICT (exchange,market_type,symbol)\n                DO UPDATE SET desired_target=EXCLUDED.desired_target",
+      "INSERT INTO backtest_artifact_requests\n                    (request_id,installation_id,internal_dedupe_key,exchange,market_type,symbol,\n                     kind,trigger,snapshot,state) VALUES (%(id)s,%(i)s,%(key)s,%(exchange)s,\n                     %(market_type)s,%(symbol)s,'base',%(trigger)s,%(snapshot)s,%(state)s)"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "claim",
+    "line": 502,
+    "signature": "self, *, installation_id: UUID, request_id: UUID, owner_token: UUID, parent_incarnation: UUID, reservation_bytes: int",
+    "returns": "Mapping[str, Any] | None",
+    "body_sha256": "1404c5aa3f199d3f36fac699bab80ec65212afe44e9b0720480499059e56f924",
+    "sql_fragments": [
+      "SELECT pg_advisory_xact_lock(290029)",
+      "SELECT build_id FROM backtest_artifact_builds\n                    WHERE state IN ('running','quarantined') LIMIT 1",
+      "SELECT * FROM backtest_artifact_requests\n                WHERE request_id=%(id)s AND installation_id=%(i)s AND state='queued' FOR UPDATE",
+      "INSERT INTO backtest_artifact_builds\n                (build_id,installation_id,exchange,market_type,symbol,snapshot,state,owner_token,\n                 parent_incarnation,attempt,epoch,reservation_bytes)\n                VALUES (%(id)s,%(i)s,%(e)s,%(m)s,%(s)s,%(snapshot)s,'running',%(owner)s,\n                        %(parent)s,1,1,%(bytes)s) RETURNING *",
+      "INSERT INTO backtest_artifact_build_requests VALUES (%(b)s,%(r)s)",
+      "INSERT INTO backtest_artifact_attempts\n                (build_id,attempt,epoch,owner_token,parent_incarnation,state)\n                VALUES (%(b)s,1,1,%(o)s,%(p)s,'running')",
+      "UPDATE backtest_artifact_requests SET state='running',\n                control_version=control_version+1 WHERE request_id=%(r)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "_fence",
+    "line": 574,
+    "signature": "self, build: Mapping[str, Any], *, state: str='running'",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "9982cfbb886c08a74e5be27753af38655b7e3de538197352e5fbc449fbf6b3c2",
+    "sql_fragments": [
+      "SELECT * FROM backtest_artifact_builds WHERE build_id=%(b)s\n            AND owner_token=%(o)s AND parent_incarnation=%(p)s AND attempt=%(a)s\n            AND epoch=%(e)s AND state=%(s)s FOR UPDATE"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "observe",
+    "line": 590,
+    "signature": "self, *, build: Mapping[str, Any], progress: Progress",
+    "returns": "None",
+    "body_sha256": "1b8fc6cdccc4048ef14840174659009f6f2e5667fb76bb9c1fc4f2d7cd1e5f1d",
+    "sql_fragments": [
+      "UPDATE backtest_artifact_builds SET progress=%(p)s WHERE build_id=%(b)s",
+      "UPDATE backtest_artifact_attempts SET progress=%(p)s\n                WHERE build_id=%(b)s AND attempt=%(a)s"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "_events",
+    "line": 623,
+    "signature": "self, build_id: UUID, state: str, reason: str | None, progress: Mapping[str, Any]",
+    "returns": "None",
+    "body_sha256": "98d099177a0b36fbb2760d7d761cf4a2f02d2cb9ee5486bbd564ceb74c050eb8",
+    "sql_fragments": [
+      "INSERT INTO backtest_artifact_events(request_id,state,reason,progress)\n            SELECT br.request_id,%(s)s,%(reason)s,%(p)s FROM backtest_artifact_build_requests br\n            JOIN backtest_artifact_requests r USING(request_id)\n            WHERE br.build_id=%(b)s AND r.state=%(s)s",
+      "DELETE FROM backtest_artifact_events WHERE event_id IN (\n            SELECT event_id FROM (\n                SELECT event_id,row_number() OVER (PARTITION BY request_id ORDER BY event_id DESC) n\n                FROM backtest_artifact_events WHERE request_id IN (\n                    SELECT request_id FROM backtest_artifact_build_requests WHERE build_id=%(b)s)\n            ) numbered WHERE n>512)"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "finish",
+    "line": 646,
+    "signature": "self, *, build: Mapping[str, Any], outcome: str, reason: str | None=None, publication: Mapping[str, Any] | None=None",
+    "returns": "None",
+    "body_sha256": "a8aa0a0a5601bc85d6c590ec52835e41206091a63a4b2cb94ebb632121e41c12",
+    "sql_fragments": [
+      "UPDATE backtest_artifact_builds SET state=%(s)s,next_retry_at=%(retry)s\n                WHERE build_id=%(b)s",
+      "UPDATE backtest_artifact_attempts SET state=%(s)s\n                WHERE build_id=%(b)s AND attempt=%(a)s",
+      "UPDATE backtest_artifact_requests SET state=%(s)s,reason=%(reason)s,\n                control_version=control_version+1 WHERE state IN ('running','retry_wait')\n                AND request_id IN\n                (SELECT request_id FROM backtest_artifact_build_requests WHERE build_id=%(b)s)",
+      "INSERT INTO backtest_artifact_source_state\n                    (exchange,market_type,symbol,desired_target,published)\n                    VALUES (%(e)s,%(m)s,%(s)s,%(target)s,%(pub)s)\n                    ON CONFLICT (exchange,market_type,symbol)\n                    DO UPDATE SET published=EXCLUDED.published\n                    "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "retry",
+    "line": 723,
+    "signature": "self, *, build: Mapping[str, Any], owner_token: UUID, parent_incarnation: UUID, now: datetime",
+    "returns": "Mapping[str, Any] | None",
+    "body_sha256": "4bb89673041778db58c1c428d325eb2a9b27800bf3b0db8be23efd3d80947e00",
+    "sql_fragments": [
+      "SELECT pg_advisory_xact_lock(290029)",
+      "UPDATE backtest_artifact_builds SET state='running',\n                owner_token=%(o)s,parent_incarnation=%(p)s,attempt=attempt+1,epoch=epoch+1,\n                progress='{}',next_retry_at=NULL WHERE build_id=%(b)s RETURNING *",
+      "INSERT INTO backtest_artifact_attempts\n                (build_id,attempt,epoch,owner_token,parent_incarnation,state)\n                VALUES (%(b)s,%(a)s,%(e)s,%(o)s,%(p)s,'running')",
+      "UPDATE backtest_artifact_requests SET state='running',reason=NULL,\n                control_version=control_version+1 WHERE state IN ('running','retry_wait')\n                AND request_id IN\n                (SELECT request_id FROM backtest_artifact_build_requests WHERE build_id=%(b)s)",
+      "SELECT build_id\n                    FROM backtest_artifact_builds\n                    WHERE state IN ('running','quarantined') LIMIT 1"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/postgres/management_repository.py",
+    "class": "PostgresArtifactManagementRepository",
+    "method": "import_legacy",
+    "line": 777,
+    "signature": "self, *, organization_id: UUID, actor_id: UUID, demands: tuple[tuple[Coordinate, str, Mapping[str, Any]], ...]",
+    "returns": "dict[str, int]",
+    "body_sha256": "5ada62f60b82971258d8b41e05282b8564023f0538722ecdf1bb4d367f609444",
+    "sql_fragments": [
+      "SELECT config_hash,snapshot FROM backtest_artifact_legacy_demands\n                    WHERE installation_id=%(i)s AND exchange=%(exchange)s\n                    AND market_type=%(market_type)s AND symbol=%(symbol)s",
+      "INSERT INTO backtest_artifact_legacy_demands\n                    (installation_id,exchange,market_type,symbol,config_hash,snapshot)\n                    VALUES (%(i)s,%(exchange)s,%(market_type)s,%(symbol)s,%(h)s,%(s)s)"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+    "class": "StoredCoordinates",
+    "method": "page",
+    "line": 38,
+    "signature": "self, *, after: tuple[int, str] | None, limit: int",
+    "returns": "Sequence[InstrumentId]",
+    "body_sha256": "441e68d82cd83ea679854601e5644a89b66227c2cc06407eb9c988f3a7efbc03",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+    "class": "StoredCoordinates",
+    "method": "observation_page",
+    "line": 40,
+    "signature": "self, *, after: tuple[int, str] | None, limit: int, before: UtcTimestamp",
+    "returns": "Sequence[StoredSourceObservation]",
+    "body_sha256": "7b22ab06e0271719219d1f1e93ba65d81634865f571878d3f0bd1caa2ecba653",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+    "class": "StoredCoordinates",
+    "method": "observation",
+    "line": 44,
+    "signature": "self, *, instrument: InstrumentId, before: UtcTimestamp",
+    "returns": "StoredSourceObservation",
+    "body_sha256": "185826d9c8f1d6b442aa051cc5687d16f22131183f5b839ce3c15269c00c748c",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+    "class": "BaseObligations",
+    "method": "observe_source",
+    "line": 50,
+    "signature": "self, *, installation_id: UUID, coordinate: Coordinate, source: SourceTarget, observed_at: datetime",
+    "returns": "UUID | None",
+    "body_sha256": "66604e1a93f0029748164829e8238ea7099c0ea3e1531357d0d382236f46f44f",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+    "class": "BaseSourceReconciler",
+    "method": "observe",
+    "line": 69,
+    "signature": "self, instrument: InstrumentId, *, now: datetime",
+    "returns": "UUID | None",
+    "body_sha256": "5460dd1fa0322deb136894b9beb04974c38c8c466af42b55f176aaee9775ab70",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+    "class": "BaseSourceReconciler",
+    "method": "_closed_cutoff",
+    "line": 75,
+    "signature": "now: datetime",
+    "returns": "UtcTimestamp",
+    "body_sha256": "61d91fee756d8085a5e4f59f8abbc25ca10b7bac7b3832c198710774247193a6",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+    "class": "BaseSourceReconciler",
+    "method": "_observe",
+    "line": 80,
+    "signature": "self, row: StoredSourceObservation, *, now: datetime",
+    "returns": "UUID | None",
+    "body_sha256": "f4a45d76ac0cb59a14fcfb1a97be1df15f6c25722a1433ee93c920a28ad7a7fd",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/base_source_reconciliation.py",
+    "class": "BaseSourceReconciler",
+    "method": "reconcile_page",
+    "line": 105,
+    "signature": "self, *, after: tuple[int, str] | None, now: datetime, limit: int=50",
+    "returns": "tuple[int, str] | None",
+    "body_sha256": "df4981f379338cd76d0daf5372240083c20a0a447cc49aa5a3dc26a7b3eeb9c6",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "class": "FrozenProfileDefaults",
+    "method": "_entries",
+    "line": 48,
+    "signature": "self",
+    "returns": "dict[str, Indicator]",
+    "body_sha256": "11e80d9ec8ce5eb1bfb866d4007bd8d2bd11694802d457a5fdbe026b4c187e31",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "class": "FrozenProfileDefaults",
+    "method": "supported_indicator_ids",
+    "line": 52,
+    "signature": "self",
+    "returns": "tuple[str, ...]",
+    "body_sha256": "0a8729d60666e63d378ec6a0ef5a44a63e06645ac8d211249161304e5c90d654",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "class": "FrozenProfileDefaults",
+    "method": "compute_defaults",
+    "line": 55,
+    "signature": "self, *, indicator_id: str",
+    "returns": "GridSpec",
+    "body_sha256": "0bab45f12022ecdacb737db2ebeba6d9792c86db760c9ea25b133fbc9001bea1",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "class": "FrozenProfileDefaults",
+    "method": "allowed_source_values",
+    "line": 65,
+    "signature": "self, *, indicator_id: str",
+    "returns": "tuple[str, ...]",
+    "body_sha256": "3341fefe67e7c4d744d14f0e4ae65aefeaefe65e310d1941a2686db60abfcc29",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "class": "FrozenProfileDefaults",
+    "method": "signal_param_defaults",
+    "line": 68,
+    "signature": "self, *, indicator_id: str",
+    "returns": "Mapping[str, ExplicitValuesSpec]",
+    "body_sha256": "538682538e70a402d091eea277d1cbff208620c852f15c386b19877d26fe8e53",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "class": "DerivativeDemand",
+    "method": "freeze",
+    "line": 88,
+    "signature": "cls, *, request_id: str, coordinate: Coordinate, source: SourceTarget, source_sha256: str, root_id: str, root_revision: int, profile: Profile",
+    "returns": null,
+    "body_sha256": "eec60f5bc67d2316c1e8bbb502b7bfbf0aa0e020a80e38e94fef1deaf4bdabad",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "class": "DerivativeDemand",
+    "method": "compatibility_key",
+    "line": 117,
+    "signature": "self",
+    "returns": "str",
+    "body_sha256": "533a99b7ffd500b66c3596186872743b22635d5e500533f5b7b181e0d8a39f40",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "class": "DerivativePlan",
+    "method": "active",
+    "line": 142,
+    "signature": "self",
+    "returns": "bool",
+    "body_sha256": "0844273db50665d37eb10dbfd829a6d72a2d88a4d34d8cb6e1630e8559c7b7b9",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "class": "DerivativePlan",
+    "method": "validate_source",
+    "line": 145,
+    "signature": "self, *, coordinate: Coordinate, source_sha256: str, start, end",
+    "returns": "None",
+    "body_sha256": "378bc39b7c9c12339fd95ede2d29d5eb4523888c2fc06620b846c04d5f563096",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "class": "DerivativePlan",
+    "method": "configure",
+    "line": 156,
+    "signature": "self, runner: BacktestArtifactPrecomputeRunnerV2, mappings: tuple[str, ...]",
+    "returns": null,
+    "body_sha256": "f3bef2dba755676cf67992210513f4d4a4042cecc85698f9208c70407fd19017",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/derivative_profiles.py",
+    "class": "ManagedDerivativePublisher",
+    "method": "publish",
+    "line": 296,
+    "signature": "self, *, plan: DerivativePlan, **kwargs",
+    "returns": null,
+    "body_sha256": "4dd3e9d482101817e3eaca13271f1cbfdb502af5c05e6cecc680f694e0821c70",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "class": "Coordinate",
+    "method": "validate_coordinate",
+    "line": 50,
+    "signature": "self",
+    "returns": "Coordinate",
+    "body_sha256": "f20cc18e377e2db0a83d6b253969468233061e91d9a8ff228ee8e1de9c17e04f",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "class": "Coordinate",
+    "method": "key",
+    "line": 57,
+    "signature": "self",
+    "returns": "tuple[str, str, str]",
+    "body_sha256": "58741f2cccf54cc2769215b194059caa0b7f654ab5f08a7446bef4c216834bef",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "class": "Grid",
+    "method": "expand",
+    "line": 70,
+    "signature": "self",
+    "returns": "tuple[int | float | str, ...]",
+    "body_sha256": "4042095ebe371028c677ce7eb860b50b5acb8086fa98a2b7d609abe3576a8682",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "class": "History",
+    "method": "bounds",
+    "line": 102,
+    "signature": "self",
+    "returns": "History",
+    "body_sha256": "bd5fc62b8c86cb73af7d67fa75d4e820755ad6fd9375f92ffa4133b39a48b504",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "class": "Profile",
+    "method": "unique_axes",
+    "line": 130,
+    "signature": "self",
+    "returns": "Profile",
+    "body_sha256": "ef3b7bbcb827c35698c95ada3c32caada789f2f21b603f5935facad17c6a75d0",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "class": "Schedule",
+    "method": "cadence",
+    "line": 154,
+    "signature": "cls, value: int",
+    "returns": "int",
+    "body_sha256": "e0abb7b23e4c7c184b91ba79ce7cbb71a49fe08b2053ea4db1643eecd7f47f13",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "class": "Schedule",
+    "method": "zone",
+    "line": 161,
+    "signature": "cls, value: str",
+    "returns": "str",
+    "body_sha256": "fb20a56aa9eb5bd188fdfa0db08621d5845a316f055458a6aa52fcca66610c3c",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "class": "Schedule",
+    "method": "wall_time",
+    "line": 170,
+    "signature": "cls, value: time",
+    "returns": "time",
+    "body_sha256": "413ecfd3eeac164d746d6d3d51860a6e033a18b0cdb012d3e5598a1a85921309",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "class": "SourceTarget",
+    "method": "closed_range",
+    "line": 184,
+    "signature": "self",
+    "returns": "SourceTarget",
+    "body_sha256": "f2bdb22b0708c3c7b2b4c1258cddcb6042bfaaec31f80ab2edc2fe1e2e004c5b",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/application/services/management.py",
+    "class": "Progress",
+    "method": "measured",
+    "line": 214,
+    "signature": "self",
+    "returns": "Progress",
+    "body_sha256": "95c91300c0ae18c8e3f6935f09848a9e996be3616381a66252f31bad8fcbc6ab",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/btcusdt_market_readiness_reader.py",
+    "class": "ClickHouseBTCUSDTMarketReadinessReader",
+    "method": "__post_init__",
+    "line": 25,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "bf6e9b170098d75e65db6be1fd3b94bf771f067429aae4d0c8b2967c0956f1be",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/btcusdt_market_readiness_reader.py",
+    "class": "ClickHouseBTCUSDTMarketReadinessReader",
+    "method": "list_btcusdt_reference_rows",
+    "line": 31,
+    "signature": "self",
+    "returns": "Sequence[BTCUSDTMarketReferenceSnapshot]",
+    "body_sha256": "67edfc0ea10f3e7c73f111b862bb8003b9d99d024ed86b6a27610ef7a7517828",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py",
+    "class": "ClickHouseCanonicalCandleIndexReader",
+    "method": "__post_init__",
+    "line": 22,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "5fb43c67cd344883140d847b17c7e7c0b90eaa22a2fa59e5b897655ba0ba7def",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py",
+    "class": "ClickHouseCanonicalCandleIndexReader",
+    "method": "bounds",
+    "line": 28,
+    "signature": "self, instrument_id: InstrumentId",
+    "returns": "tuple[UtcTimestamp, UtcTimestamp] | None",
+    "body_sha256": "255a70d6049f16499511c422a9da618e0e9750a7f9665220d3aa490429e5df5a",
+    "sql_fragments": [
+      "\n        Return first and last available minute buckets for one instrument.\n\n        Parameters:\n        - instrument_id: instrument whose canonical bounds are requested.\n\n        Returns:\n        - Tuple `(first_ts_open, last_ts_open)` in UTC or `None` when no rows exist.\n\n        Assumptions/Invariants:\n        - Bounds are computed on UTC epoch-minute keys to avoid driver/server timezone drift on\n          parameterized DateTime reads.\n\n        Errors/Exceptions:\n        - Propagates gateway/storage errors.\n\n        Side effects:\n        - Executes one ClickHouse SELECT query.\n        ",
+      "\n        SELECT\n            minOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,\n            maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key\n        FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py",
+    "class": "ClickHouseCanonicalCandleIndexReader",
+    "method": "bounds_1m",
+    "line": 68,
+    "signature": "self, *, instrument_id: InstrumentId, before: UtcTimestamp",
+    "returns": "tuple[UtcTimestamp | None, UtcTimestamp | None]",
+    "body_sha256": "da4c61ed4d4f19c8848d4a913e51e9baa7ac4ee9d80e8dff303bbaa7eeaddf7c",
+    "sql_fragments": [
+      "\n        Return canonical min/max minute buckets for one instrument before an exclusive bound.\n\n        Parameters:\n        - instrument_id: instrument whose canonical bounds are requested.\n        - before: exclusive upper bound for `ts_open`.\n\n        Returns:\n        - Tuple `(min_ts_open, max_ts_open)` where values are `None` when dataset is empty.\n\n        Assumptions/Invariants:\n        - Bounds are computed on UTC epoch-minute keys to avoid driver/server timezone drift on\n          parameterized DateTime reads.\n\n        Errors/Exceptions:\n        - Propagates gateway/storage errors.\n\n        Side effects:\n        - Executes one ClickHouse SELECT query.\n        ",
+      "\n        SELECT\n            minOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS first_minute_key,\n            maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key\n        FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py",
+    "class": "ClickHouseCanonicalCandleIndexReader",
+    "method": "max_ts_open_lt",
+    "line": 119,
+    "signature": "self, *, instrument_id: InstrumentId, before: UtcTimestamp, after: UtcTimestamp | None=None",
+    "returns": "UtcTimestamp | None",
+    "body_sha256": "ed92696a479386cc35b74cfd5e765f3df4ed6f8c6a318692f033b90d03fb7f90",
+    "sql_fragments": [
+      "\n        Return latest canonical minute strictly before `before`.\n\n        Parameters:\n        - instrument_id: instrument whose latest known minute is requested.\n        - before: upper bound (exclusive).\n        - after: optional lower bound (inclusive) for bounded tail lookups.\n\n        Returns:\n        - Latest minute in UTC or `None` when no qualifying rows exist.\n\n        Assumptions/Invariants:\n        - Result is normalized to UTC epoch-minute key to avoid driver/server timezone drift on\n          parameterized DateTime reads.\n\n        Errors/Exceptions:\n        - Propagates gateway/storage errors.\n\n        Side effects:\n        - Executes one ClickHouse SELECT query.\n        ",
+      "\n        SELECT\n            maxOrNull(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS last_minute_key\n        FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py",
+    "class": "ClickHouseCanonicalCandleIndexReader",
+    "method": "daily_counts",
+    "line": 179,
+    "signature": "self, *, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "Sequence[DailyTsOpenCount]",
+    "body_sha256": "822c578c5075d7ade3e5c0db1e86296794f11805b1fd477406d4cf0613e5c4ad",
+    "sql_fragments": [
+      "\n        Return per-day counts of distinct canonical minute buckets for one range.\n\n        Parameters:\n        - instrument_id: instrument being aggregated.\n        - time_range: UTC half-open range `[start, end)` for aggregation.\n\n        Returns:\n        - Sequence of `(day, count)` rows.\n\n        Assumptions/Invariants:\n        - Distinctness is measured on UTC epoch-minute keys to avoid driver/server timezone drift on\n          parameterized DateTime reads.\n\n        Errors/Exceptions:\n        - Raises `RuntimeError` on unexpected day value types from gateway.\n        - Propagates gateway/storage errors.\n\n        Side effects:\n        - Executes one ClickHouse SELECT query.\n        ",
+      "\n        SELECT\n            formatDateTime(ts_open, '%%F', 'UTC') AS day,\n            uniqExact(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS cnt\n        FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py",
+    "class": "ClickHouseCanonicalCandleIndexReader",
+    "method": "distinct_ts_opens",
+    "line": 237,
+    "signature": "self, *, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "Sequence[UtcTimestamp]",
+    "body_sha256": "410132d77a3eedc010c03e87957d0fee5b3241ebab5ce2548cf3726fd7a5740b",
+    "sql_fragments": [
+      "\n        Return distinct canonical minute starts for one instrument and one range.\n\n        Parameters:\n        - instrument_id: instrument being queried.\n        - time_range: UTC half-open range `[start, end)`.\n\n        Returns:\n        - Sorted sequence of UTC minute starts.\n\n        Assumptions/Invariants:\n        - Timestamps are normalized as UTC epoch-minute keys in SQL to avoid driver/server timezone\n          drift on parameterized DateTime reads.\n\n        Errors/Exceptions:\n        - Propagates gateway/storage errors.\n\n        Side effects:\n        - Executes one ClickHouse SELECT query.\n        ",
+      "\n        SELECT DISTINCT\n            intDiv(toUnixTimestamp64Milli(ts_open), 60000) AS minute_key\n        FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py",
+    "class": "ClickHouseCanonicalCandleIndexReader",
+    "method": "_table",
+    "line": 279,
+    "signature": "self",
+    "returns": "str",
+    "body_sha256": "273644b82cb795adad0e40f2276f35969c43bc29a5306ad398444e90135fdf1e",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py",
+    "class": "ClickHouseCanonicalCandleReader",
+    "method": "__init__",
+    "line": 41,
+    "signature": "self, gateway: ClickHouseGateway, database: str='market_data'",
+    "returns": "None",
+    "body_sha256": "e3e063bacfc4e380a4bcd7b0698a84abfe2d9d13b36f927889a57245e0bfb5ea",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py",
+    "class": "ClickHouseCanonicalCandleReader",
+    "method": "read_1m",
+    "line": 50,
+    "signature": "self, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "Iterator[CandleWithMeta]",
+    "body_sha256": "b331a06debd8319f8395179f8d0a089a8f05bc8e8f7351b889227a335272640c",
+    "sql_fragments": [
+      "\n        Read canonical 1m candles in one deterministic `FINAL` query.\n\n        Args:\n            instrument_id: Explicit market/symbol identity to read.\n            time_range: Half-open UTC range `[start, end)` for requested candles.\n        Returns:\n            Iterator[CandleWithMeta]: Canonical candles ordered by strictly increasing `ts_open`.\n        Assumptions:\n            `canonical_candles_1m FINAL` is the source of truth for offline precompute and may be\n            heavier than non-`FINAL` reads.\n        Raises:\n            Exception: Propagates gateway/storage failures.\n        Side Effects:\n            Executes one ClickHouse `SELECT ... FINAL`.\n        "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py",
+    "class": "ClickHouseCanonicalCandleReader",
+    "method": "read_1m_arrays",
+    "line": 78,
+    "signature": "self, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "CanonicalCandleBatch1m",
+    "body_sha256": "e4e200bcea7ae7e46a686da231fbd1fa7fc588dc8cc8f902afde414cbf2b1512",
+    "sql_fragments": [
+      "\n        Read canonical `1m` candles as a columnar batch for offline/precompute workloads.\n\n        Args:\n            instrument_id: Explicit market/symbol identity to read.\n            time_range: Half-open UTC range `[start, end)` for requested candles.\n        Returns:\n            CanonicalCandleBatch1m: Strict columnar payload ordered by increasing `ts_open`.\n        Assumptions:\n            Precompute workloads prefer numeric arrays over per-row DTO construction.\n        Raises:\n            Exception: Propagates gateway/storage failures.\n        Side Effects:\n            Executes one ClickHouse `SELECT ... FINAL`.\n        "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py",
+    "class": "ClickHouseCanonicalCandleReader",
+    "method": "_canonical_table",
+    "line": 104,
+    "signature": "self",
+    "returns": "str",
+    "body_sha256": "ae27cbddfb433eb578a92e9bed149c60951c4cbd82556e51b1cc5493b6515389",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py",
+    "class": "ClickHouseCanonicalCandleReader",
+    "method": "_select_final",
+    "line": 107,
+    "signature": "self, instrument_id: InstrumentId, start_dt, end_dt",
+    "returns": "Sequence[CandleWithMeta]",
+    "body_sha256": "08f9dbf1d775c53b02f33e462e3c2e4914935995cf0eeb729a1aa4118d868ff8",
+    "sql_fragments": [
+      "\n        Execute one `FINAL` read against canonical 1m storage for the requested UTC range.\n\n        Args:\n            instrument_id: Explicit market/symbol identity to read.\n            start_dt: Inclusive UTC range start.\n            end_dt: Exclusive UTC range end.\n        Returns:\n            Sequence[CandleWithMeta]: Materialized canonical rows ordered by `ts_open`.\n        Assumptions:\n            Historical duplicates may still exist in storage, so artifact precompute must not rely\n            on background merges to observe canonical latest state.\n        Raises:\n            Exception: Propagates gateway failures.\n        Side Effects:\n            Executes one ClickHouse `SELECT ... FINAL`.\n        ",
+      "\n        SELECT\n            market_id, symbol, instrument_key,\n            ts_open, ts_close,\n            open, high, low, close,\n            volume_base, volume_quote,\n            trades_count, taker_buy_volume_base, taker_buy_volume_quote,\n            source, ingested_at, ingest_id\n        FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py",
+    "class": "ClickHouseCanonicalCandleReader",
+    "method": "_select_final_arrays",
+    "line": 156,
+    "signature": "self, instrument_id: InstrumentId, start_dt, end_dt",
+    "returns": "CanonicalCandleBatch1m",
+    "body_sha256": "436b8dc3bd9e127bad0d8388c818eb0c35691ad94ace8b52716b8aff9680936c",
+    "sql_fragments": [
+      "\n        Execute one numeric `FINAL` read optimized for precompute columnar array materialization.\n\n        Args:\n            instrument_id: Explicit market/symbol identity to read.\n            start_dt: Inclusive UTC range start.\n            end_dt: Exclusive UTC range end.\n        Returns:\n            CanonicalCandleBatch1m: Strict columnar arrays for the requested range.\n        Assumptions:\n            ClickHouse computes UTC epoch milliseconds more efficiently than Python datetime\n            object materialization for full-history artifact bootstrap runs.\n        Raises:\n            Exception: Propagates gateway failures.\n        Side Effects:\n            Executes one ClickHouse `SELECT ... FINAL`.\n        ",
+      "\n        SELECT\n            toUnixTimestamp64Milli(ts_open) AS open_time_ms,\n            toUnixTimestamp64Milli(ts_close) AS close_time_ms,\n            toFloat32(open) AS open_f32,\n            toFloat32(high) AS high_f32,\n            toFloat32(low) AS low_f32,\n            toFloat32(close) AS close_f32,\n            toFloat32(volume_base) AS volume_base_f32\n        FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py",
+    "class": "ClickHouseCanonicalCandleReader",
+    "method": "_map_row",
+    "line": 253,
+    "signature": "self, r: Mapping[str, Any]",
+    "returns": "CandleWithMeta",
+    "body_sha256": "149a7114c0b494f4ab16505e1cca9e38e0f8a03f39fb5101e4d794b766662746",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/catalog_coverage_reader.py",
+    "class": "ClickHouseCatalogCoverageReader",
+    "method": "counts",
+    "line": 16,
+    "signature": "self, *, market_ids: Sequence[int], start_at: datetime, end_at: datetime",
+    "returns": "Mapping[tuple[int, str], int]",
+    "body_sha256": "191917f306b61707654561584e79342d4faa2900cf7fcde3a7e85d39f5cbead0",
+    "sql_fragments": [
+      "\n            SELECT market_id, symbol,\n                   uniqExact(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS candles\n            FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/catalog_coverage_reader.py",
+    "class": "ClickHouseCatalogCoverageReader",
+    "method": "latest",
+    "line": 41,
+    "signature": "self, *, market_id: int, symbol: str, before: datetime",
+    "returns": "datetime | None",
+    "body_sha256": "ae4db63aedf5b131220d4e38099179619ce46a0ae63ba320cd939c32656b2566",
+    "sql_fragments": [
+      "\n            SELECT if(bitmapCardinality(minutes) = 0, NULL, bitmapMax(minutes)) AS minute\n            FROM (\n                SELECT bitmapSubsetInRange(groupBitmapMergeState(minute_bitmap_state),\n                    toUInt32(0), toUInt32(%(before_minute)s)) AS minutes\n                FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_instrument_reader.py",
+    "class": "ClickHouseEnabledInstrumentReader",
+    "method": "__post_init__",
+    "line": 28,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "e9cc1e979c5e6791461b3a197a901c26a780e659c9f576e4278501466cf6fd9f",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_instrument_reader.py",
+    "class": "ClickHouseEnabledInstrumentReader",
+    "method": "list_enabled_tradable",
+    "line": 52,
+    "signature": "self",
+    "returns": "Sequence[InstrumentId]",
+    "body_sha256": "68bd5840a44ca7842b6a0f8c5e2745d900987f80b511f911a50932552b769a0d",
+    "sql_fragments": [
+      "\n        Fetch enabled tradable instruments from latest `market_data.ref_instruments` versions.\n\n        Parameters:\n        - None.\n\n        Returns:\n        - Sequence of instrument ids.\n\n        Assumptions/Invariants:\n        - For each `(market_id, symbol)` key only the latest row by `updated_at` is considered.\n        - Latest-state filtering uses `LIMIT 1 BY market_id, symbol`.\n        - Returned rows are ordered deterministically by `(market_id, symbol)`.\n\n        Errors/Exceptions:\n        - Propagates storage/gateway errors.\n        - Raises `ValueError` on malformed market_id values.\n\n        Side effects:\n        - Executes one ClickHouse SELECT query.\n        ",
+      "\n        SELECT market_id, symbol\n        FROM\n        (\n            SELECT\n                market_id,\n                symbol,\n                status,\n                is_tradable,\n                updated_at\n            FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_market_reader.py",
+    "class": "ClickHouseEnabledMarketReader",
+    "method": "__post_init__",
+    "line": 32,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "4b8acd90dc439f933962b5f6db163b4072e7851e240e58576928c713922e8fa3",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_market_reader.py",
+    "class": "ClickHouseEnabledMarketReader",
+    "method": "list_enabled_markets",
+    "line": 57,
+    "signature": "self",
+    "returns": "Sequence[EnabledMarketReference]",
+    "body_sha256": "9e737ef68b19d48d7daaace6f84ae5cb494cde84879b07bf635fd101bb44ee5c",
+    "sql_fragments": [
+      "\n        Read enabled markets from latest rows without using ClickHouse `FINAL`.\n\n        Parameters:\n        - None.\n\n        Returns:\n        - Sequence of enabled market rows ordered by `market_id ASC`.\n\n        Assumptions/Invariants:\n        - Latest row per market is selected with `ORDER BY updated_at DESC LIMIT 1 BY market_id`.\n\n        Errors/Exceptions:\n        - Propagates gateway query errors.\n        - Raises `ValueError` on malformed market_id values.\n\n        Side effects:\n        - Executes one ClickHouse SELECT query.\n        ",
+      "\n        SELECT market_id, exchange_name, market_type, market_code\n        FROM\n        (\n            SELECT\n                market_id,\n                exchange_name,\n                market_type,\n                market_code,\n                is_enabled,\n                updated_at\n            FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_tradable_instrument_search_reader.py",
+    "class": "ClickHouseEnabledTradableInstrumentSearchReader",
+    "method": "__post_init__",
+    "line": 33,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "150f36fe25da9bee38fedcb453949931ed869b1406890640c1a355d824c321cf",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_tradable_instrument_search_reader.py",
+    "class": "ClickHouseEnabledTradableInstrumentSearchReader",
+    "method": "search_enabled_tradable_by_market",
+    "line": 59,
+    "signature": "self, *, market_id: MarketId, symbol_prefix: str | None, limit: int",
+    "returns": "Sequence[InstrumentId]",
+    "body_sha256": "a4a1f4e82bac1507b36517210e4118990d4180c1599454a4bb22645e4d3c42fc",
+    "sql_fragments": [
+      "\n        Search latest enabled tradable instruments in one market with optional prefix.\n\n        Parameters:\n        - market_id: target market id.\n        - symbol_prefix: optional uppercase symbol prefix, `None` means no prefix filter.\n        - limit: maximum number of rows to return.\n\n        Returns:\n        - Sequence of matching instrument ids ordered by `symbol ASC`.\n\n        Assumptions/Invariants:\n        - Unknown/disabled market returns empty list via market latest-state join.\n        - Latest-state reads do not use ClickHouse `FINAL`.\n\n        Errors/Exceptions:\n        - Propagates gateway query errors.\n        - Raises `ValueError` on malformed rows.\n\n        Side effects:\n        - Executes one ClickHouse SELECT query.\n        "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "__init__",
+    "line": 29,
+    "signature": "self, *, gateway: ClickHouseGateway, database: str='market_data'",
+    "returns": "None",
+    "body_sha256": "24dd9085a78ac6f007e55505299416151cd8ba589d6cb3fadf222060923eb976",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "upsert_funding_instruments",
+    "line": 37,
+    "signature": "self, rows: Sequence[FundingInstrument]",
+    "returns": "None",
+    "body_sha256": "41c75146a2b0a789a51f7e57a2884b37910238c2fa58a13b34afa8c45a42f49c",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "list_tradable_funding_instruments",
+    "line": 41,
+    "signature": "self, *, market_ids: Sequence[MarketId]",
+    "returns": "Sequence[FundingInstrument]",
+    "body_sha256": "a16bf6d1856503d5e36165324c4aa6df28c71d3bee0422934ff26cb547a2e627",
+    "sql_fragments": [
+      "\n        SELECT\n            market_id,\n            symbol,\n            argMax(instrument_key, updated_at) AS instrument_key,\n            argMax(exchange, updated_at) AS exchange,\n            argMax(market_type, updated_at) AS market_type,\n            argMax(status, updated_at) AS status,\n            argMax(is_tradable, updated_at) AS is_tradable,\n            argMax(base_asset, updated_at) AS base_asset,\n            argMax(quote_asset, updated_at) AS quote_asset,\n            argMax(funding_interval_minutes, updated_at) AS funding_interval_minutes,\n            argMax(funding_interval_source, updated_at) AS funding_interval_source,\n            argMax(funding_cap, updated_at) AS funding_cap,\n            argMax(funding_floor, updated_at) AS funding_floor,\n            max(updated_at) AS latest_updated_at\n        FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "get_funding_instrument",
+    "line": 73,
+    "signature": "self, instrument_id: InstrumentId",
+    "returns": "FundingInstrument | None",
+    "body_sha256": "a2d8e20ffde5623d67ed6673c6da7adf8419783911a6bfeb0877d57b7ca54b7b",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "write_funding_rates",
+    "line": 81,
+    "signature": "self, rows: Sequence[FundingRateRecord]",
+    "returns": "None",
+    "body_sha256": "1441b5d8eb3d5e538c60746f740cbdf5325e3e4b2ef75e11a49b22f83133605d",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "latest_funding_time",
+    "line": 101,
+    "signature": "self, instrument_id: InstrumentId",
+    "returns": "UtcTimestamp | None",
+    "body_sha256": "a658444c5d05489da3802056b219d34b28db011199449be43709ed346d0ed0b0",
+    "sql_fragments": [
+      "\n        SELECT maxOrNull(toUnixTimestamp64Milli(funding_time)) AS funding_time_ms\n        FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "read_funding_coverage",
+    "line": 122,
+    "signature": "self, *, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "FundingRateCoverageSnapshot",
+    "body_sha256": "beb0dbbefc1b161929d3899dfc106815d7b66ee0869a791248b1b2f203f91370",
+    "sql_fragments": [
+      "\n        SELECT\n            market_id,\n            symbol,\n            argMax(instrument_key, ingested_at) AS instrument_key,\n            toUnixTimestamp64Milli(funding_time) AS funding_time_ms,\n            argMax(funding_rate, ingested_at) AS funding_rate,\n            CAST(NULL AS Nullable(Float64)) AS mark_price,\n            argMax(funding_interval_minutes, ingested_at) AS funding_interval_minutes,\n            1 AS data_quality\n        FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "_universe_payload",
+    "line": 162,
+    "signature": "self, row: FundingInstrument",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "75a7ec42258ab6c148c2938fc7884f0b09784bb0e468c32b8494ed1ca1d7ede3",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "_universe_from_row",
+    "line": 180,
+    "signature": "self, row: Mapping[str, Any]",
+    "returns": "FundingInstrument",
+    "body_sha256": "9e091596a26936c1db77f0ea8c3031d90d449acc6b9344b5cbe2dd0a8e35bf56",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "_canonical_payload",
+    "line": 201,
+    "signature": "self, row: FundingRateRecord",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "32e1e84d8c8381761799dd790b8e5d9c495922e172b44aa46687986f077d43a6",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "_binance_raw_payload",
+    "line": 215,
+    "signature": "self, row: FundingRateRecord",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "f195db7e76de6515be043a3757702f55892b1d330ce2772c92beb7ba0a269eac",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "_bybit_raw_payload",
+    "line": 220,
+    "signature": "self, row: FundingRateRecord",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "075b4ea0bcc26e8a6e09d39351cbb65f413fb6335c9942263d7fb760cec6bdb2",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "class": "ClickHouseFundingRateStore",
+    "method": "_artifact_record_from_row",
+    "line": 225,
+    "signature": "self, row: Mapping[str, Any]",
+    "returns": "FundingRateArtifactRecord",
+    "body_sha256": "f75b0a7b8a99f09ac8be34e15d6eab4c85e1438f4ad2536e4132542ea4113abd",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ClickHouseGateway",
+    "method": "insert_rows",
+    "line": 17,
+    "signature": "self, table: str, rows: Sequence[Mapping[str, Any]]",
+    "returns": "None",
+    "body_sha256": "c1c77410d59f2221312f099eca9471dbadca091feeb512935510712d0307a912",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ClickHouseGateway",
+    "method": "select",
+    "line": 20,
+    "signature": "self, query: str, parameters: Mapping[str, Any]",
+    "returns": "Sequence[Mapping[str, Any]]",
+    "body_sha256": "0f3d5db70faeda702540bc9894972ed80ef5ad9f7b9c4d624020ced920ecc364",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ClickHouseConnectGateway",
+    "method": "__init__",
+    "line": 36,
+    "signature": "self, client: Any",
+    "returns": "None",
+    "body_sha256": "736fd485a222e589fb8a62309107944efd4b8c6f5112769d82de8ee00ea63baa",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ClickHouseConnectGateway",
+    "method": "insert_rows",
+    "line": 41,
+    "signature": "self, table: str, rows: Sequence[Mapping[str, Any]]",
+    "returns": "None",
+    "body_sha256": "b9107d71e7082fdfef17c1ef2ddac51285d6c840d0d78f7a42dda901abfc98c2",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ClickHouseConnectGateway",
+    "method": "select",
+    "line": 49,
+    "signature": "self, query: str, parameters: Mapping[str, Any]",
+    "returns": "Sequence[Mapping[str, Any]]",
+    "body_sha256": "e6018904379ffaf41b5ce739d4e15460beeeaf850ff410d015277982dd73a919",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ClickHouseConnectGateway",
+    "method": "command",
+    "line": 57,
+    "signature": "self, query: str, parameters: Mapping[str, Any]",
+    "returns": "None",
+    "body_sha256": "a69c6bf0df5f23359b9b1d0c582185612594d48700889e5468878d7f36f1c65d",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ThreadLocalClickHouseConnectGateway",
+    "method": "__init__",
+    "line": 96,
+    "signature": "self, client_factory, *, max_concurrent_queries: int | None=None, admission_key: tuple[str, int, str] | None=None",
+    "returns": "None",
+    "body_sha256": "7f1f21f1c0544d73e4a9e55d65be4ef37dbfc391e0d19b66c82f84db2d79529b",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ThreadLocalClickHouseConnectGateway",
+    "method": "insert_rows",
+    "line": 126,
+    "signature": "self, table: str, rows: Sequence[Mapping[str, Any]]",
+    "returns": "None",
+    "body_sha256": "440c128e53aa136dd28a7dab33ffcf0bdc5df1ee8214eab40b3f285e3abc1498",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ThreadLocalClickHouseConnectGateway",
+    "method": "select",
+    "line": 153,
+    "signature": "self, query: str, parameters: Mapping[str, Any]",
+    "returns": "Sequence[Mapping[str, Any]]",
+    "body_sha256": "3cc0c97b9848675646f53e8e65a0a12a90d796d189ea5fbef475ca35e087a0f3",
+    "sql_fragments": [
+      "\n        Execute SELECT query through thread-local client and map rows to dicts.\n\n        Parameters:\n        - query: SQL text.\n        - parameters: bind parameters mapping.\n\n        Returns:\n        - Sequence of dictionary rows.\n\n        Assumptions/Invariants:\n        - client result object provides `column_names` and `result_rows`.\n\n        Errors/Exceptions:\n        - Propagates underlying client query errors.\n\n        Side effects:\n        - Executes one ClickHouse query request.\n        "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ThreadLocalClickHouseConnectGateway",
+    "method": "_client",
+    "line": 181,
+    "signature": "self",
+    "returns": "Any",
+    "body_sha256": "d4f119595136f9822187bcea38701d027797e127f9703dfbfafddf956520cc7a",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ThreadLocalClickHouseConnectGateway",
+    "method": "command",
+    "line": 209,
+    "signature": "self, query: str, parameters: Mapping[str, Any]",
+    "returns": "None",
+    "body_sha256": "a446658f718220b88f6de21af777fe7b9695f2d923bbe4bdf59c5a3515dea83b",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "class": "ClickHouseCommandGateway",
+    "method": "command",
+    "line": 215,
+    "signature": "self, query: str, parameters: Mapping[str, Any]",
+    "returns": "None",
+    "body_sha256": "06766379e34065fceb5a1e1005b0d621d9b8b9e0843b7e9cd1116d85b37e80f6",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_coverage_reader.py",
+    "class": "ClickHouseHistoryCoverageReader",
+    "method": "counts",
+    "line": 18,
+    "signature": "self, *, starts: Mapping[tuple[int, str], datetime], end_at: datetime",
+    "returns": "Mapping[tuple[int, str], int]",
+    "body_sha256": "9e6f875bc56b88553a7248afc00415b579f6031352639528c2678779206f1153",
+    "sql_fragments": [
+      "\n            SELECT market_id, symbol,\n                bitmapCardinality(bitmapSubsetInRange(minutes, first_minute,\n                    toUInt32(%(end)s))) AS candles\n            FROM (\n                SELECT market_id, symbol, groupBitmapMergeState(minute_bitmap_state) AS minutes\n                FROM ",
+      ".canonical_candles_1m_stats\n                WHERE (market_id, symbol) IN %(keys)s GROUP BY market_id, symbol\n            ) AS stored\n            INNER JOIN (\n                SELECT r.1 AS market_id, r.2 AS symbol, toUInt32(r.3) AS first_minute\n                FROM (SELECT arrayJoin(%(ranges)s) AS r)\n            ) AS bounds USING (market_id, symbol)\n            SETTINGS max_threads=1, max_execution_time=10, max_memory_usage=134217728\n            "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_coverage_reader.py",
+    "class": "ClickHouseHistoryCoverageReader",
+    "method": "source_absent_counts",
+    "line": 46,
+    "signature": "self, *, starts: Mapping[tuple[int, str], datetime], end_at: datetime",
+    "returns": "Mapping[tuple[int, str], int]",
+    "body_sha256": "5f429ef1bd949882438dc3bb602b90f8b355a79f57f9fc74e32072cf85047eed",
+    "sql_fragments": [
+      "SELECT market_id, symbol,\n                bitmapCardinality(bitmapSubsetInRange(bitmapAndnot(absent, actual),\n                    first_minute, toUInt32(%(end)s))) AS candles\n            FROM (\n                SELECT market_id, symbol, groupBitmapState(minute_key) AS absent\n                FROM ",
+      ".source_absent_candles_1m\n                WHERE (market_id, symbol) IN %(keys)s GROUP BY market_id, symbol\n            ) AS source\n            LEFT JOIN (\n                SELECT market_id, symbol, groupBitmapMergeState(minute_bitmap_state) AS actual\n                FROM ",
+      ".canonical_candles_1m_stats\n                WHERE (market_id, symbol) IN %(keys)s GROUP BY market_id, symbol\n            ) AS stored USING (market_id, symbol)\n            INNER JOIN (\n                SELECT r.1 AS market_id, r.2 AS symbol, toUInt32(r.3) AS first_minute\n                FROM (SELECT arrayJoin(%(ranges)s) AS r)\n            ) AS bounds USING (market_id, symbol)\n            SETTINGS max_threads=1, max_execution_time=10, max_memory_usage=134217728"
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_coverage_reader.py",
+    "class": "ClickHouseHistoryCoverageReader",
+    "method": "first_gap",
+    "line": 77,
+    "signature": "self, *, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "TimeRange | None",
+    "body_sha256": "54e4f417af7a1b3c5f2c360d01954aab8cb0aa95d338f1209e360eb1984146ee",
+    "sql_fragments": [
+      "\n            WITH toInt64(%(start)s) AS a, toInt64(%(end)s) AS b,\n                bitmapCardinality(bitmapSubsetInRange(minutes,toUInt32(a),toUInt32(b)))\n                    = b-a AS complete,\n                arrayFold((bounds, step) -> if(bounds.1 >= bounds.2, bounds,\n                    if(bitmapCardinality(bitmapSubsetInRange(minutes,toUInt32(a),\n                        toUInt32(intDiv(bounds.1+bounds.2,2)+1)))\n                        = intDiv(bounds.1+bounds.2,2)+1-a,\n                        tuple(intDiv(bounds.1+bounds.2,2)+1,bounds.2),\n                        tuple(bounds.1,intDiv(bounds.1+bounds.2,2)))),\n                    range(toUInt32(if(complete,0,32))),tuple(a,b)).1 AS first_missing,\n                if(complete,a,a+intDiv(first_missing-a,1440)*1440) AS day_start\n            SELECT if(complete,0,intDiv(day_start-a,1440)+1) AS block, day_start,\n                bitmapToArray(bitmapSubsetInRange(minutes, toUInt32(day_start),\n                    toUInt32(least(b,day_start+1440)))) AS present\n            FROM (\n                SELECT groupBitmapMergeState(minute_bitmap_state) AS minutes\n                FROM (\n                    SELECT minute_bitmap_state FROM ",
+      ".canonical_candles_1m_stats\n                    WHERE market_id=%(market)s AND symbol=%(symbol)s\n                    UNION ALL\n                    SELECT groupBitmapState(minute_key) AS minute_bitmap_state\n                    FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_range_verifier.py",
+    "class": "ClickHouseHistoryRangeVerifier",
+    "method": "confirm",
+    "line": 19,
+    "signature": "self, *, instrument_id: InstrumentId, time_range: TimeRange, observed_minutes: set[int], observed_at: datetime, accept_absence: bool, check_lease: Callable[[], None]",
+    "returns": "None",
+    "body_sha256": "f036cbc3762c18427bc389be68ef67ac52dee5e178a884d553bdf15d802d5963",
+    "sql_fragments": [
+      "SELECT DISTINCT toUInt32(intDiv(toUnixTimestamp(ts_open),60)) AS minute\n            FROM ",
+      "INSERT INTO ",
+      ".canonical_candles_1m_stats\n            SELECT market_id, symbol, sumState(toUInt64(0)), minState(ts_open),\n                maxState(ts_open), groupBitmapState(toUInt32(intDiv(toUnixTimestamp(ts_open),60)))\n            FROM ",
+      ".canonical_candles_1m\n            WHERE market_id=%(market)s AND symbol=%(symbol)s\n                AND ts_open >= %(start)s AND ts_open < %(end)s\n                AND NOT bitmapContains((SELECT groupBitmapMergeState(minute_bitmap_state)\n                    FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/instrument_coverage_reader.py",
+    "class": "ClickHouseInstrumentCoverageReader",
+    "method": "__post_init__",
+    "line": 25,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "f5376b02d09cbad4482debd737adb3b3348be7216f71e1cf635e3f96a6a03904",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/instrument_coverage_reader.py",
+    "class": "ClickHouseInstrumentCoverageReader",
+    "method": "read",
+    "line": 31,
+    "signature": "self, *, instrument_id: InstrumentId, expected_start_at: datetime, expected_end_at: datetime",
+    "returns": "InstrumentCoverageSnapshot",
+    "body_sha256": "57412bf7edc834132de1298de789d0660640b160e336690ef6116a9a9baddf7d",
+    "sql_fragments": [
+      "\n                SELECT uniqExact(intDiv(toUnixTimestamp64Milli(ts_open), 60000)) AS candles\n                FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py",
+    "class": "ClickHouseRawKlineWriter",
+    "method": "__init__",
+    "line": 24,
+    "signature": "self, gateway: ClickHouseGateway, database: str='market_data'",
+    "returns": "None",
+    "body_sha256": "e3de1ab38a5d33315e1c8b38b99beb003a290467bc81fb71760c520d4b1b1309",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py",
+    "class": "ClickHouseRawKlineWriter",
+    "method": "write_1m",
+    "line": 32,
+    "signature": "self, rows: Iterable[CandleWithMeta]",
+    "returns": "None",
+    "body_sha256": "e7ce845130558c4eaf5df6a64e1c4e7894b7e242e1050a3b8cad05cb888ced3a",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py",
+    "class": "ClickHouseRawKlineWriter",
+    "method": "_raw_table_for_market_id",
+    "line": 62,
+    "signature": "self, market_id: int",
+    "returns": "str",
+    "body_sha256": "0f7009d58aeae519e88d19b7a483a10e6aed0fdfdabca00aaa48f94042057a70",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py",
+    "class": "ClickHouseRawKlineWriter",
+    "method": "_payload_by_table",
+    "line": 87,
+    "signature": "self, rows: list[CandleWithMeta]",
+    "returns": "dict[str, list[Mapping[str, Any]]]",
+    "body_sha256": "e10e3287c0418c51285089ddf197b955495715c5006c045df382c276c91b6cb1",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py",
+    "class": "ClickHouseRawKlineWriter",
+    "method": "_row_to_raw_payload",
+    "line": 116,
+    "signature": "self, row: CandleWithMeta",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "57184d7695c69ea6159a9a7fac9ee29df5316170fcca602643453ab2f6c36385",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py",
+    "class": "ClickHouseRawKlineWriter",
+    "method": "_to_binance_raw",
+    "line": 142,
+    "signature": "self, row: CandleWithMeta",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "18b186d79dd672deae4e38943cefcb28ecaa30d9c00ff807919d730a63fa26b0",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py",
+    "class": "ClickHouseRawKlineWriter",
+    "method": "_to_bybit_raw",
+    "line": 194,
+    "signature": "self, row: CandleWithMeta",
+    "returns": "Mapping[str, Any]",
+    "body_sha256": "07d8a10e01fc7707d18b30ee4456f9f48d1b539d1ed67e98f228935c77a60ee5",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_instruments_writer.py",
+    "class": "ClickHouseInstrumentRefWriter",
+    "method": "__init__",
+    "line": 21,
+    "signature": "self, *, gateway: ClickHouseGateway, database: str",
+    "returns": "None",
+    "body_sha256": "3bd1f672ead8d2f038ae9b11ce43edf864a2b8a9e4e5978c9818da6527220211",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_instruments_writer.py",
+    "class": "ClickHouseInstrumentRefWriter",
+    "method": "existing_latest",
+    "line": 48,
+    "signature": "self, *, market_id: MarketId, symbols: Sequence[Symbol]",
+    "returns": "Mapping[str, tuple[str, int]]",
+    "body_sha256": "d967dd17fd8f4becdfd0c7b4caabd7e5caca7cff7f447d2a4828ffecaab816bb",
+    "sql_fragments": [
+      "\n        Read latest status/tradable flags for one market-symbol set.\n\n        Parameters:\n        - market_id: market id filter.\n        - symbols: symbols to fetch.\n\n        Returns:\n        - Mapping `symbol -> (status, is_tradable)`.\n\n        Assumptions/Invariants:\n        - Empty symbol input returns empty mapping without querying storage.\n\n        Errors/Exceptions:\n        - Propagates gateway query errors.\n\n        Side effects:\n        - Executes one ClickHouse SELECT query when symbols are provided.\n        ",
+      "\n            SELECT\n                symbol,\n                status,\n                is_tradable\n            FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_instruments_writer.py",
+    "class": "ClickHouseInstrumentRefWriter",
+    "method": "upsert",
+    "line": 108,
+    "signature": "self, rows: Iterable[InstrumentRefUpsert]",
+    "returns": "None",
+    "body_sha256": "36aa29bf97a2f971822e9c796f4547bcfaaec343f15e003d6a9aa195a5fcc7de",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_instruments_writer.py",
+    "class": "ClickHouseInstrumentRefWriter",
+    "method": "existing_latest_enrichment",
+    "line": 140,
+    "signature": "self, *, market_id: MarketId, symbols: Sequence[Symbol]",
+    "returns": "Mapping[str, InstrumentRefEnrichmentSnapshot]",
+    "body_sha256": "af6fd607c05cd0f004486d8a13b6f408ad9af4dc5981fe53a3467821e6517f3c",
+    "sql_fragments": [
+      "\n        Read latest enrichment fields for one market-symbol set.\n\n        Parameters:\n        - market_id: market id filter.\n        - symbols: symbols to fetch.\n\n        Returns:\n        - Mapping `symbol -> InstrumentRefEnrichmentSnapshot`.\n\n        Assumptions/Invariants:\n        - Empty symbol input returns empty mapping without storage queries.\n\n        Errors/Exceptions:\n        - Propagates gateway query errors.\n\n        Side effects:\n        - Executes one ClickHouse SELECT query when symbols are provided.\n        ",
+      "\n            SELECT\n                symbol,\n                status,\n                is_tradable,\n                base_asset,\n                quote_asset,\n                price_step,\n                qty_step,\n                min_notional\n            FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_instruments_writer.py",
+    "class": "ClickHouseInstrumentRefWriter",
+    "method": "upsert_enrichment",
+    "line": 217,
+    "signature": "self, rows: Iterable[InstrumentRefEnrichmentUpsert]",
+    "returns": "None",
+    "body_sha256": "ba508e50ad0cf4b9983ea082cb57cadf197fb83564a033547903f18f9e0a2983",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_market_writer.py",
+    "class": "ClickHouseMarketRefWriter",
+    "method": "__init__",
+    "line": 14,
+    "signature": "self, *, gateway: ClickHouseGateway, database: str",
+    "returns": "None",
+    "body_sha256": "51a27112d05934d0c9494b294974f71083cf4b274c448854783769fa49de4fe0",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_market_writer.py",
+    "class": "ClickHouseMarketRefWriter",
+    "method": "existing_market_ids",
+    "line": 22,
+    "signature": "self, ids: Iterable[MarketId]",
+    "returns": "set[int]",
+    "body_sha256": "75592f2570915dd91aeb40833f677ff6a94ca6663b40f21288a176c28e07b1bb",
+    "sql_fragments": [
+      "\n            SELECT market_id\n            FROM "
+    ]
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_market_writer.py",
+    "class": "ClickHouseMarketRefWriter",
+    "method": "insert",
+    "line": 41,
+    "signature": "self, rows: Iterable[RefMarketRow]",
+    "returns": "None",
+    "body_sha256": "d4c24d97359e9574710506c621ed9cf60873547a8d2626f61617c693360702f7",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/dto/live_tail_repair.py",
+    "class": "CandleRepairSourceAttempt",
+    "method": "__post_init__",
+    "line": 48,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "da54fbfced2d83d28b83dc2d96bfa3a22772e544868075332188af423b4d6141",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/dto/live_tail_repair.py",
+    "class": "ClosedCandleTailRow",
+    "method": "__post_init__",
+    "line": 67,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "afbc9e3b083a5cc14ca9c5e8da12d0b7e8a2597bafb98b9c9b89fac31eb5cdc7",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/dto/live_tail_repair.py",
+    "class": "ClosedCandleTailRow",
+    "method": "ts_open",
+    "line": 73,
+    "signature": "self",
+    "returns": "UtcTimestamp",
+    "body_sha256": "2bbd93c768db66f2bc87c23f5edbe3e06e251216c9ddf4fe26092089616495ad",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/dto/live_tail_repair.py",
+    "class": "ClosedCandleTailRepairPolicy",
+    "method": "__post_init__",
+    "line": 92,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "8eec4afd57e2943f077e62d35b0390a949e75d799005c83de58cfd1bdff4e1dc",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/dto/live_tail_repair.py",
+    "class": "ClosedCandleTailResult",
+    "method": "__post_init__",
+    "line": 126,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "c46bae28cefe5c5ab5a528645fcb0f470b655944f2ca0e2379d732684142c1fc",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/dto/live_tail_repair.py",
+    "class": "ClosedCandleTailResult",
+    "method": "continuous",
+    "line": 172,
+    "signature": "self",
+    "returns": "bool",
+    "body_sha256": "e6eeae676add6214f78a3ac455df19542698d4872e065ea895aa82f553d18e6e",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/dto/live_tail_repair.py",
+    "class": "ClosedCandleTailResult",
+    "method": "restored_ts_opens",
+    "line": 178,
+    "signature": "self",
+    "returns": "tuple[UtcTimestamp, ...]",
+    "body_sha256": "a8ab77b5d6a4024f3de66163b90af487c6c06848cf5f85175c7bfe170c732197",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/dto/live_tail_repair.py",
+    "class": "MarketDataCandleRepairAuditEvent",
+    "method": "__post_init__",
+    "line": 201,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "a00adbe428a00274e53c751268a63208487a05713463f7a2c978843a8073e6b4",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/btcusdt_market_readiness_reader.py",
+    "class": "BTCUSDTMarketReadinessReferenceReader",
+    "method": "list_btcusdt_reference_rows",
+    "line": 11,
+    "signature": "self",
+    "returns": "Sequence[BTCUSDTMarketReferenceSnapshot]",
+    "body_sha256": "51e88cf26a74d07b6290aa10901ed9e5bd93de694b7d2d6e1ad9eae19cddf943",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/candle_repair_audit_repository.py",
+    "class": "CandleRepairAuditRepository",
+    "method": "record",
+    "line": 14,
+    "signature": "self, *, event: MarketDataCandleRepairAuditEvent",
+    "returns": "MarketDataCandleRepairAuditEvent",
+    "body_sha256": "0d3cd17294735d804c06a5d19624a4709cbf0201a7d1815311f77ae6f824c8a8",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/candle_repair_audit_repository.py",
+    "class": "CandleRepairAuditRepository",
+    "method": "get_by_id",
+    "line": 24,
+    "signature": "self, *, event_id: UUID",
+    "returns": "MarketDataCandleRepairAuditEvent | None",
+    "body_sha256": "0c813551f9ec7c22a3643d27bff3388eeb08ec8c48f3205245deef74664d5ce6",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/candle_repair_audit_repository.py",
+    "class": "CandleRepairAuditRepository",
+    "method": "list_for_correlation",
+    "line": 30,
+    "signature": "self, *, correlation_id: str",
+    "returns": "tuple[MarketDataCandleRepairAuditEvent, ...]",
+    "body_sha256": "f99d90443ac5073ac65521a0434317bf0063de3ab05bb7a02f01cbd440d0e7e3",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/canonical_candle_index_reader.py",
+    "class": "CanonicalCandleIndexReader",
+    "method": "bounds",
+    "line": 27,
+    "signature": "self, instrument_id: InstrumentId",
+    "returns": "tuple[UtcTimestamp, UtcTimestamp] | None",
+    "body_sha256": "2b3dafca18585672935f92377f3ee50eaa519ca4ccc0844dc2384d0f0ca1e4bf",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/canonical_candle_index_reader.py",
+    "class": "CanonicalCandleIndexReader",
+    "method": "bounds_1m",
+    "line": 30,
+    "signature": "self, *, instrument_id: InstrumentId, before: UtcTimestamp",
+    "returns": "tuple[UtcTimestamp | None, UtcTimestamp | None]",
+    "body_sha256": "2d8b2bf9940556ccc04855b591c1ab71b753b44061fa238d4c8ba5fa1b8a7b09",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/canonical_candle_index_reader.py",
+    "class": "CanonicalCandleIndexReader",
+    "method": "max_ts_open_lt",
+    "line": 48,
+    "signature": "self, *, instrument_id: InstrumentId, before: UtcTimestamp, after: UtcTimestamp | None=None",
+    "returns": "UtcTimestamp | None",
+    "body_sha256": "633306b753adc03bfd3ca00d3a59ee3362581d3c4e1d9b6a0c7203050c984db6",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/canonical_candle_index_reader.py",
+    "class": "CanonicalCandleIndexReader",
+    "method": "daily_counts",
+    "line": 57,
+    "signature": "self, *, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "Sequence[DailyTsOpenCount]",
+    "body_sha256": "167a11209c7d11bc496c13966181bd7238b2d13f1467c4df0bc3752eb03f5b66",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/canonical_candle_index_reader.py",
+    "class": "CanonicalCandleIndexReader",
+    "method": "distinct_ts_opens",
+    "line": 60,
+    "signature": "self, *, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "Sequence[UtcTimestamp]",
+    "body_sha256": "0b8816b7c95f6a1d21c296439aca22efb3e6cddbd6dd97165ed48adb719b7a60",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/canonical_candle_reader.py",
+    "class": "CanonicalCandleReader",
+    "method": "read_1m",
+    "line": 31,
+    "signature": "self, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "Iterator[CandleWithMeta]",
+    "body_sha256": "8d1dce25e4d20e57fca4a0f0e098785e2dc416898b0c2bae22c3d13e448cf5f4",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/canonical_candle_reader.py",
+    "class": "CanonicalCandleReader",
+    "method": "read_1m_arrays",
+    "line": 38,
+    "signature": "self, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "CanonicalCandleBatch1m",
+    "body_sha256": "00bfcce3e5124ad8c94a6236ac947e195f5ea45dc4a2df20119de5e4b86121bc",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/catalog_coverage_reader.py",
+    "class": "CatalogCoverageReader",
+    "method": "counts",
+    "line": 8,
+    "signature": "self, *, market_ids: Sequence[int], start_at: datetime, end_at: datetime",
+    "returns": "Mapping[tuple[int, str], int]",
+    "body_sha256": "9f515b6262876a739ea11135c5d99d25f51676323b92f4905f5cadec781a37b1",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/catalog_coverage_reader.py",
+    "class": "CatalogCoverageReader",
+    "method": "latest",
+    "line": 12,
+    "signature": "self, *, market_id: int, symbol: str, before: datetime",
+    "returns": "datetime | None",
+    "body_sha256": "3c6a2c1b148734d6f880edcdc8303700fc116b82ea35e6579b2aa906007ac66e",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/catalog_snapshot_writer.py",
+    "class": "CatalogSnapshotWriter",
+    "method": "publish",
+    "line": 11,
+    "signature": "self, *, market_ids: Sequence[MarketId], rows: Sequence[InstrumentRefEnrichmentUpsert], refreshed_at: datetime",
+    "returns": "None",
+    "body_sha256": "c1a4afb3cb73afa453bc7c76559f69526ac34ef03a1e5654e63574d8c44a5eca",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/enabled_instrument_reader.py",
+    "class": "EnabledInstrumentReader",
+    "method": "list_enabled_tradable",
+    "line": 20,
+    "signature": "self",
+    "returns": "Sequence[InstrumentId]",
+    "body_sha256": "3ef261d7690c939b2d043bae531e9f6c5221b6ee0e50d80624e12308558086b7",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/enabled_market_reader.py",
+    "class": "EnabledMarketReader",
+    "method": "list_enabled_markets",
+    "line": 21,
+    "signature": "self",
+    "returns": "Sequence[EnabledMarketReference]",
+    "body_sha256": "b10f4a4767cfdf88f6b60bc0a6b24c007f79f4b0193affc32ba93086b8738d14",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/enabled_tradable_instrument_search_reader.py",
+    "class": "EnabledTradableInstrumentSearchReader",
+    "method": "search_enabled_tradable_by_market",
+    "line": 22,
+    "signature": "self, *, market_id: MarketId, symbol_prefix: str | None, limit: int",
+    "returns": "Sequence[InstrumentId]",
+    "body_sha256": "298f6fabe203ae4a1b8ed183c22a3be90a77ccc546cc4e1d9ded4f497160f495",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/funding_instrument_universe_store.py",
+    "class": "FundingInstrumentUniverseStore",
+    "method": "upsert_funding_instruments",
+    "line": 10,
+    "signature": "self, rows: Sequence[FundingInstrument]",
+    "returns": "None",
+    "body_sha256": "20099c0a7497078f52f7622b0d44f071d932b99f4fb695a7e175897e71365306",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/funding_instrument_universe_store.py",
+    "class": "FundingInstrumentUniverseStore",
+    "method": "list_tradable_funding_instruments",
+    "line": 13,
+    "signature": "self, *, market_ids: Sequence[MarketId]",
+    "returns": "Sequence[FundingInstrument]",
+    "body_sha256": "c93bf25dc62119759d95255382bb45964c433dd12447d3d7b957c58b495e87de",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/funding_instrument_universe_store.py",
+    "class": "FundingInstrumentUniverseStore",
+    "method": "get_funding_instrument",
+    "line": 20,
+    "signature": "self, instrument_id: InstrumentId",
+    "returns": "FundingInstrument | None",
+    "body_sha256": "7c29c3c8409988fda86d2f76e97299b63488e095e6093765a4927764b77c6bfa",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/funding_rate_coverage_reader.py",
+    "class": "FundingRateArtifactRecord",
+    "method": "__post_init__",
+    "line": 21,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "47b2cc75528dde63e48e64cbabcc8e8ecfa8d96372a0b7f401ef95d0aa8d1d64",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/funding_rate_coverage_reader.py",
+    "class": "FundingRateCoverageSnapshot",
+    "method": "__post_init__",
+    "line": 49,
+    "signature": "self",
+    "returns": "None",
+    "body_sha256": "162bc630c76d2e2f60fd17479e5ab4e93c385e016b88b7fefdcb71ba27515788",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/funding_rate_coverage_reader.py",
+    "class": "FundingRateCoverageReader",
+    "method": "read_funding_coverage",
+    "line": 73,
+    "signature": "self, *, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "FundingRateCoverageSnapshot",
+    "body_sha256": "152ec2066cb22285389ef694a978a35022420102dc09fc1eb316e4e63f2617e3",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/funding_rate_writer.py",
+    "class": "FundingRateWriter",
+    "method": "write_funding_rates",
+    "line": 10,
+    "signature": "self, rows: Sequence[FundingRateRecord]",
+    "returns": "None",
+    "body_sha256": "3d5be9386c0d1661746c70a0d625f8a1289f25a0192ae52cbddb276ddf266a78",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/funding_rate_writer.py",
+    "class": "FundingRateWriter",
+    "method": "latest_funding_time",
+    "line": 13,
+    "signature": "self, instrument_id: InstrumentId",
+    "returns": "UtcTimestamp | None",
+    "body_sha256": "e3ee26251315003c37aa8344c8abb2e8830dbf3dbe11e9ca291123cca59d7845",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/history_coverage_reader.py",
+    "class": "HistoryCoverageReader",
+    "method": "counts",
+    "line": 10,
+    "signature": "self, *, starts: Mapping[tuple[int, str], datetime], end_at: datetime",
+    "returns": "Mapping[tuple[int, str], int]",
+    "body_sha256": "2979700ea7326efdb48f7cfd25f5a6c6e41c574701a58d69151314efd22c66cb",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/history_coverage_reader.py",
+    "class": "HistoryCoverageReader",
+    "method": "source_absent_counts",
+    "line": 14,
+    "signature": "self, *, starts: Mapping[tuple[int, str], datetime], end_at: datetime",
+    "returns": "Mapping[tuple[int, str], int]",
+    "body_sha256": "3705070eb1f9b57ef86f1b8d2e6c10693f7aee779426262ed8292e6570232f9d",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/history_coverage_reader.py",
+    "class": "HistoryCoverageReader",
+    "method": "first_gap",
+    "line": 18,
+    "signature": "self, *, instrument_id: InstrumentId, time_range: TimeRange",
+    "returns": "TimeRange | None",
+    "body_sha256": "ff683dde6021f365e39d8a2399a80c454a1196a16a5d55664e1246eb7e655832",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/history_range_verifier.py",
+    "class": "HistoryRangeVerifier",
+    "method": "confirm",
+    "line": 10,
+    "signature": "self, *, instrument_id: InstrumentId, time_range: TimeRange, observed_minutes: set[int], observed_at: datetime, accept_absence: bool, check_lease: Callable[[], None]",
+    "returns": "None",
+    "body_sha256": "95abe7c867b4dd3d1cb725b9d8184659ad3a3f4df7df84ecc6a269843da4bda9",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/instrument_ref_writer.py",
+    "class": "InstrumentRefWriter",
+    "method": "existing_latest",
+    "line": 15,
+    "signature": "self, *, market_id: MarketId, symbols: Sequence[Symbol]",
+    "returns": "Mapping[str, tuple[str, int]]",
+    "body_sha256": "8f0122d43304cdce246c8b0bf00b94c1ca58eda76751065e96d5865a99f21168",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/instrument_ref_writer.py",
+    "class": "InstrumentRefWriter",
+    "method": "upsert",
+    "line": 29,
+    "signature": "self, rows: Iterable[InstrumentRefUpsert]",
+    "returns": "None",
+    "body_sha256": "28546dcdf98504d440c58ffb8849a93a58462d4634b95e811506957fae4c53a0",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/instrument_ref_writer.py",
+    "class": "InstrumentRefWriter",
+    "method": "existing_latest_enrichment",
+    "line": 41,
+    "signature": "self, *, market_id: MarketId, symbols: Sequence[Symbol]",
+    "returns": "Mapping[str, InstrumentRefEnrichmentSnapshot]",
+    "body_sha256": "9435cc59c85e507c6f6d978ed4cedc5a16dae4e0d0076182c63041ab5339c917",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/instrument_ref_writer.py",
+    "class": "InstrumentRefWriter",
+    "method": "upsert_enrichment",
+    "line": 59,
+    "signature": "self, rows: Iterable[InstrumentRefEnrichmentUpsert]",
+    "returns": "None",
+    "body_sha256": "1a2bfa0bd2a4e80066a6618f77e036a6692c5bd989791e76dfdf833ee1e442c5",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/market_ref_writer.py",
+    "class": "MarketRefWriter",
+    "method": "existing_market_ids",
+    "line": 10,
+    "signature": "self, ids: Iterable[MarketId]",
+    "returns": "set[int]",
+    "body_sha256": "242ffe42b20a26e03a7ae0fcf70b8df426ce081214131fb4fedc43ef89f0a12b",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/market_ref_writer.py",
+    "class": "MarketRefWriter",
+    "method": "insert",
+    "line": 13,
+    "signature": "self, rows: Iterable[RefMarketRow]",
+    "returns": "None",
+    "body_sha256": "3b1aa3e929609d93e34a926b24322d9c1484e20b7a5173affed53cf0622223e2",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/raw_kline_writer.py",
+    "class": "RawKlineWriter",
+    "method": "write_1m",
+    "line": 24,
+    "signature": "self, rows: Iterable[CandleWithMeta]",
+    "returns": "None",
+    "body_sha256": "2f7da852a2fda082d25770f382911da73c2ecc4286825a02bbcfe7b99127935b",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "RecoveryEntry",
+    "method": "task_key",
+    "line": 31,
+    "signature": "self",
+    "returns": "str",
+    "body_sha256": "0560fe36c25bc9da1d12a290b9cdac69708342435a568daeb7d3f85181603598",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "StreamRecoveryStore",
+    "method": "remember",
+    "line": 36,
+    "signature": "self, task: RestFillTask",
+    "returns": "RecoveryEntry",
+    "body_sha256": "ad76a833f888f81475562b33f0b54d11d4cc5378b712c9ccbf655d4ea474a93f",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "StreamRecoveryStore",
+    "method": "pending",
+    "line": 37,
+    "signature": "self",
+    "returns": "list[RecoveryEntry]",
+    "body_sha256": "fa5126eb33eeac165e671935bb02a85378852cc529f2c4d1f6e654fc7f0384a9",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "StreamRecoveryStore",
+    "method": "advance",
+    "line": 38,
+    "signature": "self, entry: RecoveryEntry, *, start_at: datetime",
+    "returns": "None",
+    "body_sha256": "783b422d91cd30e411b1fc0a37020d6a2a03f2ec34e1f95671ebcefb7362af5f",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "StreamRecoveryStore",
+    "method": "complete",
+    "line": 39,
+    "signature": "self, entry: RecoveryEntry",
+    "returns": "None",
+    "body_sha256": "ebf3a78a92d66f221d8f9a26532f9bcc94039dfa60dee51070db7006d79dfc8e",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "StreamRecoveryStore",
+    "method": "complete_many",
+    "line": 40,
+    "signature": "self, entries: list[RecoveryEntry]",
+    "returns": "None",
+    "body_sha256": "3e8a0d20ad7a813cee5bffa2ea5edb95ae582d70f5cc1a7130944f31ea4cd1f3",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "StreamRecoveryStore",
+    "method": "retry",
+    "line": 41,
+    "signature": "self, entry: RecoveryEntry, *, next_retry_at: datetime, code: str",
+    "returns": "None",
+    "body_sha256": "336b4fa7dccfcec686382dd16b1f8af45734ca0b568c7c37685192537a12897b",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "StreamRecoveryStore",
+    "method": "fail_many",
+    "line": 42,
+    "signature": "self, entries: list[RecoveryEntry], *, code: str",
+    "returns": "None",
+    "body_sha256": "a0221cad8100fcd3fd8c3772b1319e6e8ebae233f60633fba3e58ec76513c444",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "StreamRecoveryStore",
+    "method": "fail",
+    "line": 43,
+    "signature": "self, entry: RecoveryEntry, *, code: str",
+    "returns": "None",
+    "body_sha256": "ee78ea85cb679cf6c8622ac110fcd423b07657ad28348d90a366c11c292942ab",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "AsyncStreamRecoveryStore",
+    "method": "remember_many",
+    "line": 49,
+    "signature": "self, tasks: list[RestFillTask]",
+    "returns": "list[RecoveryEntry]",
+    "body_sha256": "7913c4ccfb75271062030d5906eb7a376b79391207c1d3680eccff6b898c68b4",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "AsyncStreamRecoveryStore",
+    "method": "pending",
+    "line": 50,
+    "signature": "self",
+    "returns": "list[RecoveryEntry]",
+    "body_sha256": "407050d15b6bd450c497fd29add098e002b9611989b1533f37209fe727c9a437",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "AsyncStreamRecoveryStore",
+    "method": "failed_history_repairs",
+    "line": 51,
+    "signature": "self",
+    "returns": "list[RecoveryEntry]",
+    "body_sha256": "7c386960beb68abd1650e562152357ed98b31e990445858fedaffdd77943597e",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "AsyncStreamRecoveryStore",
+    "method": "advance",
+    "line": 52,
+    "signature": "self, entry: RecoveryEntry, *, start_at: datetime",
+    "returns": "None",
+    "body_sha256": "b79813a37e0539cc023fcae7fd26b011c24f60c28a125857e52b104361a28a93",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "AsyncStreamRecoveryStore",
+    "method": "complete",
+    "line": 53,
+    "signature": "self, entry: RecoveryEntry",
+    "returns": "None",
+    "body_sha256": "b41dbc29ac56d82778653fd02cc9ba57b1c8777cee24cb72ed4015e5c9ace8cd",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "AsyncStreamRecoveryStore",
+    "method": "complete_many",
+    "line": 54,
+    "signature": "self, entries: list[RecoveryEntry]",
+    "returns": "None",
+    "body_sha256": "a37f360db276c05a6c539dad24a612645a6113948a25c82e675870e5108cc916",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "AsyncStreamRecoveryStore",
+    "method": "retry",
+    "line": 55,
+    "signature": "self, entry: RecoveryEntry, *, next_retry_at: datetime, code: str",
+    "returns": "None",
+    "body_sha256": "9b823155a1c9412fccd7aa0c0dd03d7a24cc6b681d0b8df75e59cfaaf22673f2",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "AsyncStreamRecoveryStore",
+    "method": "fail_many",
+    "line": 56,
+    "signature": "self, entries: list[RecoveryEntry], *, code: str",
+    "returns": "None",
+    "body_sha256": "0477574d414134baa48de2806b2772fa8daecb1a81863ce48f3805bb53a71221",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/market_data/application/ports/stores/stream_recovery_store.py",
+    "class": "AsyncStreamRecoveryStore",
+    "method": "fail",
+    "line": 57,
+    "signature": "self, entry: RecoveryEntry, *, code: str",
+    "returns": "None",
+    "body_sha256": "4e1dd4b253a87d5631a42d13f3ca28f523dcb0225a9d133139d15ee6682ef455",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/operations/backup_contracts.py",
+    "class": "InstallationCaptureRecord",
+    "method": "_validate_capture",
+    "line": 94,
+    "signature": "self",
+    "returns": "InstallationCaptureRecord",
+    "body_sha256": "18547f305e811a6ee2d21ee39a37915cdef91352560e4454a94db8b4f9319992",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/operations/backup_contracts.py",
+    "class": "ReleaseTransitionRule",
+    "method": "_validate_transition",
+    "line": 123,
+    "signature": "self",
+    "returns": "ReleaseTransitionRule",
+    "body_sha256": "3f7902b9cba58d7f3d603f23d4bd29796d831a0cec1ed3c0fda69aad785e9f74",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/operations/backup_contracts.py",
+    "class": "InstallationReleasePolicy",
+    "method": "_validate_transitions",
+    "line": 147,
+    "signature": "self",
+    "returns": "InstallationReleasePolicy",
+    "body_sha256": "ce181e9ed967ffe567a90bfe7475221cef7ed71145500fd065528244a5124d68",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/operations/backup_contracts.py",
+    "class": "InstallationReleasePolicy",
+    "method": "require_transition",
+    "line": 156,
+    "signature": "self, *, from_release: str, to_release: str",
+    "returns": "ReleaseTransitionRule",
+    "body_sha256": "46c8229bd560445fbf0288e423ad0e8775a6bb8df2ce2a11ddc6ffa76b67fe24",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/operations/backup_contracts.py",
+    "class": "InstallationBackupPolicy",
+    "method": "_validate_policy",
+    "line": 201,
+    "signature": "self",
+    "returns": "InstallationBackupPolicy",
+    "body_sha256": "73aec1a408dbece6972d891c60d989c737cddf39eaedd1b3881407fa406daca4",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/operations/backup_contracts.py",
+    "class": "InstallationBackupManifest",
+    "method": "_validate_coverage",
+    "line": 283,
+    "signature": "self",
+    "returns": "InstallationBackupManifest",
+    "body_sha256": "9b6b72dc3a80628d4b0e28ed7615a6529e6ab45ad295acae92a594076ffad87d",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/operations/backup_contracts.py",
+    "class": "InstallationBackupManifest",
+    "method": "canonical_bytes",
+    "line": 302,
+    "signature": "self",
+    "returns": "bytes",
+    "body_sha256": "b25b3994329e49fe2ba3024bdea2fa54c288746fe1de2bc5a124e21a065a7811",
+    "sql_fragments": []
+  },
+  {
+    "path": "src/trading/contexts/operations/backup_contracts.py",
+    "class": "InstallationBackupManifest",
+    "method": "manifest_sha256",
+    "line": 307,
+    "signature": "self",
+    "returns": "str",
+    "body_sha256": "0315a96c906f5b973c78f504b23f6701ec4941c1bba7a008030c6ddd27fa0ecc",
+    "sql_fragments": []
+  },
+  {
+    "path": "tests/unit/contexts/backtest_artifacts/test_automatic_base.py",
+    "class": "Source",
+    "method": "__init__",
+    "line": 49,
+    "signature": "self, minutes, missing=(), offset=0",
+    "returns": null,
+    "body_sha256": "b3525e7c4413c00cc98d1da655853a19455ce9d5c64d4724454d325fa323e546",
+    "sql_fragments": []
+  },
+  {
+    "path": "tests/unit/contexts/backtest_artifacts/test_automatic_base.py",
+    "class": "Source",
+    "method": "read_1m_arrays",
+    "line": 61,
+    "signature": "self, instrument_id, time_range",
+    "returns": null,
+    "body_sha256": "fc0ed3a30fbe8872b3cf03bca41bf50458811de7452d2d60c10cc2fc8a53276a",
+    "sql_fragments": []
+  },
+  {
+    "path": "tests/unit/contexts/backtest_artifacts/test_automatic_base.py",
+    "class": "Source",
+    "method": "read_1m",
+    "line": 68,
+    "signature": "self, instrument_id, time_range",
+    "returns": null,
+    "body_sha256": "8cb4c51666c4825533c044e7e5b4c4b1fb8e3a398602a7ae999c08caa9f23007",
+    "sql_fragments": []
+  },
+  {
+    "path": "tests/unit/contexts/backtest_artifacts/test_automatic_base.py",
+    "class": "Funding",
+    "method": "read_funding_coverage",
+    "line": 284,
+    "signature": "self, *, instrument_id, time_range",
+    "returns": null,
+    "body_sha256": "c16fb618a37cccd30aa002ca9091f47fe50c570b0db340f6136d74fb08f3f059",
+    "sql_fragments": []
+  },
+  {
+    "path": "tests/unit/contexts/backtest_artifacts/test_automatic_base.py",
+    "class": "EmptyFunding",
+    "method": "read_funding_coverage",
+    "line": 326,
+    "signature": "self, *, instrument_id, time_range",
+    "returns": null,
+    "body_sha256": "1183f6ac0a32ebe339ff2ed8cd1ca40ef1d59e0bcc2d391c62a9f0113b0446f2",
+    "sql_fragments": []
+  }
+]

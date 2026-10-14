@@ -1,0 +1,50 @@
+[
+  {
+    "source": "tools/qa/postgres_storage_prototype.py",
+    "evidence": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/immutable-prototype/postgres_storage_prototype.py.evidence",
+    "sha256": "f7ac80c972031110c1dc5bdf2568a01d9ad54a6894111a8c115df1c47108e957",
+    "bytes": 29922
+  },
+  {
+    "source": "tools/qa/test_postgres_storage_prototype.py",
+    "evidence": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/immutable-prototype/test_postgres_storage_prototype.py.evidence",
+    "sha256": "9d0ac46962e3410938c143a5c1cc61aefa8eea5f29076f78fbbb2f2100ee67c0",
+    "bytes": 1503
+  },
+  {
+    "source": ".local_artifacts/pg-comparison-20261013/report.html",
+    "evidence": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/immutable-prototype/report.html.evidence",
+    "sha256": "4a6d3380557d9b70626463b89ab596584ed313d7f829959d2315c76b810ed8ad",
+    "bytes": 17719
+  },
+  {
+    "source": ".local_artifacts/pg-comparison-20261013/summary.json",
+    "evidence": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/immutable-prototype/summary.json.evidence",
+    "sha256": "22450ae5ff99bd4069dd44641545f08fa71c698960e05c07e0d26d198e4f7c36",
+    "bytes": 20613
+  },
+  {
+    "source": ".local_artifacts/pg-comparison-20261013/measurement-contract.json",
+    "evidence": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/immutable-prototype/measurement-contract.json.evidence",
+    "sha256": "6e501cf8dcd50cca5c47dd8dca83d20f663403da54258ba430ddba2e333e9c9c",
+    "bytes": 2945
+  },
+  {
+    "source": ".local_artifacts/pg-comparison-20261013/snapshot.json",
+    "evidence": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/immutable-prototype/snapshot.json.evidence",
+    "sha256": "552d38d82ca568012f0787e5571901a46ca14a310a2dff84fda2f896bd0c31af",
+    "bytes": 17206
+  },
+  {
+    "source": ".local_artifacts/pg-comparison-20261013/measured-harness.py",
+    "evidence": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/immutable-prototype/measured-harness.py.evidence",
+    "sha256": "b33c4a0564719aca8f29f3b5b32d299be099514db88ea3eda82cf0a2bb0ef1fb",
+    "bytes": 29380
+  },
+  {
+    "source": ".local_artifacts/pg-comparison-20261013/verification.json",
+    "evidence": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/immutable-prototype/verification.json.evidence",
+    "sha256": "c172cb7c234e3f1d09bbe6aaeee03ca8f52db615fe6dda02a4444ca5e2771a0c",
+    "bytes": 578
+  }
+]

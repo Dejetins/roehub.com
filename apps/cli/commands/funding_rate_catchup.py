@@ -8,10 +8,7 @@ from pathlib import Path
 from typing import Sequence
 from uuid import uuid4
 
-from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
-    ClickHouseSettingsLoader,
-    _clickhouse_client,
-)
+from apps.cli.wiring.db.postgres import market_gateway
 from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
 from trading.contexts.market_data.adapters.outbound.clients.funding_rate_history_source import (
     RestFundingRateHistorySource,
@@ -22,11 +19,8 @@ from trading.contexts.market_data.adapters.outbound.config.instrument_key import
 from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
     load_market_data_runtime_config,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.funding_rate_store import (  # noqa: E501
-    ClickHouseFundingRateStore,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
-    ClickHouseConnectGateway,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.funding_rate_store import (
+    PostgresFundingRateStore,
 )
 from trading.contexts.market_data.application.dto import FundingInstrument
 from trading.contexts.market_data.application.use_cases import (
@@ -53,10 +47,8 @@ class FundingRateCatchupCli:
         clock = SystemClock()
         http = RequestsHttpClient.from_config(cfg, os.environ)
         try:
-
-            settings = ClickHouseSettingsLoader(os.environ).load()
-            gateway = ClickHouseConnectGateway(_clickhouse_client(settings))
-            store = ClickHouseFundingRateStore(gateway=gateway, database=settings.database)
+            gateway = market_gateway(os.environ, workload="ingestion")
+            store = PostgresFundingRateStore(gateway=gateway)
             source = RestFundingRateHistorySource(
                 cfg=cfg,
                 http=http,
@@ -129,7 +121,7 @@ class FundingRateCatchupCli:
 def _load_or_build_instrument(
     *,
     cfg,
-    store: ClickHouseFundingRateStore,
+    store: PostgresFundingRateStore,
     clock: SystemClock,
     instrument_id: InstrumentId,
     funding_interval_minutes: int | None,

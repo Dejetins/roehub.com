@@ -1,10 +1,10 @@
 from .admission import (
-    DEFAULT_BACKTEST_TIER_ADMISSION_POLICIES,
+    DEFAULT_BACKTEST_RESOURCE_POLICY,
     BacktestAdmissionConfig,
     BacktestAdmissionService,
     BacktestFullJobQuotaSnapshot,
     BacktestLazyDetailQuotaSnapshot,
-    BacktestTierAdmissionPolicy,
+    BacktestResourcePolicy,
 )
 from .combo_planning import (
     BUILD_EXACT_CONTEXT_STAGE_NAME,
@@ -233,7 +233,7 @@ __all__ = [
     "COMPILED_PREFIX_PRODUCT_TRAVERSAL_V1_BACKEND",
     "DEFAULT_TP_SL_GRID_MATCH_ATOL",
     "DEFAULT_BACKTEST_RESULT_POINTS",
-    "DEFAULT_BACKTEST_TIER_ADMISSION_POLICIES",
+    "DEFAULT_BACKTEST_RESOURCE_POLICY",
     "DEFAULT_BACKTEST_TOP_N_V1",
     "DEFAULT_BACKTEST_TRADES_CSV_MAX_ROWS",
     "DEFAULT_BACKTEST_TRADES_PAGE_SIZE",
@@ -326,7 +326,7 @@ __all__ = [
     "BacktestTpSlHitTimesService",
     "BacktestTopResultAssemblyResult",
     "BacktestTopResultAssemblyService",
-    "BacktestTierAdmissionPolicy",
+    "BacktestResourcePolicy",
     "FUNDING_ADJUSTMENT_EXACT_GLOBAL_RANKING",
     "FUNDING_ADJUSTMENT_SCOPE",
     "FUNDING_ADJUSTMENT_SCOPE_CANDIDATE_POOL",

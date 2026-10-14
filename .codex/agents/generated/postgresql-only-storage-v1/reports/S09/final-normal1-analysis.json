@@ -1,0 +1,3140 @@
+{
+  "name": "final-normal1",
+  "resource_boundary": "samples strictly inside timed window",
+  "declared_window": {
+    "start_utc": 1791948372.6680257,
+    "end_utc": 1791948672.6680257,
+    "duration_s": 300
+  },
+  "whole_driver_bounds": {
+    "pg_first_utc": 1791948370.0576568,
+    "pg_last_utc": 1791948681.9635384,
+    "server_first_utc": 1791948368.915329,
+    "server_last_utc": 1791948675.32673
+  },
+  "pg_sample_bounds_utc": [
+    1791948375.1086166,
+    1791948671.8996274
+  ],
+  "server_sample_bounds_utc": [
+    1791948374.0203588,
+    1791948670.199465
+  ],
+  "summary": {
+    "name": "final-normal1",
+    "mode": "normal",
+    "duration_requested_s": 300,
+    "window_start_utc": 1791948372.6680257,
+    "window_end_utc": 1791948672.6680257,
+    "wall_s": 300.2137592220024,
+    "client_cpu_s": 72.748948,
+    "client_maxrss_kib": 408328,
+    "stream_symbol": "S09S561B4E7F",
+    "history_symbol": "S09H561B4E7F",
+    "lanes": {
+      "catalog": {
+        "offered": 150,
+        "completed": 150,
+        "completed_in_window": 150,
+        "max_end_lag_s": 0.11292304699600209,
+        "last_queue_wait_s": 0.0004057620026287623,
+        "errors": 0,
+        "median_s": 0.05140035449585412,
+        "p95_s": 0.08144624375017881,
+        "max_s": 0.10478974999568891,
+        "max_queue_wait_s": 0.04838970499986317
+      },
+      "full": {
+        "offered": 30,
+        "completed": 30,
+        "completed_in_window": 30,
+        "max_end_lag_s": 4.801803030000883,
+        "last_queue_wait_s": 0.006080592000216711,
+        "errors": 0,
+        "median_s": 4.55810329349697,
+        "p95_s": 4.68344397310284,
+        "max_s": 4.695359543999075,
+        "max_queue_wait_s": 0.024376517998462077
+      },
+      "gap": {
+        "offered": 150,
+        "completed": 150,
+        "completed_in_window": 150,
+        "max_end_lag_s": 0.09817879700131016,
+        "last_queue_wait_s": 0.001854096000897698,
+        "errors": 0,
+        "median_s": 0.046074729500105605,
+        "p95_s": 0.07448238750184825,
+        "max_s": 0.09628591699583922,
+        "max_queue_wait_s": 0.04955584900017129
+      },
+      "history": {
+        "offered": 150,
+        "completed": 150,
+        "completed_in_window": 150,
+        "max_end_lag_s": 0.13879706300213002,
+        "last_queue_wait_s": 0.004704678998677991,
+        "errors": 0,
+        "median_s": 0.06473947899939958,
+        "p95_s": 0.09133667689820868,
+        "max_s": 0.1046976670040749,
+        "max_queue_wait_s": 0.012683684995863587
+      },
+      "hot": {
+        "offered": 300,
+        "completed": 300,
+        "completed_in_window": 300,
+        "max_end_lag_s": 0.1008004510003957,
+        "last_queue_wait_s": 0.0024469709969707765,
+        "errors": 0,
+        "median_s": 0.028011936996335862,
+        "p95_s": 0.08147942470350246,
+        "max_s": 0.09585095899819862,
+        "max_queue_wait_s": 0.04862891400262015
+      },
+      "http": {
+        "offered": 300,
+        "completed": 300,
+        "completed_in_window": 300,
+        "max_end_lag_s": 0.16315536500042072,
+        "last_queue_wait_s": 0.0012696379999397323,
+        "errors": 0,
+        "median_s": 0.08750554200378247,
+        "p95_s": 0.13203023329624558,
+        "max_s": 0.16233404199738288,
+        "max_queue_wait_s": 0.04410722399916267
+      },
+      "identity": {
+        "offered": 150,
+        "completed": 150,
+        "completed_in_window": 150,
+        "max_end_lag_s": 0.16159357399737928,
+        "last_queue_wait_s": 0.0033569709994480945,
+        "errors": 0,
+        "median_s": 0.1004536045002169,
+        "p95_s": 0.13378847980238787,
+        "max_s": 0.15309337499638787,
+        "max_queue_wait_s": 0.043585159997746814
+      },
+      "job": {
+        "offered": 60,
+        "completed": 60,
+        "completed_in_window": 60,
+        "max_end_lag_s": 0.2313713289986481,
+        "last_queue_wait_s": 0.0016102610024972819,
+        "errors": 0,
+        "median_s": 0.1660359170018637,
+        "p95_s": 0.21385603395174255,
+        "max_s": 0.2253026670005056,
+        "max_queue_wait_s": 0.016009295999538153
+      },
+      "latest": {
+        "offered": 300,
+        "completed": 300,
+        "completed_in_window": 300,
+        "max_end_lag_s": 0.11185868799657328,
+        "last_queue_wait_s": 0.00427667899930384,
+        "errors": 0,
+        "median_s": 0.02758981249644421,
+        "p95_s": 0.07889502979851387,
+        "max_s": 0.09975604200008092,
+        "max_queue_wait_s": 0.05008205799822463
+      },
+      "recovery": {
+        "offered": 150,
+        "completed": 150,
+        "completed_in_window": 150,
+        "max_end_lag_s": 0.1151380209994386,
+        "last_queue_wait_s": 0.004431096000189427,
+        "errors": 0,
+        "median_s": 0.0534219370019855,
+        "p95_s": 0.08112583164947863,
+        "max_s": 0.11141700100415619,
+        "max_queue_wait_s": 0.05216445699625183
+      },
+      "stream": {
+        "offered": 300,
+        "completed": 300,
+        "completed_in_window": 300,
+        "max_end_lag_s": 0.11652997900091577,
+        "last_queue_wait_s": 0.00011780399654526263,
+        "errors": 0,
+        "median_s": 0.043356937498174375,
+        "p95_s": 0.08384096424924792,
+        "max_s": 0.11462200000096345,
+        "max_queue_wait_s": 0.04740029700042214
+      },
+      "year": {
+        "offered": 30,
+        "completed": 30,
+        "completed_in_window": 30,
+        "max_end_lag_s": 0.7696925010022824,
+        "last_queue_wait_s": 0.01231450799969025,
+        "errors": 0,
+        "median_s": 0.6447895830024208,
+        "p95_s": 0.6903050588494807,
+        "max_s": 0.7497887089994038,
+        "max_queue_wait_s": 0.03471532399998978
+      }
+    },
+    "lifecycle_errors": []
+  },
+  "guardrails": {
+    "latest": {
+      "metric": "p95_s",
+      "limit_s": 0.1,
+      "actual_s": 0.07889502979851387,
+      "pass": true
+    },
+    "hot": {
+      "metric": "p95_s",
+      "limit_s": 0.1,
+      "actual_s": 0.08147942470350246,
+      "pass": true
+    },
+    "catalog": {
+      "metric": "p95_s",
+      "limit_s": 0.1,
+      "actual_s": 0.08144624375017881,
+      "pass": true
+    },
+    "gap": {
+      "metric": "p95_s",
+      "limit_s": 0.1,
+      "actual_s": 0.07448238750184825,
+      "pass": true
+    },
+    "stream": {
+      "metric": "p95_s",
+      "limit_s": 0.1,
+      "actual_s": 0.08384096424924792,
+      "pass": true
+    },
+    "history": {
+      "metric": "p95_s",
+      "limit_s": 0.25,
+      "actual_s": 0.09133667689820868,
+      "pass": true
+    },
+    "year": {
+      "metric": "median_s",
+      "limit_s": 2,
+      "actual_s": 0.6447895830024208,
+      "pass": true
+    },
+    "full": {
+      "metric": "p95_s",
+      "limit_s": 10,
+      "actual_s": 4.68344397310284,
+      "pass": true
+    }
+  },
+  "guardrails_pass": true,
+  "pool_wait_p95_s": 1.5879101192695084e-05,
+  "pool_wait_max_s": 0.00015208299737423658,
+  "server_cpu_seconds": 121.321006,
+  "server_mean_cores": 0.4096204068612885,
+  "server_memory_max_bytes": 2557616128,
+  "server_anon_max_bytes": 249036800,
+  "server_file_max_bytes": 2296324096,
+  "server_oom_delta": 0,
+  "client_cgroup_memory_max_bytes": 587300864,
+  "client_process_rss_sum_max_bytes": 489816064,
+  "pg_deltas": {
+    "checkpoint": {
+      "checkpoints_timed": 1.0,
+      "checkpoints_req": 0.0,
+      "checkpoint_write_time": 25494.0,
+      "checkpoint_sync_time": 28.0,
+      "buffers_checkpoint": 92.0,
+      "buffers_clean": 16926.0,
+      "maxwritten_clean": 82.0,
+      "buffers_backend": 37685.0,
+      "buffers_backend_fsync": 0.0,
+      "buffers_alloc": 7844482.0
+    },
+    "wal": {
+      "wal_records": 1027347.0,
+      "wal_fpi": 1557.0,
+      "wal_bytes": 185991764.0,
+      "wal_buffers_full": 0.0,
+      "wal_write": 1865.0,
+      "wal_sync": 1837.0,
+      "wal_write_time": 0.0,
+      "wal_sync_time": 0.0
+    },
+    "database": {
+      "numbackends": -1.0,
+      "xact_commit": 9072.0,
+      "xact_rollback": 0.0,
+      "blks_read": 8003977.0,
+      "blks_hit": 4744533.0,
+      "tup_returned": 144256957.0,
+      "tup_fetched": 132466983.0,
+      "tup_inserted": 364769.0,
+      "tup_updated": 7185.0,
+      "tup_deleted": 65173.0,
+      "conflicts": 0.0,
+      "temp_files": 0.0,
+      "temp_bytes": 0.0,
+      "deadlocks": 0.0,
+      "blk_read_time": 0.0,
+      "blk_write_time": 0.0,
+      "session_time": 3260012.3220000006,
+      "active_time": 122486.91500000004,
+      "idle_in_transaction_time": 88199.73499999987,
+      "sessions": 1693.0,
+      "sessions_abandoned": 0.0,
+      "sessions_fatal": 0.0,
+      "sessions_killed": 0.0
+    }
+  },
+  "disk_first": [
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_storage_commands",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "notification_provider_packages",
+      "heap_bytes": 8192,
+      "index_bytes": 49152,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_build_requests",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 8192
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_gc_candidates",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_model_activations",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_job_stage_a_shortlist",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_candle_repair_events",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_open_order_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_variant_compatibility_checks",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "identity_browser_devices",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "control_operation_audit_cursor",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_slot_ownership",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_manifest_entries",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_sessions",
+      "heap_bytes": 8192,
+      "index_bytes": 65536,
+      "total_bytes": 73728
+    },
+    {
+      "nspname": "public",
+      "family": "notification_telegram_binding_codes",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "rl_live_ticker_activations",
+      "heap_bytes": 0,
+      "index_bytes": 57344,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "market_data",
+      "family": "instrument_generations",
+      "heap_bytes": 24576,
+      "index_bytes": 32768,
+      "total_bytes": 98304
+    },
+    {
+      "nspname": "market_data",
+      "family": "verification_leases",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_signals",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_coordinator_owners",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "notification_telegram_update_cursors",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 8192
+    },
+    {
+      "nspname": "public",
+      "family": "execution_gateway_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_builds",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_leases",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "market_data",
+      "family": "raw_bybit_funding_rates",
+      "heap_bytes": 0,
+      "index_bytes": 1130496,
+      "total_bytes": 2260992
+    },
+    {
+      "nspname": "public",
+      "family": "identity_webauthn_credentials",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_instrument_history_bounds",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_attempts",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_publisher_keys",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "market_data",
+      "family": "coverage_rebuilds",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_storage_cooldown",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "notification_report_runs",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_work_events",
+      "heap_bytes": 81920,
+      "index_bytes": 139264,
+      "total_bytes": 253952
+    },
+    {
+      "nspname": "public",
+      "family": "identity_organizations",
+      "heap_bytes": 8192,
+      "index_bytes": 49152,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_training_runs",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_slot_readers",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_auth_challenges",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "market_data",
+      "family": "raw_binance_klines_1m",
+      "heap_bytes": 2945990656,
+      "index_bytes": 1058250752,
+      "total_bytes": 4008681472
+    },
+    {
+      "nspname": "market_data",
+      "family": "source_absent_candles_1m",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_manifests",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_oidc_auth_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "execution_fills",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "execution_order_events",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "execution_reconciliation_runs",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_catalog_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_execution_process_heartbeats",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_work_requests",
+      "heap_bytes": 98304,
+      "index_bytes": 131072,
+      "total_bytes": 270336
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_paper_scenario_coverage_results",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_plugin_packages",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_provider_windows",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "market_data",
+      "family": "candle_coverage_days",
+      "heap_bytes": 5578752,
+      "index_bytes": 1458176,
+      "total_bytes": 7077888
+    },
+    {
+      "nspname": "market_data",
+      "family": "ref_market",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_dataset_versions",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_instrument_selection_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_private_stream_sessions",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "job_runtime_jobs",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "notification_events",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_cadence",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_position_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "notification_telegram_recipient_bindings",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "execution_intents",
+      "heap_bytes": 0,
+      "index_bytes": 81920,
+      "total_bytes": 90112
+    },
+    {
+      "nspname": "market_data",
+      "family": "canonical_candles_1m",
+      "heap_bytes": 6429130752,
+      "index_bytes": 1076756480,
+      "total_bytes": 7511244800
+    },
+    {
+      "nspname": "public",
+      "family": "identity_installation_owners",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 8192
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_auth_rate_limits",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_storage_previews",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "market_data",
+      "family": "candle_coverage_summary",
+      "heap_bytes": 16384,
+      "index_bytes": 16384,
+      "total_bytes": 73728
+    },
+    {
+      "nspname": "public",
+      "family": "identity_user_profile_overrides",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "control_operation_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_live_profiles",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "market_data",
+      "family": "funding_instrument_universe",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_artifact_lifecycle_policies",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_paper_accounting",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_plugin_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_administrative_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_plugin_operations",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "identity_support_access_grants",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "execution_source_events",
+      "heap_bytes": 0,
+      "index_bytes": 57344,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "identity_invitations",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_stream_recovery",
+      "heap_bytes": 8192,
+      "index_bytes": 32768,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_plugin_installations",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_accounts",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_runs",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_account_config_guard_results",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_requests",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_object_locations",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "notification_delivery_attempts",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_memberships",
+      "heap_bytes": 8192,
+      "index_bytes": 32768,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_policies",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "market_data",
+      "family": "ref_instruments",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_integrations",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_credential_versions",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "identity_external_identities",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_org_blobs",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_users",
+      "heap_bytes": 8192,
+      "index_bytes": 40960,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "identity_plugin_permissions",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "execution_notification_outbox",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_balance_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_bootstrap_tickets",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_calibration_packs",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "notification_routes",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_variant_scenario_matrix_rows",
+      "heap_bytes": 0,
+      "index_bytes": 57344,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "execution_ledger_retention_policies",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_execution_request_observations",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "identity_installations",
+      "heap_bytes": 8192,
+      "index_bytes": 32768,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_recovery_codes",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_legacy_demands",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_telegram_channels",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 8192
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_events",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_exchange_keys",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_auth_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_position_ownership",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_installation_settings",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "rl_risk_sizing_policy_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "notification_provider_instances",
+      "heap_bytes": 8192,
+      "index_bytes": 57344,
+      "total_bytes": 73728
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_provider_permits",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_exchange_bindings",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_profiles",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "market_data",
+      "family": "raw_bybit_klines_1m",
+      "heap_bytes": 44933120,
+      "index_bytes": 16384000,
+      "total_bytes": 62709760
+    },
+    {
+      "nspname": "public",
+      "family": "paper_orders",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "alembic_version",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_model_registry_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_dispatch_state",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_pins",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_user_preferences",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_quotas",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 8192
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_events",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "identity_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "job_runtime_attempts",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "execution_kill_switch_state",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "execution_provider_allowlist",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "rl_risk_sizing_policies",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "execution_account_safety_state",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_job_top_variants",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "notification_telegram_updates",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_backtest_variant_provenance",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "market_data",
+      "family": "raw_binance_funding_rates",
+      "heap_bytes": 0,
+      "index_bytes": 1130496,
+      "total_bytes": 2260992
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_source_state",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "execution_funding_events",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "market_data",
+      "family": "canonical_funding_rates",
+      "heap_bytes": 0,
+      "index_bytes": 1130496,
+      "total_bytes": 2260992
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_connections",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "notification_deliveries",
+      "heap_bytes": 0,
+      "index_bytes": 57344,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_instrument_selections",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_objects",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_instrument_filter_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_history_bounds",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "execution_orders",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "roehub_storage_migrations",
+      "heap_bytes": 16384,
+      "index_bytes": 16384,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_provider_scopes",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_lazy_trades_materializations",
+      "heap_bytes": 0,
+      "index_bytes": 57344,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "rl_live_ticker_entitlement_overrides",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_subscription_requirements",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "identity_oidc_login_attempts",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "notification_telegram_command_registry",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "execution_ledger_pitr_drills",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_notification_preferences",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_stream_events",
+      "heap_bytes": 131072,
+      "index_bytes": 172032,
+      "total_bytes": 335872
+    },
+    {
+      "nspname": "public",
+      "family": "execution_risk_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_capital_reservations",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_account_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "market_data",
+      "family": "candle_history_verification",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_jobs",
+      "heap_bytes": 0,
+      "index_bytes": 139264,
+      "total_bytes": 147456
+    },
+    {
+      "nspname": "public",
+      "family": "execution_mainnet_approvals",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_model_versions",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_catalog_refresh_state",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_strategies",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_commands",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "paper_fills",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_work_batches",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_plugin_instances",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_stream_connections",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 65536
+    }
+  ],
+  "disk_last": [
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_storage_commands",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "notification_provider_packages",
+      "heap_bytes": 8192,
+      "index_bytes": 49152,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_build_requests",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 8192
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_gc_candidates",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_model_activations",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_job_stage_a_shortlist",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_candle_repair_events",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_open_order_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_variant_compatibility_checks",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "identity_browser_devices",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "control_operation_audit_cursor",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_slot_ownership",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_manifest_entries",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_sessions",
+      "heap_bytes": 8192,
+      "index_bytes": 65536,
+      "total_bytes": 73728
+    },
+    {
+      "nspname": "public",
+      "family": "notification_telegram_binding_codes",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "rl_live_ticker_activations",
+      "heap_bytes": 0,
+      "index_bytes": 57344,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "market_data",
+      "family": "instrument_generations",
+      "heap_bytes": 24576,
+      "index_bytes": 32768,
+      "total_bytes": 98304
+    },
+    {
+      "nspname": "market_data",
+      "family": "verification_leases",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_signals",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_coordinator_owners",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "notification_telegram_update_cursors",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 8192
+    },
+    {
+      "nspname": "public",
+      "family": "execution_gateway_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_builds",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_leases",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "market_data",
+      "family": "raw_bybit_funding_rates",
+      "heap_bytes": 0,
+      "index_bytes": 1130496,
+      "total_bytes": 2260992
+    },
+    {
+      "nspname": "public",
+      "family": "identity_webauthn_credentials",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_instrument_history_bounds",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_attempts",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_publisher_keys",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "market_data",
+      "family": "coverage_rebuilds",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_storage_cooldown",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "notification_report_runs",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_work_events",
+      "heap_bytes": 106496,
+      "index_bytes": 155648,
+      "total_bytes": 294912
+    },
+    {
+      "nspname": "public",
+      "family": "identity_organizations",
+      "heap_bytes": 8192,
+      "index_bytes": 49152,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_training_runs",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_slot_readers",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_auth_challenges",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "market_data",
+      "family": "raw_binance_klines_1m",
+      "heap_bytes": 2975850496,
+      "index_bytes": 1071685632,
+      "total_bytes": 4051976192
+    },
+    {
+      "nspname": "market_data",
+      "family": "source_absent_candles_1m",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_manifests",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_oidc_auth_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "execution_fills",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "execution_order_events",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "execution_reconciliation_runs",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_catalog_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_execution_process_heartbeats",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_work_requests",
+      "heap_bytes": 114688,
+      "index_bytes": 139264,
+      "total_bytes": 294912
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_paper_scenario_coverage_results",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_plugin_packages",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_provider_windows",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "market_data",
+      "family": "candle_coverage_days",
+      "heap_bytes": 5619712,
+      "index_bytes": 1482752,
+      "total_bytes": 7143424
+    },
+    {
+      "nspname": "market_data",
+      "family": "ref_market",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_dataset_versions",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_instrument_selection_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_private_stream_sessions",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "job_runtime_jobs",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "notification_events",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_cadence",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_position_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "notification_telegram_recipient_bindings",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "execution_intents",
+      "heap_bytes": 0,
+      "index_bytes": 81920,
+      "total_bytes": 90112
+    },
+    {
+      "nspname": "market_data",
+      "family": "canonical_candles_1m",
+      "heap_bytes": 6493593600,
+      "index_bytes": 1090191360,
+      "total_bytes": 7589150720
+    },
+    {
+      "nspname": "public",
+      "family": "identity_installation_owners",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 8192
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_auth_rate_limits",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_storage_previews",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "market_data",
+      "family": "candle_coverage_summary",
+      "heap_bytes": 16384,
+      "index_bytes": 16384,
+      "total_bytes": 73728
+    },
+    {
+      "nspname": "public",
+      "family": "identity_user_profile_overrides",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "control_operation_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_live_profiles",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "market_data",
+      "family": "funding_instrument_universe",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_artifact_lifecycle_policies",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_paper_accounting",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_plugin_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_administrative_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_plugin_operations",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "identity_support_access_grants",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "execution_source_events",
+      "heap_bytes": 0,
+      "index_bytes": 57344,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "identity_invitations",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_stream_recovery",
+      "heap_bytes": 8192,
+      "index_bytes": 32768,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_plugin_installations",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_accounts",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_runs",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_account_config_guard_results",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_requests",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_object_locations",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "notification_delivery_attempts",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_memberships",
+      "heap_bytes": 8192,
+      "index_bytes": 32768,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_policies",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "market_data",
+      "family": "ref_instruments",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "identity_integrations",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_credential_versions",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "identity_external_identities",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_org_blobs",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_users",
+      "heap_bytes": 8192,
+      "index_bytes": 40960,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "identity_plugin_permissions",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "execution_notification_outbox",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_balance_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_bootstrap_tickets",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_calibration_packs",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "notification_routes",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_variant_scenario_matrix_rows",
+      "heap_bytes": 0,
+      "index_bytes": 57344,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "execution_ledger_retention_policies",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_execution_request_observations",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "identity_installations",
+      "heap_bytes": 8192,
+      "index_bytes": 32768,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_recovery_codes",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_legacy_demands",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_telegram_channels",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 8192
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_events",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_exchange_keys",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "identity_local_auth_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_position_ownership",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_installation_settings",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "rl_risk_sizing_policy_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "notification_provider_instances",
+      "heap_bytes": 8192,
+      "index_bytes": 57344,
+      "total_bytes": 73728
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_provider_permits",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_exchange_bindings",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_profiles",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "market_data",
+      "family": "raw_bybit_klines_1m",
+      "heap_bytes": 44933120,
+      "index_bytes": 16384000,
+      "total_bytes": 62709760
+    },
+    {
+      "nspname": "public",
+      "family": "paper_orders",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "alembic_version",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_model_registry_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_dispatch_state",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_pins",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_user_preferences",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_quotas",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 8192
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_events",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "identity_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "job_runtime_attempts",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "execution_kill_switch_state",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "execution_provider_allowlist",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "rl_risk_sizing_policies",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "execution_account_safety_state",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_job_top_variants",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "notification_telegram_updates",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_backtest_variant_provenance",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "market_data",
+      "family": "raw_binance_funding_rates",
+      "heap_bytes": 0,
+      "index_bytes": 1130496,
+      "total_bytes": 2260992
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_source_state",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "execution_funding_events",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "market_data",
+      "family": "canonical_funding_rates",
+      "heap_bytes": 0,
+      "index_bytes": 1130496,
+      "total_bytes": 2260992
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_connections",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "notification_deliveries",
+      "heap_bytes": 0,
+      "index_bytes": 57344,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_instrument_selections",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "artifact_store_objects",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_instrument_filter_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_history_bounds",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "execution_orders",
+      "heap_bytes": 0,
+      "index_bytes": 49152,
+      "total_bytes": 57344
+    },
+    {
+      "nspname": "public",
+      "family": "roehub_storage_migrations",
+      "heap_bytes": 16384,
+      "index_bytes": 16384,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_provider_scopes",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_lazy_trades_materializations",
+      "heap_bytes": 0,
+      "index_bytes": 57344,
+      "total_bytes": 65536
+    },
+    {
+      "nspname": "public",
+      "family": "rl_live_ticker_entitlement_overrides",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_subscription_requirements",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "identity_oidc_login_attempts",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "notification_telegram_command_registry",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "execution_ledger_pitr_drills",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "identity_notification_preferences",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_stream_events",
+      "heap_bytes": 172032,
+      "index_bytes": 212992,
+      "total_bytes": 425984
+    },
+    {
+      "nspname": "public",
+      "family": "execution_risk_audit_events",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_capital_reservations",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "public",
+      "family": "exchange_account_snapshots",
+      "heap_bytes": 0,
+      "index_bytes": 32768,
+      "total_bytes": 40960
+    },
+    {
+      "nspname": "market_data",
+      "family": "candle_history_verification",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_jobs",
+      "heap_bytes": 0,
+      "index_bytes": 139264,
+      "total_bytes": 147456
+    },
+    {
+      "nspname": "public",
+      "family": "execution_mainnet_approvals",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "rl_trading_model_versions",
+      "heap_bytes": 0,
+      "index_bytes": 16384,
+      "total_bytes": 24576
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_catalog_refresh_state",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "strategy_strategies",
+      "heap_bytes": 0,
+      "index_bytes": 40960,
+      "total_bytes": 49152
+    },
+    {
+      "nspname": "public",
+      "family": "backtest_artifact_commands",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "paper_fills",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_work_batches",
+      "heap_bytes": 0,
+      "index_bytes": 8192,
+      "total_bytes": 16384
+    },
+    {
+      "nspname": "public",
+      "family": "extensions_plugin_instances",
+      "heap_bytes": 0,
+      "index_bytes": 24576,
+      "total_bytes": 32768
+    },
+    {
+      "nspname": "public",
+      "family": "market_data_stream_connections",
+      "heap_bytes": 8192,
+      "index_bytes": 16384,
+      "total_bytes": 65536
+    }
+  ],
+  "wal_disk_first": "436207616",
+  "wal_disk_last": "436207616",
+  "tables_first": [
+    {
+      "schemaname": "market_data",
+      "family": "ref_instruments",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "instrument_generations",
+      "live": 127,
+      "dead": 64,
+      "inserted": 127,
+      "updated": 24636,
+      "deleted": 0,
+      "autovacuum_count": 6,
+      "last_autovacuum": "2026-10-14T03:24:30.702277+00:00",
+      "autoanalyze_count": 42
+    },
+    {
+      "schemaname": "market_data",
+      "family": "verification_leases",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "raw_bybit_funding_rates",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "coverage_rebuilds",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "raw_bybit_klines_1m",
+      "live": 268443,
+      "dead": 0,
+      "inserted": 268443,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 8,
+      "last_autovacuum": "2026-10-14T02:38:22.963593+00:00",
+      "autoanalyze_count": 7
+    },
+    {
+      "schemaname": "market_data",
+      "family": "raw_binance_klines_1m",
+      "live": 15456385,
+      "dead": 0,
+      "inserted": 15460393,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 115,
+      "last_autovacuum": "2026-10-14T03:25:28.12123+00:00",
+      "autoanalyze_count": 123
+    },
+    {
+      "schemaname": "market_data",
+      "family": "source_absent_candles_1m",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "public",
+      "family": "market_data_work_requests",
+      "live": 205,
+      "dead": 3,
+      "inserted": 205,
+      "updated": 615,
+      "deleted": 0,
+      "autovacuum_count": 6,
+      "last_autovacuum": "2026-10-14T03:25:28.782016+00:00",
+      "autoanalyze_count": 10
+    },
+    {
+      "schemaname": "market_data",
+      "family": "candle_coverage_days",
+      "live": 10951,
+      "dead": 2086,
+      "inserted": 10951,
+      "updated": 16507,
+      "deleted": 0,
+      "autovacuum_count": 14,
+      "last_autovacuum": "2026-10-14T02:37:44.394572+00:00",
+      "autoanalyze_count": 23
+    },
+    {
+      "schemaname": "market_data",
+      "family": "ref_market",
+      "live": 4,
+      "dead": 36,
+      "inserted": 4,
+      "updated": 36,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "raw_binance_funding_rates",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "canonical_funding_rates",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "canonical_candles_1m",
+      "live": 15724760,
+      "dead": 0,
+      "inserted": 15724730,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 116,
+      "last_autovacuum": "2026-10-14T03:25:28.633154+00:00",
+      "autoanalyze_count": 122
+    },
+    {
+      "schemaname": "public",
+      "family": "identity_local_auth_rate_limits",
+      "live": 0,
+      "dead": 29,
+      "inserted": 512,
+      "updated": 0,
+      "deleted": 512,
+      "autovacuum_count": 8,
+      "last_autovacuum": "2026-10-14T03:24:30.69814+00:00",
+      "autoanalyze_count": 14
+    },
+    {
+      "schemaname": "market_data",
+      "family": "candle_coverage_summary",
+      "live": 127,
+      "dead": 6,
+      "inserted": 127,
+      "updated": 16380,
+      "deleted": 0,
+      "autovacuum_count": 10,
+      "last_autovacuum": "2026-10-14T02:37:44.42507+00:00",
+      "autoanalyze_count": 39
+    },
+    {
+      "schemaname": "market_data",
+      "family": "funding_instrument_universe",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "candle_history_verification",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "public",
+      "family": "market_data_stream_recovery",
+      "live": 1,
+      "dead": 28,
+      "inserted": 512,
+      "updated": 0,
+      "deleted": 511,
+      "autovacuum_count": 8,
+      "last_autovacuum": "2026-10-14T03:24:30.704256+00:00",
+      "autoanalyze_count": 14
+    }
+  ],
+  "tables_last": [
+    {
+      "schemaname": "market_data",
+      "family": "ref_instruments",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "instrument_generations",
+      "live": 127,
+      "dead": 62,
+      "inserted": 127,
+      "updated": 25524,
+      "deleted": 0,
+      "autovacuum_count": 6,
+      "last_autovacuum": "2026-10-14T03:24:30.702277+00:00",
+      "autoanalyze_count": 46
+    },
+    {
+      "schemaname": "market_data",
+      "family": "verification_leases",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "raw_bybit_funding_rates",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "coverage_rebuilds",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "raw_bybit_klines_1m",
+      "live": 268443,
+      "dead": 0,
+      "inserted": 268443,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 8,
+      "last_autovacuum": "2026-10-14T02:38:22.963593+00:00",
+      "autoanalyze_count": 7
+    },
+    {
+      "schemaname": "market_data",
+      "family": "raw_binance_klines_1m",
+      "live": 15604813,
+      "dead": 0,
+      "inserted": 15609873,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 117,
+      "last_autovacuum": "2026-10-14T03:30:28.531977+00:00",
+      "autoanalyze_count": 128
+    },
+    {
+      "schemaname": "market_data",
+      "family": "source_absent_candles_1m",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "public",
+      "family": "market_data_work_requests",
+      "live": 264,
+      "dead": 24,
+      "inserted": 264,
+      "updated": 792,
+      "deleted": 0,
+      "autovacuum_count": 7,
+      "last_autovacuum": "2026-10-14T03:30:29.486268+00:00",
+      "autoanalyze_count": 12
+    },
+    {
+      "schemaname": "market_data",
+      "family": "candle_coverage_days",
+      "live": 10957,
+      "dead": 297,
+      "inserted": 11055,
+      "updated": 17050,
+      "deleted": 0,
+      "autovacuum_count": 15,
+      "last_autovacuum": "2026-10-14T03:28:29.065802+00:00",
+      "autoanalyze_count": 23
+    },
+    {
+      "schemaname": "market_data",
+      "family": "ref_market",
+      "live": 4,
+      "dead": 36,
+      "inserted": 4,
+      "updated": 36,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "raw_binance_funding_rates",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "canonical_funding_rates",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "canonical_candles_1m",
+      "live": 15874240,
+      "dead": 0,
+      "inserted": 15874210,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 118,
+      "last_autovacuum": "2026-10-14T03:30:29.337201+00:00",
+      "autoanalyze_count": 127
+    },
+    {
+      "schemaname": "public",
+      "family": "identity_local_auth_rate_limits",
+      "live": 0,
+      "dead": 51,
+      "inserted": 660,
+      "updated": 0,
+      "deleted": 660,
+      "autovacuum_count": 10,
+      "last_autovacuum": "2026-10-14T03:29:29.077993+00:00",
+      "autoanalyze_count": 18
+    },
+    {
+      "schemaname": "market_data",
+      "family": "candle_coverage_summary",
+      "live": 127,
+      "dead": 36,
+      "inserted": 127,
+      "updated": 16923,
+      "deleted": 0,
+      "autovacuum_count": 10,
+      "last_autovacuum": "2026-10-14T02:37:44.42507+00:00",
+      "autoanalyze_count": 43
+    },
+    {
+      "schemaname": "market_data",
+      "family": "funding_instrument_universe",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "market_data",
+      "family": "candle_history_verification",
+      "live": 0,
+      "dead": 0,
+      "inserted": 0,
+      "updated": 0,
+      "deleted": 0,
+      "autovacuum_count": 0,
+      "last_autovacuum": null,
+      "autoanalyze_count": 0
+    },
+    {
+      "schemaname": "public",
+      "family": "market_data_stream_recovery",
+      "live": 0,
+      "dead": 52,
+      "inserted": 660,
+      "updated": 0,
+      "deleted": 660,
+      "autovacuum_count": 10,
+      "last_autovacuum": "2026-10-14T03:29:29.080391+00:00",
+      "autoanalyze_count": 18
+    }
+  ],
+  "sample_count": 2070,
+  "resource_sample_count": 60
+}

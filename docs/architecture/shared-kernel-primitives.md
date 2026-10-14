@@ -1,5 +1,12 @@
 # Shared Kernel — Primitives (Trading)
 
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Domain InstrumentId/UTC/float64/null semantics сохраняются; UInt32 counts отображаются в checked BIGINT, timestamp — UTC milliseconds. Storage engine не входит в domain identity.
+
+
 Этот документ фиксирует минимальные доменные примитивы Shared Kernel и правила, которые должны быть одинаковыми во всех bounded contexts.
 
 Цель:
@@ -9,13 +16,13 @@
 - единая каноническая свеча (`Candle`) и отдельно её метаданные (`CandleMeta`);
 - единый параметр таймфрейма (`Timeframe`) и правила rollup из 1m.
 
-Источник правды по хранению данных рынка: ClickHouse DDL (см. таблицы `market_data.*`), в частности `market_data.canonical_candles_1m`.
+Источник правды по хранению данных рынка: PostgreSQL DDL (см. таблицы `market_data.*`), в частности `market_data.canonical_candles_1m`.
 
 
 ## Ключевые решения
 
 ### 1) Идентичность рынка
-- Рынок идентифицируется `MarketId` (UInt16 в ClickHouse), соответствующий `market_data.ref_market.market_id`.
+- Рынок идентифицируется `MarketId` (UInt16 в PostgreSQL), соответствующий `market_data.ref_market.market_id`.
 - `market_type` (spot/futures) и биржа (binance/bybit) — детали справочника `ref_market`, в доменных примитивах отдельно не хранятся.
 
 ### 2) Идентичность инструмента
@@ -24,13 +31,13 @@
 
 ### 3) Время
 - Канонический формат времени в домене: timezone-aware `datetime` в UTC.
-- Точность: миллисекунды (совместимо с `DateTime64(3, 'UTC')`).
+- Точность: миллисекунды (совместимо с `PostgreSQL timestamptz(3)`).
 
 ### 4) Диапазоны времени
 - `TimeRange` трактуется как полуинтервал: `[start, end)`.
 
 ### 5) Числа (OHLCV)
-- Цены и объёмы в `Candle` представлены как `float`, совместимо с `Float64` в ClickHouse.
+- Цены и объёмы в `Candle` представлены как `float`, совместимо с `Float64` в PostgreSQL.
 - Точный денежный учёт (Decimal) — отдельное решение для будущих контекстов (execution/pnl/risk), не для канонических свечей.
 
 ### 6) Таймфреймы
@@ -47,7 +54,7 @@
 `MarketId` — стабильный идентификатор рынка (биржа + тип рынка) из `market_data.ref_market.market_id`. Используется как ключ рынка во всех свечных таблицах.
 
 **Representation**  
-- целое число (концептуально `UInt16` в ClickHouse; в домене — value object вокруг `int`).
+- целое число (концептуально `UInt16` в PostgreSQL; в домене — value object вокруг `int`).
 
 **Invariants**  
 - `market_id > 0`.
@@ -78,7 +85,7 @@
 - не пустая строка после нормализации.
 
 **Source of truth (DDL)**  
-- `symbol LowCardinality(String)` в свечных таблицах и в `ref_instruments`.
+- `symbol text` в свечных таблицах и в `ref_instruments`.
 
 **Serialization**  
 - как строка.
@@ -144,13 +151,13 @@
 - timezone-aware `datetime` в UTC.
 
 **Precision**  
-- миллисекунды (совместимо с `DateTime64(3, 'UTC')`).
+- миллисекунды (совместимо с `PostgreSQL timestamptz(3)`).
 
 **Invariants**  
 - timezone-aware, интерпретируется как UTC (naive datetime запрещён).
 
 **Source of truth (DDL)**  
-`DateTime64(3, 'UTC')` используется в:
+`PostgreSQL timestamptz(3)` используется в:
 - `open_time`, `close_time`
 - `ts_open`, `ts_close`
 - `ingested_at`
@@ -270,7 +277,7 @@ Rollup возвращает только **закрытые и полные ба
 - если `volume_quote` задан, то `volume_quote >= 0`
 
 **Numeric type decision**
-- float (совместимо с `Float64` в ClickHouse).
+- float (совместимо с `Float64` в PostgreSQL).
 
 **Source of truth (DDL)**
 `market_data.canonical_candles_1m`:
@@ -296,7 +303,7 @@ Rollup возвращает только **закрытые и полные ба
   - `ws`   (websocket)
   - `rest` (REST API)
   - `file` (ручная/пакетная загрузка исторических данных из файлов)
-- `ingested_at: UtcTimestamp` — версия записи (для `ReplacingMergeTree(ingested_at)`)
+- `ingested_at: UtcTimestamp` — версия записи для PostgreSQL version-aware upsert
 - `ingest_id: Optional[UUID]` — идентификатор запуска ingestion (если используется)
 - `instrument_key: str` — trace/debug строка для логов/отладки (например `"{exchange}:{market_type}:{symbol}"`)
 - `trades_count: Optional[int]`

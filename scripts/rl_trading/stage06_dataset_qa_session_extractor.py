@@ -18,13 +18,9 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from apps.cli.wiring.db.clickhouse import (  # noqa: E402
-    ClickHouseSettingsLoader,
-    _clickhouse_client,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (  # noqa: E402,E501
-    ClickHouseConnectGateway,
-    ClickHouseGateway,
+from apps.cli.wiring.db.postgres import market_gateway  # noqa: E402
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.ingestion_gateway import (  # noqa: E402
+    IngestionGateway,
 )
 from trading.contexts.rl_trading.domain import (  # noqa: E402
     RawFeatureCandleBatch,
@@ -62,9 +58,7 @@ DEFAULT_STAGE05_RAW_FEATURE_MANIFEST = (
     Path("/opt/roehub/state/rl_trading/datasets/stage05_raw_feature_dataset_v1")
     / "stage05_raw_feature_manifest.json"
 )
-DEFAULT_OUTPUT_ROOT = Path(
-    "/opt/roehub/state/rl_trading/datasets/stage06_sessionized_dataset_v1"
-)
+DEFAULT_OUTPUT_ROOT = Path("/opt/roehub/state/rl_trading/datasets/stage06_sessionized_dataset_v1")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -89,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
             expected_refresh_manifest_sha256=args.expected_refresh_manifest_sha256,
             raw_feature_manifest_path=args.raw_feature_manifest,
             output_root=args.output_root,
-            from_clickhouse=bool(args.from_clickhouse),
+            from_postgresql=bool(args.from_postgresql),
             symbols=args.symbol,
             all_symbols=bool(args.all_symbols),
             dataset_versions=args.dataset_version,
@@ -133,7 +127,7 @@ def build_sessionized_dataset(
     expected_refresh_manifest_sha256: str,
     raw_feature_manifest_path: Path,
     output_root: Path,
-    from_clickhouse: bool,
+    from_postgresql: bool,
     symbols: Sequence[str] | None,
     all_symbols: bool,
     dataset_versions: Sequence[str] | None,
@@ -152,7 +146,7 @@ def build_sessionized_dataset(
         )
     if not all_symbols and not symbols:
         raise SessionizedDatasetError(reason="symbol_selection_required", field="symbol")
-    if not from_clickhouse and not raw_feature_manifest_path.exists():
+    if not from_postgresql and not raw_feature_manifest_path.exists():
         raise SessionizedDatasetError(
             reason="raw_feature_manifest_not_found",
             field=str(raw_feature_manifest_path),
@@ -189,13 +183,13 @@ def build_sessionized_dataset(
         raise SessionizedDatasetError(reason="no_source_windows_selected")
 
     output_root.mkdir(parents=True, exist_ok=True)
-    gateway: ClickHouseGateway | None = None
+    gateway: IngestionGateway | None = None
     database: str | None = None
     raw_entries: Mapping[tuple[str, str], Mapping[str, Any]] = {}
-    if from_clickhouse:
-        settings = ClickHouseSettingsLoader(os.environ).load()
-        gateway = ClickHouseConnectGateway(_clickhouse_client(settings))
-        database = settings.database
+    if from_postgresql:
+        settings = market_gateway(os.environ, workload="bulk")
+        gateway = settings
+        database = "market_data"
     else:
         raw_entries = _raw_slab_entries_by_key(_read_json(raw_feature_manifest_path))
 
@@ -222,10 +216,10 @@ def build_sessionized_dataset(
                 )
                 continue
 
-            if from_clickhouse:
+            if from_postgresql:
                 if gateway is None or database is None:
-                    raise SessionizedDatasetError(reason="clickhouse_gateway_not_initialized")
-                slab = _read_slab_from_clickhouse(
+                    raise SessionizedDatasetError(reason="postgres_gateway_not_initialized")
+                slab = _read_slab_from_postgresql(
                     gateway=gateway,
                     database=database,
                     market_id=source_window.market_id,
@@ -279,10 +273,10 @@ def build_sessionized_dataset(
     build_scope = {
         "all_symbols": all_symbols,
         "dataset_versions": sorted({window.dataset_version for window in source_windows}),
-        "from_clickhouse": from_clickhouse,
+        "from_postgresql": from_postgresql,
         "max_minutes_per_source_window": max_minutes_per_source_window,
         "max_symbols": max_symbols,
-        "raw_feature_manifest": None if from_clickhouse else str(raw_feature_manifest_path),
+        "raw_feature_manifest": None if from_postgresql else str(raw_feature_manifest_path),
         "selected_symbols": sorted({window.symbol for window in source_windows}),
         "effective_split_windows": [window.as_payload() for window in split_windows],
         "splits": sorted({window.split for window in split_windows}),
@@ -436,9 +430,9 @@ def _effective_split_window(
     )
 
 
-def _read_slab_from_clickhouse(
+def _read_slab_from_postgresql(
     *,
-    gateway: ClickHouseGateway,
+    gateway: IngestionGateway,
     database: str,
     market_id: int,
     symbol: str,
@@ -446,33 +440,11 @@ def _read_slab_from_clickhouse(
     end: datetime,
 ) -> RawFeatureSlab:
     expected_rows = _minute_count(start, end)
-    q = f"""
-    SELECT
-        toUnixTimestamp64Milli(ts_open) AS open_time_ms,
-        toUnixTimestamp64Milli(ts_close) AS close_time_ms,
-        toFloat32(open) AS open_f32,
-        toFloat32(high) AS high_f32,
-        toFloat32(low) AS low_f32,
-        toFloat32(close) AS close_f32,
-        toFloat32(volume_base) AS volume_base_f32,
-        toFloat32(volume_quote) AS volume_quote_f32,
-        toInt64(trades_count) AS trades_count_i64
-    FROM {database}.canonical_candles_1m FINAL
-    WHERE market_id = %(market_id)s
-      AND symbol = %(symbol)s
-      AND toUnixTimestamp64Milli(ts_open) >= %(start_ms)s
-      AND toUnixTimestamp64Milli(ts_open) < %(end_ms)s
-    ORDER BY ts_open
-    """
-    rows = gateway.select(
-        q,
-        {
-            "end_ms": int(end.timestamp() * 1000),
-            "market_id": market_id,
-            "start_ms": int(start.timestamp() * 1000),
-            "symbol": symbol,
-        },
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.research_export import (  # noqa: E501
+        feature_rows,
     )
+
+    rows = feature_rows(gateway, market_id=market_id, symbol=symbol, start=start, end=end)
     if len(rows) != expected_rows:
         raise SessionizedDatasetError(
             reason="candle_row_count_mismatch",
@@ -584,7 +556,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_STAGE05_RAW_FEATURE_MANIFEST,
     )
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
-    parser.add_argument("--from-clickhouse", action="store_true")
+    parser.add_argument("--from-postgresql", action="store_true")
     parser.add_argument("--exchange", type=str, default="binance")
     parser.add_argument("--market-type", type=str, default="futures")
     parser.add_argument("--symbol", action="append", default=None)

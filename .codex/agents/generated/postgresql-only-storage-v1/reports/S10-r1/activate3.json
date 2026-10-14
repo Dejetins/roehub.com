@@ -1,0 +1,1 @@
+{"runtime": "sha256:0b1c79f46b393c6dd0ce44728bb07e92ad81d240bf64924df99f4c173fc193a6", "controller": "sha256:b3f133e58e3f5ce16b41182fe0a87170131d4bb9a8f87fee5d4a2ea9cd9b352e", "outputs": ["compose.yaml", "control-policy.json", "config/operational-manifest.json", "control-compose.yaml", "generation-manifest.json"]}

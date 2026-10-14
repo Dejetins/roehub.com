@@ -1,0 +1,1025 @@
+{
+  "scope": "Non-pack S07 differences against entry, pre-transition hashes. Prior hunks not claimed. Receipt creation may require a separately logged generated map refresh. Orchestrator pending-contract repair excluded.",
+  "files": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "status": "modified",
+      "baseline_sha256": "7a9722e09c12a34690d874901ff9d1bbbfddce5c6b35a780b02ac933740fee40",
+      "final_sha256": "b3c1bf09048379a91cd941622cee834047d5ceec0228bdad48ac46ab2455d057"
+    },
+    {
+      "path": "apps/api/dto/market_data_reference.py",
+      "status": "modified",
+      "baseline_sha256": "d5bfeca6aec54f45fbd7ef7da383cb2d5d4b744be2e1db4f3c31465310b9e771",
+      "final_sha256": "55b954f89a81c4ca032ddac50e7a87577289c95c2e7db7da15c834ab7ab19aa3"
+    },
+    {
+      "path": "apps/api/routes/monitoring.py",
+      "status": "modified",
+      "baseline_sha256": "7c2395899a4c92a49a2aa96f0bbf858dce14aba5fed99a4adfc5fe815c9c2245",
+      "final_sha256": "2d8cdc309db67278ee6b75068cd06d188594b93f2539aadb5cb59f9e8fc7faf8"
+    },
+    {
+      "path": "apps/api/wiring/modules/market_data_reference.py",
+      "status": "modified",
+      "baseline_sha256": "2a7db184458e1ed5f918d823ddc5ff1ef39320e0ca244882e075682865f9a31f",
+      "final_sha256": "0467d9dfdf5f761ab419eaa11b6d41149438cbab96e7f8bab94aca61f096a31d"
+    },
+    {
+      "path": "apps/cli/wiring/db/clickhouse.py",
+      "status": "deleted",
+      "baseline_sha256": "838da808316b2f3c7da3b18b45cad4efeeec49fdd452052874596f579bdda2f6",
+      "final_sha256": null
+    },
+    {
+      "path": "apps/migrations/research_runtime_probe.py",
+      "status": "modified",
+      "baseline_sha256": "3e4d281c27f50d1f61ef4506687d8f6078b1f73874857c804f4f723768e31db1",
+      "final_sha256": "c215057dc6f3fe8224d396bda7796fec281f481f703cc9e89c73697538c5826a"
+    },
+    {
+      "path": "apps/migrations/storage.py",
+      "status": "modified",
+      "baseline_sha256": "1e8d45db6c6d4fddeb853584d95a6f13ad221adf6b2c569f4d4410e72f799b4d",
+      "final_sha256": "243f57384e750fcbbbaa84bb1d10d86d4e03f47dc48eb5dae14f4e2159e224ba"
+    },
+    {
+      "path": "apps/monitoring/__init__.py",
+      "status": "modified",
+      "baseline_sha256": "3204f2bc0fe09b3671d516f8fad9da63c5babf85ad68a66de22c4d40e8518d81",
+      "final_sha256": "0c149ad75acbe6aa16689341b2158e119b4e62a12b0684f1dc0d2f889c7f3df5"
+    },
+    {
+      "path": "apps/monitoring/clickhouse_exporter.py",
+      "status": "deleted",
+      "baseline_sha256": "7c9222473f0827a6be1fdcbb2d528072370db70ee53bc99d753f042e06ac5d8d",
+      "final_sha256": null
+    },
+    {
+      "path": "apps/navigator-web/src/data-downloads.tsx",
+      "status": "modified",
+      "baseline_sha256": "954587e7bf3d0cf8e920a478962897aba29faa939adce25052ff6f7d77696cfc",
+      "final_sha256": "6f6cc8a9103046efa88274a757596894fac52b5f33f45b1687c0611b57325af9"
+    },
+    {
+      "path": "apps/navigator-web/src/monitoring-page.tsx",
+      "status": "modified",
+      "baseline_sha256": "16f93c10d98bc48175b2d18379ba7974955df2979186d8c7e1f7d8bed3fee394",
+      "final_sha256": "0ab052281c6458763e54547413d36131431eb9c5cd6c3737aa377233aa9399fe"
+    },
+    {
+      "path": "apps/platform-web/e2e/foundation.spec.ts",
+      "status": "modified",
+      "baseline_sha256": "5ef6aa21b610e0761447fed53c07fa46406b025017fb9435763736a28cb9d066",
+      "final_sha256": "9edbfada06c97071c9776c130ee7bfff9cc3ea86aa64c3278fd3abb8db03b26d"
+    },
+    {
+      "path": "apps/platform-web/e2e/journey.spec.ts",
+      "status": "modified",
+      "baseline_sha256": "9cbe551c55201a7810dc4a1f6a8ed46c7aa2553a321b3f8e1db62f7769cb3cd0",
+      "final_sha256": "0829fac1918f3faaf468a919fc6474076770a20cf3dd76cd48d8ea341f12328c"
+    },
+    {
+      "path": "apps/platform-web/e2e/library.spec.ts",
+      "status": "modified",
+      "baseline_sha256": "fb2b72fb9850b6446ae92d97c42967e06f327e7179dc4c6ab0bb4de11776062f",
+      "final_sha256": "02eba789e68635469ec96cfa24f7ac3128dcdb9f5c718c3015ef7811a4c0226d"
+    },
+    {
+      "path": "apps/worker/market_data_ws/wiring/io_process.py",
+      "status": "modified",
+      "baseline_sha256": "cd5aca9d4cc933116db6686bbabcf53acfdcc3f86c1877e79c11f7a191c1f804",
+      "final_sha256": "30a88fc3e3b396b6db778f84285f6848dad44274d97c33406b37a44d04f8f17d"
+    },
+    {
+      "path": "configs/dev/clickhouse-local-observability.xml",
+      "status": "deleted",
+      "baseline_sha256": "f0dd55cc97bf61e587599c8640f6b44f08f5e21d1bf226f08d3595ac1ff4a507",
+      "final_sha256": null
+    },
+    {
+      "path": "configs/dev/clickhouse-local-profiles.xml",
+      "status": "deleted",
+      "baseline_sha256": "dd47892ff7081ad82f7daf8ea806d53330049d5114b325a8265aa6668ffb4ef4",
+      "final_sha256": null
+    },
+    {
+      "path": "configs/installation/generated/base/generation-manifest.json",
+      "status": "modified",
+      "baseline_sha256": "4d31fce487f991a4ca2a54feff731eefb3be7fdf20331921cf5259e676a99361",
+      "final_sha256": "2153e00ddbd472da9bf96b83a8c48ee1d0fca324f6a62d4c033271a9c7fb25be"
+    },
+    {
+      "path": "configs/installation/generated/ml/generation-manifest.json",
+      "status": "modified",
+      "baseline_sha256": "a63a449faef14ae0e30c06a4e9b91f3929ad9bb12cee766d2882dbae88adc8c9",
+      "final_sha256": "4fb9759c6bce8c5ae1b9101e8f2634ddf51954fd8d2f7c5e7aab221dce8318a5"
+    },
+    {
+      "path": "configs/installation/generated/trading/generation-manifest.json",
+      "status": "modified",
+      "baseline_sha256": "17420f18ba50b0aeb0891f4364e39db8d11be957f700572617f2aacaaef934cd",
+      "final_sha256": "5812e98cdc8522f0b5b0830b7f3576e8011ec264e02d89882f9072b307ee06cf"
+    },
+    {
+      "path": "configs/installation/runtime-input-inventory.json",
+      "status": "modified",
+      "baseline_sha256": "3d06e586f4664fdfeb89e1e0ba3151e7e7d7e7e7c891cedb9569aa4c47a8333f",
+      "final_sha256": "919fe8477bbca36386551e4dc59dd559425f220c70d27366125a65f14218c67a"
+    },
+    {
+      "path": "docs/architecture/README.md",
+      "status": "modified",
+      "baseline_sha256": "ccf1b2a83d494991975a8ea909729024c0543eb2e172d667cf88dbbd6707f394",
+      "final_sha256": "e92d8a0df4078f1d7eba46f4b0d1e399d985d0c14e48dc0ea2d88d9cc5728682"
+    },
+    {
+      "path": "docs/architecture/apps/cli/cli-backfill-1m.md",
+      "status": "modified",
+      "baseline_sha256": "523f1e4f43f7fa0a24653f49a0f9c457bfcdcee44e24ac4c28c9a6021e2dc144",
+      "final_sha256": "478b40289754123163070640e2fcc3489e83e34e56a2b429f1090ce84c3fc5f5"
+    },
+    {
+      "path": "docs/architecture/apps/web/web-ui-tests-docs-index-v1.md",
+      "status": "modified",
+      "baseline_sha256": "3011b871934cebaf0861e1f6674fcbb2d17fa22df0f61f664b44fce916249bc9",
+      "final_sha256": "fca7574517b0fbb64c578ae2d623517916f1b3e6014c59df60de27020f84dbac"
+    },
+    {
+      "path": "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1.md",
+      "status": "modified",
+      "baseline_sha256": "d99fb14f5f1726c3b9243bf77f2cae81d8377b2b0a0506f0698acb5c15aaf9d0",
+      "final_sha256": "4b8684d65e47b3e10300ca2fc6a2014f951f465cf62ef127ccb75cd75f34eab4"
+    },
+    {
+      "path": "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+      "status": "modified",
+      "baseline_sha256": "1e5af243c3f57b3bf4aaecbaeb77b850ffa332544ffef3a57840f8aa66fabfd2",
+      "final_sha256": "2a97a46b37928313a39aaf6a6ed28f4995f6a6be1b54831794dceace5f4e3e69"
+    },
+    {
+      "path": "docs/architecture/identity/organizations-rbac-audit-v1.md",
+      "status": "modified",
+      "baseline_sha256": "fb05c923d2819c1a08105e19219828cafa71382590fc99cc3587bf9d885b0baa",
+      "final_sha256": "b34802c23c22a40709e2e9364a984c09fe9de6c912aa9a325952172819abd79f"
+    },
+    {
+      "path": "docs/architecture/indicators/indicators-application-ports-walking-skeleton-v1.md",
+      "status": "modified",
+      "baseline_sha256": "b553813749e4ae352f7aa4c8aafc41b5d46fd1e7891b11cc60dfb7e9d927ac5b",
+      "final_sha256": "9fe62c5abba31e582f44b6b7eff650d371fe41f3c13ba99dcbf1ad8431fc1a2c"
+    },
+    {
+      "path": "docs/architecture/indicators/indicators-grid-builder-estimate-guards-v1.md",
+      "status": "modified",
+      "baseline_sha256": "80a95e1eab226bc4f2695fcdfeebaa33ec6d63828f9b6ecd8ab6dea9a888acdb",
+      "final_sha256": "22c79ebf3fe412fac9de16aff32faf6875b3aab8dbc87d5547c00b37f4737775"
+    },
+    {
+      "path": "docs/architecture/live_execution/live-execution-universal-order-gateway-v1.md",
+      "status": "modified",
+      "baseline_sha256": "4e73f8c748f0e22ec248fc6faba02f5df86b7dad7e4d5285a4e8e888cea82af7",
+      "final_sha256": "bb30b152a968f91e9faf5894ba6ce5e81113d31de7fd00637ed295aeab269e3e"
+    },
+    {
+      "path": "docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1.md",
+      "status": "modified",
+      "baseline_sha256": "f9406e1ca52e94d48f197f2338763e3bf42398041cf42c6109b526624483a150",
+      "final_sha256": "e3ec2002e57d0ead954f2f7e32e935a9d79468d50ac1e09e83bdd9f3e8ac9c18"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-application-ports.md",
+      "status": "modified",
+      "baseline_sha256": "c50a0daaf49065dee6cc419567999fa69d1d274cf29895ae1796967fcb98d6ea",
+      "final_sha256": "d36a2df35a840ff18965c88e10b0c8915d937ee85a7150a529c90c571767613e"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-live-feed-redis-streams-v1.md",
+      "status": "modified",
+      "baseline_sha256": "05adf76ceb11ff7c3fea4270766d4b7c1db29c7b0d93f3cbadbd47f71849174b",
+      "final_sha256": "57a8ccfc76b4de61b2b8d09e19a02bdd41077517c21e50db8e428ca8e6b1c2e7"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-live-tail-repair-v1.md",
+      "status": "modified",
+      "baseline_sha256": "b6b8f185e06e69aa6da79cf52c4693958a14a0c4a158f21db605f89bb5d1dc38",
+      "final_sha256": "4ccf2d4d4e203446d61df58edc0abf9750cd7f56c11439676c1d24a4eb6be426"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-real-adapters-clickhouse-parquet.md",
+      "status": "modified",
+      "baseline_sha256": "9f0d56acdaae2e038448b62a7e0c297fdf15342715ffb1065f3dad244122fec8",
+      "final_sha256": "2b77de107a8afe6b785f4593865b9d72c4ee28a913f3dfa21b1ca577489ec9a2"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-reference-api-v1.md",
+      "status": "modified",
+      "baseline_sha256": "40fdd91ca80850520a673cdf9d5c1109a9200076e6f2c8476ab0234ef716fd52",
+      "final_sha256": "a854414d5c1f075b180343e90c145e49f4b8ec38d64114aa225a67fd260c4f32"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-reference-data-sync-v2.md",
+      "status": "modified",
+      "baseline_sha256": "91d88d6a3b92c02af3d220c0bba41cfe3c9e7398ddbfc75d43da88dfed1592a4",
+      "final_sha256": "a2059e328b0a386af7ab3c6ddf14b9576436c9ae3089535d5074c03f92967408"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-rest-historical-catchup-1m-v2.md",
+      "status": "modified",
+      "baseline_sha256": "9988fb90f27e69f25c1232c10cc244df352a6a5236dc8610b01b8ecae9b263e2",
+      "final_sha256": "d5fea5d9739662c7137bfbfdcc6e2387346e285167bde5bba73dd075ad0873b1"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-runtime-config-invariants-v2.md",
+      "status": "modified",
+      "baseline_sha256": "698ee580801e5852bddb2677e00b07ae9233aa64f5bc165a5103958752f738bc",
+      "final_sha256": "0389c1cbbe3ed350e2b89653f28bfa81bff5d5a7a160fec8b7614b425076d552"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-use-case-backfill-1m.md",
+      "status": "modified",
+      "baseline_sha256": "29ee2cc603d98629efe486320c4ba89b6763f6d224fb687c146bcf24e1530425",
+      "final_sha256": "43054d7e7560e2a70f1c970cec57324b2533c625e429134a32bf83154e90bb87"
+    },
+    {
+      "path": "docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md",
+      "status": "modified",
+      "baseline_sha256": "34951739699e603620d8ead9a8c3d704ca4e237fbe1c5a8135ee076312b16de7",
+      "final_sha256": "c27a4d4cdbf995b6a41146794257ea277fc4b89a31222e641d826437989e75c9"
+    },
+    {
+      "path": "docs/architecture/market_data/postgresql-storage-current-status-v1.md",
+      "status": "created",
+      "baseline_sha256": null,
+      "final_sha256": "14a4161090b4156a2664742235c95c719a9162a5fe408872eb91f6e40f428555"
+    },
+    {
+      "path": "docs/architecture/ml/rl-trading-agent-platform-v1.md",
+      "status": "modified",
+      "baseline_sha256": "af91d2567bd7b42fa73f4ad11f8063847a2a829e84b6427e9b7cceff4094425a",
+      "final_sha256": "7624bcd65c291dc05019535a9c556a1992cc9b6ad8071a9352bd59cd3b507b8a"
+    },
+    {
+      "path": "docs/architecture/operations/native-service-control-monitoring-admin-target-v1.md",
+      "status": "modified",
+      "baseline_sha256": "326350e7a4c75d73a2eb6c12679567c7296037b9166794752c8bea0545c7ed77",
+      "final_sha256": "52dcbde0ea72aa893add718f2589646e661b9fd9ccc86a20d4e31388439d5fe5"
+    },
+    {
+      "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md",
+      "status": "modified",
+      "baseline_sha256": "ad330a87131b170a80f39f78a90292090dbb1abaef28555a7d6a8458a7ad2d55",
+      "final_sha256": "3f5c048951853ca9869a15474074cebb55f4283e715dc2a5e7259c333b711e26"
+    },
+    {
+      "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md",
+      "status": "modified",
+      "baseline_sha256": "6e28169aef7b880e821849ee8602d8315863102ee832aebd17d8785f0f9e598a",
+      "final_sha256": "1dae19ed67a43691d2262359c4fc2fea8b7cf1627a80d595c9363f08118a0561"
+    },
+    {
+      "path": "docs/architecture/project-map/PROJECT_MAP.md",
+      "status": "modified",
+      "baseline_sha256": "b357dd7a190142f8b9d2c2dde0191b4efc57bb7205f380af792ce3fa93bada2e",
+      "final_sha256": "c0d9dda9ff02b3cc57b42f27f59af85cc6b261c7b348c7e505fd60e097621b3b"
+    },
+    {
+      "path": "docs/architecture/project-map/component-map.mmd",
+      "status": "modified",
+      "baseline_sha256": "008e72ce1560d55eaaa8cdccda62ad9f18ca20fdd1da6aea4f1c415014293a95",
+      "final_sha256": "a597a5ae995ce3bbacb9a678a591b3462e374c713f3e50d4ff7eb8d24eedd690"
+    },
+    {
+      "path": "docs/architecture/project-map/project-map.json",
+      "status": "modified",
+      "baseline_sha256": "cbebaf542fcfe76fb001b5a5aa817adfe4ad349253fa8a203328eb11d3f9ed8f",
+      "final_sha256": "54585bccc7faa281a352ee9b5b3e4e28554d696b8f0f77f4382f79910b35cf4a"
+    },
+    {
+      "path": "docs/architecture/shared-kernel-primitives.md",
+      "status": "modified",
+      "baseline_sha256": "8909834ef863dc0fae311dd07038a13903554dffecdd8b238a5f76fdac214765",
+      "final_sha256": "11a6d051e1233464789b7408b489ba35217991b81a8e74d1d52b442f9853a3d6"
+    },
+    {
+      "path": "docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md",
+      "status": "modified",
+      "baseline_sha256": "30cf4297cf214b95aa276e06d9aa126228702d4f6fd623b8dd26736930a8d90d",
+      "final_sha256": "5858ef24270016bc00f3e7b609b04204a2a6ab789e5661676c810010ff4a7486"
+    },
+    {
+      "path": "docs/architecture/strategy/strategy-milestone-3-epics-v1.md",
+      "status": "modified",
+      "baseline_sha256": "a07315009f91e2fe7236b268db222b962aabd52ed9c48163a725ed724a3e2e29",
+      "final_sha256": "f37fab20cc83991e55d86c1168431cfe3130d8876f112f92f0b4ca2db003f252"
+    },
+    {
+      "path": "docs/architecture/strategy/strategy-runtime-config-v1.md",
+      "status": "modified",
+      "baseline_sha256": "c7e11c5f514a393491490bc6e0c21e53e0660fe329979262a50f99f966ae42b4",
+      "final_sha256": "270703374f5385952d4ed31ae91cd6bf2c7e61a864f709ad694eb73558b917dd"
+    },
+    {
+      "path": "docs/runbooks/clickhouse-memory-profiles.md",
+      "status": "modified",
+      "baseline_sha256": "c806044a75415ca4e23f27ca807ce9589ce594cc21208604152404f1d962423c",
+      "final_sha256": "450e659a9fb69e73b9a4b9ffd2e619ff2cad7787e7e2d7f52ebb832d1b5fb735"
+    },
+    {
+      "path": "docs/runbooks/clickhouse-partition-dedup.md",
+      "status": "modified",
+      "baseline_sha256": "906020894ec43a16859a8e68fe73baa0a081e58547c2ce60de7887f6fca28cf8",
+      "final_sha256": "763ef327654b02bb069f2a97ee9123c476f9c0d14847a63d2c29119b68c4a979"
+    },
+    {
+      "path": "docs/runbooks/generated/ru/database.clickhouse-degraded.md",
+      "status": "deleted",
+      "baseline_sha256": "bb5bd0dc87fe59f0befe2837561e668c5ad6678b26dd5b795c0bba46eceb634f",
+      "final_sha256": null
+    },
+    {
+      "path": "docs/runbooks/generated/ru/database.postgresql-degraded.md",
+      "status": "created",
+      "baseline_sha256": null,
+      "final_sha256": "2b9012af1768cc886e3c8a823524fff776d633fe85437c5c80325effc6146154"
+    },
+    {
+      "path": "docs/runbooks/generated/ru/worker.market-data-live-tail-gap.md",
+      "status": "modified",
+      "baseline_sha256": "dc4699290f2c1e02a585d5f4d418e49dc20c5aceab342a18fb14db9375e2e9a0",
+      "final_sha256": "1b6af846f60017f28f8604b98d27e3299025e9e1d5bd74a519a01369422073b6"
+    },
+    {
+      "path": "docs/runbooks/locales/ru/database.clickhouse-degraded.yaml",
+      "status": "deleted",
+      "baseline_sha256": "44b1b65924d33814f6f4e1201c5133f41f97f3ca90115674913f1f3c70f96533",
+      "final_sha256": null
+    },
+    {
+      "path": "docs/runbooks/locales/ru/database.postgresql-degraded.yaml",
+      "status": "created",
+      "baseline_sha256": null,
+      "final_sha256": "70dc2cfa88b8f54d9ff875acc31966609e20a5944122b65b4b71acb956ac68be"
+    },
+    {
+      "path": "docs/runbooks/locales/ru/worker.market-data-live-tail-gap.yaml",
+      "status": "modified",
+      "baseline_sha256": "5f6f5b1c40e99fac375df85e9df6d3e097966a01ebe33eb292d745335b219f62",
+      "final_sha256": "105d7eb2a342411442b3eab103f24c0fb995b0cce081e950e4120f4d650fee50"
+    },
+    {
+      "path": "docs/runbooks/market-data-redis-streams.md",
+      "status": "modified",
+      "baseline_sha256": "a18e442945723934a037b3d196da00049f2fdd49fae9f5b160a758f697c302db",
+      "final_sha256": "efd6334549b1dada776e0629a1a187a1ef0651569f15a54746147171009e4217"
+    },
+    {
+      "path": "docs/runbooks/navigator-local-market-data-recovery.md",
+      "status": "modified",
+      "baseline_sha256": "b6cbc14c16babcde6c3ce41bf1cc62520545a9fa35357150892f0a5286a429e9",
+      "final_sha256": "d71722dd4832d47fbcc67ec1261ba1fa9669db241b1b9fe97c5a3d858524948f"
+    },
+    {
+      "path": "docs/runbooks/offline-release-installation.md",
+      "status": "modified",
+      "baseline_sha256": "5e442221dae083073f5434026f0ea4c269278ef489261558f22610d83d4c38a1",
+      "final_sha256": "a9b082e63e038b40498e3a7c11d664573f2ffa15ad192ad349466d58da335a8b"
+    },
+    {
+      "path": "docs/runbooks/ops/database.clickhouse-degraded.yaml",
+      "status": "deleted",
+      "baseline_sha256": "669bd9923cdef6b59ef7221e2a4d7ad2d5678c69800322f22967a3acfa9532e7",
+      "final_sha256": null
+    },
+    {
+      "path": "docs/runbooks/ops/database.postgresql-degraded.yaml",
+      "status": "created",
+      "baseline_sha256": null,
+      "final_sha256": "825719ae9f05025f1d3784a34e48e2bf7fc9045cad5cdb87b94f7144fa42e652"
+    },
+    {
+      "path": "docs/runbooks/ops/worker.market-data-live-tail-gap.yaml",
+      "status": "modified",
+      "baseline_sha256": "5cb13af16c79afff36b4736a3f00ecfd16b06c5e8d6f195b53ad36556ed4f482",
+      "final_sha256": "13fc2c5f611d0d04953c2784da199f024b269c491f68ebf1e8595417060c5f99"
+    },
+    {
+      "path": "docs/runbooks/runbooks.json",
+      "status": "modified",
+      "baseline_sha256": "8e8488a8b6f86fb6023206f1f3e1d9b486acb1b1dcab92690e7507af7a488da1",
+      "final_sha256": "378b211c5cc07441563ebceea277bc1a4543b0d12bc44fb75c8f0d97597d980d"
+    },
+    {
+      "path": "infra/docker/docker-compose.market_data.yml",
+      "status": "modified",
+      "baseline_sha256": "5410eb55d0670bd5f50c8a0ed8ea3725ace6eb5e03caf900a46e5b0cb3cd78ed",
+      "final_sha256": "4270fab93a2a83c260677394a5e44046685661b90871cf7f97dadde8a36412d7"
+    },
+    {
+      "path": "infra/docker/docker-compose.yml",
+      "status": "modified",
+      "baseline_sha256": "89ee051354981f8198d1a20f24c9f5e1dd2e47b8c5dbb3213fad4d3d968c76c5",
+      "final_sha256": "97431dc1b78aef913bb2cedb43674121b5aefc5e827329e8ad7a325bce66e390"
+    },
+    {
+      "path": "infra/monitoring/rules/market-data-funding.rules.yml",
+      "status": "modified",
+      "baseline_sha256": "97d6d2f0869647536dc7e73f678efe049b2a76f8f21abd145d681c5a597f5627",
+      "final_sha256": "116ebd6f83a7c35f85c8a608aab6b77d43db1b43d4325eb86f3518e93f2f08f0"
+    },
+    {
+      "path": "infra/monitoring/rules/platform-monitoring.rules.yml",
+      "status": "modified",
+      "baseline_sha256": "89a41c157f31e6e502ced84b6a8938359d736feea68933cf4558a500cd79939f",
+      "final_sha256": "3544c2708ec0643c025243f644cff1ed5b717a42731d1ab0089a4328b7418f11"
+    },
+    {
+      "path": "infra/monitoring/rules/strategy-producer.rules.yml",
+      "status": "modified",
+      "baseline_sha256": "f767dc6714fd662f1ab5c5ea3f5770910bf1c1e6cce69dfdb4ca46eaf61a8bd3",
+      "final_sha256": "4a287838d0983e832dd6e6ceaf9fc5fb1be78596dfa31c05ce143e1968d8fa77"
+    },
+    {
+      "path": "migrations/clickhouse/funding_rates_ddl.sql",
+      "status": "deleted",
+      "baseline_sha256": "b9b6ca495027e84fe66d5d31a36b3977a187513529a56791b8ff0f5baf8e34e3",
+      "final_sha256": null
+    },
+    {
+      "path": "migrations/clickhouse/history_source_absences_ddl.sql",
+      "status": "deleted",
+      "baseline_sha256": "e438e5f0dca0d8fc55c8f292353ab63555115f469175d5f2239684caca263bfa",
+      "final_sha256": null
+    },
+    {
+      "path": "migrations/clickhouse/manifest.json",
+      "status": "deleted",
+      "baseline_sha256": "cb44e9b7dd55e7b1a15cb4d8922dc85c2c80ed37037f1939ec07c38e0715973a",
+      "final_sha256": null
+    },
+    {
+      "path": "migrations/clickhouse/market_data_ddl.sql",
+      "status": "deleted",
+      "baseline_sha256": "e6e2e75f53291f5b9c1fb66a632e213afc3ed83e9e415c63f39e049f3d834161",
+      "final_sha256": null
+    },
+    {
+      "path": "pyproject.toml",
+      "status": "modified",
+      "baseline_sha256": "67890a736a4eb3839ae03585100f9418e9ea6e1cb086bafdc24bfda9f7af5218",
+      "final_sha256": "856b82dc9ef191c06baa4b75a9eaa8670465d8f721b6fb3a21e4432b94b6c350"
+    },
+    {
+      "path": "scripts/ops/optimize_canonical_partitions.sh",
+      "status": "deleted",
+      "baseline_sha256": "dc4ed9de8b5cf97869c681a03418b81c5f6873d5cdc81a70091e79a8cba207ea",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+      "status": "deleted",
+      "baseline_sha256": "f14f0a1b44a774efac5fcbe168845552c43ae03fa8a98df080a460151d3ae164",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py",
+      "status": "modified",
+      "baseline_sha256": "514523cfda28f1cff28230a99cadac27ec721157e0e896491c00601c6965105c",
+      "final_sha256": "0d2f67adb665aa999c59119830b60775e27d3c66b2cdb8f0c357a4d7eb63407a"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py",
+      "status": "modified",
+      "baseline_sha256": "87bb8ebec763a8f2db398a0f94fa9b68c678d88cc782c14b33fe7a845218174a",
+      "final_sha256": "c29e5b1adc630a80fb082a960f08ce98df79308d33f20c41c2742e960e5a2523"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/__init__.py",
+      "status": "deleted",
+      "baseline_sha256": "a8a1f213263ef98fe064a089a82af65ee235b8c76901f949645f233ab888815a",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/btcusdt_market_readiness_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "a5671757737593c1004d0baf0a6b10f9404df8f191dab01f13f5e92e9e975674",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "4804741430cef5a2f0a2857cd69ba2ef06c09f511d094539822f2d5af7e0989e",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "b806e5e220189109c22f060d50aa2cc8a4b10170758de9e883df1436da5cebfd",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/catalog_coverage_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "36746a477cc2d2008f817a6b91f8724e06caa1bcac848f5a777f171e1a26fb28",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_instrument_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "b7e35b03db1f0d36d69ac0bcc954749fe4aa127198d7734c50b0ecce1f566f46",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_market_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "fc3b14f8de4ec4b02fa2daeaad99189dff594f08e933a6afa5c4cf98ff6bf765",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_tradable_instrument_search_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "3ad9b9a280a72a14ba632d1f7e5dddf46463a38688f4059a42ab8e81a226869e",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+      "status": "deleted",
+      "baseline_sha256": "c841885cdda2677ff05428d1655137db0dda2313864d15b8b68f64fa706ff437",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+      "status": "deleted",
+      "baseline_sha256": "93eece935f1bc5b6d9e728e143bbc39167a367ddac08b2ff736776b82e228313",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_coverage_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "32321ea9905acfea6b3985d6702a36130c66122fc86438ae271b55a7adaf9023",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_range_verifier.py",
+      "status": "deleted",
+      "baseline_sha256": "a71f7d2bab5743d9f3139ed0be29e2217d66b332ea79b2ef6ee81718301c2d03",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/instrument_coverage_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "34a59d8b359056a0be7838ab8233bd935175134c23b73184ede55fac8c35b5c0",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py",
+      "status": "deleted",
+      "baseline_sha256": "05f6634e6f3e863b27667e6d881aa7b996f2b221abd9551c1f970f362610a9f2",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_instruments_writer.py",
+      "status": "deleted",
+      "baseline_sha256": "9b0d93bc925631c1dca9b9aed3709527cb055e53f48876a9aba9571f0aa98433",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_market_writer.py",
+      "status": "deleted",
+      "baseline_sha256": "bc890997daea4d937d72921f530b86fb7fdc2fae1822f93736f8705081e29543",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/work_errors.py",
+      "status": "deleted",
+      "baseline_sha256": "b51eb495493fdefad25c301e4059cbf445ce1233825b1d57e50de2779a56eca9",
+      "final_sha256": null
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py",
+      "status": "modified",
+      "baseline_sha256": "4816cfe4ab56fbfb38ce849193885c651d11072a138107242209ed7eab3f9b82",
+      "final_sha256": "60b4cb90c48c0fbbed5872fe542ab1b5b2c794749d85f9f98eadf9354cd5ab79"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/ports/stores/canonical_candle_reader.py",
+      "status": "modified",
+      "baseline_sha256": "78cd9d2b084bbce4a34ded9efaf899eb8ac4ec4ac6ac931b865f69d7ba4e8cfe",
+      "final_sha256": "5faf570a6159ffc69818a9922521d79e00fbc7bc66c426993fba5dd5ed3d25d0"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/ports/stores/enabled_market_reader.py",
+      "status": "modified",
+      "baseline_sha256": "46ae5ef5fbef0ceb47233203f1ffa8d66d461e4940ced593854b83dc7d626ed0",
+      "final_sha256": "8830c2a34a38bf6bd13ce9a41aa8939b238dae21cd323fd52cda1f52f21ce9a2"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/ports/stores/enabled_tradable_instrument_search_reader.py",
+      "status": "modified",
+      "baseline_sha256": "f07862c498f55b65f69054e9e968bd69f2b184d153fd1883edf1b723ce40a6b7",
+      "final_sha256": "a8667d09569353a23bb59e597af371300d48bc6b168c51aa1dfa90fc85970698"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/list_enabled_markets.py",
+      "status": "modified",
+      "baseline_sha256": "85c335d110698d0917a30aaf037948719bc260c1a835f2a98282bc0e46a5ca91",
+      "final_sha256": "b727df138d87b3e62dca4c09e4023d4d026a1b129be02d04ad25408047e4a992"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/rest_catchup_1m.py",
+      "status": "modified",
+      "baseline_sha256": "725e5aa569fa37febda7d535224181d1c1a4444f293109afefe4ebf4c398948e",
+      "final_sha256": "8d9ae0fcf5baac83b1e9054acb5397652f4762c9986928aa4d5f162d4adfc514"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/rest_fill_range_1m.py",
+      "status": "modified",
+      "baseline_sha256": "f42b561544bd360b4af08188d456d3abf8696ea81a1ecc3d007db0b4fee44162",
+      "final_sha256": "db2b3ca8f0144e4fd78c94587bf11ab79221e88b76bfefe89746670d95e1411f"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/search_enabled_tradable_instruments.py",
+      "status": "modified",
+      "baseline_sha256": "5c7c0127bbe7e5dd933a1e56283d65ae27df2b5c774d307b87ab9b7180e9f003",
+      "final_sha256": "faa28fa31ebbcda088106367855e73874dab98c0e4a2c62340470a5bd5d0123f"
+    },
+    {
+      "path": "src/trading/contexts/market_data/application/use_cases/time_slicing.py",
+      "status": "modified",
+      "baseline_sha256": "6d95149d8b609eb77b03541086c9a3cd2320dd34e7580c626072047cc4d3e0d3",
+      "final_sha256": "ed1f4d9a78ade632bec556af6720b16befa240cf598ff619ffa450a3acd08c94"
+    },
+    {
+      "path": "src/trading/contexts/strategy/adapters/outbound/config/live_runner_runtime_config.py",
+      "status": "modified",
+      "baseline_sha256": "205b8ff020e3142c38865c812ec632ac08dd557319986d729f437b99826c31da",
+      "final_sha256": "b2a931b0a9082994b665dee89e8d3fb5acd7838bcd2554a988c6042fc3310229"
+    },
+    {
+      "path": "src/trading/contexts/strategy/application/ports/closed_candle_tail_provider.py",
+      "status": "modified",
+      "baseline_sha256": "c7ba17661035ffd6b7ce22be1e2c3bd902f7155590878b29a1a434a290f186a5",
+      "final_sha256": "b335e9b06854bdc6a2c876343b14fb8346c5a1baab4620f3f0ec9d40c7557f2a"
+    },
+    {
+      "path": "src/trading/shared_kernel/primitives/utc_timestamp.py",
+      "status": "modified",
+      "baseline_sha256": "2306062129b72954749c4655b9c26c05ffd3200377641d754918b5c56776e17f",
+      "final_sha256": "0593b96832493062b6fcda3a4b86c00f8fd280ade0e104b8c7c9197208bf50b0"
+    },
+    {
+      "path": "tests/fixtures/market_data/stage05-compose.override.yaml",
+      "status": "modified",
+      "baseline_sha256": "41b4d5b629d6c4ceb957d05251c1b05b024b847e6e89490a060e233a3f38eea4",
+      "final_sha256": "34b2bdd37d53a400ad08f8f0d0d0e7ef877401e301817a9132eee8533dedb58f"
+    },
+    {
+      "path": "tests/fixtures/storage/clickhouse-interrupted/0001_interrupted.sql",
+      "status": "deleted",
+      "baseline_sha256": "d4b130d22d06803ed05918ed592f4589c832853d1d9c4e8d7f42381362d5fb5a",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/fixtures/storage/clickhouse-interrupted/manifest.json",
+      "status": "deleted",
+      "baseline_sha256": "7e9bbc9700145e833e1462f31db42659a1f6a5160855ab58491e6388eaaea216",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/fixtures/storage/market-provider-fields.json",
+      "status": "created",
+      "baseline_sha256": null,
+      "final_sha256": "bf23583528bec8fe4fd1d53f6c030ce7aaabd5bac1eb57f3af0e7b96e974278d"
+    },
+    {
+      "path": "tests/notebook_tests/02_rest_catchup_1m.ipynb",
+      "status": "modified",
+      "baseline_sha256": "76e539b15fb4251c5e77a25f3eed2ac928af23a749b471c41c23123c78322d31",
+      "final_sha256": "bf0c21b6543c54f59cf62e27d9e93110be518f94c0846479784d603663878507"
+    },
+    {
+      "path": "tests/real_infra/backtest/test_artifact_dispatch.py",
+      "status": "modified",
+      "baseline_sha256": "aeccefadabb1bad4eb392232a96b87021a54ffb1856b95532fdad68bdd7ca274",
+      "final_sha256": "e4399fa07f7dd25759f79cb59cfcdb515b652a7e3e34586e7b0c7501f7ed9c90"
+    },
+    {
+      "path": "tests/real_infra/backtest/test_artifact_integrated.py",
+      "status": "modified",
+      "baseline_sha256": "9262547d840992b2e241e02cc7eaa27c2883cbc89934176d695fbb601782dcd1",
+      "final_sha256": "aa4bc4ba8aefa9e1e65ebe3bb87d914a775c223ed138862086b5ca26de0af3d0"
+    },
+    {
+      "path": "tests/real_infra/backtest/test_artifact_management.py",
+      "status": "modified",
+      "baseline_sha256": "bbf6cf22dbc29762e7e6c7ae7b75b7f8db5376d9e79d6820783fce49e5f88558",
+      "final_sha256": "f7170380de7edaadccd3a5426aa180b1e6a65840623f5304f3583636b2a397ea"
+    },
+    {
+      "path": "tests/real_infra/backtest/test_automatic_base_lifecycle.py",
+      "status": "modified",
+      "baseline_sha256": "bd897141eaa150715c036915c8c2f9fed62083a2c4c93d0260f1e6c9ceed3ce8",
+      "final_sha256": "0a543e40e756543f60af4d739ec1122cbfa57099ac778e14d21f3b4cb493afe6"
+    },
+    {
+      "path": "tests/real_infra/market_data/pg_source_fixture.py",
+      "status": "created",
+      "baseline_sha256": null,
+      "final_sha256": "10b2a8b2da6aef034cbc8b20d3accf77cc22d7e59bcaa0a0b19cbf48e4ae5051"
+    },
+    {
+      "path": "tests/real_infra/market_data/postgres_semantic_test_ids.txt",
+      "status": "created",
+      "baseline_sha256": null,
+      "final_sha256": "869d807dd576743e6c3f4b2d00a7ea3b416d292e188a62812f4c00ddd154269b"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_clickhouse_workloads.py",
+      "status": "deleted",
+      "baseline_sha256": "cb9ab7c0dbd2fd8855bc6b32f525eb457b11f406a6d5a75a7447276199f7a1dd",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/real_infra/market_data/test_full_history_clickhouse.py",
+      "status": "deleted",
+      "baseline_sha256": "6427b64d63b2af78dea5ba7ee40f57eaddaeffb95955d9cd32944b378ee3c897",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/real_infra/market_data/test_postgres_consumers.py",
+      "status": "modified",
+      "baseline_sha256": "9fe6b9a2ee0dcb683885578e2ac243173191f2dcfbcf57255a98a839b4b5ea5f",
+      "final_sha256": "5b78a72877b9956a02b523461fa212c0b0c6224029140bf9ee94a3d65ac7c091"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_postgres_legacy_semantics.py",
+      "status": "created",
+      "baseline_sha256": null,
+      "final_sha256": "6e9e8240c2ad958a4c040e3dd050211e74825a02b7633dbd1e17ebc137e21e94"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_postgres_readers_frontier.py",
+      "status": "modified",
+      "baseline_sha256": "65df8767831c5ad1de7ebafc87e8f3ef4dd55310b20f6b71031ee15a6a9dd29f",
+      "final_sha256": "be1cd222affcca31d9a5bf1eb360e4ef58f5d46b8dbb9195912f306e68d99383"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_storage_schema_postgres.py",
+      "status": "modified",
+      "baseline_sha256": "b3710b7a971554ab8e78758b5efc53650b99e5ad332dacd568dd34960962dfcd",
+      "final_sha256": "15f981f920eace0840733af65b2bf00c06b698b4c1742f4bdd649cdff7c4e225"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_stream_recovery_postgres.py",
+      "status": "modified",
+      "baseline_sha256": "136150bb97a36f07fcc1857370d1878a73ee551ad33012ca7f76e963b29d6809",
+      "final_sha256": "88bb3a41bec941e4cce7283d202bdcb3e1bfe5e149d5f77cf6f2683efc97a7c6"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_transactional_ingestion_postgres.py",
+      "status": "modified",
+      "baseline_sha256": "84f7db586783e39d61917256bcb7d3a05a0c4c59841bdd8e859bb8c56ccf4068",
+      "final_sha256": "bdae5e13abce5d78a201a33a428b0165d15fae5e7755d8d7e709a82edbcc1075"
+    },
+    {
+      "path": "tests/real_infra/market_data/test_work_requests_postgres.py",
+      "status": "modified",
+      "baseline_sha256": "e7ce70e8fa780077a9b55357737e8f964bed5e3d88f8cb12dbd9062fc17075ef",
+      "final_sha256": "b8486e17d4a57a3531095a565a23d745b145eac63fafe34cfcc3e8c4d0ddc558"
+    },
+    {
+      "path": "tests/unit/apps/api/test_market_data_reference_routes.py",
+      "status": "modified",
+      "baseline_sha256": "be6ec8f798312eab14eb2e36160e146507c7dbe9f672a70997a79f582be70093",
+      "final_sha256": "c1de3e9ea9ab774747ae76a0b92a7df33243cb23bdce484558dc647329287370"
+    },
+    {
+      "path": "tests/unit/apps/api/test_market_data_reference_wiring_module.py",
+      "status": "modified",
+      "baseline_sha256": "7273b99498b6a033163caba49cff4cffc2ba364874fe1cc4eba94f8a7ae64317",
+      "final_sha256": "0c8b3b9394264f072f3f8191b110988c42271b9583b5608904b1e67a8d255f21"
+    },
+    {
+      "path": "tests/unit/apps/cli/test_backfill_1m_parsing.py",
+      "status": "modified",
+      "baseline_sha256": "bc900fb3d687ba07e3bcb8415538da63bc8f76da4a238ccd022c58eb0f47d93c",
+      "final_sha256": "ca0bc500aa1f07ea304d981ba61734f5c62d1997b8f13077cde96a132128f603"
+    },
+    {
+      "path": "tests/unit/apps/cli/test_backtest_artifact_publish_cli.py",
+      "status": "modified",
+      "baseline_sha256": "de74e78f393bdeccb8caad9aa0ce9eff0ee452fe288b47a46be6c280d9c8e5f2",
+      "final_sha256": "988e811767e8fda326ac795fdc2688dcf889e8378e7d89ce3a7c259f23e7472f"
+    },
+    {
+      "path": "tests/unit/apps/migrations/test_storage_lifecycle.py",
+      "status": "modified",
+      "baseline_sha256": "d0c94b458052882aefecb5007085492eb70e4c7291c4b6d3250d943c9a872593",
+      "final_sha256": "99bad37993133026499935cc87e71862f088ed0f8ca231b65987a0c44df4b1fa"
+    },
+    {
+      "path": "tests/unit/apps/monitoring/test_clickhouse_exporter.py",
+      "status": "deleted",
+      "baseline_sha256": "4ce19ddfa338a0d0fb10ca2d2b09799aa7c8ad101ad4ce6f4aeb28a367949de3",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/apps/monitoring/test_postgres_observer.py",
+      "status": "created",
+      "baseline_sha256": null,
+      "final_sha256": "6603a18d24aa698367ce56bccbd05c173459a0d74ff68fb6f6c893fdc0eec512"
+    },
+    {
+      "path": "tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py",
+      "status": "modified",
+      "baseline_sha256": "a6a628f069056d8076feab963b5becea895908a0f59e8f8b229cfac35e9c791b",
+      "final_sha256": "a37f50d85aa98b84e1d7412181f5b9e190449da88a6124db9b717fc9f36e4d22"
+    },
+    {
+      "path": "tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py",
+      "status": "modified",
+      "baseline_sha256": "e2f1c1ffdccc4ea24d53b0226819df60477f1d18194e2b7cc7f3359ebbb50112",
+      "final_sha256": "5028364030dfa2746f3a44101c66366a014417d4e955ddead9f48d729ca9ecdf"
+    },
+    {
+      "path": "tests/unit/apps/worker/test_persistent_writer.py",
+      "status": "modified",
+      "baseline_sha256": "dbed38b5e7694bd698756ee911809510f1ccc149b65e24140dbc84e64f8404d1",
+      "final_sha256": "38d62d0e8d4890ca17c2cbc9a394099b8e4aea70c51d41c34c60815f1f719aaa"
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_btcusdt_market_readiness_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "bee23dda74641b0057b6f96da03457288d9cf48ef5ce5e037c6babba97a01f47",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_index_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "ef40a013751f748d92e745f24c25f0a8acafe367f403bc40b6d70c41ab2ce668",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_canonical_candle_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "74f634c955f829a5e049ade885b10ce36b7ec8d6ae7d7974ca6c4babbe1768e4",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_enabled_instrument_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "ccf38832818d0f8ac6a9cf9a930bba3798f831827ea19a8cc4e98027174789c1",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_enabled_market_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "675c324b5e0e0e6e484fa97bf5c91c5c3ce6450a03423290aaa7cff355c43d10",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_enabled_tradable_instrument_search_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "9a8d25aaa818f337054c724f363230ede9164d6bfe701501271f08cc62561e4f",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_funding_rate_store.py",
+      "status": "deleted",
+      "baseline_sha256": "a2ab804efc0ad91f644a9ddc4fd560840111f308a1c0e2319d1e44de7a8fcd93",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_instrument_coverage_reader.py",
+      "status": "deleted",
+      "baseline_sha256": "61cb6845bbe43e4f676fc716e550d5d337d4adae8ce96b39b0d40e094e2c18a9",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_raw_kline_writer.py",
+      "status": "deleted",
+      "baseline_sha256": "c9c37c8825a885fbf958d16c411a2414bd156ee51e073c532176a518b60d2dc6",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_ref_instruments_writer.py",
+      "status": "deleted",
+      "baseline_sha256": "5842183be29d8197a07b89cbe82b9bf700945a74a8b88605eada480cfa48b4df",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/contexts/market_data/adapters/test_clickhouse_thread_local_gateway.py",
+      "status": "deleted",
+      "baseline_sha256": "83c1d39cfe5c077522ca7a402453cc19622ff751f2667a51d4e04c2706e5ff98",
+      "final_sha256": null
+    },
+    {
+      "path": "tests/unit/tools/test_ci_route_changes.py",
+      "status": "modified",
+      "baseline_sha256": "9fd7d0cb5f5a0ba9b5ff15ea1882a4edfaa3eee93ebd3762c654bbb4a5105169",
+      "final_sha256": "0c558ae72a3aa13e4895dbedc41c5d95b21b2a89b0a43363642589f2e6cff3f4"
+    },
+    {
+      "path": "tests/unit/tools/test_clickhouse_workload_installation.py",
+      "status": "deleted",
+      "baseline_sha256": "d7f56a84e8d2a888cfa158f2d85f2e233a73474d0068f2272c95b1a9f6efa43e",
+      "final_sha256": null
+    },
+    {
+      "path": "tools/ci/route_changes.py",
+      "status": "modified",
+      "baseline_sha256": "7e28e7d3839bb00d82d1fe02d8bf6ca9d4eb2ccd7c8e8be5ac19c6375503fda2",
+      "final_sha256": "a87b048134b965dcea73e66561165014f6676b521111094784f617918301a55e"
+    },
+    {
+      "path": "tools/docs/generate_project_map.py",
+      "status": "modified",
+      "baseline_sha256": "1ad516199969d2bfddb8dfbbd6e7094cc440050e86b6c0e7938f4831ae206f7e",
+      "final_sha256": "cd72f333f171801e1e08f56949305a1b5135fef23dc85e0e85fbbec22a350743"
+    },
+    {
+      "path": "tools/installation/clickhouse_workloads.py",
+      "status": "deleted",
+      "baseline_sha256": "b8ab98ab30bbb4d99cf9916319eb8516be3ea9ea4b3681cb878bf6df7d1431b9",
+      "final_sha256": null
+    },
+    {
+      "path": "tools/qa/backtests_client_fixture.py",
+      "status": "modified",
+      "baseline_sha256": "9b2faedfdbf2450f96aee5e18c4d87afd10c63840bd5bd20e3cfc015f16177f3",
+      "final_sha256": "c65dd0bd5e8bd0bf014600fe3366fd94c1f3f7dcac7a5379170fe3a370fc087b"
+    },
+    {
+      "path": "tools/qa/market_data_ingestion_comparison.py",
+      "status": "deleted",
+      "baseline_sha256": "db895ba94b501736201ef5e28a8c122530521e902eceda329072eb4aeb90f2fc",
+      "final_sha256": null
+    },
+    {
+      "path": "tools/qa/market_data_mixed_load.py",
+      "status": "deleted",
+      "baseline_sha256": "a4b333174196a4b4747b7a1f87004a11e4581330952a8a1025b6f60186848ab0",
+      "final_sha256": null
+    },
+    {
+      "path": "tools/qa/market_data_recovery_comparison.py",
+      "status": "deleted",
+      "baseline_sha256": "61d55df9cfc7d18a1ac1f4cd4285034684b08c9e0095c3ab62b8ab18280a81ae",
+      "final_sha256": null
+    },
+    {
+      "path": "tools/qa/market_data_resource_comparison.py",
+      "status": "deleted",
+      "baseline_sha256": "eff382004b4754052a21ec23183c14153e5b39ffe08becb4f76b0f3eef102fd0",
+      "final_sha256": null
+    },
+    {
+      "path": "tools/qa/postgres_storage_prototype.py",
+      "status": "modified",
+      "baseline_sha256": "f7ac80c972031110c1dc5bdf2568a01d9ad54a6894111a8c115df1c47108e957",
+      "final_sha256": "dee6e806627eb0a221eb7b23f0831a44af732763e51dd72baf2c40bef4b22ce0"
+    },
+    {
+      "path": "tools/qa/test_postgres_storage_prototype.py",
+      "status": "deleted",
+      "baseline_sha256": "9d0ac46962e3410938c143a5c1cc61aefa8eea5f29076f78fbbb2f2100ee67c0",
+      "final_sha256": null
+    },
+    {
+      "path": "tools/qa/workpages_monitoring.py",
+      "status": "modified",
+      "baseline_sha256": "1aa1bfa40b10f7e3e15fb5a34cdef01b69fa584e1761624dbced026267706f9d",
+      "final_sha256": "fbcf2b7525c0b777964de60e0e925ec5b6187eaec6036522465bf37c648fa01e"
+    },
+    {
+      "path": "tools/release/THIRD_PARTY_NOTICES.md",
+      "status": "modified",
+      "baseline_sha256": "15036c12379e3c9256168ba8a427173a4337764328fd379e3247e69bcb4ff21a",
+      "final_sha256": "0ed419c7dee1ac9a6e0db6585631c3fc886a242683c6f620c2680c43736f13ba"
+    },
+    {
+      "path": "tools/release/oss_policy.json",
+      "status": "modified",
+      "baseline_sha256": "b8fffb55eb38e93381a9043a44568fa838a0146164e1ff24f8f2267ecc068e87",
+      "final_sha256": "65fa02f88319ec658f26e1307be0cdc879eee3b6962c31aebe3d5fda1eaf0622"
+    },
+    {
+      "path": "tools/release/preliminary-sbom.spdx.json",
+      "status": "modified",
+      "baseline_sha256": "496a868c766ab4886eab95dee13cce254614e25092a13f44d0dbb4e8744b1897",
+      "final_sha256": "6fd472d0675ce82a47d5e8741df95a99e90f0fa6a7c975a72761cfe135a45fe8"
+    },
+    {
+      "path": "tools/release/release-metadata.json",
+      "status": "modified",
+      "baseline_sha256": "52566e822d34c1a26e35b618e84657c1b638f3cb0b07fa63a1f06fea180d1591",
+      "final_sha256": "6322875bea58e0a94b3da62bab0dc870d8cbdfee6fb8238a058e2b02cf6f8382"
+    },
+    {
+      "path": "uv.lock",
+      "status": "modified",
+      "baseline_sha256": "46aca1e6a34d292cf488bb73962d4c1bae65b9cf2dbdf3ecdb7589d1387b67e0",
+      "final_sha256": "7ef37dbe159be67091a0ff718ef16d34cf93f6029801e2808f96137856f18207"
+    }
+  ]
+}

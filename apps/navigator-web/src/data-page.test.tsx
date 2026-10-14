@@ -727,3 +727,16 @@ it('automatically recovers inspector reads while keeping unknown stream state ex
  expect(panel.queryByRole('alert')).not.toBeInTheDocument();
  expect(panel.getByText('Running')).toBeVisible();expect(panel.getByRole('switch')).toBeEnabled();
 });
+
+it('loads sparse stream events on demand and hides them when access is lost',async()=>{
+ let denied=false;
+ const calls:string[]=[];
+ mount(url=>url.pathname.endsWith('/stream-events')?(calls.push(url.search),denied?Response.json({}, {status:403}):Response.json({items:[{event_id:10,market_id:1,symbol:'BTCUSDT',event_type:'connection_opened',occurred_at:'2026-10-12T10:00:00Z',reason:null,error_code:null,attempt:0,start_at:null,end_at:null}],next_cursor:null,retention_days:30})):undefined);
+ await screen.findByRole('heading',{name:'BTCUSDT'});expect(calls).toHaveLength(0);
+ fireEvent.click(screen.getByRole('button',{name:'Show log'}));
+ fireEvent.click(await screen.findByRole('button',{name:'Stream events'}));
+ const journal=await screen.findByRole('region',{name:'Stream event journal'});
+ await within(journal).findByText('Connection established');expect(calls[0]).toContain('market_id=1');
+ denied=true;fireEvent.click(within(journal).getByRole('button',{name:'Refresh events'}));
+ await waitFor(()=>expect(screen.queryByText('Connection established')).not.toBeInTheDocument());
+});

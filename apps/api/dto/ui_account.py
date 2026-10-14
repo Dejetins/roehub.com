@@ -34,7 +34,6 @@ class AccountProfileResponse(BaseModel):
     timezone: str
     locale: LocaleValue
     telegram_discord: str | None
-    subscription_status: str
     updated_at: datetime
 
 
@@ -50,7 +49,6 @@ class UpdateAccountProfileRequest(BaseModel):
 class AccountLimitsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    plan: str
     exchange_connections_used: int
     exchange_connections_limit: int
     api_keys_used: int

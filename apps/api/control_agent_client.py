@@ -16,6 +16,7 @@ from apps.control_agent.auth import read_private_credential
 from apps.migrations.bootstrap import normalize_psycopg_dsn
 from trading.contexts.operations import ControlOperationError, OperationRequest, OperationResult
 from trading.contexts.operations.adapters import ControlAgentUnixClient
+from trading.platform.postgres_budget import connect as budget_connect
 
 
 class ControlAuditSink(Protocol):
@@ -39,7 +40,7 @@ class PostgresControlAuditSink:
 
     def current_sequence(self) -> int:
         try:
-            with psycopg.connect(self._dsn, autocommit=True) as connection:
+            with budget_connect(self._dsn, autocommit=True) as connection:
                 with connection.cursor() as cursor:
                     cursor.execute(
                         "SELECT sequence FROM control_operation_audit_cursor "
@@ -47,9 +48,7 @@ class PostgresControlAuditSink:
                     )
                     row = cursor.fetchone()
         except psycopg.Error as error:
-            raise ControlOperationError(
-                code="control_agent.audit_store_unavailable"
-            ) from error
+            raise ControlOperationError(code="control_agent.audit_store_unavailable") from error
         if row is None:
             raise ControlOperationError(code="control_agent.audit_cursor_missing")
         return int(row[0])
@@ -62,7 +61,7 @@ class PostgresControlAuditSink:
     ) -> None:
         event = _validated_audit_event(entry_hash=entry_hash, payload=payload)
         try:
-            with psycopg.connect(self._dsn) as connection:
+            with budget_connect(self._dsn) as connection:
                 with connection.cursor() as cursor:
                     cursor.execute(
                         "SELECT sequence, entry_hash FROM control_operation_audit_cursor "
@@ -70,9 +69,7 @@ class PostgresControlAuditSink:
                     )
                     row = cursor.fetchone()
                     if row is None:
-                        raise ControlOperationError(
-                            code="control_agent.audit_cursor_missing"
-                        )
+                        raise ControlOperationError(code="control_agent.audit_cursor_missing")
                     current_sequence = int(row[0])
                     current_hash = str(row[1]) if row[1] is not None else None
                     sequence = cast(int, event["sequence"])
@@ -84,9 +81,7 @@ class PostgresControlAuditSink:
                         )
                         existing = cursor.fetchone()
                         if existing is None or str(existing[0]) != entry_hash:
-                            raise ControlOperationError(
-                                code="control_agent.audit_replay_conflict"
-                            )
+                            raise ControlOperationError(code="control_agent.audit_replay_conflict")
                         return
                     if sequence != current_sequence + 1:
                         raise ControlOperationError(code="control_agent.audit_sequence_gap")
@@ -131,9 +126,7 @@ class PostgresControlAuditSink:
         except ControlOperationError:
             raise
         except psycopg.Error as error:
-            raise ControlOperationError(
-                code="control_agent.audit_store_unavailable"
-            ) from error
+            raise ControlOperationError(code="control_agent.audit_store_unavailable") from error
 
 
 class ApiControlAgentClient:
@@ -195,14 +188,10 @@ def build_control_agent_audit_runtime_from_environ(
         "ROEHUB_CONTROL_AGENT_SOCKET",
         "ROEHUB_CONTROL_AGENT_API_IDENTITY_FILE",
     )
-    control_present = tuple(
-        bool(values.get(key, "").strip()) for key in control_keys
-    )
+    control_present = tuple(bool(values.get(key, "").strip()) for key in control_keys)
     if not any(control_present):
         return None
-    if not all(control_present) or not values.get(
-        "ROEHUB_STORAGE_POSTGRES_DSN", ""
-    ).strip():
+    if not all(control_present) or not values.get("ROEHUB_STORAGE_POSTGRES_DSN", "").strip():
         raise ControlOperationError(code="control_agent.api_configuration_incomplete")
     return (
         build_api_control_agent_client_from_environ(environ=values),

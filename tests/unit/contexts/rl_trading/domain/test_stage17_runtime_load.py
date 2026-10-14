@@ -75,7 +75,7 @@ def test_stage17_runtime_load_summary_accepts_bounded_infrastructure_load() -> N
             "product_readiness",
             "mainnet_readiness",
         ],
-        "max_monitor_only_tickers_for_technical_soak": 20,
+        "max_monitor_only_tickers_for_technical_soak": 5,
         "reason": "stage17_infrastructure_only_load_gate_accepted",
         "stage18_allowed": True,
     }

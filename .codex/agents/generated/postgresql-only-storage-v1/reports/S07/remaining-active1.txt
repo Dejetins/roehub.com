@@ -1,0 +1,272 @@
+infra/monitoring/rules/market-data-funding.rules.yml:13:          action: Check market-data-scheduler logs, provider status and ClickHouse writes.
+scripts/rl_trading/stage08c_original_hf_full_training_run.py:46:DEFAULT_TORCH_NUM_THREADS = max(1, os.cpu_count() or 1)
+scripts/rl_trading/stage08c_original_hf_full_training_run.py:427:    run.add_argument("--torch-num-threads", type=int, default=DEFAULT_TORCH_NUM_THREADS)
+infra/monitoring/rules/platform-monitoring.rules.yml:40:      - alert: ClickHouseExporterDown
+infra/monitoring/rules/platform-monitoring.rules.yml:41:        expr: max(up{job="clickhouse_exporter"}) == 0
+infra/monitoring/rules/platform-monitoring.rules.yml:46:          summary: clickhouse_exporter is down
+infra/monitoring/rules/platform-monitoring.rules.yml:47:          description: Prometheus cannot scrape clickhouse_exporter:9116 for 2 minutes.
+infra/monitoring/rules/platform-monitoring.rules.yml:112:      - alert: ClickHouseHttpPingDown
+infra/monitoring/rules/platform-monitoring.rules.yml:113:        expr: max(probe_success{job="blackbox_http",service="clickhouse_http_ping"}) == 0
+infra/monitoring/rules/platform-monitoring.rules.yml:118:          summary: ClickHouse HTTP /ping probe is failing
+infra/monitoring/rules/platform-monitoring.rules.yml:119:          description: Blackbox HTTP probe to http://clickhouse:8123/ping has failed for 2 minutes.
+infra/monitoring/rules/platform-monitoring.rules.yml:170:      - alert: ClickHouseServiceDegraded
+infra/monitoring/rules/platform-monitoring.rules.yml:171:        expr: max(clickhouse_exporter_scrape_success{job="clickhouse_exporter"}) == 0
+infra/monitoring/rules/platform-monitoring.rules.yml:176:          summary: ClickHouse exporter cannot query ClickHouse
+infra/monitoring/rules/platform-monitoring.rules.yml:177:          description: The repo-managed clickhouse_exporter has failed to read ClickHouse metrics for 5 minutes.
+infra/monitoring/rules/strategy-producer.rules.yml:26:          escalation: Keep allowlists narrow, inspect Postgres/Redis/ClickHouse dependency readiness, and do not enable broader strategy production.
+scripts/rl_trading/stage08e_roehub_native_full_training_run.py:45:DEFAULT_TORCH_NUM_THREADS = max(1, os.cpu_count() or 1)
+scripts/rl_trading/stage08e_roehub_native_full_training_run.py:562:    run.add_argument("--torch-num-threads", type=int, default=DEFAULT_TORCH_NUM_THREADS)
+scripts/rl_trading/stage08o_stage08k_dqn_forensic_decomposition.py:16:DEFAULT_FINAL_MANIFEST = Path(
+scripts/rl_trading/stage08o_stage08k_dqn_forensic_decomposition.py:694:    parser.add_argument("--final-manifest", type=Path, default=DEFAULT_FINAL_MANIFEST)
+infra/docker/docker-compose.market_data.yml:19:    - market-data-clickhouse
+infra/docker/docker-compose.market_data.yml:39:    - market-data-clickhouse
+scripts/rl_trading/smoke_torch_device.py:40:        default=int(os.environ.get("ROEHUB_RL_TORCH_NUM_THREADS", "4")),
+scripts/rl_trading/smoke_torch_device.py:45:        default=int(os.environ.get("ROEHUB_RL_TORCH_NUM_INTEROP_THREADS", "1")),
+infra/docker/openbao/openbao-2.5.4-licensed-qr.patch:24:+func (q qrWriter) Write(bitmap [][]bool) error {
+infra/docker/openbao/openbao-2.5.4-licensed-qr.patch:28:+	if len(bitmap) <= trim*2 {
+infra/docker/openbao/openbao-2.5.4-licensed-qr.patch:29:+		return fmt.Errorf("QR bitmap is too small: %d", len(bitmap))
+infra/docker/openbao/openbao-2.5.4-licensed-qr.patch:31:+	height := len(bitmap) - trim*2
+infra/docker/openbao/openbao-2.5.4-licensed-qr.patch:32:+	width := len(bitmap[0]) - trim*2
+infra/docker/openbao/openbao-2.5.4-licensed-qr.patch:34:+		return fmt.Errorf("QR bitmap is too narrow: %d", len(bitmap[0]))
+infra/docker/openbao/openbao-2.5.4-licensed-qr.patch:36:+	for row, modules := range bitmap {
+infra/docker/openbao/openbao-2.5.4-licensed-qr.patch:37:+		if len(modules) != len(bitmap[0]) {
+infra/docker/openbao/openbao-2.5.4-licensed-qr.patch:38:+			return fmt.Errorf("QR bitmap row %d has width %d, expected %d", row, len(modules), len(bitmap[0]))
+infra/docker/openbao/openbao-2.5.4-licensed-qr.patch:50:+		return bitmap[row+trim][col+trim]
+tools/docs/generate_project_map.py:388:- ClickHouse: рыночные ряды, вычислительные и аналитические данные; миграции в `migrations/clickhouse/`.
+tools/installation/local_platform.py:42:    if any("clickhouse" in key.lower() for key in config):
+tools/installation/local_platform.py:294:    if any("clickhouse" in key.lower() for key in config):
+scripts/rl_trading/stage08g_dual_branch_cpu_training_evaluation.py:30:STAGE08G_DUAL_BRANCH_RUN_KIND_V1 = "rl_trading_stage08g_dual_branch_cpu_run"
+scripts/rl_trading/stage08g_dual_branch_cpu_training_evaluation.py:31:STAGE08G_DUAL_BRANCH_SCHEMA_VERSION_V1 = 1
+scripts/rl_trading/stage08g_dual_branch_cpu_training_evaluation.py:43:DEFAULT_TORCH_NUM_THREADS = max(1, os.cpu_count() or 1)
+scripts/rl_trading/stage08g_dual_branch_cpu_training_evaluation.py:505:        "schema_version": STAGE08G_DUAL_BRANCH_SCHEMA_VERSION_V1,
+scripts/rl_trading/stage08g_dual_branch_cpu_training_evaluation.py:532:        "schema_version": STAGE08G_DUAL_BRANCH_SCHEMA_VERSION_V1,
+scripts/rl_trading/stage08g_dual_branch_cpu_training_evaluation.py:598:        return STAGE08G_DUAL_BRANCH_RUN_KIND_V1
+scripts/rl_trading/stage08g_dual_branch_cpu_training_evaluation.py:790:    parser.add_argument("--torch-num-threads", type=int, default=DEFAULT_TORCH_NUM_THREADS)
+scripts/rl_trading/stage08o_high_volatility_regime_report.py:17:DEFAULT_FINAL_MANIFEST = Path(
+scripts/rl_trading/stage08o_high_volatility_regime_report.py:479:    parser.add_argument("--final-manifest", type=Path, default=DEFAULT_FINAL_MANIFEST)
+tests/unit/apps/web/test_web_v2_1_routes.py:12:_WORKBENCH_CSS = Path(__file__).resolve().parents[4] / "apps/web/dist/css/workbench.css"
+tests/unit/apps/web/test_web_v2_1_routes.py:97:    css = _WORKBENCH_CSS.read_text(encoding="utf-8")
+tests/unit/apps/worker/test_persistent_writer.py:245:    from clickhouse_connect.driver.exceptions import DatabaseError
+scripts/rl_trading/stage08g_cpu_optuna_calibration.py:56:DEFAULT_TORCH_NUM_THREADS = max(1, os.cpu_count() or 1)
+scripts/rl_trading/stage08g_cpu_optuna_calibration.py:909:    parser.add_argument("--torch-num-threads", type=int, default=DEFAULT_TORCH_NUM_THREADS)
+tests/real_infra/backtest/test_artifact_integrated.py:443:            "ROEHUB_BACKTEST_SCRATCH_ROOT": str(directory / "scratch"),
+tests/real_infra/backtest/test_artifact_dispatch.py:639:            "CH_HOST": "127.0.0.1",
+tests/real_infra/backtest/test_artifact_dispatch.py:640:            "CH_PORT": "1",
+tests/real_infra/backtest/test_artifact_dispatch.py:641:            "CH_PASSWORD": "disposable-only",
+tests/real_infra/backtest/test_artifact_input_lifecycle.py:799:            "ROEHUB_BACKTEST_SCRATCH_ROOT": str(scratch),
+tests/real_infra/backtest/test_artifact_input_lifecycle.py:1231:            "ROEHUB_BACKTEST_SCRATCH_ROOT": str(root),
+tests/real_infra/backtest/test_artifact_input_lifecycle.py:1485:        "ROEHUB_BACKTEST_SCRATCH_ROOT": str(tmp_path / "scratch"),
+tests/real_infra/backtest/test_artifact_input_lifecycle.py:1974:            "ROEHUB_BACKTEST_SCRATCH_ROOT": str(tmp_path / "scratch"),
+tests/real_infra/market_data/test_work_requests_postgres.py:526:@pytest.mark.skipif(not os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_PORT'),
+tests/real_infra/market_data/test_work_requests_postgres.py:527:                    reason='explicit disposable ClickHouse target required')
+tests/real_infra/market_data/test_work_requests_postgres.py:529:def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store, pressure_code):
+tests/real_infra/market_data/test_work_requests_postgres.py:533:    import clickhouse_connect
+tests/real_infra/market_data/test_work_requests_postgres.py:535:    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
+tests/real_infra/market_data/test_work_requests_postgres.py:536:        transient_clickhouse_error,
+tests/real_infra/market_data/test_work_requests_postgres.py:542:    ch = clickhouse_connect.get_client(
+tests/real_infra/market_data/test_work_requests_postgres.py:543:        host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
+tests/real_infra/market_data/test_work_requests_postgres.py:544:        username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
+tests/real_infra/market_data/test_work_requests_postgres.py:545:        password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
+tests/real_infra/market_data/test_work_requests_postgres.py:565:                    other = clickhouse_connect.get_client(
+tests/real_infra/market_data/test_work_requests_postgres.py:566:                        host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
+tests/real_infra/market_data/test_work_requests_postgres.py:567:                        username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
+tests/real_infra/market_data/test_work_requests_postgres.py:568:                        password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
+tests/real_infra/market_data/test_work_requests_postgres.py:578:                pytest.fail('ClickHouse did not enforce resource pressure')
+tests/real_infra/market_data/test_work_requests_postgres.py:593:        ch.command(f'CREATE TABLE {table} (minute UInt64) ENGINE=MergeTree ORDER BY minute')
+tests/real_infra/market_data/test_work_requests_postgres.py:596:            retryable_storage_error=lambda e: transient_clickhouse_error(e) or False,
+tests/real_infra/market_data/test_storage_schema_postgres.py:79:            source_text = (ROOT / 'migrations/clickhouse' / source).read_text()
+tests/real_infra/market_data/test_postgres_consumers.py:68:        "CH_HOST": "unreachable.invalid",
+tests/real_infra/market_data/test_postgres_consumers.py:323:            environ={"STRATEGY_PG_DSN": db, "CH_HOST": "unreachable.invalid"}
+tests/real_infra/market_data/test_postgres_consumers.py:540:        Backfill1mCli(environ={"STRATEGY_PG_DSN": db, "CH_HOST": "unreachable.invalid"}).run(
+tests/real_infra/market_data/test_postgres_consumers.py:582:    monkeypatch.setenv("CH_HOST", "unreachable.invalid")
+tests/real_infra/market_data/test_postgres_consumers.py:612:             %s,%s,'failed','[{"source":"clickhouse","status":"failed","error_code":"clickhouse_exception"}]',
+tests/real_infra/market_data/test_postgres_consumers.py:613:             '[]','[]','clickhouse_exception',%s) RETURNING event_id,created_at""",
+tests/unit/apps/api/test_market_data_reference_wiring_module.py:13:    Dummy ClickHouse settings loader returning deterministic database settings.
+tests/unit/apps/api/test_market_data_reference_wiring_module.py:20:      - apps/cli/wiring/db/clickhouse.py
+tests/unit/apps/api/test_market_data_reference_routes.py:698:def test_market_data_reference_fails_closed_before_clickhouse_read(
+tests/unit/apps/cli/test_backtest_artifact_publish_cli.py:437:    class _FakeClickHouseSettingsLoader:
+tests/unit/apps/cli/test_backtest_artifact_publish_cli.py:439:        Minimal ClickHouse settings loader stub for CLI wiring tests.
+apps/navigator-web/design-qa.md:530:or ClickHouse writes. Existing REST fill deduplication is covered by its unit tests.
+src/trading/contexts/strategy/application/ports/closed_candle_tail_provider.py:14:    exchange REST providers or ClickHouse directly through this contract.
+apps/navigator-web/src/style.css:333:/* Content changes never morph a chart bitmap or fade the surrounding workspace. */
+apps/navigator-web/src/data-downloads.tsx:180: return code==='storage_memory_pressure'?w('ClickHouse needs more free memory.','ClickHouse ожидает освобождения памяти.'):
+apps/navigator-web/src/monitoring-page.tsx:19:function serviceName(id:string){return ({api:'API',web:'Web',postgresql:'PostgreSQL',clickhouse:'ClickHouse',redis:'Redis',openbao:'OpenBao'})[id]??id.replaceAll('-',' ');}
+tests/unit/apps/cli/test_backfill_1m_parsing.py:8:from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader
+tests/unit/apps/cli/test_backfill_1m_parsing.py:43:def test_clickhouse_env_loader_defaults() -> None:
+tests/unit/apps/cli/test_backfill_1m_parsing.py:45:    s = ClickHouseSettingsLoader(env).load()
+tests/unit/apps/cli/test_backfill_1m_parsing.py:55:def test_clickhouse_env_loader_parses_values() -> None:
+tests/unit/apps/cli/test_backfill_1m_parsing.py:57:        "CH_HOST": "ch",
+tests/unit/apps/cli/test_backfill_1m_parsing.py:58:        "CH_PORT": "8443",
+tests/unit/apps/cli/test_backfill_1m_parsing.py:59:        "CH_USER": "u",
+tests/unit/apps/cli/test_backfill_1m_parsing.py:60:        "CH_PASSWORD": "p",
+tests/unit/apps/cli/test_backfill_1m_parsing.py:61:        "CH_DATABASE": "market_data",
+tests/unit/apps/cli/test_backfill_1m_parsing.py:62:        "CH_SECURE": "1",
+tests/unit/apps/cli/test_backfill_1m_parsing.py:63:        "CH_VERIFY": "0",
+tests/unit/apps/cli/test_backfill_1m_parsing.py:65:    s = ClickHouseSettingsLoader(env).load()
+tests/unit/apps/cli/test_backfill_1m_parsing.py:74:def test_clickhouse_env_loader_reads_file_backed_credential(tmp_path) -> None:
+tests/unit/apps/cli/test_backfill_1m_parsing.py:75:    credential_path = tmp_path / "clickhouse-credential"
+tests/unit/apps/cli/test_backfill_1m_parsing.py:79:    settings = ClickHouseSettingsLoader(
+tests/unit/apps/cli/test_backfill_1m_parsing.py:81:            "CH_HOST": "ch",
+tests/unit/apps/cli/test_backfill_1m_parsing.py:82:            "CH_DATABASE": "roehub",
+apps/api/routes/monitoring.py:34:    if capability.startswith(("market_data.", "storage.clickhouse")):
+apps/worker/backtest_job_runner/wiring/modules/backtest_job_runner.py:605:                    "ROEHUB_BACKTEST_SCRATCH_ROOT",
+tests/unit/apps/scheduler/test_backtest_artifact_publisher_metrics.py:53:            Metric tests do not need ClickHouse and therefore use a fixed in-memory snapshot.
+apps/migrations/bootstrap.py:31:_RESEARCH_ORGANIZATION_ISOLATION_V1_SQL_FILE = "0014_research_organization_isolation_v1.sql"
+apps/migrations/bootstrap.py:445:        filenames=(_RESEARCH_ORGANIZATION_ISOLATION_V1_SQL_FILE,),
+apps/api/routes/strategies.py:63:    SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1,
+apps/api/routes/strategies.py:90:_DEFAULT_LAUNCH_CAPITAL_USD = Decimal("50")
+apps/api/routes/strategies.py:92:_ALLOWED_LAUNCH_MODES = frozenset(SCENARIO_MATRIX_MODES_V1)
+apps/api/routes/strategies.py:93:_ALLOWED_LAUNCH_MARKET_TYPES = frozenset({"spot", "futures"})
+apps/api/routes/strategies.py:94:_ALLOWED_LAUNCH_ENTRY_SIZING = frozenset({"fixed_quote", "fixed_equity_pct"})
+apps/api/routes/strategies.py:95:_ALLOWED_LAUNCH_RISK_MODES = frozenset(SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1)
+apps/api/routes/strategies.py:96:_ALLOWED_LAUNCH_DIRECTIONS = frozenset({"long", "short", "long_short_reversal"})
+apps/api/routes/strategies.py:332:    capital_allocation_usd: Decimal = Field(default=_DEFAULT_LAUNCH_CAPITAL_USD, ge=0)
+apps/api/routes/strategies.py:1710:    return _DEFAULT_LAUNCH_CAPITAL_USD
+apps/api/routes/strategies.py:1799:    if mode not in _ALLOWED_LAUNCH_MODES:
+apps/api/routes/strategies.py:1803:    if market_type not in _ALLOWED_LAUNCH_MARKET_TYPES:
+apps/api/routes/strategies.py:1807:    if entry_sizing not in _ALLOWED_LAUNCH_ENTRY_SIZING:
+apps/api/routes/strategies.py:1811:    if risk_mode not in _ALLOWED_LAUNCH_RISK_MODES:
+apps/api/routes/strategies.py:1813:    if direction not in _ALLOWED_LAUNCH_DIRECTIONS:
+apps/worker/backtest_job_runner/wiring/modules/lazy_trades_child_process.py:154:                            "ROEHUB_BACKTEST_SCRATCH_ROOT",
+apps/api/routes/backtests.py:71:_STRATEGY_VARIANT_LAUNCH_REJECTED_REASONS = frozenset(
+apps/api/routes/backtests.py:84:_STRATEGY_VARIANT_LAUNCH_DUPLICATE_REASONS = frozenset(
+apps/api/routes/backtests.py:844:    if candidate in _STRATEGY_VARIANT_LAUNCH_REJECTED_REASONS:
+apps/api/routes/backtests.py:848:        if suffix in _STRATEGY_VARIANT_LAUNCH_REJECTED_REASONS:
+apps/api/routes/backtests.py:856:    if reason in _STRATEGY_VARIANT_LAUNCH_DUPLICATE_REASONS:
+apps/worker/backtest_job_runner/wiring/modules/child_process.py:163:                            "ROEHUB_BACKTEST_SCRATCH_ROOT",
+tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py:447:    class _FakeClickHouseSettingsLoader:
+tests/unit/apps/scheduler/test_backtest_artifact_publisher_app.py:449:        Minimal ClickHouse settings loader stub for scheduler wiring tests.
+apps/api/routes/market_data_reference.py:44:    DEFAULT_INSTRUMENT_SEARCH_LIMIT,
+apps/api/routes/market_data_reference.py:45:    MAX_INSTRUMENT_SEARCH_LIMIT,
+apps/api/routes/market_data_reference.py:136:            default=DEFAULT_INSTRUMENT_SEARCH_LIMIT,
+apps/api/routes/market_data_reference.py:138:            le=MAX_INSTRUMENT_SEARCH_LIMIT,
+apps/api/routes/market_data_reference.py:175:        limit: int = Query(default=50, ge=1, le=MAX_INSTRUMENT_SEARCH_LIMIT),
+apps/api/routes/market_data_reference.py:415:        market_id=MarketId(market_id), q=normalized_symbol, limit=MAX_INSTRUMENT_SEARCH_LIMIT
+apps/api/monitoring.py:35:_STRATEGY_VARIANT_LAUNCH_TOTAL = Counter(
+apps/api/monitoring.py:110:_EXECUTION_DISPATCH_TOTAL = Counter(
+apps/api/monitoring.py:115:_EXECUTION_DISPATCH_RETRY_TOTAL = Counter(
+apps/api/monitoring.py:120:_EXECUTION_DISPATCH_DLQ_TOTAL = Counter(
+apps/api/monitoring.py:125:_EXECUTION_DISPATCH_BACKPRESSURE_TOTAL = Counter(
+apps/api/monitoring.py:130:_EXECUTION_DISPATCH_REDIS_ERRORS_TOTAL = Counter(
+apps/api/monitoring.py:275:    _STRATEGY_VARIANT_LAUNCH_TOTAL.labels(result=result, reason=reason).inc()
+apps/api/monitoring.py:381:    _EXECUTION_DISPATCH_TOTAL.labels(
+apps/api/monitoring.py:388:    _EXECUTION_DISPATCH_RETRY_TOTAL.labels(reason=(reason or "unknown")[:80]).inc()
+apps/api/monitoring.py:392:    _EXECUTION_DISPATCH_DLQ_TOTAL.labels(reason=(reason or "unknown")[:80]).inc()
+apps/api/monitoring.py:396:    _EXECUTION_DISPATCH_BACKPRESSURE_TOTAL.labels(reason=(reason or "unknown")[:80]).inc()
+apps/api/monitoring.py:400:    _EXECUTION_DISPATCH_REDIS_ERRORS_TOTAL.labels(reason=(reason or "unknown")[:80]).inc()
+apps/api/dto/market_data_reference.py:31:      - migrations/clickhouse/market_data_ddl.sql
+src/trading/contexts/strategy/application/use_cases/__init__.py:28:    SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1,
+src/trading/contexts/strategy/application/use_cases/__init__.py:58:    "SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1",
+tests/unit/contexts/backtest/application/services/test_research_identity.py:4:    RESEARCH_REQUEST_NAMESPACE,
+tests/unit/contexts/backtest/application/services/test_research_identity.py:32:    assert RESEARCH_REQUEST_NAMESPACE == "research-request/v1"
+apps/platform-web/e2e/journey.spec.ts:213:      boundary: 'Real production API/auth/worker, disposable PostgreSQL/ClickHouse and synthetic production artifacts; no mocked response',
+apps/platform-web/src/style.css:333:/* Content changes never morph a chart bitmap or fade the surrounding workspace. */
+apps/api/wiring/modules/live_execution.py:46:_DISPATCH_ENABLED_KEY = "ROEHUB_EXECUTION_DISPATCH_REDIS_ENABLED"
+apps/api/wiring/modules/live_execution.py:47:_DISPATCH_REDIS_HOST_KEY = "ROEHUB_EXECUTION_DISPATCH_REDIS_HOST"
+apps/api/wiring/modules/live_execution.py:48:_DISPATCH_REDIS_PORT_KEY = "ROEHUB_EXECUTION_DISPATCH_REDIS_PORT"
+apps/api/wiring/modules/live_execution.py:49:_DISPATCH_REDIS_DB_KEY = "ROEHUB_EXECUTION_DISPATCH_REDIS_DB"
+apps/api/wiring/modules/live_execution.py:50:_DISPATCH_REDIS_PASSWORD_ENV_KEY = "ROEHUB_EXECUTION_DISPATCH_REDIS_PASSWORD_ENV"
+apps/api/wiring/modules/live_execution.py:51:_DISPATCH_REDIS_SOCKET_TIMEOUT_KEY = "ROEHUB_EXECUTION_DISPATCH_REDIS_SOCKET_TIMEOUT_S"
+apps/api/wiring/modules/live_execution.py:52:_DISPATCH_REDIS_CONNECT_TIMEOUT_KEY = "ROEHUB_EXECUTION_DISPATCH_REDIS_CONNECT_TIMEOUT_S"
+apps/api/wiring/modules/live_execution.py:53:_DISPATCH_REQUEST_STREAM_KEY = "ROEHUB_EXECUTION_DISPATCH_REQUEST_STREAM"
+apps/api/wiring/modules/live_execution.py:54:_DISPATCH_RETRY_STREAM_KEY = "ROEHUB_EXECUTION_DISPATCH_RETRY_STREAM"
+apps/api/wiring/modules/live_execution.py:55:_DISPATCH_DLQ_STREAM_KEY = "ROEHUB_EXECUTION_DISPATCH_DLQ_STREAM"
+apps/api/wiring/modules/live_execution.py:56:_DISPATCH_CONSUMER_GROUP_KEY = "ROEHUB_EXECUTION_DISPATCH_CONSUMER_GROUP"
+apps/api/wiring/modules/live_execution.py:57:_DISPATCH_RETRY_BUDGET_KEY = "ROEHUB_EXECUTION_DISPATCH_RETRY_BUDGET"
+apps/api/wiring/modules/live_execution.py:58:_DISPATCH_BACKPRESSURE_LENGTH_KEY = "ROEHUB_EXECUTION_DISPATCH_BACKPRESSURE_LENGTH"
+apps/api/wiring/modules/live_execution.py:214:        redis_host=environ.get(_DISPATCH_REDIS_HOST_KEY, _default_redis_host(env_name)).strip(),
+apps/api/wiring/modules/live_execution.py:216:            environ.get(_DISPATCH_REDIS_PORT_KEY, "6379"),
+apps/api/wiring/modules/live_execution.py:217:            key=_DISPATCH_REDIS_PORT_KEY,
+apps/api/wiring/modules/live_execution.py:220:            environ.get(_DISPATCH_REDIS_DB_KEY, "0"),
+apps/api/wiring/modules/live_execution.py:221:            key=_DISPATCH_REDIS_DB_KEY,
+apps/api/wiring/modules/live_execution.py:223:        redis_password_env=_optional_str(environ.get(_DISPATCH_REDIS_PASSWORD_ENV_KEY)),
+apps/api/wiring/modules/live_execution.py:225:            environ.get(_DISPATCH_REDIS_SOCKET_TIMEOUT_KEY, "2.0"),
+apps/api/wiring/modules/live_execution.py:226:            key=_DISPATCH_REDIS_SOCKET_TIMEOUT_KEY,
+apps/api/wiring/modules/live_execution.py:229:            environ.get(_DISPATCH_REDIS_CONNECT_TIMEOUT_KEY, "2.0"),
+apps/api/wiring/modules/live_execution.py:230:            key=_DISPATCH_REDIS_CONNECT_TIMEOUT_KEY,
+apps/api/wiring/modules/live_execution.py:233:            _DISPATCH_REQUEST_STREAM_KEY, "execution.requests.v1"
+apps/api/wiring/modules/live_execution.py:236:            _DISPATCH_RETRY_STREAM_KEY, "execution.requests.retry.v1"
+apps/api/wiring/modules/live_execution.py:238:        dlq_stream=environ.get(_DISPATCH_DLQ_STREAM_KEY, "execution.requests.dlq.v1").strip(),
+apps/api/wiring/modules/live_execution.py:240:            _DISPATCH_CONSUMER_GROUP_KEY, "exchange-execution.v1"
+apps/api/wiring/modules/live_execution.py:243:            environ.get(_DISPATCH_RETRY_BUDGET_KEY, "3"),
+apps/api/wiring/modules/live_execution.py:244:            key=_DISPATCH_RETRY_BUDGET_KEY,
+apps/api/wiring/modules/live_execution.py:247:            environ.get(_DISPATCH_BACKPRESSURE_LENGTH_KEY, "10000"),
+apps/api/wiring/modules/live_execution.py:248:            key=_DISPATCH_BACKPRESSURE_LENGTH_KEY,
+apps/api/wiring/modules/live_execution.py:263:    raw = environ.get(_DISPATCH_ENABLED_KEY)
+apps/api/wiring/modules/live_execution.py:266:    return _parse_bool_for_key(raw, key=_DISPATCH_ENABLED_KEY)
+apps/platform-web/e2e/library.spec.ts:111:    boundary: 'Production local Web/auth/API + disposable PostgreSQL/ClickHouse; two real API-created jobs from 4320 synthetic candles',
+src/trading/contexts/strategy/application/use_cases/scenario_matrix.py:40:SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1: tuple[str, ...] = ("single_position_cap",)
+src/trading/contexts/strategy/application/use_cases/scenario_matrix.py:173:                        SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1,
+src/trading/contexts/strategy/application/use_cases/scenario_matrix.py:366:    "SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1",
+apps/api/wiring/modules/ui_backtests.py:67:    MAX_INSTRUMENT_SEARCH_LIMIT,
+apps/api/wiring/modules/ui_backtests.py:393:                limit=MAX_INSTRUMENT_SEARCH_LIMIT,
+src/trading/contexts/strategy/application/__init__.py:59:    SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1,
+src/trading/contexts/strategy/application/__init__.py:151:    "SCENARIO_MATRIX_LAUNCH_RISK_MODES_V1",
+tests/unit/contexts/rl_trading/domain/test_feature_contract.py:37:        "hot_path_clickhouse_scan": "forbidden",
+apps/api/wiring/modules/market_data_reference.py:132:      - apps/cli/wiring/db/clickhouse.py
+apps/api/wiring/modules/market_data_reference.py:140:        ClickHouse settings loader applies repository-wide fail-fast validation policy.
+apps/api/wiring/modules/market_data_reference.py:142:        ValueError: If auth dependency or ClickHouse settings are invalid.
+apps/api/wiring/modules/market_data_reference.py:144:        Configures thread-local ClickHouse gateway factory for request-time reads.
+tests/unit/contexts/rl_trading/domain/test_backtest_evaluation.py:9:    STAGE08_RESEARCH_FUNDING_MODEL_V1,
+tests/unit/contexts/rl_trading/domain/test_backtest_evaluation.py:43:    assert scorecard["costs"]["funding_model"] == STAGE08_RESEARCH_FUNDING_MODEL_V1
+apps/platform-web/e2e/foundation.spec.ts:151:    boundary: 'Real Web + production auth/API + disposable PostgreSQL/ClickHouse + synthetic artifact files',
+src/trading/contexts/rl_trading/domain/feature_contract.py:214:            "hot_path_clickhouse_scan": "forbidden",
+src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py:155:_EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
+src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py:8996:    return int((value.value - _EPOCH_UTC) // timedelta(milliseconds=1))
+src/trading/contexts/backtest_artifacts/application/services/v2/artifact_precompute_runner.py:9019:    return UtcTimestamp(_EPOCH_UTC + timedelta(milliseconds=value))
+src/trading/contexts/rl_trading/domain/backtest_evaluation.py:39:STAGE08_RESEARCH_FUNDING_MODEL_V1 = "research_zero_funding_no_point_in_time_arrays"
+src/trading/contexts/rl_trading/domain/backtest_evaluation.py:59:    funding_model: str = STAGE08_RESEARCH_FUNDING_MODEL_V1
+src/trading/contexts/rl_trading/domain/backtest_evaluation.py:441:                if selected_config.funding_model == STAGE08_RESEARCH_FUNDING_MODEL_V1
+src/trading/contexts/rl_trading/domain/backtest_evaluation.py:743:    if config.funding_model == STAGE08_RESEARCH_FUNDING_MODEL_V1:
+src/trading/contexts/rl_trading/domain/__init__.py:53:    STAGE08_RESEARCH_FUNDING_MODEL_V1,
+src/trading/contexts/rl_trading/domain/__init__.py:545:    "STAGE08_RESEARCH_FUNDING_MODEL_V1",
+src/trading/contexts/rl_trading/domain/upstream_methodology.py:46:DEFAULT_TORCH_NUM_THREADS_V1 = max(1, os.cpu_count() or 1)
+src/trading/contexts/rl_trading/domain/upstream_methodology.py:112:    torch_num_threads: int = DEFAULT_TORCH_NUM_THREADS_V1
+src/trading/contexts/market_data/application/ports/stores/enabled_tradable_instrument_search_reader.py:17:      - src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/
+src/trading/contexts/market_data/application/ports/stores/enabled_market_reader.py:16:      - src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/
+src/trading/contexts/market_data/application/use_cases/time_slicing.py:14:    - ClickHouse raw-таблицы партиционированы по дню (toYYYYMMDD по времени открытия свечи).
+src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py:366:            Reads ClickHouse bounds, writes inactive-slot artifacts, validates the slot, and
+src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py:553:        requested_time_range: Full canonical ClickHouse bounds for the target symbol.
+src/trading/contexts/backtest_artifacts/application/use_cases/publish_backtest_artifacts_v2.py:560:        Incremental publish is a tail refresh. If ClickHouse later exposes older canonical rows
+src/trading/contexts/market_data/application/ports/stores/canonical_candle_reader.py:27:    - concrete storage adapter chooses implementation strategy (`FINAL` or equivalent), without
+src/trading/contexts/market_data/application/use_cases/list_enabled_markets.py:20:      - src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/
+src/trading/contexts/market_data/application/use_cases/rest_fill_range_1m.py:46:    - `max_days_per_insert` is in `[1, 7]` for ClickHouse partition safety.
+src/trading/contexts/market_data/application/use_cases/__init__.py:24:    DEFAULT_INSTRUMENT_SEARCH_LIMIT,
+src/trading/contexts/market_data/application/use_cases/__init__.py:25:    MAX_INSTRUMENT_SEARCH_LIMIT,
+src/trading/contexts/market_data/application/use_cases/__init__.py:57:    "DEFAULT_INSTRUMENT_SEARCH_LIMIT",
+src/trading/contexts/market_data/application/use_cases/__init__.py:58:    "MAX_INSTRUMENT_SEARCH_LIMIT",
+src/trading/contexts/market_data/application/use_cases/search_enabled_tradable_instruments.py:10:DEFAULT_INSTRUMENT_SEARCH_LIMIT = 50
+src/trading/contexts/market_data/application/use_cases/search_enabled_tradable_instruments.py:11:MAX_INSTRUMENT_SEARCH_LIMIT = 200
+src/trading/contexts/market_data/application/use_cases/search_enabled_tradable_instruments.py:24:      - src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/
+src/trading/contexts/market_data/application/use_cases/search_enabled_tradable_instruments.py:30:    default_limit: int = DEFAULT_INSTRUMENT_SEARCH_LIMIT
+src/trading/contexts/market_data/application/use_cases/search_enabled_tradable_instruments.py:31:    max_limit: int = MAX_INSTRUMENT_SEARCH_LIMIT
+src/trading/contexts/market_data/application/use_cases/rest_catchup_1m.py:354:        # day -> count (IMPORTANT: day is datetime.date from ClickHouse)
+src/trading/contexts/strategy/adapters/outbound/config/live_runner_runtime_config.py:37:    StrategyLiveRunnerRepairConfig — repair(read) retry policy for canonical ClickHouse lag.
+src/trading/contexts/backtest/application/services/research_identity.py:10:RESEARCH_REQUEST_NAMESPACE = "research-request/v1"
+src/trading/contexts/backtest/application/services/research_identity.py:32:    namespaced = f"{RESEARCH_REQUEST_NAMESPACE}\0{organization_id}\0{normalized}"
+src/trading/contexts/backtest/application/services/research_identity.py:51:    "RESEARCH_REQUEST_NAMESPACE",
+src/trading/contexts/backtest/application/services/v2/no_risk_exact.py:116:NO_RISK_SEARCH_METRIC_PROFILE = "ranking_total_return_trade_count"
+src/trading/contexts/backtest/application/services/v2/no_risk_exact.py:270:            NO_RISK_SEARCH_METRIC_PROFILE
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md:6:target or ClickHouse fallback. Identity, organization access, provider HTTP, Redis and
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/work_request_repository.py:47:        connection fails closed. Already in-flight ClickHouse inserts can finish;
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/INGESTION.md:67:optional fields. This intentionally breaks reliance on old CH argMax nullable-field
+src/trading/contexts/backtest/application/services/v2/tp_sl_hit_times.py:41:DEFAULT_TP_SL_GRID_MATCH_ATOL = 1e-7
+src/trading/contexts/backtest/application/services/v2/tp_sl_hit_times.py:90:    match_atol: float = DEFAULT_TP_SL_GRID_MATCH_ATOL
+src/trading/contexts/backtest/application/services/v2/tp_sl_hit_times.py:588:    "DEFAULT_TP_SL_GRID_MATCH_ATOL",
+tests/unit/contexts/market_data/adapters/test_postgres_candle_repair_audit_repository.py:57:def test_postgres_candle_repair_audit_repository_inserts_and_reads_without_clickhouse() -> None:
+tests/unit/contexts/market_data/adapters/test_postgres_candle_repair_audit_repository.py:79:    assert "ClickHouse" not in joined_queries
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_reader.py:15:from .query_support import BATCH_ROWS, key, rows
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_reader.py:149:                    if len(batch) == BATCH_ROWS:
+src/trading/contexts/backtest/application/services/__init__.py:6:    RESEARCH_REQUEST_NAMESPACE,
+src/trading/contexts/backtest/application/services/__init__.py:36:    "RESEARCH_REQUEST_NAMESPACE",
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/query_support.py:8:BATCH_ROWS = 4096
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/query_support.py:36:        while batch := cursor.fetchmany(BATCH_ROWS):
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/research_export.py:11:from .query_support import BATCH_ROWS, rows
+src/trading/contexts/market_data/adapters/outbound/persistence/postgres/research_export.py:84:                if len(batch) == BATCH_ROWS:
+tests/unit/tools/test_offline_release_bundle.py:31:    "clickhouse",
+tests/unit/tools/test_local_platform.py:57:    assert "clickhouse" not in compose["services"]
+tests/unit/tools/test_local_platform.py:86:        {"clickhouse_volume": "old-store"},
+src/trading/contexts/backtest/application/services/v2/__init__.py:202:    DEFAULT_TP_SL_GRID_MATCH_ATOL,
+src/trading/contexts/backtest/application/services/v2/__init__.py:234:    "DEFAULT_TP_SL_GRID_MATCH_ATOL",
+src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/market_data_candle_feed.py:38:_EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
+src/trading/contexts/indicators/adapters/outbound/feeds/market_data_acl/market_data_candle_feed.py:238:    delta = ts.value - _EPOCH_UTC

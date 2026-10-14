@@ -1,0 +1,12 @@
+{
+  "action": "start",
+  "services": [
+    "api",
+    "web",
+    "operational-health"
+  ],
+  "operation_id": "7bdee1a8-2442-4063-8048-f2a9167d4d1b",
+  "returncode": 0,
+  "stdout": "{\"action\": \"start\", \"active_services\": [\"api\", \"operational-health\", \"postgresql\", \"web\"], \"detail_code\": \"topology.started\", \"journal_sequence\": 345, \"operation_id\": \"7bdee1a8-2442-4063-8048-f2a9167d4d1b\", \"profile\": \"trading\", \"schema\": \"io.roehub.control-operation-result/v1alpha1\", \"state\": \"succeeded\"}\n",
+  "stderr": ""
+}

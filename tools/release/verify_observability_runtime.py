@@ -27,8 +27,6 @@ PROJECT_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]{2,62}$")
 MONITORING_SERVICES = (
     "alertmanager",
     "blackbox",
-    "grafana",
-    "loki",
     "operational-health",
     "prometheus",
 )
@@ -38,10 +36,8 @@ INJECTIONS = (
     ("api", "ready"),
     ("strategy-live-runner", "ready"),
     ("postgresql", "unknown"),
-    ("clickhouse", "unknown"),
     ("redis", "unknown"),
     ("openbao", "degraded"),
-    ("plugin-gateway", "degraded"),
 )
 
 
@@ -199,8 +195,7 @@ def _wait_state(
 def _prometheus_alert_firing(prometheus_port: int, service: str) -> bool:
     payload = _get_json(prometheus_port, "/api/v1/alerts")
     return any(
-        item.get("labels", {}).get("alertname")
-        == "RoehubOperationalServiceDegraded"
+        item.get("labels", {}).get("alertname") == "RoehubOperationalServiceDegraded"
         and item.get("labels", {}).get("service") == service
         and item.get("state") == "firing"
         for item in payload.get("data", {}).get("alerts", [])
@@ -210,8 +205,7 @@ def _prometheus_alert_firing(prometheus_port: int, service: str) -> bool:
 def _prometheus_named_alert_firing(prometheus_port: int, alert_name: str) -> bool:
     payload = _get_json(prometheus_port, "/api/v1/alerts")
     return any(
-        item.get("labels", {}).get("alertname") == alert_name
-        and item.get("state") == "firing"
+        item.get("labels", {}).get("alertname") == alert_name and item.get("state") == "firing"
         for item in payload.get("data", {}).get("alerts", [])
     )
 
@@ -253,8 +247,7 @@ def _wait_named_alert(
 def _alertmanager_has_service(alertmanager_port: int, service: str) -> bool:
     payload = _get_json(alertmanager_port, "/api/v2/alerts")
     return any(
-        item.get("labels", {}).get("alertname")
-        == "RoehubOperationalServiceDegraded"
+        item.get("labels", {}).get("alertname") == "RoehubOperationalServiceDegraded"
         and item.get("labels", {}).get("service") == service
         for item in payload
     )
@@ -277,46 +270,6 @@ def _wait_alertmanager(
     )
 
 
-def _loki_transitions(loki_port: int, service: str) -> list[dict[str, Any]]:
-    payload = _get_json(
-        loki_port,
-        "/loki/api/v1/query_range",
-        params={
-            "query": (
-                '{source="roehub-operational-health",'
-                f'profile="trading",service="{service}"}}'
-            ),
-            "limit": "500",
-            "since": "2h",
-        },
-    )
-    transitions: list[dict[str, Any]] = []
-    for stream in payload.get("data", {}).get("result", []):
-        for _timestamp, line in stream.get("values", []):
-            value = json.loads(line)
-            if value.get("event") == "operational_state_transition":
-                transitions.append(value)
-    return transitions
-
-
-def _wait_loki_state(
-    loki_port: int,
-    service: str,
-    state: str,
-    *,
-    timeout: float = 60,
-) -> int:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        transitions = _loki_transitions(loki_port, service)
-        if any(item.get("state") == state for item in transitions):
-            return len(transitions)
-        time.sleep(1)
-    raise ObservabilityProofError(
-        f"Loki transition did not appear: service={service}, state={state}"
-    )
-
-
 def _prometheus_history(prometheus_port: int, service: str) -> list[dict[str, Any]]:
     now = time.time()
     payload = _get_json(
@@ -324,8 +277,7 @@ def _prometheus_history(prometheus_port: int, service: str) -> list[dict[str, An
         "/api/v1/query_range",
         params={
             "query": (
-                "roehub_operational_service_state"
-                f'{{service="{service}",state="stopped"}}'
+                "roehub_operational_service_state" f'{{service="{service}",state="stopped"}}'
             ),
             "start": str(now - 3600),
             "end": str(now),
@@ -339,8 +291,6 @@ def _monitoring_ready(ports: dict[str, int]) -> dict[str, str]:
     paths = {
         "alertmanager": "/-/ready",
         "blackbox": "/-/ready",
-        "grafana": "/api/health",
-        "loki": "/ready",
         "operational-health": "/health/ready",
         "prometheus": "/-/ready",
     }
@@ -362,7 +312,7 @@ def _running_monitoring(project: str) -> list[str]:
 
 def _volume_evidence(project: str) -> dict[str, str]:
     result: dict[str, str] = {}
-    for owner in ("alertmanager", "grafana", "loki", "prometheus"):
+    for owner in ("alertmanager", "prometheus"):
         name = f"{project}_{owner}-data"
         payload = json.loads(_run(["docker", "volume", "inspect", name]))[0]
         if payload.get("Labels", {}).get("io.roehub.state-owner") != owner:
@@ -388,9 +338,7 @@ def _cleanup_project(project: str, compose: list[str]) -> dict[str, Any]:
     _run([*compose, "down", "-v", "--remove-orphans"], timeout=180)
     residual = _residual_resources(project)
     if any(residual.values()):
-        raise ObservabilityProofError(
-            f"Compose cleanup left residual resources: {residual}"
-        )
+        raise ObservabilityProofError(f"Compose cleanup left residual resources: {residual}")
     return {
         "status": "completed",
         "project": project,
@@ -426,8 +374,6 @@ def verify_observability_runtime(
     ports = {
         "alertmanager": _port(project, "alertmanager", 9093),
         "blackbox": _port(project, "blackbox", 9115),
-        "grafana": _port(project, "grafana", 3000),
-        "loki": _port(project, "loki", 3100),
         "operational-health": _port(project, "operational-health", 9300),
         "prometheus": _port(project, "prometheus", 9090),
     }
@@ -437,10 +383,6 @@ def verify_observability_runtime(
         baseline = _snapshot(ports["operational-health"])
         if _service_state(baseline, "openbao") != "degraded":
             raise ObservabilityProofError("fresh sealed OpenBao must map to degraded")
-        if _service_state(baseline, "plugin-gateway") != "degraded":
-            raise ObservabilityProofError(
-                "plugin HTTP 200 domain-degraded response must not map to ready"
-            )
         baseline_states = {
             service: _service_state(baseline, service) for service, _state in INJECTIONS
         }
@@ -462,11 +404,6 @@ def verify_observability_runtime(
             _wait_alert(ports["prometheus"], service, firing=True)
             if service == "api":
                 _wait_alertmanager(ports["alertmanager"], service, active=True)
-            stopped_log_count = _wait_loki_state(
-                ports["loki"],
-                service,
-                "stopped",
-            )
             _run([*compose, "start", service], timeout=60)
             recovered_state, recovered_detail = _wait_state(
                 ports["operational-health"],
@@ -477,11 +414,6 @@ def verify_observability_runtime(
                 _wait_alert(ports["prometheus"], service, firing=False)
             if service == "api":
                 _wait_alertmanager(ports["alertmanager"], service, active=False)
-            recovered_log_count = _wait_loki_state(
-                ports["loki"],
-                service,
-                recovered_state,
-            )
             injections.append(
                 {
                     "service": service,
@@ -490,8 +422,6 @@ def verify_observability_runtime(
                     "recovery_state": recovered_state,
                     "recovery_detail": recovered_detail,
                     "monitoring_running": running_monitoring,
-                    "bounded_log_transitions": recovered_log_count,
-                    "new_failure_transitions": recovered_log_count >= stopped_log_count,
                 }
             )
 
@@ -518,20 +448,12 @@ def verify_observability_runtime(
         }
 
         api_stopped_history = _prometheus_history(ports["prometheus"], "api")
-        api_logs_before_restart = _loki_transitions(ports["loki"], "api")
         if not api_stopped_history:
             raise ObservabilityProofError("Prometheus did not retain the API failure series")
-        if not api_logs_before_restart:
-            raise ObservabilityProofError("Loki did not retain the API transition log")
 
-        _run([*compose, "restart", "prometheus", "loki"], timeout=90)
+        _run([*compose, "restart", "prometheus"], timeout=90)
         ports["prometheus"] = _port(project, "prometheus", 9090)
-        ports["loki"] = _port(project, "loki", 3100)
         _wait_http(ports["prometheus"], "/-/ready")
-        _wait_http(ports["loki"], "/ready")
-        api_logs_after_restart = _loki_transitions(ports["loki"], "api")
-        if len(api_logs_after_restart) < len(api_logs_before_restart):
-            raise ObservabilityProofError("Loki transitions did not survive restart")
         persisted_history = _prometheus_history(ports["prometheus"], "api")
         if not persisted_history:
             raise ObservabilityProofError("Prometheus failure series did not survive restart")
@@ -586,20 +508,14 @@ def verify_observability_runtime(
             firing=False,
         )
 
-        grafana_search = httpx.get(
-            f"http://127.0.0.1:{ports['grafana']}/api/search",
-            timeout=5,
-            follow_redirects=False,
+        observed_states = (
+            {item["failure_state"] for item in injections}
+            | {item["recovery_state"] for item in injections}
+            | {
+                timeout_injection["failure_state"],
+                timeout_injection["recovery_state"],
+            }
         )
-        if grafana_search.status_code != 401:
-            raise ObservabilityProofError("Grafana anonymous API access is not disabled")
-
-        observed_states = {
-            item["failure_state"] for item in injections
-        } | {item["recovery_state"] for item in injections} | {
-            timeout_injection["failure_state"],
-            timeout_injection["recovery_state"],
-        }
         if observed_states != {"ready", "degraded", "stopped", "unknown"}:
             raise ObservabilityProofError(
                 f"four-state runtime proof incomplete: {sorted(observed_states)}"
@@ -612,7 +528,6 @@ def verify_observability_runtime(
             "baseline_overall_state": baseline["overall_state"],
             "baseline_service_states": baseline_states,
             "fresh_openbao_state": "degraded",
-            "plugin_http_200_degraded_state": "degraded",
             "observed_operational_states": sorted(observed_states),
             "monitoring_readiness": readiness,
             "failure_injections": injections,
@@ -627,10 +542,7 @@ def verify_observability_runtime(
             "api_alert_lifecycle": "fired-and-resolved",
             "alert_receiver": "local-audit-only",
             "prometheus_failure_series_persisted": True,
-            "loki_transition_count_before_restart": len(api_logs_before_restart),
-            "loki_transition_count_after_restart": len(api_logs_after_restart),
             "observability_volumes": _volume_evidence(project),
-            "grafana_anonymous_api": "denied",
             "external_notifications": False,
             "external_provider_writes": False,
             "real_order_effects": False,

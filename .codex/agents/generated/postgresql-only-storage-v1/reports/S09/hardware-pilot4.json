@@ -1,0 +1,9 @@
+{
+  "purpose": "pilot4 matched hardware intervention; same binary reader/mix as pilot3",
+  "previous_pg_cpus": 2,
+  "pg_nanocpus": 4000000000,
+  "pg_memory_bytes": 4294967296,
+  "image_id": "sha256:ca0bd484cb98bf4b24eb1010e73fb3fcbd6714d240fbc1a10eea5b7dbecb641d",
+  "client_unchanged": "4CPU/6GiB",
+  "durability_unchanged": true
+}

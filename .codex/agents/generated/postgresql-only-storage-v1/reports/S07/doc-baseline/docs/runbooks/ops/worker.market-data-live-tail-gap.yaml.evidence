@@ -1,0 +1,87 @@
+apiVersion: ops.roehub.io/v1
+kind: Runbook
+metadata:
+  id: worker.market-data-live-tail-gap
+  revision: 1
+  source_legacy: docs/runbooks/market-data-live-tail-repair.md
+spec:
+  title: Market-data live tail remains incomplete beyond policy
+  summary: Bound the missing interval and pause dependent work before attempting recovery.
+  severity: high
+  component_ids: [worker:market_data_ws, context:market_data]
+  prerequisites:
+    - id: identify_market
+      text: Confirm the installation, source instance, market, instrument, and interval without private account data.
+    - id: preserve_checkpoint
+      text: Preserve the last acknowledged checkpoint before changing worker state.
+  symptoms:
+    - id: unrepaired_gap
+      text: A closed interval remains missing after the repair policy window.
+    - id: repair_circuit_open
+      text: The ClickHouse repair circuit remains open or REST fallback errors grow.
+  diagnostics:
+    - id: inspect_freshness
+      capability: observe.metrics.query
+      instruction: Compare live-tail lag, cache misses, repair attempts, and acknowledgement progress.
+      expected_evidence: A bounded per-source freshness snapshot with sanitized labels.
+    - id: read_worker_logs
+      capability: observe.logs.read
+      instruction: Read bounded worker events around the first missing interval.
+      expected_evidence: Redacted event classes and timestamps without payloads or credentials.
+  allowed_actions:
+    - id: pause_worker
+      capability: control.worker.pause
+      instruction: Pause the affected worker when continued acknowledgement would hide the gap.
+      approval: operator
+      effect: reversible
+    - id: restart_worker
+      capability: control.service.restart
+      instruction: Restart the affected worker after preserving its checkpoint and bounded evidence.
+      approval: operator
+      effect: reversible
+    - id: resume_worker
+      capability: control.worker.resume
+      instruction: Resume the worker only after the missing interval is repaired or explicitly quarantined.
+      approval: operator
+      effect: reversible
+  rollback:
+    - id: resume_preserved_checkpoint
+      action_ref: resume_worker
+      instruction: Resume from the preserved checkpoint after verifying no interval was skipped.
+      expected_evidence: Checkpoint continuity and freshness metrics are within policy.
+  evidence:
+    collect:
+      - id: lag_window
+        text: First missing interval, last acknowledged interval, and current closed interval.
+      - id: repair_outcomes
+        text: Sanitized repair source outcomes and circuit state.
+    success_conditions:
+      - id: continuity_restored
+        text: The closed interval sequence is continuous and acknowledgements advance normally.
+    failure_conditions:
+      - id: gap_persists
+        text: The gap persists or recovery would require unknown source data.
+  secret_redaction:
+    forbidden_evidence_keys: [api_key, authorization, cookie, secret, token]
+    rules:
+      - id: redact_source_credentials
+        text: Never record provider credentials or signed request material.
+      - id: bound_market_payloads
+        text: Record interval identities and counts, not raw provider payloads.
+  owner:
+    team: market-data.operations
+    escalation_role: operator
+  related_alerts:
+    - MarketDataClickHouseRepairCircuitOpenTooLong
+    - MarketDataLiveTailUnrepairedGapBeyondPolicy
+    - MarketDataRestTailRepairErrors
+  monitoring_gaps: []
+  safety:
+    warnings:
+      - id: no_blind_ack
+        text: Do not advance acknowledgements across a missing closed interval.
+      - id: no_unbounded_backfill
+        text: Do not start an unbounded historical backfill from this runbook.
+    stop_conditions:
+      - id: source_identity_unknown
+        text: Stop if source, market, instrument, or checkpoint identity is ambiguous.

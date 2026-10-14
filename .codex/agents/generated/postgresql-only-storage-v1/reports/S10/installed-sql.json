@@ -1,0 +1,298 @@
+{
+  "coverage": [
+    [
+      1,
+      "0GUSDT",
+      2880,
+      "2026-10-10 00:00:00+00:00",
+      "2026-10-11 23:59:00+00:00",
+      "b8f5ab1d-c22c-49f6-8365-31fec6f06b83"
+    ],
+    [
+      1,
+      "AAPLBUSDT",
+      2880,
+      "2026-10-10 00:00:00+00:00",
+      "2026-10-11 23:59:00+00:00",
+      "dfab8cc8-2f70-4f18-a97d-ef33f188fa0e"
+    ],
+    [
+      1,
+      "AAVEUSDT",
+      2880,
+      "2026-10-10 00:00:00+00:00",
+      "2026-10-11 23:59:00+00:00",
+      "00f392b6-327a-4465-9bf7-980d63d5bd8a"
+    ],
+    [
+      1,
+      "ACTUSDT",
+      2880,
+      "2026-10-10 00:00:00+00:00",
+      "2026-10-11 23:59:00+00:00",
+      "ba4acd53-caa2-46ff-8385-9c9fc2869f04"
+    ],
+    [
+      2,
+      "0GUSDT",
+      2880,
+      "2026-10-10 00:00:00+00:00",
+      "2026-10-11 23:59:00+00:00",
+      "5bada9c0-b4ac-4af3-877a-ff6c51544566"
+    ]
+  ],
+  "canonical": [
+    [
+      1,
+      "0GUSDT",
+      2880,
+      "2026-10-10 00:00:00+00:00",
+      "2026-10-11 23:59:00+00:00"
+    ],
+    [
+      1,
+      "AAPLBUSDT",
+      2880,
+      "2026-10-10 00:00:00+00:00",
+      "2026-10-11 23:59:00+00:00"
+    ],
+    [
+      1,
+      "AAVEUSDT",
+      2880,
+      "2026-10-10 00:00:00+00:00",
+      "2026-10-11 23:59:00+00:00"
+    ],
+    [
+      1,
+      "ACTUSDT",
+      2880,
+      "2026-10-10 00:00:00+00:00",
+      "2026-10-11 23:59:00+00:00"
+    ],
+    [
+      2,
+      "0GUSDT",
+      2880,
+      "2026-10-10 00:00:00+00:00",
+      "2026-10-11 23:59:00+00:00"
+    ]
+  ],
+  "selected": [
+    [
+      1,
+      "0GUSDT"
+    ],
+    [
+      1,
+      "AAPLBUSDT"
+    ],
+    [
+      1,
+      "AAVEUSDT"
+    ],
+    [
+      1,
+      "ACTUSDT"
+    ],
+    [
+      2,
+      "0GUSDT"
+    ]
+  ],
+  "stream_connections": [],
+  "funding": [],
+  "artifact_requests": [
+    [
+      "16108c28-551d-47d4-a7a2-c62985258f1f",
+      "binance",
+      "spot",
+      "AAVEUSDT",
+      "error",
+      "retained_manifest_precheck_refused"
+    ],
+    [
+      "bf0aff25-0abe-401f-87ee-2028d04a4f8a",
+      "binance",
+      "spot",
+      "AAVEUSDT",
+      "error",
+      "retained_manifest_precheck_refused"
+    ],
+    [
+      "ec8287b0-7320-48c3-9566-138f30f030bd",
+      "binance",
+      "spot",
+      "ACTUSDT",
+      "ready",
+      null
+    ],
+    [
+      "ca7166bd-599e-44d3-9b54-6bec3edc98f8",
+      "binance",
+      "spot",
+      "ACTUSDT",
+      "ready",
+      null
+    ],
+    [
+      "a3eb684e-d700-4c9b-a72c-620d80bf505c",
+      "binance",
+      "spot",
+      "0GUSDT",
+      "ready",
+      null
+    ],
+    [
+      "68ac6a95-6b7d-48fc-bd24-58b2b4d6b7b5",
+      "binance",
+      "futures",
+      "0GUSDT",
+      "error",
+      "funding_unavailable"
+    ],
+    [
+      "2df39c9b-df5a-4936-88b1-caa40b0bc80d",
+      "binance",
+      "spot",
+      "AAPLBUSDT",
+      "ready",
+      null
+    ],
+    [
+      "bca0772b-8463-487f-a7dc-54bd463b95a7",
+      "binance",
+      "spot",
+      "AAVEUSDT",
+      "ready",
+      null
+    ],
+    [
+      "3ee48c8a-96ce-4fb6-8fd3-bac5bbb892c0",
+      "binance",
+      "spot",
+      "AAPLBUSDT",
+      "ready",
+      null
+    ],
+    [
+      "2d6c0db0-dbda-4be3-ad52-e24a0620e7c4",
+      "binance",
+      "spot",
+      "0GUSDT",
+      "ready",
+      null
+    ],
+    [
+      "ff7453d2-7913-4a33-861f-cca8b44b04db",
+      "binance",
+      "futures",
+      "0GUSDT",
+      "error",
+      "funding_unavailable"
+    ]
+  ],
+  "artifact_events": [
+    [
+      "error",
+      "funding_unavailable",
+      2
+    ],
+    [
+      "error",
+      "retained_manifest_precheck_refused",
+      2
+    ],
+    [
+      "ready",
+      null,
+      7
+    ],
+    [
+      "running",
+      "publication_reconciliation_required",
+      2
+    ],
+    [
+      "running",
+      null,
+      302
+    ]
+  ],
+  "catalog_job": [
+    [
+      "81415c14-943f-4e46-8eb1-40c070e7e91a",
+      "catalog_refresh",
+      "failed",
+      "source_or_storage_unavailable",
+      0
+    ]
+  ],
+  "catalog_events": [
+    [
+      "queued",
+      "queued",
+      null
+    ],
+    [
+      "started",
+      "running",
+      null
+    ],
+    [
+      "failed",
+      "failed",
+      "source_or_storage_unavailable"
+    ]
+  ],
+  "slot_safety": [
+    [
+      "available",
+      202
+    ]
+  ],
+  "slot_readers": [
+    [
+      0
+    ]
+  ],
+  "postgres_parameters": [
+    [
+      "max_connections",
+      "48",
+      null
+    ],
+    [
+      "shared_buffers",
+      "32768",
+      "8kB"
+    ],
+    [
+      "work_mem",
+      "4096",
+      "kB"
+    ]
+  ],
+  "adoption": [
+    [
+      "postgres-adoption-reference",
+      1
+    ],
+    [
+      "postgres-alembic",
+      43
+    ],
+    [
+      "postgres-sql",
+      16
+    ],
+    [
+      "postgres-sql-adopted",
+      15
+    ],
+    [
+      "postgresql",
+      1
+    ]
+  ]
+}

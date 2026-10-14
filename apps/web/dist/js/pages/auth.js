@@ -229,23 +229,6 @@ if (localAuth instanceof HTMLElement) {
     })
     .catch(() => setStatus("Сервис входа временно недоступен."));
 
-  const oidcPanel = localAuth.querySelector("[data-oidc-login]");
-  fetchJson("/api/auth/oidc/status")
-    .then((payload) => {
-      const providerName = oidcPanel?.querySelector("[data-oidc-provider-name]");
-      if (providerName instanceof HTMLElement) {
-        providerName.textContent = payload.display_name;
-      }
-      if (oidcPanel instanceof HTMLElement) {
-        oidcPanel.hidden = false;
-      }
-    })
-    .catch(() => {
-      if (oidcPanel instanceof HTMLElement) {
-        oidcPanel.hidden = true;
-      }
-    });
-
   localAuth.querySelector("[data-passkey-login]")?.addEventListener("click", async () => {
     try {
       setStatus("Подтвердите вход на устройстве.");

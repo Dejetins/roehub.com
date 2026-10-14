@@ -7,6 +7,7 @@ HTTP adapters must expose only scoped methods. File writes still require 0028 sl
 from __future__ import annotations
 
 import re
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any, Mapping
 from uuid import UUID, uuid4
@@ -38,6 +39,61 @@ class PostgresArtifactManagementRepository:
         self, *, gateway: BacktestPostgresGateway, catalog: ProfileCatalog, access: CoordinateAccess
     ) -> None:
         self.db, self.catalog, self.access = gateway, catalog, access
+
+    def _current_revision(
+        self, coordinate, generation, content, funding, *, ready=True, allow_append=False
+    ):
+        market = {
+            ("binance", "spot"): 1,
+            ("binance", "futures"): 2,
+            ("bybit", "spot"): 3,
+            ("bybit", "futures"): 4,
+        }[(coordinate.exchange, coordinate.market_type)]
+        return (
+            self._one(
+                "SELECT g.generation FROM market_data.instrument_generations g LEFT JOIN "
+                "market_data.candle_coverage_summary s USING(market_id,symbol,generation) "
+                "WHERE g.market_id=%(m)s AND g.symbol=%(s)s AND g.generation=%(g)s "
+                "AND (g.content_revision=%(c)s OR (%(ready)s AND %(allow_append)s "
+                "AND g.append_safe_revision=g.content_revision "
+                "AND g.last_correction_revision<=%(c)s AND %(c)s<=g.content_revision)) "
+                "AND g.funding_revision=%(f)s "
+                "AND (g.index_state='ready' AND s.actual_count IS NOT NULL)=%(ready)s "
+                "FOR SHARE OF g",
+                m=market,
+                s=coordinate.symbol,
+                g=generation,
+                c=content,
+                f=funding,
+                ready=ready,
+                allow_append=allow_append,
+            )
+            is not None
+        )
+
+    @contextmanager
+    def source_guard(self, build):
+        """Hold generation lock through pointer commit and ready projection."""
+        with self.db.transaction():
+            self.require_current_source(build)
+            yield
+
+    def require_current_source(self, build):
+        try:
+            source = SourceTarget.model_validate(build["snapshot"]["source"])
+        except (ValueError, KeyError, TypeError):
+            raise ManagementError("legacy_source_target_invalid") from None
+        coordinate = Coordinate(
+            exchange=build["exchange"], market_type=build["market_type"], symbol=build["symbol"]
+        )
+        if not self._current_revision(
+            coordinate,
+            source.source_generation,
+            source.content_revision,
+            source.funding_revision,
+            allow_append=True,
+        ):
+            raise ManagementError("source_revision_changed")
 
     def _one(self, query: str, **params: Any) -> Mapping[str, Any] | None:
         return self.db.fetch_one(query=query, parameters=params)
@@ -599,9 +655,11 @@ class PostgresArtifactManagementRepository:
             if previous and progress.observed_at <= datetime.fromisoformat(previous["observed_at"]):
                 raise ManagementError("stale_progress")
             if observed and (
-                progress.completed_units < observed["completed_units"] or
-                (observed["total_units"] is not None
-                 and progress.total_units != observed["total_units"])
+                progress.completed_units < observed["completed_units"]
+                or (
+                    observed["total_units"] is not None
+                    and progress.total_units != observed["total_units"]
+                )
             ):
                 raise ManagementError("progress_regression")
             series[key] = dict(payload)
@@ -672,6 +730,8 @@ class PostgresArtifactManagementRepository:
         ):
             raise ManagementError("publication_receipt_required")
         with self.db.transaction():
+            if outcome == "ready":
+                self.require_current_source(build)
             current = self._fence(build)
             if outcome == "retry_wait" and current["attempt"] >= 8:
                 outcome, reason = "error", "attempts_exhausted"

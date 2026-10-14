@@ -1,5 +1,12 @@
 # Indicators — Порты application + доменный walking skeleton v1
 
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Потребители сохраняют domain/array/API и security границы. S05 переносит wiring и прямые SQL/script callers; S08 доказывает numerical/runtime parity. Упоминание прежнего engine ниже не задаёт целевую зависимость.
+
+
 Этот документ является source of truth для **IND-EPIC-01**.
 Он определяет минимальную доменную модель, application DTO и application ports
 для bounded context `indicators`.
@@ -150,7 +157,7 @@
 ## Порты
 
 Контракты портов определяются в application-слое.
-Имена и семантика не зависят от конкретной реализации (Numba/Numpy, ClickHouse и т.д.).
+Имена и семантика не зависят от конкретной реализации (Numba/Numpy, PostgreSQL и т.д.).
 
 ### IndicatorRegistry
 
@@ -172,7 +179,7 @@
 
 **Назначение**
 `CandleFeed` — порт чтения канонических свечей из market_data в формате dense arrays.
-Порт не зависит от ClickHouse/таблиц/биржи: это детали адаптера.
+Порт не зависит от PostgreSQL/таблиц/биржи: это детали адаптера.
 
 **Контракт**
 - `load_1m_dense(market_id: MarketId, symbol: Symbol, time_range: TimeRange) -> CandleArrays`

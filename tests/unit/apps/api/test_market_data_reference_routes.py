@@ -695,7 +695,7 @@ def _build_client(
         ),
     ],
 )
-def test_market_data_reference_fails_closed_before_clickhouse_read(
+def test_market_data_reference_fails_closed_before_storage_read(
     scope_resolver: ResearchOrganizationScopeResolver | None,
     expected_status: int,
     expected_code: str,

@@ -146,9 +146,9 @@ cookies, tokens и исходный provider payload в аудит не попа
 - `POST /auth/local/passkeys/options|complete`;
 - `POST /auth/local/recent-auth/options|complete`.
 
-Local auth всегда включён. OIDC routes появляются только при полном явном
-наборе provider settings и остаются дополнительным способом Stage `07`, а не
-условием base profile.
+Local auth всегда включён. С 2026-10-13 внешний OIDC удалён: provider settings,
+login/link/callback/status routes больше не поддерживаются. Локальные сессии,
+восстановление, CSRF и recent-auth сохраняются.
 
 ## Persistence
 
@@ -171,7 +171,7 @@ Manifest phase SHA-256 —
 
 | Поверхность | Классификация | Последствие |
 |---|---|---|
-| Local-auth API/DTO | `compatible-change` | Добавлены новые routes; старый OIDC контракт не удалён. |
+| Local-auth API/DTO | `compatible-change` | Локальные routes сохранены; удаление OIDC в 2026-10-13 — отдельный `breaking-change`. |
 | Base identity semantics | `breaking-change` | Local passkey становится обязательным базовым способом вместо обязательного Keycloak. |
 | Identity application ports | `compatible-change` | Добавлены local-auth и user/session lifecycle методы. |
 | PostgreSQL persistence | `breaking-change` | Greenfield schema получает обязательную phase `local-auth-0012`. |
@@ -193,10 +193,9 @@ audit. Реальный Chromium с виртуальным CTAP2 authenticator �
 passkey registration/login, password fallback, recovery, CSRF, logout,
 session rotation, expiry и закрытую регистрацию на desktop/mobile layout.
 
-Stage `07` добавит provider-neutral OIDC linking/degradation, сохраняя локального
-владельца как независимый fallback. Stage `08` перенесёт остальные secret
-references и operational recovery в OpenBao. Stage `19` добавит полный
-административный browser UI.
+Исторические Stage `07`, `08`, `19` не являются текущим планом исполнения.
+OIDC из Stage `07` удалён 2026-10-13. OpenBao и локальный административный UI
+сохранены; локальная аутентификация является действующим способом входа.
 
 ## Устройства и управление входами (2026-10-10)
 
@@ -216,9 +215,8 @@ references и operational recovery в OpenBao. Stage `19` добавит пол�
   сохраняется в `identity_sessions`; bearer `session_id` никогда не входит в DTO
   устройств. Старый `GET /ui/account/sessions` сохраняет прежний контракт.
 - Все успешные local-auth flows (bootstrap, passkey, password, recovery,
-  recent-auth) и OIDC login регистрируют устройство **до** выдачи auth cookie.
+  recent-auth) регистрируют устройство **до** выдачи auth cookie.
   При ошибке регистрации новая сессия компенсирующе отзывается; cookie не выдаётся.
-  OIDC linking без новой сессии не изменяет устройство.
 - Регистрация и owner-scoped отзыв устройства сериализуются блокировкой строки
   пользователя. При повторном входе в том же профиле предыдущие сессии этого
   устройства отзываются атомарно, а `device_id` сохраняется. В остальных профилях

@@ -1,0 +1,10 @@
+### Result
+Total messages: 7 (Errors: 7, Warnings: 0)
+
+[ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T07%3A53%3A00.000Z&end_at=2026-10-14T07%3A53%3A00.000Z:0
+[ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T07%3A53%3A00.000Z&end_at=2026-10-14T07%3A53%3A00.000Z:0
+[ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T07%3A53%3A00.000Z&end_at=2026-10-14T07%3A53%3A00.000Z:0
+[ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:20120/api/auth/current-user:0
+[ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T07%3A53%3A00.000Z&end_at=2026-10-14T07%3A53%3A00.000Z:0
+[ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:20120/api/auth/current-user:0
+[ERROR] Failed to load resource: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:20120/api/auth/current-user:0

@@ -1,0 +1,206 @@
+"""Atomic bounded raw/canonical/coverage ingestion; success means durable COMMIT."""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from datetime import timedelta
+
+from trading.contexts.market_data.application.dto import CandleWithMeta
+
+from .ingestion_common import bounded, lock_generations, payload_order, stage, upsert_staged, utc_ms
+from .ingestion_gateway import IngestionGateway
+
+
+class PostgresRawKlineWriter:
+    def __init__(self, gateway: IngestionGateway):
+        self._gateway = gateway
+
+    def write_1m(self, rows: Iterable[CandleWithMeta]) -> None:
+        batch = bounded(rows, _canonical)
+        if batch:
+            self._gateway.prepare_months(r["ts_open"] for r in batch)
+            self._gateway.run(lambda conn: self._write(conn, batch))
+
+    def _write(self, conn, batch):
+        generations = lock_generations(conn, ((r["market_id"], r["symbol"]) for r in batch))
+        # Raw observations intentionally retain retries, canonical and coverage do not.
+        for market_family, table in (
+            ({1, 2}, "raw_binance_klines_1m"),
+            ({3, 4}, "raw_bybit_klines_1m"),
+        ):
+            raw = [_raw(r) for r in batch if r["market_id"] in market_family]
+            if raw:
+                name = stage(conn, table, raw, name=table + "_stage", reuse=True)
+                # Fixed names above, never caller-controlled SQL identifiers.
+                from psycopg import sql
+
+                columns = sql.SQL(",").join(map(sql.Identifier, raw[0]))
+                conn.execute(
+                    sql.SQL("INSERT INTO market_data.{} ({}) SELECT {} FROM {}").format(
+                        sql.Identifier(table), columns, columns, sql.Identifier("pg_temp", name)
+                    )
+                )
+        for row in batch:
+            row["payload_order"] = payload_order(
+                v for k, v in row.items() if k not in ("ingested_at", "ingest_id", "payload_order")
+            )
+        # Stable session-local relations avoid per-write PostgreSQL catalog cache growth.
+        # COMMIT clears their rows; rollback restores the preceding empty state.
+        stage(conn, "canonical_candles_1m", batch, name="candle_stage", reuse=True)
+        conn.execute(
+            "CREATE TEMP TABLE IF NOT EXISTS pg_temp.candle_winners "
+            "(LIKE pg_temp.candle_stage) ON COMMIT DELETE ROWS"
+        )
+        conn.execute("TRUNCATE pg_temp.candle_winners")
+        conn.execute(
+            "INSERT INTO pg_temp.candle_winners "
+            "SELECT DISTINCT ON (market_id,symbol,ts_open) * FROM pg_temp.candle_stage "
+            "ORDER BY market_id,symbol,ts_open,ingested_at DESC,payload_order DESC"
+        )
+        # Metadata/source changes never invalidate identical array inputs.
+        changed = conn.execute(
+            """
+            SELECT DISTINCT s.market_id,s.symbol FROM pg_temp.candle_winners s
+            LEFT JOIN market_data.canonical_candles_1m c
+              ON c.market_id=s.market_id AND c.symbol=s.symbol AND c.ts_open=s.ts_open
+              AND c.ts_open >= %s AND c.ts_open <= %s
+            WHERE (c.ts_open IS NULL OR (s.ingested_at,s.payload_order) >
+                   (c.ingested_at,c.payload_order)) AND
+              (c.ts_open IS NULL OR ROW(s.instrument_key,s.ts_close,s.open,s.high,s.low,s.close,
+                 s.volume_base,s.volume_quote,s.trades_count,s.taker_buy_volume_base,
+                 s.taker_buy_volume_quote) IS DISTINCT FROM
+               ROW(c.instrument_key,c.ts_close,c.open,c.high,c.low,c.close,c.volume_base,
+                   c.volume_quote,c.trades_count,c.taker_buy_volume_base,c.taker_buy_volume_quote))
+        """,
+            (min(r["ts_open"] for r in batch), max(r["ts_open"] for r in batch)),
+        ).fetchall()
+        upsert_staged(
+            conn,
+            "canonical_candles_1m",
+            list(batch[0]),
+            keys=("market_id", "symbol", "ts_open"),
+            name="candle_stage",
+        )
+        days = conn.execute("""
+            SELECT market_id,symbol,ts_open::date,
+                bit_or(set_bit(0::bit(1440),
+                    (extract(hour FROM ts_open)*60+extract(minute FROM ts_open))::int,1)),
+                min(ts_open),max(ts_open)
+            FROM pg_temp.candle_winners GROUP BY market_id,symbol,ts_open::date
+            ORDER BY market_id,symbol,ts_open::date
+        """).fetchall()
+        for market, symbol, day, mask, first, last in days:
+            generation = generations[(market, symbol)]
+            conn.execute(
+                "INSERT INTO market_data.candle_coverage_days "
+                "(market_id,symbol,day,generation,policy_version) VALUES (%s,%s,%s,%s,1) "
+                "ON CONFLICT DO NOTHING",
+                (market, symbol, day, generation),
+            )
+            before = conn.execute(
+                "SELECT actual_count FROM market_data.candle_coverage_days "
+                "WHERE market_id=%s AND symbol=%s AND day=%s FOR UPDATE",
+                (market, symbol, day),
+            ).fetchone()[0]
+            after = conn.execute(
+                "UPDATE market_data.candle_coverage_days "
+                "SET actual=actual | %s::bit(1440), "
+                "source_absent=source_absent & ~%s::bit(1440) "
+                "WHERE market_id=%s AND symbol=%s AND day=%s "
+                "RETURNING actual_count",
+                (mask, mask, market, symbol, day),
+            ).fetchone()[0]
+            conn.execute(
+                """INSERT INTO market_data.candle_coverage_summary AS s
+                (market_id,symbol,generation,actual_count,first_ts,last_ts)
+                VALUES (%s,%s,%s,%s,%s,%s) ON CONFLICT (market_id,symbol) DO UPDATE SET
+                actual_count=s.actual_count+%s,
+                first_ts=least(s.first_ts,EXCLUDED.first_ts),
+                last_ts=greatest(s.last_ts,EXCLUDED.last_ts)""",
+                (market, symbol, generation, after, first, last, after - before),
+            )
+        conn.execute("""DELETE FROM market_data.source_absent_candles_1m a
+            USING pg_temp.candle_winners s WHERE a.market_id=s.market_id AND a.symbol=s.symbol
+            AND a.minute_key=extract(epoch FROM s.ts_open)::bigint/60""")
+        for market, symbol in changed:
+            conn.execute(
+                "UPDATE market_data.instrument_generations "
+                "SET content_revision=content_revision+1,updated_at=clock_timestamp() "
+                "WHERE market_id=%s AND symbol=%s",
+                (market, symbol),
+            )
+            # A correction invalidates the certificate, never silently advances a frontier.
+            conn.execute(
+                "DELETE FROM market_data.candle_history_verification "
+                "WHERE market_id=%s AND symbol=%s",
+                (market, symbol),
+            )
+        for market, symbol in generations:
+            conn.execute(
+                "UPDATE market_data.instrument_generations SET index_state='ready' "
+                "WHERE market_id=%s AND symbol=%s",
+                (market, symbol),
+            )
+
+
+def _canonical(row: CandleWithMeta):
+    c, m = row.candle, row.meta
+    market = c.instrument_id.market_id.value
+    if market not in (1, 2, 3, 4):
+        raise ValueError("unsupported candle market")
+    start = utc_ms(c.ts_open.value)
+    return dict(
+        market_id=market,
+        symbol=str(c.instrument_id.symbol),
+        instrument_key=m.instrument_key,
+        ts_open=start,
+        ts_close=utc_ms(c.ts_close.value) if market <= 2 else start + timedelta(minutes=1),
+        open=float(c.open),
+        high=float(c.high),
+        low=float(c.low),
+        close=float(c.close),
+        volume_base=float(c.volume_base),
+        volume_quote=float(c.volume_quote or 0),
+        trades_count=int(m.trades_count or 0) if market <= 2 else None,
+        taker_buy_volume_base=float(m.taker_buy_volume_base or 0) if market <= 2 else None,
+        taker_buy_volume_quote=float(m.taker_buy_volume_quote or 0) if market <= 2 else None,
+        source=m.source,
+        ingested_at=utc_ms(m.ingested_at.value),
+        ingest_id=m.ingest_id,
+    )
+
+
+def _raw(r):
+    common = {
+        k: r[k]
+        for k in (
+            "market_id",
+            "symbol",
+            "instrument_key",
+            "open",
+            "high",
+            "low",
+            "close",
+            "source",
+            "ingested_at",
+            "ingest_id",
+        )
+    }
+    common["volume"] = r["volume_base"]
+    if r["market_id"] <= 2:
+        common.update(
+            open_time=r["ts_open"],
+            close_time=r["ts_close"],
+            quote_asset_volume=r["volume_quote"],
+            number_of_trades=r["trades_count"],
+            taker_buy_base_asset_volume=r["taker_buy_volume_base"],
+            taker_buy_quote_asset_volume=r["taker_buy_volume_quote"],
+        )
+    else:
+        common.update(
+            interval_min=1,
+            start_time_ms=int(r["ts_open"].timestamp() * 1000),
+            start_time_utc=r["ts_open"],
+            turnover=r["volume_quote"],
+        )
+    return common

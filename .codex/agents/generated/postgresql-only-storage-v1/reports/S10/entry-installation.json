@@ -1,0 +1,1214 @@
+[
+  {
+    "Id": "4f4815dba5c58b1ecf3f352094625e6cd555b68a7e1279b67c46156a21801c66",
+    "Name": "/roehub-local-web-1",
+    "Image": "sha256:76102b11c889e38cbee80af8ac829596c79beca5a881b3ad7740d83afe2d0d1c",
+    "Mounts": [],
+    "NetworkSettings": {
+      "SandboxID": "dfeed77ff6ad8b642d4a06f1bcf8113a094db5fdc5b32e1563178139d1d2fcbc",
+      "SandboxKey": "/var/run/docker/netns/dfeed77ff6ad",
+      "Ports": {
+        "8010/tcp": [
+          {
+            "HostIp": "127.0.0.1",
+            "HostPort": "20120"
+          }
+        ]
+      },
+      "Networks": {
+        "roehub-local-platform": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "roehub-local-web-1",
+            "web"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "8163422278eea82547c201401509627377a12a1eb307f482dfeb4c7efa3e2dca",
+          "EndpointID": "1a2bc089b1019bd2cb2b889d17e25a735f1e414e447695e93c56d1f37a582b3f",
+          "Gateway": "172.23.0.1",
+          "IPAddress": "172.23.0.10",
+          "MacAddress": "96:bb:37:f5:e7:01",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "roehub-local-web-1",
+            "web",
+            "4f4815dba5c5"
+          ]
+        }
+      }
+    },
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 29522,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-10-13T16:52:21.67179213Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-10-14T06:57:44.067168297Z",
+            "End": "2026-10-14T06:57:44.299199381Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:49.300312508Z",
+            "End": "2026-10-14T06:57:49.494743383Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:54.496183011Z",
+            "End": "2026-10-14T06:57:54.699267927Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:59.699532097Z",
+            "End": "2026-10-14T06:57:59.891188805Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:04.892090918Z",
+            "End": "2026-10-14T06:58:05.098712293Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "labels": {
+      "com.docker.compose.config-hash": "e568a297335345c83406411fd4cc6dc4ed4173cfdc37668fa3043f5a66234c3d",
+      "com.docker.compose.container-number": "1",
+      "com.docker.compose.depends_on": "api:service_healthy:false",
+      "com.docker.compose.image": "sha256:76102b11c889e38cbee80af8ac829596c79beca5a881b3ad7740d83afe2d0d1c",
+      "com.docker.compose.oneoff": "False",
+      "com.docker.compose.project": "roehub-local",
+      "com.docker.compose.project.config_files": "-",
+      "com.docker.compose.project.working_dir": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+      "com.docker.compose.replace": "web-1",
+      "com.docker.compose.service": "web",
+      "com.docker.compose.version": "2.40.3",
+      "io.roehub.local.ui-change": "layout-alignment-20261013",
+      "org.opencontainers.image.revision": "1c29f095175d17a5a9e567cae252e3d4e15f0a40"
+    },
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    }
+  },
+  {
+    "Id": "0395b79d378664687fc661c22b5e5234d3f116bc7b262626d8782c75f5767337",
+    "Name": "/roehub-local-api-1",
+    "Image": "sha256:76102b11c889e38cbee80af8ac829596c79beca5a881b3ad7740d83afe2d0d1c",
+    "Mounts": [
+      {
+        "Type": "bind",
+        "Source": "/host_mnt/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/config",
+        "Destination": "/etc/roehub",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/private/api",
+        "Destination": "/etc/roehub-api-identity",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/host_mnt/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/private/clickhouse-workloads/interactive.password",
+        "Destination": "/run/roehub-ch/password",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "volume",
+        "Name": "roehub-local-control-socket",
+        "Source": "/var/lib/docker/volumes/roehub-local-control-socket/_data",
+        "Destination": "/var/run/roehub",
+        "Driver": "local",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": ""
+      },
+      {
+        "Type": "volume",
+        "Name": "roehub-local_trades-cache",
+        "Source": "/var/lib/docker/volumes/roehub-local_trades-cache/_data",
+        "Destination": "/var/lib/roehub/trades-cache",
+        "Driver": "local",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": ""
+      },
+      {
+        "Type": "bind",
+        "Source": "/host_mnt/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "Destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": "rprivate"
+      }
+    ],
+    "NetworkSettings": {
+      "SandboxID": "ce7e92ad58ebeba8cfbd107417ffa83cb2b295eac238f17330178f90863c9e1b",
+      "SandboxKey": "/var/run/docker/netns/ce7e92ad58eb",
+      "Ports": {},
+      "Networks": {
+        "roehub-local-platform": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "roehub-local-api-1",
+            "api"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "8163422278eea82547c201401509627377a12a1eb307f482dfeb4c7efa3e2dca",
+          "EndpointID": "7ecc9b6f52fecf9a266fa43cd0345b814bc92661b4b7f57d730eb5263f58eacc",
+          "Gateway": "172.23.0.1",
+          "IPAddress": "172.23.0.6",
+          "MacAddress": "de:dd:67:8a:e5:3c",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "roehub-local-api-1",
+            "api",
+            "0395b79d3786"
+          ]
+        }
+      }
+    },
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 28866,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-10-13T16:52:16.096090877Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-10-14T06:57:46.09829934Z",
+            "End": "2026-10-14T06:57:46.223549548Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:51.223869384Z",
+            "End": "2026-10-14T06:57:51.371362718Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:56.374928678Z",
+            "End": "2026-10-14T06:57:56.524403262Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:01.526345916Z",
+            "End": "2026-10-14T06:58:01.661397166Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:06.663008502Z",
+            "End": "2026-10-14T06:58:06.812492336Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "labels": {
+      "com.docker.compose.config-hash": "8b4c5caa0f852f468549017f917f235ef05ccef38470589ebb23a94310f8f3fd",
+      "com.docker.compose.container-number": "1",
+      "com.docker.compose.depends_on": "clickhouse:service_healthy:false,postgresql:service_healthy:false",
+      "com.docker.compose.image": "sha256:76102b11c889e38cbee80af8ac829596c79beca5a881b3ad7740d83afe2d0d1c",
+      "com.docker.compose.oneoff": "False",
+      "com.docker.compose.project": "roehub-local",
+      "com.docker.compose.project.config_files": "-",
+      "com.docker.compose.project.working_dir": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+      "com.docker.compose.replace": "api-1",
+      "com.docker.compose.service": "api",
+      "com.docker.compose.version": "2.40.3",
+      "io.roehub.local.ui-change": "layout-alignment-20261013",
+      "org.opencontainers.image.revision": "1c29f095175d17a5a9e567cae252e3d4e15f0a40"
+    },
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    }
+  },
+  {
+    "Id": "46d57a63a70723196005262efd3185f0b047fc447b21c2de531e87ccf94f7540",
+    "Name": "/roehub-control-control-agent-1",
+    "Image": "sha256:d9234723c2c925dcf6542d6bff2d31f24bdd7fc41bc83b78b66798986a1c28cb",
+    "Mounts": [
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/config",
+        "Destination": "/etc/roehub",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/var/run/docker.sock",
+        "Destination": "/var/run/docker.sock",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "volume",
+        "Name": "roehub-local-control-socket",
+        "Source": "/var/lib/docker/volumes/roehub-local-control-socket/_data",
+        "Destination": "/var/run/roehub",
+        "Driver": "local",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": ""
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+        "Destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/control-state",
+        "Destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/control-state",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "Destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": "rprivate"
+      }
+    ],
+    "NetworkSettings": {
+      "SandboxID": "dc24c2a20d52de03f6da473ea62e304b89ba12dedb6d7a79b30ec50f65a09e20",
+      "SandboxKey": "/var/run/docker/netns/dc24c2a20d52",
+      "Ports": {},
+      "Networks": {
+        "roehub-local-platform": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "roehub-control-control-agent-1",
+            "control-agent"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "8163422278eea82547c201401509627377a12a1eb307f482dfeb4c7efa3e2dca",
+          "EndpointID": "a226afd97fbbd24fb0b41ba707004cbe83edfdb210d541897c59078bb9ab1dfb",
+          "Gateway": "172.23.0.1",
+          "IPAddress": "172.23.0.2",
+          "MacAddress": "1a:6e:1c:d1:2b:1d",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "roehub-control-control-agent-1",
+            "control-agent",
+            "46d57a63a707"
+          ]
+        }
+      }
+    },
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 27655,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-10-13T16:52:06.155554386Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-10-14T06:57:45.48198059Z",
+            "End": "2026-10-14T06:57:45.519928381Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:50.521841675Z",
+            "End": "2026-10-14T06:57:50.558248925Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:55.560328636Z",
+            "End": "2026-10-14T06:57:55.608576136Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:00.61320718Z",
+            "End": "2026-10-14T06:58:00.675682972Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:05.677818252Z",
+            "End": "2026-10-14T06:58:05.734964585Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "labels": {
+      "com.docker.compose.config-hash": "7efd3545637d8d7c7753a8643085f31354824bdd75037417c871290ab6accaea",
+      "com.docker.compose.container-number": "1",
+      "com.docker.compose.depends_on": "",
+      "com.docker.compose.image": "sha256:703324f82a0851265ffa65c67ff239abfdd39e2deca4214b30ce46f5acca2c6f",
+      "com.docker.compose.oneoff": "False",
+      "com.docker.compose.project": "roehub-control",
+      "com.docker.compose.project.config_files": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/control-compose.yaml",
+      "com.docker.compose.project.working_dir": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+      "com.docker.compose.replace": "control-agent-1",
+      "com.docker.compose.service": "control-agent",
+      "com.docker.compose.version": "5.5.1",
+      "org.opencontainers.image.revision": "1c29f095175d17a5a9e567cae252e3d4e15f0a40"
+    },
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    }
+  },
+  {
+    "Id": "bec8c514b10359e4e3e1242e7430a83c72b6618d8d9a216feec19f291a87ace7",
+    "Name": "/roehub-local-market-data-scheduler-1",
+    "Image": "sha256:5becdcb13de5185d9f47cd211d98a8546b69da298ae70b380e070633e6904c3a",
+    "Mounts": [
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/config",
+        "Destination": "/etc/roehub",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/private/clickhouse-workloads/backfill.password",
+        "Destination": "/run/roehub-ch/password",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "Destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": "rprivate"
+      }
+    ],
+    "NetworkSettings": {
+      "SandboxID": "1244d93d5650b9ead08a727e581f7bd0199bbf5e90d1eb9ac0b4369de149701f",
+      "SandboxKey": "/var/run/docker/netns/1244d93d5650",
+      "Ports": {},
+      "Networks": {
+        "roehub-local-platform": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "roehub-local-market-data-scheduler-1",
+            "market-data-scheduler"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "8163422278eea82547c201401509627377a12a1eb307f482dfeb4c7efa3e2dca",
+          "EndpointID": "d84f21800d73c141ed9c71b660070258b19af4f0ded4af5d649b359a2eb4643c",
+          "Gateway": "172.23.0.1",
+          "IPAddress": "172.23.0.7",
+          "MacAddress": "56:83:6d:01:ac:a3",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "roehub-local-market-data-scheduler-1",
+            "market-data-scheduler",
+            "bec8c514b103"
+          ]
+        }
+      }
+    },
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 67557,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-10-13T15:47:57.021105716Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-10-14T06:57:46.098326423Z",
+            "End": "2026-10-14T06:57:46.222766215Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:51.223021884Z",
+            "End": "2026-10-14T06:57:51.371374259Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:56.374878262Z",
+            "End": "2026-10-14T06:57:56.52443947Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:01.526288708Z",
+            "End": "2026-10-14T06:58:01.661393958Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:06.663082794Z",
+            "End": "2026-10-14T06:58:06.812399211Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "labels": {
+      "com.docker.compose.config-hash": "9c34be3accbb2416d25c8c6695386bdaf7965c2908284a4a2e941252e377b583",
+      "com.docker.compose.container-number": "1",
+      "com.docker.compose.depends_on": "clickhouse:service_healthy:false,postgresql:service_healthy:false",
+      "com.docker.compose.image": "sha256:5becdcb13de5185d9f47cd211d98a8546b69da298ae70b380e070633e6904c3a",
+      "com.docker.compose.oneoff": "False",
+      "com.docker.compose.project": "roehub-local",
+      "com.docker.compose.project.config_files": "-",
+      "com.docker.compose.project.working_dir": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+      "com.docker.compose.replace": "market-data-scheduler-1",
+      "com.docker.compose.service": "market-data-scheduler",
+      "com.docker.compose.version": "2.40.3",
+      "io.roehub.local.ui-change": "monitoring-toolbar-20261012",
+      "org.opencontainers.image.revision": "1c29f095175d17a5a9e567cae252e3d4e15f0a40"
+    },
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    }
+  },
+  {
+    "Id": "58ddd206d9dd52a24067ede9ddbb496d66dc178bfd249c223c47e4191ff2dd3f",
+    "Name": "/roehub-local-market-data-ws-1",
+    "Image": "sha256:5becdcb13de5185d9f47cd211d98a8546b69da298ae70b380e070633e6904c3a",
+    "Mounts": [
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/config",
+        "Destination": "/etc/roehub",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/private/clickhouse-workloads/stream.password",
+        "Destination": "/run/roehub-ch/password",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "Destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": "rprivate"
+      }
+    ],
+    "NetworkSettings": {
+      "SandboxID": "f319f1cb5dff17691065d42e33cdcb1f603bf06da6772dc577c30c026fbd4b1e",
+      "SandboxKey": "/var/run/docker/netns/f319f1cb5dff",
+      "Ports": {},
+      "Networks": {
+        "roehub-local-platform": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "roehub-local-market-data-ws-1",
+            "market-data-ws"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "8163422278eea82547c201401509627377a12a1eb307f482dfeb4c7efa3e2dca",
+          "EndpointID": "bb7d882be71af15553e42cfb2e0c9d39faea41439d91654bfbdfdce645671e52",
+          "Gateway": "172.23.0.1",
+          "IPAddress": "172.23.0.8",
+          "MacAddress": "fe:97:33:a2:b8:73",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "roehub-local-market-data-ws-1",
+            "market-data-ws",
+            "58ddd206d9dd"
+          ]
+        }
+      }
+    },
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 67556,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-10-13T15:47:57.021895799Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-10-14T06:57:46.098149673Z",
+            "End": "2026-10-14T06:57:46.304499507Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:51.305270051Z",
+            "End": "2026-10-14T06:57:51.424902009Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:56.425997345Z",
+            "End": "2026-10-14T06:57:56.551743178Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:01.5525815Z",
+            "End": "2026-10-14T06:58:01.700475875Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:06.701105169Z",
+            "End": "2026-10-14T06:58:06.828573294Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "labels": {
+      "com.docker.compose.config-hash": "cfc14eeb9e0e177a121b757ea8699c6dda82e0b39994026c1f49d763b56b20ec",
+      "com.docker.compose.container-number": "1",
+      "com.docker.compose.depends_on": "clickhouse:service_healthy:false,postgresql:service_healthy:false",
+      "com.docker.compose.image": "sha256:5becdcb13de5185d9f47cd211d98a8546b69da298ae70b380e070633e6904c3a",
+      "com.docker.compose.oneoff": "False",
+      "com.docker.compose.project": "roehub-local",
+      "com.docker.compose.project.config_files": "-",
+      "com.docker.compose.project.working_dir": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+      "com.docker.compose.replace": "market-data-ws-1",
+      "com.docker.compose.service": "market-data-ws",
+      "com.docker.compose.version": "2.40.3",
+      "io.roehub.local.ui-change": "monitoring-toolbar-20261012",
+      "org.opencontainers.image.revision": "1c29f095175d17a5a9e567cae252e3d4e15f0a40"
+    },
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    }
+  },
+  {
+    "Id": "2535d93ca692efba272ef67073d614e35e3f18359cca6c0d1406c3fff800cf2e",
+    "Name": "/roehub-local-backtest-artifact-publisher-1",
+    "Image": "sha256:5becdcb13de5185d9f47cd211d98a8546b69da298ae70b380e070633e6904c3a",
+    "Mounts": [
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/config",
+        "Destination": "/etc/roehub",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/private/clickhouse-workloads/artifacts.password",
+        "Destination": "/run/roehub-ch/password",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "Destination": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/overview-preview-sep26/artifacts/backtest/v2",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": "rprivate"
+      }
+    ],
+    "NetworkSettings": {
+      "SandboxID": "2f0287ac252bc84e581282227875a8b90a702969c7411a11a8d1acd0c531d301",
+      "SandboxKey": "/var/run/docker/netns/2f0287ac252b",
+      "Ports": {},
+      "Networks": {
+        "roehub-local-platform": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "roehub-local-backtest-artifact-publisher-1",
+            "backtest-artifact-publisher"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "8163422278eea82547c201401509627377a12a1eb307f482dfeb4c7efa3e2dca",
+          "EndpointID": "13a4e5bfb27fbf1d9dcc0852bf6d134a791e2ebf4ccf76f397b18257ac2485cb",
+          "Gateway": "172.23.0.1",
+          "IPAddress": "172.23.0.9",
+          "MacAddress": "ea:71:a3:0f:18:c3",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "roehub-local-backtest-artifact-publisher-1",
+            "backtest-artifact-publisher",
+            "2535d93ca692"
+          ]
+        }
+      }
+    },
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 67555,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-10-13T15:47:57.019819257Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-10-14T06:57:46.098138215Z",
+            "End": "2026-10-14T06:57:46.222725882Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:51.222995884Z",
+            "End": "2026-10-14T06:57:51.371350593Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:56.374836053Z",
+            "End": "2026-10-14T06:57:56.524896512Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:01.526316375Z",
+            "End": "2026-10-14T06:58:01.661403291Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:06.663213794Z",
+            "End": "2026-10-14T06:58:06.812478086Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "labels": {
+      "com.docker.compose.config-hash": "6e955fa1836f90ef6dbc0663b9f0b7acd9c9194944436e4efd53d5b8ec5e6394",
+      "com.docker.compose.container-number": "1",
+      "com.docker.compose.depends_on": "postgresql:service_healthy:false,clickhouse:service_healthy:false",
+      "com.docker.compose.image": "sha256:5becdcb13de5185d9f47cd211d98a8546b69da298ae70b380e070633e6904c3a",
+      "com.docker.compose.oneoff": "False",
+      "com.docker.compose.project": "roehub-local",
+      "com.docker.compose.project.config_files": "-",
+      "com.docker.compose.project.working_dir": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+      "com.docker.compose.replace": "backtest-artifact-publisher-1",
+      "com.docker.compose.service": "backtest-artifact-publisher",
+      "com.docker.compose.version": "2.40.3",
+      "io.roehub.local.ui-change": "monitoring-toolbar-20261012",
+      "org.opencontainers.image.revision": "1c29f095175d17a5a9e567cae252e3d4e15f0a40"
+    },
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    }
+  },
+  {
+    "Id": "5a07a933be6c7f1ef596839607885a9594a10b28f11db31b73369208b9da370f",
+    "Name": "/roehub-local-operational-health-1",
+    "Image": "sha256:5becdcb13de5185d9f47cd211d98a8546b69da298ae70b380e070633e6904c3a",
+    "Mounts": [
+      {
+        "Type": "bind",
+        "Source": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/config",
+        "Destination": "/etc/roehub",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      }
+    ],
+    "NetworkSettings": {
+      "SandboxID": "cd45c24c0074941cf15f4173aacb611a9cbc0db5cdcba19fce542de05ff66788",
+      "SandboxKey": "/var/run/docker/netns/cd45c24c0074",
+      "Ports": {},
+      "Networks": {
+        "roehub-local-platform": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "roehub-local-operational-health-1",
+            "operational-health"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "8163422278eea82547c201401509627377a12a1eb307f482dfeb4c7efa3e2dca",
+          "EndpointID": "f6e538917e7b373fc2b6200cfc6fe1517a284194c94e201905f77b6954b77d00",
+          "Gateway": "172.23.0.1",
+          "IPAddress": "172.23.0.3",
+          "MacAddress": "d6:4f:8b:9a:71:81",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "roehub-local-operational-health-1",
+            "operational-health",
+            "5a07a933be6c"
+          ]
+        }
+      }
+    },
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 66597,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-10-13T15:47:51.384698296Z",
+      "FinishedAt": "0001-01-01T00:00:00Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-10-14T06:57:45.21254459Z",
+            "End": "2026-10-14T06:57:45.398933381Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:50.408484134Z",
+            "End": "2026-10-14T06:57:50.620059384Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:57:55.621792386Z",
+            "End": "2026-10-14T06:57:55.791882136Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:00.795997597Z",
+            "End": "2026-10-14T06:58:01.012659097Z",
+            "ExitCode": 0,
+            "Output": ""
+          },
+          {
+            "Start": "2026-10-14T06:58:06.014055794Z",
+            "End": "2026-10-14T06:58:06.209046419Z",
+            "ExitCode": 0,
+            "Output": ""
+          }
+        ]
+      }
+    },
+    "labels": {
+      "com.docker.compose.config-hash": "bbb3616b65d4568fc743de041908aa1a9c5e3fd652606d3683965010d4d17c82",
+      "com.docker.compose.container-number": "1",
+      "com.docker.compose.depends_on": "",
+      "com.docker.compose.image": "sha256:5becdcb13de5185d9f47cd211d98a8546b69da298ae70b380e070633e6904c3a",
+      "com.docker.compose.oneoff": "False",
+      "com.docker.compose.project": "roehub-local",
+      "com.docker.compose.project.config_files": "-",
+      "com.docker.compose.project.working_dir": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+      "com.docker.compose.replace": "operational-health-1",
+      "com.docker.compose.service": "operational-health",
+      "com.docker.compose.version": "2.40.3",
+      "io.roehub.local.ui-change": "monitoring-toolbar-20261012",
+      "org.opencontainers.image.revision": "1c29f095175d17a5a9e567cae252e3d4e15f0a40"
+    },
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    }
+  },
+  {
+    "Id": "1824ac077231b9956576b491387f7cb2850b78f247a97e454ef8a8797eb96e6f",
+    "Name": "/roehub-local-clickhouse-1",
+    "Image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+    "Mounts": [
+      {
+        "Type": "bind",
+        "Source": "/host_mnt/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/config/clickhouse-workloads-entrypoint.sh",
+        "Destination": "/workloads-entrypoint.sh",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/host_mnt/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/private/clickhouse-workloads/users.xml",
+        "Destination": "/run/roehub-private/workloads.xml",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "volume",
+        "Name": "roehub-navigator-ch",
+        "Source": "/var/lib/docker/volumes/roehub-navigator-ch/_data",
+        "Destination": "/var/lib/clickhouse",
+        "Driver": "local",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": ""
+      },
+      {
+        "Type": "bind",
+        "Source": "/host_mnt/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/config/clickhouse-capacity.xml",
+        "Destination": "/etc/clickhouse-server/config.d/capacity.xml",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/host_mnt/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/config/clickhouse-observability.xml",
+        "Destination": "/etc/clickhouse-server/config.d/local.xml",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/host_mnt/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/config/clickhouse-query-limits.xml",
+        "Destination": "/etc/clickhouse-server/users.d/capacity.xml",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      },
+      {
+        "Type": "bind",
+        "Source": "/host_mnt/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local/config/clickhouse-profiles.xml",
+        "Destination": "/etc/clickhouse-server/users.d/local.xml",
+        "Mode": "ro",
+        "RW": false,
+        "Propagation": "rprivate"
+      }
+    ],
+    "NetworkSettings": {
+      "SandboxID": "fff042e63aa9b96ec96ca578f8d291f74d2da136ca202113e87d2e4c25d327ee",
+      "SandboxKey": "/var/run/docker/netns/fff042e63aa9",
+      "Ports": {
+        "8123/tcp": null,
+        "9000/tcp": null,
+        "9009/tcp": null
+      },
+      "Networks": {
+        "roehub-local-platform": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "roehub-local-clickhouse-1",
+            "clickhouse"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "8163422278eea82547c201401509627377a12a1eb307f482dfeb4c7efa3e2dca",
+          "EndpointID": "603ca9fcf148448f9a8feb6516cf30d56a55dbf812fa7f52a0117ccd64d31ccb",
+          "Gateway": "172.23.0.1",
+          "IPAddress": "172.23.0.5",
+          "MacAddress": "c6:42:2d:f6:90:d3",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "roehub-local-clickhouse-1",
+            "clickhouse",
+            "1824ac077231"
+          ]
+        }
+      }
+    },
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 66604,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-10-13T15:47:51.389651588Z",
+      "FinishedAt": "2026-10-13T12:22:39.465692667Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-10-14T06:57:46.918922132Z",
+            "End": "2026-10-14T06:57:46.956498882Z",
+            "ExitCode": 0,
+            "Output": "102\n"
+          },
+          {
+            "Start": "2026-10-14T06:57:51.959519843Z",
+            "End": "2026-10-14T06:57:52.005880676Z",
+            "ExitCode": 0,
+            "Output": "102\n"
+          },
+          {
+            "Start": "2026-10-14T06:57:57.007112512Z",
+            "End": "2026-10-14T06:57:57.045857179Z",
+            "ExitCode": 0,
+            "Output": "102\n"
+          },
+          {
+            "Start": "2026-10-14T06:58:02.047130583Z",
+            "End": "2026-10-14T06:58:02.076971042Z",
+            "ExitCode": 0,
+            "Output": "102\n"
+          },
+          {
+            "Start": "2026-10-14T06:58:07.078119586Z",
+            "End": "2026-10-14T06:58:07.110717919Z",
+            "ExitCode": 0,
+            "Output": "102\n"
+          }
+        ]
+      }
+    },
+    "labels": {
+      "com.clickhouse.build.version": "25.8.33.6-alpine",
+      "com.docker.compose.config-hash": "e433c51f294f64ae2d927aff0b4765a9380ab1ac017064ea1ca2754328e660e2",
+      "com.docker.compose.container-number": "1",
+      "com.docker.compose.depends_on": "",
+      "com.docker.compose.image": "sha256:87e0a5b72f5465b18eacca7c76850e7ff551c9795c50e451f5646299e5e24146",
+      "com.docker.compose.oneoff": "False",
+      "com.docker.compose.project": "roehub-local",
+      "com.docker.compose.project.config_files": "-",
+      "com.docker.compose.project.working_dir": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+      "com.docker.compose.replace": "clickhouse-1",
+      "com.docker.compose.service": "clickhouse",
+      "com.docker.compose.version": "2.40.3"
+    },
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    }
+  },
+  {
+    "Id": "d5a5ea630ad7c81e46ec1c9f26b3520133fa5ea075ea56d9b9e6a756257d1eec",
+    "Name": "/roehub-local-postgresql-1",
+    "Image": "sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685",
+    "Mounts": [
+      {
+        "Type": "volume",
+        "Name": "roehub-navigator-pg",
+        "Source": "/var/lib/docker/volumes/roehub-navigator-pg/_data",
+        "Destination": "/var/lib/postgresql/data",
+        "Driver": "local",
+        "Mode": "rw",
+        "RW": true,
+        "Propagation": ""
+      }
+    ],
+    "NetworkSettings": {
+      "SandboxID": "59ffb1595bf876f662d473f778bb2ea563d4692113b0e00aa1f08dc1476ab837",
+      "SandboxKey": "/var/run/docker/netns/59ffb1595bf8",
+      "Ports": {
+        "5432/tcp": null
+      },
+      "Networks": {
+        "roehub-local-platform": {
+          "IPAMConfig": null,
+          "Links": null,
+          "Aliases": [
+            "roehub-local-postgresql-1",
+            "postgresql"
+          ],
+          "DriverOpts": null,
+          "GwPriority": 0,
+          "NetworkID": "8163422278eea82547c201401509627377a12a1eb307f482dfeb4c7efa3e2dca",
+          "EndpointID": "0c9d76339429fb3cb219cb0698664c6063138d2daf93abe2c3600ac87871b31b",
+          "Gateway": "172.23.0.1",
+          "IPAddress": "172.23.0.4",
+          "MacAddress": "8a:ad:5b:52:ae:d3",
+          "IPPrefixLen": 16,
+          "IPv6Gateway": "",
+          "GlobalIPv6Address": "",
+          "GlobalIPv6PrefixLen": 0,
+          "DNSNames": [
+            "roehub-local-postgresql-1",
+            "postgresql",
+            "d5a5ea630ad7"
+          ]
+        }
+      }
+    },
+    "state": {
+      "Status": "running",
+      "Running": true,
+      "Paused": false,
+      "Restarting": false,
+      "OOMKilled": false,
+      "Dead": false,
+      "Pid": 66603,
+      "ExitCode": 0,
+      "Error": "",
+      "StartedAt": "2026-10-13T15:47:51.39025463Z",
+      "FinishedAt": "2026-10-13T12:22:17.631623962Z",
+      "Health": {
+        "Status": "healthy",
+        "FailingStreak": 0,
+        "Log": [
+          {
+            "Start": "2026-10-14T06:57:46.805157049Z",
+            "End": "2026-10-14T06:57:46.82089159Z",
+            "ExitCode": 0,
+            "Output": "/var/run/postgresql:5432 - accepting connections\n"
+          },
+          {
+            "Start": "2026-10-14T06:57:51.821998634Z",
+            "End": "2026-10-14T06:57:51.838890676Z",
+            "ExitCode": 0,
+            "Output": "/var/run/postgresql:5432 - accepting connections\n"
+          },
+          {
+            "Start": "2026-10-14T06:57:56.84179097Z",
+            "End": "2026-10-14T06:57:56.86712422Z",
+            "ExitCode": 0,
+            "Output": "/var/run/postgresql:5432 - accepting connections\n"
+          },
+          {
+            "Start": "2026-10-14T06:58:01.87061875Z",
+            "End": "2026-10-14T06:58:01.883078417Z",
+            "ExitCode": 0,
+            "Output": "/var/run/postgresql:5432 - accepting connections\n"
+          },
+          {
+            "Start": "2026-10-14T06:58:06.885894586Z",
+            "End": "2026-10-14T06:58:06.899678086Z",
+            "ExitCode": 0,
+            "Output": "/var/run/postgresql:5432 - accepting connections\n"
+          }
+        ]
+      }
+    },
+    "labels": {
+      "com.docker.compose.config-hash": "837ddc295a6994c7f2bacb8cb3262aa6641752b934ecd2d4657b839b65bf3819",
+      "com.docker.compose.container-number": "1",
+      "com.docker.compose.depends_on": "",
+      "com.docker.compose.image": "sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685",
+      "com.docker.compose.oneoff": "False",
+      "com.docker.compose.project": "roehub-local",
+      "com.docker.compose.project.config_files": "-",
+      "com.docker.compose.project.working_dir": "/Users/daniildegtyarev/Projects/roehub.com/.local_artifacts/platform-local",
+      "com.docker.compose.replace": "postgresql-1",
+      "com.docker.compose.service": "postgresql",
+      "com.docker.compose.version": "2.40.3"
+    },
+    "restart": {
+      "Name": "unless-stopped",
+      "MaximumRetryCount": 0
+    }
+  }
+]

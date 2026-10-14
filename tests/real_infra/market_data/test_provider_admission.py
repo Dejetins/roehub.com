@@ -524,30 +524,24 @@ def test_dead_idle_child_is_joined_and_replaced_without_capacity_leak(admission,
 
 
 def test_managed_upgrade_applies_admission_once_and_preserves_spend(monkeypatch):
-    """Exercise new SQL phase/marker; prior phases and Alembic are outside this fixture."""
+    """Actual full-schema prerequisites plus lost phase marker and idempotent resume."""
     from apps.migrations import storage
 
     root = Path(__file__).resolve().parents[3]
     manifest = root / "migrations/postgres/manifest.json"
     phases = storage._load_postgres_phases(manifest)
     version = "market-data-provider-admission-0034"
-    schema = "provider_upgrade_" + uuid4().hex
-    dsn = make_conninfo(DSN, options=f"-c search_path={schema}")
+    name = "s08_provider_upgrade_" + uuid4().hex
+    dsn = make_conninfo(DSN, dbname=name, options="")
     with psycopg.connect(DSN, autocommit=True) as connection:
-        connection.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
+        connection.execute(sql.SQL("CREATE DATABASE {}").format(sql.Identifier(name)))
     try:
+        # Apply real prerequisites, including market schema and current partitions.
+        # Only the selected missing marker simulates interruption; no fictional
+        # future phases or bypassed Alembic success are recorded.
+        storage.apply_postgres_migrations(dsn, repo_root=root, manifest_path=manifest)
         with psycopg.connect(dsn) as connection:
-            connection.execute(
-                "CREATE TABLE market_data_history_bounds (market_id smallint, symbol text)"
-            )
-        storage._ensure_postgres_state_table(dsn)
-        for prior, (checksum, _) in phases.items():
-            if prior != version:
-                storage._record_postgres_marker(
-                    dsn, store="postgres-sql", version=prior, checksum=checksum
-                )
-        monkeypatch.setattr(storage, "_alembic_revision_files", lambda _: ())
-        monkeypatch.setattr(storage, "run_alembic_upgrade_head", lambda **_: None)
+            connection.execute("DELETE FROM roehub_storage_migrations WHERE version=%s", (version,))
         original_marker = storage._record_postgres_marker
 
         def crash_before_marker(*args, **kwargs):
@@ -577,4 +571,6 @@ def test_managed_upgrade_applies_admission_once_and_preserves_spend(monkeypatch)
             ).fetchone() == (0,)
     finally:
         with psycopg.connect(DSN, autocommit=True) as connection:
-            connection.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
+            connection.execute(
+                sql.SQL("DROP DATABASE {} WITH (FORCE)").format(sql.Identifier(name))
+            )

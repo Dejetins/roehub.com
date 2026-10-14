@@ -4,6 +4,7 @@ import {useTranslation} from 'react-i18next';
 import {RefreshCw} from 'lucide-react';
 import {Filter} from 'lucide-react';
 import {useLibraryFilterPopup} from './library-filter-popup';
+import {LibraryHeader, type LibraryActions} from './library-header';
 import {ApiError} from './api';
 import {LoadingData, ReadStatus} from './loading-data';
 
@@ -92,10 +93,9 @@ export function formatTime(value: string | null | undefined, locale='en') {
 
 export const deniesRead = (error: unknown) => error instanceof ApiError && [401,403,404].includes(error.status ?? 0);
 
-export function CollectionLibrary({title,actions,filters,onReset,children}:{title:string;actions?:ReactNode;filters?:ReactNode;onReset?:()=>void;children:ReactNode}) {
+export function CollectionLibrary({title,actions,filters,onReset,children,compactActions}:{title:string;compactActions?:boolean;actions?:LibraryActions;filters?:ReactNode;onReset?:()=>void;children:ReactNode}) {
   const w=useWords(),popup=useLibraryFilterPopup();
-  return <aside className="navigator-library"><header className="panel-head"><h2>{title}</h2><div className="work-library-actions">{actions}
-    {filters&&<button ref={popup.trigger} type="button" className="library-icon-action" aria-label={w('Filters','Фильтры')} title={w('Filters','Фильтры')} aria-expanded={popup.open} onClick={popup.toggle}><Filter aria-hidden="true"/></button>}</div></header>
+  return <aside className="navigator-library"><LibraryHeader title={title} compactActions={compactActions} actions={(actions||filters)?{...actions, filter: filters&&<button ref={popup.trigger} type="button" className="library-icon-action" aria-label={w('Filters','Фильтры')} title={w('Filters','Фильтры')} aria-expanded={popup.open} onClick={popup.toggle}><Filter aria-hidden="true"/></button>}:undefined}/>
     {filters&&<section ref={popup.popup} popover="auto" role="dialog" aria-label={w('Filters','Фильтры')} className="library-filter-popup strategy-filter-popover" onToggle={event=>popup.setOpen(event.newState==='open')}
       onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();popup.close();}}}><div className="strategy-filters">{filters}<button type="button" className="library-filter-reset" onClick={onReset}>{w('Reset filters','Сбросить фильтры')}</button></div></section>}
     <div className="library-body">{children}</div></aside>;

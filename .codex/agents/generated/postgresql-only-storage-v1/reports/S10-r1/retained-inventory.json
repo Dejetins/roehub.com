@@ -1,0 +1,294 @@
+[
+  {
+    "month": "202010",
+    "selected_rows": 24300
+  },
+  {
+    "month": "202011",
+    "selected_rows": 43140
+  },
+  {
+    "month": "202012",
+    "selected_rows": 44328
+  },
+  {
+    "month": "202101",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202102",
+    "selected_rows": 40241
+  },
+  {
+    "month": "202103",
+    "selected_rows": 44550
+  },
+  {
+    "month": "202104",
+    "selected_rows": 42766
+  },
+  {
+    "month": "202105",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202106",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202107",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202108",
+    "selected_rows": 44370
+  },
+  {
+    "month": "202109",
+    "selected_rows": 43080
+  },
+  {
+    "month": "202110",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202111",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202112",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202201",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202202",
+    "selected_rows": 40320
+  },
+  {
+    "month": "202203",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202204",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202205",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202206",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202207",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202208",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202209",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202210",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202211",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202212",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202301",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202302",
+    "selected_rows": 40320
+  },
+  {
+    "month": "202303",
+    "selected_rows": 44560
+  },
+  {
+    "month": "202304",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202305",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202306",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202307",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202308",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202309",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202310",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202311",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202312",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202401",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202402",
+    "selected_rows": 41760
+  },
+  {
+    "month": "202403",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202404",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202405",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202406",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202407",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202408",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202409",
+    "selected_rows": 43200
+  },
+  {
+    "month": "202410",
+    "selected_rows": 44640
+  },
+  {
+    "month": "202411",
+    "selected_rows": 71400
+  },
+  {
+    "month": "202412",
+    "selected_rows": 89280
+  },
+  {
+    "month": "202501",
+    "selected_rows": 89280
+  },
+  {
+    "month": "202502",
+    "selected_rows": 80640
+  },
+  {
+    "month": "202503",
+    "selected_rows": 89280
+  },
+  {
+    "month": "202504",
+    "selected_rows": 86400
+  },
+  {
+    "month": "202505",
+    "selected_rows": 89280
+  },
+  {
+    "month": "202506",
+    "selected_rows": 86400
+  },
+  {
+    "month": "202507",
+    "selected_rows": 89280
+  },
+  {
+    "month": "202508",
+    "selected_rows": 89280
+  },
+  {
+    "month": "202509",
+    "selected_rows": 117975
+  },
+  {
+    "month": "202510",
+    "selected_rows": 178560
+  },
+  {
+    "month": "202511",
+    "selected_rows": 172800
+  },
+  {
+    "month": "202512",
+    "selected_rows": 178560
+  },
+  {
+    "month": "202601",
+    "selected_rows": 178560
+  },
+  {
+    "month": "202602",
+    "selected_rows": 161280
+  },
+  {
+    "month": "202603",
+    "selected_rows": 178560
+  },
+  {
+    "month": "202604",
+    "selected_rows": 172800
+  },
+  {
+    "month": "202605",
+    "selected_rows": 178560
+  },
+  {
+    "month": "202606",
+    "selected_rows": 172800
+  },
+  {
+    "month": "202607",
+    "selected_rows": 182160
+  },
+  {
+    "month": "202608",
+    "selected_rows": 223200
+  },
+  {
+    "month": "202609",
+    "selected_rows": 216000
+  },
+  {
+    "month": "202610",
+    "selected_rows": 79200
+  }
+]

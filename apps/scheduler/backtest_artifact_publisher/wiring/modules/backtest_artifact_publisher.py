@@ -24,7 +24,7 @@ from apps.api.wiring.modules.indicators import (
     build_artifact_precompute_indicators_compute,
     build_indicators_registry,
 )
-from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+from apps.cli.wiring.db.postgres import market_gateway
 from apps.scheduler.backtest_artifact_publisher.wiring.managed_access import ManagedCoordinateAccess
 from apps.scheduler.backtest_artifact_publisher.wiring.managed_app import (  # noqa: E501
     ManagedArtifactPublisherApp,
@@ -55,13 +55,14 @@ from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2UseCase,
 )
 from trading.contexts.indicators.application.services import GridBuilder
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseCanonicalCandleIndexReader,
-    ClickHouseCanonicalCandleReader,
-    ThreadLocalClickHouseConnectGateway,
-)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresInstrumentSelectionRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_index_reader import (  # noqa: E501
+    PostgresCanonicalCandleIndexReader,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_reader import (  # noqa: E501
+    PostgresCanonicalCandleReader,
 )
 from trading.contexts.market_data.application.ports.stores import EnabledInstrumentReader
 from trading.platform.time.system_clock import SystemClock  # noqa: F401
@@ -859,17 +860,17 @@ def build_backtest_artifact_publisher_app(
 
     Args:
         config_path: Path to `backtest_artifacts.yaml`.
-        environ: Runtime environment mapping with ClickHouse and Postgres credentials.
+        environ: Runtime environment mapping with PostgreSQL market and control-plane credentials.
         metrics_port: Prometheus metrics HTTP port.
         lock_path: Optional override for the host-level lock file path.
     Returns:
         BacktestArtifactPublisherApp: Ready-to-run scheduler app instance.
     Assumptions:
-        Startup must fail fast when config, ClickHouse, or Postgres dependencies are invalid.
+        Startup must fail fast when config, PostgreSQL, or Postgres dependencies are invalid.
     Raises:
         ValueError: If config/env/DSN contracts are invalid.
         FileNotFoundError: If the config path does not exist.
-        RuntimeError: If ClickHouse client dependency is not installed.
+        RuntimeError: If PostgreSQL client dependency is not installed.
     Side Effects:
         Reads config files and initializes storage/compute adapters used by the scheduler.
     Docs:
@@ -884,10 +885,7 @@ def build_backtest_artifact_publisher_app(
     path_builder = BacktestArtifactPathBuilderV2(root=artifact_runtime_config.artifact_root_path())
     artifact_loader = YamlBacktestArtifactLoaderV2(path_resolver=path_builder)
     pointer_writer = AtomicArtifactCurrentPointerWriterV2(path_resolver=path_builder)
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="artifacts")
-    clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
-        client_factory=lambda: _clickhouse_client(clickhouse_settings)
-    )
+    postgres_gateway = market_gateway(environ, workload="artifacts")
     strategy_postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
     if not strategy_postgres_dsn:
         raise ValueError("STRATEGY_PG_DSN is required for backtest-artifact-publisher scheduler")
@@ -912,26 +910,28 @@ def build_backtest_artifact_publisher_app(
             config_sha256=artifact_config_hash
         ),
         artifact_loader=artifact_loader,
-        canonical_candle_reader=ClickHouseCanonicalCandleReader(
-            gateway=clickhouse_gateway,
-            database=clickhouse_settings.database,
+        canonical_candle_reader=PostgresCanonicalCandleReader(
+            gateway=postgres_gateway,
         ),
         defaults_provider=defaults_provider,
         signal_rules_engine=BacktestSignalRulesEngineV2(defaults_provider=defaults_provider),
         indicator_compute=indicator_compute,
         indicator_grid_builder=GridBuilder(registry=indicator_registry),
     )
+    from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.publication_fence import (  # noqa: E501
+        PostgresPublicationFence,
+    )
+
+    publication_gateway = PsycopgBacktestPostgresGateway(dsn=strategy_postgres_dsn)
     slot_publisher = BacktestArtifactSlotPublisherV2(
+        source_fence=PostgresPublicationFence(publication_gateway),
         artifact_loader=artifact_loader,
         current_pointer_writer=pointer_writer,
-        job_repository=PostgresBacktestJobRepository(
-            gateway=PsycopgBacktestPostgresGateway(dsn=strategy_postgres_dsn)
-        ),
+        job_repository=PostgresBacktestJobRepository(gateway=publication_gateway),
     )
     publish_use_case = PublishBacktestArtifactsV2UseCase(
-        canonical_candle_index_reader=ClickHouseCanonicalCandleIndexReader(
-            gateway=clickhouse_gateway,
-            database=clickhouse_settings.database,
+        canonical_candle_index_reader=PostgresCanonicalCandleIndexReader(
+            gateway=postgres_gateway,
         ),
         precompute_runner=precompute_runner,
         slot_publisher=slot_publisher,
@@ -957,8 +957,8 @@ def build_backtest_artifact_publisher_app(
         from trading.contexts.backtest_artifacts.adapters.outbound.defaults.management_catalog import (  # noqa: E501
             ManagementCatalog,  # noqa: E501
         )
-        from trading.contexts.backtest_artifacts.adapters.outbound.persistence.clickhouse.stored_coordinates import (  # noqa: E501
-            ClickHouseStoredArtifactCoordinates,  # noqa: E501
+        from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.stored_coordinates import (  # noqa: E501
+            PostgresStoredArtifactCoordinates,
         )
         from trading.contexts.backtest_artifacts.application.services.automatic_base import (
             AutomaticBasePublisher,  # noqa: E501
@@ -966,12 +966,12 @@ def build_backtest_artifact_publisher_app(
         from trading.contexts.backtest_artifacts.application.services.management import (
             ManagementError,  # noqa: E501
         )
-        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.funding_rate_store import (  # noqa: E501
-            ClickHouseFundingRateStore,  # noqa: E501
+        from trading.contexts.market_data.adapters.outbound.persistence.postgres.funding_rate_store import (  # noqa: E501
+            PostgresFundingRateStore,
         )
 
         installation = UUID(managed_installation)
-        gateway = PsycopgBacktestPostgresGateway(dsn=strategy_postgres_dsn)
+        gateway = publication_gateway
         settings = gateway.fetch_one(
             query=(
                 "SELECT * FROM backtest_artifact_installation_settings "
@@ -988,7 +988,7 @@ def build_backtest_artifact_publisher_app(
         if artifact_runtime_config.publish_schedule.enabled:
             raise ManagementError("legacy_scheduler_enabled")
         reference = build_market_data_reference_use_cases(
-            environ=environ, clickhouse_workload="artifacts"
+            environ=environ, postgres_workload="artifacts"
         )
         app = compose_managed_app(
             installation_id=installation,
@@ -1002,14 +1002,14 @@ def build_backtest_artifact_publisher_app(
             publisher=AutomaticBasePublisher(
                 replace(
                     precompute_runner,
-                    funding_rate_coverage_reader=ClickHouseFundingRateStore(
-                        gateway=clickhouse_gateway, database=clickhouse_settings.database
-                    ),
+                    funding_rate_coverage_reader=PostgresFundingRateStore(gateway=postgres_gateway),
                 ),
-                slot_publisher,
+                replace(
+                    slot_publisher, job_repository=PostgresBacktestJobRepository(gateway=gateway)
+                ),
             ),
-            stored_coordinates=ClickHouseStoredArtifactCoordinates(
-                clickhouse_gateway, clickhouse_settings.database
+            stored_coordinates=PostgresStoredArtifactCoordinates(
+                market_gateway(environ, workload="reconcile")
             ),
             candle_index=publish_use_case.canonical_candle_index_reader,
             root=artifact_runtime_config.artifact_root_path(),

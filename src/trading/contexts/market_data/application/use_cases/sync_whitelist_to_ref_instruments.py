@@ -42,7 +42,9 @@ class SyncWhitelistToRefInstrumentsUseCase:
         if clock is None:  # type: ignore[truthy-bool]
             raise ValueError("SyncWhitelistToRefInstrumentsUseCase requires clock")
         if not known_market_ids:
-            raise ValueError("SyncWhitelistToRefInstrumentsUseCase requires non-empty known_market_ids")  # noqa: E501
+            raise ValueError(
+                "SyncWhitelistToRefInstrumentsUseCase requires non-empty known_market_ids"
+            )  # noqa: E501
         self._writer = writer
         self._clock = clock
         self._known_market_ids = known_market_ids
@@ -66,11 +68,13 @@ class SyncWhitelistToRefInstrumentsUseCase:
             }
         )
         if bad:
-            raise ValueError(f"whitelist contains unknown market_id(s) not present in runtime config: {bad}")  # noqa: E501
+            raise ValueError(
+                f"whitelist contains unknown market_id(s) not present in runtime config: {bad}"
+            )  # noqa: E501
 
         now = self._clock.now()
 
-        # group by market_id for efficient CH queries
+        # Group by market, then read bounded reference batches.
         by_market: dict[int, list[WhitelistInstrumentRow]] = {}
         for r in rows_list:
             by_market.setdefault(r.instrument_id.market_id.value, []).append(r)
@@ -83,7 +87,13 @@ class SyncWhitelistToRefInstrumentsUseCase:
         for mid_int, group in by_market.items():
             market_id = MarketId(mid_int)
             symbols: list[Symbol] = [g.instrument_id.symbol for g in group]
-            existing = self._writer.existing_latest(market_id=market_id, symbols=symbols)
+            existing = {}
+            for offset in range(0, len(symbols), 1000):
+                existing.update(
+                    self._writer.existing_latest(
+                        market_id=market_id, symbols=symbols[offset : offset + 1000]
+                    )
+                )
 
             for r in group:
                 sym = str(r.instrument_id.symbol)
@@ -113,7 +123,8 @@ class SyncWhitelistToRefInstrumentsUseCase:
                     )
                 )
 
-        self._writer.upsert(upserts)
+        for offset in range(0, len(upserts), 1000):
+            self._writer.upsert(upserts[offset : offset + 1000])
 
         return SyncWhitelistReport(
             rows_total=len(rows_list),

@@ -12,7 +12,7 @@ class UtcTimestamp:
     Правила (зафиксированы в docs/architecture/shared-kernel-primitives.md):
     - входной datetime должен быть timezone-aware (naive запрещён)
     - храним время в UTC
-    - точность приводим к миллисекундам (DateTime64(3, 'UTC'))
+    - точность приводим к миллисекундам (UTC millisecond timestamp)
     """
 
     value: datetime
@@ -29,7 +29,7 @@ class UtcTimestamp:
         dt_utc = dt.astimezone(timezone.utc)
 
         # 3) Приводим точность к миллисекундам:
-        # DateTime64(3) хранит миллисекунды, поэтому микросекунды обрезаем вниз.
+        # Storage contract хранит миллисекунды, поэтому микросекунды обрезаем вниз.
         ms = (dt_utc.microsecond // 1000) * 1000
         dt_utc_ms = dt_utc.replace(microsecond=ms)
 

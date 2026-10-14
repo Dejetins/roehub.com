@@ -1,0 +1,10 @@
+{
+  "action": "restart",
+  "services": [
+    "postgresql"
+  ],
+  "operation_id": "3173cc8f-5ae6-400a-aa35-76388d96accf",
+  "returncode": 0,
+  "stdout": "{\"action\": \"restart\", \"active_services\": [], \"detail_code\": \"control_agent.restart_rejected\", \"journal_sequence\": 381, \"operation_id\": \"3173cc8f-5ae6-400a-aa35-76388d96accf\", \"profile\": \"trading\", \"schema\": \"io.roehub.control-operation-result/v1alpha1\", \"state\": \"failed\"}\n",
+  "stderr": ""
+}

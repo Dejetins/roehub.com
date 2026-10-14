@@ -1,0 +1,48 @@
+"""Time production writer statements and capture the expensive join plan on S09 only."""
+
+import json
+import time
+
+from tools.qa.postgres_production_soak import APP_DSN, OUT
+from tools.qa.postgres_production_workload import replay
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.ingestion_gateway import (
+    IngestionGateway,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (
+    PostgresRawKlineWriter,
+)
+
+samples = []
+
+
+class Connection:
+    def __init__(self, c):
+        self.c = c
+
+    def __getattr__(self, key):
+        return getattr(self.c, key)
+
+    def execute(self, query, params=None):
+        text = str(query)
+        if "SELECT DISTINCT s.market_id,s.symbol FROM candle_winners" in text:
+            plan = self.c.execute(
+                "EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) " + query, params
+            ).fetchone()[0]
+            (OUT / "writer-join-after.json").write_text(json.dumps(plan, indent=2))
+        started = time.monotonic()
+        result = self.c.execute(query, params)
+        samples.append({"query": text, "seconds": time.monotonic() - started})
+        return result
+
+
+class Writer(PostgresRawKlineWriter):
+    def _write(self, c, batch):
+        return super()._write(Connection(c), batch)
+
+
+g = IngestionGateway(APP_DSN, deadline_s=30)
+try:
+    Writer(g).write_1m(replay("S09PROFILE", 1000, 1000))
+finally:
+    g.close()
+    (OUT / "writer-statements-after.json").write_text(json.dumps(samples, indent=2))

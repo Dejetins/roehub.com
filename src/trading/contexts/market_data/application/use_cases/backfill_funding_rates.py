@@ -205,7 +205,8 @@ class BackfillFundingRatesUseCase:
                     funding_interval_source=instrument.funding_interval_source,
                 )
             )
-            self._writer.write_funding_rates(rows)
+            for offset in range(0, len(rows), 1000):
+                self._writer.write_funding_rates(rows[offset : offset + 1000])
         except Exception as exc:  # noqa: BLE001
             return FundingCatchupInstrumentReport(
                 instrument_id=instrument.instrument_id,

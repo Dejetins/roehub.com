@@ -1,0 +1,159 @@
+{
+  "schema": "io.roehub.installation-recovery-runtime-proof/v1alpha1",
+  "stage": "21",
+  "status": "passed",
+  "proof_boundary": "N/A: disposable local Docker projects, generated fixture data, operator-generated temporary keys, no production restore",
+  "source_project": "roehub-s06-backup6-source",
+  "target_project": "roehub-s06-backup6-target",
+  "monitoring_project": "roehub-s06-backup6-monitoring",
+  "state_owner_coverage": [
+    "artifacts",
+    "observability",
+    "openbao",
+    "plugin_operation_audit",
+    "postgresql",
+    "redis_checkpoint",
+    "release_config"
+  ],
+  "encrypted_entries": 7,
+  "manifest_signature": "verified",
+  "source_target_separation": "passed",
+  "roehubctl_without_web_api": {
+    "backup": "succeeded",
+    "restore": "succeeded",
+    "backup_cancellation": {
+      "request": "succeeded",
+      "target": "failed",
+      "resume": "succeeded"
+    },
+    "restore_cancellation": {
+      "request": "succeeded",
+      "target": "failed",
+      "resume": "succeeded"
+    },
+    "control_socket": "unix",
+    "web_api_running": false
+  },
+  "monitoring_during_recovery": {
+    "running": [
+      "alertmanager",
+      "blackbox",
+      "operational-health",
+      "prometheus"
+    ],
+    "operational_health_ready": true,
+    "web_api_running": false
+  },
+  "restore_comparison": {
+    "postgresql": {
+      "rows": 5,
+      "kinds": [
+        "audit",
+        "config",
+        "operation",
+        "plugin",
+        "user"
+      ],
+      "users_config_plugin_operation_audit": "matched"
+    },
+    "postgresql_timeseries": {
+      "rows": 3,
+      "time_range": [
+        "2026-07-14 09:00:00.000",
+        "2026-07-14 09:02:00.000"
+      ],
+      "digest_match": true
+    },
+    "redis_checkpoint": {
+      "value_match": true,
+      "source_of_truth": false
+    },
+    "artifacts": {
+      "digest": "sha256:15078be2718eaaea75b0f3f4a377be221b6da93bcb049758d6d8453f807ed043",
+      "match": true
+    },
+    "plugin_operation_audit": "matched",
+    "release_config": {
+      "exact_files": 3,
+      "match": true
+    },
+    "observability_bounded_history": "matched",
+    "openbao_encrypted_snapshot": {
+      "ciphertext_sha256": "sha256:e7f73d92d08d95b14f7d276a387d52f17f09e44d57659d33e25b5d6dd4a748d1",
+      "decryptable_by_operator_key": true,
+      "same_snapshot_fresh_volume_restore": "passed"
+    },
+    "all_plaintext_digests": 7
+  },
+  "openbao": {
+    "encrypted_raft_snapshot": true,
+    "fresh_volume_force_restore": "passed",
+    "fresh_storage_guard": "passed",
+    "forbidden_output_scan": "passed",
+    "cleanup": "passed"
+  },
+  "backup_progress": "completed",
+  "restore_progress": "completed",
+  "observed_rpo_seconds": 41.03762,
+  "observed_rto_seconds": 3.8298853329615667,
+  "sla_claimed": false,
+  "release_lifecycle": {
+    "fixture": "versioned-unpublished-n-minus-one",
+    "injected_failure": "failed_before_atomic_release_commit",
+    "from_release": "0.0.0",
+    "to_release": "0.1.0",
+    "preupgrade_backup_verified": true,
+    "resume_after_failure": "passed",
+    "observed_upgrade_seconds": 0.032681790995411575,
+    "rollback_release": "0.0.0",
+    "rollback_state_owner_count": 7,
+    "observed_rollback_seconds": 3.8518932500155643,
+    "failed_update_state": "failed",
+    "failed_update_detail": "upgrade.injected_failure_before_commit",
+    "resumed_update_state": "succeeded",
+    "rollback_state": "succeeded",
+    "irreversible_update_state": "failed",
+    "irreversible_migration_guard": "upgrade.forward_recovery_plan_required"
+  },
+  "external_provider_writes": false,
+  "real_order_effects": false,
+  "production_mutation": false,
+  "sensitive_data_present": false,
+  "cleanup": {
+    "status": "completed",
+    "down_exit_status": {
+      "roehub-s06-backup6-source": 0,
+      "roehub-s06-backup6-target": 0,
+      "roehub-s06-backup6-update": 0,
+      "roehub-s06-backup6-rollback": 0,
+      "roehub-s06-backup6-monitoring": 0
+    },
+    "residual_resources": {
+      "roehub-s06-backup6-source": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s06-backup6-target": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s06-backup6-update": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s06-backup6-rollback": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s06-backup6-monitoring": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      }
+    }
+  }
+}

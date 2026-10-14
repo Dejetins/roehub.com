@@ -21,7 +21,7 @@ class SearchEnabledTradableInstrumentsUseCase:
     Related:
       - src/trading/contexts/market_data/application/ports/stores/
         enabled_tradable_instrument_search_reader.py
-      - src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/
+      - src/trading/contexts/market_data/adapters/outbound/persistence/postgres/
         enabled_tradable_instrument_search_reader.py
       - apps/api/routes/market_data_reference.py
     """

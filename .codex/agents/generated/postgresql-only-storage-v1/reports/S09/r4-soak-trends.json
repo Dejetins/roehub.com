@@ -1,0 +1,72 @@
+{
+  "pg": [
+    {
+      "quarter": 1,
+      "samples": 179,
+      "memory_median_bytes": 356937728,
+      "memory_max_bytes": 660623360
+    },
+    {
+      "quarter": 2,
+      "samples": 179,
+      "memory_median_bytes": 330858496,
+      "memory_max_bytes": 713281536
+    },
+    {
+      "quarter": 3,
+      "samples": 179,
+      "memory_median_bytes": 328933376,
+      "memory_max_bytes": 675254272
+    },
+    {
+      "quarter": 4,
+      "samples": 179,
+      "memory_median_bytes": 337145856,
+      "memory_max_bytes": 744529920
+    }
+  ],
+  "server": [
+    {
+      "quarter": 1,
+      "samples": 177,
+      "memory_median_bytes": 2397421568,
+      "memory_max_bytes": 2618486784,
+      "anon_median_bytes": 240410624,
+      "anon_max_bytes": 255963136
+    },
+    {
+      "quarter": 2,
+      "samples": 176,
+      "memory_median_bytes": 2439538688.0,
+      "memory_max_bytes": 2631237632,
+      "anon_median_bytes": 251858944.0,
+      "anon_max_bytes": 268357632
+    },
+    {
+      "quarter": 3,
+      "samples": 176,
+      "memory_median_bytes": 2438129664.0,
+      "memory_max_bytes": 2589589504,
+      "anon_median_bytes": 252786688.0,
+      "anon_max_bytes": 268517376
+    },
+    {
+      "quarter": 4,
+      "samples": 176,
+      "memory_median_bytes": 2452494336.0,
+      "memory_max_bytes": 2638131200,
+      "anon_median_bytes": 253048832.0,
+      "anon_max_bytes": 272965632
+    }
+  ],
+  "relation_growth_bytes": {
+    "market_data_work_events": 499712,
+    "raw_binance_klines_1m": 611942400,
+    "market_data_work_requests": 442368,
+    "candle_coverage_days": 974848,
+    "canonical_candles_1m": 1111392256,
+    "identity_local_auth_rate_limits": -16384,
+    "market_data_stream_recovery": -16384,
+    "market_data_stream_events": 876544
+  }
+}

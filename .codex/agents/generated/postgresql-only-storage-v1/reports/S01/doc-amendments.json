@@ -1,0 +1,206 @@
+[
+  {
+    "path": "docs/architecture/apps/cli/cli-backfill-1m.md",
+    "before_sha256": "e2693d3438697f59c1c82649e4971c5c22f6c33f236fac27567fcfeee8eb194d",
+    "after_sha256": "708b99f1e4444d9177ff3cc0f28b239552d6c3183b2a40ad57e90b657ad8cab9",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/apps/web/web-ui-tests-docs-index-v1.md",
+    "before_sha256": "65f19f2b71b844a239c7ddc3a3a5e93deb3b35df7ce4896249a58a62be181a92",
+    "after_sha256": "3011b871934cebaf0861e1f6674fcbb2d17fa22df0f61f664b44fce916249bc9",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/backtest/backtest-futures-funding-and-short-direction-policy-v1.md",
+    "before_sha256": "2d2d01aa3e4def91a0b5f54464f8b39c68758e1f7731128f52ee9a6e6b3ba08b",
+    "after_sha256": "5fcf125d3a4f69f760ce734dee0d4368cbd7e546dff9bef49cbcfa9c04573011",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/backtest/backtest-service-artifact-runtime-v1.ru.md",
+    "before_sha256": "e89fb1fce9132e47b7ee09ffb93d59208bc80c18bef673ebfb11ad4f45d146c7",
+    "after_sha256": "40b7359889e34cc9dda8ffa970d74771b6adffcdd2f2410043b79cf2df170c7d",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/identity/organizations-rbac-audit-v1.md",
+    "before_sha256": "1e01ddcedd689c910dce99ab0e69be8773a9362a88fd5c3cf5ade1b256762eb7",
+    "after_sha256": "fb05c923d2819c1a08105e19219828cafa71382590fc99cc3587bf9d885b0baa",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/indicators/indicators-application-ports-walking-skeleton-v1.md",
+    "before_sha256": "66dd8879035e84360f68236e3d43c1cb3dad54759642c6c31787ca3b11e509aa",
+    "after_sha256": "b553813749e4ae352f7aa4c8aafc41b5d46fd1e7891b11cc60dfb7e9d927ac5b",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/live_execution/live-execution-universal-order-gateway-v1.md",
+    "before_sha256": "93cdd3925b955f92bd3a57d83ef4afc5f7367c616f001c36fbd82f32fc821e21",
+    "after_sha256": "4e73f8c748f0e22ec248fc6faba02f5df86b7dad7e4d5285a4e8e888cea82af7",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/live_execution/strategy-producer-paper-testnet-trading-v1.md",
+    "before_sha256": "1c425e718b40e558b8a899a96c6f6dd4a3931460fdf5b3ccc56c074a1eeba43d",
+    "after_sha256": "f9406e1ca52e94d48f197f2338763e3bf42398041cf42c6109b526624483a150",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/market_data/market-data-application-ports.md",
+    "before_sha256": "9829431ea1718237fbf21fff68658ee3451dc34c2f3631d729edf38d10c6247a",
+    "after_sha256": "6d062c98e6c3f0db80579cb2977ce3a80961d8b4c12884d1b51e898e76de5b0d",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/market_data/market-data-live-feed-redis-streams-v1.md",
+    "before_sha256": "475a321e4bed27863d5e0df54777d5c9ba4b4c539cbc20e5767fb58ef57d8619",
+    "after_sha256": "2ddcf064f6660b656ba02abedf9cd6e6cb32363f10907ffe90afa010283dd7e0",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/market_data/market-data-live-tail-repair-v1.md",
+    "before_sha256": "6dbcb5cee9eb77cd2b7fecee4019556897a3c29ded2e3885749eada5712bc0be",
+    "after_sha256": "185245118842f8a89aff6e0258a8aa1f468b164e1b6c13cb43485dd9d02bd987",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/market_data/market-data-real-adapters-clickhouse-parquet.md",
+    "before_sha256": "d2135bb1759aa8121dadc51045211c2c6b83cb010a51ac51f2e46ecaa506edb6",
+    "after_sha256": "9f0d56acdaae2e038448b62a7e0c297fdf15342715ffb1065f3dad244122fec8",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/market_data/market-data-reference-api-v1.md",
+    "before_sha256": "6f2f5df284f00fc59a0d6a9a03028f505401bb9b1c090994af543ded527e5e13",
+    "after_sha256": "5d7a7947707a425d0ddf7e27aa71e12fd969324fd50333bc9725e3593300a683",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/market_data/market-data-reference-data-sync-v2.md",
+    "before_sha256": "4d9305b6469674c8b307cbdcb648c3d3383ac7a27310ed55f54ebb635b22ddf8",
+    "after_sha256": "02aa7063d0c9a7b31241c8e9446908a59c678d5563608cdca9884f17c928b47a",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/market_data/market-data-rest-historical-catchup-1m-v2.md",
+    "before_sha256": "462ff9e197570446183a35a3253008bbfe78ea65d793d4b4b8831edfd8ec25a5",
+    "after_sha256": "3ec690e51eccba37a4c35c29d7a5ffe4770083f3d315eab5b76705b824976784",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/market_data/market-data-runtime-config-invariants-v2.md",
+    "before_sha256": "16e2c68c5daece9b38cb1f5cb5ae606e61b2f8f993bdfc50ee87cacd568105e6",
+    "after_sha256": "0717491587e8ab6fc1fe45bdb6520f2b5e7b522e28880f7a741c3e818ed95369",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/market_data/market-data-use-case-backfill-1m.md",
+    "before_sha256": "66a8133acbe976bc729d397932afa63ede6c77f15355d2bef1248d4cb46984fd",
+    "after_sha256": "accab0948d47a589f8ba66fa2086db5cc3c5e7c9b732b003418776914a6d3d8d",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/market_data/market-data-ws-live-ingestion-worker-v1.md",
+    "before_sha256": "06fa766e61fbe08129506e884d38095e466d84a2a842c207e446a6b5db4710ce",
+    "after_sha256": "2f7aadaed1f276ab89cffb824157da076027ff2cc86ea0307e745616576cc10a",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/ml/rl-trading-agent-platform-v1.md",
+    "before_sha256": "67435978cfc6504f7991716015180f92404fa8910cabd381441900996606c282",
+    "after_sha256": "df35728850ee34b18c8072d260e7d71fa59ff107bf4d5fbee9b0cdb639165eaa",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/operations/native-service-control-monitoring-admin-target-v1.md",
+    "before_sha256": "5847db9ee18699f775059b0832775ae576a630173f074565a295736c79c3f1d6",
+    "after_sha256": "326350e7a4c75d73a2eb6c12679567c7296037b9166794752c8bea0545c7ed77",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md",
+    "before_sha256": "f3b563e8490520aed661743046a7895fef275d555bb2b1ac9f40ad120d2b0847",
+    "after_sha256": "ad330a87131b170a80f39f78a90292090dbb1abaef28555a7d6a8458a7ad2d55",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md",
+    "before_sha256": "dda4ec86a71ce858623a7c153289970b2609f81afafc34421ec2b5f272f3f3f7",
+    "after_sha256": "6e28169aef7b880e821849ee8602d8315863102ee832aebd17d8785f0f9e598a",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/shared-kernel-primitives.md",
+    "before_sha256": "b3b495bc31684896e8f811fc53fc8a6389c1501d1f5fb8b897122897ccbb9e1a",
+    "after_sha256": "8909834ef863dc0fae311dd07038a13903554dffecdd8b238a5f76fdac214765",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md",
+    "before_sha256": "e9430c967c7cd904609feb4ce185ea3581ff49ca66ac31fc97334858c039a694",
+    "after_sha256": "9a23bd9fd367dd2c4fc2b41b3f1f295aea9fcdadb7c787201762ea357472d484",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/strategy/strategy-milestone-3-epics-v1.md",
+    "before_sha256": "665853df8098582ce4b22f3a350fc0679c656f1965c9c08da071356ecadfa6ae",
+    "after_sha256": "a07315009f91e2fe7236b268db222b962aabd52ed9c48163a725ed724a3e2e29",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/architecture/strategy/strategy-runtime-config-v1.md",
+    "before_sha256": "5def421520f6e6905b98247562ed3aefd957d49e8c0e77bb2ea3204ba4065c80",
+    "after_sha256": "3e50fa7500280da8f8f41a44b3c241c77639521acfa513657a10a04078e67519",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/runbooks/clickhouse-memory-profiles.md",
+    "before_sha256": "2d5a2b5ca907af61159881aec67d98a5b9ecb1f4331d7b6fa4d11f687a7abc84",
+    "after_sha256": "c806044a75415ca4e23f27ca807ce9589ce594cc21208604152404f1d962423c",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/runbooks/clickhouse-partition-dedup.md",
+    "before_sha256": "7de6376dca3eb5fa25fe851d707f87b7a3e10bcee26644905aa2b8285c845d49",
+    "after_sha256": "906020894ec43a16859a8e68fe73baa0a081e58547c2ce60de7887f6fca28cf8",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/runbooks/installation-backup-restore-upgrade.md",
+    "before_sha256": "833a78a15bb47b0228d49babd2f20b73bba74d16a14c1e7e70ffda0ce5a54d7b",
+    "after_sha256": "e7a1a1fa1b8418e725c5b54f55aefc535c823d98f0069009c9a4e33cbeed308d",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/runbooks/market-data-live-tail-repair.md",
+    "before_sha256": "2b5905d35dadbe577d6935d367cfea22d16341c50a1700d20add1f0cb7480b40",
+    "after_sha256": "37dfceaf02247321968fceddbb12b324628ecf953f0d4b5e14af1da6bbd1b187",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/runbooks/market-data-redis-streams.md",
+    "before_sha256": "d05129e9473a40176601e898bb013eac2779f7098141711194fb51d022eba9b0",
+    "after_sha256": "a18e442945723934a037b3d196da00049f2fdd49fae9f5b160a758f697c302db",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/runbooks/navigator-local-market-data-recovery.md",
+    "before_sha256": "1d5fa575a26b3be56b105c842ec58f58eb86d577d2cb8421a2d79314aa855924",
+    "after_sha256": "b6cbc14c16babcde6c3ce41bf1cc62520545a9fa35357150892f0a5286a429e9",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/runbooks/offline-release-installation.md",
+    "before_sha256": "49bc1371ee64dca5b7282d435f4d91b1fbb80cc5f9f85262dc57a8d56d3e6045",
+    "after_sha256": "27a92bef012091ec4e1a3c55e575b0022441e78b6ef71e60fdc555874da6a402",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  },
+  {
+    "path": "docs/runbooks/storage-bootstrap-and-migrations.md",
+    "before_sha256": "6bfbdac3a44639063378403f73d41e447cf43575f6738c973a053cac88594f97",
+    "after_sha256": "708512e4e385cec2d09b0ae48880c9a6425cb075d88d8843f832f93dc05a4f2e",
+    "ownership": "target amendment inserted after H1, outside frontmatter; original bytes otherwise preserved"
+  }
+]

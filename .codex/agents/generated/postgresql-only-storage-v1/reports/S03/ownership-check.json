@@ -1,0 +1,8 @@
+{
+  "protected_files": 300,
+  "changed_protected": [],
+  "changed_unowned_baseline_files": [],
+  "stale_manifest": [],
+  "foreign_dirty_changes": "excluded; baseline-status.txt",
+  "result": "pass"
+}

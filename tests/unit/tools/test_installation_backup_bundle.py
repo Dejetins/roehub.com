@@ -25,7 +25,7 @@ from trading.contexts.operations import BackupStateOwner
 
 
 def _apply_materialized(root: Path, manifest: object) -> dict[str, object]:
-    assert len(list(root.glob("*.snapshot"))) == 8
+    assert len(list(root.glob("*.snapshot"))) == 7
     assert manifest is not None
     return {"status": "ready", "state_owner_count": 8}
 
@@ -85,7 +85,6 @@ def _sources(root: Path, captured_at: datetime) -> tuple[BackupSource, ...]:
         mode = {
             BackupStateOwner.RELEASE_CONFIG: "application_quiesced",
             BackupStateOwner.POSTGRESQL: "database_snapshot",
-            BackupStateOwner.CLICKHOUSE: "database_snapshot",
             BackupStateOwner.REDIS_CHECKPOINT: "durable_checkpoint",
             BackupStateOwner.OPENBAO: "encrypted_raft_snapshot",
             BackupStateOwner.ARTIFACTS: "content_addressed_snapshot",
@@ -161,7 +160,7 @@ def test_backup_encrypts_signs_and_restores_every_state_owner(tmp_path: Path) ->
     assert {entry.owner for entry in manifest.entries} == set(BackupStateOwner)
     assert all(entry.encrypted for entry in manifest.entries)
     assert not list(bundle.glob("*.snapshot"))
-    assert result["restored_state_owner_count"] == 8
+    assert result["restored_state_owner_count"] == 7
     for source in sources:
         restored = tmp_path / "restored" / f"{source.owner.value}.snapshot"
         assert restored.read_bytes() == source.path.read_bytes()
@@ -308,7 +307,7 @@ def test_n_minus_one_upgrade_failure_resume_and_rollback(tmp_path: Path) -> None
     assert upgraded["from_release"] == "0.0.0"
     assert upgraded["to_release"] == "0.1.0"
     assert rolled_back["restored_release"] == "0.0.0"
-    assert rolled_back["state_owner_count"] == 8
+    assert rolled_back["state_owner_count"] == 7
 
 
 def test_irreversible_upgrade_requires_forward_recovery_plan(tmp_path: Path) -> None:
@@ -329,9 +328,7 @@ def test_irreversible_upgrade_requires_forward_recovery_plan(tmp_path: Path) -> 
 
 
 def test_backup_honors_cancellation_before_writing_ciphertext(tmp_path: Path) -> None:
-    age_identity, age_recipient, signing_file, verification_file = _materials(
-        tmp_path
-    )
+    age_identity, age_recipient, signing_file, verification_file = _materials(tmp_path)
     quiesce = datetime(2026, 7, 14, 12, 0, tzinfo=UTC)
     sources = _sources(tmp_path / "sources", quiesce + timedelta(seconds=1))
     cancellation = tmp_path / "cancel"

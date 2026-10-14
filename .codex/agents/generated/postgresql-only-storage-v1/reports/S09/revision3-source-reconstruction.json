@@ -1,0 +1,8 @@
+{
+  "method": "Reversed revision4 edits; exact bytes independently matched contemporaneous revision3 measured source SHA256. Reconstructed after run, not claimed to be original snapshot.",
+  "files": {
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_common.py": "37c87f382d8b4309ffbb69562070f0682dd414cc4e219d7d577f083f7814c4d6",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/raw_kline_writer.py": "3606fdf991a540d7901961286be82c806f439f604825796b5139da8fd0f7235b",
+    "src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_reader.py": "e3e48765537d199e4515a82c66d647d45af4decc03c2b271f0c8be2526f1708b"
+  }
+}

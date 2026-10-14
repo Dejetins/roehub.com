@@ -1,67 +1,9 @@
 from __future__ import annotations
 
-from types import SimpleNamespace
-
 import pytest
 from fastapi import APIRouter
 
 from apps.api.wiring.modules import market_data_reference as market_data_reference_module
-
-
-class _DummySettingsLoader:
-    """
-    Dummy ClickHouse settings loader returning deterministic database settings.
-
-    Docs:
-      - docs/architecture/market_data/market-data-reference-api-v1.md
-    Related:
-      - tests/unit/apps/api/test_market_data_reference_wiring_module.py
-      - apps/api/wiring/modules/market_data_reference.py
-      - apps/cli/wiring/db/clickhouse.py
-    """
-
-    def __init__(self, environ) -> None:  # noqa: ANN001
-        """
-        Store environ argument for compatibility with production loader API.
-
-        Parameters:
-        - environ: runtime environment mapping.
-
-        Returns:
-        - None.
-
-        Assumptions/Invariants:
-        - Value is unused in this test double.
-
-        Errors/Exceptions:
-        - None.
-
-        Side effects:
-        - None.
-        """
-        self._environ = environ
-
-    def load(self, *, workload=None):  # noqa: ANN001
-        """
-        Return minimal settings namespace expected by wiring module.
-
-        Parameters:
-        - None.
-
-        Returns:
-        - Settings object with `database` field.
-
-        Assumptions/Invariants:
-        - Wiring uses only `database` in this test.
-
-        Errors/Exceptions:
-        - None.
-
-        Side effects:
-        - None.
-        """
-        _ = self._environ
-        return SimpleNamespace(database="market_data")
 
 
 class _DummyFactory:
@@ -118,28 +60,16 @@ def test_build_market_data_reference_router_mounts_expected_paths(monkeypatch) -
     - Monkeypatches wiring module collaborators.
     """
     monkeypatch.setattr(
-        market_data_reference_module,
-        "ClickHouseSettingsLoader",
-        _DummySettingsLoader,
+        market_data_reference_module, "market_gateway", lambda environ, **kwargs: object()
     )
     monkeypatch.setattr(
         market_data_reference_module,
-        "_clickhouse_client",
-        lambda _settings: object(),
-    )
-    monkeypatch.setattr(
-        market_data_reference_module,
-        "ThreadLocalClickHouseConnectGateway",
+        "PostgresEnabledMarketReader",
         _DummyFactory,
     )
     monkeypatch.setattr(
         market_data_reference_module,
-        "ClickHouseEnabledMarketReader",
-        _DummyFactory,
-    )
-    monkeypatch.setattr(
-        market_data_reference_module,
-        "ClickHouseEnabledTradableInstrumentSearchReader",
+        "PostgresEnabledTradableInstrumentSearchReader",
         _DummyFactory,
     )
     monkeypatch.setattr(
@@ -284,22 +214,15 @@ def _paths_from_router(*, router: APIRouter) -> set[str]:
     Side effects:
     - None.
     """
-    return {
-        path
-        for route in router.routes
-        for path in (str(getattr(route, "path", "")),)
-        if path
-    }
+    return {path for route in router.routes for path in (str(getattr(route, "path", "")),) if path}
 
 
-def test_artifact_reference_wiring_uses_only_its_composition_owned_secret(tmp_path):
-    credential = tmp_path / "artifacts.password"
-    credential.write_text("x" * 64)
+def test_artifact_reference_wiring_uses_pg_bulk_class_without_ch_credentials():
+    from apps.cli.wiring.db.postgres import close_market_gateways
+
     use_cases = market_data_reference_module.build_market_data_reference_use_cases(
-        environ={
-            "ROEHUB_CH_WORKLOADS_REQUIRED": "1",
-            "ROEHUB_CH_ARTIFACTS_PASSWORD_FILE": str(credential),
-        },
-        clickhouse_workload="artifacts",
+        environ={"STRATEGY_PG_DSN": "host=localhost dbname=disposable"},
+        postgres_workload="artifacts",
     )
     assert use_cases.coverage_reader is not None
+    close_market_gateways()

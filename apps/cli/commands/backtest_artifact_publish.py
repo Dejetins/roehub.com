@@ -12,7 +12,7 @@ from apps.api.wiring.modules.indicators import (
     build_artifact_precompute_indicators_compute,
     build_indicators_registry,
 )
-from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+from apps.cli.wiring.db.postgres import market_gateway
 from trading.contexts.backtest_artifacts.adapters.outbound import (
     AtomicArtifactCurrentPointerWriterV2,
     BacktestArtifactPathBuilderV2,
@@ -36,11 +36,14 @@ from trading.contexts.backtest_artifacts.application.use_cases import (
     PublishBacktestArtifactsV2UseCase,
 )
 from trading.contexts.indicators.application.services import GridBuilder
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseCanonicalCandleIndexReader,
-    ClickHouseCanonicalCandleReader,
-    ClickHouseConnectGateway,
-    ClickHouseFundingRateStore,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_index_reader import (  # noqa: E501
+    PostgresCanonicalCandleIndexReader,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_reader import (  # noqa: E501
+    PostgresCanonicalCandleReader,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.funding_rate_store import (
+    PostgresFundingRateStore,
 )
 from trading.platform.time.system_clock import SystemClock  # noqa: F401
 
@@ -156,7 +159,7 @@ class BacktestArtifactPublishCli:
         Returns:
             int: Process exit code (`0` success, `1` runtime failure, `2` argument failure).
         Assumptions:
-            Artifact config, ClickHouse, indicators defaults, and Postgres pin-guard storage are
+            Artifact config, PostgreSQL, indicators defaults, and Postgres pin-guard storage are
             available to the selected environment.
         Raises:
             None.
@@ -326,7 +329,7 @@ def _build_publish_use_case_v2(
     Raises:
         ValueError: If config/env/DSN/contracts are invalid.
         FileNotFoundError: If required configs are missing.
-        RuntimeError: If ClickHouse client dependency is not installed.
+        RuntimeError: If PostgreSQL client dependency is not installed.
     Side Effects:
         Reads configs, builds storage adapters, and warms up indicators compute.
     Docs:
@@ -345,8 +348,7 @@ def _build_publish_use_case_v2(
     path_builder = BacktestArtifactPathBuilderV2(root=artifact_runtime_config.artifact_root_path())
     artifact_loader = YamlBacktestArtifactLoaderV2(path_resolver=path_builder)
     pointer_writer = AtomicArtifactCurrentPointerWriterV2(path_resolver=path_builder)
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="artifacts")
-    clickhouse_gateway = ClickHouseConnectGateway(_clickhouse_client(clickhouse_settings))
+    postgres_gateway = market_gateway(environ, workload="artifacts")
     strategy_postgres_dsn = environ.get("STRATEGY_PG_DSN", "").strip()
     if not strategy_postgres_dsn:
         raise ValueError("STRATEGY_PG_DSN is required for backtest-artifact-publish CLI")
@@ -371,30 +373,31 @@ def _build_publish_use_case_v2(
             config_sha256=artifact_config_hash
         ),
         artifact_loader=artifact_loader,
-        canonical_candle_reader=ClickHouseCanonicalCandleReader(
-            gateway=clickhouse_gateway,
-            database=clickhouse_settings.database,
+        canonical_candle_reader=PostgresCanonicalCandleReader(
+            gateway=postgres_gateway,
         ),
-        funding_rate_coverage_reader=ClickHouseFundingRateStore(
-            gateway=clickhouse_gateway,
-            database=clickhouse_settings.database,
+        funding_rate_coverage_reader=PostgresFundingRateStore(
+            gateway=postgres_gateway,
         ),
         defaults_provider=defaults_provider,
         signal_rules_engine=BacktestSignalRulesEngineV2(defaults_provider=defaults_provider),
         indicator_compute=indicator_compute,
         indicator_grid_builder=GridBuilder(registry=indicator_registry),
     )
+    from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres.publication_fence import (  # noqa: E501
+        PostgresPublicationFence,
+    )
+
+    publication_gateway = PsycopgBacktestPostgresGateway(dsn=strategy_postgres_dsn)
     slot_publisher = BacktestArtifactSlotPublisherV2(
+        source_fence=PostgresPublicationFence(publication_gateway),
         artifact_loader=artifact_loader,
         current_pointer_writer=pointer_writer,
-        job_repository=PostgresBacktestJobRepository(
-            gateway=PsycopgBacktestPostgresGateway(dsn=strategy_postgres_dsn)
-        ),
+        job_repository=PostgresBacktestJobRepository(gateway=publication_gateway),
     )
     return PublishBacktestArtifactsV2UseCase(
-        canonical_candle_index_reader=ClickHouseCanonicalCandleIndexReader(
-            gateway=clickhouse_gateway,
-            database=clickhouse_settings.database,
+        canonical_candle_index_reader=PostgresCanonicalCandleIndexReader(
+            gateway=postgres_gateway,
         ),
         precompute_runner=precompute_runner,
         slot_publisher=slot_publisher,
@@ -402,7 +405,8 @@ def _build_publish_use_case_v2(
         coordinate_validation=artifact_runtime_config.to_validation_spec,
         coordinate_settings=lambda coordinates: (
             artifact_runtime_config.to_precompute_runtime_settings(
-                config_sha256=artifact_config_hash, coordinates=coordinates,
+                config_sha256=artifact_config_hash,
+                coordinates=coordinates,
             )
         ),
     )

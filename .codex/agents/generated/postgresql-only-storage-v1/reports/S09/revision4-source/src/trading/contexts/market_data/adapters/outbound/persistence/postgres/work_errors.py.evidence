@@ -1,0 +1,24 @@
+"""Sanitized PostgreSQL retry classification; driver messages are never persisted."""
+
+import psycopg
+
+from trading.contexts.market_data.application.services.ingestion_retry import (
+    TemporaryIngestionError,
+)
+
+from .ingestion_gateway import retryable
+
+
+def transient_postgres_error(error: Exception) -> str | None:
+    if isinstance(error, TemporaryIngestionError):
+        return (
+            "storage_busy"
+            if "saturat" in str(error) or "admission" in str(error)
+            else "storage_unavailable"
+        )
+    state = getattr(error, "sqlstate", None)
+    if state in {"53300", "55P03", "57014"}:
+        return "storage_busy"
+    if state == "53200":
+        return "storage_memory_pressure"
+    return "storage_unavailable" if isinstance(error, psycopg.Error) and retryable(error) else None

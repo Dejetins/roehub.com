@@ -1,29 +1,26 @@
 {
   "base": {
-    "compose.yaml": "ddc191fe51c7785afb8505b93d25b341f91e4628f68c3519de5a314aed122faa",
-    "effective-config.redacted.json": "ca44beb14a8a6c50c5e81be43ea92fba44f4be606c9f150dd927d2252df8c964",
-    "generation-manifest.json": "06cf07859d8ea9ab1f0fe6a1657dbe04206a98c6833224e9d62ade8b80f7c5e2",
-    "oidc.json": "e78c8d6d18ffc22736c3a73a491687e25304322b213da173032cec9337c9e943",
-    "openbao.json": "e8a507e8d6b650787d11de52401695da8226b8cb68b37179585da778a4776898",
+    "compose.yaml": "0145dfa936c39ef1a20e8d6d078327f4e9db6d1043f9ac2c965b9e22b1f0d1fe",
+    "effective-config.redacted.json": "dc8c7d642bcb9cf350638dbe8d33253a1cc23ebdf5031c300a8ead93572a50fb",
+    "generation-manifest.json": "fe679dc31cee1f10d96ceea3a2a2d995ed5bd629fdefa23f52ec6a54f2711345",
+    "openbao.json": "8a5445bae66d43807907b6873a990f6e79fbaf437661dbb985dafb107e9888c5",
     "prometheus.yml": "a17fdd4231e57fc55450d941375037252750b3c4052b201be8823d2912da2255",
-    "service-config.json": "6dbddc7b04f7548f33ce55898f080ee119dd97ab388a1639421993197abba77b"
+    "service-config.json": "987f65b21124ae36a279a28c93a829b20054b72efd9c2a8a0374700bf673701b"
   },
   "ml": {
-    "compose.yaml": "4d55fd7970a1f5c19bfddce937f1cd881ee7d4e5febecfd17e7e8ae797d6228a",
-    "effective-config.redacted.json": "6586db3d13c1088efd8f49ac657b8bd63eb17322daa8f6157d83ad3930ed8c74",
-    "generation-manifest.json": "415504cced07d2ec9c2c9a419a51ce719246aa13082090b2c210ce9cb7b399a6",
-    "oidc.json": "4bb8bfe89f79c3d50c9547b97aac9cc309fb2fefcbf5986d18dddf4f216c7c16",
-    "openbao.json": "f1c1a54a7468f12fcc391f0885ea82e28082b34122d4292e3513da8f256f88c5",
+    "compose.yaml": "8904612429120585227fe0d51bbcd5d6845e6743ec7e79600d4f01972bc2f608",
+    "effective-config.redacted.json": "f56b945f22693e1ac119b76b0f963089c3c147f62f7f72d8e5b42339a72159cf",
+    "generation-manifest.json": "81b01ef7b2a90a99b87260ed553760d9803ca1529b21432bf124580aab556377",
+    "openbao.json": "197dbc2d4c0d1a0f30921f00798bf8e2cfd6d148cbf2c0f4e1560b298f0d2338",
     "prometheus.yml": "785b3a528f7034da645c2741bfc8cb6b017f52d3d518a62066e97194eb74c4f3",
-    "service-config.json": "e7d2ee7df720e02818c2ebbadf8406146584140d0b9c79dd41a25f0032015de2"
+    "service-config.json": "ed2f509b319a33e583f487a1b675b77c29806a273fdb6ddbb966edbe796534f0"
   },
   "trading": {
-    "compose.yaml": "535d7509c0ea75de234ad0f333738b13e3fb700e62035761a2f48cd9e78fdfa8",
-    "effective-config.redacted.json": "5b9c2484e59348ee276e75501a77f2e062d52e0a1bd4d85ba901199c916e3513",
-    "generation-manifest.json": "aa05ad34707c0b90fc74b9572051ccdd78072aa2c759e5273fcd659d7bd0d262",
-    "oidc.json": "addca709d6b8b8c49379e1af1ffc569f682468f799831ec94cd53113c1bbeefa",
-    "openbao.json": "8530da794d8dec1a937d7e48364c06f19cd84fa4147f348be5087bf647967b62",
+    "compose.yaml": "3716805eb0a9d087068b7e6cd7de8c04daf0db5f4c30c91b0c73a117594ac05d",
+    "effective-config.redacted.json": "cb4f5389821152ac122816e23d9a7f4ab74d3280e108d505ee429caba24525ad",
+    "generation-manifest.json": "e4edbf57f48485ef7cbc3834aa47afbf5482a9930669f6938dbd7c655bfa8727",
+    "openbao.json": "c05a678e5f54d25744afb41c61f8a9669221d3b2e9f88251cefe4fb54fc6f218",
     "prometheus.yml": "d04663ef5bb975bba73cdc07eaac2e0b8bf6ad851e8ffb9bc0f35218255578c6",
-    "service-config.json": "97ed22ef19d3caf408fb0c9cc47bc11634e3490cf858dd4c39da1bc0da0310fb"
+    "service-config.json": "2eef3cb73dd3dab72da10c021c59eeb2aa32552775378d85a6d8e663c92d6712"
   }
 }

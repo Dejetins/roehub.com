@@ -1,6 +1,6 @@
 # Identity exchange keys storage policy v2
 
-Документ фиксирует актуальный storage/API-контракт `exchange keys` после Keycloak cutover.
+Документ фиксирует актуальный storage/API-контракт `exchange keys` для локальной аутентификации.
 
 ## Статус
 
@@ -11,7 +11,7 @@
 
 - безопасное хранение API-ключей биржи (storage-only);
 - отсутствие утечек секретов через API/логи;
-- auth через Roehub session model (Keycloak-backed), без local 2FA dependency.
+- auth через локальную Roehub session model, без local 2FA dependency.
 
 ## Scope
 
@@ -29,7 +29,8 @@
 
 - API-auth: только через `RequireCurrentUserDependency` (cookie `roehub_session_id`).
 - Local `/2fa/*` и local 2FA gate в API отсутствуют.
-- OTP/2FA policy (если нужна) управляется в Keycloak.
+- Для чувствительных изменений требуется свежая локальная аутентификация (`recent-auth`).
+- Keycloak и внешний OIDC удалены; внешнего step-up провайдера нет.
 
 ## Контракты
 
@@ -45,8 +46,8 @@
 
 ## Связанные документы
 
-- `docs/architecture/identity/identity-keycloak-auth-model-v1.md`
-- `docs/runbooks/keycloak-local-setup-and-ops.md`
+- `docs/architecture/identity/local-auth-sessions-recovery-v1.md`
+- `docs/runbooks/offline-release-installation.md`
 
 ## Связанные файлы
 

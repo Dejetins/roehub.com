@@ -1,0 +1,185 @@
+{
+  "schema": "io.roehub.installation-recovery-runtime-proof/v1alpha1",
+  "stage": "21",
+  "status": "passed",
+  "proof_boundary": "N/A: disposable local Docker projects, generated fixture data, operator-generated temporary keys, no production restore",
+  "source_project": "roehub-s06-backup7-source",
+  "target_project": "roehub-s06-backup7-target",
+  "monitoring_project": "roehub-s06-backup7-monitoring",
+  "state_owner_coverage": [
+    "artifacts",
+    "observability",
+    "openbao",
+    "plugin_operation_audit",
+    "postgresql",
+    "redis_checkpoint",
+    "release_config"
+  ],
+  "encrypted_entries": 7,
+  "manifest_signature": "verified",
+  "source_target_separation": "passed",
+  "roehubctl_without_web_api": {
+    "backup": "succeeded",
+    "restore": "succeeded",
+    "backup_cancellation": {
+      "request": "succeeded",
+      "target": "failed",
+      "resume": "succeeded"
+    },
+    "restore_cancellation": {
+      "request": "succeeded",
+      "target": "failed",
+      "resume": "succeeded"
+    },
+    "control_socket": "unix",
+    "web_api_running": false
+  },
+  "monitoring_during_recovery": {
+    "running": [
+      "alertmanager",
+      "blackbox",
+      "operational-health",
+      "prometheus"
+    ],
+    "operational_health_ready": true,
+    "web_api_running": false
+  },
+  "restore_comparison": {
+    "market_data": {
+      "post_restore_semantics": {
+        "late_actual_removes_absence_and_invalidates_frontier": true,
+        "same_bounds_correction_changes_revision": true
+      },
+      "snapshot": {
+        "absent_count": 8,
+        "actual_count": 2,
+        "content_revision": 2,
+        "frontier": "2026-02-01T00:10:00+00:00",
+        "funding_revision": 0,
+        "generation": "013466d7-f485-49e3-af56-0d6d754632c8",
+        "index_sha256": "9fefb85253a73c285ac3f6d374ce7cf757662f56b1225f15b9c4c59c3d1b7c85",
+        "index_state": "ready",
+        "table_sha256": {
+          "candle_coverage_days": "53cce8482b58fa35dfbfd79a1f6f988428241ee2ea34570e3ad069af809b03e6",
+          "candle_coverage_summary": "eb13040620763b60d54e1b80793268535d8bf95596f7123696cdfae62bccc3d4",
+          "candle_history_verification": "baf48bf6e39fe942f85637a781312701cca53ca7a55655e1064d075b8af4dfe5",
+          "canonical_candles_1m": "8c93738193ab9586d283911f966e9b8664db63f157f337bcaac8877a1eb3a5c8",
+          "instrument_generations": "73580fddafc3188afea0140a2edd85fa945b6859ad88f4baee2f3104026b58d2",
+          "raw_binance_klines_1m": "d59e21b84b0434c204bf5c25c0b1968f2480234b521905cc04ab8c115458d51d",
+          "source_absent_candles_1m": "d02faa3740aed19e44c2f6fdaa013c20baba1bdab8727a284f287eee13c791f5",
+          "verification_leases": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      }
+    },
+    "postgresql": {
+      "rows": 5,
+      "kinds": [
+        "audit",
+        "config",
+        "operation",
+        "plugin",
+        "user"
+      ],
+      "users_config_plugin_operation_audit": "matched"
+    },
+    "postgresql_timeseries": {
+      "rows": 3,
+      "time_range": [
+        "2026-07-14 09:00:00.000",
+        "2026-07-14 09:02:00.000"
+      ],
+      "digest_match": true
+    },
+    "redis_checkpoint": {
+      "value_match": true,
+      "source_of_truth": false
+    },
+    "artifacts": {
+      "digest": "sha256:15078be2718eaaea75b0f3f4a377be221b6da93bcb049758d6d8453f807ed043",
+      "match": true
+    },
+    "plugin_operation_audit": "matched",
+    "release_config": {
+      "exact_files": 3,
+      "match": true
+    },
+    "observability_bounded_history": "matched",
+    "openbao_encrypted_snapshot": {
+      "ciphertext_sha256": "sha256:57add04dcadcd2fa114ae8801f85b56d948e2eb9d72b7d87d3436ac8797d847a",
+      "decryptable_by_operator_key": true,
+      "same_snapshot_fresh_volume_restore": "passed"
+    },
+    "all_plaintext_digests": 7
+  },
+  "openbao": {
+    "encrypted_raft_snapshot": true,
+    "fresh_volume_force_restore": "passed",
+    "fresh_storage_guard": "passed",
+    "forbidden_output_scan": "passed",
+    "cleanup": "passed"
+  },
+  "backup_progress": "completed",
+  "restore_progress": "completed",
+  "observed_rpo_seconds": 38.359378,
+  "observed_rto_seconds": 8.508318041916937,
+  "sla_claimed": false,
+  "release_lifecycle": {
+    "fixture": "versioned-unpublished-n-minus-one",
+    "injected_failure": "failed_before_atomic_release_commit",
+    "from_release": "0.0.0",
+    "to_release": "0.1.0",
+    "preupgrade_backup_verified": true,
+    "resume_after_failure": "passed",
+    "observed_upgrade_seconds": 0.03350354195572436,
+    "rollback_release": "0.0.0",
+    "rollback_state_owner_count": 7,
+    "observed_rollback_seconds": 8.71482758410275,
+    "failed_update_state": "failed",
+    "failed_update_detail": "upgrade.injected_failure_before_commit",
+    "resumed_update_state": "succeeded",
+    "rollback_state": "succeeded",
+    "irreversible_update_state": "failed",
+    "irreversible_migration_guard": "upgrade.forward_recovery_plan_required"
+  },
+  "external_provider_writes": false,
+  "real_order_effects": false,
+  "production_mutation": false,
+  "sensitive_data_present": false,
+  "cleanup": {
+    "status": "completed",
+    "down_exit_status": {
+      "roehub-s06-backup7-source": 0,
+      "roehub-s06-backup7-target": 0,
+      "roehub-s06-backup7-update": 0,
+      "roehub-s06-backup7-rollback": 0,
+      "roehub-s06-backup7-monitoring": 0
+    },
+    "residual_resources": {
+      "roehub-s06-backup7-source": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s06-backup7-target": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s06-backup7-update": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s06-backup7-rollback": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s06-backup7-monitoring": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      }
+    }
+  }
+}

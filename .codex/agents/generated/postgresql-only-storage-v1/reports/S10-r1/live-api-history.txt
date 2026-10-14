@@ -1,0 +1,6 @@
+### Result
+[{"status":404,"body":{"detail":"Instrument is unavailable"}},{"status":404,"body":{"detail":"Instrument is unavailable"}},{"status":404,"body":{"detail":"Instrument is unavailable"}},{"status":404,"body":{"detail":"Instrument is unavailable"}},{"status":200,"body":{"start_at":"2025-09-17T15:45:00Z","end_at":"2026-10-14T08:53:00Z","expected_candles":564068,"actual_candles":564068,"source_absent_minutes":0,"missing_candles":0,"coverage_percent":100,"state":"complete","market_id":2,"symbol":"0GUSDT","timeframe":"1m","observed_at":"2026-10-14T08:53:08.770180Z","origin_state":"ready"}}]
+### Ran Playwright code
+```js
+await (async page=>{const out=[];for(const [m,s] of [[1,"0GUSDT"],[1,"AAPLBUSDT"],[1,"AAVEUSDT"],[1,"ACTUSDT"],[2,"0GUSDT"]]){const r=await page.request.get(`http://127.0.0.1:20120/api/market-data/workspace/history?market_id=${m}&symbol=${s}`);out.push({status:r.status(),body:await r.json()});}return out;})(page);
+```

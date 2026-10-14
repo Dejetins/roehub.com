@@ -1,4 +1,5 @@
 import {useLibraryFilterPopup} from './library-filter-popup';
+import {LibraryHeader} from './library-header';
 import {useReadSnapshot} from './read-snapshot';
 import { LoadingData, ReadStatus } from './loading-data';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -10,7 +11,7 @@ import {ChartDisplayMenu} from './chart-display-menu';
 import {StrategyOperations} from './strategy-operations';
 import { ApiError } from './api';
 import { MotionLink } from './motion';
-import { RefreshCw, PanelRight, Filter } from 'lucide-react';
+import { RefreshCw, PanelRight, Filter, Plus, Search } from 'lucide-react';
 import { formatDate, isRestricted } from './library';
 import { filterStrategies, newestStrategy, newestFirst, preferredStrategy, readStrategies, readStrategy, readStrategyStatus } from './strategies-api';
 
@@ -28,6 +29,9 @@ export function StrategiesPage({ subject }: { subject: string }) {
   const id = location.pathname.split('/')[2] || params.getAll('strategy_id').at(-1) || '';
   const [collapsed, setCollapsed] = useState(false);
   const {open:filtersOpen,setOpen:setFiltersOpen,trigger:filterTrigger,popup:filterPopup,toggle:toggleFilters}=useLibraryFilterPopup();
+  const searchPopup = useLibraryFilterPopup(), createPopup = useLibraryFilterPopup();
+  const ru = i18n.language.startsWith('ru');
+  const createLabel = ru ? 'Добавить стратегию' : 'Add strategy';
   const listCollapsed = !!id && collapsed;
   const [now, setNow] = useState(Date.now);
   useEffect(() => { const timer = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(timer); }, []);
@@ -78,9 +82,22 @@ export function StrategiesPage({ subject }: { subject: string }) {
 
       </section>
       <div className="strategy-list-slot" inert={listCollapsed} aria-hidden={listCollapsed}><div className="strategy-list-clip"><section id="strategies-library" className="panel library navigator-library" aria-labelledby="strategies-library-heading">
-        <div className="panel-head"><h2 id="strategies-library-heading">{t('strategy.library')}</h2><span className="count">{items?.length ?? '—'}</span><div className="actions"><button className="library-icon-action strategies-refresh" aria-label={t('refresh')} title={t('refresh')} disabled={!eligible.length} onClick={() => {eligible.forEach(read => void read.refetch());}}><RefreshCw aria-hidden="true" /></button><button ref={filterTrigger} type="button" className="library-icon-action" aria-label={t('filters')} title={t('filters')} aria-expanded={filtersOpen} aria-controls="strategy-library-filters" onClick={toggleFilters}><Filter aria-hidden="true"/></button></div></div>
+        <LibraryHeader title={t('strategy.library')} headingId="strategies-library-heading" count={<span className="count">{items?.length ?? '—'}</span>} actions={{
+          create: <button ref={createPopup.trigger} type="button" className="library-icon-action" aria-label={createLabel} title={createLabel} aria-expanded={createPopup.open} aria-controls="strategy-create-menu" onClick={createPopup.toggle}><Plus aria-hidden="true"/></button>,
+          search: <button ref={searchPopup.trigger} type="button" className="library-icon-action" aria-label={t('strategy.search')} title={t('strategy.search')} aria-expanded={searchPopup.open} aria-controls="strategy-library-search" onClick={searchPopup.toggle}><Search aria-hidden="true"/></button>,
+          refresh: <button className="library-icon-action strategies-refresh" aria-label={t('refresh')} title={t('refresh')} disabled={!eligible.length} onClick={() => {eligible.forEach(read => void read.refetch());}}><RefreshCw aria-hidden="true" /></button>, filter: <button ref={filterTrigger} type="button" className="library-icon-action" aria-label={t('filters')} title={t('filters')} aria-expanded={filtersOpen} aria-controls="strategy-library-filters" onClick={toggleFilters}><Filter aria-hidden="true"/></button>}}/>
         <div className="library-tabs view-switch" role="group" aria-label={t('strategy.statesLabel',{defaultValue:i18n.language.startsWith('ru')?'Состояние стратегии':'Strategy state'})}>{['','running','stopped'].map(value=><button type="button" key={value} aria-pressed={stateFilter===value} onClick={()=>filter('state',value)}>{value?t(`strategy.states.${value}`):t('strategy.all')}</button>)}</div>
         <div className="library-body">
+          <section ref={createPopup.popup} id="strategy-create-menu" popover="auto" role="dialog" aria-label={createLabel} className="library-filter-popup strategy-filter-popover" onToggle={event=>createPopup.setOpen(event.newState==='open')} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();createPopup.close();}}}>
+            <div className="strategy-filters">
+              <p>{ru ? 'Стратегия создаётся из результата бэктеста. Выберите вариант и нажмите «Сохранить стратегию».' : 'Create a strategy from a backtest result. Select a variant and choose “Save strategy”.'}</p>
+              <MotionLink className="button-link" to="/backtests">{ru ? 'Выбрать результат бэктеста' : 'Choose a backtest result'}</MotionLink>
+              <MotionLink className="button-link" to="/backtests/new">{ru ? 'Новый бэктест' : 'New backtest'}</MotionLink>
+            </div>
+          </section>
+          <section ref={searchPopup.popup} id="strategy-library-search" popover="auto" role="dialog" aria-label={t('strategy.search')} className="library-filter-popup strategy-filter-popover" onToggle={event=>searchPopup.setOpen(event.newState==='open')} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();searchPopup.close();}}}>
+            <div className="strategy-filters"><label>{t('strategy.search')}<input type="search" maxLength={200} value={query} onChange={event=>filter('q',event.target.value)}/></label></div>
+          </section>
           <section ref={filterPopup} popover="auto" role="dialog" onToggle={event=>setFiltersOpen(event.newState==='open')} id="strategy-library-filters" className="library-filter-popup strategy-filter-popover" aria-label={t('filters')} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();filterPopup.current?.hidePopover();filterTrigger.current?.focus();}}}><div className="strategy-filters"><label>{t('strategy.search')}<input maxLength={200} value={query} onChange={e => filter('q', e.target.value)} /></label>
             <LibraryFilter label={t('strategy.market')} all={t('strategy.all')} value={market} options={[...new Set(items?.map(item=>item.spec.market_type))].map(value=>({value,label:value}))} onChange={value=>filter('market',value)}/>
             <LibraryFilter label={t('timeframe')} all={t('strategy.all')} value={timeframe} options={[...new Set(items?.map(item=>item.spec.timeframe))].map(value=>({value,label:value}))} onChange={value=>filter('timeframe',value)}/>

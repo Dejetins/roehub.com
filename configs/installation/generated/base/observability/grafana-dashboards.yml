@@ -1,8 +1,0 @@
-apiVersion: 1
-providers:
-- disableDeletion: true
-  editable: false
-  name: Roehub generated
-  options:
-    path: /var/lib/grafana/dashboards/roehub
-  type: file

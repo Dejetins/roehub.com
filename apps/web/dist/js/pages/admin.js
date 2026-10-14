@@ -141,47 +141,6 @@ if (root instanceof HTMLElement) {
     });
   };
 
-  const renderPlugins = (installations = [], operations = []) => {
-    const target = root.querySelector("[data-admin-plugins]");
-    if (target) {
-      target.replaceChildren();
-      if (!installations.length) {
-        const row = document.createElement("tr");
-        const cell = document.createElement("td");
-        cell.colSpan = 4;
-        cell.textContent = t("admin.plugins.empty");
-        row.append(cell);
-        target.append(row);
-      }
-      installations.forEach((plugin) => {
-        const row = document.createElement("tr");
-        appendCell(row, plugin.plugin_id, { code: true });
-        appendCell(row, readable(plugin.status));
-        appendCell(row, plugin.granted_permissions.join(", ") || "—");
-        appendCell(row, plugin.rollback_available ? t("admin.answer.yes") : t("admin.answer.no"));
-        target.append(row);
-      });
-    }
-    const operationTarget = root.querySelector("[data-admin-plugin-operations]");
-    if (!operationTarget) return;
-    operationTarget.replaceChildren();
-    if (!operations.length) {
-      const empty = document.createElement("p");
-      empty.textContent = t("admin.operations.empty");
-      operationTarget.append(empty);
-    }
-    operations.forEach((operation) => {
-      const item = document.createElement("div");
-      item.className = "admin-operation-list__item";
-      [operation.kind, operation.target_id, readable(operation.status)].forEach((value) => {
-        const span = document.createElement("span");
-        span.textContent = value;
-        item.append(span);
-      });
-      operationTarget.append(item);
-    });
-  };
-
   const renderEvents = (events = []) => {
     const target = root.querySelector("[data-admin-events]");
     if (!target) return;
@@ -276,10 +235,6 @@ if (root instanceof HTMLElement) {
     roleStatus?.classList.toggle("rh-status--success", snapshot.recent_auth);
     const reauth = root.querySelector("[data-admin-recent-auth-banner]");
     if (reauth) reauth.hidden = snapshot.recent_auth;
-    const canManagePlugins = snapshot.permissions.includes("plugins.manage") && snapshot.recent_auth;
-    root.querySelectorAll("[data-admin-plugin-form] input, [data-plugin-submit]").forEach((control) => {
-      control.disabled = !canManagePlugins;
-    });
     const canOperate = snapshot.permissions.includes("operations.execute") && snapshot.recent_auth;
     root.querySelectorAll("[data-admin-operation]").forEach((button) => {
       const installationOnly = button.hasAttribute("data-installation-operation");
@@ -289,7 +244,6 @@ if (root instanceof HTMLElement) {
     });
     renderCapabilities(snapshot.capabilities);
     renderMembers(snapshot.members);
-    renderPlugins(snapshot.plugin_installations, snapshot.plugin_operations);
     renderEvents(snapshot.events);
     renderOperationalHealth(snapshot.operational_health);
     setConsoleState("ready", t("admin.state.ready"), t("admin.state.ready_desc", { organization: snapshot.organization_name }));
@@ -360,85 +314,6 @@ if (root instanceof HTMLElement) {
       const message = error instanceof RoehubApiError ? error.message : t("admin.confirm.failed");
       text("[data-confirm-status]", message);
       if (confirmationSubmit) confirmationSubmit.disabled = false;
-    }
-  });
-
-  const renderPermissionDiff = ({ current, requested, declared }) => {
-    const target = root.querySelector("[data-admin-plugin-diff]");
-    if (!target) return;
-    target.replaceChildren();
-    const added = requested.filter((permission) => !current.includes(permission));
-    [
-      [t("admin.plugins.current"), current],
-      [t("admin.plugins.requested"), requested],
-      [t("admin.plugins.added"), added],
-      [t("admin.plugins.declared"), declared],
-    ].forEach(([labelValue, values], index) => {
-      const row = document.createElement("div");
-      row.className = `admin-diff__row${index === 2 && values.length ? " admin-diff__added" : ""}`;
-      const label = document.createElement("strong");
-      label.textContent = labelValue;
-      const value = document.createElement("span");
-      value.textContent = values.join(", ") || "—";
-      row.append(label, value);
-      target.append(row);
-    });
-    return added;
-  };
-
-  root.querySelector("[data-admin-plugin-form]")?.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    if (!(event.currentTarget instanceof HTMLFormElement)) return;
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const bundleId = String(formData.get("bundle_id") || "").trim();
-    const instanceName = String(formData.get("instance_name") || "").trim();
-    const requested = formData.getAll("permissions").map(String).sort();
-    try {
-      setConsoleState("", t("admin.plugins.validating"), bundleId);
-      const validated = await apiFetch(
-        endpoint("pluginValidateTemplate", { organization_id: state.organizationId }),
-        {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ bundle_id: bundleId }),
-        },
-      );
-      const currentInstallation = state.snapshot?.plugin_installations?.find(
-        (plugin) => plugin.plugin_id === validated.plugin_id,
-      );
-      const current = currentInstallation?.granted_permissions || [];
-      const added = renderPermissionDiff({ current, requested, declared: validated.permissions });
-      setConsoleState("ready", t("admin.plugins.validated"), validated.plugin_id);
-      openConfirmation({
-        title: t("admin.confirm.plugin_title"),
-        impact: t("admin.confirm.plugin_impact", {
-          plugin: validated.plugin_id,
-          added: added.length ? added.join(", ") : t("admin.plugins.none"),
-        }),
-        execute: async () => {
-          await apiFetch(
-            endpoint("pluginInstallTemplate", { organization_id: state.organizationId }),
-            {
-              method: "POST",
-              headers: {
-                "content-type": "application/json",
-                "Idempotency-Key": `admin-plugin-${Date.now()}`,
-              },
-              body: JSON.stringify({
-                bundle_id: bundleId,
-                instance_name: instanceName,
-                permissions: requested,
-                config: {},
-              }),
-            },
-          );
-          form.reset();
-          await loadSnapshot();
-        },
-      });
-    } catch (error) {
-      setConsoleState("error", t("admin.plugins.failed"), error instanceof Error ? error.message : String(error));
     }
   });
 

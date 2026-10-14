@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import Any, Mapping, Protocol, cast
 
-import psycopg
 from psycopg.rows import dict_row
+
+from trading.platform.postgres_budget import connect as budget_connect
 
 
 class MarketDataPostgresGateway(Protocol):
@@ -47,7 +48,7 @@ class PsycopgMarketDataPostgresGateway(MarketDataPostgresGateway):
         self._dsn = normalized_dsn
 
     def fetch_one(self, *, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any] | None:
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with budget_connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, query), parameters)
                 row = cursor.fetchone()
@@ -61,13 +62,13 @@ class PsycopgMarketDataPostgresGateway(MarketDataPostgresGateway):
         query: str,
         parameters: Mapping[str, Any],
     ) -> tuple[Mapping[str, Any], ...]:
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with budget_connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, query), parameters)
                 rows = cursor.fetchall()
         return tuple(dict(row) for row in rows)
 
     def execute(self, *, query: str, parameters: Mapping[str, Any]) -> None:
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with budget_connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, query), parameters)

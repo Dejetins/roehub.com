@@ -9,6 +9,7 @@ from psycopg.conninfo import conninfo_to_dict
 from psycopg.rows import dict_row
 
 from apps.migrations.main import main as run_alembic_migrations_main
+from trading.platform.postgres_budget import admin_connect as budget_connect
 
 _IDENTITY_CORE_SQL_FILES: tuple[str, ...] = (
     "0001_identity_v1.sql",
@@ -33,13 +34,9 @@ _NOTIFICATION_PROVIDER_INSTANCES_V1_SQL_FILE = "0016_notification_provider_insta
 _EXTENSIONS_PLUGIN_PLATFORM_V1ALPHA1_SQL_FILE = "0017_extensions_plugin_platform_v1alpha1.sql"
 _ARTIFACT_STORE_V1_SQL_FILE = "0018_artifact_store_v1.sql"
 _ISOLATED_JOB_RUNTIME_V1_SQL_FILE = "0019_isolated_job_runtime_v1.sql"
-_EXECUTION_GATEWAY_MAINNET_SAFETY_V1_SQL_FILE = (
-    "0020_execution_gateway_mainnet_safety_v1.sql"
-)
+_EXECUTION_GATEWAY_MAINNET_SAFETY_V1_SQL_FILE = "0020_execution_gateway_mainnet_safety_v1.sql"
 _CONTROL_OPERATION_AUDIT_V1_SQL_FILE = "0021_control_operation_audit_v1.sql"
-_MARKET_DATA_INSTRUMENT_SELECTIONS_V1_SQL_FILE = (
-    "0022_market_data_instrument_selections_v1.sql"
-)
+_MARKET_DATA_INSTRUMENT_SELECTIONS_V1_SQL_FILE = "0022_market_data_instrument_selections_v1.sql"
 
 
 @dataclass(frozen=True, slots=True)
@@ -326,7 +323,7 @@ def apply_identity_baseline_sql(
         filenames=(_STRATEGY_EXCHANGE_BINDINGS_V1_SQL_FILE,),
     )[0]
 
-    with psycopg.connect(
+    with budget_connect(
         normalized_identity_dsn,
         autocommit=True,
         row_factory=cast(Any, dict_row),
@@ -391,7 +388,7 @@ def apply_strategy_exchange_bindings_sql(
         migrations_dir=migrations_dir,
         filenames=(_STRATEGY_EXCHANGE_BINDINGS_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
@@ -408,7 +405,7 @@ def apply_organizations_rbac_audit_sql(
         migrations_dir=migrations_dir,
         filenames=(_ORGANIZATIONS_RBAC_AUDIT_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
@@ -421,7 +418,7 @@ def apply_local_auth_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
         migrations_dir=migrations_dir,
         filenames=(_LOCAL_AUTH_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
@@ -434,7 +431,7 @@ def apply_oidc_provider_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
         migrations_dir=migrations_dir,
         filenames=(_OIDC_PROVIDER_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
@@ -447,7 +444,7 @@ def apply_research_organization_isolation_sql(*, identity_dsn: str, migrations_d
         migrations_dir=migrations_dir,
         filenames=(_RESEARCH_ORGANIZATION_ISOLATION_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
@@ -460,7 +457,7 @@ def apply_trading_organization_isolation_sql(*, identity_dsn: str, migrations_di
         migrations_dir=migrations_dir,
         filenames=(_TRADING_ORGANIZATION_ISOLATION_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
@@ -473,7 +470,7 @@ def apply_notification_provider_instances_sql(*, identity_dsn: str, migrations_d
         migrations_dir=migrations_dir,
         filenames=(_NOTIFICATION_PROVIDER_INSTANCES_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
@@ -486,7 +483,7 @@ def apply_extensions_plugin_platform_sql(*, identity_dsn: str, migrations_dir: P
         migrations_dir=migrations_dir,
         filenames=(_EXTENSIONS_PLUGIN_PLATFORM_V1ALPHA1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
@@ -499,7 +496,7 @@ def apply_artifact_store_sql(*, identity_dsn: str, migrations_dir: Path) -> None
         migrations_dir=migrations_dir,
         filenames=(_ARTIFACT_STORE_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
@@ -512,14 +509,12 @@ def apply_isolated_job_runtime_sql(*, identity_dsn: str, migrations_dir: Path) -
         migrations_dir=migrations_dir,
         filenames=(_ISOLATED_JOB_RUNTIME_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
-def apply_execution_gateway_mainnet_safety_sql(
-    *, identity_dsn: str, migrations_dir: Path
-) -> None:
+def apply_execution_gateway_mainnet_safety_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
     """Apply persisted execution gateway and mainnet safety policy."""
 
     normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
@@ -527,14 +522,12 @@ def apply_execution_gateway_mainnet_safety_sql(
         migrations_dir=migrations_dir,
         filenames=(_EXECUTION_GATEWAY_MAINNET_SAFETY_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
-def apply_control_operation_audit_sql(
-    *, identity_dsn: str, migrations_dir: Path
-) -> None:
+def apply_control_operation_audit_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
     """Apply durable control-agent audit events and reconciliation cursor."""
 
     normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
@@ -542,14 +535,12 @@ def apply_control_operation_audit_sql(
         migrations_dir=migrations_dir,
         filenames=(_CONTROL_OPERATION_AUDIT_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
-def apply_market_data_instrument_selections_sql(
-    *, identity_dsn: str, migrations_dir: Path
-) -> None:
+def apply_market_data_instrument_selections_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
     """Apply organization-scoped market-data selection and catalog-state schema."""
 
     normalized_identity_dsn = normalize_psycopg_dsn(dsn=identity_dsn)
@@ -557,7 +548,7 @@ def apply_market_data_instrument_selections_sql(
         migrations_dir=migrations_dir,
         filenames=(_MARKET_DATA_INSTRUMENT_SELECTIONS_V1_SQL_FILE,),
     )[0]
-    with psycopg.connect(normalized_identity_dsn, autocommit=True) as connection:
+    with budget_connect(normalized_identity_dsn, autocommit=True) as connection:
         print(f"Applying post-Alembic identity SQL: {sql_path.name}")
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
@@ -567,7 +558,7 @@ def apply_market_data_work_requests_sql(*, identity_dsn: str, migrations_dir: Pa
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0023_market_data_work_requests_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
@@ -576,7 +567,7 @@ def apply_market_data_full_history_sql(*, identity_dsn: str, migrations_dir: Pat
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0024_market_data_full_history_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
@@ -786,7 +777,7 @@ def apply_market_data_work_recovery_sql(*, identity_dsn: str, migrations_dir: Pa
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0025_market_data_work_recovery_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
@@ -795,7 +786,7 @@ def apply_market_data_queue_events_sql(*, identity_dsn: str, migrations_dir: Pat
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0026_market_data_queue_events_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
@@ -804,7 +795,7 @@ def apply_market_data_stream_recovery_sql(*, identity_dsn: str, migrations_dir: 
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0027_market_data_stream_recovery_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn), autocommit=True) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
@@ -813,7 +804,7 @@ def apply_backtest_input_recipe_sql(*, identity_dsn: str, migrations_dir: Path) 
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0028_backtest_input_recipe_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
@@ -822,7 +813,7 @@ def apply_backtest_artifact_management_sql(*, identity_dsn: str, migrations_dir:
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0029_backtest_artifact_management_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
@@ -831,7 +822,7 @@ def apply_backtest_artifact_dispatch_sql(*, identity_dsn: str, migrations_dir: P
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0030_backtest_artifact_dispatch_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
@@ -840,7 +831,7 @@ def apply_backtest_artifact_storage_sql(*, identity_dsn: str, migrations_dir: Pa
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0031_backtest_artifact_storage_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
@@ -849,7 +840,7 @@ def apply_identity_browser_devices_sql(*, identity_dsn: str, migrations_dir: Pat
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0032_identity_browser_devices_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
@@ -858,7 +849,7 @@ def apply_market_data_stream_connections_sql(*, identity_dsn: str, migrations_di
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0033_market_data_stream_connections_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)
 
 
@@ -867,5 +858,14 @@ def apply_market_data_provider_admission_sql(*, identity_dsn: str, migrations_di
     sql_path = _collect_sql_paths(
         migrations_dir=migrations_dir, filenames=("0034_market_data_provider_admission_v1.sql",)
     )[0]
-    with psycopg.connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
+        _execute_sql_script(connection=connection, sql_path=sql_path)
+
+
+def apply_market_data_stream_events_sql(*, identity_dsn: str, migrations_dir: Path) -> None:
+    """Add bounded public market-data lifecycle events."""
+    sql_path = _collect_sql_paths(
+        migrations_dir=migrations_dir, filenames=("0035_market_data_stream_events_v1.sql",)
+    )[0]
+    with budget_connect(normalize_psycopg_dsn(dsn=identity_dsn)) as connection:
         _execute_sql_script(connection=connection, sql_path=sql_path)

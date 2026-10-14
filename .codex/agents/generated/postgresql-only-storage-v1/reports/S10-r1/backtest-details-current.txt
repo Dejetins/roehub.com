@@ -1,0 +1,203 @@
+### Page
+- Page URL: http://127.0.0.1:20121/backtests/baea0c76-6278-4805-8862-03902fcdd1ba?variant=job_baea0c76d1ba__ema_close_w10__risk_none__vh_249ea7bb
+- Page Title: Backtests · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f13e8]:
+  - link "Skip to content" [ref=f13e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - banner [ref=f13e10]:
+    - generic [ref=f13e11]: RoeHub
+    - navigation "Language" [ref=f13e12]:
+      - link "Русский" [ref=f13e13] [cursor=pointer]:
+        - /url: /locale?locale=ru&next=%2Fbacktests%2Fbaea0c76-6278-4805-8862-03902fcdd1ba%3Fvariant%3Djob_baea0c76d1ba__ema_close_w10__risk_none__vh_249ea7bb
+      - link "English" [ref=f13e14] [cursor=pointer]:
+        - /url: /locale?locale=en&next=%2Fbacktests%2Fbaea0c76-6278-4805-8862-03902fcdd1ba%3Fvariant%3Djob_baea0c76d1ba__ema_close_w10__risk_none__vh_249ea7bb
+  - complementary [ref=f13e15]:
+    - navigation "Navigation" [ref=f13e16]:
+      - link "Overview" [ref=f13e17] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f13e23] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f13e26] [cursor=pointer]:
+        - /url: /strategies
+      - generic "The Data page is not available yet." [ref=f13e29]:
+        - text: Data
+        - generic [ref=f13e34]: Unavailable
+      - link "Settings" [ref=f13e35] [cursor=pointer]:
+        - /url: /settings
+    - link "Sign out" [ref=f13e39] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f13e43]:
+    - generic [ref=f13e44]:
+      - heading "Backtests" [level=1] [ref=f13e45]
+      - generic [ref=f13e47]:
+        - button "Hide history" [expanded] [ref=f13e285] [cursor=pointer]
+        - region [ref=f13e48]:
+          - generic [ref=f13e49]:
+            - heading "Jobs" [level=2] [ref=f13e50]
+            - generic "Jobs on this page" [ref=f13e51]: "5"
+            - link "New backtest" [ref=f13e52] [cursor=pointer]:
+              - /url: /backtests/new
+            - generic [ref=f13e286]:
+              - button "Refresh" [ref=f13e287] [cursor=pointer]
+              - button "Filters" [ref=f13e294] [cursor=pointer]
+          - tablist "Jobs" [ref=f13e54]:
+            - tab "New backtest" [ref=f13e55] [cursor=pointer]
+            - tab "History" [active] [selected] [ref=f13e56] [cursor=pointer]
+          - tabpanel "History" [ref=f13e297]:
+            - paragraph [ref=f13e298]: All states · All risk modes
+            - status [ref=f13e299]: Stale snapshot · Oct 14, 2026, 8:59 AM UTC
+            - region "Job history table" [ref=f13e300]:
+              - table [ref=f13e301]:
+                - caption [ref=f13e302]: Jobs on this page
+                - rowgroup [ref=f13e303]:
+                  - row [ref=f13e304]:
+                    - columnheader "Backtest" [ref=f13e305]
+                    - columnheader "State" [ref=f13e306]
+                - rowgroup [ref=f13e307]:
+                  - row [ref=f13e404]:
+                    - cell "S10-r1 live futures PostgreSQL 0GUSDT · futures · 1h" [ref=f13e309]:
+                      - link "S10-r1 live futures PostgreSQL" [ref=f13e310] [cursor=pointer]:
+                        - /url: /backtests/baea0c76-6278-4805-8862-03902fcdd1ba
+                      - generic [ref=f13e311]: 0GUSDT · futures · 1h
+                    - cell "Queued Stale snapshot" [ref=f13e405]:
+                      - text: Queued
+                      - generic [ref=f13e406]: Stale snapshot
+                  - row [ref=f13e407]:
+                    - cell "S10 PG-only retained history proof ACTUSDT · spot · 15m" [ref=f13e314]:
+                      - link "S10 PG-only retained history proof" [ref=f13e315] [cursor=pointer]:
+                        - /url: /backtests/ad277dfd-bc79-41c4-a3e7-03c40df5e18f
+                      - generic [ref=f13e316]: ACTUSDT · spot · 15m
+                    - cell "Completed Stale snapshot" [ref=f13e408]:
+                      - text: Completed
+                      - generic [ref=f13e409]: Stale snapshot
+                  - row [ref=f13e410]:
+                    - cell "Binance historical · BTCUSDT · EMA 5–50 BTCUSDT · spot · 15m" [ref=f13e319]:
+                      - link "Binance historical · BTCUSDT · EMA 5–50" [ref=f13e320] [cursor=pointer]:
+                        - /url: /backtests/54429a5c-c5e5-4f24-bb68-75df21f26d7c
+                      - generic [ref=f13e321]: BTCUSDT · spot · 15m
+                    - cell "Completed Stale snapshot" [ref=f13e411]:
+                      - text: Completed
+                      - generic [ref=f13e412]: Stale snapshot
+                  - row [ref=f13e413]:
+                    - cell "Demo EMA · TP/SL BTCUSDT · spot · 15m" [ref=f13e324]:
+                      - link "Demo EMA · TP/SL" [ref=f13e325] [cursor=pointer]:
+                        - /url: /backtests/e9d85b78-58ff-495f-8b0b-2b8e5ac64b8a
+                      - generic [ref=f13e326]: BTCUSDT · spot · 15m
+                    - cell "Completed Stale snapshot" [ref=f13e414]:
+                      - text: Completed
+                      - generic [ref=f13e415]: Stale snapshot
+                  - row [ref=f13e416]:
+                    - cell "Demo EMA · baseline BTCUSDT · spot · 15m" [ref=f13e329]:
+                      - link "Demo EMA · baseline" [ref=f13e330] [cursor=pointer]:
+                        - /url: /backtests/2c252ee4-aa0a-4f1c-b560-7482d7122cdd
+                      - generic [ref=f13e331]: BTCUSDT · spot · 15m
+                    - cell "Completed Stale snapshot" [ref=f13e417]:
+                      - text: Completed
+                      - generic [ref=f13e418]: Stale snapshot
+            - navigation "Job pages" [ref=f13e333]:
+              - generic [ref=f13e334]:
+                - text: Rows per page
+                - combobox "Page size (1–250)" [ref=f13e335]:
+                  - option "5"
+                  - option "10"
+                  - option "25"
+                  - option "50" [selected]
+                  - option "100"
+                  - option "250"
+              - button "First page" [disabled] [ref=f13e336]
+              - button "Next page" [disabled] [ref=f13e340]
+            - paragraph [ref=f13e343]: Newest first. Risk filtering applies within each server page; an empty page can still have a next page.
+            - group [ref=f13e344]:
+              - generic "Search, instrument and date filters" [ref=f13e345] [cursor=pointer]
+        - region "Backtest detail" [ref=f13e346]:
+          - generic [ref=f13e347]:
+            - heading "S10-r1 live futures PostgreSQL" [level=2] [ref=f13e349]
+            - generic [ref=f13e350]:
+              - status [ref=f13e351]: Completed
+              - generic [ref=f13e360]:
+                - heading "Ranked variants" [level=3] [ref=f13e362]
+                - region "Ranked variants" [ref=f13e363]:
+                  - table [ref=f13e364]:
+                    - rowgroup [ref=f13e365]:
+                      - row [ref=f13e366] [cursor=pointer]:
+                        - columnheader "Selected variant" [ref=f13e367]
+                        - columnheader [ref=f13e368]:
+                          - button "Return · % ↓" [ref=f13e369]
+                        - columnheader [ref=f13e370]:
+                          - button "Maximum drawdown · %" [ref=f13e371]
+                        - columnheader [ref=f13e372]:
+                          - button "Profit factor" [ref=f13e373]
+                        - columnheader [ref=f13e374]:
+                          - button "Win rate · %" [ref=f13e375]
+                        - columnheader [ref=f13e376]:
+                          - button "Trades" [ref=f13e377]
+                    - rowgroup [ref=f13e378]:
+                      - row [ref=f13e379] [cursor=pointer]:
+                        - 'cell "EMA 10 #1 · TP —% · SL —%" [ref=f13e380]':
+                          - link "EMA 10" [ref=f13e381]:
+                            - /url: /backtests/baea0c76-6278-4805-8862-03902fcdd1ba?variant=job_baea0c76d1ba__ema_close_w10__risk_none__vh_249ea7bb
+                          - generic [ref=f13e382]: "#1 · TP —% · SL —%"
+                        - cell "-3.13" [ref=f13e383]
+                        - cell "3.13" [ref=f13e384]
+                        - cell "0" [ref=f13e385]
+                        - cell "0" [ref=f13e386]
+                        - cell "3" [ref=f13e387]
+                - region "Selected variant" [ref=f13e388]:
+                  - heading "Selected variant · 1" [level=3] [ref=f13e419]
+                  - generic [ref=f13e420]:
+                    - generic [ref=f13e421]:
+                      - term [ref=f13e422]: Return · %
+                      - definition [ref=f13e423]: "-3.1"
+                    - generic [ref=f13e424]:
+                      - term [ref=f13e425]: Maximum drawdown · %
+                      - definition [ref=f13e426]: "3.1"
+                    - generic [ref=f13e427]:
+                      - term [ref=f13e428]: Profit factor
+                      - definition [ref=f13e429]: "0"
+                    - generic [ref=f13e430]:
+                      - term [ref=f13e431]: Win rate · %
+                      - definition [ref=f13e432]: "0"
+                    - generic [ref=f13e433]:
+                      - term [ref=f13e434]: Trades
+                      - definition [ref=f13e435]: "3"
+                  - tablist "Results" [ref=f13e398]:
+                    - tab "Overview" [selected] [ref=f13e399] [cursor=pointer]
+                    - tab "Metrics" [ref=f13e400] [cursor=pointer]
+                    - tab "Trades" [ref=f13e401] [cursor=pointer]
+                    - tab "Monthly statistics" [ref=f13e402] [cursor=pointer]
+                  - tabpanel "Overview" [ref=f13e436]:
+                    - generic [ref=f13e437]:
+                      - generic [ref=f13e438]:
+                        - generic [ref=f13e439]:
+                          - group "Chart" [ref=f13e440]:
+                            - button "Equity" [pressed] [ref=f13e441] [cursor=pointer]
+                            - button "Drawdown · %" [ref=f13e442] [cursor=pointer]
+                            - button "Price & trades" [ref=f13e443] [cursor=pointer]
+                          - group "Chart period" [ref=f13e445]:
+                            - button "1D" [ref=f13e446] [cursor=pointer]
+                            - button "1W" [disabled] [ref=f13e447]
+                            - button "1M" [disabled] [ref=f13e448]
+                            - button "3M" [disabled] [ref=f13e449]
+                            - button "1Y" [disabled] [ref=f13e450]
+                            - button "All" [pressed] [ref=f13e451] [cursor=pointer]
+                        - button "Full screen" [ref=f13e452] [cursor=pointer]
+                      - generic [ref=f13e459]:
+                        - generic [ref=f13e460]:
+                          - paragraph [ref=f13e461]: Hover for values · drag the slider to zoom · Ctrl + scroll to zoom on the chart
+                          - generic [ref=f13e462]:
+                            - checkbox "Trade exits" [ref=f13e463]
+                            - text: Trade exits
+                        - img "Equity" [ref=f13e464]
+                        - group [ref=f13e467]:
+                          - generic "Show accessible data table" [ref=f13e468] [cursor=pointer]
+                  - button "Refresh results" [ref=f13e403] [cursor=pointer]
+                  - group [ref=f13e471]:
+                    - generic "Save strategy / export" [ref=f13e472] [cursor=pointer]
+              - group [ref=f13e358]:
+                - generic "Job information" [ref=f13e359] [cursor=pointer]
+  - contentinfo [ref=f13e283]:
+    - text: Artifact-backed backtests
+    - generic [ref=f13e284]: Library snapshots · live selected job
+```

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Mapping
 
 from psycopg.conninfo import conninfo_to_dict
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import URL, Connection
 from sqlalchemy.engine.url import make_url
 
@@ -136,6 +136,12 @@ def _upgrade_head_under_lock(*, config: Config, sqlalchemy_url: URL, lock_key: i
       - apps/migrations/main.py
     """
     engine = create_engine(sqlalchemy_url, pool_pre_ping=True)
+    from trading.platform.postgres_budget import admin_connect
+
+    @event.listens_for(engine, "do_connect")
+    def connect_budgeted(_dialect, _record, args, kwargs):
+        return admin_connect(*args, **kwargs)
+
     with engine.connect() as connection:
         _acquire_pg_advisory_lock(connection=connection, lock_key=lock_key)
         try:
@@ -312,9 +318,9 @@ def _to_sqlalchemy_url_from_conninfo_dsn(*, conninfo_dsn: str) -> URL:
         for key, value in sorted(conninfo_fields.items())
         if key not in {"dbname", "host", "hostaddr", "password", "port", "user"} and str(value)
     }
-    resolved_host = str(
-        conninfo_fields.get("host", conninfo_fields.get("hostaddr", ""))
-    ).strip() or None
+    resolved_host = (
+        str(conninfo_fields.get("host", conninfo_fields.get("hostaddr", ""))).strip() or None
+    )
     resolved_user = str(conninfo_fields.get("user", "")).strip() or None
     resolved_password = str(conninfo_fields.get("password", "")).strip() or None
 

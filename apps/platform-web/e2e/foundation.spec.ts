@@ -148,7 +148,7 @@ test('real session, selected routes, assets, locale, SSR navigation and rollback
   expect(errors).toEqual([]);
   expect(failedRequests.filter(failure => failure.phase === 'foundation' || failure.reason !== 'net::ERR_ABORTED')).toEqual([]);
   writeFileSync(resolve(evidence, 'foundation-observations.json'), JSON.stringify({
-    boundary: 'Real Web + production auth/API + disposable PostgreSQL/ClickHouse + synthetic artifact files',
+    boundary: 'Real Web + production auth/API + disposable PostgreSQL + synthetic artifact files',
     api, preflight, idleRunnerMetrics: 200,
     javascriptErrors: errors, transportFailures: failedRequests, consoleErrors, httpErrors,
     preservedSsrNote: 'Production strategy CRUD/dashboard are installed. Optional OIDC and unrelated overview/account projections are omitted; existing Settings market-data CSS/JS assets are absent. Navigation is proved, not complete Settings functionality.',

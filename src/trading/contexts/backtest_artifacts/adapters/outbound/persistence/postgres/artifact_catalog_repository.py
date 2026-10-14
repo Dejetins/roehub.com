@@ -18,6 +18,7 @@ from trading.integration import (
     ArtifactBlobDescriptor,
     ArtifactManifest,
 )
+from trading.platform.postgres_budget import connect as budget_connect
 from trading.shared_kernel.primitives import OrganizationId
 
 _DEFAULT_QUOTA_BYTES = 10 * 1024 * 1024 * 1024
@@ -30,7 +31,7 @@ class PostgresArtifactCatalogRepository:
         self._dsn = dsn
 
     def _connect(self) -> psycopg.Connection[Any]:
-        return psycopg.connect(self._dsn, row_factory=cast(Any, dict_row))
+        return budget_connect(self._dsn, row_factory=cast(Any, dict_row))
 
     def register_blob(
         self,

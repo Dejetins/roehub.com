@@ -57,6 +57,8 @@ def store():
             conn.execute(
                 sql.SQL(cast(LiteralString, migration.replace("BEGIN;", "").replace("COMMIT;", "")))
             )
+        conn.execute("CREATE TABLE market_data_stream_events (event_id bigserial PRIMARY KEY, "
+                     "occurred_at timestamptz NOT NULL DEFAULT now())")
         org, actor = uuid4(), uuid4()
         conn.execute("INSERT INTO identity_organizations (organization_id) VALUES (%s)", (org,))
         conn.execute(
@@ -523,27 +525,22 @@ def test_pause_wins_terminal_error_and_active_job_ignores_catalog_period(store):
     assert summary[0]['job_id'] == job['job_id']
 
 
-@pytest.mark.skipif(not os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_PORT'),
-                    reason='explicit disposable ClickHouse target required')
-@pytest.mark.parametrize("pressure_code", [241, 202])
-def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store, pressure_code):
+@pytest.mark.parametrize("pressure_code", ["57014", "55P03"])
+def test_real_postgres_pressure_preserves_confirmed_checkpoint(store, pressure_code):
     from dataclasses import dataclass
     from types import SimpleNamespace
 
-    import clickhouse_connect
-
-    from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
-        transient_clickhouse_error,
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_errors import (
+        transient_postgres_error,
     )
     from trading.contexts.market_data.application.services.work_requests import (
         MarketDataWorkRequestRunner,
     )
-    repo, org, actor, _ = store
-    ch = clickhouse_connect.get_client(
-        host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
-        username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
-        password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
-    table = 'market_data.work_recovery_test_'+uuid4().hex
+    repo, org, actor, gateway = store
+    connection = gateway.connect()
+    connection.commit()
+    connection.autocommit = True
+    connection.execute("CREATE TABLE recovery_pressure_fixture (minute bigint PRIMARY KEY)")
     clock = [datetime.now(UTC).replace(second=0, microsecond=0)]
     start = clock[0]-timedelta(hours=3)
     job = repo.submit(organization_id=org, actor_user_id=actor, key=uuid4(),
@@ -557,26 +554,25 @@ def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store, pres
             offset = rows[0][0]
             if offset == 60 and fault[0]:
                 fault[0] = False
-                if pressure_code == 241:
-                    ch.command(f'INSERT INTO {table} SELECT number FROM numbers(100000)',
-                               settings={'max_memory_usage':1,'max_threads':1,'max_execution_time':5})
-                else:
-                    import time
-                    other = clickhouse_connect.get_client(
-                        host='127.0.0.1', port=int(os.environ['ROEHUB_MARKET_DATA_TEST_CH_PORT']),
-                        username=os.environ.get('ROEHUB_MARKET_DATA_TEST_CH_USER', 'proof'),
-                        password=os.environ['ROEHUB_MARKET_DATA_TEST_CH_PASSWORD'])
+                if pressure_code == "57014":
+                    connection.execute("SET statement_timeout='10ms'")
                     try:
-                        with ThreadPoolExecutor(max_workers=1) as pool:
-                            running = pool.submit(other.command, 'SELECT sleep(2)')
-                            time.sleep(.2)
-                            ch.command(f'INSERT INTO {table} SELECT number FROM numbers(60)',
-                                       settings={'max_concurrent_queries_for_user':1})
-                            running.result()
+                        connection.execute("SELECT pg_sleep(1)")
                     finally:
-                        other.close()
-                pytest.fail('ClickHouse did not enforce resource pressure')
-            ch.insert(table, rows, column_names=['minute'])
+                        connection.execute("SET statement_timeout=0")
+                else:
+                    with gateway.connect() as blocker:
+                        blocker.execute(
+                            "LOCK TABLE recovery_pressure_fixture IN ACCESS EXCLUSIVE MODE"
+                        )
+                        connection.execute("SET lock_timeout='10ms'")
+                        try:
+                            connection.execute("INSERT INTO recovery_pressure_fixture VALUES (60)")
+                        finally:
+                            connection.execute("SET lock_timeout=0")
+                pytest.fail("PostgreSQL did not enforce the configured timeout")
+            with connection.cursor() as cursor:
+                cursor.executemany("INSERT INTO recovery_pressure_fixture VALUES (%s)", rows)
 
     @dataclass
     class Fill:
@@ -590,17 +586,16 @@ def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store, pres
             return SimpleNamespace(rows_read=60, rows_written=60)
 
     try:
-        ch.command(f'CREATE TABLE {table} (minute UInt64) ENGINE=MergeTree ORDER BY minute')
         runner = MarketDataWorkRequestRunner(
             repo, cast(Any, Fill(Writer())), lambda *_: None, now=lambda: clock[0],
-            retryable_storage_error=lambda e: transient_clickhouse_error(e) or False,
+            retryable_storage_error=lambda e: transient_postgres_error(e) or False,
         )
         assert runner.run_once()
         waiting = repo.get(organization_id=org, job_id=job['job_id'])
         assert (waiting['state'], waiting['completed_units'], waiting['rows_written']) == (
             'retry_wait', 60, 60)
         assert waiting['error_code'] == (
-            'storage_memory_pressure' if pressure_code == 241 else 'storage_unavailable')
+            'storage_busy')
         assert waiting['error_phase'] == 'fill_window'
         assert not runner.run_once()
         clock[0] = waiting['next_retry_at']
@@ -609,13 +604,16 @@ def test_real_clickhouse_241_recovery_preserves_confirmed_checkpoint(store, pres
         assert (done['state'], done['completed_units'], done['rows_written']) == (
             'succeeded', 180, 180)
         assert visits == [0, 60, 60, 120]
-        assert ch.query(f'SELECT count(),uniqExact(minute) FROM {table}').result_rows == [(180,180)]
+        assert connection.execute(
+            'SELECT count(*) AS n,count(DISTINCT minute) AS distinct_n '
+            'FROM recovery_pressure_fixture'
+        ).fetchone() == {'n': 180, 'distinct_n': 180}
         events = repo.events(organization_id=org, job_id=job['job_id'], before=None, limit=20)
         assert [e['event_type'] for e in events] == [
             'succeeded', 'recovered', 'retry_scheduled', 'started', 'queued']
     finally:
-        ch.command(f'DROP TABLE IF EXISTS {table}')
-        ch.close()
+        connection.execute('DROP TABLE recovery_pressure_fixture')
+        connection.close()
 
 
 def test_parallel_batch_has_four_slots_and_preserves_pause_cancel_and_live_siblings(store):

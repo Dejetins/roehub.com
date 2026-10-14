@@ -37,15 +37,6 @@ groups:
           summary: redis_exporter is down
           description: Prometheus cannot scrape redis_exporter:9121 for 2 minutes.
 
-      - alert: ClickHouseExporterDown
-        expr: max(up{job="clickhouse_exporter"}) == 0
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: clickhouse_exporter is down
-          description: Prometheus cannot scrape clickhouse_exporter:9116 for 2 minutes.
-
       - alert: ApiMetricsDown
         expr: max(up{job="api"}) == 0
         for: 2m
@@ -63,16 +54,6 @@ groups:
         annotations:
           summary: API /health probe is failing
           description: Blackbox probe to http://api:8000/health has failed for 2 minutes.
-
-      - alert: OidcProviderUnavailable
-        expr: sum by (provider_id) (increase(identity_oidc_provider_requests_total{outcome=~"transport_error|http_[0-9]+|result_unknown|deadline_exceeded|validation_error"}[10m])) >= 3
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: Configured OIDC provider is persistently unavailable
-          description: Three or more sanitized OIDC provider failures were observed within 10 minutes and persisted for 5 minutes; local authentication and existing sessions remain independent.
-          runbook: docs/runbooks/generated/ru/identity.oidc-provider-unavailable.md
 
       - alert: ExchangeExecutionDown
         expr: max(up{job="exchange-execution"}) == 0
@@ -119,17 +100,6 @@ groups:
           summary: Redis TCP probe is failing
           description: Blackbox TCP connectivity to redis:6379 has failed for 2 minutes.
 
-      - alert: ClickHouseHttpPingDown
-        expr: max(probe_success{job="blackbox_http",service="clickhouse_http_ping"}) == 0
-        for: 2m
-        labels:
-          severity: critical
-        annotations:
-          summary: ClickHouse HTTP /ping probe is failing
-          description: Blackbox HTTP probe to http://clickhouse:8123/ping has failed for 2 minutes.
-
-  - name: mac-studio-resource-pressure
-    rules:
       - alert: HostHighCpu
         expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{job="node_exporter",mode="idle"}[5m])) * 100) > 85
         for: 10m
@@ -177,15 +147,6 @@ groups:
 
   - name: mac-studio-market-data
     rules:
-      - alert: ClickHouseServiceDegraded
-        expr: max(clickhouse_exporter_scrape_success{job="clickhouse_exporter"}) == 0
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: ClickHouse exporter cannot query ClickHouse
-          description: The repo-managed clickhouse_exporter has failed to read ClickHouse metrics for 5 minutes.
-
       - alert: MarketDataWorkerErrorsGrowing
         expr: increase(ws_errors_total{job="market-data-ws-worker"}[15m]) > 0 or increase(insert_errors_total{job="market-data-ws-worker"}[15m]) > 0 or increase(redis_publish_errors_total{job="market-data-ws-worker"}[15m]) > 0
         for: 0m

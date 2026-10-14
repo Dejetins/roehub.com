@@ -1,0 +1,44 @@
+Profiling overhead included; not guardrail timing. Wall 8.696312669999315
+         15521599 function calls (15520600 primitive calls) in 8.633 seconds
+
+   Ordered by: internal time
+   List reduced from 457 to 35 due to restriction <35>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+      947    3.383    0.004    5.740    0.006 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/connection.py:401(wait)
+  3838747    1.234    0.000    1.234    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/rows.py:123(dict_row_)
+      938    0.813    0.001    1.448    0.002 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_reader.py:131(flush)
+    42568    0.740    0.000    2.356    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/server_cursor.py:163(_fetch_gen)
+        1    0.690    0.690    8.613    8.613 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_reader.py:124(read)
+     2814    0.582    0.000    0.582    0.000 {built-in method numpy.asarray}
+    42574    0.357    0.000    0.372    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/_connection_base.py:442(_exec_command)
+  3838748    0.338    0.000    6.079    0.000 /workspace/src/trading/contexts/market_data/adapters/outbound/persistence/postgres/query_support.py:32(rows)
+  3842574    0.220    0.000    0.220    0.000 {method 'append' of 'list' objects}
+  3839765    0.171    0.000    0.171    0.000 {built-in method builtins.len}
+     2814    0.052    0.000    0.053    0.000 {method 'tofile' of 'numpy.ndarray' objects}
+        2    0.012    0.006    0.012    0.006 {method 'poll' of 'select.poll' objects}
+      939    0.005    0.000    0.006    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/sql.py:413(as_bytes)
+      937    0.005    0.000    0.005    0.000 {method 'clear' of 'list' objects}
+        2    0.003    0.001    0.003    0.001 {built-in method posix.fsync}
+      940    0.003    0.000    0.007    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/sql.py:221(format)
+      939    0.002    0.000    5.716    0.006 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/server_cursor.py:317(fetchmany)
+     7529    0.002    0.000    0.002    0.000 {built-in method _abc._abc_instancecheck}
+     2824    0.002    0.000    0.002    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/sql.py:208(__init__)
+      941    0.002    0.000    0.002    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/sql.py:375(as_bytes)
+     2832    0.001    0.000    0.001    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/_encodings.py:82(conn_encoding)
+     4708    0.001    0.000    0.012    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/sql.py:140(<genexpr>)
+     7529    0.001    0.000    0.003    0.000 <frozen abc>:117(__instancecheck__)
+     9517    0.001    0.000    0.002    0.000 {built-in method builtins.isinstance}
+     1887    0.001    0.000    0.003    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/sql.py:216(as_bytes)
+ 1888/947    0.001    0.000    0.013    0.000 {method 'join' of 'bytes' objects}
+        3    0.001    0.000    0.001    0.000 {built-in method select.select}
+      941    0.001    0.000    0.003    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/sql.py:135(__init__)
+     2854    0.001    0.000    0.001    0.000 {method 'encode' of 'str' objects}
+      941    0.001    0.000    0.014    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/sql.py:139(as_bytes)
+      946    0.001    0.000    0.001    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/_connection_base.py:527(_check_connection_ok)
+     5645    0.001    0.000    0.001    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/sql.py:53(__init__)
+      941    0.001    0.000    0.001    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/sql.py:359(__init__)
+      940    0.000    0.000    0.001    0.000 /usr/local/lib/python3.12/string.py:287(parse)
+      947    0.000    0.000    0.000    0.000 /opt/roehub/.venv/lib/python3.12/site-packages/psycopg/_adapters_map.py:189(get_dumper)
+
+

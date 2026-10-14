@@ -1,0 +1,65 @@
+[
+  {
+    "name": "/roehub-local-api-1",
+    "running": false,
+    "exit": 143,
+    "finished": "2026-10-14T06:59:51.487593301Z",
+    "restart": "no"
+  },
+  {
+    "name": "/roehub-local-web-1",
+    "running": false,
+    "exit": 143,
+    "finished": "2026-10-14T06:59:51.138555217Z",
+    "restart": "no"
+  },
+  {
+    "name": "/roehub-local-market-data-ws-1",
+    "running": false,
+    "exit": 0,
+    "finished": "2026-10-14T06:59:34.011446793Z",
+    "restart": "no"
+  },
+  {
+    "name": "/roehub-local-market-data-scheduler-1",
+    "running": false,
+    "exit": 0,
+    "finished": "2026-10-14T06:59:32.498239584Z",
+    "restart": "no"
+  },
+  {
+    "name": "/roehub-local-backtest-artifact-publisher-1",
+    "running": false,
+    "exit": 0,
+    "finished": "2026-10-14T06:59:31.333559416Z",
+    "restart": "no"
+  },
+  {
+    "name": "/roehub-local-operational-health-1",
+    "running": false,
+    "exit": 143,
+    "finished": "2026-10-14T06:59:51.177358676Z",
+    "restart": "no"
+  },
+  {
+    "name": "/roehub-local-clickhouse-1",
+    "running": true,
+    "exit": 0,
+    "finished": "2026-10-13T12:22:39.465692667Z",
+    "restart": "no"
+  },
+  {
+    "name": "/roehub-local-postgresql-1",
+    "running": true,
+    "exit": 0,
+    "finished": "2026-10-13T12:22:17.631623962Z",
+    "restart": "no"
+  },
+  {
+    "name": "/roehub-control-control-agent-1",
+    "running": false,
+    "exit": 143,
+    "finished": "2026-10-14T07:00:09.024415795Z",
+    "restart": "no"
+  }
+]

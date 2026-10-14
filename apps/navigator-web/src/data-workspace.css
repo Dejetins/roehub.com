@@ -1,5 +1,5 @@
 /* The approved exchange catalog uses the same Navigator surfaces and type scale. */
-.navigator-grid.workpages-grid.data-workspace{--nav-inspector:300px;grid-template-rows:40px minmax(0,1fr);grid-template-areas:'library heading inspector' 'library catalog inspector';height:calc(100dvh - 60px);min-height:620px}
+.navigator-grid.workpages-grid.data-workspace{grid-template-rows:40px minmax(0,1fr);grid-template-areas:'library heading inspector' 'library catalog inspector';height:calc(100dvh - 60px);min-height:620px}
 .data-workspace .data-exchanges{padding:0;gap:4px}
 .data-exchanges>a>svg{margin-inline-start:auto;width:14px;height:14px}
 .data-exchange-mark{width:32px;min-width:32px;height:24px;display:grid;place-items:center}
@@ -100,8 +100,8 @@
 .navigator-app .data-workspace .data-instrument-details dl{display:grid;grid-template-columns:1fr 1fr;font-size:10px;gap:8px;margin:12px 0}
 .navigator-app .data-workspace .data-instrument-details dd{margin:0}
 :root[data-navigator-density=comfortable] .data-catalog-table td{height:44px;padding-block:7px}
-@media(max-width:1250px){.navigator-grid.workpages-grid.data-workspace{--nav-library:188px;--nav-inspector:270px}.data-catalog-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.data-heading-subtitle{display:none}.data-progress progress{width:50px}}
-@media(max-width:1050px) and (min-width:651px){.navigator-grid.workpages-grid.data-workspace{height:auto;grid-template-columns:var(--nav-library) minmax(0,1fr);grid-template-rows:40px 600px auto;grid-template-areas:'library heading' 'library catalog' 'library inspector'}.navigator-app .data-workspace .data-inspector{max-height:none}.data-inspector-section{max-width:560px}}
+@media(max-width:1250px){.data-catalog-tools{grid-template-columns:repeat(2,minmax(0,1fr))}.data-heading-subtitle{display:none}.data-progress progress{width:50px}}
+@media(max-width:980px) and (min-width:651px){.navigator-grid.workpages-grid.data-workspace{height:auto;grid-template-columns:var(--nav-library) minmax(0,1fr);grid-template-rows:40px 600px auto;grid-template-areas:'library heading' 'library catalog' 'library inspector'}.navigator-app .data-workspace .data-inspector{max-height:none}.data-inspector-section{max-width:560px}}
 @media(max-width:650px){.navigator-grid.workpages-grid.data-workspace{height:auto;min-height:0}.data-workspace .navigator-library{max-height:150px}.data-workspace .data-exchanges{display:flex;flex-direction:row}.data-exchanges>a{flex:1}.data-exchanges>a>svg{display:none}.data-workspace .data-catalog{order:2;height:560px;min-height:560px}.navigator-app .data-workspace .data-inspector{order:3;max-height:none}.data-catalog-tools{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px}.data-catalog-context{padding-inline:10px}.data-catalog-footer{padding-inline:10px}.data-range-picker>form{position:fixed;left:56px;right:8px;top:180px;width:auto}.data-workspace .navigator-heading>.work-actions .work-link-button{font-size:10px}.data-catalog-tools :is(input,select){font-size:11px}}
 
 .data-workspace .data-job-failed{color:var(--danger,#ff9b87)}
@@ -218,7 +218,7 @@
 .navigator-grid.workpages-grid.data-workspace{grid-template-rows:minmax(0,1fr);grid-template-areas:'library catalog inspector'}
 .data-catalog-context>.work-actions{margin-inline-start:auto;gap:6px;flex-wrap:nowrap}
 .data-workspace .data-download-journal{flex-basis:350px;max-height:calc(38% + 31px)}
-@media(min-width:651px) and (max-width:1050px){.navigator-grid.workpages-grid.data-workspace{grid-template-rows:650px auto;grid-template-areas:'library catalog' 'library inspector'}}
+@media(min-width:651px) and (max-width:980px){.navigator-grid.workpages-grid.data-workspace{grid-template-rows:650px auto;grid-template-areas:'library catalog' 'library inspector'}}
 @media(max-width:650px){.data-workspace .data-catalog{height:608px;min-height:608px}.data-workspace .data-catalog:has(.data-download-journal){height:898px}.data-workspace .data-download-journal{flex-basis:378px;max-height:378px}}
 
 .data-stream-state.failed,#data-stream-help[role="alert"]{color:var(--danger,#ff9b87)}

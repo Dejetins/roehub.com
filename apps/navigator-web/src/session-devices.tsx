@@ -52,7 +52,7 @@ export function SessionDevices({subject}:{subject:string}) {
     </tr></thead><tbody>{rows.map(row=><tr key={row.device_id}>
       <td><div className="security-device-name"><Monitor size={16} aria-hidden="true"/><strong>{row.label==='Browser'?w('Unknown browser','Неизвестный браузер'):row.label}</strong>{row.is_current&&<span className="security-device-current">{w('This device','Это устройство')}</span>}</div></td>
       <td>{time(row.last_seen_at)}</td><td><span className={row.active?'security-device-valid':''}>{row.active?w('Valid','Действителен'):w('Ended','Завершён')}</span></td>
-      <td>{row.active&&<button type="button" disabled={locked} onClick={()=>void revoke(row.device_id)} aria-label={row.is_current?w('Sign out on this device','Выйти на этом устройстве'):w(`End sign-in: ${row.label}`,`Завершить вход: ${row.label}`)}>{pending===row.device_id?w('Ending…','Завершение…'):row.is_current?w('Sign out','Выйти'):w('End sign-in','Завершить вход')}</button>}</td>
+      <td>{row.active&&<button type="button" disabled={locked} onClick={()=>void revoke(row.device_id)} aria-label={w(`End session: ${row.label}`,`Завершить сеанс: ${row.label}`)}>{pending===row.device_id?w('Ending…','Завершение…'):w('End session','Завершить сеанс')}</button>}</td>
     </tr>)}</tbody></table></div>
     {!rows.length&&query.isSuccess&&<p className="work-empty">{w('No devices','Нет устройств')}</p>}
     {query.hasNextPage&&<button type="button" disabled={query.isFetching||Boolean(pending)} onClick={()=>void query.fetchNextPage()}>{w('Show more','Показать ещё')}</button>}

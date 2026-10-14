@@ -1,16 +1,6 @@
 from .account_settings_repository import (
     AccountSettingsRepository,
 )
-from .authentication_provider import (
-    AuthenticationProvider,
-    AuthenticationProviderError,
-    OidcAttemptPurpose,
-    OidcIdentityCompletion,
-    OidcIdentityRepository,
-    OidcIdentityRepositoryError,
-    OidcLoginAttempt,
-    VerifiedExternalIdentity,
-)
 from .clock import IdentityClock
 from .current_user import CurrentUser, CurrentUserPrincipal, CurrentUserUnauthorizedError
 from .exchange_keys_repository import ExchangeKeysRepository
@@ -36,8 +26,6 @@ __all__ = [
     "CurrentUserPrincipal",
     "CurrentUserUnauthorizedError",
     "AccountSettingsRepository",
-    "AuthenticationProvider",
-    "AuthenticationProviderError",
     "ExchangeKeysRepository",
     "ExchangeKeysSecretCipher",
     "IdentityClock",
@@ -50,13 +38,7 @@ __all__ = [
     "LocalPasskey",
     "OrganizationRepository",
     "OrganizationRepositoryInvariantError",
-    "OidcAttemptPurpose",
-    "OidcIdentityCompletion",
-    "OidcIdentityRepository",
-    "OidcIdentityRepositoryError",
-    "OidcLoginAttempt",
     "SessionRepository",
     "RecoveryCodeHash",
     "UserRepository",
-    "VerifiedExternalIdentity",
 ]

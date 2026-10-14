@@ -1,0 +1,132 @@
+{
+  "containers": [
+    {
+      "name": "roehub-s10-platform-web",
+      "id": "1d45b676c647e69b543d7c48f801888a7a1a80ea2f2f49f8dbf5af2fb3ac57f7",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-adoption-pg",
+      "id": "f303d0a3042e34f317a3846a6444913a74b82c6f6de36d9035490cae179435a2",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-reference-client",
+      "id": "949207349c58f46633d4a0f0dc0979041990901f2ed88851711f07ec12bb1c29",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-operator",
+      "id": "6334515590c421c96f757a5acb90c35a0e9da7aa58761aaa27aa63b3d89a1742",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-recovery-verify",
+      "id": "81c94a0d8929eabbd4888c4464913f9df3d1e362489cdce9c27b4d9f1273504f",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-replacement-pg",
+      "id": "96617b55ec16d106eb7fa809ffdb4ccdc425e464e7b5b18425b6cefa9369db5a",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-replacement-client",
+      "id": "b8e0240df9115c2c9b44093239d317be0925e3a6d68b8982fe954d206175b439",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-replacement-supervisor",
+      "id": "895331e9336a3ee4dbaf8dc111dc456963ca9621a2cac0d3aa78ddb6334d30a8",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-replacement2-pg",
+      "id": "71d50b9fb80a496156eece5319d4e229590066013587f2dd8038b12950b62b37",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-replacement2-client",
+      "id": "3f0e8605e7a15b9f88ef7b7424027f650c5e729c04ea1eee744e4a464219954a",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-replacement2-supervisor",
+      "id": "ca469c201a0097e5b7fab8cc22ae67796818c10dea86620c2e5780a36a5e1fed",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-replacement3-pg",
+      "id": "64323cac544b8f7364ef05fd65722535b517ee8ca2ceedb364881af2f2e4e044",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-replacement3-client",
+      "id": "bb9de782d6b8fd26717e8f56c1f50440d3af9643a38d03d6227719f86f36bb8b",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-replacement3-supervisor",
+      "id": "34d5714e4b4dbd83fc1a7c0a8e304fa4c8dc7c263b08d2d61acb54683629295d",
+      "removed": true
+    },
+    {
+      "name": "roehub-s10-replacement3-owner",
+      "id": "eb70a62f4675039496b43ef5eede037fa5573e8eaf4d72cc9c48cf29b6f7355f",
+      "removed": true
+    }
+  ],
+  "resources": [
+    {
+      "kind": "volume",
+      "name": "roehub-s10-replacement-data",
+      "removed": true
+    },
+    {
+      "kind": "volume",
+      "name": "roehub-s10-replacement-registry",
+      "removed": true
+    },
+    {
+      "kind": "network",
+      "name": "roehub-s10-replacement",
+      "removed": true
+    },
+    {
+      "kind": "volume",
+      "name": "roehub-s10-replacement2-data",
+      "removed": true
+    },
+    {
+      "kind": "volume",
+      "name": "roehub-s10-replacement2-registry",
+      "removed": true
+    },
+    {
+      "kind": "network",
+      "name": "roehub-s10-replacement2",
+      "removed": true
+    },
+    {
+      "kind": "volume",
+      "name": "roehub-s10-replacement3-data",
+      "removed": true
+    },
+    {
+      "kind": "volume",
+      "name": "roehub-s10-replacement3-registry",
+      "removed": true
+    },
+    {
+      "kind": "network",
+      "name": "roehub-s10-replacement3",
+      "removed": true
+    }
+  ],
+  "retained": [
+    "encrypted recovery archive and separate key",
+    "retired-s10 artifacts/config",
+    "roehub-navigator-ch inert volume",
+    "all S03/S09/benchmark/foreign resources"
+  ]
+}

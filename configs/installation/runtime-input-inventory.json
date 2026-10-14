@@ -6,11 +6,11 @@
     "user_installation_input": "configs/installation/roehub.yaml"
   },
   "counts": {
-    "explicit_legacy_runtime_handoff": 49,
-    "installation_generated_runtime": 56,
+    "explicit_legacy_runtime_handoff": 40,
+    "installation_generated_runtime": 35,
     "internal_runtime_tuning": 2,
-    "openbao_secret_reference": 26,
-    "product_config_postgresql": 35
+    "openbao_secret_reference": 18,
+    "product_config_postgresql": 26
   },
   "entries": [
     {
@@ -49,188 +49,10 @@
     },
     {
       "classification": "installation_generated_runtime",
-      "key": "CH_DATABASE",
-      "owner_stage": "03,17",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py",
-        "infra/docker/docker-compose.market_data.yml",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "CH_HOST",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/docker-compose.market_data.yml",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "openbao_secret_reference",
-      "key": "CH_PASSWORD",
-      "owner_stage": "08",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py",
-        "infra/docker/docker-compose.market_data.yml",
-        "infra/docker/runtime-entrypoint.py"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "CH_PORT",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/docker-compose.market_data.yml",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "CH_SECURE",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/docker-compose.market_data.yml",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "explicit_legacy_runtime_handoff",
-      "key": "CH_USER",
-      "owner_stage": "17",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py",
-        "infra/docker/docker-compose.market_data.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "CH_VERIFY",
-      "owner_stage": "03,17",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py",
-        "infra/docker/docker-compose.market_data.yml",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "CLICKHOUSE_DB",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "CLICKHOUSE_EXPORTER_HOST",
-      "owner_stage": "03,17",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "CLICKHOUSE_EXPORTER_PORT",
-      "owner_stage": "03,17",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py"
-      ]
-    },
-    {
-      "classification": "explicit_legacy_runtime_handoff",
-      "key": "CLICKHOUSE_EXPORTER_SCRAPE_URI",
-      "owner_stage": "17",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py"
-      ]
-    },
-    {
-      "classification": "explicit_legacy_runtime_handoff",
-      "key": "CLICKHOUSE_EXPORTER_TIMEOUT_SECONDS",
-      "owner_stage": "17",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "CLICKHOUSE_EXPORTER_VERIFY_TLS",
-      "owner_stage": "03,17",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "CLICKHOUSE_HTTP_PORT",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/.env.example"
-      ]
-    },
-    {
-      "classification": "openbao_secret_reference",
-      "key": "CLICKHOUSE_PASSWORD",
-      "owner_stage": "08",
-      "sources": [
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "CLICKHOUSE_TCP_PORT",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/.env.example"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "CLICKHOUSE_URL",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/.env.example"
-      ]
-    },
-    {
-      "classification": "explicit_legacy_runtime_handoff",
-      "key": "CLICKHOUSE_USER",
-      "owner_stage": "17",
-      "sources": [
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
       "key": "DATABASE_URL",
       "owner_stage": "03,17",
       "sources": [
         "infra/docker/.env.example"
-      ]
-    },
-    {
-      "classification": "openbao_secret_reference",
-      "key": "EXTENSIONS_PG_DSN",
-      "owner_stage": "08",
-      "sources": [
-        "apps/api/wiring/modules/extensions.py"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "GF_SERVER_ROOT_URL",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "GRAFANA_PORT",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/docker-compose.yml"
       ]
     },
     {
@@ -291,86 +113,6 @@
       ]
     },
     {
-      "classification": "product_config_postgresql",
-      "key": "IDENTITY_OIDC_ALLOW_INSECURE_HTTP",
-      "owner_stage": "04-16",
-      "sources": [
-        "apps/api/wiring/modules/identity.py"
-      ]
-    },
-    {
-      "classification": "product_config_postgresql",
-      "key": "IDENTITY_OIDC_CLIENT_ID",
-      "owner_stage": "04-16",
-      "sources": [
-        "apps/api/wiring/modules/identity.py"
-      ]
-    },
-    {
-      "classification": "openbao_secret_reference",
-      "key": "IDENTITY_OIDC_CLIENT_SECRET_REF",
-      "owner_stage": "08",
-      "sources": [
-        "apps/api/wiring/modules/identity.py"
-      ]
-    },
-    {
-      "classification": "product_config_postgresql",
-      "key": "IDENTITY_OIDC_CONNECT_TIMEOUT_SECONDS",
-      "owner_stage": "04-16",
-      "sources": [
-        "apps/api/wiring/modules/identity.py"
-      ]
-    },
-    {
-      "classification": "product_config_postgresql",
-      "key": "IDENTITY_OIDC_DISPLAY_NAME",
-      "owner_stage": "04-16",
-      "sources": [
-        "apps/api/wiring/modules/identity.py"
-      ]
-    },
-    {
-      "classification": "product_config_postgresql",
-      "key": "IDENTITY_OIDC_ISSUER",
-      "owner_stage": "04-16",
-      "sources": [
-        "apps/api/wiring/modules/identity.py"
-      ]
-    },
-    {
-      "classification": "product_config_postgresql",
-      "key": "IDENTITY_OIDC_OVERALL_TIMEOUT_SECONDS",
-      "owner_stage": "04-16",
-      "sources": [
-        "apps/api/wiring/modules/identity.py"
-      ]
-    },
-    {
-      "classification": "product_config_postgresql",
-      "key": "IDENTITY_OIDC_PROVIDER_ID",
-      "owner_stage": "04-16",
-      "sources": [
-        "apps/api/wiring/modules/identity.py"
-      ]
-    },
-    {
-      "classification": "product_config_postgresql",
-      "key": "IDENTITY_OIDC_REDIRECT_URI",
-      "owner_stage": "04-16",
-      "sources": [
-        "apps/api/wiring/modules/identity.py"
-      ]
-    },
-    {
-      "classification": "product_config_postgresql",
-      "key": "IDENTITY_OIDC_RESPONSE_TIMEOUT_SECONDS",
-      "owner_stage": "04-16",
-      "sources": [
-        "apps/api/wiring/modules/identity.py"
-      ]
-    },
-    {
       "classification": "openbao_secret_reference",
       "key": "IDENTITY_PG_DSN",
       "owner_stage": "08",
@@ -378,7 +120,6 @@
         "apps/api/wiring/modules/identity.py",
         "apps/api/wiring/modules/ui_account.py",
         "apps/migrations/local_auth_runtime_probe.py",
-        "apps/migrations/oidc_runtime_probe.py",
         "src/trading/contexts/exchange_control/adapters/inbound/http/app.py"
       ]
     },
@@ -413,118 +154,12 @@
       ]
     },
     {
-      "classification": "installation_generated_runtime",
-      "key": "KEYCLOAK_AUTH_URL",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/.env.example",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "KEYCLOAK_BASE_URL",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/.env.example",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "explicit_legacy_runtime_handoff",
-      "key": "KEYCLOAK_CLIENT_ID",
-      "owner_stage": "17",
-      "sources": [
-        "infra/docker/.env.example",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "openbao_secret_reference",
-      "key": "KEYCLOAK_CLIENT_SECRET",
-      "owner_stage": "08",
-      "sources": [
-        "infra/docker/.env.example",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "KEYCLOAK_END_SESSION_URL",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/.env.example",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "KEYCLOAK_INTROSPECTION_URL",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/.env.example",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "explicit_legacy_runtime_handoff",
-      "key": "KEYCLOAK_LOGOUT_REDIRECT_URI",
-      "owner_stage": "17",
-      "sources": [
-        "infra/docker/.env.example",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "explicit_legacy_runtime_handoff",
-      "key": "KEYCLOAK_REALM",
-      "owner_stage": "17",
-      "sources": [
-        "infra/docker/.env.example",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "explicit_legacy_runtime_handoff",
-      "key": "KEYCLOAK_REDIRECT_URI",
-      "owner_stage": "17",
-      "sources": [
-        "infra/docker/.env.example",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "openbao_secret_reference",
-      "key": "KEYCLOAK_TOKEN_URL",
-      "owner_stage": "08",
-      "sources": [
-        "infra/docker/.env.example",
-        "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
       "classification": "product_config_postgresql",
       "key": "MARKET_DATA_BUILD_CONTEXT",
       "owner_stage": "04-16",
       "sources": [
         "infra/docker/docker-compose.market_data.yml",
         "infra/docker/docker-compose.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "MARKET_DATA_CH_HTTP_PORT",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/docker-compose.market_data.yml"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "MARKET_DATA_CH_NATIVE_PORT",
-      "owner_stage": "03,17",
-      "sources": [
-        "infra/docker/docker-compose.market_data.yml"
       ]
     },
     {
@@ -597,9 +232,24 @@
       "key": "OPENBAO_ADDR",
       "owner_stage": "03,17",
       "sources": [
-        "apps/api/wiring/modules/identity.py",
         "apps/exchange_execution/main/app.py",
         "src/trading/contexts/exchange_control/adapters/inbound/http/app.py"
+      ]
+    },
+    {
+      "classification": "explicit_legacy_runtime_handoff",
+      "key": "PGSERVICE",
+      "owner_stage": "17",
+      "sources": [
+        "src/trading/platform/postgres_budget.py"
+      ]
+    },
+    {
+      "classification": "explicit_legacy_runtime_handoff",
+      "key": "PGSERVICEFILE",
+      "owner_stage": "17",
+      "sources": [
+        "src/trading/platform/postgres_budget.py"
       ]
     },
     {
@@ -797,14 +447,6 @@
       ]
     },
     {
-      "classification": "openbao_secret_reference",
-      "key": "ROEHUB_CLICKHOUSE_PASSWORD_FILE",
-      "owner_stage": "08",
-      "sources": [
-        "infra/docker/runtime-entrypoint.py"
-      ]
-    },
-    {
       "classification": "explicit_legacy_runtime_handoff",
       "key": "ROEHUB_CONTROL_AGENT_JOB_IDENTITY_FILE",
       "owner_stage": "17",
@@ -853,7 +495,6 @@
       "owner_stage": "03,17",
       "sources": [
         "apps/api/wiring/modules/backtest.py",
-        "apps/api/wiring/modules/extensions.py",
         "apps/api/wiring/modules/identity.py",
         "apps/api/wiring/modules/live_execution.py",
         "apps/api/wiring/modules/research_tenancy.py",
@@ -1119,28 +760,12 @@
       ]
     },
     {
-      "classification": "openbao_secret_reference",
-      "key": "ROEHUB_IDENTITY_OPENBAO_TOKEN_FILE",
-      "owner_stage": "08",
-      "sources": [
-        "apps/api/wiring/modules/identity.py"
-      ]
-    },
-    {
       "classification": "explicit_legacy_runtime_handoff",
       "key": "ROEHUB_INDICATORS_CONFIG",
       "owner_stage": "17",
       "sources": [
         "apps/api/wiring/modules/backtest_artifacts.py",
         "src/trading/platform/config/indicators_compute_numba.py"
-      ]
-    },
-    {
-      "classification": "explicit_legacy_runtime_handoff",
-      "key": "ROEHUB_LOG_LEVEL",
-      "owner_stage": "17",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py"
       ]
     },
     {
@@ -1206,7 +831,6 @@
       "key": "ROEHUB_OPENBAO_ROOT",
       "owner_stage": "03,17",
       "sources": [
-        "apps/api/wiring/modules/identity.py",
         "apps/worker/notification_dispatcher/wiring/modules/notification_dispatcher.py",
         "apps/worker/telegram_bot_worker/wiring/modules/telegram_bot_worker.py"
       ]
@@ -1228,35 +852,35 @@
       ]
     },
     {
-      "classification": "installation_generated_runtime",
-      "key": "ROEHUB_PLUGIN_BUNDLE_SPOOL_ROOT",
-      "owner_stage": "03,17",
-      "sources": [
-        "apps/api/wiring/modules/extensions.py"
-      ]
-    },
-    {
-      "classification": "installation_generated_runtime",
-      "key": "ROEHUB_PLUGIN_GATEWAY_URL",
-      "owner_stage": "03,17",
-      "sources": [
-        "apps/api/wiring/modules/extensions.py"
-      ]
-    },
-    {
       "classification": "explicit_legacy_runtime_handoff",
-      "key": "ROEHUB_PLUGIN_PUBLISHER_KEYS_FILE",
+      "key": "ROEHUB_PG_BUDGET_REQUIRED",
       "owner_stage": "17",
       "sources": [
-        "apps/api/wiring/modules/extensions.py"
+        "src/trading/platform/postgres_budget.py"
       ]
     },
     {
-      "classification": "explicit_legacy_runtime_handoff",
-      "key": "ROEHUB_PLUGIN_UNSIGNED_DEVELOPMENT",
-      "owner_stage": "17",
+      "classification": "installation_generated_runtime",
+      "key": "ROEHUB_PG_BUDGET_ROOT",
+      "owner_stage": "03,17",
       "sources": [
-        "apps/api/wiring/modules/extensions.py"
+        "src/trading/platform/postgres_budget.py"
+      ]
+    },
+    {
+      "classification": "openbao_secret_reference",
+      "key": "ROEHUB_PG_MAINTENANCE_DSN",
+      "owner_stage": "08",
+      "sources": [
+        "apps/monitoring/postgres_observer.py"
+      ]
+    },
+    {
+      "classification": "openbao_secret_reference",
+      "key": "ROEHUB_PG_MONITOR_DSN",
+      "owner_stage": "08",
+      "sources": [
+        "apps/monitoring/postgres_observer.py"
       ]
     },
     {
@@ -1280,33 +904,10 @@
     },
     {
       "classification": "openbao_secret_reference",
-      "key": "ROEHUB_STORAGE_CLICKHOUSE_DSN",
-      "owner_stage": "08",
-      "sources": [
-        "apps/migrations/research_runtime_probe.py",
-        "apps/migrations/storage.py",
-        "apps/migrations/verify_storage_runtime.py",
-        "infra/docker/storage-embedded.compose.yml",
-        "infra/docker/storage-external.compose.yml"
-      ]
-    },
-    {
-      "classification": "openbao_secret_reference",
-      "key": "ROEHUB_STORAGE_CLICKHOUSE_PASSWORD",
-      "owner_stage": "08",
-      "sources": [
-        "apps/migrations/storage.py",
-        "infra/docker/runtime-entrypoint.py",
-        "infra/docker/storage-embedded.compose.yml"
-      ]
-    },
-    {
-      "classification": "openbao_secret_reference",
       "key": "ROEHUB_STORAGE_POSTGRES_DSN",
       "owner_stage": "08",
       "sources": [
         "apps/control_agent/artifact_storage_wiring.py",
-        "apps/migrations/extensions_plugin_runtime_probe.py",
         "apps/migrations/notification_provider_runtime_probe.py",
         "apps/migrations/organization_runtime_probe.py",
         "apps/migrations/research_runtime_probe.py",
@@ -1374,14 +975,6 @@
     },
     {
       "classification": "explicit_legacy_runtime_handoff",
-      "key": "ROEHUB_TRADING_MODE",
-      "owner_stage": "17",
-      "sources": [
-        "apps/api/wiring/modules/extensions.py"
-      ]
-    },
-    {
-      "classification": "explicit_legacy_runtime_handoff",
       "key": "ROEHUB_WEB_ASSET_VERSION",
       "owner_stage": "17",
       "sources": [
@@ -1420,6 +1013,7 @@
         "apps/api/wiring/modules/strategy.py",
         "apps/api/wiring/modules/ui_account.py",
         "apps/cli/commands/backtest_artifact_publish.py",
+        "apps/cli/wiring/db/postgres.py",
         "apps/control_agent/artifact_storage_wiring.py",
         "apps/exchange_execution/main/app.py",
         "apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py",
@@ -1427,7 +1021,9 @@
         "apps/worker/backtest_job_runner/main/lazy_trades_child.py",
         "apps/worker/market_data_ws/wiring/io_process.py",
         "apps/worker/market_data_ws/wiring/modules/market_data_ws.py",
+        "apps/worker/market_data_ws/wiring/persistent_writer.py",
         "apps/worker/strategy_live_runner/wiring/modules/strategy_live_runner.py",
+        "infra/docker/docker-compose.market_data.yml",
         "src/trading/contexts/market_data/adapters/outbound/clients/common_http/http_client.py"
       ]
     },
@@ -1485,7 +1081,7 @@
       ]
     }
   ],
-  "file_input_total": 28,
+  "file_input_total": 25,
   "file_inputs": [
     {
       "path": "configs/dev/backtest_artifacts.yaml",
@@ -1560,21 +1156,9 @@
       ]
     },
     {
-      "path": "configs/installation/generated/base/docker-compose.yml",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py"
-      ]
-    },
-    {
       "path": "configs/installation/generated/base/generation-manifest.json",
       "sources": [
         "infra/docker/Dockerfile.runtime"
-      ]
-    },
-    {
-      "path": "configs/installation/generated/base/prometheus.yml",
-      "sources": [
-        "apps/monitoring/clickhouse_exporter.py"
       ]
     },
     {
@@ -1624,12 +1208,6 @@
     },
     {
       "path": "configs/market_data.yaml",
-      "sources": [
-        "src/trading/platform/config/runtime_topology.py"
-      ]
-    },
-    {
-      "path": "configs/plugin-publisher-keys.json",
       "sources": [
         "src/trading/platform/config/runtime_topology.py"
       ]
@@ -1687,5 +1265,5 @@
     "infra"
   ],
   "schema": "io.roehub.runtime-input-inventory/v1alpha1",
-  "total": 168
+  "total": 121
 }

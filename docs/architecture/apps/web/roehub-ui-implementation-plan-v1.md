@@ -235,7 +235,7 @@ may proceed alongside UI planning; product execution remains separately authoriz
 | UI-EXEC | Execution activity/detail and source-to-fill reconciliation, then live workspace/manual position control | F; execution projections/source identity; strategy/connection/risk/authority contracts for commands. UI-STRAT/UI-CONN integration before full manual-control journey; monitoring detail for full diagnostic links |
 | UI-MODELS | Registry/detail/comparison, then train/promote/rollback consumers | F; model/experiment projections + Q-MODELS; data/artifact/job identities before exposing dependent actions; UI-ART/UI-JOBS for complete cross-area navigation |
 | UI-OPS | Monitoring workspace, service/datastore detail, incident-to-job/runbook links | F; real monitoring/freshness/dependency projections; UI-JOBS/UI-DOCS for complete diagnostic journeys; any operational action needs its own eligible server contract |
-| UI-ACCOUNT | Personal profile/preferences/notifications/security; admin members/resources/extensions/maintenance | F; existing account/admin contracts; installation authority and missing projections per task. Destructive/recovery operations require scoped proof; no inferred deployment authority |
+| UI-ACCOUNT | Personal profile/preferences/notifications/security; admin members/resources/maintenance | F; existing account/admin contracts; installation authority and missing projections per task. Destructive/recovery operations require scoped proof; no inferred deployment authority |
 | UI-DOCS | Version-matched local documentation, search, runbooks and safe continuation | F; documentation visibility/version contracts; explicitly migrate framework `/docs` before route cutover, preserving compatibility redirects where selected |
 
 Near-term sequence:
@@ -411,11 +411,10 @@ historical records are explicitly retained without turning them into product pag
 | UI-EXEC | `screen.live.workspace`, `screen.live.execution_activity`, `screen.live.execution_detail`, `screen.live.manual_position_flow` |
 | UI-MODELS | `screen.models.registry`, `screen.models.detail` |
 | UI-OPS | `screen.monitoring.workspace`, `screen.monitoring.service_detail`, `contract.diagnostics.health` |
-| UI-ACCOUNT | `screen.settings.profile`, `screen.settings.preferences`, `screen.settings.notifications`, `screen.settings.security`, `screen.admin.overview`, `screen.admin.members`, `screen.admin.resources`, `screen.admin.extensions`, `screen.admin.maintenance` |
+| UI-ACCOUNT | `screen.settings.profile`, `screen.settings.preferences`, `screen.settings.notifications`, `screen.settings.security`, `screen.admin.overview`, `screen.admin.members`, `screen.admin.resources`, `screen.admin.maintenance` |
 | UI-DOCS | `screen.docs.index`, `screen.docs.runbook`, `contract.framework.api_docs` |
 | F/S1 | `contract.integration.api_proxy`, `contract.delivery.static_assets` |
 | A | `contract.authorization.target_matrix` |
-| QA only | `screen.qa.plugin_panel_lab` |
 | Historical only | `historical.react_prototype` |
 
 F/S1 covers transport/static compatibility; A remains server-owned authorization.

@@ -1,5 +1,12 @@
 # Live Trading — запуск стратегий из бэктеста и универсальный order gateway v1
 
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Целевая repair chain: Redis hot cache → canonical PG → REST; source enum/config/circuit/metrics согласованно переходят на canonical_store в S05. Durable audit, ACK ordering, provider admission и действующие права сохраняются.
+
+
 Документ фиксирует целевую архитектуру production-контура живой торговли Roehub:
 от выбора варианта стратегии из результата бэктеста до создания immutable
 strategy, запуска/restart live run, генерации фактического сигнала, risk gate,
@@ -158,7 +165,7 @@ Revision hash нативных адаптеров и emulator вычисляет
 
 | Область | Состояние |
 |---|---|
-| Market Data | Закрытые 1m свечи публикуются в Redis Streams `md.candles.1m.<instrument_key>`. ClickHouse canonical остается historical truth. |
+| Market Data | Закрытые 1m свечи публикуются в Redis Streams `md.candles.1m.<instrument_key>`. PostgreSQL canonical остается historical truth. |
 | Strategy Live Runner | Читает Redis Streams, ведет `strategy_runs.checkpoint_ts_open`, делает warmup/rollup/repair и realtime output. |
 | Strategy CRUD/Run API | Есть immutable strategy CRUD/clone и `POST /strategies/{strategy_id}/run|stop`; restart как отдельный user contract не выделен. |
 | Strategy Realtime Output | Публикует user-scoped Redis Streams `strategy.metrics.v1.user.<user_id>` и `strategy.events.v1.user.<user_id>`. |
@@ -728,7 +735,7 @@ orders. Он отвечает на один вопрос: можно ли кон
 | `variant_owner_scoped` | User видит только свой succeeded job/variant. |
 | `variant_materialized` | Variant доступен без тяжелого синхронного recompute в API. |
 | `live_evaluator_supported` | Все indicators/rules/signal_template поддержаны live runner. |
-| `market_data_available` | Для `instrument_key/timeframe` есть runtime Redis/ClickHouse source. |
+| `market_data_available` | Для `instrument_key/timeframe` есть runtime Redis/PostgreSQL source. |
 | `instrument_mapping_supported` | Backtest symbol однозначно мапится в exchange instrument. |
 | `market_type_supported` | v1 поддерживает `spot`/`futures` для этой стратегии и exchange connection. |
 | `sizing_supported` | Sizing policy можно нормализовать без неизвестной account state. |

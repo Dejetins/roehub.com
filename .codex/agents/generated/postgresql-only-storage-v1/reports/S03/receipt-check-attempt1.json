@@ -1,0 +1,1 @@
+{"status": "fail", "check": "receipt", "errors": ["--stage and --executor are only valid for entry checks"], "proof_boundary": "artifact-structure-and-file-binding"}

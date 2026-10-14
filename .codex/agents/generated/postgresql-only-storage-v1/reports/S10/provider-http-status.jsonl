@@ -1,0 +1,4 @@
+{"provider": "binance_spot", "http_status": 451, "content_type": "application/json", "provider_code": null}
+{"provider": "binance_futures", "http_status": 451, "content_type": "application/json", "provider_code": null}
+{"provider": "bybit_spot", "http_status": 403, "content_type": "application/json", "provider_code": null}
+{"provider": "bybit_futures", "http_status": 403, "content_type": "application/json", "provider_code": null}

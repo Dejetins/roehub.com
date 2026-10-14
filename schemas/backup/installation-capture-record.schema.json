@@ -30,7 +30,6 @@
       "enum": [
         "release_config",
         "postgresql",
-        "clickhouse",
         "redis_checkpoint",
         "openbao",
         "artifacts",
@@ -68,21 +67,6 @@
             "properties": {
               "owner": {
                 "const": "postgresql"
-              }
-            },
-            "required": [
-              "owner"
-            ],
-            "type": "object"
-          },
-          "maxContains": 1,
-          "minContains": 1
-        },
-        {
-          "contains": {
-            "properties": {
-              "owner": {
-                "const": "clickhouse"
               }
             },
             "required": [
@@ -172,8 +156,8 @@
       "items": {
         "$ref": "#/$defs/BackupCaptureEntry"
       },
-      "maxItems": 8,
-      "minItems": 8,
+      "maxItems": 7,
+      "minItems": 7,
       "title": "Entries",
       "type": "array",
       "uniqueItems": true
@@ -194,10 +178,10 @@
       "type": "string"
     },
     "schema": {
-      "const": "io.roehub.installation-capture/v1alpha1",
-      "default": "io.roehub.installation-capture/v1alpha1",
+      "const": "io.roehub.installation-capture/v2alpha1",
+      "default": "io.roehub.installation-capture/v2alpha1",
       "enum": [
-        "io.roehub.installation-capture/v1alpha1"
+        "io.roehub.installation-capture/v2alpha1"
       ],
       "title": "Schema",
       "type": "string"

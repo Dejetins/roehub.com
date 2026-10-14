@@ -24,9 +24,7 @@ from apps.control_agent.job_runtime_backend import ControlAgentJobDockerRunner
 from apps.migrations.storage import apply_postgres_migrations
 from apps.worker.job_runtime import (
     JobAttemptExecutor,
-    JobRuntimeAuthorityError,
     OciJobRunner,
-    PluginTrustResolution,
     TrustedRuntimeAuthority,
     TrustedRuntimeGrant,
 )
@@ -37,7 +35,6 @@ from trading.contexts.backtest_artifacts.adapters.outbound.persistence.postgres 
     PostgresArtifactCatalogRepository,
 )
 from trading.contexts.backtest_artifacts.application import ArtifactStoreService
-from trading.contexts.extensions.domain import PluginInstallation, PluginPackage
 from trading.integration import (
     JobEnvelope,
     JobResourceLimits,
@@ -47,7 +44,7 @@ from trading.integration.job_runtime_postgres import (
     JobRuntimeCatalogError,
     PostgresJobRuntimeCatalog,
 )
-from trading.shared_kernel.primitives import InstallationId, OrganizationId
+from trading.shared_kernel.primitives import OrganizationId
 
 ROOT = Path(__file__).resolve().parents[3]
 POSTGRES_IMAGE = "postgres:16"
@@ -632,7 +629,6 @@ def main() -> None:
             )
             grant_specs = (
                 ("backtest", SUCCESS_COMMAND),
-                ("custom_strategy", STRATEGY_COMMAND),
                 ("backtest", CRASH_COMMAND),
                 ("backtest", VOLUNTARY_137_COMMAND),
                 ("backtest", BACKGROUND_TAMPER_COMMAND),
@@ -645,7 +641,6 @@ def main() -> None:
                 ("backtest", INODE_LIMIT_COMMAND),
             )
             grants: list[TrustedRuntimeGrant] = []
-            plugin_trust_records: dict[str, PluginTrustResolution] = {}
             for index, (capability, command) in enumerate(grant_specs):
                 grant_envelope = _envelope(
                     organization_id=organization_id,
@@ -654,63 +649,9 @@ def main() -> None:
                     capability=capability,
                     command=command,
                 )
-                if capability == "custom_strategy":
-                    package = PluginPackage(
-                        package_id=uuid4(),
-                        installation_id=InstallationId(uuid4()),
-                        plugin_id="strategy.fixture",
-                        version=grant_envelope.runtime.version,
-                        package_digest=cast(str, grant_envelope.runtime.plugin_package_digest),
-                        image_reference="alpine@" + JOB_IMAGE_DIGEST,
-                        image_digest=JOB_IMAGE_DIGEST,
-                        publisher_key_id="stage15.publisher",
-                        publisher_public_key_b64=base64.b64encode(public_key).decode(),
-                        publisher_key_fingerprint_sha256="1" * 64,
-                        manifest={},
-                        created_at=datetime.now(UTC),
-                    )
-                    installation = PluginInstallation(
-                        plugin_installation_id=uuid4(),
-                        installation_id=package.installation_id,
-                        organization_id=OrganizationId(organization_id),
-                        plugin_id=package.plugin_id,
-                        package_id=package.package_id,
-                        previous_package_id=None,
-                        granted_permissions=(),
-                        status="enabled",
-                        created_at=datetime.now(UTC),
-                        updated_at=datetime.now(UTC),
-                    )
-                    trust_root = {
-                        cast(str, package.publisher_key_id): cast(
-                            str, package.publisher_key_fingerprint_sha256
-                        )
-                    }
-                    plugin_trust_records[package.package_digest] = (
-                        package,
-                        installation,
-                        trust_root,
-                    )
-                    grants.append(
-                        TrustedRuntimeGrant.for_signed_plugin(
-                            envelope=grant_envelope,
-                            package=package,
-                            installation=installation,
-                            trusted_publisher_fingerprints=trust_root,
-                        )
-                    )
-                else:
-                    grants.append(TrustedRuntimeGrant.for_builtin(grant_envelope))
-
-            def resolve_plugin_trust(envelope: JobEnvelope) -> PluginTrustResolution:
-                package_digest = envelope.runtime.plugin_package_digest
-                if package_digest is None:
-                    raise KeyError("plugin package digest is missing")
-                return plugin_trust_records[package_digest]
-
+                grants.append(TrustedRuntimeGrant.for_builtin(grant_envelope))
             authority = TrustedRuntimeAuthority(
                 grants=tuple(grants),
-                plugin_trust_resolver=resolve_plugin_trust,
             )
             runtime_root = temp_root / "runtime"
             executor = JobAttemptExecutor(
@@ -761,37 +702,6 @@ def main() -> None:
             )
             if getattr(first_result, "outputs") != getattr(second_result, "outputs"):
                 raise RuntimeError("deterministic replay output changed")
-
-            strategy = _envelope(
-                organization_id=organization_id,
-                artifact_digest=input_manifest.manifest_digest,
-                semantic_key="strategy:intent:0001",
-                command=STRATEGY_COMMAND,
-                capability="custom_strategy",
-            )
-            strategy_result, _ = _execute(
-                envelope=strategy,
-                catalog=catalog,
-                executor=executor,
-                runtime_root=runtime_root,
-            )
-            if len(getattr(strategy_result, "strategy_decisions")) != 1:
-                raise RuntimeError("strategy decision contract was not enforced")
-            strategy_package_digest = cast(str, strategy.runtime.plugin_package_digest)
-            strategy_trust_root = cast(
-                dict[str, str], plugin_trust_records[strategy_package_digest][2]
-            )
-            saved_trust_root = dict(strategy_trust_root)
-            strategy_trust_root.clear()
-            try:
-                authority.authorize(strategy)
-            except JobRuntimeAuthorityError as error:
-                if error.code != "job.plugin_publisher_untrusted":
-                    raise
-            else:
-                raise RuntimeError("revoked plugin trust remained executable")
-            finally:
-                strategy_trust_root.update(saved_trust_root)
 
             crash = _envelope(
                 organization_id=organization_id,
@@ -1149,7 +1059,6 @@ def main() -> None:
                         "deterministic_replay": "passed",
                         "docker_socket_denial": "passed",
                         "durable_postgresql_attempts": "passed",
-                        "dynamic_plugin_reauthorization": "passed",
                         "database_immutability_guards": "passed",
                         "image_digest_binding": "passed",
                         "non_root_read_only": "passed",
@@ -1160,7 +1069,6 @@ def main() -> None:
                         "recovery_cancel_linearizability": "passed",
                         "recovery_lease_exclusivity": "passed",
                         "retry_same_job": "passed",
-                        "strategy_signal_intent_only": "passed",
                         "timeout_cleanup": "passed",
                         "benchmark": benchmark,
                     },

@@ -1,0 +1,14 @@
+{
+  "action": "stop",
+  "services": [
+    "api",
+    "web",
+    "market-data-scheduler",
+    "operational-health",
+    "backtest-artifact-publisher"
+  ],
+  "operation_id": "1aa6d388-33db-435a-a88a-719de9c189e1",
+  "returncode": 0,
+  "stdout": "{\"action\": \"stop\", \"active_services\": [\"postgresql\"], \"detail_code\": \"topology.stopped\", \"journal_sequence\": 387, \"operation_id\": \"1aa6d388-33db-435a-a88a-719de9c189e1\", \"profile\": \"trading\", \"schema\": \"io.roehub.control-operation-result/v1alpha1\", \"state\": \"succeeded\"}\n",
+  "stderr": ""
+}

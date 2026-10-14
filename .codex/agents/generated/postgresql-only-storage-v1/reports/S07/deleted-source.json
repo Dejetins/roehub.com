@@ -1,0 +1,254 @@
+[
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py",
+    "sha256": "b806e5e220189109c22f060d50aa2cc8a4b10170758de9e883df1436da5cebfd",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_market_writer.py",
+    "sha256": "bc890997daea4d937d72921f530b86fb7fdc2fae1822f93736f8705081e29543",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_market_writer.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_instruments_writer.py",
+    "sha256": "9b0d93bc925631c1dca9b9aed3709527cb055e53f48876a9aba9571f0aa98433",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_instruments_writer.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py",
+    "sha256": "93eece935f1bc5b6d9e728e143bbc39167a367ddac08b2ff736776b82e228313",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/work_errors.py",
+    "sha256": "b51eb495493fdefad25c301e4059cbf445ce1233825b1d57e50de2779a56eca9",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/work_errors.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_market_reader.py",
+    "sha256": "fc3b14f8de4ec4b02fa2daeaad99189dff594f08e933a6afa5c4cf98ff6bf765",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_market_reader.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/catalog_coverage_reader.py",
+    "sha256": "36746a477cc2d2008f817a6b91f8724e06caa1bcac848f5a777f171e1a26fb28",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/catalog_coverage_reader.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/__init__.py",
+    "sha256": "a8a1f213263ef98fe064a089a82af65ee235b8c76901f949645f233ab888815a",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/__init__.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+    "sha256": "c841885cdda2677ff05428d1655137db0dda2313864d15b8b68f64fa706ff437",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_tradable_instrument_search_reader.py",
+    "sha256": "3ad9b9a280a72a14ba632d1f7e5dddf46463a38688f4059a42ab8e81a226869e",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_tradable_instrument_search_reader.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_instrument_reader.py",
+    "sha256": "b7e35b03db1f0d36d69ac0bcc954749fe4aa127198d7734c50b0ecce1f566f46",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_instrument_reader.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/btcusdt_market_readiness_reader.py",
+    "sha256": "a5671757737593c1004d0baf0a6b10f9404df8f191dab01f13f5e92e9e975674",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/btcusdt_market_readiness_reader.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py",
+    "sha256": "05f6634e6f3e863b27667e6d881aa7b996f2b221abd9551c1f970f362610a9f2",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_coverage_reader.py",
+    "sha256": "32321ea9905acfea6b3985d6702a36130c66122fc86438ae271b55a7adaf9023",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_coverage_reader.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py",
+    "sha256": "4804741430cef5a2f0a2857cd69ba2ef06c09f511d094539822f2d5af7e0989e",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/instrument_coverage_reader.py",
+    "sha256": "34a59d8b359056a0be7838ab8233bd935175134c23b73184ede55fac8c35b5c0",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/instrument_coverage_reader.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_range_verifier.py",
+    "sha256": "a71f7d2bab5743d9f3139ed0be29e2217d66b332ea79b2ef6ee81718301c2d03",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_range_verifier.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+    "sha256": "f14f0a1b44a774efac5fcbe168845552c43ae03fa8a98df080a460151d3ae164",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "migrations/clickhouse/market_data_ddl.sql",
+    "sha256": "e6e2e75f53291f5b9c1fb66a632e213afc3ed83e9e415c63f39e049f3d834161",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/migrations/clickhouse/market_data_ddl.sql.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "migrations/clickhouse/history_source_absences_ddl.sql",
+    "sha256": "e438e5f0dca0d8fc55c8f292353ab63555115f469175d5f2239684caca263bfa",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/migrations/clickhouse/history_source_absences_ddl.sql.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "migrations/clickhouse/manifest.json",
+    "sha256": "cb44e9b7dd55e7b1a15cb4d8922dc85c2c80ed37037f1939ec07c38e0715973a",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/migrations/clickhouse/manifest.json.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "migrations/clickhouse/funding_rates_ddl.sql",
+    "sha256": "b9b6ca495027e84fe66d5d31a36b3977a187513529a56791b8ff0f5baf8e34e3",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/migrations/clickhouse/funding_rates_ddl.sql.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "tests/fixtures/storage/clickhouse-interrupted/manifest.json",
+    "sha256": "7e9bbc9700145e833e1462f31db42659a1f6a5160855ab58491e6388eaaea216",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/tests/fixtures/storage/clickhouse-interrupted/manifest.json.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "tests/fixtures/storage/clickhouse-interrupted/0001_interrupted.sql",
+    "sha256": "d4b130d22d06803ed05918ed592f4589c832853d1d9c4e8d7f42381362d5fb5a",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/tests/fixtures/storage/clickhouse-interrupted/0001_interrupted.sql.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "apps/cli/wiring/db/clickhouse.py",
+    "sha256": "838da808316b2f3c7da3b18b45cad4efeeec49fdd452052874596f579bdda2f6",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/apps/cli/wiring/db/clickhouse.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "apps/monitoring/clickhouse_exporter.py",
+    "sha256": "7c9222473f0827a6be1fdcbb2d528072370db70ee53bc99d753f042e06ac5d8d",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/apps/monitoring/clickhouse_exporter.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "tools/installation/clickhouse_workloads.py",
+    "sha256": "b8ab98ab30bbb4d99cf9916319eb8516be3ea9ea4b3681cb878bf6df7d1431b9",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/tools/installation/clickhouse_workloads.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "scripts/ops/optimize_canonical_partitions.sh",
+    "sha256": "dc4ed9de8b5cf97869c681a03418b81c5f6873d5cdc81a70091e79a8cba207ea",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/scripts/ops/optimize_canonical_partitions.sh.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "configs/dev/clickhouse-local-profiles.xml",
+    "sha256": "dd47892ff7081ad82f7daf8ea806d53330049d5114b325a8265aa6668ffb4ef4",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/configs/dev/clickhouse-local-profiles.xml.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "configs/dev/clickhouse-local-observability.xml",
+    "sha256": "f0dd55cc97bf61e587599c8640f6b44f08f5e21d1bf226f08d3595ac1ff4a507",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/configs/dev/clickhouse-local-observability.xml.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "tools/qa/postgres_storage_prototype.py",
+    "sha256": "f7ac80c972031110c1dc5bdf2568a01d9ad54a6894111a8c115df1c47108e957",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/tools/qa/postgres_storage_prototype.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "replaced-with-pg-only-tool"
+  },
+  {
+    "path": "tools/qa/test_postgres_storage_prototype.py",
+    "sha256": "9d0ac46962e3410938c143a5c1cc61aefa8eea5f29076f78fbbb2f2100ee67c0",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/tools/qa/test_postgres_storage_prototype.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "tools/qa/market_data_resource_comparison.py",
+    "sha256": "eff382004b4754052a21ec23183c14153e5b39ffe08becb4f76b0f3eef102fd0",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/tools/qa/market_data_resource_comparison.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "tools/qa/market_data_ingestion_comparison.py",
+    "sha256": "db895ba94b501736201ef5e28a8c122530521e902eceda329072eb4aeb90f2fc",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/tools/qa/market_data_ingestion_comparison.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "tools/qa/market_data_recovery_comparison.py",
+    "sha256": "61d55df9cfc7d18a1ac1f4cd4285034684b08c9e0095c3ab62b8ab18280a81ae",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/tools/qa/market_data_recovery_comparison.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  },
+  {
+    "path": "tools/qa/market_data_mixed_load.py",
+    "sha256": "a4b333174196a4b4747b7a1f87004a11e4581330952a8a1025b6f60186848ab0",
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S07/retired-source/tools/qa/market_data_mixed_load.py.evidence",
+    "reason": "retired engine implementation or benchmark; useful semantic tests separately ported",
+    "disposition": "deleted"
+  }
+]

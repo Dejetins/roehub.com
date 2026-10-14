@@ -17,9 +17,6 @@
       "enabled": false
     }
   },
-  "oidc": {
-    "enabled": false
-  },
   "openbao": {
     "address": "http://openbao:8200",
     "mode": "embedded",
@@ -45,7 +42,7 @@
     "cpus": 2,
     "memory_mb": 2048
   },
-  "schema": "io.roehub.runtime-config/v1alpha1",
+  "schema": "io.roehub.runtime-config/v2alpha1",
   "stores": {
     "postgresql": {
       "credentials_ref": "openbao://kv/roehub/storage/postgresql#credentials",

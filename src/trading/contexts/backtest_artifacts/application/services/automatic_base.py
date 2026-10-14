@@ -150,7 +150,8 @@ def freeze_source(
     arrays = (opens[:count], closes[:count], values[:count])
     digest = hashlib.sha256()
     for array in arrays:
-        digest.update(array.tobytes())
+        for offset in range(0, len(array), 4096):
+            digest.update(array[offset : offset + 4096].tobytes())
         array.flags.writeable = False
     return FrozenBaseSource(
         instrument, time_range, CanonicalCandleBatch1m(*arrays), digest.hexdigest()
@@ -171,6 +172,7 @@ class AutomaticBasePublisher:
 
     runner: native.BacktestArtifactPrecomputeRunnerV2
     publisher: BacktestArtifactSlotPublisherV2
+    on_publication: Callable[[BasePublication], None] | None = None
 
     def publish(
         self,
@@ -276,10 +278,13 @@ class AutomaticBasePublisher:
         configured_runner = replace(self.runner, runtime_settings=settings)
         if derivatives is not None:
             derivatives.validate_source(
-                coordinate=Coordinate(exchange=coordinates.exchange,
-                                      market_type=coordinates.market_type,
-                                      symbol=coordinates.symbol),
-                source_sha256=source_digest, start=source.time_range.start.value,
+                coordinate=Coordinate(
+                    exchange=coordinates.exchange,
+                    market_type=coordinates.market_type,
+                    symbol=coordinates.symbol,
+                ),
+                source_sha256=source_digest,
+                start=source.time_range.start.value,
                 end=source.time_range.end.value,
             )
             configured_runner, spec = derivatives.configure(self.runner, mappings)
@@ -301,6 +306,15 @@ class AutomaticBasePublisher:
         )
         # Full finite rebuild intentionally includes historical extensions/corrections. Never
         # reattach derivative inventory from a different source prefix.
+        state = "ready" if len(mappings) == len(ARTIFACT_MAPPING_TIMEFRAMES_V2) else "partial"
+        if self.on_publication is not None:
+            callback = self.on_publication
+            publisher = replace(
+                publisher,
+                on_publication=lambda published: callback(
+                    BasePublication(state, source_digest, inventory, published)
+                ),
+            )
         _, result = publisher.build_and_publish(
             request=request,
             precheck=precheck,

@@ -160,3 +160,13 @@ def test_app_image_rebuilds_for_copied_runtime_inputs(path: str) -> None:
 )
 def test_app_image_ignores_digest_bound_outputs_excluded_from_context(path: str) -> None:
     assert not classify_web_image([path])
+
+
+def test_postgres_semantics_run_with_mixed_unit_changes() -> None:
+    for path in (
+        "tests/real_infra/market_data/test_postgres_legacy_semantics.py",
+        "tests/real_infra/market_data/postgres_semantic_test_ids.txt",
+        "tests/real_infra/backtest/test_artifact_integrated.py",
+    ):
+        result = classify_ci([path, "tests/unit/apps/worker/test_persistent_writer.py"])
+        assert result["run_migrations"] == "true"

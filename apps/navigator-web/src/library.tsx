@@ -1,4 +1,5 @@
 import {useLibraryFilterPopup} from './library-filter-popup';
+import {LibraryHeader} from './library-header';
 import {useReadSnapshot} from './read-snapshot';
 import {JobSelection} from './job-selection';
 import { LoadingData, ReadStatus } from './loading-data';
@@ -94,12 +95,13 @@ export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, a
     <div className={`${configuration ? "panes with-configuration" : "panes"} ${mode==='detail'?'report-workspace backtest-detail-workspace':''} ${historyCollapsed?'history-collapsed':''}`}>
       {mode==='detail'&&<button className="history-toggle navigator-history-toggle" aria-expanded={!historyCollapsed} onClick={()=>setHistoryCollapsed(v=>!v)}>{t(historyCollapsed?'results.showHistory':'results.hideHistory')}</button>}
       <section className="panel library navigator-library" aria-labelledby="jobs-heading">
-        <div className="panel-head"><h2 id="jobs-heading">{t('jobs')}</h2>
-          {data && <span className="count" aria-label={t('pageCount')}>{data.items.length}</span>}
-          <Link className="button-link library-icon-action" title={t('new')} data-client-link="true" to={`/backtests/new${listQuery ? `?${listQuery}` : ''}`} aria-label={t('new')} onClick={event => { if (onNew && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); onNew(); } }}><Plus aria-hidden="true" /></Link>
-            {!configurationActive&&<button ref={searchTrigger} type="button" className="library-icon-action" aria-label={t('search')} title={t('search')} aria-expanded={searchOpen} aria-controls="navigator-job-search" onClick={()=>setSearchOpen(value=>!value)}><Search aria-hidden="true"/></button>}
-            {!configurationActive&&<div className="actions"><Refresh iconOnly query={jobs} deadline={deadline} now={now} />
-            <div className="library-filter-menu">
+        <LibraryHeader title={t('jobs')} headingId="jobs-heading"
+          count={data && <span className="count" aria-label={t('pageCount')}>{data.items.length}</span>}
+          actions={{
+          create: <Link className="button-link library-icon-action" title={t('new')} data-client-link="true" to={`/backtests/new${listQuery ? `?${listQuery}` : ''}`} aria-label={t('new')} onClick={event => { if (onNew && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); onNew(); } }}><Plus aria-hidden="true" /></Link>,
+          search: !configurationActive&&<button ref={searchTrigger} type="button" className="library-icon-action" aria-label={t('search')} title={t('search')} aria-expanded={searchOpen} aria-controls="navigator-job-search" onClick={()=>setSearchOpen(value=>!value)}><Search aria-hidden="true"/></button>,
+          refresh: !configurationActive&&<Refresh iconOnly query={jobs} deadline={deadline} now={now} />,
+          filter: !configurationActive&&<div className="library-filter-menu">
             <button className="library-icon-action" title={t('filters')} ref={filterTrigger} onClick={toggleFilters} aria-label={t('filters')} aria-expanded={filtersOpen} aria-controls="library-filter-popup"><Filter aria-hidden="true" /></button>
             <section ref={filterPopup} popover="auto" onToggle={event=>setFiltersOpen(event.newState==='open')} id="library-filter-popup" className="library-filter-popup strategy-filter-popover" role="dialog" aria-label={t('filters')} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();closeFilters();}}}>
               <div className="library-filter-field"><span>{t('state')}</span><ChartDisplayMenu label={t('state')} value={params.get('state')?t(`states.${params.get('state')}`):t('allStates')} options={['',...jobStates].map(value=>({label:value?t(`states.${value}`):t('allStates'),checked:(params.get('state')??'')===value,onChange:()=>change('state',value)}))}/></div>
@@ -107,8 +109,8 @@ export function BacktestsWorkspace({ subject, mode = 'list', embedded = false, a
 
               <button className="library-filter-reset" disabled={!hasFilters} onClick={()=>setParams(mode==='detail'&&normalized.has('variant')?{variant:normalized.get('variant')!}:{})}>{t('resetFilters')}</button>
             </section>
-            </div></div>}
-        </div>
+            </div>
+        }}/>
         {configuration&&<div className="result-tabs library-tabs" role="tablist" aria-label={t('jobs')}>
           {[{id:'new',label:t('new'),selected:configurationActive,action:onNew},{id:'history',label:i18n.language.startsWith('ru')?'История':'History',selected:!configurationActive,action:onHistory}].map((tab,index)=><button key={tab.id} id={`library-tab-${tab.id}`} role="tab" aria-selected={tab.selected} aria-controls={`library-panel-${tab.id}`} tabIndex={tab.selected?0:-1} onClick={tab.action} onKeyDown={event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const next=event.key==='Home'?'new':event.key==='End'?'history':index===0?'history':'new';(next==='new'?onNew:onHistory)?.();document.getElementById(`library-tab-${next}`)?.focus();}}}>{tab.label}</button>)}
         </div>}

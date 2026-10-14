@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from http.cookies import SimpleCookie
-from uuid import UUID, uuid4, uuid5
+from uuid import UUID, uuid5
 
 import httpx
 from fastapi import Request
@@ -26,8 +26,6 @@ _PERMISSIONS = {
         "members.read",
         "members.manage",
         "roles.manage",
-        "plugins.read",
-        "plugins.manage",
         "operations.execute",
         "trading.execute",
         "mainnet.approve",
@@ -39,25 +37,21 @@ _PERMISSIONS = {
         "members.read",
         "members.manage",
         "roles.manage",
-        "plugins.read",
-        "plugins.manage",
         "operations.execute",
         "audit.read",
     ],
     "operator": [
         "organization.read",
         "members.read",
-        "plugins.read",
         "operations.execute",
         "audit.read",
     ],
     "trader": [
         "organization.read",
         "members.read",
-        "plugins.read",
         "trading.execute",
     ],
-    "viewer": ["organization.read", "members.read", "plugins.read"],
+    "viewer": ["organization.read", "members.read"],
 }
 
 
@@ -143,28 +137,6 @@ def _api_handler(request: httpx.Request) -> httpx.Response:
                         "created_at": "2026-07-13T09:05:00Z",
                     },
                 ],
-                "plugin_installations": [
-                    {
-                        "plugin_installation_id": str(PLUGIN_ID),
-                        "plugin_id": "qa.market-data",
-                        "package_id": str(PACKAGE_ID),
-                        "rollback_available": True,
-                        "granted_permissions": ["data.read"],
-                        "status": "enabled",
-                        "updated_at": "2026-07-13T09:30:00Z",
-                    }
-                ],
-                "plugin_instances": [
-                    {
-                        "instance_id": str(INSTANCE_ID),
-                        "plugin_installation_id": str(PLUGIN_ID),
-                        "name": "QA market feed",
-                        "config_revision": 2,
-                        "status": "enabled",
-                        "updated_at": "2026-07-13T09:30:00Z",
-                    }
-                ],
-                "plugin_operations": [],
                 "events": events,
                 "capabilities": {
                     "providers": "available",
@@ -180,7 +152,6 @@ def _api_handler(request: httpx.Request) -> httpx.Response:
                     "profile": "trading",
                     "overall_state": health_state,
                     "generated_at": "2026-07-14T12:00:00Z",
-                    "grafana_path": None,
                     "services": [
                         {
                             "service_id": "api",
@@ -246,35 +217,7 @@ def _api_handler(request: httpx.Request) -> httpx.Response:
             },
         )
 
-    if request.method == "POST" and path.endswith("/plugins/bundles:validate"):
-        return _json_response(
-            200,
-            {
-                "contract": "ValidatedPluginBundle/v1alpha1",
-                "plugin_id": "qa.market-data",
-                "version": "1.1.0",
-                "package_digest": f"sha256:{'1' * 64}",
-                "image_digest": f"sha256:{'2' * 64}",
-                "publisher_key_id": "qa-publisher",
-                "permissions": ["data.read", "network.egress"],
-            },
-        )
 
-    if request.method == "POST" and path.endswith("/plugins/installations"):
-        return _json_response(
-            202,
-            {
-                "contract": "PluginOperation/v1alpha1",
-                "operation_id": str(uuid4()),
-                "organization_id": str(ORGANIZATION_ID),
-                "kind": "update",
-                "target_id": "qa.market-data",
-                "status": "pending",
-                "result": {"contract": "PluginOperation/v1alpha1"},
-                "created_at": "2026-07-13T10:01:00Z",
-                "updated_at": "2026-07-13T10:01:00Z",
-            },
-        )
 
     if request.method == "POST" and path.endswith("/operations"):
         operation_id = _scoped_operation_id(request)
@@ -387,7 +330,7 @@ app.state.current_user_api_client = type(
     {
         "fetch_current_user": lambda self, *, cookie_header: CurrentUserApiResult(
             status_code=200,
-            user=WebCurrentUser(user_id="qa-browser-user", paid_level="free"),
+            user=WebCurrentUser(user_id="qa-browser-user"),
             error_message=None,
         )
     },

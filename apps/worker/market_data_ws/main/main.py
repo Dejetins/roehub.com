@@ -111,7 +111,7 @@ async def _run_async(config_path: str, metrics_port: int) -> int:
     - Process exit code.
 
     Assumptions/Invariants:
-    - ClickHouse settings are supplied through environment variables.
+    - PostgreSQL settings are supplied through environment variables.
 
     Errors/Exceptions:
     - Propagates wiring/runtime exceptions to caller.
@@ -161,4 +161,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

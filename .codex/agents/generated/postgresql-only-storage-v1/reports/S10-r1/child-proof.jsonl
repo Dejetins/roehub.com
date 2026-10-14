@@ -1,0 +1,4 @@
+{"call": 1, "rows_read": 1, "rows_written": 1, "active_children": 0, "quarantined": 0}
+{"call": 2, "rows_read": 1, "rows_written": 1, "active_children": 0, "quarantined": 0}
+{"call": 3, "rows_read": 1, "rows_written": 1, "active_children": 0, "quarantined": 0}
+{"call": 4, "rows_read": 1, "rows_written": 1, "active_children": 0, "quarantined": 0}

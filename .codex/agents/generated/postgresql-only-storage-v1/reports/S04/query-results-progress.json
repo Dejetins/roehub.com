@@ -1,0 +1,227 @@
+[
+  {
+    "family": "Q02-arrays-2year",
+    "elapsed_s": 2.1057627089321613,
+    "cpu_s": 1.268841,
+    "rss_before": 145211392,
+    "rss_peak": 154025984,
+    "parity": "pass",
+    "result_sha256": "c2978a783f27ed04ac73664db52f9bc5c1bba3e090250ab63ad8e092087a5107"
+  },
+  {
+    "family": "Q02-dto-2year",
+    "elapsed_s": 18.171439707977697,
+    "cpu_s": 16.546355000000002,
+    "rss_before": 154140672,
+    "rss_peak": 154222592,
+    "parity": "pass",
+    "result_sha256": "1180f28d0c04fd86c535514785655980ce9fc463627ef249c8af952fc6e41756"
+  },
+  {
+    "family": "Q03-bounds",
+    "elapsed_s": 0.015257540973834693,
+    "cpu_s": 0.00265500000000074,
+    "rss_before": 55853056,
+    "rss_peak": 55853056,
+    "parity": "pass",
+    "result_sha256": "3053abdef8f6423551203dbc099f1c06c404b8f7e7df099387a8ee5e01928dc9"
+  },
+  {
+    "family": "Q03-before-partial",
+    "elapsed_s": 0.0308347080135718,
+    "cpu_s": 0.0012140000000009366,
+    "rss_before": 61440000,
+    "rss_peak": 61440000,
+    "parity": "pass",
+    "result_sha256": "e5aa99562c3b05c75f4f7a67c5175105498fcdc24f516c77cfa5be5bc8e4cf9d"
+  },
+  {
+    "family": "Q03-tail",
+    "elapsed_s": 0.012306999997235835,
+    "cpu_s": 0.0017139999999997713,
+    "rss_before": 62291968,
+    "rss_peak": 62291968,
+    "parity": "pass",
+    "result_sha256": "0f2948b45f15e18209c7d61dae2ac2ecd95307fac0abcf71f2846839250a10c0"
+  },
+  {
+    "family": "Q04-daily",
+    "elapsed_s": 0.023951790994033217,
+    "cpu_s": 0.0049600000000005195,
+    "rss_before": 63012864,
+    "rss_peak": 63012864,
+    "parity": "pass",
+    "result_sha256": "ccc4c28ad18b0eb4ff86c5272e004980a065761a806269d2ce841e845bb293bb"
+  },
+  {
+    "family": "Q04-distinct",
+    "elapsed_s": 0.014467375003732741,
+    "cpu_s": 0.010058000000000789,
+    "rss_before": 68681728,
+    "rss_peak": 68681728,
+    "parity": "pass",
+    "result_sha256": "c0d013b49224e81eb9e56d0a51aab6a98d138c6c3ec0c823662bd369377b86c0"
+  },
+  {
+    "family": "Q05-catalog",
+    "elapsed_s": 0.010660875006578863,
+    "cpu_s": 0.0019299999999979889,
+    "rss_before": 71942144,
+    "rss_peak": 71942144,
+    "parity": "pass",
+    "result_sha256": "f3af0614041a8c11c9919dcc72b8a78d383d918e6ac660c4b8ffb4fb43f074d0"
+  },
+  {
+    "family": "Q06-instrument",
+    "elapsed_s": 0.004772874992340803,
+    "cpu_s": 0.001101000000002017,
+    "rss_before": 72744960,
+    "rss_peak": 72744960,
+    "parity": "pass",
+    "result_sha256": "f109d032245c97048b12165f78473ca58685492bd6d20fa4c281df37da45bf8e"
+  },
+  {
+    "family": "Q07-gap-dense-2year",
+    "elapsed_s": 0.017602624953724444,
+    "cpu_s": 0.002176000000002176,
+    "rss_before": 72876032,
+    "rss_peak": 72876032,
+    "parity": "pass",
+    "result_sha256": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91"
+  },
+  {
+    "family": "Q07-gap-sparse-2year",
+    "elapsed_s": 0.0043065829668194056,
+    "cpu_s": 0.0010070000000013124,
+    "rss_before": 73056256,
+    "rss_peak": 73056256,
+    "parity": "pass",
+    "result_sha256": "03af1ac5fe3294feeaefc135ef88b667fdd2550cc87a8297351cf373921c14f3"
+  },
+  {
+    "family": "Q07-absence-count",
+    "elapsed_s": 0.00457949994597584,
+    "cpu_s": 0.0009939999999986071,
+    "rss_before": 73056256,
+    "rss_peak": 73056256,
+    "parity": "pass",
+    "result_sha256": "6d7e12ef45d46de439692ca4da37bb93b9d5caab10e0bf7d00df1937a4809707"
+  },
+  {
+    "family": "Q08-verify-week",
+    "elapsed_s": 0.02562383294571191,
+    "cpu_s": 0.0050080000000001235,
+    "rss_before": 73138176,
+    "rss_peak": 73138176,
+    "parity": "pass",
+    "result_sha256": "dc937b59892604f5a86ac96936cd7ff09e25f18ae6b758e8014a24c7fa039e91"
+  },
+  {
+    "family": "Q09-observation-page",
+    "elapsed_s": 0.43749199993908405,
+    "cpu_s": 0.01573699999999789,
+    "rss_before": 73465856,
+    "rss_peak": 73973760,
+    "parity": "pass",
+    "result_sha256": "7e361865f31df37ee474a911486b673e5abd86aa03b2e87572f4d305dee950d3"
+  },
+  {
+    "family": "Q10-market-ids",
+    "elapsed_s": 0.006769791012629867,
+    "cpu_s": 0.0015949999999982367,
+    "rss_before": 74153984,
+    "rss_peak": 74153984,
+    "parity": "pass",
+    "result_sha256": "42854fb4fe8bba2f319335c00d6e7b6d72a740592f1b46b218640f67fa99ad97"
+  },
+  {
+    "family": "Q11-reference-batch",
+    "elapsed_s": 0.006722416961565614,
+    "cpu_s": 0.0026150000000022544,
+    "rss_before": 74186752,
+    "rss_peak": 74186752,
+    "parity": "pass",
+    "result_sha256": "3541ca018f3c7f2f05ca60baf62e55b178c6481567cb23f0b2e83840aba0b33a"
+  },
+  {
+    "family": "Q12-markets",
+    "elapsed_s": 0.00300154194701463,
+    "cpu_s": 0.0007780000000003895,
+    "rss_before": 74416128,
+    "rss_peak": 74416128,
+    "parity": "pass",
+    "result_sha256": "357630db422bd5f3a55b56f82351fd11a460e48c6595a6a6375b5f4324cd50ff"
+  },
+  {
+    "family": "Q12-enabled",
+    "elapsed_s": 0.047114624991081655,
+    "cpu_s": 0.041389999999999816,
+    "rss_before": 74579968,
+    "rss_peak": 74579968,
+    "parity": "pass",
+    "result_sha256": "ba263e9ec37a66231d34eb407e9708be7dd7305ad0a1f44dd22a75f0dbe373fa"
+  },
+  {
+    "family": "Q12-search",
+    "elapsed_s": 0.00451766699552536,
+    "cpu_s": 0.000942999999999472,
+    "rss_before": 124305408,
+    "rss_peak": 124305408,
+    "parity": "pass",
+    "result_sha256": "c11a3a652caa67e4c084f10e08855b9686d05d643f056ac766eeb1ac1f23469c"
+  },
+  {
+    "family": "Q12-readiness",
+    "elapsed_s": 0.0028007919900119305,
+    "cpu_s": 0.0008189999999999031,
+    "rss_before": 124321792,
+    "rss_peak": 124321792,
+    "parity": "pass",
+    "result_sha256": "827feaae594bad5b244230c4894430cfd857ed44bb1460d9df4580a72ca81cee"
+  },
+  {
+    "family": "Q13-universe",
+    "elapsed_s": 0.0041440409841015935,
+    "cpu_s": 0.0009090000000000487,
+    "rss_before": 124321792,
+    "rss_peak": 124321792,
+    "parity": "pass",
+    "result_sha256": "d391307e2d11fbc6b49ca2d0b5424a405019f9fa95af8d575e0d174bf149197e"
+  },
+  {
+    "family": "Q13-get",
+    "elapsed_s": 0.0031730830669403076,
+    "cpu_s": 0.0009459999999990032,
+    "rss_before": 124321792,
+    "rss_peak": 124321792,
+    "parity": "pass",
+    "result_sha256": "b07579b08258a0d8936f6525cc456331c63bb8b63d45173f769e85d796f351e0"
+  },
+  {
+    "family": "Q15-latest",
+    "elapsed_s": 0.015349416993558407,
+    "cpu_s": 0.0006449999999986744,
+    "rss_before": 124321792,
+    "rss_peak": 124321792,
+    "parity": "pass",
+    "result_sha256": "5d6baa97188b5f24496bee10f73568098387a2a94d503b02e82ef95130069008"
+  },
+  {
+    "family": "Q15-range-2year",
+    "elapsed_s": 0.07447362504899502,
+    "cpu_s": 0.04430500000000137,
+    "rss_before": 124321792,
+    "rss_peak": 127565824,
+    "parity": "pass",
+    "result_sha256": "32ed8ede0f44122b0652b451cbc8d888f046260c1c51819025c6bcd672a06618"
+  },
+  {
+    "family": "Q16-rebuild-step",
+    "elapsed_s": 0.006053459015674889,
+    "cpu_s": 0.0011980000000022528,
+    "rss_before": 139476992,
+    "rss_peak": 139476992,
+    "parity": "pass",
+    "result_sha256": "60a33e6cf5151f2d52eddae9685cfa270426aa89d8dbc7dfb854606f1d1a40fe"
+  }
+]

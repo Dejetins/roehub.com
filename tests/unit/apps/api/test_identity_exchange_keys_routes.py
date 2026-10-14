@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -499,7 +500,7 @@ def test_exchange_keys_mutations_require_recent_auth_after_same_origin_check() -
     assert response.json() == {
         "detail": {
             "error": "recent_auth_required",
-            "message": "Recent Keycloak authentication is required.",
+            "message": "Recent authentication is required.",
         }
     }
 
@@ -587,9 +588,9 @@ def _build_test_client() -> tuple[
     user_repository = InMemoryIdentityUserRepository()
     session_repository = InMemoryIdentitySessionRepository()
 
-    user = user_repository.upsert_keycloak_login(
-        keycloak_subject=_KEYCLOAK_SUBJECT,
-        login_at=now,
+    user = user_repository.create_local_user(
+        user_id=UserId(UUID(int=1)),
+        created_at=now,
     )
     session = session_repository.create_session(
         user_id=user.user_id,

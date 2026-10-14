@@ -1,0 +1,11 @@
+{
+  "restore_target": "roehub-s10-recovery-verify",
+  "isolated_empty_restore": true,
+  "public_tables_exact": 154,
+  "archive_files_exact": {
+    "installation-config.tar.gz.age": 140,
+    "artifacts-before.tar.gz.age": 13787
+  },
+  "user_config_secret_state": "recoverable",
+  "source_database_mutated": false
+}

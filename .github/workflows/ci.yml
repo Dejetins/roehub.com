@@ -132,7 +132,6 @@ jobs:
           with zipfile.ZipFile(wheel) as archive:
               names = set(archive.namelist())
           required = {
-              "schemas/plugins/roehub-plugin-manifest-v1alpha1.schema.json",
               "apps/web/templates/pages/backtests.html",
               "apps/web/dist/js/pages/backtests.js",
               "apps/web/dist/vendor/lightweight-charts.NOTICE.txt",
@@ -236,6 +235,24 @@ jobs:
       - name: Migrations (fail-fast)
         run: |
           uv run python -m apps.migrations.main --dsn "$POSTGRES_DSN"
+
+      - name: Bound disposable PostgreSQL headroom proof
+        run: |
+          docker exec ${{ job.services.postgres.id }} psql -U roehub -d roehub -c "ALTER SYSTEM SET max_connections = '48'"
+          docker restart ${{ job.services.postgres.id }}
+          for attempt in $(seq 1 30); do
+            docker exec ${{ job.services.postgres.id }} pg_isready -U roehub -d roehub && break
+            sleep 1
+          done
+
+      - name: PostgreSQL semantic replacement coverage
+        env:
+          ROEHUB_S03_DISPOSABLE_DSN: ${{ env.POSTGRES_DSN }}
+          ROEHUB_S04_DISPOSABLE_DSN: ${{ env.POSTGRES_DSN }}
+          ROEHUB_MARKET_DATA_TEST_DSN: ${{ env.POSTGRES_DSN }}
+          ROEHUB_BACKTEST_TEST_DSN: ${{ env.POSTGRES_DSN }}
+        run: |
+          xargs uv run pytest -q < tests/real_infra/market_data/postgres_semantic_test_ids.txt
 
   test_shards:
     name: test-shard (${{ matrix.name }})

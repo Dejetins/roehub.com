@@ -14,6 +14,7 @@ from trading.contexts.market_data.application.ports.stores.stream_recovery_store
     RecoveryEntry,
     recovery_key,
 )
+from trading.platform.postgres_budget import connect as budget_connect
 from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, TimeRange, UtcTimestamp
 
 
@@ -33,7 +34,7 @@ class PostgresStreamRecoveryStore:
     @contextmanager
     def lease(self):
         """One collector; losing the session prevents acceptance/acknowledgement."""
-        with psycopg.connect(self.dsn, autocommit=True) as conn:
+        with budget_connect(self.dsn, autocommit=True) as conn:
             locked = conn.execute("SELECT pg_try_advisory_lock(744948345628)").fetchone()
             if not locked or not locked[0]:
                 raise RuntimeError("stream collector is already running")
@@ -109,18 +110,27 @@ class PostgresStreamRecoveryStore:
             raise RuntimeError("stream_connection_capacity_exceeded")
         # Use the lease connection itself, so a lost lease cannot publish stale health.
         with self._lease.transaction():
-            self._lease.execute("DELETE FROM market_data_stream_connections")
+            self._lease.execute(
+                "DELETE FROM market_data_stream_connections WHERE (market_id,symbol) NOT IN "
+                "(SELECT * FROM unnest(%s::int[],%s::text[]))",
+                ([key[0] for key in snapshot], [key[1] for key in snapshot]),
+            )
             with self._lease.cursor() as cursor:
                 cursor.executemany(
                     "INSERT INTO market_data_stream_connections "
-                    "(market_id,symbol,connected,collector_pid) VALUES (%s,%s,%s,pg_backend_pid())",
-                    [(market, symbol, connected)
-                     for (market, symbol), connected in snapshot.items()],
+                    "(market_id,symbol,connected,collector_pid) VALUES (%s,%s,%s,pg_backend_pid()) "
+                    "ON CONFLICT (market_id,symbol) DO UPDATE SET "
+                    "connected=EXCLUDED.connected,collector_pid=EXCLUDED.collector_pid,"
+                    "observed_at=now()",
+                    [
+                        (market, symbol, connected)
+                        for (market, symbol), connected in snapshot.items()
+                    ],
                 )
 
     def collector_status(self) -> dict[str, Any]:
         """Read the live collector lease and sanitized repair states, never worker tokens."""
-        with psycopg.connect(self.dsn) as conn:
+        with budget_connect(self.dsn) as conn:
             running = conn.execute(
                 "SELECT EXISTS (SELECT 1 FROM pg_locks WHERE locktype='advisory' "
                 "AND classid=%s AND objid=%s AND objsubid=1 AND granted "
@@ -149,11 +159,14 @@ class PostgresStreamRecoveryStore:
                 "WHERE datname=current_database())) LIMIT %s",
                 (744948345628 >> 32, 744948345628 & 0xFFFFFFFF, self.max_entries),
             ).fetchall()
-            return {"running": bool(running and running[0]), "repairs": repairs,
-                    "connections": {(m, s): connected for m, s, connected in connections}}
+            return {
+                "running": bool(running and running[0]),
+                "repairs": repairs,
+                "connections": {(m, s): connected for m, s, connected in connections},
+            }
 
     def history_error(self, market_id: int, symbol: str) -> str | None:
-        with psycopg.connect(self.dsn) as conn:
+        with budget_connect(self.dsn) as conn:
             row = conn.execute(
                 "SELECT error_code FROM market_data_stream_recovery "
                 "WHERE market_id=%s AND symbol=%s AND state='failed' "
@@ -217,7 +230,7 @@ class PostgresStreamRecoveryStore:
 
     def rearm_failed(self) -> int:
         """Explicit operator action after fixing the cause, never an automatic retry."""
-        with psycopg.connect(self.dsn) as conn:
+        with budget_connect(self.dsn) as conn:
             return conn.execute(
                 "UPDATE market_data_stream_recovery SET state='pending',"
                 "next_retry_at=NULL,error_code=NULL,attempt=0,token=%s,"
@@ -227,7 +240,7 @@ class PostgresStreamRecoveryStore:
 
     def _execute(self, sql: str, parameters: tuple) -> None:
         self._check_lease()
-        with psycopg.connect(self.dsn) as conn:
+        with budget_connect(self.dsn) as conn:
             conn.execute(cast(LiteralString, sql), parameters)
 
 

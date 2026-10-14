@@ -109,7 +109,7 @@ export async function requestJson<T>(
   }
 }
 
-const sessionSchema = z.object({ user_id: z.string().min(1), paid_level: z.string().min(1) });
+const sessionSchema = z.object({ user_id: z.string().min(1) });
 export async function readSession(signal?: AbortSignal): Promise<SessionIdentity> {
   return (await requestJson('/api/auth/current-user', sessionSchema, { signal })).data;
 }

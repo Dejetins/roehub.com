@@ -8,24 +8,16 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Sequence
 
-from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
-    ClickHouseSettingsLoader,
-    _clickhouse_client,
-)
+from apps.cli.wiring.db.postgres import market_gateway
 from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
     load_market_data_runtime_config,
 )
 from trading.contexts.market_data.adapters.outbound.config.whitelist import (
     load_whitelist_rows_from_csv,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
-    ClickHouseConnectGateway,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.ref_instruments_writer import (  # noqa: E501
-    ClickHouseInstrumentRefWriter,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.ref_market_writer import (  # noqa: E501
-    ClickHouseMarketRefWriter,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.reference_writers import (
+    PostgresInstrumentRefWriter,
+    PostgresMarketRefWriter,
 )
 from trading.contexts.market_data.application.dto.reference_data import WhitelistInstrumentRow
 from trading.contexts.market_data.application.use_cases.seed_ref_market import SeedRefMarketUseCase
@@ -60,13 +52,11 @@ class SyncInstrumentsCli:
 
         clock = SystemClock()
 
-        # ClickHouse (reuse existing CLI wiring env loader)
-        settings = ClickHouseSettingsLoader(os.environ).load()
-        client = _clickhouse_client(settings)
-        gateway = ClickHouseConnectGateway(client)
+        # PostgreSQL (reuse existing CLI wiring env loader)
+        gateway = market_gateway(os.environ, workload="reference")
 
-        market_writer = ClickHouseMarketRefWriter(gateway=gateway, database=settings.database)
-        instr_writer = ClickHouseInstrumentRefWriter(gateway=gateway, database=settings.database)
+        market_writer = PostgresMarketRefWriter(gateway=gateway)
+        instr_writer = PostgresInstrumentRefWriter(gateway=gateway)
 
         # 1) seed ref_market
         seed_uc = SeedRefMarketUseCase(writer=market_writer, clock=clock)

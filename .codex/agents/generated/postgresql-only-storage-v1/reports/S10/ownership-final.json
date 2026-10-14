@@ -1,0 +1,13 @@
+{
+  "changed_since_entry": [
+    "apps/migrations/storage.py",
+    "docs/architecture/project-map/PROJECT_MAP.md",
+    "docs/architecture/project-map/project-map.json",
+    "docs/runbooks/navigator-local-market-data-recovery.md",
+    "docs/runbooks/storage-bootstrap-and-migrations.md",
+    "tools/installation/local_platform.py",
+    "tools/installation/postgres_budget_recovery.py"
+  ],
+  "missing_since_entry": [],
+  "entry_files": 6261
+}

@@ -29,7 +29,7 @@ class Backfill1mCandlesUseCase:
         source: CandleIngestSource,
         writer: RawKlineWriter,
         clock: Clock,
-        batch_size: int = 50_000,
+        batch_size: int = 8192,
     ) -> None:
         if source is None:  # type: ignore[truthy-bool]
             raise ValueError("Backfill1mCandlesUseCase requires source")
@@ -43,7 +43,7 @@ class Backfill1mCandlesUseCase:
         self._source = source
         self._writer = writer
         self._clock = clock
-        self._batch_size = batch_size
+        self._batch_size = min(batch_size, 8192)
 
     def run(self, command: Backfill1mCommand) -> Backfill1mReport:
         started_at = self._clock.now()

@@ -1,0 +1,215 @@
+# Market Data — Runtime Config & Invariants (v2)
+
+## Consumer wiring — S05, 2026-10-14
+
+Запись raw/canonical/coverage выполняется транзакционно в PostgreSQL. REST/Parquet batches ограничены 8192 строками, metadata/funding — 1000. Месячные партиции заранее создаёт maintenance; application DDL не разрешён.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup и полный runtime regression остаются S06/S08.
+
+## PostgreSQL-only target — S01, 2026-10-13
+
+Нормативная целевая поправка: [PG storage contract D1–D7](market-data-real-adapters-postgresql-parquet-v1.md).
+Она заменяет только engine-specific требования этого документа для будущего
+PG-only перехода. Остальной текст описывает прежний/текущий исходный baseline
+и исторические проверки; он не доказывает выполненную миграцию. S01 не меняет
+runtime, SQL schema или данные.
+
+Дневные CH partitions заменяются месячными PG partitions. Ограничение verification <=7 дней и существующие row/byte/flush/provider budgets сохраняются; соединения и concurrency считаются на всю установку, включая lease sessions.
+
+
+> Исторический документ: с `roehub-market-data-activation-and-instrument-selection-v1`
+> CSV whitelist не определяет runtime-набор подписок, REST-догонки или публикации.
+> Набор collector строится из organization-owned selections и pin активных
+> стратегий; исходный документ сохранён для старого CLI-импорта и исторического
+> контекста. Актуальная модель описана в
+> `docs/architecture/platform/roehub-market-data-activation-and-instrument-selection-v1.md`.
+
+Этот документ фиксирует runtime-конфигурацию и инварианты исполнения для bounded context `market_data`
+в рамках этапа v2 (REST + WS + автоматическая догонка хвоста).
+
+Цель:
+- один YAML описывает 4 рынка (binance/bybit × spot/futures), endpoints REST/WS, параметры reconnect/ping, flush policy;
+- whitelist тикеров задаётся CSV файлом;
+- REST backfill режется на чанки так, чтобы один insert не пересекал >7 дневных партиций ClickHouse;
+- rate limits берутся **онлайн** у биржи (autodetect), поэтому численные лимиты не хранятся в YAML.
+
+Scope:
+- конфигурация и её валидация относятся к wiring/infra (composition roots), не к domain/application.
+
+
+## Ключевые решения
+
+### 1) Единственный источник runtime-настроек — `configs/.../market_data.yaml`
+CLI/worker/notebooks читают YAML на старте процесса.
+Настройки меняются без правок кода: достаточно изменить YAML/CSV и перезапустить процесс.
+
+Конфиг читается на старте процесса (без hot reload). Это упрощает эксплуатацию и делает запуск детерминированным.
+
+### 2) Whitelist тикеров — CSV файл (источник правды)
+Whitelist определяет, какие инструменты:
+- попадают в `ref_instruments` (через отдельный use-case в EPIC 1),
+- подписываются в WS,
+- догоняются через REST.
+
+CSV — операторский формат, легко редактируется и версионируется.
+
+### 3) Rate limits — autodetect (онлайн), численные лимиты не хранятся в YAML
+Численные лимиты могут изменяться биржей, поэтому значения берём **из ответов/метаданных API**:
+
+- **Binance**:
+  - `exchangeInfo.rateLimits[]` даёт текущие caps/лимиты.
+  - REST-ответы возвращают заголовки `X-MBX-USED-WEIGHT-*` (usage), что позволяет адаптивно ограничивать скорость запросов.
+
+- **Bybit**:
+  - REST-ответы возвращают заголовки `X-Bapi-Limit`, `X-Bapi-Limit-Status`, `X-Bapi-Limit-Reset-Timestamp`,
+    что достаточно для динамической подстройки лимитера на уровне endpoint’ов.
+
+В YAML остаются только *управляющие параметры лимитера* (safety factor, max concurrency), чтобы:
+- ограничить параллелизм,
+- иметь консервативный режим до получения первых заголовков/metadata.
+
+### 4) REST backfill использует time-slicing по UTC дням: максимум 7 дней на insert
+ClickHouse raw таблицы партиционированы по дню (`toYYYYMMDD` по времени открытия свечи).
+Чтобы избегать ошибок и лимитов на количество партиций/parts в одной вставке,
+любой диапазон backfill режется на чанки так, чтобы один insert затрагивал не более 7 дневных партиций.
+
+
+## YAML Schema (market_data.yaml)
+
+### Top-level
+- `version: int` — версия схемы конфига (для будущей миграции)
+- `market_data: {...}` — настройки market_data
+
+### market_data.markets[]
+Каждый элемент описывает один рынок.
+
+Required fields:
+- `market_id: int` — соответствует `market_data.ref_market.market_id`
+- `exchange: "binance" | "bybit"`
+- `market_type: "spot" | "futures"`
+- `market_code: str` — например `binance:spot`
+
+REST:
+- `rest.base_url: str`
+- `rest.earliest_available_ts_utc: str (ISO-8601, UTC, not in future)`
+- `rest.timeout_s: float`
+- `rest.retries: int`
+- `rest.backoff.base_s: float`
+- `rest.backoff.max_s: float`
+- `rest.backoff.jitter_s: float`
+
+REST limiter (управляющие параметры):
+- `rest.limiter.mode: "autodetect"` — фиксировано для v2
+- `rest.limiter.safety_factor: float` — доля от лимита, которую используем (например 0.8)
+- `rest.limiter.max_concurrency: int` — максимальная параллельность запросов
+
+WS:
+- `ws.url: str`
+- `ws.ping_interval_s: float`
+- `ws.pong_timeout_s: float`
+- `ws.reconnect.min_delay_s: float`
+- `ws.reconnect.max_delay_s: float`
+- `ws.reconnect.factor: float`
+- `ws.reconnect.jitter_s: float`
+- `ws.max_symbols_per_connection: int`
+
+WS operational notes:
+- Bybit V5 public WS ограничивает размер `subscribe.args` (в проде observed limit: `<= 10`).
+- Адаптер обязан отправлять подписки батчами и валидировать subscribe ACK (`op=subscribe`, `success=true`).
+- При `success=false` runtime должен падать в reconnect-loop с явной ошибкой в логах.
+
+### market_data.ingestion
+Flush/maintenance policy для WS worker и scheduler:
+- `flush_interval_ms: int` — максимальная задержка удержания данных в буфере перед вставкой в ClickHouse.
+  Даже если буфер не достиг `max_buffer_rows`, по таймеру выполняется flush.
+  Меньше `flush_interval_ms` → ниже latency до raw, но больше insert-операций.
+- `max_buffer_rows: int` — предохранитель на всплески: flush при достижении размера буфера.
+- `rest_concurrency_instruments: int` — ограничение параллельных REST fill/insurance задач по инструментам.
+- `tail_lookback_minutes: int` — lookback для scheduler insurance catchup (S3).
+
+SLO guidance:
+- чтобы уложиться в “≤1s до raw” (лучше 0.5s), рекомендуется `flush_interval_ms` порядка 250–500 ms
+  (при разумном `max_buffer_rows`, например 1k–5k).
+
+### market_data.scheduler.jobs
+Периодические maintenance интервалы:
+- `sync_whitelist.interval_seconds`
+- `enrich.interval_seconds`
+- `rest_insurance_catchup.interval_seconds`
+
+Operational semantics:
+- scheduler на старте делает startup scan по enabled/tradable инструментам:
+  - bootstrap `[effective_history_start, now_floor)` для пустого canonical
+  - historical backfill `[effective_history_start, canonical_min)` если canonical начинается позже effective boundary
+  - tail insurance `[max(canonical_max + 1m, now_floor - tail_lookback), now_floor)`.
+ - `effective_history_start` вычисляется так:
+  - сначала берём market-wide `earliest_available_ts_utc` как coarse lower bound;
+  - если exchange может подтвердить более поздний symbol-specific start, scheduler сдвигает lower bound вперёд;
+  - если symbol-specific bound не удалось получить, scheduler мягко откатывается к `earliest_available_ts_utc`.
+ - текущие exchange methods для symbol-specific start:
+  - Binance futures: `GET /fapi/v1/exchangeInfo` -> `symbols[].onboardDate`
+  - Bybit futures: `GET /v5/market/instruments-info` -> `list[].launchTime`
+  - Binance/Bybit spot: earliest non-empty window по `GET .../klines` / `GET /v5/market/kline`
+- observability startup scan:
+  - `scheduler_startup_scan_instruments_total`
+  - `scheduler_tasks_planned_total{reason=...}`
+  - `scheduler_tasks_enqueued_total{reason=...}`
+
+### market_data.backfill
+Политика REST backfill:
+- `max_days_per_insert: 7` — константа этапа v2 (не конфигурируется выше 7)
+- `chunk_align: "utc_day"` — режем по границам UTC дней
+
+
+## Whitelist CSV schema
+
+File: `whitelist.csv`
+
+Required columns:
+- `market_id` — int
+- `symbol` — str (trim, upper)
+- `is_enabled` — 0/1
+
+Semantics:
+- `is_enabled=1` → инструмент активен: участвует в подписках и backfill
+- `is_enabled=0` → инструмент игнорируется
+
+Duplicates:
+- если встречается повтор ключа `(market_id, symbol)`, применяется правило:
+  - последняя строка побеждает (last-win), с warning в лог
+
+
+## Time-slicing (≤7 дней на insert)
+
+Input:
+- `TimeRange [start, end)` в UTC
+
+Rule:
+- диапазон режется по границам UTC-дней так, чтобы каждый чанк затрагивал не более 7 дневных партиций CH.
+
+Algorithm (conceptual):
+- cursor = start
+- while cursor < end:
+  - anchor = floor_to_utc_day(cursor)              # 00:00 UTC
+  - boundary = anchor + 7 days                     # day boundary
+  - slice_end = min(end, boundary)
+  - yield [cursor, slice_end)
+  - cursor = slice_end
+
+Guarantee:
+- один чанк не пересекает >7 партиций `toYYYYMMDD(ts_open)`.
+
+
+## Notes
+- Конфиг читается на старте процесса (без hot reload).
+- Валидируем YAML/CSV строго и падаем быстро, чтобы не получать “тихие” частичные запуски.
+- `rest.earliest_available_ts_utc` — обязательный ключ, используется как coarse market-wide fallback lower bound.
+- Scheduler MAY использовать более поздний symbol-specific history start, если exchange его подтвердил.
+- Для конкурентных `asyncio.to_thread(...)` путей worker/scheduler используют thread-local CH gateway
+  (один ClickHouse client на поток), чтобы избежать session-конфликта concurrent queries.
+- Adapters могут логировать “observed rate limits” (из заголовков/metadata) для диагностики,
+  но не используют захардкоженные численные лимиты из конфига.

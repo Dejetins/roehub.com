@@ -1,0 +1,33 @@
+{
+  "surface": "apps/navigator-web existing candidate consumer",
+  "provider": "synthetic closed candles",
+  "storage": "production PostgreSQL adapters and jobs",
+  "range": {
+    "start": "2026-10-12T00:18",
+    "end": "2026-10-12T00:24"
+  },
+  "progress": {
+    "job": [
+      "queued",
+      2,
+      6,
+      2,
+      2
+    ],
+    "canonical_count": 2
+  },
+  "complete": {
+    "job": [
+      "succeeded",
+      6,
+      6,
+      6,
+      6
+    ],
+    "canonical_count": 6
+  },
+  "streamEvent": "production connection transition trigger, real API and rendered journal",
+  "monitoring": "real observer TCP reachability only; Unknown / readiness not confirmed; no SQL health metric claim",
+  "offline": "owned fixture API SIGSTOP: HTTP timeout, explicit error, retained snapshot; SIGCONT recovery passed",
+  "promotedToAccepted": false
+}

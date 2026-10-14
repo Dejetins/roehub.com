@@ -20,11 +20,10 @@ from trading.contexts.identity.domain.entities import (
     OrganizationInvitation,
     OrganizationMembership,
     OrganizationRole,
-    PluginPermission,
-    PluginPermissionGrant,
     SupportAccessGrant,
     permissions_for_role,
 )
+from trading.platform.postgres_budget import connect as budget_connect
 from trading.shared_kernel.primitives import InstallationId, OrganizationId, UserId
 
 
@@ -459,60 +458,6 @@ class PostgresOrganizationRepository(OrganizationRepository):
             created_at=created_at,
         )
 
-    def set_plugin_permission(
-        self,
-        *,
-        organization_id: OrganizationId,
-        plugin_id: str,
-        user_id: UserId,
-        permission: PluginPermission,
-        actor_user_id: UserId,
-        updated_at: datetime,
-    ) -> PluginPermissionGrant:
-        try:
-            with self._connect() as connection, connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    INSERT INTO identity_plugin_permissions (
-                        organization_id, plugin_id, user_id, permission,
-                        granted_by_user_id, created_at, updated_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (organization_id, plugin_id, user_id)
-                    DO UPDATE SET
-                        permission = EXCLUDED.permission,
-                        granted_by_user_id = EXCLUDED.granted_by_user_id,
-                        updated_at = EXCLUDED.updated_at
-                    """,
-                    (
-                        str(organization_id),
-                        plugin_id,
-                        str(user_id),
-                        permission,
-                        str(actor_user_id),
-                        updated_at,
-                        updated_at,
-                    ),
-                )
-                self._audit_for_organization(
-                    cursor=cursor,
-                    organization_id=organization_id,
-                    actor_user_id=actor_user_id,
-                    action="plugin.permission_set",
-                    target_type="plugin_permission",
-                    target_id=f"{plugin_id}:{user_id}",
-                    metadata={"permission": permission},
-                    created_at=updated_at,
-                )
-        except psycopg.errors.ForeignKeyViolation as error:
-            raise OrganizationRepositoryInvariantError(code="membership_not_found") from error
-        return PluginPermissionGrant(
-            organization_id=organization_id,
-            plugin_id=plugin_id,
-            user_id=user_id,
-            permission=permission,
-            updated_at=updated_at,
-        )
-
     def grant_support_access(
         self,
         *,
@@ -656,7 +601,7 @@ class PostgresOrganizationRepository(OrganizationRepository):
             )
 
     def _connect(self) -> psycopg.Connection[Any]:
-        return psycopg.connect(self._dsn, row_factory=cast(Any, dict_row))
+        return budget_connect(self._dsn, row_factory=cast(Any, dict_row))
 
     @staticmethod
     def _installation_id(*, cursor: Any) -> InstallationId:

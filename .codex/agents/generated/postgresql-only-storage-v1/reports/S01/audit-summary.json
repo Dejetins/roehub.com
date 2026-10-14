@@ -1,0 +1,30 @@
+{
+  "inventory_paths": 1520,
+  "initial_paths": 318,
+  "literal_or_path_hits": 1094,
+  "closure_paths": 481,
+  "caller_edges": 1371,
+  "schema_dependencies": 58,
+  "tables": 11,
+  "method_signatures": 219,
+  "categories": {
+    "active-consumer-or-contract": 242,
+    "active-storage-adapter": 18,
+    "applied-schema-history": 57,
+    "dependency-manifest": 2,
+    "generated-or-generation-source": 25,
+    "generated-schema": 5,
+    "illustrative-nonruntime-reference": 1,
+    "immutable-history": 771,
+    "installation-operations": 58,
+    "legacy-executable-schema": 4,
+    "normative-doc": 35,
+    "retire-executable": 2,
+    "runbook-source": 5,
+    "semantic-test-or-fixture": 202,
+    "supported-optional-script": 24,
+    "unrelated-final-token": 59,
+    "verification-tool": 10
+  },
+  "errors": []
+}

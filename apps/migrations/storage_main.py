@@ -31,7 +31,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Generated service-config.json; never pass raw credentials here.",
     )
     parser.add_argument("--postgres-manifest", default="")
-    parser.add_argument("--clickhouse-manifest", default="")
     parser.add_argument(
         "--output-json",
         default="",
@@ -73,11 +72,6 @@ def main(argv: list[str] | None = None) -> int:
             default=repo_root / "migrations" / "postgres" / "manifest.json",
             label="PostgreSQL migration manifest",
         )
-        clickhouse_manifest = _resolve_path(
-            args.clickhouse_manifest,
-            default=repo_root / "migrations" / "clickhouse" / "manifest.json",
-            label="ClickHouse migration manifest",
-        )
         config = load_storage_config(service_config)
         endpoints = load_storage_endpoints(config=config, environ=os.environ)
         if args.command == "bootstrap":
@@ -87,7 +81,6 @@ def main(argv: list[str] | None = None) -> int:
                     endpoints=endpoints,
                     repo_root=repo_root,
                     postgres_manifest=postgres_manifest,
-                    clickhouse_manifest=clickhouse_manifest,
                 )
         else:
             require_schema = args.command in {"readiness", "status"}
@@ -96,7 +89,6 @@ def main(argv: list[str] | None = None) -> int:
                 endpoints=endpoints,
                 repo_root=repo_root,
                 postgres_manifest=postgres_manifest,
-                clickhouse_manifest=clickhouse_manifest,
                 require_schema=require_schema,
             )
         _write_status(payload, args.output_json)

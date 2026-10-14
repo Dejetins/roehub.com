@@ -35,46 +35,7 @@ class UserRepository(Protocol):
         """
         ...
 
-    def find_by_keycloak_subject(self, *, keycloak_subject: str) -> User | None:
-        """
-        Find user by external Keycloak subject bound to local Roehub identity.
 
-        Args:
-            keycloak_subject: Opaque external subject from Keycloak `sub`.
-        Returns:
-            User | None: Active or deleted user snapshot, or `None` when missing.
-        Assumptions:
-            Keycloak subject is unique across all identity users.
-        Raises:
-            ValueError: If repository implementation rejects blank or malformed subject.
-        Side Effects:
-            None.
-        """
-        ...
-
-    def upsert_keycloak_login(
-        self,
-        *,
-        keycloak_subject: str,
-        login_at: datetime,
-    ) -> User:
-        """
-        Create-or-update user by Keycloak subject during successful login.
-
-        Args:
-            keycloak_subject: Opaque external subject from Keycloak `sub`.
-            login_at: Current UTC login timestamp.
-        Returns:
-            User: Persisted local Roehub user snapshot after create/update/reactivate.
-        Assumptions:
-            Repository preserves stable local `user_id` for repeat logins of one subject.
-            `paid_level` source of truth remains Roehub identity storage, not provider claims.
-        Raises:
-            ValueError: If repository cannot persist or map domain state.
-        Side Effects:
-            Writes one record in identity storage.
-        """
-        ...
 
     def create_local_user(
         self,

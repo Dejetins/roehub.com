@@ -1,0 +1,10 @@
+{
+  "action": "stop",
+  "services": [
+    "market-data-ws"
+  ],
+  "operation_id": "04f9c20f-a896-4250-91bd-387769f09bd1",
+  "returncode": 0,
+  "stdout": "{\"action\": \"stop\", \"active_services\": [\"api\", \"backtest-artifact-publisher\", \"market-data-scheduler\", \"operational-health\", \"postgresql\", \"web\"], \"detail_code\": \"topology.stopped\", \"journal_sequence\": 384, \"operation_id\": \"04f9c20f-a896-4250-91bd-387769f09bd1\", \"profile\": \"trading\", \"schema\": \"io.roehub.control-operation-result/v1alpha1\", \"state\": \"succeeded\"}\n",
+  "stderr": ""
+}

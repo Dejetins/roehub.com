@@ -19,14 +19,6 @@ OBSERVABILITY_IMAGES = {
         "prom/blackbox-exporter:v0.27.0@sha256:"
         "a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d"
     ),
-    "grafana": (
-        "grafana/grafana:12.0.2@sha256:"
-        "b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa"
-    ),
-    "loki": (
-        "grafana/loki:3.5.1@sha256:"
-        "a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745"
-    ),
 }
 
 SAFE_RESTART_SERVICES = frozenset(
@@ -35,7 +27,6 @@ SAFE_RESTART_SERVICES = frozenset(
         "exchange-control",
         "exchange-execution",
         "notification-report-scheduler",
-        "plugin-gateway",
         "rl-inference",
         "strategy-live-runner",
         "telegram-bot-worker",
@@ -51,16 +42,6 @@ def render_observability_outputs(*, topology: dict[str, Any]) -> dict[str, bytes
         "observability/alertmanager.yml": yaml_bytes(_alertmanager_config()),
         "observability/alerts.yml": yaml_bytes(_alert_rules()),
         "observability/blackbox.yml": yaml_bytes(_blackbox_config()),
-        "observability/grafana-dashboard.json": json_bytes(
-            _grafana_dashboard(profile=str(topology["profile"]))
-        ),
-        "observability/grafana-dashboards.yml": yaml_bytes(
-            _grafana_dashboard_provisioning()
-        ),
-        "observability/grafana-datasources.yml": yaml_bytes(
-            _grafana_datasources()
-        ),
-        "observability/loki.yml": yaml_bytes(_loki_config()),
         "observability/operational-manifest.json": json_bytes(manifest),
     }
 
@@ -71,7 +52,7 @@ def build_operational_manifest(*, topology: dict[str, Any]) -> dict[str, Any]:
         _probe(
             service_id="postgresql",
             capability="storage.postgresql",
-            kind="tcp_reachability",
+            kind="postgresql",
             target="postgresql:5432",
             action_ref="diagnostics",
             required=False,
@@ -89,25 +70,12 @@ def build_operational_manifest(*, topology: dict[str, Any]) -> dict[str, Any]:
             capability="secrets.openbao",
             kind="openbao",
             target=(
-                "http://openbao:8200/v1/sys/health?standbyok=true&"
-                "sealedcode=200&uninitcode=200"
+                "http://openbao:8200/v1/sys/health?standbyok=true&" "sealedcode=200&uninitcode=200"
             ),
             runbook_id="auth.openbao-unavailable",
             action_ref="diagnostics",
         ),
     ]
-    if profile != "base":
-        probes.append(
-            _probe(
-                service_id="clickhouse",
-                capability="storage.clickhouse",
-                kind="http_reachability",
-                target="http://clickhouse:8123/ping",
-                runbook_id="database.clickhouse-degraded",
-                action_ref="diagnostics",
-                required=False,
-            )
-        )
     for role in topology["roles"]:
         if role.get("lifecycle") != "service" or role["name"] == "operational-health":
             continue
@@ -127,14 +95,11 @@ def build_operational_manifest(*, topology: dict[str, Any]) -> dict[str, Any]:
                     else "http_reachability"
                 ),
                 target=(
-                    f"http://{service_id}:{int(role['internal_port'])}"
-                    f"{role['health_path']}"
+                    f"http://{service_id}:{int(role['internal_port'])}" f"{role['health_path']}"
                 ),
                 runbook_id=runbook_id,
                 action_ref=(
-                    "restart_service"
-                    if service_id in SAFE_RESTART_SERVICES
-                    else "diagnostics"
+                    "restart_service" if service_id in SAFE_RESTART_SERVICES else "diagnostics"
                 ),
                 required=str(role["health_path"]) in {"/health", "/health/ready"},
             )
@@ -194,54 +159,8 @@ def observability_compose_services() -> dict[str, Any]:
             "user": "65534:65534",
             "command": ["--config.file=/etc/blackbox_exporter/config.yml"],
             "tmpfs": ["/tmp:rw,noexec,nosuid,size=16m"],
-            "volumes": [
-                "./observability/blackbox.yml:/etc/blackbox_exporter/config.yml:ro"
-            ],
+            "volumes": ["./observability/blackbox.yml:/etc/blackbox_exporter/config.yml:ro"],
             "deploy": {"resources": {"limits": {"cpus": "0.25", "memory": "128M"}}},
-        },
-        "loki": {
-            **common,
-            "image": OBSERVABILITY_IMAGES["loki"],
-            "user": "10001:10001",
-            "command": ["-config.file=/etc/loki/local-config.yaml"],
-            "tmpfs": ["/tmp:rw,noexec,nosuid,size=16m"],
-            "volumes": [
-                "./observability/loki.yml:/etc/loki/local-config.yaml:ro",
-                "loki-data:/loki",
-            ],
-            "deploy": {"resources": {"limits": {"cpus": "0.5", "memory": "512M"}}},
-        },
-        "grafana": {
-            **common,
-            "image": OBSERVABILITY_IMAGES["grafana"],
-            "user": "472:472",
-            "depends_on": {
-                "secret-init": {"condition": "service_completed_successfully"}
-            },
-            "environment": {
-                "GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES": "false",
-                "GF_ANALYTICS_CHECK_FOR_UPDATES": "false",
-                "GF_ANALYTICS_REPORTING_ENABLED": "false",
-                "GF_AUTH_ANONYMOUS_ENABLED": "false",
-                "GF_PLUGINS_PREINSTALL_DISABLED": "true",
-                "GF_PLUGINS_PUBLIC_KEY_RETRIEVAL_DISABLED": "true",
-                "GF_SECURITY_ADMIN_PASSWORD__FILE": (
-                    "/run/grafana-secrets/admin-password"
-                ),
-                "GF_USERS_ALLOW_SIGN_UP": "false",
-            },
-            "tmpfs": ["/tmp:rw,noexec,nosuid,size=32m"],
-            "volumes": [
-                "./observability/grafana-datasources.yml:"
-                "/etc/grafana/provisioning/datasources/roehub.yml:ro",
-                "./observability/grafana-dashboards.yml:"
-                "/etc/grafana/provisioning/dashboards/roehub.yml:ro",
-                "./observability/grafana-dashboard.json:"
-                "/var/lib/grafana/dashboards/roehub/operational.json:ro",
-                "grafana-data:/var/lib/grafana",
-                "grafana-secrets:/run/grafana-secrets:ro",
-            ],
-            "deploy": {"resources": {"limits": {"cpus": "0.5", "memory": "512M"}}},
         },
     }
 
@@ -249,8 +168,6 @@ def observability_compose_services() -> dict[str, Any]:
 def observability_volumes() -> dict[str, dict[str, dict[str, str]]]:
     return {
         "alertmanager-data": {"labels": {"io.roehub.state-owner": "alertmanager"}},
-        "grafana-data": {"labels": {"io.roehub.state-owner": "grafana"}},
-        "loki-data": {"labels": {"io.roehub.state-owner": "loki"}},
         "prometheus-data": {"labels": {"io.roehub.state-owner": "prometheus"}},
     }
 
@@ -280,8 +197,6 @@ def _probe(
 def _capability(service_id: str) -> str:
     if service_id in {"api", "web"}:
         return "product.web_api"
-    if service_id.startswith("plugin"):
-        return "extensions.plugins"
     if service_id.startswith("notification") or service_id == "telegram-bot-worker":
         return "notifications.delivery"
     if service_id.startswith("market-data"):
@@ -321,11 +236,7 @@ def _prometheus_config(*, manifest: dict[str, Any]) -> dict[str, Any]:
         if item["kind"] == "tcp_reachability"
     ]
     return {
-        "alerting": {
-            "alertmanagers": [
-                {"static_configs": [{"targets": ["alertmanager:9093"]}]}
-            ]
-        },
+        "alerting": {"alertmanagers": [{"static_configs": [{"targets": ["alertmanager:9093"]}]}]},
         "global": {"evaluation_interval": "2s", "scrape_interval": "2s"},
         "rule_files": ["/etc/prometheus/alerts.yml"],
         "scrape_configs": [
@@ -345,10 +256,6 @@ def _prometheus_config(*, manifest: dict[str, Any]) -> dict[str, Any]:
             {
                 "job_name": "alertmanager",
                 "static_configs": [{"targets": ["alertmanager:9093"]}],
-            },
-            {
-                "job_name": "loki",
-                "static_configs": [{"targets": ["loki:3100"]}],
             },
             {
                 "job_name": "blackbox-http",
@@ -390,15 +297,12 @@ def _alert_rules() -> dict[str, Any]:
                                 "Generated domain health is not ready; use only the linked "
                                 "allowlisted action."
                             ),
-                            "runbook": (
-                                "/runbooks/{{ $labels.runbook_id }}"
-                            ),
+                            "runbook": ("/runbooks/{{ $labels.runbook_id }}"),
                             "summary": (
-                                "Roehub service {{ $labels.service }} is "
-                                "{{ $labels.state }}"
+                                "Roehub service {{ $labels.service }} is " "{{ $labels.state }}"
                             ),
                         },
-                        "expr": "roehub_operational_service_state{state!=\"ready\"} == 1",
+                        "expr": 'roehub_operational_service_state{state!="ready"} == 1',
                         "for": "0s",
                         "labels": {"severity": "warning"},
                     },
@@ -412,29 +316,11 @@ def _alert_rules() -> dict[str, Any]:
                             "runbook": "/runbooks/runtime.observability-unavailable",
                             "summary": "Roehub operational health service is unavailable",
                         },
-                        "expr": "up{job=\"operational-health\"} == 0",
+                        "expr": 'up{job="operational-health"} == 0',
                         "for": "0s",
                         "labels": {
                             "runbook_id": "runtime.observability-unavailable",
                             "severity": "critical",
-                        },
-                    },
-                    {
-                        "alert": "RoehubOperationalLogPushFailed",
-                        "annotations": {
-                            "action_ref": "diagnostics",
-                            "description": (
-                                "The bounded transition sink is unavailable; do not treat "
-                                "missing logs as healthy state."
-                            ),
-                            "runbook": "/runbooks/runtime.observability-unavailable",
-                            "summary": "Roehub operational transitions are not reaching Loki",
-                        },
-                        "expr": "roehub_operational_log_push_success == 0",
-                        "for": "0s",
-                        "labels": {
-                            "runbook_id": "runtime.observability-unavailable",
-                            "severity": "warning",
                         },
                     },
                     {
@@ -481,107 +367,6 @@ def _blackbox_config() -> dict[str, Any]:
             },
             "tcp_connect": {"prober": "tcp", "timeout": "2s"},
         }
-    }
-
-
-def _loki_config() -> dict[str, Any]:
-    return {
-        "analytics": {"reporting_enabled": False},
-        "auth_enabled": False,
-        "common": {
-            "instance_addr": "127.0.0.1",
-            "path_prefix": "/loki",
-            "replication_factor": 1,
-            "ring": {"kvstore": {"store": "inmemory"}},
-            "storage": {
-                "filesystem": {
-                    "chunks_directory": "/loki/chunks",
-                    "rules_directory": "/loki/rules",
-                }
-            },
-        },
-        "schema_config": {
-            "configs": [
-                {
-                    "from": "2024-01-01",
-                    "index": {"period": "24h", "prefix": "index_"},
-                    "object_store": "filesystem",
-                    "schema": "v13",
-                    "store": "tsdb",
-                }
-            ]
-        },
-        "server": {"http_listen_port": 3100},
-    }
-
-
-def _grafana_datasources() -> dict[str, Any]:
-    return {
-        "apiVersion": 1,
-        "datasources": [
-            {
-                "access": "proxy",
-                "isDefault": True,
-                "name": "Roehub Prometheus",
-                "type": "prometheus",
-                "uid": "roehub-prometheus",
-                "url": "http://prometheus:9090",
-            },
-            {
-                "access": "proxy",
-                "name": "Roehub Loki",
-                "type": "loki",
-                "uid": "roehub-loki",
-                "url": "http://loki:3100",
-            },
-        ],
-    }
-
-
-def _grafana_dashboard_provisioning() -> dict[str, Any]:
-    return {
-        "apiVersion": 1,
-        "providers": [
-            {
-                "disableDeletion": True,
-                "editable": False,
-                "name": "Roehub generated",
-                "options": {"path": "/var/lib/grafana/dashboards/roehub"},
-                "type": "file",
-            }
-        ],
-    }
-
-
-def _grafana_dashboard(*, profile: str) -> dict[str, Any]:
-    return {
-        "annotations": {"list": []},
-        "editable": False,
-        "panels": [
-            {
-                "datasource": {"type": "prometheus", "uid": "roehub-prometheus"},
-                "fieldConfig": {"defaults": {}, "overrides": []},
-                "gridPos": {"h": 12, "w": 24, "x": 0, "y": 0},
-                "id": 1,
-                "options": {"showHeader": True},
-                "targets": [
-                    {
-                        "expr": "roehub_operational_service_state",
-                        "format": "table",
-                        "refId": "A",
-                    }
-                ],
-                "title": "Generated operational state",
-                "type": "table",
-            }
-        ],
-        "schemaVersion": 41,
-        "tags": ["roehub", "generated", profile],
-        "templating": {"list": []},
-        "time": {"from": "now-1h", "to": "now"},
-        "title": f"Roehub {profile} operational health",
-        "uid": f"roehub-{profile}-operational",
-        "version": 1,
     }
 
 

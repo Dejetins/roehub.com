@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from uuid import UUID
 
 from fastapi import Depends, FastAPI
 from fastapi.testclient import TestClient
@@ -21,6 +22,7 @@ from trading.contexts.identity.application.ports import IdentityClock
 from trading.contexts.identity.application.ports.current_user import (
     CurrentUserPrincipal,
 )
+from trading.shared_kernel.primitives import UserId
 
 _SESSION_COOKIE_NAME = "roehub_session_id"
 _BASE_NOW = datetime(2026, 4, 22, 12, 0, tzinfo=timezone.utc)
@@ -310,9 +312,9 @@ def _build_dependency_test_client(
     )
     user_repository = InMemoryIdentityUserRepository()
     session_repository = InMemoryIdentitySessionRepository()
-    user = user_repository.upsert_keycloak_login(
-        keycloak_subject="keycloak-subject-1",
-        login_at=validated_session_created_at,
+    user = user_repository.create_local_user(
+        user_id=UserId(UUID(int=1)),
+        created_at=validated_session_created_at,
     )
     session = session_repository.create_session(
         user_id=user.user_id,

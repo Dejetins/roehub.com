@@ -1,0 +1,17 @@
+"""Use the accepted exclusive Docker recovery adapter on the exact S09 target."""
+
+import json
+from pathlib import Path
+
+from tools.installation.postgres_budget_recovery import Engine, enroll, recover, resume
+from tools.qa.postgres_production_soak import DSN
+
+root = Path("/run/roehub-pg-budget")
+engine = Engine("/var/run/docker.sock")
+result = {}
+if not (root / "recovery-authority.json").exists():
+    result["enroll"] = enroll(root, engine, "roehub-s09-pg", DSN)
+result["recover"] = recover(root, engine, "roehub-s09-pg")
+result["resume"] = resume(root, engine, "roehub-s09-pg", DSN)
+# Caller chooses a new immutable log filename; stdout contains sanitized adapter receipts.
+print(json.dumps(result))

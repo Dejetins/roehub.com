@@ -17,30 +17,17 @@
     {
       "navigation_group_id": "research",
       "label": "Research",
-      "items": [
-        "screen.data.catalog",
-        "screen.strategies.library",
-        "screen.backtests.library",
-        "screen.models.registry"
-      ]
+      "items": ["screen.data.catalog", "screen.strategies.library", "screen.backtests.library", "screen.models.registry"]
     },
     {
       "navigation_group_id": "operations",
       "label": "Operations",
-      "items": [
-        "screen.live.workspace",
-        "screen.monitoring.workspace",
-        "screen.connections.workspace"
-      ]
+      "items": ["screen.live.workspace", "screen.monitoring.workspace", "screen.connections.workspace"]
     },
     {
       "navigation_group_id": "system",
       "label": "System",
-      "items": [
-        "screen.docs.index",
-        "screen.settings.profile",
-        "screen.admin.overview"
-      ]
+      "items": ["screen.docs.index", "screen.settings.profile", "screen.admin.overview"]
     }
   ],
   "screens": [
@@ -299,17 +286,6 @@
       "required_states": ["loading", "ready", "backtest_budget", "artifact_budget", "admission_profile", "installation_owner_required", "save_error"]
     },
     {
-      "screen_id": "screen.admin.extensions",
-      "kind": "route_screen",
-      "label": "Extensions and providers",
-      "canonical_route": "/admin/extensions",
-      "navigation_group_id": "system",
-      "target_status": "target_not_implemented",
-      "source_surface_ids": [],
-      "journey_ids": ["journey.administer_and_recover"],
-      "required_states": ["loading", "ready", "validation", "install_pending", "rollback_confirmation", "permission_forbidden", "error_retry"]
-    },
-    {
       "screen_id": "screen.admin.maintenance",
       "kind": "route_screen",
       "label": "Backups, updates and recovery",
@@ -352,17 +328,6 @@
       "source_surface_ids": ["platform.system.error_and_recovery_states"],
       "journey_ids": ["journey.auth.sign_in_and_continue", "journey.administer_and_recover"],
       "required_states": ["not_found_404", "permission_forbidden_403", "identity_unavailable_502", "service_unavailable_503", "proxy_failure_502", "session_expired", "operation_unknown", "retry", "safe_recovery"]
-    },
-    {
-      "screen_id": "screen.qa.plugin_panel_lab",
-      "kind": "qa_only_screen",
-      "label": "Feature-flagged plugin panel laboratory",
-      "canonical_route": "/__qa/plugin-panels",
-      "navigation_group_id": null,
-      "target_status": "compatibility_only",
-      "source_surface_ids": ["platform.qa.plugin_panel_lab"],
-      "journey_ids": [],
-      "required_states": ["disabled_404", "loading", "renderer_state", "query_error"]
     },
     {
       "screen_id": "contract.diagnostics.health",

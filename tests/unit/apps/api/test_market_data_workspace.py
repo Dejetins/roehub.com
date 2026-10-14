@@ -362,3 +362,23 @@ def test_pause_requested_exposes_resume_before_worker_acknowledges(surface):
                            headers=headers, json={'control_version': 0})
     assert response.status_code == 200
     assert response.json()['can_resume'] and not response.json()['can_pause']
+
+
+def test_stream_events_require_auth_available_market_and_bound_pagination(surface):
+    client, seen, org, end = surface
+    def rows(**kwargs):
+        seen.append(kwargs)
+        return [dict(event_id=i,market_id=2,symbol='BTCUSDT',event_type='connection_opened',
+                     occurred_at=end,reason=None,error_code=None,attempt=0,start_at=None,end_at=None)
+                for i in [9,8,7]]
+    client.app.state.jobs.stream_events = rows
+    url = '/market-data/workspace/stream-events?market_id=2&limit=2'
+    assert client.get(url).status_code == 401
+    headers = {'x-user':'allowed'}
+    assert client.get(url.replace('market_id=2','market_id=1'),headers=headers).status_code == 404
+    response = client.get(url+'&before=10',headers=headers)
+    assert response.status_code == 200
+    assert [e['event_id'] for e in response.json()['items']] == [9,8]
+    assert response.json()['next_cursor'] == 8
+    assert seen[-1] == dict(market_id=2,symbol=None,before=10,limit=3)
+    assert client.get(url.replace('limit=2','limit=200'),headers=headers).status_code == 422

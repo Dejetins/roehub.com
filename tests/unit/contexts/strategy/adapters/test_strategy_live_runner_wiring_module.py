@@ -201,12 +201,12 @@ def test_live_tail_metrics_are_bounded_and_scrapable() -> None:
 
     assert provider_hooks.on_repair_attempt is not None
     assert provider_hooks.on_repair_latency is not None
-    assert provider_hooks.on_clickhouse_circuit_state is not None
+    assert provider_hooks.on_canonical_store_circuit_state is not None
     provider_hooks.on_repair_attempt("redis_hot_cache", "miss")
-    provider_hooks.on_repair_attempt("clickhouse", "failed")
+    provider_hooks.on_repair_attempt("canonical_store", "failed")
     provider_hooks.on_repair_attempt("rest", "succeeded")
     provider_hooks.on_repair_latency("rest", "succeeded", 0.25)
-    provider_hooks.on_clickhouse_circuit_state(1)
+    provider_hooks.on_canonical_store_circuit_state(1)
 
     assert hot_cache_hooks.on_write_success is not None
     assert hot_cache_hooks.on_read_hit is not None
@@ -223,13 +223,13 @@ def test_live_tail_metrics_are_bounded_and_scrapable() -> None:
     assert 'source_stage="strategy_runner"' in payload
     assert 'source_stage="unknown"' in payload
     assert "market_data_live_tail_repair_total" in payload
-    assert 'source="clickhouse",status="failed"' in payload
+    assert 'source="canonical_store",status="failed"' in payload
     assert "market_data_live_tail_repair_latency_seconds" in payload
     assert "market_data_hot_cache_hit_total" in payload
     assert "market_data_hot_cache_miss_total" in payload
     assert "market_data_hot_cache_write_total" in payload
     assert "market_data_hot_cache_error_total" in payload
-    assert "market_data_clickhouse_repair_circuit_state 1.0" in payload
+    assert "market_data_canonical_store_repair_circuit_state 1.0" in payload
     assert "strategy_live_runner_checkpoint_stall_total" in payload
     assert "strategy_live_runner_deferred_ack_total" in payload
     assert "run-00000000-0000-0000-0000-000000000001" not in payload

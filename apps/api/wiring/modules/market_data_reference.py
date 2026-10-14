@@ -18,7 +18,7 @@ from apps.api.routes import (
 )
 from apps.api.routes.market_data_catalog import build_catalog_workspace_router
 from apps.api.routes.market_data_workspace import build_market_data_workspace_router
-from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+from apps.cli.wiring.db.postgres import market_gateway
 from trading.contexts.backtest.adapters.outbound import (
     PsycopgBacktestPostgresGateway,
     load_backtest_artifacts_runtime_config,
@@ -27,28 +27,31 @@ from trading.contexts.identity.adapters.inbound.api.deps import RequireCurrentUs
 from trading.contexts.market_data.adapters.outbound.persistence.artifact_inventory_reader import (
     FileSystemActiveArtifactInventoryReader,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseBTCUSDTMarketReadinessReader,
-    ClickHouseCanonicalCandleIndexReader,
-    ClickHouseEnabledMarketReader,
-    ClickHouseEnabledTradableInstrumentSearchReader,
-    ClickHouseInstrumentCoverageReader,
-    ThreadLocalClickHouseConnectGateway,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.catalog_coverage_reader import (  # noqa: E501
-    ClickHouseCatalogCoverageReader,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_coverage_reader import (  # noqa: E501
-    ClickHouseHistoryCoverageReader,
-)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresInstrumentSelectionRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_index_reader import (  # noqa: E501
+    PostgresCanonicalCandleIndexReader,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.catalog_coverage_reader import (  # noqa: E501
+    PostgresCatalogCoverageReader,
 )
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.catalog_snapshot_repository import (  # noqa: E501
     PostgresCatalogSnapshotRepository,
 )
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_bounds_repository import (  # noqa: E501
     PostgresHistoryBoundsRepository,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_coverage_reader import (  # noqa: E501
+    PostgresHistoryCoverageReader,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.instrument_coverage_reader import (  # noqa: E501
+    PostgresInstrumentCoverageReader,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.reference_readers import (
+    PostgresBTCUSDTMarketReadinessReader,
+    PostgresEnabledMarketReader,
+    PostgresEnabledTradableInstrumentSearchReader,
 )
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.stream_recovery_store import (  # noqa: E501
     PostgresStreamRecoveryStore,
@@ -80,41 +83,35 @@ class MarketDataReferenceUseCases:
     list_enabled_markets: ListEnabledMarketsUseCase
     search_enabled_tradable_instruments: SearchEnabledTradableInstrumentsUseCase
     btcusdt_market_readiness: BTCUSDTMarketReadinessUseCase
-    coverage_reader: ClickHouseInstrumentCoverageReader
+    coverage_reader: PostgresInstrumentCoverageReader
 
 
 def build_market_data_reference_use_cases(
-    *, environ: Mapping[str, str],
-    clickhouse_workload: Literal["interactive", "artifacts"] = "interactive",
+    *,
+    environ: Mapping[str, str],
+    postgres_workload: Literal["interactive", "artifacts"] = "interactive",
 ) -> MarketDataReferenceUseCases:
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload=clickhouse_workload)
-    clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
-        client_factory=lambda: _clickhouse_client(clickhouse_settings)
-    )
+    postgres_gateway = market_gateway(environ, workload=postgres_workload)
 
     return MarketDataReferenceUseCases(
         list_enabled_markets=ListEnabledMarketsUseCase(
-            reader=ClickHouseEnabledMarketReader(
-                gateway=clickhouse_gateway,
-                database=clickhouse_settings.database,
+            reader=PostgresEnabledMarketReader(
+                gateway=postgres_gateway,
             )
         ),
         search_enabled_tradable_instruments=SearchEnabledTradableInstrumentsUseCase(
-            reader=ClickHouseEnabledTradableInstrumentSearchReader(
-                gateway=clickhouse_gateway,
-                database=clickhouse_settings.database,
+            reader=PostgresEnabledTradableInstrumentSearchReader(
+                gateway=postgres_gateway,
             )
         ),
         btcusdt_market_readiness=BTCUSDTMarketReadinessUseCase(
-            reference_reader=ClickHouseBTCUSDTMarketReadinessReader(
-                gateway=clickhouse_gateway,
-                database=clickhouse_settings.database,
+            reference_reader=PostgresBTCUSDTMarketReadinessReader(
+                gateway=postgres_gateway,
             ),
             stream_reader=_build_btcusdt_stream_readiness_reader(environ=environ),
         ),
-        coverage_reader=ClickHouseInstrumentCoverageReader(
-            gateway=clickhouse_gateway,
-            database=clickhouse_settings.database,
+        coverage_reader=PostgresInstrumentCoverageReader(
+            gateway=postgres_gateway,
         ),
     )
 
@@ -132,7 +129,7 @@ def build_market_data_reference_router(
     Related:
       - apps/api/routes/market_data_reference.py
       - apps/api/main/app.py
-      - apps/cli/wiring/db/clickhouse.py
+      - apps/cli/wiring/db/postgres.py
 
     Args:
         environ: Runtime environment mapping.
@@ -140,11 +137,11 @@ def build_market_data_reference_router(
     Returns:
         APIRouter: Router exposing reference markets and instruments endpoints.
     Assumptions:
-        ClickHouse settings loader applies repository-wide fail-fast validation policy.
+        PostgreSQL settings loader applies repository-wide fail-fast validation policy.
     Raises:
-        ValueError: If auth dependency or ClickHouse settings are invalid.
+        ValueError: If auth dependency or PostgreSQL settings are invalid.
     Side Effects:
-        Configures thread-local ClickHouse gateway factory for request-time reads.
+        Configures bounded PostgreSQL gateway factory for request-time reads.
     """
     if current_user_dependency is None:  # type: ignore[truthy-bool]
         raise ValueError("build_market_data_reference_router requires current_user_dependency")
@@ -153,16 +150,13 @@ def build_market_data_reference_router(
 
     history_readiness = None
     if environ.get("STRATEGY_PG_DSN"):
-        history_settings = ClickHouseSettingsLoader(environ).load(workload="interactive")
+        history_settings = market_gateway(environ, workload="interactive")
         history_readiness = HistoryReadiness(
             origins=PostgresHistoryBoundsRepository(
                 gateway=PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
             ),
-            coverage=ClickHouseHistoryCoverageReader(
-                gateway=ThreadLocalClickHouseConnectGateway(
-                    client_factory=lambda: _clickhouse_client(history_settings)
-                ),
-                database=history_settings.database,
+            coverage=PostgresHistoryCoverageReader(
+                gateway=history_settings,
             ),
         )
     router = build_market_data_reference_api_router(
@@ -181,7 +175,7 @@ def build_market_data_reference_router(
         if selections is None:
             raise ValueError("STRATEGY_PG_DSN is required for market data work requests")
         gateway = PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
-        settings = ClickHouseSettingsLoader(environ).load(workload="interactive")
+        settings = market_gateway(environ, workload="interactive")
         router.include_router(
             build_catalog_workspace_router(
                 collector_status=PostgresStreamRecoveryStore(
@@ -195,11 +189,8 @@ def build_market_data_reference_router(
                 snapshots=PostgresCatalogSnapshotRepository(gateway=gateway),
                 jobs=PostgresMarketDataWorkRequestRepository(gateway=gateway),
                 markets=use_cases.list_enabled_markets,
-                coverage=ClickHouseCatalogCoverageReader(
-                    gateway=ThreadLocalClickHouseConnectGateway(
-                        client_factory=lambda: _clickhouse_client(settings)
-                    ),
-                    database=settings.database,
+                coverage=PostgresCatalogCoverageReader(
+                    gateway=settings,
                 ),
             )
         )
@@ -213,11 +204,8 @@ def build_market_data_reference_router(
                 jobs=PostgresMarketDataWorkRequestRepository(gateway=gateway),
                 markets=use_cases.list_enabled_markets,
                 search=use_cases.search_enabled_tradable_instruments,
-                index=ClickHouseCanonicalCandleIndexReader(
-                    gateway=ThreadLocalClickHouseConnectGateway(
-                        client_factory=lambda: _clickhouse_client(settings)
-                    ),
-                    database=settings.database,
+                index=PostgresCanonicalCandleIndexReader(
+                    gateway=settings,
                 ),
             )
         )

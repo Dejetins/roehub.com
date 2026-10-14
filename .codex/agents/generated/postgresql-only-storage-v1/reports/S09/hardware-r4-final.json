@@ -1,0 +1,81 @@
+[
+  {
+    "name": "roehub-s09-pg",
+    "id": "99e29d5e2fd946b62f91eb62e2dbc8486f9576af9e368f8fbccf649de9ec7c1c",
+    "limits": {
+      "NanoCpus": 2000000000,
+      "Memory": 4294967296,
+      "MemorySwap": 4294967296,
+      "ShmSize": 536870912
+    },
+    "state": {
+      "Running": true,
+      "OOMKilled": false,
+      "StartedAt": "2026-10-14T02:53:47.114475841Z"
+    },
+    "restart_count": 0,
+    "volumes": [
+      {
+        "name": "roehub-s09-data",
+        "type": "volume",
+        "destination": "/var/lib/postgresql/data"
+      }
+    ]
+  },
+  {
+    "name": "roehub-s09-client",
+    "id": "cd93a5d84ef24d6ea520ae2f1ed73a107f36f311b45ee2af3333ac67754615d6",
+    "limits": {
+      "NanoCpus": 4000000000,
+      "Memory": 6442450944,
+      "MemorySwap": 6442450944,
+      "ShmSize": 67108864
+    },
+    "state": {
+      "Running": true,
+      "OOMKilled": true,
+      "StartedAt": "2026-10-14T02:14:49.746365134Z"
+    },
+    "restart_count": 0,
+    "volumes": [
+      {
+        "name": null,
+        "type": "bind",
+        "destination": "/workspace"
+      },
+      {
+        "name": "roehub-s09-registry",
+        "type": "volume",
+        "destination": "/run/roehub-pg-budget"
+      },
+      {
+        "name": "514d7597211ef0188037840788395bd4a6be5d29b1db57409e08db354bb21811",
+        "type": "volume",
+        "destination": "/var/lib/postgresql/data"
+      }
+    ]
+  },
+  {
+    "name": "roehub-s03-s09-regression",
+    "id": "ffed634a240649a14a11b0b731cad94bfa4df02199d6e06a3b17d8c843d69cf8",
+    "limits": {
+      "NanoCpus": 0,
+      "Memory": 0,
+      "MemorySwap": 0,
+      "ShmSize": 67108864
+    },
+    "state": {
+      "Running": true,
+      "OOMKilled": false,
+      "StartedAt": "2026-10-14T05:12:14.59156859Z"
+    },
+    "restart_count": 0,
+    "volumes": [
+      {
+        "name": "bae528ebb890ad391b6662bb1be19c5615360a4937669b7c6cd74adc94692b59",
+        "type": "volume",
+        "destination": "/var/lib/postgresql/data"
+      }
+    ]
+  }
+]

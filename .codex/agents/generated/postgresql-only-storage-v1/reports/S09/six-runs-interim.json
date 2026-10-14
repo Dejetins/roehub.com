@@ -1,0 +1,56 @@
+[
+  {
+    "name": "final-normal1",
+    "duration_s": 300,
+    "samples": 2070,
+    "all_in_window": true,
+    "errors": 0,
+    "year": 30,
+    "full": 30
+  },
+  {
+    "name": "final-stress1",
+    "duration_s": 300,
+    "samples": 2370,
+    "all_in_window": true,
+    "errors": 0,
+    "year": 30,
+    "full": 30
+  },
+  {
+    "name": "final-normal2",
+    "duration_s": 300,
+    "samples": 2070,
+    "all_in_window": true,
+    "errors": 0,
+    "year": 30,
+    "full": 30
+  },
+  {
+    "name": "final-stress2",
+    "duration_s": 300,
+    "samples": 2370,
+    "all_in_window": true,
+    "errors": 0,
+    "year": 30,
+    "full": 30
+  },
+  {
+    "name": "final-normal3",
+    "duration_s": 300,
+    "samples": 2070,
+    "all_in_window": true,
+    "errors": 0,
+    "year": 30,
+    "full": 30
+  },
+  {
+    "name": "final-stress3",
+    "duration_s": 300,
+    "samples": 2370,
+    "all_in_window": true,
+    "errors": 0,
+    "year": 30,
+    "full": 30
+  }
+]

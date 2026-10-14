@@ -1,0 +1,111 @@
+"""Aggregate only the complete final revision; keep every per-run verdict visible."""
+
+import hashlib
+import json
+from pathlib import Path
+
+import numpy as np
+
+from tools.qa.postgres_production_analyze import OUT, analyze
+
+names = [f"r4-{mode}{i}" for i in range(1, 4) for mode in ("normal", "stress")] + ["r4-soak1"]
+
+
+def rows(path):
+    return [json.loads(x) for x in path.read_text().splitlines()]
+
+
+def kv(s):
+    return {r.split()[0]: int(r.split()[1]) for r in s.splitlines()}
+
+
+results = {}
+pooled = {"normal": [], "stress": [], "soak": []}
+source_sets = []
+for name in names:
+    result = analyze(name)
+    (OUT / (name + "-analysis.json")).write_text(json.dumps(result, indent=2))
+    summary = result["summary"]
+    window = result["declared_window"]
+    assert window
+    samples = rows(OUT / (name + "-samples.jsonl"))
+    kind = "soak" if "soak" in name else summary["mode"]
+    pooled[kind].extend(samples)
+    assert not summary["lifecycle_errors"]
+    assert all(
+        v["offered"] == v["completed"] == v["completed_in_window"] and v["errors"] == 0
+        for v in summary["lanes"].values()
+    )
+    assert len({(r["lane"], r["index"]) for r in samples}) == len(samples)
+    assert all(r["ok"] for r in samples)
+    for lane, v in summary["lanes"].items():
+        assert sorted(r["index"] for r in samples if r["lane"] == lane) == list(range(v["offered"]))
+    receipt = json.loads((OUT / (name + "-replay-parity.json")).read_text())
+    for lane, proof in receipt.items():
+        assert proof["all_17_fields_equal"] and proof["input_sha256"] == proof["output_sha256"]
+        assert len(proof["per_batch_receipts"]) == summary["lanes"][lane]["completed"]
+        assert all(
+            p["input_value_hash"] == p["output_value_hash"] for p in proof["per_batch_receipts"]
+        )
+        assert proof["canonical_rows"] == sum(p["rows"] for p in proof["per_batch_receipts"])
+    resources = rows(OUT / (name + "-pg-resources.jsonl"))
+    inwindow = [r for r in resources if window["start_utc"] <= r["utc"] <= window["end_utc"]]
+    client_events = {
+        k: kv(inwindow[-1]["client_cgroup"]["memory.events"])[k] - v
+        for k, v in kv(inwindow[0]["client_cgroup"]["memory.events"]).items()
+    }
+    result["client_memory_events_delta"] = client_events
+    assert client_events["oom_kill"] == 0 and result["server_oom_delta"] == 0
+    result["registry_max"] = {
+        k: max(r["pg"]["registry"][k] for r in resources) for k in ("market", "control", "admin")
+    }
+    assert all(
+        result["registry_max"][k] <= v for k, v in {"market": 16, "control": 24, "admin": 8}.items()
+    )
+    result["autovacuum_delta"] = sum(r["autovacuum_count"] for r in result["tables_last"]) - sum(
+        r["autovacuum_count"] for r in result["tables_first"]
+    )
+    result["receipts"] = receipt
+    result["all_sample_indices_unique_and_complete"] = True
+    source_sets.append(json.loads((OUT / (name + "-source-hashes.json")).read_text()))
+    results[name] = result
+assert all(s == source_sets[0] for s in source_sets)
+root = Path.cwd()
+assert all(
+    hashlib.sha256((root / p).read_bytes()).hexdigest() == h for p, h in source_sets[0].items()
+)
+aggregates = {}
+for regime, samples in pooled.items():
+    metrics = {}
+    for lane in sorted({r["lane"] for r in samples}):
+        rs = [r for r in samples if r["lane"] == lane]
+        latency = np.asarray(
+            [
+                r.get("result", {}).get("adapter_s", r["elapsed_s"])
+                if isinstance(r.get("result"), dict)
+                else r["elapsed_s"]
+                for r in rs
+            ]
+        )
+        metrics[lane] = {
+            "samples": len(rs),
+            "median_s": float(np.median(latency)),
+            "p95_s": float(np.quantile(latency, 0.95)),
+            "max_s": float(latency.max()),
+            "queue_p95_s": float(np.quantile([r["queue_wait_s"] for r in rs], 0.95)),
+            "max_queue_s": max(r["queue_wait_s"] for r in rs),
+        }
+    aggregates[regime] = metrics
+assert all(r["guardrails_pass"] for r in results.values())
+assert results["r4-soak1"]["summary"]["duration_requested_s"] >= 3600
+assert results["r4-soak1"]["pg_deltas"]["checkpoint"]["checkpoints_timed"] >= 2
+assert results["r4-soak1"]["autovacuum_delta"] > 0
+output = {
+    "same_source_revision": True,
+    "names": names,
+    "pooled": aggregates,
+    "runs": results,
+    "all_required_checks_pass": True,
+}
+(OUT / "r4-matrix-analysis.json").write_text(json.dumps(output, indent=2))
+print(json.dumps({"all_required_checks_pass": True, "pooled": aggregates}))

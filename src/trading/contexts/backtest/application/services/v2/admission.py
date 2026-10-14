@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from math import ceil
-from types import MappingProxyType
 from typing import Any, Mapping
 
 from trading.contexts.backtest.application.dto import (
@@ -23,7 +22,7 @@ DEFAULT_BACKTEST_CREATE_WINDOW_SECONDS = 60 * 60
 
 
 @dataclass(frozen=True, slots=True)
-class BacktestTierAdmissionPolicy:
+class BacktestResourcePolicy:
     max_active_full_jobs: int
     max_running_full_jobs: int
     max_full_job_creates_per_hour: int
@@ -58,63 +57,22 @@ def _require_positive_int(*, field_name: str, value: int) -> None:
         raise ValueError(f"{field_name} must be a positive integer")
 
 
-DEFAULT_BACKTEST_TIER_ADMISSION_POLICIES: Mapping[str, BacktestTierAdmissionPolicy] = (
-    MappingProxyType(
-        {
-            "free": BacktestTierAdmissionPolicy(
-                max_active_full_jobs=2,
-                max_running_full_jobs=1,
-                max_full_job_creates_per_hour=5,
-                max_top_n=20,
-                max_indicator_arity=2,
-                max_range_days=365,
-                max_active_lazy_detail_tasks=2,
-                max_lazy_detail_creates_per_hour=10,
-                min_autorefresh_seconds=60,
-            ),
-            "base": BacktestTierAdmissionPolicy(
-                max_active_full_jobs=5,
-                max_running_full_jobs=1,
-                max_full_job_creates_per_hour=15,
-                max_top_n=50,
-                max_indicator_arity=3,
-                max_range_days=730,
-                max_active_lazy_detail_tasks=5,
-                max_lazy_detail_creates_per_hour=30,
-                min_autorefresh_seconds=30,
-            ),
-            "pro": BacktestTierAdmissionPolicy(
-                max_active_full_jobs=20,
-                max_running_full_jobs=1,
-                max_full_job_creates_per_hour=60,
-                max_top_n=50,
-                max_indicator_arity=7,
-                max_range_days=None,
-                max_active_lazy_detail_tasks=20,
-                max_lazy_detail_creates_per_hour=120,
-                min_autorefresh_seconds=15,
-            ),
-            "ultra": BacktestTierAdmissionPolicy(
-                max_active_full_jobs=1_000_000_000_000,
-                max_running_full_jobs=1_000_000_000_000,
-                max_full_job_creates_per_hour=1_000_000_000_000,
-                max_top_n=50,
-                max_indicator_arity=1_000_000_000_000,
-                max_range_days=None,
-                max_active_lazy_detail_tasks=1_000_000_000_000,
-                max_lazy_detail_creates_per_hour=1_000_000_000_000,
-                min_autorefresh_seconds=1,
-            ),
-        }
-    )
+DEFAULT_BACKTEST_RESOURCE_POLICY = BacktestResourcePolicy(
+    max_active_full_jobs=20,
+    max_running_full_jobs=1,
+    max_full_job_creates_per_hour=60,
+    max_top_n=50,
+    max_indicator_arity=7,
+    max_range_days=None,
+    max_active_lazy_detail_tasks=20,
+    max_lazy_detail_creates_per_hour=120,
+    min_autorefresh_seconds=15,
 )
 
 
 @dataclass(frozen=True, slots=True)
 class BacktestAdmissionConfig:
-    tier_policies: Mapping[str, BacktestTierAdmissionPolicy] = (
-        DEFAULT_BACKTEST_TIER_ADMISSION_POLICIES
-    )
+    resource_policy: BacktestResourcePolicy = DEFAULT_BACKTEST_RESOURCE_POLICY
     max_active_full_jobs_global: int = 200
     max_active_lazy_detail_tasks_global: int = 500
     retry_after_seconds: int = DEFAULT_BACKTEST_QUOTA_RETRY_AFTER_SECONDS
@@ -132,19 +90,9 @@ class BacktestAdmissionConfig:
             field_name="retry_after_seconds",
             value=self.retry_after_seconds,
         )
-        normalized: dict[str, BacktestTierAdmissionPolicy] = {}
-        for raw_tier, policy in self.tier_policies.items():
-            tier = str(raw_tier).strip().lower()
-            if not tier:
-                raise ValueError("backtest admission tier key must be non-empty")
-            normalized[tier] = policy
-        for required_tier in ("free", "base", "pro", "ultra"):
-            if required_tier not in normalized:
-                raise ValueError(f"missing backtest admission tier {required_tier!r}")
-        object.__setattr__(self, "tier_policies", MappingProxyType(normalized))
 
-    def policy_for(self, *, paid_level: PaidLevel) -> BacktestTierAdmissionPolicy:
-        return self.tier_policies[str(paid_level)]
+    def policy_for(self, *, paid_level: PaidLevel) -> BacktestResourcePolicy:
+        return self.resource_policy
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,11 +120,8 @@ class BacktestAdmissionService:
     ) -> BacktestRuntimeGuardrails:
         return replace(
             base_guardrails,
-            max_top_n=max(policy.max_top_n for policy in self.config.tier_policies.values()),
-            max_indicator_arity=max(
-                policy.max_indicator_arity
-                for policy in self.config.tier_policies.values()
-            ),
+            max_top_n=self.config.resource_policy.max_top_n,
+            max_indicator_arity=self.config.resource_policy.max_indicator_arity,
         )
 
     def ensure_full_job_request_allowed(
@@ -185,17 +130,15 @@ class BacktestAdmissionService:
         paid_level: PaidLevel,
         preflight: BacktestPreflightResult,
     ) -> None:
-        tier = str(paid_level)
         policy = self.config.policy_for(paid_level=paid_level)
         top_n = int(preflight.normalized_request.get("top_n") or 0)
         if top_n > policy.max_top_n:
             _raise_request_too_expensive(
-                paid_level=tier,
                 limit_scope="full_jobs.top_n",
                 issue=BacktestValidationIssue(
                     path="top_n",
                     code="max_top_n",
-                    message=f"top_n must be <= {policy.max_top_n} for paid_level {tier}",
+                    message=f"top_n must be <= {policy.max_top_n}",
                 ),
                 limit=policy.max_top_n,
                 requested=top_n,
@@ -205,14 +148,13 @@ class BacktestAdmissionService:
         indicator_arity = len(indicators) if isinstance(indicators, list) else 0
         if indicator_arity > policy.max_indicator_arity:
             _raise_request_too_expensive(
-                paid_level=tier,
                 limit_scope="full_jobs.indicator_arity",
                 issue=BacktestValidationIssue(
                     path="indicators",
                     code="max_indicator_arity",
                     message=(
                         "indicator arity must be <= "
-                        f"{policy.max_indicator_arity} for paid_level {tier}"
+                        f"{policy.max_indicator_arity}"
                     ),
                 ),
                 limit=policy.max_indicator_arity,
@@ -222,14 +164,13 @@ class BacktestAdmissionService:
         requested_days = _request_range_days(preflight=preflight)
         if policy.max_range_days is not None and requested_days > policy.max_range_days:
             _raise_request_too_expensive(
-                paid_level=tier,
                 limit_scope="full_jobs.range_days",
                 issue=BacktestValidationIssue(
                     path="time_range",
                     code="max_range_days",
                     message=(
                         "time_range days must be <= "
-                        f"{policy.max_range_days} for paid_level {tier}"
+                        f"{policy.max_range_days}"
                     ),
                 ),
                 limit=policy.max_range_days,
@@ -242,7 +183,6 @@ class BacktestAdmissionService:
         paid_level: PaidLevel,
         snapshot: BacktestFullJobQuotaSnapshot,
     ) -> None:
-        tier = str(paid_level)
         policy = self.config.policy_for(paid_level=paid_level)
         if snapshot.active_full_jobs_global >= self.config.max_active_full_jobs_global:
             _raise_queue_saturated(
@@ -253,7 +193,6 @@ class BacktestAdmissionService:
             )
         if snapshot.active_full_jobs_for_user >= policy.max_active_full_jobs:
             _raise_rate_limited(
-                paid_level=tier,
                 limit_scope="full_jobs.active",
                 limit=policy.max_active_full_jobs,
                 used=snapshot.active_full_jobs_for_user,
@@ -261,7 +200,6 @@ class BacktestAdmissionService:
             )
         if snapshot.full_job_creates_in_window >= policy.max_full_job_creates_per_hour:
             _raise_rate_limited(
-                paid_level=tier,
                 limit_scope="full_jobs.creates_per_hour",
                 limit=policy.max_full_job_creates_per_hour,
                 used=snapshot.full_job_creates_in_window,
@@ -274,7 +212,6 @@ class BacktestAdmissionService:
         paid_level: PaidLevel,
         snapshot: BacktestLazyDetailQuotaSnapshot,
     ) -> None:
-        tier = str(paid_level)
         policy = self.config.policy_for(paid_level=paid_level)
         if (
             snapshot.active_lazy_detail_tasks_global
@@ -291,7 +228,6 @@ class BacktestAdmissionService:
             >= policy.max_active_lazy_detail_tasks
         ):
             _raise_rate_limited(
-                paid_level=tier,
                 limit_scope="lazy_detail.active",
                 limit=policy.max_active_lazy_detail_tasks,
                 used=snapshot.active_lazy_detail_tasks_for_user,
@@ -302,7 +238,6 @@ class BacktestAdmissionService:
             >= policy.max_lazy_detail_creates_per_hour
         ):
             _raise_rate_limited(
-                paid_level=tier,
                 limit_scope="lazy_detail.creates_per_hour",
                 limit=policy.max_lazy_detail_creates_per_hour,
                 used=snapshot.lazy_detail_creates_in_window,
@@ -335,7 +270,6 @@ def _parse_utc(*, value: Any) -> datetime | None:
 
 def _raise_request_too_expensive(
     *,
-    paid_level: str,
     limit_scope: str,
     issue: BacktestValidationIssue,
     limit: int,
@@ -343,10 +277,9 @@ def _raise_request_too_expensive(
 ) -> None:
     raise RoehubError(
         code=BACKTEST_ERROR_REQUEST_TOO_EXPENSIVE,
-        message="Backtest request exceeds tier admission policy",
+        message="Backtest request exceeds resource policy",
         details={
             "errors": [issue.as_mapping()],
-            "paid_level": paid_level,
             "limit_scope": limit_scope,
             "limit": limit,
             "requested": requested,
@@ -357,7 +290,6 @@ def _raise_request_too_expensive(
 
 def _raise_rate_limited(
     *,
-    paid_level: str,
     limit_scope: str,
     limit: int,
     used: int,
@@ -365,9 +297,8 @@ def _raise_rate_limited(
 ) -> None:
     raise RoehubError(
         code=BACKTEST_ERROR_RATE_LIMITED,
-        message="Backtest quota was reached for the current tier",
+        message="Backtest resource quota was reached",
         details={
-            "paid_level": paid_level,
             "limit_scope": limit_scope,
             "limit": limit,
             "used": used,
@@ -404,6 +335,6 @@ __all__ = [
     "BacktestAdmissionService",
     "BacktestFullJobQuotaSnapshot",
     "BacktestLazyDetailQuotaSnapshot",
-    "BacktestTierAdmissionPolicy",
-    "DEFAULT_BACKTEST_TIER_ADMISSION_POLICIES",
+    "BacktestResourcePolicy",
+    "DEFAULT_BACKTEST_RESOURCE_POLICY",
 ]

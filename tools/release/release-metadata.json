@@ -2,11 +2,11 @@
   "artifacts": {
     "preliminary_sbom": {
       "path": "tools/release/preliminary-sbom.spdx.json",
-      "sha256": "54cdb7c827900f356d2fd4b1b755028b59ff0ebaa89e488d328f54740f37dee9"
+      "sha256": "0bb3ac85f020d22c8094dbbfff028a4a11a78b7a9306d11fb290afbc13acdad2"
     },
     "third_party_notices": {
       "path": "tools/release/THIRD_PARTY_NOTICES.md",
-      "sha256": "3b03726a70b391f986265b985ef59ed853e7ff6cbe54ec4f02a3437490baccec"
+      "sha256": "b815fda70eab7f4ab7d03af810141682f2ca354656ca29c6fde5a16e9e1bc378"
     }
   },
   "compatibility": {
@@ -31,33 +31,12 @@
       ],
       "reference": "prom/blackbox-exporter:v0.27.0@sha256:a50c4c0eda297baa1678cd4dc4712a67fdea713b832d43ce7fcc5f9bea05094d"
     },
-    "clickhouse": {
-      "platforms": [
-        "linux/amd64",
-        "linux/arm64"
-      ],
-      "reference": "clickhouse/clickhouse-server:24.8@sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b"
-    },
     "config_consumer": {
       "platforms": [
         "linux/amd64",
         "linux/arm64"
       ],
       "reference": "alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce"
-    },
-    "grafana": {
-      "platforms": [
-        "linux/amd64",
-        "linux/arm64"
-      ],
-      "reference": "grafana/grafana:12.0.2@sha256:b5b59bfc7561634c2d7b136c4543d702ebcc94a3da477f21ff26f89ffd4214fa"
-    },
-    "loki": {
-      "platforms": [
-        "linux/amd64",
-        "linux/arm64"
-      ],
-      "reference": "grafana/loki:3.5.1@sha256:a74594532eec4cc313401beedc4dd2708c43674c032084b1aeb87c14a5be1745"
     },
     "ml_runtime": {
       "platforms": [

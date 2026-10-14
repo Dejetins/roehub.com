@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Callable, Iterable
@@ -42,7 +43,7 @@ class RestFillRange1mUseCase:
     - check_lease: fence checked before verification metadata mutations.
 
     Assumptions/Invariants:
-    - `max_days_per_insert` is in `[1, 7]` for ClickHouse partition safety.
+    - `max_days_per_insert` is in `[1, 7]` to bound transaction and verification work.
     - `batch_size` is positive.
     """
 
@@ -161,6 +162,8 @@ class RestFillRange1mUseCase:
         Side effects:
         - Reads canonical index bounds for selected reasons.
         """
+        if self.history_verifier is not None:
+            return task
         clamp_reasons = {"bootstrap", "scheduler_bootstrap", "historical_backfill"}
         if task.reason not in clamp_reasons or self.index_reader is None:
             return task
@@ -206,41 +209,59 @@ class RestFillRange1mUseCase:
         Side effects:
         - Writes to raw storage through writer port.
         """
-        rows_read = 0
-        rows_written = 0
-        batches_written = 0
-        batch: list[CandleWithMeta] = []
-        existing_minute_keys = self._existing_minute_keys(task=task, chunk=chunk)
+        self.check_lease()
+        verifier = self.history_verifier
+        fence = verifier.acquire(instrument_id=task.instrument_id) if verifier else None
+        try:
+            origin = verifier.origin(instrument_id=task.instrument_id) if verifier else None
+            renew_at = time.monotonic() + 30
+            rows_read = 0
+            rows_written = 0
+            batches_written = 0
+            batch: list[CandleWithMeta] = []
+            existing_minute_keys = self._existing_minute_keys(task=task, chunk=chunk)
 
-        for row in self._missing_rows(task=task, chunk=chunk, present=existing_minute_keys):
-            rows_read += 1
-            minute_key = _minute_key(row.candle.ts_open.value)
-            if minute_key in existing_minute_keys:
-                continue
-            existing_minute_keys.add(minute_key)
-            batch.append(row)
+            for row in self._missing_rows(task=task, chunk=chunk, present=existing_minute_keys):
+                if self.history_verifier is not None and time.monotonic() >= renew_at:
+                    self.history_verifier.renew(instrument_id=task.instrument_id, fence=fence)
+                    renew_at = time.monotonic() + 30
+                self.check_lease()
+                rows_read += 1
+                minute_key = _minute_key(row.candle.ts_open.value)
+                if minute_key in existing_minute_keys:
+                    continue
+                existing_minute_keys.add(minute_key)
+                batch.append(row)
 
-            if len(batch) >= self.batch_size:
+                if len(batch) >= min(self.batch_size, 8192):
+                    self._write_batch(batch)
+                    rows_written += len(batch)
+                    batches_written += 1
+                    batch = []
+
+            if batch:
                 self._write_batch(batch)
                 rows_written += len(batch)
                 batches_written += 1
-                batch = []
 
-        if batch:
-            self._write_batch(batch)
-            rows_written += len(batch)
-            batches_written += 1
+            # Only a fully consumed successful source read can confirm an omission.
+            # Existing canonical keys and every returned key must still be durable.
+            if self.history_verifier is not None:
+                self.history_verifier.confirm(
+                    instrument_id=task.instrument_id,
+                    time_range=chunk,
+                    observed_minutes=existing_minute_keys,
+                    observed_at=self.clock.now().value,
+                    accept_absence=task.reason != "ws_recovery",
+                    check_lease=self.check_lease,
+                    fence=fence,
+                    origin=origin,
+                )
 
-        # Only a fully consumed successful source read can confirm an omission.
-        # Existing canonical keys and every returned key must still be durable.
-        if self.history_verifier is not None:
-            self.history_verifier.confirm(
-                instrument_id=task.instrument_id, time_range=chunk,
-                observed_minutes=existing_minute_keys, observed_at=self.clock.now().value,
-                accept_absence=task.reason != "ws_recovery", check_lease=self.check_lease,
-            )
-
-        return rows_read, rows_written, batches_written
+            return rows_read, rows_written, batches_written
+        finally:
+            if verifier is not None and fence is not None:
+                verifier.release(instrument_id=task.instrument_id, fence=fence)
 
     def _missing_rows(self, *, task: RestFillTask, chunk: TimeRange, present: set[int]):
         """Ask the provider only for contiguous missing minutes in this bounded chunk."""

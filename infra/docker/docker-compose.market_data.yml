@@ -1,95 +1,53 @@
-# Dev/standalone compose for market-data only.
-# Production path uses infra/docker/docker-compose.yml.
 services:
-  market-data-clickhouse:
-    image: clickhouse/clickhouse-server:24.8
-    restart: unless-stopped
-    environment:
-      CLICKHOUSE_DB: ${CH_DATABASE:-market_data}
-      CLICKHOUSE_USER: ${CH_USER:-default}
-      CLICKHOUSE_PASSWORD: ${CH_PASSWORD:-}
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
-    ports:
-      - "127.0.0.1:${MARKET_DATA_CH_HTTP_PORT:-18123}:8123"
-      - "127.0.0.1:${MARKET_DATA_CH_NATIVE_PORT:-19000}:9000"
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8123/ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 20
-    volumes:
-      - market_data_ch_data:/var/lib/clickhouse
-      - market_data_ch_logs:/var/log/clickhouse-server
-
   redis:
     image: redis:7.2-bookworm
     container_name: redis
     restart: unless-stopped
-    command: ["redis-server", "--appendonly", "yes"]
+    command:
+    - redis-server
+    - --appendonly
+    - 'yes'
     volumes:
-      - market_data_redis_data:/data
-
+    - market_data_redis_data:/data
+    environment: {}
   market-data-ws-worker:
     build:
       context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
       dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
     restart: unless-stopped
     depends_on:
-      - market-data-clickhouse
-      - redis
+    - redis
     environment:
-      CH_HOST: ${CH_HOST:-market-data-clickhouse}
-      CH_PORT: ${CH_PORT:-8123}
-      CH_DATABASE: ${CH_DATABASE:-market_data}
-      CH_USER: ${CH_USER:-default}
-      CH_PASSWORD: ${CH_PASSWORD:-}
-      CH_SECURE: ${CH_SECURE:-0}
-      CH_VERIFY: ${CH_VERIFY:-1}
+      STRATEGY_PG_DSN: ${STRATEGY_PG_DSN:?explicit migrated PostgreSQL endpoint required}
       ROEHUB_REDIS_PASSWORD: ${ROEHUB_REDIS_PASSWORD:-}
     command:
-      - python
-      - -m
-      - apps.worker.market_data_ws.main.main
-      - --config
-      - ${MARKET_DATA_CONFIG_PATH:-/app/configs/prod/market_data.yaml}
-      - --metrics-port
-      - "9201"
+    - python
+    - -m
+    - apps.worker.market_data_ws.main.main
+    - --config
+    - ${MARKET_DATA_CONFIG_PATH:-/app/configs/prod/market_data.yaml}
+    - --metrics-port
+    - '9201'
     ports:
-      - "127.0.0.1:${MARKET_DATA_WORKER_METRICS_PORT:-9201}:9201"
-
+    - 127.0.0.1:${MARKET_DATA_WORKER_METRICS_PORT:-9201}:9201
   market-data-scheduler:
     build:
       context: ${MARKET_DATA_BUILD_CONTEXT:-../..}
       dockerfile: ${MARKET_DATA_DOCKERFILE:-infra/docker/Dockerfile.market_data}
     restart: unless-stopped
-    depends_on:
-      - market-data-clickhouse
     environment:
-      CH_HOST: ${CH_HOST:-market-data-clickhouse}
-      CH_PORT: ${CH_PORT:-8123}
-      CH_DATABASE: ${CH_DATABASE:-market_data}
-      CH_USER: ${CH_USER:-default}
-      CH_PASSWORD: ${CH_PASSWORD:-}
-      CH_SECURE: ${CH_SECURE:-0}
-      CH_VERIFY: ${CH_VERIFY:-1}
+      STRATEGY_PG_DSN: ${STRATEGY_PG_DSN:?explicit migrated PostgreSQL endpoint required}
     command:
-      - python
-      - -m
-      - apps.scheduler.market_data_scheduler.main.main
-      - --config
-      - ${MARKET_DATA_CONFIG_PATH:-/app/configs/prod/market_data.yaml}
-      - --whitelist
-      - ${MARKET_DATA_WHITELIST_PATH:-/app/configs/prod/whitelist.csv}
-      - --metrics-port
-      - "9202"
+    - python
+    - -m
+    - apps.scheduler.market_data_scheduler.main.main
+    - --config
+    - ${MARKET_DATA_CONFIG_PATH:-/app/configs/prod/market_data.yaml}
+    - --whitelist
+    - ${MARKET_DATA_WHITELIST_PATH:-/app/configs/prod/whitelist.csv}
+    - --metrics-port
+    - '9202'
     ports:
-      - "127.0.0.1:${MARKET_DATA_SCHEDULER_METRICS_PORT:-9202}:9202"
-
+    - 127.0.0.1:${MARKET_DATA_SCHEDULER_METRICS_PORT:-9202}:9202
 volumes:
-  market_data_ch_data: {}
-  market_data_ch_logs: {}
   market_data_redis_data: {}

@@ -12,6 +12,7 @@ from typing import Any, LiteralString, cast
 from uuid import uuid4
 
 import psycopg
+from psycopg.conninfo import conninfo_to_dict, make_conninfo
 from psycopg.rows import dict_row
 
 from trading.contexts.market_data.adapters.outbound.persistence.postgres.stream_recovery_store import (  # noqa: E501
@@ -23,11 +24,22 @@ from trading.contexts.market_data.application.ports.stores.stream_recovery_store
     RecoveryEntry,
     recovery_key,
 )
+from trading.platform.postgres_budget import async_connect
 
 
 class AsyncPostgresStreamRecoveryStore:
     def __init__(self, dsn: str, *, max_entries: int = 20000) -> None:
         self._dsn = PostgresStreamRecoveryStore(dsn, max_entries=max_entries).dsn
+        # The server owns the advisory lease. A client-side deadline cannot
+        # release it when a broken network drops the socket's final close.
+        # Bound dead-peer detection on this Linux deployment's server socket;
+        # healthy idle collectors still answer TCP keepalives.
+        options = str(conninfo_to_dict(self._dsn).get("options") or "")
+        self._dsn = make_conninfo(
+            self._dsn,
+            options=options + " -c tcp_keepalives_idle=10 -c tcp_keepalives_interval=5"
+            " -c tcp_keepalives_count=3 -c tcp_user_timeout=15000",
+        )
         self.max_entries = max_entries
         self._conn: psycopg.AsyncConnection[dict[str, Any]] | None = None
         self._lock = asyncio.Lock()
@@ -37,15 +49,19 @@ class AsyncPostgresStreamRecoveryStore:
     async def lease(self):
         if self._conn is not None:
             raise RuntimeError("collector lease already entered")
-        async with await psycopg.AsyncConnection[dict[str, Any]].connect(
-            self._dsn, autocommit=True, row_factory=dict_row
-        ) as conn:
+        async with await async_connect(self._dsn, autocommit=True, row_factory=dict_row) as conn:
             async with self._deadline(conn):
                 row = await (
                     await conn.execute("SELECT pg_try_advisory_lock(744948345628) AS locked")
                 ).fetchone()
             if not row or not row["locked"]:
                 raise RuntimeError("stream collector is already running")
+            async with self._deadline(conn):
+                slot = await (
+                    await conn.execute("SELECT pg_try_advisory_lock(563298,12) AS locked")
+                ).fetchone()
+            if not slot or not slot["locked"]:
+                raise RuntimeError("market recovery connection budget exhausted")
             self._conn, self._failed = conn, False
             try:
                 yield self
@@ -205,13 +221,20 @@ class AsyncPostgresStreamRecoveryStore:
         if len(snapshot) > self.max_entries:
             raise RuntimeError("stream_connection_capacity_exceeded")
         async with self._transaction() as conn:
-            await conn.execute("DELETE FROM market_data_stream_connections")
+            await conn.execute(
+                "DELETE FROM market_data_stream_connections WHERE (market_id,symbol) NOT IN "
+                "(SELECT * FROM unnest(%s::int[],%s::text[]))",
+                ([key[0] for key in snapshot], [key[1] for key in snapshot]),
+            )
             if snapshot:
                 await conn.execute(
                     "INSERT INTO market_data_stream_connections "
                     "(market_id,symbol,connected,collector_pid) "
                     "SELECT m,s,c,pg_backend_pid() FROM unnest(%s::int[],%s::text[],"
-                    "%s::bool[]) AS x(m,s,c)",
+                    "%s::bool[]) AS x(m,s,c) "
+                    "ON CONFLICT (market_id,symbol) DO UPDATE SET "
+                    "connected=EXCLUDED.connected,collector_pid=EXCLUDED.collector_pid,"
+                    "observed_at=now()",
                     (
                         [key[0] for key in snapshot],
                         [key[1] for key in snapshot],

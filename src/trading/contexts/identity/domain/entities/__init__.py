@@ -8,8 +8,6 @@ from .organization import (
     OrganizationMembership,
     OrganizationPermission,
     OrganizationRole,
-    PluginPermission,
-    PluginPermissionGrant,
     SupportAccessGrant,
     permissions_for_role,
 )
@@ -25,8 +23,6 @@ __all__ = [
     "OrganizationMembership",
     "OrganizationPermission",
     "OrganizationRole",
-    "PluginPermission",
-    "PluginPermissionGrant",
     "SupportAccessGrant",
     "User",
     "permissions_for_role",

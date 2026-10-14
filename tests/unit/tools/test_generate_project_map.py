@@ -62,6 +62,18 @@ def _repo(tmp_path: Path) -> Path:
     return tmp_path
 
 
+def test_build_map_excludes_deleted_tracked_files(tmp_path: Path) -> None:
+    root = _repo(tmp_path)
+    deleted = "configs/observability/grafana-dashboard.json"
+    _write(root / deleted, "{}\n")
+    subprocess.run(["git", "add", deleted], cwd=root, check=True)
+    (root / deleted).unlink()
+
+    data = build_map(root)
+
+    assert deleted not in {item["path"] for item in data["inventory"]}
+
+
 def test_build_map_discovers_inventory_components_and_import_edges(tmp_path: Path) -> None:
     data = build_map(_repo(tmp_path))
 

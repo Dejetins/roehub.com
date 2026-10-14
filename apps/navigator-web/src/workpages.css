@@ -8,7 +8,6 @@
 .work-categories a{display:flex;align-items:center;gap:8px;padding:10px 8px;border-radius:8px;font-size:12px;min-height:38px}
 .work-categories a[aria-current=page]{background:#252c34}
 .work-categories svg{width:16px;height:16px}
-.work-library-actions{display:flex;gap:6px;align-items:center;margin-left:auto}
 .work-list-group{font-size:11px;color:var(--muted);margin:12px 0 0;line-height:18px}
 .work-object-row{display:flex;flex-direction:column;gap:4px;min-height:64px;padding:10px 6px;border-bottom:1px solid var(--line);font-size:11px;line-height:15px;overflow-wrap:anywhere}
 .work-object-row span{color:var(--muted);font-size:10px}.work-object-row[aria-current]{background:#252c34;box-shadow:inset 2px 0 var(--violet)}

@@ -23,8 +23,8 @@ def test_local_ui_surface_registry_has_stable_referenced_inventory() -> None:
     assert registry["schema_version"] == "1.0"
     assert registry["scope"] == "local_platform"
     assert registry["counts"] == {
-        "current_route_patterns": 28,
-        "surface_records": 33,
+        "current_route_patterns": 27,
+        "surface_records": 32,
         "journeys": 12,
     }
 

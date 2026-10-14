@@ -503,30 +503,33 @@ def test_real_composed_cycle_and_source_cursor(dispatch, tmp_path):
     from apps.scheduler.backtest_artifact_publisher.wiring.modules.backtest_artifact_publisher import (  # noqa: E501
         FileBacktestArtifactPublisherHostLock,
     )
-    from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol, UtcTimestamp
+    from tests.real_infra.backtest.test_automatic_base_lifecycle import (
+        PostgresCanonicalCandleIndexReader,
+        PostgresCanonicalCandleReader,
+        PostgresStoredArtifactCoordinates,
+        insert,
+    )
 
     m = dispatch
     f, w = worker(m, tmp_path)
 
-    class Stored:
-        def page(self, **kwargs):
-            return (InstrumentId(MarketId(1), Symbol("BTCUSDT")),)
-
-    class Index:
-        def bounds_1m(self, **kwargs):
-            return UtcTimestamp(START), UtcTimestamp(START + timedelta(minutes=179))
-
-        def distinct_ts_opens(self, **kwargs):
-            return (UtcTimestamp(START),)
+    insert(m["source_gateway"])
+    publisher = replace(
+        w.publisher,
+        runner=replace(
+            w.publisher.runner,
+            canonical_candle_reader=PostgresCanonicalCandleReader(m["source_gateway"]),
+        ),
+    )
 
     app = compose_managed_app(
         installation_id=m["installation"],
         gateway=m["db"],
         catalog=m["catalog"],
         access=m["repo"].access,
-        publisher=w.publisher,
-        stored_coordinates=Stored(),
-        candle_index=Index(),
+        publisher=publisher,
+        stored_coordinates=PostgresStoredArtifactCoordinates(m["source_gateway"]),
+        candle_index=PostgresCanonicalCandleIndexReader(m["source_gateway"]),
         root=f.builder.root,
         root_id="backtest-primary",
         root_revision=1,
@@ -636,9 +639,6 @@ def test_existing_scheduler_factory_selects_managed_only_explicitly(
         environ={
             "STRATEGY_PG_DSN": m["dsn"],
             "ROEHUB_ARTIFACT_MANAGEMENT_INSTALLATION_ID": str(m["installation"]),
-            "CH_HOST": "127.0.0.1",
-            "CH_PORT": "1",
-            "CH_PASSWORD": "disposable-only",
             "INDICATORS_CONFIG": str(Path("configs/dev/indicators.yaml").resolve()),
         },
         metrics_port=19999,
@@ -671,7 +671,7 @@ def test_reject_retry_releases_logical_capacity_without_ttl(dispatch):
     )
 
 
-def test_missed_targets_coalesce_without_mutating_requests(dispatch):
+def test_distinct_source_targets_remain_separate_without_mutating_requests(dispatch):
     from uuid import uuid4
 
     m = dispatch
@@ -705,8 +705,18 @@ def test_missed_targets_coalesce_without_mutating_requests(dispatch):
         incarnation=uuid4(),
         reservation=100,
     )
-    assert build["snapshot"]["source"] == newer.model_dump(mode="json")
-    assert len(build["snapshot"]["requests"]) == 2
+    assert build["snapshot"]["source"] == older.model_dump(mode="json")
+    assert len(build["snapshot"]["requests"]) == 1
+    r.finish(build=build, outcome="error", reason="test_finished")
+    next_build = r.claim_group(
+        installation=m["installation"],
+        request=r.next_request(m["installation"]),
+        owner=uuid4(),
+        incarnation=uuid4(),
+        reservation=100,
+    )
+    assert next_build["snapshot"]["source"] == newer.model_dump(mode="json")
+    assert len(next_build["snapshot"]["requests"]) == 1
     assert {
         str(row["request_id"]): row["snapshot"]
         for row in r.rows("SELECT * FROM backtest_artifact_requests")
@@ -829,7 +839,7 @@ def test_preclaim_storage_permission_failure_is_durable(dispatch, tmp_path):
     assert not m["repo"].rows("SELECT * FROM backtest_artifact_builds")
 
 
-def test_coalesced_history_checks_effective_storage_before_freeze(dispatch, tmp_path):
+def test_exact_target_history_checks_storage_before_freeze(dispatch, tmp_path):
     m = dispatch
     r = m["repo"]
     p = item(m)
@@ -849,18 +859,15 @@ def test_coalesced_history_checks_effective_storage_before_freeze(dispatch, tmp_
         }
     )
     r.observe_source(
-        installation_id=m["installation"], coordinate=p.coordinate, source=older, observed_at=NOW
-    )
-    r.observe_source(
         installation_id=m["installation"], coordinate=p.coordinate, source=newer, observed_at=NOW
     )
     _, w = worker(m, tmp_path)
     r._exec("UPDATE backtest_artifact_installation_settings SET budget_bytes=1103741824")
     assert w.run_once(m["installation"]) is None
-    build = r.rows("SELECT * FROM backtest_artifact_builds")[0]
-    assert build["state"] == "error"
+    assert not r.rows("SELECT * FROM backtest_artifact_builds")
     assert (
         r.rows("SELECT reason FROM backtest_artifact_requests")[0]["reason"] == "resource_conflict"
     )
-    assert build["snapshot"]["source"] == newer.model_dump(mode="json")
-    assert "frozen_source" not in build["snapshot"]
+    request = r.rows("SELECT snapshot FROM backtest_artifact_requests")[0]
+    assert request["snapshot"]["source"] == newer.model_dump(mode="json")
+    assert "frozen_source" not in request["snapshot"]

@@ -292,6 +292,66 @@
           "sha256": "c3772dad10b9b3b14693028b827b16863847bbc8723e3e05e0c1de4451080c3f"
         }
       ]
+    },
+    {
+      "version": "market-data-stream-events-0035",
+      "sha256": "d44e3a8ce7b8f70503742223f5969971f8e2db4a3cea668a5b8a7741c56d107f",
+      "files": [
+        {
+          "path": "0035_market_data_stream_events_v1.sql",
+          "sha256": "7251af68dd4afa69975e55672c3033f17d45c684eb0c273a8ab31805b9d00266"
+        }
+      ]
+    },
+    {
+      "version": "market-data-storage-0036",
+      "sha256": "64c6f609b133101611716beaf02b841644fe67b0ec3e0bddf4e5be04d0f6586c",
+      "files": [
+        {
+          "path": "0036_market_data_storage_v1.sql",
+          "sha256": "34543fdd22aef3a6224ba29046cd894f917d5bb4b0809c6f8563c1d8daa6a7b9"
+        }
+      ]
+    },
+    {
+      "version": "market-data-reference-0037",
+      "sha256": "2953be5cdf5dc6d21cd8555ff53c7b0af37db81c81a99d647234bd419f7cc102",
+      "files": [
+        {
+          "path": "0037_market_data_reference_versions_v1.sql",
+          "sha256": "52b421e8c24d2b8d00a4ddc9fa93e0388399f1de526663eee212f31ff78cf178"
+        }
+      ]
+    },
+    {
+      "version": "market-data-verification-0038",
+      "sha256": "ce0b47116184261553b36cb4d671546832660799a286c5275683e0d0227400d8",
+      "files": [
+        {
+          "path": "0038_market_data_verification_fences_v1.sql",
+          "sha256": "8af6d62c18daacc9c7db317ea98b65afa37a807aeee195c74fd6f1c170d02011"
+        }
+      ]
+    },
+    {
+      "version": "market-data-consumers-0039",
+      "sha256": "da564b15e4e9b507814fff2bb9aa3099fe0a39ba4e769c8063c2d900b7a25289",
+      "files": [
+        {
+          "path": "0039_market_data_consumer_contract_v1.sql",
+          "sha256": "47c5d73e98c4a0e3b7bdc50bbee3c5e9d7ff8427bb3b0545a423f2d908f62ff9"
+        }
+      ]
+    },
+    {
+      "version": "market-data-append-fence-0040",
+      "sha256": "e7cfbb10ff039f58dffd3612f5e544478e39da56c130cbb1a8a220c7515f5506",
+      "files": [
+        {
+          "path": "0040_market_data_append_fence_v1.sql",
+          "sha256": "1e0d610c941c2a3686d05864ef57f89f1e74bb9a0841d54b819dc96a52c34bef"
+        }
+      ]
     }
   ]
 }

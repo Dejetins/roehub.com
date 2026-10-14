@@ -1,0 +1,10 @@
+### Browser `s10-installed` opened with pid 92815.
+### Ran Playwright code
+```js
+await page.goto('http://127.0.0.1:20120/login');
+```
+### Page
+- Page URL: http://127.0.0.1:20120/login
+- Page Title: Sign in to Roehub | Roehub
+### Snapshot
+- [Snapshot](.playwright-cli/page-2026-10-14T08-16-47-003Z.yml)

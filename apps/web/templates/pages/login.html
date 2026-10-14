@@ -45,12 +45,6 @@
           </form>
         </details>
       </div>
-      <div class="local-auth__federated" data-oidc-login hidden>
-        <p>{{ t("auth.oidc.invitation_note") }}</p>
-        <a class="rh-button auth-gateway__continue" href="{{ oidc_login_url }}" data-oidc-login-link>
-          {{ t("auth.oidc.login") }} <span data-oidc-provider-name></span>
-        </a>
-      </div>
       <form class="local-auth__form" data-local-bootstrap hidden>
         <p class="local-auth__notice">{{ t("auth.local.bootstrap_note") }}</p>
         <label>{{ t("auth.local.ticket") }}<input name="ticket_file" type="file" accept="text/plain,.txt" required></label>

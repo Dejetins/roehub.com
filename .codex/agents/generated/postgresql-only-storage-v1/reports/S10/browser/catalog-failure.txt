@@ -1,0 +1,88 @@
+### Page
+- Page URL: http://127.0.0.1:20120/data?job=81415c14-943f-4e46-8eb1-40c070e7e91a&market=1
+- Page Title: Data · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f7e8]:
+  - link "Skip to content" [ref=f7e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - complementary [ref=f7e10]:
+    - generic "RoeHub" [ref=f7e11]: R
+    - navigation "Navigation" [ref=f7e12]:
+      - link "Overview" [ref=f7e13] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f7e20] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f7e24] [cursor=pointer]:
+        - /url: /strategies
+      - link "Data" [ref=f7e28] [cursor=pointer]:
+        - /url: /data
+      - link "Connections" [ref=f7e34] [cursor=pointer]:
+        - /url: /connections
+      - link "Monitoring" [ref=f7e38] [cursor=pointer]:
+        - /url: /monitoring
+      - link "Settings" [ref=f7e42] [cursor=pointer]:
+        - /url: /settings/profile
+    - group [ref=f7e47]:
+      - 'generic "Language: EN" [ref=f7e48] [cursor=pointer]': EN
+    - link "Sign out" [ref=f7e51] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f7e56]:
+    - generic [ref=f7e57]:
+      - text: Data
+      - generic [ref=f7e58]: Navigator
+    - generic [ref=f7e59]:
+      - complementary [ref=f7e60]:
+        - heading "Exchanges" [level=2] [ref=f7e63]
+        - generic [ref=f7e64]:
+          - navigation "Exchanges"
+          - status [ref=f7e65]:
+            - generic [ref=f7e68]: Loading data…
+      - heading "Data" [active] [level=1] [ref=f7e69]
+      - region "Instrument catalog" [ref=f7e70]:
+        - navigation "Data view" [ref=f7e71]:
+          - link "Candles" [ref=f7e72] [cursor=pointer]:
+            - /url: /data?job=81415c14-943f-4e46-8eb1-40c070e7e91a&market=1
+          - link "Artifacts" [ref=f7e73] [cursor=pointer]:
+            - /url: /data?job=81415c14-943f-4e46-8eb1-40c070e7e91a&market=1&view=artifacts
+        - generic [ref=f7e74]:
+          - generic [ref=f7e75]:
+            - generic [ref=f7e76]: Search instruments
+            - searchbox "Search instruments" [ref=f7e77]
+          - button "Market" [ref=f7e79] [cursor=pointer]: All markets
+          - button "History" [ref=f7e83] [cursor=pointer]: "History: all"
+          - button "Stream" [ref=f7e87] [cursor=pointer]: "Stream: all"
+        - generic [ref=f7e90]:
+          - generic [ref=f7e91]: All available history · 1m · through the latest closed minute
+          - generic [ref=f7e92]:
+            - button "Show log" [ref=f7e93] [cursor=pointer]
+            - button "Refresh" [ref=f7e94] [cursor=pointer]
+        - status [ref=f7e101]:
+          - generic [ref=f7e104]: Loading data…
+        - generic "Catalog rows" [ref=f7e105]:
+          - table [ref=f7e106]:
+            - rowgroup [ref=f7e107]:
+              - row [ref=f7e108]:
+                - columnheader [ref=f7e109]:
+                  - checkbox "Select this page for download" [disabled] [ref=f7e110]
+                - columnheader [ref=f7e111]:
+                  - button "Instrument" [ref=f7e112] [cursor=pointer]
+                - columnheader [ref=f7e115]:
+                  - button "Market" [ref=f7e116] [cursor=pointer]
+                - columnheader [ref=f7e120]:
+                  - button "History / download" [ref=f7e121] [cursor=pointer]
+                - columnheader [ref=f7e125]:
+                  - button "Stream" [ref=f7e126] [cursor=pointer]
+            - rowgroup
+        - generic [ref=f7e130]:
+          - generic [ref=f7e131]: —
+          - generic [ref=f7e132]:
+            - button "Previous page" [disabled] [ref=f7e133]
+            - button "Next page" [disabled] [ref=f7e136]
+      - complementary "Instrument settings" [ref=f7e139]:
+        - generic [ref=f7e140]:
+          - heading "Request details" [level=2] [ref=f7e141]
+          - button "Close request" [ref=f7e142] [cursor=pointer]
+        - status [ref=f7e146]:
+          - generic [ref=f7e149]: Loading data…
+```

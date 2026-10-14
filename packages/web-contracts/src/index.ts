@@ -2,7 +2,6 @@
 export type Locale = 'ru' | 'en';
 export interface SessionIdentity {
   user_id: string;
-  paid_level: string;
 }
 export interface ClientBootstrap {
   locale: Locale;

@@ -1,0 +1,49 @@
+### Page
+- Page URL: http://localhost:57917/strategies
+- Page Title: Strategies · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f5e8]:
+  - link "Skip to content" [ref=f5e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - banner [ref=f5e10]:
+    - generic [ref=f5e11]: RoeHub
+    - navigation "Language" [ref=f5e12]:
+      - link "Русский" [ref=f5e13] [cursor=pointer]:
+        - /url: /locale?locale=ru&next=%2Fstrategies
+      - link "English" [ref=f5e14] [cursor=pointer]:
+        - /url: /locale?locale=en&next=%2Fstrategies
+  - complementary [ref=f5e15]:
+    - navigation "Navigation" [ref=f5e16]:
+      - link "Overview" [ref=f5e17] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f5e23] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f5e26] [cursor=pointer]:
+        - /url: /strategies
+      - generic "The Data page is not available yet." [ref=f5e29]:
+        - text: Data
+        - generic [ref=f5e34]: Unavailable
+      - link "Settings" [ref=f5e35] [cursor=pointer]:
+        - /url: /settings
+    - link "Sign out" [ref=f5e39] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f5e43]:
+    - generic [ref=f5e221]:
+      - heading "Strategies" [active] [level=1] [ref=f5e222]
+      - generic [ref=f5e223]:
+        - region "Strategy workspace" [ref=f5e224]:
+          - paragraph [ref=f5e226]: Select a strategy to inspect its immutable specification.
+        - region [ref=f5e229]:
+          - generic [ref=f5e230]:
+            - heading "Library" [level=2] [ref=f5e231]
+            - generic [ref=f5e232]: "0"
+          - generic [ref=f5e233]:
+            - group [ref=f5e234]:
+              - generic "Filters" [ref=f5e235] [cursor=pointer]
+            - status [ref=f5e236]: Last read · Oct 13, 2026, 10:26 PM UTC
+            - paragraph [ref=f5e237]: No saved strategies yet
+  - contentinfo [ref=f5e93]:
+    - text: Strategy workspace
+    - generic [ref=f5e94]: State and executions
+```

@@ -29,7 +29,6 @@ _DOMAIN_COMMANDS = {
     "backtest-artifact-publish",
     "funding-rate-catchup",
     "local-auth-bootstrap",
-    "plugins",
     "providers",
     "rest-catchup",
     "sync-instruments",

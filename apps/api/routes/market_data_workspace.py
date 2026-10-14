@@ -198,6 +198,22 @@ def build_market_data_workspace_router(
             raise HTTPException(409, {"code": "history_origin_unknown"})
         return first
 
+    @router.get("/market-data/workspace/stream-events")
+    def stream_events(
+        market_id: int = Query(ge=1),
+        symbol: str | None = Query(default=None, max_length=64, pattern=r"^[A-Z0-9_]+$"),
+        before: int | None = Query(default=None, ge=1),
+        limit: int = Query(default=30, ge=1, le=100),
+        principal: CurrentUserPrincipal = Depends(current_user_dependency),
+    ):
+        organization(principal)
+        require_market(market_id)
+        rows = jobs.stream_events(market_id=market_id, symbol=symbol,
+                                  before=before, limit=limit + 1)
+        return dict(items=list(rows[:limit]),
+                    next_cursor=rows[limit - 1]["event_id"] if len(rows) > limit else None,
+                    retention_days=30)
+
     @router.get("/market-data/workspace/backlog", response_model=WorkBacklogResponse)
     def backlog(
         principal: CurrentUserPrincipal = Depends(current_user_dependency),

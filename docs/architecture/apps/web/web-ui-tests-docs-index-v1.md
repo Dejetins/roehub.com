@@ -1,5 +1,12 @@
 # Web UI v1 -- Tests + Docs Index (WEB-EPIC-07)
 
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Потребители сохраняют domain/array/API и security границы. S05 переносит wiring и прямые SQL/script callers; S08 доказывает numerical/runtime parity. Упоминание прежнего engine ниже не задаёт целевую зависимость.
+
+
 **Статус:** исторический реестр регрессионных проверок SSR. Будущие проверки
 выбираются в границах конкретных задач; базовые продуктовые требования
 зафиксированы в
@@ -66,7 +73,7 @@ Milestone 6 добавил:
 ## Non-goals
 
 - Полные e2e UI тесты (Playwright) в v1.
-- Интеграционные тесты с реальным Postgres/ClickHouse/edge proxy.
+- Интеграционные тесты с реальным Postgres/PostgreSQL/edge proxy.
 
 ## Implementation notes (как именно фиксируем контракт)
 

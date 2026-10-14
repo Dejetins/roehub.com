@@ -38,7 +38,8 @@
             "http_json",
             "http_reachability",
             "tcp_reachability",
-            "openbao"
+            "openbao",
+            "postgresql"
           ]
         },
         "target": {"type": "string", "minLength": 3, "maxLength": 512},

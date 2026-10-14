@@ -1,5 +1,22 @@
 # Market Data -- Reference API v1 (markets + instruments)
 
+## Consumer wiring — S05, 2026-10-14
+
+Чтение справочника, поиска и coverage переведено на PostgreSQL; public DTO, организация, авторизация и loading/snapshot semantics сохранены.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+API/auth/org scope и snapshot/loading contract сохраняются. Coverage читает summary/day masks; source absence не входит в actual count/latest. Старые snapshot/generation после reset недействительны.
+
+
 Validation boundary: a local Docker `runtime smoke` and real browser proof are
 required in addition to `pytest`, `ruff`, and `pyright` for browser-visible or
 persistence-affecting changes to this contract.
@@ -11,21 +28,21 @@ persistence-affecting changes to this contract.
 > пути API-router ниже приведены без proxy-префикса.
 
 This document fixes WEB-EPIC-03 architecture: auth-only JSON API endpoints for UI dropdown/search,
-backed by ClickHouse reference tables `market_data.ref_market` and `market_data.ref_instruments`.
+backed by PostgreSQL reference tables `market_data.ref_market` and `market_data.ref_instruments`.
 
 ## Goal
 
-- Let Web UI load enabled markets and search enabled/tradable instruments without direct ClickHouse access.
-- Keep responses deterministic (stable ordering) and storage reads explicit (no ORM, no hidden FINAL).
+- Let Web UI load enabled markets and search enabled/tradable instruments without direct PostgreSQL access.
+- Keep responses deterministic (stable ordering) and storage reads explicit (no ORM, bounded parameterized SQL).
 - Reuse existing identity auth (opaque Roehub session cookie) via API `current_user_dependency`.
 
 ## Context
 
-- Reference data source-of-truth lives in ClickHouse (DDL):
-  - `migrations/clickhouse/market_data_ddl.sql`
+- Reference data source-of-truth lives in PostgreSQL (DDL):
+  - `migrations/postgres/0036_market_data_storage_v1.sql`
   - tables:
-    - `market_data.ref_market` (ReplacingMergeTree(updated_at), key `market_id`)
-    - `market_data.ref_instruments` (ReplacingMergeTree(updated_at), key `(market_id, symbol)`)
+    - `market_data.ref_market` (primary key `market_id`)
+    - `market_data.ref_instruments` (primary key `(market_id, symbol)`)
 
 - UI runs same-origin behind edge/web proxy (WEB-EPIC-02): browser calls JSON API via `/api/*`,
   but API router paths remain without `/api` prefix.
@@ -52,14 +69,12 @@ Add read-only ports and use-cases for reference lookup:
   - prefix search by `symbol` (`q`), deterministic ordering: `symbol ASC`
   - `limit` validated (`default=50`, `max=200`)
 
-### 2) ClickHouse adapters (explicit SQL)
+### 2) PostgreSQL adapters (explicit SQL)
 
-Implement ClickHouse adapters that:
+Implement PostgreSQL adapters that:
 
 - use explicit SQL and deterministic `ORDER BY`.
-- implement latest-state reads without `FINAL` via:
-  - `ORDER BY updated_at DESC`
-  - `LIMIT 1 BY <key>`
+- read the unique current primary-key row; writers enforce version precedence atomically.
 
 ### 3) API router (auth-only)
 
@@ -124,8 +139,8 @@ start is explicit and cannot imply zero or complete coverage. The accepted
   candle missing from canonical storage uses `source_history_incomplete`; three
   retries without confirmed progress end in an explicit failure. Normal
   source/storage backoff, fencing, pause/cancel priority and four-worker admission
-  are retained. No candle deletion or checkpoint reset is involved. ClickHouse
-  migration `0003` adds the separate source-absence table.
+  are retained. No candle deletion or checkpoint reset is involved. PostgreSQL
+  the current PostgreSQL manifest (`0036` onward) owns the separate source-absence table.
 - Streaming selection persists desired collection immediately, including unknown,
   empty or partial history. PUT no longer returns `409 full_history_required` and
   does not synchronously read history storage. Authentication, organization scope,
@@ -193,8 +208,7 @@ History coverage, completed job range and collection intent are distinct:
 an open WebSocket. A completed job confirms all exchange-available candles in its fixed requested
 interval, with source omissions recorded separately; later
 closed minutes can make current full-history coverage incomplete when streaming
-is disabled. Canonical bitmap aggregates assume the existing append-only candle
-lifecycle; administrative deletion requires rebuilding that aggregate index.
+is disabled. Actual/source-absent day masks are generation-bound. Administrative deletion/reset requires the coordinated generation/index lifecycle; stale generations fail closed.
 
 ### Verified source availability and index repair (2026-10-10)
 
@@ -206,9 +220,7 @@ acknowledge source absences. Every existing/returned candle must first be found
 in canonical storage. Receipts for actually received WebSocket candles continue
 to require real candles, even if a REST response is empty.
 
-Verification repairs missing bitmap keys from the bounded canonical window. The
-repair adds bitmap/min/max states with a zero raw-row counter, so retries do not
-inflate ingestion totals. Candle values are not rewritten. The normal window
+Verification checks generation-bound exact day masks against the bounded canonical window. Drift becomes unknown/needs_rebuild; API reads do not repair it. Explicit bounded rebuild owns repair and invalidates stale certificates. Candle values are not rewritten. The normal window
 limit is 1,440 minutes for manual jobs and 60 for stream preparation; the verifier
 rejects ranges larger than seven days. Work-request metadata writes recheck the
 same coordinator/worker fence as candle writes. Source omissions are written
@@ -216,8 +228,8 @@ only after canonical verification, so interruption before metadata persistence
 leaves the interval eligible for another read.
 
 Gap discovery and stream admission use the union of actual candle keys and
-confirmed source absences. Expected history is calendar minutes minus source
-absences that have no actual candle. A later real candle wins over an old absence
+confirmed source absences. Actual coverage uses all calendar minutes as its denominator. Verified completeness
+uses actual candles plus accepted source absences; these are distinct observations. A later real candle wins over an old absence
 without double counting. A known fully absent range is complete with zero actual
 candles; an unknown origin remains unknown. Job `completed_units` counts verified
 calendar minutes, whereas `rows_written` counts real writes. A job's fixed range
@@ -234,7 +246,7 @@ Compatibility: persistence and optional API fields are `compatible-change`;
 provider endpoints, selection/auth contracts and candle payloads are `none`.
 The meaning of full-history completeness is a user-authorized `breaking-change`
 from a candle for every calendar minute to every exchange-available candle.
-Apply ClickHouse `0003` before updating API, scheduler and collector; update the
+Apply the current PostgreSQL manifest through `0039` before updating API, scheduler and collector; update the
 Navigator client with them. Existing actual/expected fields retain numeric types.
 Rollback preserves canonical data and the additive table, but old readers ignore
 source absences and can block again at legitimate trading halts. Rebuilding the
@@ -244,7 +256,7 @@ bitmap after administrative deletion remains a separate operator operation.
 
 The consumer-owned `StoredCoordinates` port in Backtest Artifacts adds
 `observation_page(after, limit, before)` and a single-coordinate `observation`.
-The adapter merges actual-minute bitmap states, then clips keys to the exclusive
+The adapter reads generation-bound actual-minute day masks, then clips keys to the exclusive
 cutoff. Non-aligned cutoffs include an existing minute whose opening time is
 strictly earlier; publisher calls use the last closed-minute boundary. Empty
 bitmaps return null bounds, while epoch minute zero remains valid. Source absence
@@ -257,7 +269,7 @@ Normal publisher reconciliation reads the index once per page with bounded query
 resources; it does not scan canonical history or perform per-coordinate probes.
 REST/WS post-commit hints retain batch coalescing and failure isolation. Optional
 hints and the periodic sweep observe the same index; neither repairs drift by
-itself. Missing index keys use the bounded verification/repair procedure above;
+itself. Missing index keys require the explicit bounded rebuild procedure above;
 unavailable queries propagate failure instead of reporting a successful empty
 sweep. No canonical fallback, schema migration or absence-policy change is added.
 
@@ -300,14 +312,9 @@ Reason:
 Reason:
 - UI dropdown/search must be stable and testable.
 
-### 3) Latest-state reads without ClickHouse `FINAL`
+### 3) Current-state reads
 
-We treat reference tables as versioned rows and read the latest version deterministically:
-
-- `ORDER BY updated_at DESC LIMIT 1 BY <key>`
-
-Reason:
-- avoids expensive `FINAL` on ReplacingMergeTree.
+Reference primary keys enforce one current row. Version precedence, independent enable/enrichment clocks and stable ties are enforced by the writer transaction. Reads use explicit deterministic ordering.
 
 ### 4) Unknown/disabled market_id returns empty list (HTTP 200)
 
@@ -328,11 +335,11 @@ Reason:
 ## Related files
 
 - `docs/architecture/roadmap/milestone-6-epics-v1.md` -- WEB-EPIC-03.
-- `migrations/clickhouse/market_data_ddl.sql` -- ClickHouse DDL for `ref_market`/`ref_instruments`.
+- `migrations/postgres/0036_market_data_storage_v1.sql` -- PostgreSQL DDL for `ref_market`/`ref_instruments`.
 
 - `src/trading/contexts/market_data/application/dto/reference_data.py` -- existing reference DTOs.
 - `src/trading/contexts/market_data/application/ports/stores/*` -- existing ports patterns.
-- `src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/gateway.py` -- ClickHouseGateway abstraction.
+- `src/trading/contexts/market_data/adapters/outbound/persistence/postgres/ingestion_gateway.py` -- IngestionGateway abstraction.
 
 - `apps/api/main/app.py` -- API composition root (will include new router).
 - `apps/api/wiring/modules/*` -- wiring module for new router.
@@ -375,19 +382,17 @@ anchor. A retry rechecks the submitting actor's current membership and coordinat
 access; a revoked request is not promoted to ready by another shared request's success.
 
 
-### ClickHouse admission and API compatibility (S02, 2026-10-10)
+### PostgreSQL admission and API compatibility
 
-Reference, catalog, workspace and dashboard ClickHouse reads select the
-`interactive` identity in trusted composition. HTTP inputs cannot select a class
-or settings profile. Public response schemas, authorization, source absence and
-read retry/loading contracts are unchanged. Missing/unreadable class credentials
-fail startup; they never fall back to shared credentials in an activated install.
-Read failures remain failures, not successful empty catalogs or exchange absence.
-Native admission code 202 reuses the existing safe `storage_unavailable` reason
-for durable ingestion retries; 241 retains `storage_memory_pressure`. Worker
-checkpoints, backoff and pending recovery metadata survive both conditions.
-No new public state or UI retry policy is introduced. Server enforcement and
-upgrade/rollback are specified in the S02 section of the local recovery runbook.
+Trusted composition selects bounded `interactive`, `ingestion` or `bulk` workloads.
+HTTP inputs cannot select a workload. All use explicit `STRATEGY_PG_DSN` in the
+same migrated database as publication/control fencing. Registry admission precedes
+connection handshakes; the installation budgets are interactive 16, ingestion 24,
+bulk 8. SQLSTATE resource/timeout/lock refusals retain safe retry reasons;
+auth/schema failures are not retried as temporary overload. Read failures remain
+failures, never successful empty catalogs or exchange absence. Public response,
+authorization and snapshot/loading contracts remain unchanged. See the current
+local recovery runbook for shared registry, deadlines and recovery limits.
 
 ### Rolling execution and shared REST admission (S03, 2026-10-10)
 
@@ -415,23 +420,23 @@ sharing a NAT are outside this contract.
 Migration `market-data-provider-admission-0034` and matching configuration must
 precede new runtime clients; mixed legacy/new clients do not provide a shared
 quota guarantee. Upgrade, rollback and exact-token confirmed-drain recovery are
-specified in the S03 section of `docs/runbooks/navigator-local-market-data-recovery.md`.
+specified in `docs/runbooks/navigator-local-market-data-recovery.md`.
 This describes the source candidate, not installed-runtime acceptance.
 
 ### Asynchronous durable collector admission (S04, 2026-10-11)
 
 Collector acceptance follows capacity reservation → batched PG commit → buffer
-admission → synchronous canonical/MV write acknowledgement → token-fenced receipt
+admission → synchronous raw/canonical/coverage transaction COMMIT acknowledgement → token-fenced receipt
 completion. Pending producers, in-flight batches and retries share bounded row
 and accounted-byte budgets. Awaiting capacity is not acceptance. Cancellation
 cannot cancel another producer's shared commit or delete an uncertain receipt.
 A lost PG reply closes the lease session; restart reconciles stable keys, keeping
 failed/rearm semantics and actual-candle-only WS recovery. No exactly-once claim
-is made across the two databases.
+is made across the journal and candle transactions.
 
 All collector recovery and health operations use the lifecycle-owned async PG
 session. Synchronous administrative/history consumers retain their existing port.
 The internal async port is additive; journal schema, public DTOs, authorization,
 source-absence semantics and UI loading behavior are unchanged. This source
 contract is not an installed-runtime rollout receipt. Drain/rollback and observed
-proof boundaries are in the S04 section of the local recovery runbook.
+proof boundaries are in the local recovery runbook.

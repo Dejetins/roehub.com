@@ -1,0 +1,38 @@
+[
+  {
+    "provider": "binance_spot",
+    "http_status": 200,
+    "classification": "http_success",
+    "api_ret_code": null,
+    "instrument_count": 3725,
+    "observed_at": "2026-10-14T08:06:01.939428+00:00",
+    "raw_response_saved": false
+  },
+  {
+    "provider": "binance_futures",
+    "http_status": 200,
+    "classification": "http_success",
+    "api_ret_code": null,
+    "instrument_count": 927,
+    "observed_at": "2026-10-14T08:06:02.526273+00:00",
+    "raw_response_saved": false
+  },
+  {
+    "provider": "bybit_spot",
+    "http_status": 200,
+    "classification": "http_success",
+    "api_ret_code": 0,
+    "instrument_count": 527,
+    "observed_at": "2026-10-14T08:06:03.171123+00:00",
+    "raw_response_saved": false
+  },
+  {
+    "provider": "bybit_futures",
+    "http_status": 200,
+    "classification": "http_success",
+    "api_ret_code": 0,
+    "instrument_count": 500,
+    "observed_at": "2026-10-14T08:06:24.146266+00:00",
+    "raw_response_saved": false
+  }
+]

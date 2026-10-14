@@ -1,5 +1,12 @@
 # Организации, RBAC и административный аудит v1
 
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Потребители сохраняют domain/array/API и security границы. S05 переносит wiring и прямые SQL/script callers; S08 доказывает numerical/runtime parity. Упоминание прежнего engine ниже не задаёт целевую зависимость.
+
+
 ## Цель и пользовательский результат
 
 Новая самостоятельно разворачиваемая установка Roehub хранит пользователей,
@@ -26,14 +33,14 @@ Stage `05` включает:
 
 - singleton-установку, `installation_owner`, организации и членство;
 - роли `owner`, `admin`, `operator`, `trader`, `viewer`;
-- приглашения, права на экземпляры плагинов и временный support-доступ;
+- приглашения и временный support-доступ;
 - versioned API `/api/v1/installations/*` и `/api/v1/organizations/*`;
 - неизменяемый административный аудит без чувствительных payload;
 - организационные внешние ключи для provenance, exchange connections,
   strategies и positions.
 
 Не входят browser login/recovery и точный `recent-auth` reauthentication flow
-(Stage `06`), OIDC linking (Stage `07`), OpenBao (Stage `08`) и перевод всех
+(Stage `06`), OpenBao (Stage `08`) и перевод всех
 research/trading use cases на новый `organization_id` (Stages `09`,`10`). До
 этого старые resource-write adapters могут завершаться fail-closed на новом
 обязательном столбце вместо создания ресурса без организации.
@@ -60,10 +67,9 @@ authorization microservice также отклонён: он добавил бы
 
 | Возможность | `owner` | `admin` | `operator` | `trader` | `viewer` |
 |---|---:|---:|---:|---:|---:|
-| Просмотр организации/участников/плагинов | да | да | да | да | да |
+| Просмотр организации/участников | да | да | да | да | да |
 | Изменение организации | да | да | нет | нет | нет |
 | Управление участниками и ролями | да | да | нет | нет | нет |
-| Управление правами плагинов | да | да | нет | нет | нет |
 | Эксплуатационные действия | да | да | да | нет | нет |
 | Торговые действия | да | нет | нет | да | нет |
 | `mainnet.approve` | да | нет | нет | нет | нет |
@@ -92,7 +98,6 @@ authorization microservice также отклонён: он добавил бы
 - `GET|POST /api/v1/organizations`;
 - `POST|PATCH|DELETE /api/v1/organizations/{organization_id}/members...`;
 - `POST /api/v1/organizations/{organization_id}/invitations`;
-- `PUT /api/v1/organizations/{organization_id}/plugins/{plugin_id}/permissions/{user_id}`;
 - `POST /api/v1/installations/support-access`;
 - `GET /api/v1/organizations/{organization_id}/audit`.
 
@@ -144,9 +149,10 @@ event. Истёкший grant закрывается и может быть бе
 | Audit/support operations | `compatible-change` | Новые versioned события и fail-closed операции. |
 | Browser UI | `none` | Административный UI относится к Stage `19`. |
 
-Поиск `paid_level` нашёл 48 файлов-потребителей в `src`, `apps`, migrations и
-tests. Поле намеренно сохранено; удаление до миграции admission/UI/RL consumers
-было бы недоказанным breaking change.
+С 2026-10-13 тарифные поля удалены из публичных проекций. Admission и RL
+используют общие конечные ресурсные лимиты независимо от legacy `paid_level`.
+Поле в старом хранилище и история миграций сохранены без платных полномочий.
+Plugin permissions и соответствующий API удалены; остальная RBAC сохраняется.
 
 Rollback текущих production-данных не нужен и не разрешён. Внутри нового
 self-hosted lifecycle откат выполняется восстановлением пустого/резервного
@@ -155,9 +161,9 @@ self-hosted lifecycle откат выполняется восстановлен
 ## Доказательства и stop gates
 
 - focused identity/API/migration tests охватывают две организации, все роли,
-  admin member/plugin management, `recent-auth`, last-owner и аудит;
+  admin member management, `recent-auth`, last-owner и аудит;
 - `uv run python -m apps.migrations.verify_storage_runtime` поднимает реальные
-  PostgreSQL/ClickHouse/Redis, применяет `organization-0011` и выполняет
+  PostgreSQL/Redis, применяет `organization-0011` и выполняет
   отрицательные SQL-проверки same-org/orphan/audit;
 - production users, базы, identifiers и credentials не читаются;
 - любой cross-org доступ, чувствительный audit payload или попытка применить

@@ -1,0 +1,9 @@
+### Ran Playwright code
+```js
+await page.goto('http://127.0.0.1:20120/data');
+```
+### Page
+- Page URL: http://127.0.0.1:20120/data
+- Page Title: Data · RoeHub
+### Snapshot
+- [Snapshot](.playwright-cli/page-2026-10-14T08-18-45-625Z.yml)

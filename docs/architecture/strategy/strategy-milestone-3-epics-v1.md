@@ -4,6 +4,13 @@
 
 # Strategy — User Goal & Scope (Milestone 3 / EPIC 0)
 
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Целевая repair chain: Redis hot cache → canonical PG → REST; source enum/config/circuit/metrics согласованно переходят на canonical_store в S05. Durable audit, ACK ordering, provider admission и действующие права сохраняются.
+
+
 Документ фиксирует целевой пользовательский сценарий и границы `Strategy v1` (Milestone 3) перед реализацией EPIC’ов 1–13.
 
 ## Цель (с точки зрения пользователя)
@@ -43,7 +50,7 @@
   * читает Redis Streams 1m: `md.candles.1m.<instrument_key>`
   * делает rollup в TF стратегии (для TF > `1m`); для TF=`1m` использует базовые 1m (passthrough)
   * гарантирует правило “только закрытые и полные бакеты”
-  * умеет repair missing 1m из ClickHouse canonical (`market_data.canonical_candles_1m`)
+  * умеет repair missing 1m из PostgreSQL canonical (`market_data.canonical_candles_1m`)
 * Realtime output:
 
   * Redis Streams для UI: метрики/ивенты (**schema_version=1**)
@@ -81,13 +88,13 @@ Redis Streams (source of truth для live хвоста):
 
 ### Repair источник (дырки)
 
-ClickHouse canonical 1m (source of truth для дыр):
+PostgreSQL canonical 1m (source of truth для дыр):
 
 * `market_data.canonical_candles_1m`
 
 Текущая реализация reader’а canonical (market_data context):
 
-* `src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py`
+* `src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_reader.py`
 
 ## Таймфреймы и rollup (Strategy v1)
 
@@ -122,7 +129,7 @@ ClickHouse canonical 1m (source of truth для дыр):
 * алгоритм v1: `numeric_max_param_v1` (`max` по положительным numeric-параметрам индикаторов, fallback=`1`)
 * live runner **не выполняет evaluation**, пока не накоплено вычисленное `warmup_bars` свечей TF стратегии
 * вычисленный `warmup_bars` фиксируется в `run.metadata_json.warmup` для трассировки
-* warmup seed берём не из Redis, а из ClickHouse canonical:
+* warmup seed берём не из Redis, а из PostgreSQL canonical:
 
   * при старте run: загрузить диапазон `warmup_bars * timeframe.duration` до `now_floor`
   * построить derived свечи и заполнить буфер

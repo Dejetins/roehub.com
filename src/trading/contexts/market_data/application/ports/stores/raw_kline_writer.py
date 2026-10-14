@@ -6,19 +6,13 @@ from trading.contexts.market_data.application.dto import CandleWithMeta
 
 
 class RawKlineWriter(Protocol):
-    """
-    RawKlineWriter — порт записи 1m свечей в ClickHouse raw-таблицы (raw_*_klines_1m).
+    """Persist one caller-bounded batch of normalized closed candles.
 
-    Важно:
-    - canonical формируется автоматически через MV (raw -> canonical)
-    - прямых записей в canonical нет
-
-    Contract:
-    - write_1m(rows: Iterable[CandleWithMeta]) -> None
-
-    Semantics:
-    - адаптер маршрутизирует запись в нужную raw-таблицу (implementation detail)
-    - повторные вставки возможны (re-ingestion/backfill); допустимы дубликаты до merge
+    Successful return acknowledges durable storage; failures propagate and callers
+    retain recovery work. Adapters route raw observations and own canonical/index
+    maintenance. PostgreSQL commits those effects atomically; the legacy adapter
+    remains for consumers awaiting the coordinated storage switch. Raw replay may
+    retain observations, but must not inflate canonical counts or content revisions.
     """
 
     def write_1m(self, rows: Iterable[CandleWithMeta]) -> None:

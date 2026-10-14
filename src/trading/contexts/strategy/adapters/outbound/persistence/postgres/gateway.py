@@ -7,12 +7,15 @@ from typing import Any, ContextManager, Mapping, Protocol, cast
 import psycopg
 from psycopg.rows import dict_row
 
+from trading.platform.postgres_budget import connect as budget_connect
+
 
 class StrategyPostgresTransaction(Protocol):
     """One PostgreSQL transaction with a stable MVCC snapshot."""
 
-    def fetch_one(self, *, query: str, parameters: Mapping[str, Any]) -> Mapping[str, Any] | None:
-        ...
+    def fetch_one(
+        self, *, query: str, parameters: Mapping[str, Any]
+    ) -> Mapping[str, Any] | None: ...
 
     def fetch_all(
         self, *, query: str, parameters: Mapping[str, Any]
@@ -93,6 +96,7 @@ class StrategyPostgresGateway(Protocol):
             Executes one SQL statement.
         """
         ...
+
 
 class _PsycopgStrategyPostgresTransaction(StrategyPostgresTransaction):
     def __init__(self, *, connection: psycopg.Connection[Any]) -> None:
@@ -177,7 +181,7 @@ class PsycopgStrategyPostgresGateway(TransactionalStrategyPostgresGateway):
         Side Effects:
             Opens connection and executes one query.
         """
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with budget_connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, query), parameters)
                 row = cursor.fetchone()
@@ -206,7 +210,7 @@ class PsycopgStrategyPostgresGateway(TransactionalStrategyPostgresGateway):
         Side Effects:
             Opens connection and executes one query.
         """
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with budget_connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, query), parameters)
                 rows = cursor.fetchall()
@@ -228,27 +232,25 @@ class PsycopgStrategyPostgresGateway(TransactionalStrategyPostgresGateway):
         Side Effects:
             Opens connection and executes one query.
         """
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with budget_connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
             with connection.cursor() as cursor:
                 cursor.execute(cast(Any, query), parameters)
 
     @contextmanager
     def transaction(self) -> Iterator[StrategyPostgresTransaction]:
         """Yield one repeatable-read transaction and commit only on success."""
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with budget_connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
             with connection.cursor() as cursor:
                 cursor.execute("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ")
             yield _PsycopgStrategyPostgresTransaction(connection=connection)
 
     @contextmanager
-    def serialized_transaction(
-        self, *, lock_key: str
-    ) -> Iterator[StrategyPostgresTransaction]:
+    def serialized_transaction(self, *, lock_key: str) -> Iterator[StrategyPostgresTransaction]:
         """Acquire a session lock before creating the repeatable-read snapshot."""
         normalized_key = lock_key.strip()
         if not normalized_key:
             raise ValueError("serialized transaction requires non-empty lock key")
-        with psycopg.connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
+        with budget_connect(self._dsn, row_factory=cast(Any, dict_row)) as connection:
             connection.autocommit = True
             with connection.cursor() as cursor:
                 cursor.execute(

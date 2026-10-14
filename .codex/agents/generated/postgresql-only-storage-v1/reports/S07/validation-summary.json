@@ -1,0 +1,99 @@
+{
+  "stage": "S07",
+  "executor": "s07-20261014-01a137df-removal",
+  "required_scope_result": "pass",
+  "proof_boundary": "Repository dependency/reference closure, owned static/build/import gates and semantic replacement proof; not full functional/performance/cutover readiness",
+  "checks": {
+    "semantic_ci": {
+      "passed": 82,
+      "log": "semantic-ci-final3.log"
+    },
+    "dispatch_final": {
+      "passed": 21,
+      "log": "dispatch-final.log"
+    },
+    "consumer_fixture_final": {
+      "passed": 1,
+      "log": "consumer-fixture-final.log"
+    },
+    "scram_role": {
+      "passed": 1,
+      "log": "scram-role-proof.log"
+    },
+    "units": {
+      "passed": 44,
+      "log": "unit-final1.log"
+    },
+    "consumer_units": {
+      "passed": 33,
+      "log": "consumer-unit.log"
+    },
+    "tools_docs": {
+      "passed": 431,
+      "log": "tools-doc-tests2.log"
+    },
+    "browser": {
+      "passed": 2,
+      "log": "browser-foundation.log"
+    },
+    "navigator": {
+      "passed": 65,
+      "log": "navigator-tests.log"
+    },
+    "focused_pyright": {
+      "errors": 0,
+      "log": "pyright-focused.log"
+    },
+    "ruff_owned": {
+      "result": "pass",
+      "log": "ruff-owned1.log"
+    },
+    "generated": {
+      "result": "pass",
+      "log": "generated-final.log"
+    },
+    "wheel_import": {
+      "result": "pass",
+      "logs": [
+        "wheel-build.log",
+        "import-build-smoke.log"
+      ]
+    },
+    "residual_audit": {
+      "unresolved": 0,
+      "legacy_product_test_tool_imports": 0,
+      "evidence": "residual-audit.json"
+    },
+    "immutable": {
+      "unchanged": 276,
+      "evidence": "immutable-check.json"
+    },
+    "structural_repair": {
+      "result": "pass",
+      "evidence": "transition-preflight.log"
+    }
+  },
+  "open_findings": [
+    {
+      "id": "PG_CONNECT_TIMEOUT_CODE",
+      "test": "tests/real_infra/market_data/test_transactional_ingestion_postgres.py::test_connect_handshake_absolute_deadline_without_background_thread",
+      "result": "failed",
+      "evidence": "timeout-attribution.json",
+      "next_owner": "S08 functional recovery; no S07 runtime classifier involvement"
+    },
+    {
+      "id": "WHOLE_TREE_PYRIGHT",
+      "result": "not_green",
+      "evidence": "pyright1.log",
+      "note": "59 initial errors; eight S07 errors corrected and focused check passed. No final whole-tree green/blanket baseline attribution."
+    },
+    {
+      "id": "RESTART_PROOF",
+      "result": "not_repeated",
+      "note": "Broader run lacked explicitly labeled restart target; S08 must provide its own required restart proof."
+    }
+  ],
+  "review": "independent-review.md",
+  "publication": "not_authorized_or_performed",
+  "next_stage": "S08 remains for orchestrator; do not claim from this executor"
+}

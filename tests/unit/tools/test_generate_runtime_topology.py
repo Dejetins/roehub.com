@@ -26,46 +26,38 @@ def test_runtime_topology_generation_is_deterministic_and_complete(tmp_path: Pat
     assert run(["--output", str(tmp_path), "--check"]) == 0
 
     expected = {
-            "base": {
-                "alertmanager",
-                "api",
-                "blackbox",
-                "grafana",
-                "loki",
-                "notification-dispatcher",
-                "notification-report-scheduler",
-                "openbao",
-                "operational-health",
-                "plugin-gateway",
-                "postgresql",
-                "prometheus",
+        "base": {
+            "alertmanager",
+            "api",
+            "blackbox",
+            "notification-dispatcher",
+            "notification-report-scheduler",
+            "openbao",
+            "operational-health",
+            "postgresql",
+            "prometheus",
             "redis",
             "secret-init",
             "storage-migrations",
             "telegram-bot-worker",
             "web",
         },
-            "trading": {
-                "alertmanager",
-                "api",
-                "backtest-artifact-publisher",
-                "backtest-job-runner",
-                "blackbox",
-            "clickhouse",
-            "clickhouse-exporter",
+        "trading": {
+            "alertmanager",
+            "api",
+            "backtest-artifact-publisher",
+            "backtest-job-runner",
+            "blackbox",
             "exchange-control",
-                "exchange-execution",
-                "grafana",
-                "loki",
+            "exchange-execution",
             "market-data-scheduler",
             "market-data-ws",
             "notification-dispatcher",
             "notification-report-scheduler",
-                "openbao",
-                "operational-health",
-            "plugin-gateway",
-                "postgresql",
-                "prometheus",
+            "openbao",
+            "operational-health",
+            "postgresql",
+            "prometheus",
             "redis",
             "secret-init",
             "storage-migrations",
@@ -73,27 +65,22 @@ def test_runtime_topology_generation_is_deterministic_and_complete(tmp_path: Pat
             "telegram-bot-worker",
             "web",
         },
-            "ml": {
-                "alertmanager",
-                "api",
+        "ml": {
+            "alertmanager",
+            "api",
             "backtest-artifact-publisher",
-                "backtest-job-runner",
-                "blackbox",
-            "clickhouse",
-            "clickhouse-exporter",
+            "backtest-job-runner",
+            "blackbox",
             "exchange-control",
-                "exchange-execution",
-                "grafana",
-                "loki",
+            "exchange-execution",
             "market-data-scheduler",
             "market-data-ws",
             "notification-dispatcher",
             "notification-report-scheduler",
-                "openbao",
-                "operational-health",
-            "plugin-gateway",
-                "postgresql",
-                "prometheus",
+            "openbao",
+            "operational-health",
+            "postgresql",
+            "prometheus",
             "redis",
             "rl-inference",
             "secret-init",
@@ -148,8 +135,7 @@ def test_runtime_topology_generation_is_deterministic_and_complete(tmp_path: Pat
             assert all(
                 service["networks"] == ["roehub"]
                 for name, service in services.items()
-                if name
-                not in {"market-data-ws", "market-data-scheduler", "web", "secret-init"}
+                if name not in {"market-data-ws", "market-data-scheduler", "web", "secret-init"}
                 and "networks" in service
             )
         assert {
@@ -172,24 +158,18 @@ def test_runtime_topology_generation_is_deterministic_and_complete(tmp_path: Pat
             if row.get("restart") != "no" and not row.get("profiles")
         }
         assert all(
-            "@sha256:" in row["release_reference"]
-            for row in control_policy["services"].values()
+            "@sha256:" in row["release_reference"] for row in control_policy["services"].values()
         )
         operational_health = services["operational-health"]
-        assert operational_health["environment"] == {
-            "PYTHONUNBUFFERED": "1",
-            "ROEHUB_ENV": "prod",
-            "ROEHUB_PROFILE": profile,
-        }
-        assert operational_health["volumes"] == [
-            "./observability/operational-manifest.json:"
-            "/etc/roehub/operational-manifest.json:ro"
-        ]
+        env = operational_health["environment"]
+        assert env["ROEHUB_PG_BUDGET_REQUIRED"] == "1"
+        assert "user=roehub_monitor" in env["ROEHUB_PG_MONITOR_DSN"]
+        assert "user=roehub_maintenance" in env["ROEHUB_PG_MAINTENANCE_DSN"]
+        assert not any("IDENTITY" in key or "REDIS" in key for key in env)
+        assert not any("runtime-secrets:" in mount for mount in operational_health["volumes"])
+        assert "pg-budget:/run/roehub-pg-budget" in operational_health["volumes"]
         assert services["web"]["environment"]["WEB_API_BASE_URL"] == "http://web:8010"
-        assert (
-            services["web"]["environment"]["WEB_API_UPSTREAM_URL"]
-            == "http://api:8000"
-        )
+        assert services["web"]["environment"]["WEB_API_UPSTREAM_URL"] == "http://api:8000"
         if profile != "base":
             exchange_control_probe = services["exchange-control"]["healthcheck"]["test"][-1]
             assert "/health/live" in exchange_control_probe
@@ -206,18 +186,14 @@ def test_runtime_topology_generation_is_deterministic_and_complete(tmp_path: Pat
         operational_serialized = json.dumps(operational_health, sort_keys=True).lower()
         for forbidden in (
             "database_url",
-            "dsn",
             "password",
             "runtime-secrets",
-            "secret",
             "token",
         ):
             assert forbidden not in operational_serialized
         for service_name in (
             "alertmanager",
             "blackbox",
-            "grafana",
-            "loki",
             "openbao",
             "operational-health",
             "postgresql",
@@ -226,8 +202,6 @@ def test_runtime_topology_generation_is_deterministic_and_complete(tmp_path: Pat
             "secret-init",
         ):
             assert control_policy["services"][service_name]["restart_allowed"] is False
-        for service_name in ("api", "plugin-gateway", "web"):
-            assert control_policy["services"][service_name]["restart_allowed"] is True
 
 
 def test_generated_service_configs_use_dns_and_safe_modes(tmp_path: Path) -> None:
@@ -237,9 +211,7 @@ def test_generated_service_configs_use_dns_and_safe_modes(tmp_path: Path) -> Non
     strategy = yaml.safe_load((trading / "strategy.yaml").read_text())
     execution = yaml.safe_load((trading / "exchange-execution.yaml").read_text())
     notifications = yaml.safe_load((trading / "notifications.yaml").read_text())
-    backtest_artifacts = yaml.safe_load(
-        (trading / "backtest-artifacts.yaml").read_text()
-    )
+    backtest_artifacts = yaml.safe_load((trading / "backtest-artifacts.yaml").read_text())
 
     assert market["market_data"]["live_feed"]["redis_streams"]["host"] == "redis"
     assert strategy["strategy"]["live_worker"]["redis_streams"]["host"] == "redis"

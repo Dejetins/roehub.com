@@ -100,7 +100,6 @@
       "enum": [
         "release_config",
         "postgresql",
-        "clickhouse",
         "redis_checkpoint",
         "openbao",
         "artifacts",
@@ -122,10 +121,10 @@
       "type": "string"
     },
     "compatibility": {
-      "const": "greenfield-self-hosted-v1",
-      "default": "greenfield-self-hosted-v1",
+      "const": "postgresql-only-v2",
+      "default": "postgresql-only-v2",
       "enum": [
-        "greenfield-self-hosted-v1"
+        "postgresql-only-v2"
       ],
       "title": "Compatibility",
       "type": "string"
@@ -164,25 +163,6 @@
               },
               "owner": {
                 "const": "postgresql"
-              }
-            },
-            "required": [
-              "owner",
-              "consistency_mode"
-            ],
-            "type": "object"
-          },
-          "maxContains": 1,
-          "minContains": 1
-        },
-        {
-          "contains": {
-            "properties": {
-              "consistency_mode": {
-                "const": "database_snapshot"
-              },
-              "owner": {
-                "const": "clickhouse"
               }
             },
             "required": [
@@ -293,8 +273,8 @@
       "items": {
         "$ref": "#/$defs/BackupManifestEntry"
       },
-      "maxItems": 8,
-      "minItems": 8,
+      "maxItems": 7,
+      "minItems": 7,
       "title": "Entries",
       "type": "array",
       "uniqueItems": true
@@ -320,10 +300,10 @@
       "type": "string"
     },
     "schema": {
-      "const": "io.roehub.installation-backup/v1alpha1",
-      "default": "io.roehub.installation-backup/v1alpha1",
+      "const": "io.roehub.installation-backup/v2alpha1",
+      "default": "io.roehub.installation-backup/v2alpha1",
       "enum": [
-        "io.roehub.installation-backup/v1alpha1"
+        "io.roehub.installation-backup/v2alpha1"
       ],
       "title": "Schema",
       "type": "string"

@@ -370,27 +370,30 @@ def test_reconciliation_consumes_batched_bounds_without_fanout_and_keeps_empty_c
     from trading.shared_kernel.primitives import InstrumentId, MarketId, Symbol
 
     observed, cutoffs = [], []
-    instrument = InstrumentId(MarketId(1), Symbol('BTCUSDT'))
-    row = StoredSourceObservation(instrument, UtcTimestamp(START), UtcTimestamp(START))
+    instrument = InstrumentId(MarketId(1), Symbol("BTCUSDT"))
+    row = StoredSourceObservation(
+        instrument, UtcTimestamp(START), UtcTimestamp(START), uuid4(), 1, 0, 1, "ready"
+    )
 
     def page(**kw):
-        cutoffs.append(kw['before'])
+        cutoffs.append(kw["before"])
         return (row,)
 
     def forbidden(*args, **kwargs):
-        raise AssertionError('canonical fanout forbidden')
+        raise AssertionError("canonical fanout forbidden")
 
     reconciler = BaseSourceReconciler(
-        uuid4(), cast(Any, SimpleNamespace(bounds_1m=forbidden,distinct_ts_opens=forbidden)),
-        cast(Any, SimpleNamespace(observation_page=page,observation=lambda **kw: row)),
+        uuid4(),
+        cast(Any, SimpleNamespace(bounds_1m=forbidden, distinct_ts_opens=forbidden)),
+        cast(Any, SimpleNamespace(observation_page=page, observation=lambda **kw: row)),
         cast(Any, SimpleNamespace(observe_source=lambda **kw: observed.append(kw))),
     )
-    now = START + timedelta(minutes=2,seconds=17)
-    assert reconciler.reconcile_page(after=None, now=now,limit=1) == (1,'BTCUSDT')
-    assert cutoffs == [UtcTimestamp(START+timedelta(minutes=2))]
-    assert observed[0]['source'].history.end_utc == START+timedelta(minutes=1)
-    row = StoredSourceObservation(instrument,None,None)
-    assert reconciler.reconcile_page(after=None, now=now,limit=1) == (1,'BTCUSDT')
-    assert len(observed)==1
-    with pytest.raises(ValueError, match='utc_required'):
-        reconciler.reconcile_page(after=None,now=now.replace(tzinfo=None))
+    now = START + timedelta(minutes=2, seconds=17)
+    assert reconciler.reconcile_page(after=None, now=now, limit=1) == (1, "BTCUSDT")
+    assert cutoffs == [UtcTimestamp(START + timedelta(minutes=2))]
+    assert observed[0]["source"].history.end_utc == START + timedelta(minutes=1)
+    row = StoredSourceObservation(instrument, None, None)
+    assert reconciler.reconcile_page(after=None, now=now, limit=1) == (1, "BTCUSDT")
+    assert len(observed) == 1
+    with pytest.raises(ValueError, match="utc_required"):
+        reconciler.reconcile_page(after=None, now=now.replace(tzinfo=None))

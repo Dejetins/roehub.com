@@ -1,0 +1,12 @@
+### Result
+{"status":422,"body":{"error":{"code":"validation_error","message":"Validation failed","details":{"errors":[{"path":"body.idempotency_key","code":"uuid_parsing","message":"Input should be a valid UUID, invalid character: expected an optional prefix of `urn:uuid:` followed by [0-9a-fA-F-], found `s` at 1"}]}}}}
+### Ran Playwright code
+```js
+await (async page=>{const r=await page.request.post("http://127.0.0.1:20120/api/market-data/work-requests",{headers:{Origin:"http://127.0.0.1:20120"},data:{kind:"catalog_refresh",market_id:1,idempotency_key:"s10-r1-final-spot-catalog"}});return {status:r.status(),body:await r.json()};})(page);
+```
+### Page
+- Page URL: http://127.0.0.1:20121/backtests
+- Page Title: Backtests · RoeHub
+- Console: 1 errors, 0 warnings
+### Events
+- New console entries: .playwright-cli/console-2026-10-14T08-51-09-483Z.log#L1

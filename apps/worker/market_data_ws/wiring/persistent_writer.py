@@ -1,6 +1,6 @@
 """Single warmed, killable raw writer with bounded private IPC.
 
-Only this process owns its ClickHouse client. One request is in flight. A timeout,
+Only this process owns its PostgreSQL gateway. One request is in flight. A timeout,
 transport failure or cancellation destroys the generation before another call;
 the caller's durable receipts retain any uncertain INSERT for safe recovery.
 """
@@ -18,12 +18,6 @@ import struct
 import threading
 from typing import Mapping, Sequence
 
-from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
-from apps.worker.market_data_ws.wiring.io_process import classify_io_error
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseRawKlineWriter,
-    ThreadLocalClickHouseConnectGateway,
-)
 from trading.contexts.market_data.application.dto import CandleWithMeta
 from trading.contexts.market_data.application.services.ingestion_retry import (
     TemporaryIngestionError,
@@ -62,42 +56,6 @@ def _read_commands(sock: socket.socket, commands: queue.Queue) -> None:
         os._exit(1)
 
 
-def _writer_child(sock: socket.socket, environ: dict[str, str]) -> None:
-    logging.disable(logging.CRITICAL)
-    commands: queue.Queue = queue.Queue(maxsize=1)
-    threading.Thread(target=_read_commands, args=(sock, commands), daemon=True).start()
-    client = None
-    try:
-        settings = ClickHouseSettingsLoader(environ).load(workload="stream")
-        client = _clickhouse_client(settings)
-        gateway = ThreadLocalClickHouseConnectGateway(client_factory=lambda: client)
-        writer = ClickHouseRawKlineWriter(gateway=gateway, database=settings.database)
-        sock.sendall(_encode({"ok": True}))  # Ready includes client initialization.
-        while True:
-            rows = commands.get()
-            writer.write_1m(rows)
-            sock.sendall(_encode({"ok": True}))
-    except Exception as exc:
-        code = classify_io_error(exc)
-        try:
-            sock.sendall(
-                _encode(
-                    {
-                        "ok": False,
-                        "temporary": code is not None,
-                        "code": code or "non_retryable_ingestion_error",
-                        "retry_after_s": float(getattr(exc, "retry_after_s", 0)),
-                    }
-                )
-            )
-        except OSError:
-            pass
-    finally:
-        if client is not None:
-            client.close()
-        sock.close()
-
-
 class PersistentRawWriterProcess:
     """Reuse one warmed writer; kill/reap before reusing after an uncertain outcome."""
 
@@ -108,7 +66,7 @@ class PersistentRawWriterProcess:
             raise ValueError("writer timeout must be positive")
         self._environ = dict(environ)
         self._timeout_s = timeout_s
-        self._target = child_target or _writer_child
+        self._target = child_target or postgres_writer_child
         self._lock = asyncio.Lock()
         self._child = None
         self._socket: socket.socket | None = None
@@ -214,3 +172,43 @@ class PersistentRawWriterProcess:
             self._active_call.cancel()
             await asyncio.gather(self._active_call, return_exceptions=True)
         self._discard()
+
+
+def postgres_writer_child(sock: socket.socket, environ: dict[str, str]) -> None:
+    """Lifecycle-owned PG child; partitions are provisioned by maintenance."""
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.ingestion_gateway import (  # noqa: E501
+        IngestionGateway,
+    )
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (  # noqa: E501
+        PostgresRawKlineWriter,
+    )
+
+    logging.disable(logging.CRITICAL)
+    commands: queue.Queue = queue.Queue(maxsize=1)
+    threading.Thread(target=_read_commands, args=(sock, commands), daemon=True).start()
+    gateway = IngestionGateway(environ["STRATEGY_PG_DSN"])
+    try:
+        gateway.run(lambda conn: conn.execute("SELECT 1"))
+        writer = PostgresRawKlineWriter(gateway)
+        sock.sendall(_encode({"ok": True}))
+        while True:
+            writer.write_1m(commands.get())
+            sock.sendall(_encode({"ok": True}))
+    except Exception as exc:
+        code = exc.code if isinstance(exc, TemporaryIngestionError) else None
+        try:
+            sock.sendall(
+                _encode(
+                    {
+                        "ok": False,
+                        "temporary": code is not None,
+                        "code": code or "non_retryable_ingestion_error",
+                        "retry_after_s": 0.0,
+                    }
+                )
+            )
+        except OSError:
+            pass
+    finally:
+        gateway.close()
+        sock.close()

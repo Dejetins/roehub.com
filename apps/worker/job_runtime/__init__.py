@@ -1,8 +1,6 @@
 from apps.worker.job_runtime.authority import (
     JobRuntimeAuthorityError,
     JobSubmissionService,
-    PluginTrustResolution,
-    PluginTrustResolver,
     TrustedRuntimeAuthority,
     TrustedRuntimeGrant,
 )
@@ -21,8 +19,6 @@ __all__ = [
     "JobRuntimeAuthorityError",
     "JobRuntimeRecovery",
     "JobSubmissionService",
-    "PluginTrustResolution",
-    "PluginTrustResolver",
     "OciExecutionResult",
     "OciJobRunner",
     "OciRuntimeError",

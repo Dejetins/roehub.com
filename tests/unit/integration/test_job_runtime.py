@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import subprocess
-from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
@@ -23,7 +22,6 @@ from apps.worker.job_runtime.authority import (
 from apps.worker.job_runtime.capabilities import CAPABILITY_POLICIES
 from apps.worker.job_runtime.executor import JobAttemptExecutor
 from apps.worker.job_runtime.oci_runner import OciJobRunner, OciRuntimeError
-from trading.contexts.extensions.domain import PluginInstallation, PluginPackage
 from trading.integration import (
     JobEnvelope,
     JobOutputDescriptor,
@@ -33,7 +31,6 @@ from trading.integration import (
     StrategyRuntimeDecision,
 )
 from trading.integration.job_runtime_postgres import ClaimedJobAttempt
-from trading.shared_kernel.primitives import InstallationId, OrganizationId
 
 _REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -236,92 +233,6 @@ def test_model_validation_is_the_boundary_for_annotated_aggregate_limits() -> No
         JobResultManifest.model_validate(result_payload)
 
 
-def test_runtime_authority_binds_capability_image_command_and_plugin_package() -> None:
-    payload = _envelope().model_dump(mode="json", by_alias=True)
-    payload.update(
-        {
-            "capability": "custom_strategy",
-            "runtime": {
-                "name": "roehub.strategy",
-                "version": "1.0.0",
-                "plugin_package_digest": "1" * 64,
-            },
-        }
-    )
-    envelope = JobEnvelope.model_validate(payload)
-    package = PluginPackage(
-        package_id=uuid4(),
-        installation_id=InstallationId(uuid4()),
-        plugin_id="strategy.fixture",
-        version=envelope.runtime.version,
-        package_digest=cast(str, envelope.runtime.plugin_package_digest),
-        image_reference="roehub/strategy@" + envelope.image_digest,
-        image_digest=envelope.image_digest,
-        publisher_key_id="publisher.fixture",
-        publisher_public_key_b64="cHVibGljLWtleQ==",
-        publisher_key_fingerprint_sha256="1" * 64,
-        manifest={},
-        created_at=datetime.now(UTC),
-    )
-    installation = PluginInstallation(
-        plugin_installation_id=uuid4(),
-        installation_id=package.installation_id,
-        organization_id=OrganizationId(envelope.organization_id),
-        plugin_id=package.plugin_id,
-        package_id=package.package_id,
-        previous_package_id=None,
-        granted_permissions=(),
-        status="enabled",
-        created_at=datetime.now(UTC),
-        updated_at=datetime.now(UTC),
-    )
-    trust_root = {
-        cast(str, package.publisher_key_id): cast(str, package.publisher_key_fingerprint_sha256)
-    }
-    authority = TrustedRuntimeAuthority(
-        grants=(
-            TrustedRuntimeGrant.for_signed_plugin(
-                envelope=envelope,
-                package=package,
-                installation=installation,
-                trusted_publisher_fingerprints=trust_root,
-            ),
-        ),
-        plugin_trust_resolver=lambda _envelope: (package, installation, trust_root),
-    )
-
-    authority.authorize(envelope)
-    for changed in (
-        envelope.model_copy(update={"image_digest": "sha256:" + "f" * 64}),
-        envelope.model_copy(update={"command": ("/bin/false",)}),
-        envelope.model_copy(
-            update={
-                "runtime": envelope.runtime.model_copy(update={"plugin_package_digest": "2" * 64})
-            }
-        ),
-    ):
-        with pytest.raises(JobRuntimeAuthorityError) as raised:
-            authority.authorize(changed)
-        assert raised.value.code == "job.runtime_not_trusted"
-
-    with pytest.raises(JobRuntimeAuthorityError) as raised:
-        TrustedRuntimeGrant.for_signed_plugin(
-            envelope=envelope,
-            package=replace(
-                package,
-                publisher_key_id=None,
-                publisher_public_key_b64=None,
-                publisher_key_fingerprint_sha256=None,
-            ),
-            installation=installation,
-            trusted_publisher_fingerprints={},
-        )
-    assert raised.value.code == "job.plugin_package_unsigned"
-
-    trust_root.clear()
-    with pytest.raises(JobRuntimeAuthorityError) as raised:
-        authority.authorize(envelope)
-    assert raised.value.code == "job.plugin_publisher_untrusted"
 
 
 def test_docker_control_timeout_with_ambiguous_cleanup_stays_recoverable(
@@ -400,3 +311,10 @@ def test_submission_service_rejects_untrusted_envelope_before_catalog_write() ->
             created_at=datetime.now(UTC),
         )
     catalog.submit.assert_called_once()
+
+
+def test_plugin_job_is_rejected_by_builtin_authority() -> None:
+    envelope = _envelope()
+    authority = TrustedRuntimeAuthority(grants=(TrustedRuntimeGrant.for_builtin(envelope),))
+    with pytest.raises(JobRuntimeAuthorityError):
+        authority.authorize(envelope.model_copy(update={"capability": "custom_strategy"}))

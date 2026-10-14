@@ -1,0 +1,26 @@
+"""Matched before/after SQL plans within one transaction on the full frozen dataset."""
+import hashlib
+import json
+from tools.qa.postgres_production_soak import APP_DSN,OUT
+from tools.qa.postgres_production_workload import replay
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.ingestion_gateway import IngestionGateway
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import PostgresRawKlineWriter
+original=next(r['query'] for r in json.loads((OUT/'writer-statements-before.json').read_text()) if 'SELECT DISTINCT s.market_id,s.symbol FROM candle_winners' in r['query'])
+class Connection:
+    def __init__(self,c):self.c=c
+    def __getattr__(self,key):return getattr(self.c,key)
+    def execute(self,query,params=None):
+        if 'SELECT DISTINCT s.market_id,s.symbol FROM candle_winners' in str(query):
+            results={};plans={}
+            for name,q,p in [('before',original,None),('after',query,params)]:
+                plans[name]=self.c.execute('EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) '+q,p).fetchone()[0]
+                rows=self.c.execute(q,p).fetchall()
+                results[name]={'rows':len(rows),'sha256':hashlib.sha256(json.dumps(rows,sort_keys=True).encode()).hexdigest()}
+            assert results['before']==results['after']
+            (OUT/'writer-comparable-full.json').write_text(json.dumps({'plans':plans,'results':results,'same_transaction':True,'order':['before','after'],'limits':'isolates join only; does not prove full workload speedup'},indent=2))
+        return self.c.execute(query,params)
+class Writer(PostgresRawKlineWriter):
+    def _write(self,c,batch):return super()._write(Connection(c),batch)
+g=IngestionGateway(APP_DSN,deadline_s=30)
+try:Writer(g).write_1m(replay('S09PROFILECOMPARE',0,1000))
+finally:g.close()

@@ -38,7 +38,7 @@ candle close -> StrategySignal -> ExecutionSourceEvent -> ExecutionIntent
 
 Критерий успеха v1: Roehub умеет автоматически, но под контролем агента,
 исполнить реальные mainnet market orders по Binance/Bybit `spot` и `futures`
-с жесткими лимитами, немедленным закрытием canary-позиций, Prometheus/Grafana
+с жесткими лимитами, немедленным закрытием canary-позиций, Prometheus/Alertmanager
 метриками, user/operator alerts, reconciliation и безопасным rollback.
 
 ## Бизнес-Смысл
@@ -165,7 +165,7 @@ flowchart LR
     EC["exchange-control + OpenBao"]
     EX["Binance / Bybit mainnet"]
     DB["Postgres ledgers"]
-    Metrics["Prometheus / Grafana"]
+    Metrics["Prometheus / Alertmanager"]
     Alerts["notification outbox + Telegram user alert"]
 
     User --> UI
@@ -336,7 +336,7 @@ Tests-only acceptance запрещена для всех stages этого пл�
 | Auto-close failed | Open kill switch, stop strategy producer mainnet scope, reconcile provider position, perform operator/manual close if needed, record incident. |
 | Unknown provider state | Do not replay; query provider order/status/fill, reconcile, then decide. |
 | Telegram delivery failed | Keep mainnet expansion blocked; inspect delivery rows/provider health; follow notification replay policy. |
-| Metrics/alerts missing | Do not accept stage; keep next stage blocked until Prometheus/Grafana/runbook evidence exists. |
+| Metrics/alerts missing | Do not accept stage; keep next stage blocked until Prometheus/Alertmanager/runbook evidence exists. |
 
 ## Open Decisions / Blockers
 

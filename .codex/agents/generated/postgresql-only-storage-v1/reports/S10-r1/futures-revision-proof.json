@@ -1,0 +1,2357 @@
+{
+  "request": [
+    "655250e4-06c8-4c49-a49b-f7d2ad9f97f4",
+    "ready",
+    null,
+    {
+      "source": {
+        "history": {
+          "kind": "range",
+          "end_utc": "2026-10-14T08:53:00Z",
+          "start_utc": "2025-09-17T15:45:00Z"
+        },
+        "revision": "v2:5bada9c0-b4ac-4af3-877a-ff6c51544566:654:4",
+        "watermark": "2026-10-14T08:53:00Z",
+        "compute_identity": "native-base-v2",
+        "content_revision": 654,
+        "funding_identity": "futures",
+        "funding_revision": 4,
+        "source_generation": "5bada9c0-b4ac-4af3-877a-ff6c51544566"
+      },
+      "profile": {
+        "mode": "on_demand",
+        "history": {
+          "kind": "all_loaded",
+          "end_utc": null,
+          "start_utc": null
+        },
+        "revision": 1,
+        "indicators": [
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.dema",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  5,
+                  10,
+                  15,
+                  20,
+                  25,
+                  30,
+                  35,
+                  40,
+                  45,
+                  50
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.ema",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.hma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.lwma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.rma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.sma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.tema",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "ma.vwma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.wma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.zlema",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "momentum.cci",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -100
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  100
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "momentum.fisher",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  12
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "momentum.roc",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "momentum.rsi",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  30
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  70
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "d_window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  3
+                ],
+                "stop_incl": null
+              },
+              "k_window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              },
+              "smoothing": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  3
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "momentum.stoch",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  80
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  15
+                ],
+                "stop_incl": null
+              },
+              "signal_window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  9
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "momentum.trix",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "momentum.williams_r",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -80
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -20
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {},
+            "sources": [],
+            "indicator_id": "structure.candle_stats",
+            "signal_params": {
+              "min_body_pct": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.5
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "atr_window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "structure.candle_stats_atr_norm",
+            "signal_params": {
+              "min_body_atr": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.5
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "structure.distance_to_ma_norm",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -1.0
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  1.0
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "structure.percent_rank",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  80
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "left": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  5
+                ],
+                "stop_incl": null
+              },
+              "right": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  5
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "structure.pivots",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "structure.zscore",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -1.0
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  1.0
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              },
+              "smoothing": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "trend.adx",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "trend.aroon",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  70
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  30
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "trend.donchian",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "trend.linreg_slope",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "accel_max": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.2
+                ],
+                "stop_incl": null
+              },
+              "accel_step": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.02
+                ],
+                "stop_incl": null
+              },
+              "accel_start": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.02
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "trend.psar",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "trend.vortex",
+            "signal_params": {
+              "abs_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.1
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "volatility.atr",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              },
+              "annualization": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  365
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "volatility.hv",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "volatility.stddev",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {},
+            "sources": [],
+            "indicator_id": "volatility.tr",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "volatility.variance",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {},
+            "sources": [],
+            "indicator_id": "volume.ad_line",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "volume.cmf",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.05
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -0.05
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "volume.mfi",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  80
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {},
+            "sources": [],
+            "indicator_id": "volume.obv",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "volume.volume_sma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "volume.vwap",
+            "signal_params": {}
+          }
+        ],
+        "profile_id": "7259c2c3-6a5b-5133-8075-f1bf9aff0ab4",
+        "sl_levels_pct": [
+          1.0,
+          2.0
+        ],
+        "tp_levels_pct": [
+          1.0,
+          2.0
+        ],
+        "catalog_revision": "d210a3798725de5b2db4c65973866c169f9671431f54e263497bb8071bb58d5f",
+        "catalog_indicators": [
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.dema",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  5,
+                  10,
+                  15,
+                  20,
+                  25,
+                  30,
+                  35,
+                  40,
+                  45,
+                  50
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.ema",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.hma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.lwma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.rma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.sma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.tema",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "ma.vwma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.wma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close"
+            ],
+            "indicator_id": "ma.zlema",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "momentum.cci",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -100
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  100
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  10
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "momentum.fisher",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  12
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "momentum.roc",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "momentum.rsi",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  30
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  70
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "d_window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  3
+                ],
+                "stop_incl": null
+              },
+              "k_window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              },
+              "smoothing": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  3
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "momentum.stoch",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  80
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  15
+                ],
+                "stop_incl": null
+              },
+              "signal_window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  9
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "momentum.trix",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "momentum.williams_r",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -80
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -20
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {},
+            "sources": [],
+            "indicator_id": "structure.candle_stats",
+            "signal_params": {
+              "min_body_pct": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.5
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "atr_window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "structure.candle_stats_atr_norm",
+            "signal_params": {
+              "min_body_atr": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.5
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "structure.distance_to_ma_norm",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -1.0
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  1.0
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "structure.percent_rank",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  80
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "left": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  5
+                ],
+                "stop_incl": null
+              },
+              "right": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  5
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "structure.pivots",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "structure.zscore",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -1.0
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  1.0
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              },
+              "smoothing": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "trend.adx",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "trend.aroon",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  70
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  30
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "trend.donchian",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "trend.linreg_slope",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "accel_max": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.2
+                ],
+                "stop_incl": null
+              },
+              "accel_step": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.02
+                ],
+                "stop_incl": null
+              },
+              "accel_start": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.02
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "trend.psar",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "trend.vortex",
+            "signal_params": {
+              "abs_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.1
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "volatility.atr",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              },
+              "annualization": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  365
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "volatility.hv",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "volatility.stddev",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {},
+            "sources": [],
+            "indicator_id": "volatility.tr",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [
+              "close",
+              "high",
+              "hlc3",
+              "low",
+              "ohlc4",
+              "open"
+            ],
+            "indicator_id": "volatility.variance",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {},
+            "sources": [],
+            "indicator_id": "volume.ad_line",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "volume.cmf",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  0.05
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -0.05
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  14
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "volume.mfi",
+            "signal_params": {
+              "long_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              },
+              "short_threshold": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  80
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {},
+            "sources": [],
+            "indicator_id": "volume.obv",
+            "signal_params": {
+              "long_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -5
+                ],
+                "stop_incl": null
+              },
+              "short_delta_periods": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  -10
+                ],
+                "stop_incl": null
+              }
+            }
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "volume.volume_sma",
+            "signal_params": {}
+          },
+          {
+            "params": {
+              "window": {
+                "mode": "explicit",
+                "step": null,
+                "start": null,
+                "values": [
+                  20
+                ],
+                "stop_incl": null
+              }
+            },
+            "sources": [],
+            "indicator_id": "volume.vwap",
+            "signal_params": {}
+          }
+        ],
+        "derivative_timeframes": [
+          "15m",
+          "1d",
+          "1h",
+          "2d",
+          "2h",
+          "30m",
+          "3d",
+          "4h",
+          "6h",
+          "8h"
+        ]
+      },
+      "root_id": "backtest-primary",
+      "actor_id": "323ce186-93f8-4d0d-92b2-980679eff1f6",
+      "schedule": {
+        "anchor": "2026-10-09",
+        "timezone": "UTC",
+        "local_time": "02:00:00",
+        "interval_days": 1
+      },
+      "root_revision": 1,
+      "policy_version": 1
+    }
+  ],
+  "current_source": [
+    "5bada9c0-b4ac-4af3-877a-ff6c51544566",
+    678,
+    654,
+    678,
+    4
+  ]
+}

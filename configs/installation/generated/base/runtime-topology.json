@@ -8,9 +8,7 @@
     "operational-health",
     "prometheus",
     "alertmanager",
-    "blackbox",
-    "grafana",
-    "loki"
+    "blackbox"
   ],
   "profile": "base",
   "roles": [
@@ -26,9 +24,7 @@
         "--port",
         "9300",
         "--interval-seconds",
-        "2",
-        "--loki-url",
-        "http://loki:3100"
+        "2"
       ],
       "component_ids": [
         "app:monitoring"
@@ -152,42 +148,6 @@
       "lifecycle": "service",
       "name": "web",
       "network_access": "web_ingress",
-      "profiles": [
-        "base",
-        "trading",
-        "ml"
-      ],
-      "resources": {
-        "cpus": 0.5,
-        "memory_mb": 384
-      }
-    },
-    {
-      "command": [
-        "python",
-        "-m",
-        "apps.plugin_gateway.main.main",
-        "--host",
-        "0.0.0.0",
-        "--port",
-        "9209"
-      ],
-      "component_ids": [
-        "app:plugin_gateway"
-      ],
-      "depends_on": [
-        "postgresql",
-        "storage-migrations"
-      ],
-      "entrypoints": [
-        "apps/plugin_gateway/main/app.py",
-        "apps/plugin_gateway/main/main.py"
-      ],
-      "health_path": "/health/ready",
-      "image": "runtime",
-      "internal_port": 9209,
-      "lifecycle": "service",
-      "name": "plugin-gateway",
       "profiles": [
         "base",
         "trading",

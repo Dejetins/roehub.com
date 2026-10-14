@@ -11,8 +11,6 @@ from trading.contexts.identity.domain.entities import (
     OrganizationInvitation,
     OrganizationMembership,
     OrganizationRole,
-    PluginPermission,
-    PluginPermissionGrant,
     SupportAccessGrant,
 )
 from trading.shared_kernel.primitives import OrganizationId, UserId
@@ -107,16 +105,6 @@ class OrganizationRepository(Protocol):
         created_at: datetime,
     ) -> OrganizationInvitation: ...
 
-    def set_plugin_permission(
-        self,
-        *,
-        organization_id: OrganizationId,
-        plugin_id: str,
-        user_id: UserId,
-        permission: PluginPermission,
-        actor_user_id: UserId,
-        updated_at: datetime,
-    ) -> PluginPermissionGrant: ...
 
     def grant_support_access(
         self,

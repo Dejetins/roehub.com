@@ -3,7 +3,6 @@ from .api import (
     CurrentUserResponse,
     ExchangeKeyResponse,
     RequireCurrentUserDependency,
-    build_auth_oidc_router,
     build_exchange_keys_router,
 )
 
@@ -12,6 +11,5 @@ __all__ = [
     "CurrentUserResponse",
     "ExchangeKeyResponse",
     "RequireCurrentUserDependency",
-    "build_auth_oidc_router",
     "build_exchange_keys_router",
 ]

@@ -1,0 +1,1 @@
+{"services":{"operational-health":{"image":"roehub/s08-proof:local","environment":{"PYTHONPATH":"/workspace/src:/workspace"},"volumes":["/Users/daniildegtyarev/Projects/roehub.com:/workspace:ro"]},"openbao":{"image":"sha256:436eaf9778cad75507ff70ea26ace30dcbe15606e619ac3823495663d7f7c115"}}}

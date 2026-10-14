@@ -65,6 +65,7 @@ from trading.contexts.strategy.adapters.outbound.persistence.postgres import (
     PsycopgStrategyPostgresGateway,
 )
 from trading.contexts.strategy.domain.entities import Strategy, StrategyRun, StrategySpecV1
+from trading.platform.postgres_budget import admin_connect as budget_connect
 from trading.shared_kernel.primitives import (
     InstrumentId,
     MarketId,
@@ -341,9 +342,7 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
 
     strategies: list[Strategy] = []
     runs: list[StrategyRun] = []
-    for organization_id, user_id in zip(
-        fixture.organizations, fixture.users, strict=True
-    ):
+    for organization_id, user_id in zip(fixture.organizations, fixture.users, strict=True):
         strategy = strategy_repository.create(
             strategy=Strategy.create(
                 organization_id=organization_id,
@@ -405,9 +404,7 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
                 connection_id=connection_id,
             )
         )
-        accepted_risk_context = _accepted_probe_risk_context(
-            durable_context=durable_risk_context
-        )
+        accepted_risk_context = _accepted_probe_risk_context(durable_context=durable_risk_context)
         intent = ingress.create_intent(
             command=_intent_command(
                 organization_id=organization_id,
@@ -441,11 +438,14 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
     )
     if not replay.duplicate or replay.intent.intent_id != intent_results[0].intent.intent_id:
         raise TradingRuntimeProofError("same-organization intent replay was not deduplicated")
-    if intent_repository.get_intent_by_id(
-        organization_id=fixture.organizations[1],
-        owner_user_id=fixture.users[1],
-        intent_id=intent_results[0].intent.intent_id,
-    ) is not None:
+    if (
+        intent_repository.get_intent_by_id(
+            organization_id=fixture.organizations[1],
+            owner_user_id=fixture.users[1],
+            intent_id=intent_results[0].intent.intent_id,
+        )
+        is not None
+    ):
         raise TradingRuntimeProofError("cross-organization intent query leaked a row")
 
     account_ownership_mismatch = _expect_cross_organization_resolution_rejection(
@@ -553,11 +553,14 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
         raise TradingRuntimeProofError("paper replay created duplicate accounting")
     if paper_snapshots[0].accounting_id == paper_snapshots[1].accounting_id:
         raise TradingRuntimeProofError("paper accounting identities collided across organizations")
-    if paper_repository.get_latest_accounting_for_strategy(
-        organization_id=fixture.organizations[1],
-        owner_user_id=fixture.users[1],
-        strategy_id=strategies[0].strategy_id,
-    ) is not None:
+    if (
+        paper_repository.get_latest_accounting_for_strategy(
+            organization_id=fixture.organizations[1],
+            owner_user_id=fixture.users[1],
+            strategy_id=strategies[0].strategy_id,
+        )
+        is not None
+    ):
         raise TradingRuntimeProofError("cross-organization paper query leaked a row")
 
     ownership_service = StrategyPositionOwnershipService(repository=ownership_repository)
@@ -584,11 +587,14 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
                 now=now,
             )
         )
-    if ownership_repository.get_for_run(
-        organization_id=fixture.organizations[1],
-        owner_user_id=fixture.users[1],
-        strategy_run_id=runs[0].run_id,
-    ) is not None:
+    if (
+        ownership_repository.get_for_run(
+            organization_id=fixture.organizations[1],
+            owner_user_id=fixture.users[1],
+            strategy_run_id=runs[0].run_id,
+        )
+        is not None
+    ):
         raise TradingRuntimeProofError("cross-organization position query leaked a row")
 
     unknown_reconciliation = _prove_unknown_reconciliation(
@@ -634,9 +640,7 @@ def run_probe(*, postgres_dsn: str) -> dict[str, object]:
         "mainnet_attempt": mainnet_guard["mainnet_attempt"],
         "mainnet_submits": mainnet_guard["mainnet_submits"],
         "database_constraints": database_constraints,
-        "production_repositories": (
-            "strategy,run,intent,paper,position,order,execution_process"
-        ),
+        "production_repositories": ("strategy,run,intent,paper,position,order,execution_process"),
     }
 
 
@@ -684,9 +688,7 @@ def _risk_context_query(
     )
 
 
-def _accepted_probe_risk_context(
-    *, durable_context: ExecutionRiskContext
-) -> ExecutionRiskContext:
+def _accepted_probe_risk_context(*, durable_context: ExecutionRiskContext) -> ExecutionRiskContext:
     durable_facts = (
         durable_context.organization_ownership_verified,
         durable_context.account_ownership_verified,
@@ -835,9 +837,7 @@ def _load_execution_intent_request_model() -> type[BaseModel]:
     return model
 
 
-def _table_count(
-    *, gateway: PsycopgStrategyPostgresGateway, table_name: str
-) -> int:
+def _table_count(*, gateway: PsycopgStrategyPostgresGateway, table_name: str) -> int:
     if not table_name.replace("_", "").isalnum():
         raise TradingRuntimeProofError("invalid proof table name")
     row = gateway.fetch_one(
@@ -882,9 +882,7 @@ def _record_dispatched_probe_intent(
         )
     )
     if created.intent.risk_status != "accepted":
-        raise TradingRuntimeProofError(
-            f"controlled {proof_key} intent did not pass the risk gate"
-        )
+        raise TradingRuntimeProofError(f"controlled {proof_key} intent did not pass the risk gate")
     claimed = intent_repository.claim_intent_for_dispatch(
         organization_id=organization_id,
         intent_id=created.intent.intent_id,
@@ -905,9 +903,7 @@ def _record_dispatched_probe_intent(
     return dispatched
 
 
-def _proof_message(
-    *, intent: ExecutionIntent, message_id: str
-) -> ExchangeExecutionRedisMessage:
+def _proof_message(*, intent: ExecutionIntent, message_id: str) -> ExchangeExecutionRedisMessage:
     return ExchangeExecutionRedisMessage(
         stream_name="execution.requests.v1",
         message_id=message_id,
@@ -969,9 +965,7 @@ def _prove_controlled_testnet_boundary(
         ),
         clock=_Clock(now=now),
         on_observation=lambda status, reason: observations.append((status, reason)),
-        on_private_stream=lambda exchange, reason: private_stream_events.append(
-            (exchange, reason)
-        ),
+        on_private_stream=lambda exchange, reason: private_stream_events.append((exchange, reason)),
     )
     result = service.run_once()
     session_row = gateway.fetch_one(
@@ -1201,9 +1195,7 @@ def _prove_unknown_reconciliation(
         or adapter.submitted != 0
         or order is None
         or order.status != "status_checked"
-        or observations != [
-            ("reconciled", "unknown_state_reconciled_present_without_resubmit")
-        ]
+        or observations != [("reconciled", "unknown_state_reconciled_present_without_resubmit")]
     ):
         raise TradingRuntimeProofError("unknown order state reconciliation was incomplete")
     return "matched_without_resubmit"
@@ -1220,16 +1212,14 @@ def _strategy_spec() -> StrategySpecV1:
     )
 
 
-def _seed_fixture(
-    *, dsn: str, now: datetime
-) -> _Fixture:
+def _seed_fixture(*, dsn: str, now: datetime) -> _Fixture:
     organization_values = (uuid4(), uuid4())
     user_values = (uuid4(), uuid4())
     connection_values = (uuid4(), uuid4())
     credential_values = (uuid4(), uuid4())
     session_values = (uuid4(), uuid4())
     snapshot_values = (uuid4(), uuid4())
-    with psycopg.connect(dsn) as connection, connection.cursor() as cursor:
+    with budget_connect(dsn) as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT installation_id FROM identity_installations WHERE singleton_key = TRUE"
         )
@@ -1271,10 +1261,7 @@ def _seed_fixture(
                 installation_id, user_id, granted_by_user_id, granted_at
             ) VALUES (%s, %s, %s, %s)
             """,
-            tuple(
-                (installation_id, user_id, user_id, now)
-                for user_id in user_values
-            ),
+            tuple((installation_id, user_id, user_id, now) for user_id in user_values),
         )
         cursor.executemany(
             """
@@ -1301,9 +1288,7 @@ def _seed_fixture(
             """,
             tuple(
                 (organization_id, user_id, now, now)
-                for organization_id, user_id in zip(
-                    organization_values, user_values, strict=True
-                )
+                for organization_id, user_id in zip(organization_values, user_values, strict=True)
             ),
         )
         cursor.executemany(

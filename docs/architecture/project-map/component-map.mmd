@@ -23,8 +23,6 @@ flowchart TB
   class n_app_navigator_web app
   n_app_platform_web["app:platform-web"]
   class n_app_platform_web app
-  n_app_plugin_gateway["app:plugin_gateway"]
-  class n_app_plugin_gateway app
   n_app_roehubctl["app:roehubctl"]
   class n_app_roehubctl app
   n_app_runtime_probe["app:runtime_probe"]
@@ -39,8 +37,6 @@ flowchart TB
   class n_context_backtest_artifacts context
   n_context_exchange_control["context:exchange_control"]
   class n_context_exchange_control context
-  n_context_extensions["context:extensions"]
-  class n_context_extensions context
   n_context_identity["context:identity"]
   class n_context_identity context
   n_context_indicators["context:indicators"]
@@ -96,7 +92,6 @@ flowchart TB
   n_app_api --> n_app_monitoring
   n_app_api --> n_context_backtest
   n_app_api --> n_context_backtest_artifacts
-  n_app_api --> n_context_extensions
   n_app_api --> n_context_identity
   n_app_api --> n_context_indicators
   n_app_api --> n_context_live_execution
@@ -105,12 +100,10 @@ flowchart TB
   n_app_api --> n_context_operations
   n_app_api --> n_context_rl_trading
   n_app_api --> n_context_strategy
-  n_app_api --> n_core_integration
   n_app_api --> n_core_platform
   n_app_api --> n_core_shared_kernel
   n_app_cli --> n_app_api
   n_app_cli --> n_context_backtest_artifacts
-  n_app_cli --> n_context_extensions
   n_app_cli --> n_context_identity
   n_app_cli --> n_context_indicators
   n_app_cli --> n_context_market_data
@@ -126,23 +119,23 @@ flowchart TB
   n_app_exchange_execution --> n_context_strategy
   n_app_exchange_execution --> n_core_shared_kernel
   n_app_migrations --> n_context_backtest
-  n_app_migrations --> n_context_extensions
   n_app_migrations --> n_context_identity
   n_app_migrations --> n_context_live_execution
   n_app_migrations --> n_context_market_data
   n_app_migrations --> n_context_notifications
   n_app_migrations --> n_context_strategy
-  n_app_migrations --> n_core_integration
   n_app_migrations --> n_core_platform
   n_app_migrations --> n_core_shared_kernel
+  n_app_monitoring --> n_app_migrations
+  n_app_monitoring --> n_core_platform
   n_app_navigator_web --> n_app_api
   n_app_navigator_web --> n_app_control_agent
   n_app_navigator_web --> n_context_backtest
   n_app_navigator_web --> n_context_backtest_artifacts
   n_app_navigator_web --> n_context_identity
   n_app_navigator_web --> n_context_operations
+  n_app_navigator_web --> n_core_platform
   n_app_navigator_web --> n_core_shared_kernel
-  n_app_plugin_gateway --> n_core_integration
   n_app_roehubctl --> n_app_cli
   n_app_roehubctl --> n_app_control_agent
   n_app_roehubctl --> n_context_operations
@@ -169,9 +162,6 @@ flowchart TB
   n_context_exchange_control --> n_context_identity
   n_context_exchange_control --> n_core_platform
   n_context_exchange_control --> n_core_shared_kernel
-  n_context_extensions --> n_context_identity
-  n_context_extensions --> n_core_integration
-  n_context_extensions --> n_core_shared_kernel
   n_context_identity --> n_core_platform
   n_context_identity --> n_core_shared_kernel
   n_context_indicators --> n_context_market_data
@@ -182,6 +172,7 @@ flowchart TB
   n_context_live_execution --> n_core_shared_kernel
   n_context_market_data --> n_context_backtest
   n_context_market_data --> n_context_backtest_artifacts
+  n_context_market_data --> n_core_platform
   n_context_market_data --> n_core_shared_kernel
   n_context_notifications --> n_core_platform
   n_context_notifications --> n_core_shared_kernel
@@ -194,7 +185,7 @@ flowchart TB
   n_context_strategy --> n_context_notifications
   n_context_strategy --> n_core_platform
   n_context_strategy --> n_core_shared_kernel
-  n_core_integration --> n_context_extensions
+  n_core_integration --> n_core_platform
   n_core_platform --> n_context_market_data
   n_core_platform --> n_core_shared_kernel
   n_worker_backtest_job_runner --> n_app_api
@@ -206,7 +197,6 @@ flowchart TB
   n_worker_backtest_job_runner --> n_core_shared_kernel
   n_worker_job_runtime --> n_app_control_agent
   n_worker_job_runtime --> n_context_backtest_artifacts
-  n_worker_job_runtime --> n_context_extensions
   n_worker_job_runtime --> n_context_operations
   n_worker_job_runtime --> n_core_integration
   n_worker_job_runtime --> n_core_shared_kernel

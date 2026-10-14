@@ -1,5 +1,12 @@
 # Native Service Control, Monitoring, and Admin Target (v1)
 
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Storage service/exporter/actions используют PG connection/pool/lock/WAL/partition/coverage diagnostics по текущему operational topology. Исторические host/service схемы ниже не разрешают их повторное развёртывание.
+
+
 > Статус: `superseded` как целевая архитектура с 2026-07-13.
 > Новый источник целевого устройства:
 > `docs/architecture/platform/roehub-self-hosted-oss-platform-v1.md`.
@@ -14,8 +21,8 @@ Docker runtime).
 
 ## Статус и границы
 
-- Статус: historical superseded target; часть текста всё ещё описывает текущий
-  runtime до выполнения нового миграционного плана.
+- Статус: historical superseded target; ниже не описывается текущий runtime.
+  Актуальные профили перечислены в `docs/runbooks/offline-release-installation.md`.
 - Хост backend: retired host.
 - Публичный edge и private backend topology сохранены только как historical
   evidence.
@@ -47,7 +54,7 @@ Docker runtime).
 | `exchange-execution` (Stage 13 skeleton) | `launchd` + `Monit` | `:9206`, `/health/ready`, Redis stream/DLQ/backpressure/clock metrics | disabled-adapter observation, DLQ quarantine diagnostics, future kill-switch |
 | PostgreSQL | `brew services`/`launchd` + `Monit` | `postgres-exporter` + TCP probe | `pgAdmin 4` (role/db/session ops) |
 | Redis | `brew services`/`launchd` + `Monit` | `redis-exporter` + memory/latency alerts | `redis-commander` (streams/keys ops) |
-| ClickHouse | `launchd` + `Monit` | `clickhouse-exporter`, HTTP `/ping`, native TCP probe | `CH-UI`/DBeaver CE + runbook operations |
+| PostgreSQL | `launchd` + `Monit` | PostgreSQL observer, bounded SQL health and TCP probe | DBeaver CE + runbook operations |
 | Prometheus | `brew services` + `Monit` | self-monitoring (`up`, scrape health, TSDB) | rule/scrape management through repo config |
 | Grafana | `brew services` + `Monit` | `/api/health`, dashboard errors | dashboards, on-call views, incident drilldown |
 | Alertmanager | `brew services` + `Monit` | `/api/v2/status`, notification delivery | silences, routing policies |
@@ -221,11 +228,11 @@ Docker runtime).
 - Мониторинг: `redis-exporter`, memory fragmentation, evictions, stream lag.
 - Админ-операции: `redis-commander`, stream inspection, consumer group diagnostics.
 
-### 9) ClickHouse
+### 9) PostgreSQL
 
 - Управление: `launchd` + `Monit`.
-- Мониторинг: `clickhouse-exporter`, `/ping`, insert/query latency, disk usage.
-- Админ-операции: `CH-UI`/DBeaver CE, partition maintenance runbooks, dedup jobs.
+- Мониторинг: PostgreSQL observer, active connections, locks, WAL, partitions and coverage health.
+- Админ-операции: DBeaver CE, bounded partition/coverage rebuild runbooks.
 
 ### 10) Monitoring stack (`Prometheus`, `Grafana`, `Alertmanager`)
 

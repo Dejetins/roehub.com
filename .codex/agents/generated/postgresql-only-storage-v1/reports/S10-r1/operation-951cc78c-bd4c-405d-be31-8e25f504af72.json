@@ -1,0 +1,11 @@
+{
+  "action": "start",
+  "services": [
+    "market-data-scheduler",
+    "market-data-ws"
+  ],
+  "operation_id": "951cc78c-bd4c-405d-be31-8e25f504af72",
+  "returncode": 0,
+  "stdout": "{\"action\": \"start\", \"active_services\": [\"api\", \"backtest-artifact-publisher\", \"market-data-scheduler\", \"market-data-ws\", \"operational-health\", \"postgresql\", \"web\"], \"detail_code\": \"topology.started\", \"journal_sequence\": 393, \"operation_id\": \"951cc78c-bd4c-405d-be31-8e25f504af72\", \"profile\": \"trading\", \"schema\": \"io.roehub.control-operation-result/v1alpha1\", \"state\": \"succeeded\"}\n",
+  "stderr": ""
+}

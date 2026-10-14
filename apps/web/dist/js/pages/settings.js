@@ -428,15 +428,12 @@ function renderProfile(profile) {
   if (!profile) return;
   const locale = profile.locale || profile.language || "en";
   const contact = profile.telegram_discord || profile.telegram || "--";
-  const subscription = profile.subscription_status || profile.subscription || "free";
   setText("[data-profile-username]", profile.username || "quant_trader");
   setText("[data-profile-email]", profile.email || "quant_trader@example.com");
   setText("[data-profile-user-id]", profile.user_id);
   setText("[data-profile-timezone]", profile.timezone);
   setText("[data-profile-locale]", locale.toUpperCase());
   setText("[data-profile-contact]", contact);
-  setText("[data-profile-subscription]", formatPlan(subscription));
-  setText("[data-status-account]", formatPlan(subscription));
 }
 
 function renderLimits(limits) {

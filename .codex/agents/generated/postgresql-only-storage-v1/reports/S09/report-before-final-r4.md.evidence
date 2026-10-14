@@ -1,0 +1,83 @@
+# S09 — Production query performance and mixed-load proof
+
+Status: `in_progress`. Revision 3 meets latency/parity checks, but follow-up diagnostics confirm operation-count-dependent backend CacheMemoryContext growth. Acceptance is pending a causal fix and repeated proof. The revision-3 results below are retained diagnostic evidence, not final acceptance. The canonical ledger and immutable transition receipt own stage status. Exactly S09; S10 is not executed.
+
+## Scope and ownership
+
+Executor `s09-20261014-01a1382f-performance`. No branch, worktree, stash, commit, publication or installed-runtime cutover. The preexisting dirty tree is excluded. `S09/baseline-comparison.json` shows only three production files and two existing test files changed relative to entry, with no missing existing files; predecessor reports/receipts, historical data and applied SQL0001–0039 are preserved.
+
+Production changes under `src/trading/contexts/market_data/adapters/outbound/persistence/postgres/`:
+
+- `raw_kline_writer.py`: explicit inclusive batch timestamp bounds prune the changed-value join; reuse the existing candle stage.
+- `ingestion_common.py`: extract the existing winner upsert into `upsert_staged`; avoid a second payload hash and COPY for raw candle ingestion.
+- `canonical_candle_reader.py`: binary tuple cursor and bounded 4096-row structured conversion replace per-row dictionary/text conversion. SQL ordering/ranges, transaction and retry semantics, temporary-file handling and output types remain unchanged.
+
+Proof ownership: seven `tools/qa/postgres_production_*.py` tools, `tests/unit/tools/test_postgres_production_hash.py`, added writer correction/replay and reader disconnect tests, this report and `S09/` evidence. `S09/owned-files.json` lists source hashes. Compatibility is `none` for public API/DTO, schema, configuration, backup, identity and winner/transaction behavior; these are internal execution changes.
+
+## Fixed data, environment and method
+
+The immutable 89 Parquet parts contain 15,130,115 canonical rows and 102 instruments. `full-parity.json` compares all 17 normalized fields row by row and hashes exact schema/null/value streams. `timestamp-precision.json` checks all three timestamp columns directly across the historical rows, preventing a submillisecond cast from hiding differences. Source normalization explicitly maps accepted Binance missing numeric values to zero and Bybit close timestamps to the minute end; source bytes are unchanged.
+
+Largest instrument ALGOUSDT has 3,838,747 rows; its one-year slice has 524,077. Every measured large read has a full content hash against independently prepared Parquet arrays. Only production artifact fields use the existing float32 conversion. Hashing is chunk/layout independent and never uses truncated numpy representations.
+
+Disposable PostgreSQL 16.15 container `roehub-s09-pg`: 2 CPU, 4 GiB memory/swap ceiling, shared_buffers 256 MiB, work_mem 4 MiB, max_connections 48, checkpoint_timeout 5 min, max_wal_size 1 GiB, fsync/synchronous_commit/full_page_writes and autovacuum enabled. Separate Linux client `roehub-s09-client`: 4 CPU / 6 GiB. Host: Apple M5 Max, 18 physical/logical cores, 36 GiB RAM. See hardware/preflight evidence. Import and parity warm filesystem caches; this is not a cold-disk benchmark. Writes are retained under fresh per-run symbols, so database size increases between repetitions.
+
+Frozen measurement contract revision 3 and 36 identical source hashes cover all seven final runs. Twelve concurrent lanes exercise stream/history ingestion, latest/hot/catalog/gap reads, year/full artifact arrays, real HTTP with persisted identity and organization resolution, identity rate-limit persistence, fenced job submit/claim/checkpoint/finish/read, and asynchronous recovery remember/pending/complete/publish on the same server. Normal offers 5 stream rows/s; stress offers 100 rows/s; both offer 1000 history rows every 2 s. Large reads run every 10 s in two bulk slots. Open-loop due/start/end and admission wait are retained for every sample.
+
+Production preparation, writes and commit remain timed. Proof-only write input hashing and full 17-field per-batch output comparison run after each horizon, with separate UTC markers. Resource analysis uses only samples inside the timed horizon; post-verification is not counted as soak duration. All successful batch offsets, counts, hashes and raw witnesses reconcile.
+
+## Final repeated matrix and soak
+
+`S09/final-matrix-analysis.json` is the machine-readable aggregate. Each of three normal and three stress runs completed at least 300 real seconds, with 30 year and 30 full reads per run (90 of each per regime). The stress soak lasted 3600.224 s and completed 360 of each large read. All 41,760 offered operations completed within their offered window, with zero operation/lifecycle errors and no missing indices. All seven runs pass individually; pooling does not hide a failed run.
+
+| Metric | Limit | Normal pooled | Stress pooled | Soak |
+|---|---:|---:|---:|---:|
+| Latest p95 | 100 ms | 80.45 ms | 73.70 ms | 75.58 ms |
+| Active hot latest p95 | 100 ms | 81.23 ms | 82.07 ms | 87.87 ms |
+| Catalog p95 | 100 ms | 80.51 ms | 83.59 ms | 91.48 ms |
+| Gap p95 | 100 ms | 72.69 ms | 72.73 ms | 81.78 ms |
+| Stream write p95 | 100 ms | 84.20 ms | 85.56 ms | 93.33 ms |
+| 1000-row history write p95 | 250 ms | 91.11 ms | 90.09 ms | 92.71 ms |
+| Year input median | 2 s | 0.650 s | 0.642 s | 0.657 s |
+| Full instrument p95 | 10 s | 4.938 s | 4.771 s | 4.905 s |
+
+Across short repetitions, stream p95 ranges 81.05–87.77 ms, year median 0.639–0.656 s, and full p95 4.683–4.943 s. Soak HTTP p95 is 135.25 ms, identity 139.19 ms, job lifecycle 215.37 ms and recovery 91.90 ms; these include their complete operations and are reported separately from adapter guardrails.
+
+The final matrix verifies 454,500 stream and 2,700,000 history rows: 3,154,500 canonical rows and 3,154,507 raw rows, including seven deliberate stream seeds. Every batch has exact input/output content parity and expected raw count. The soak alone verifies 360,000 stream plus 1,800,000 history rows. Historical full parity and all measured array hashes remain valid.
+
+## Resource stability and physical admission
+
+During the soak, sampled server CPU totals 1486.42 s (0.413 mean cores over observed bounds); client workload CPU is 962.68 s. Server cgroup memory peaks at 2,673,020,928 bytes, including file cache up to 2,346,586,112 bytes and anonymous memory up to 312,000,512 bytes. Client cgroup peaks at 649,035,776 bytes; process RSS sum at 506,580,992 bytes. Sampling is approximately 5 s, not an instantaneous peak guarantee. Lifetime peak/OOM counters include earlier failed verifier work and are not substituted for run deltas.
+
+`soak-trends.json` shows client quarter medians 320/299/306/313 MiB and server 2357/2427/2428/2417 MiB: aggregate cgroup memory remains within a narrow envelope. Anonymous server memory does grow: quarter medians 246,161,408 → 275,398,656 → 282,927,104 → 299,749,376 bytes. Client RSS medians grow 311,586,816 → 325,722,112 bytes, consistent with the retained sample list. After workload/parity sessions close, server anonymous memory returns to approximately 8.52 MB (8.13 MiB) (`post-soak-idle-server-memory.txt`), supporting a session-associated allocation explanation. The exact server memory-context cause and an indefinitely long-lived session plateau are not established; this is a residual evidence limitation, not a flat-memory or leak-free claim. Server/client OOM deltas are zero. All offered work completes in-window; maximum scheduling queue wait is 80.20 ms, maximum measured pool wait 0.300 ms, with no accumulating backlog.
+
+The soak crosses 12 timed checkpoints and 256 autovacuum events; zero requested checkpoints, deadlocks, database rollbacks, temp bytes and abandoned/fatal/killed sessions. WAL generation is 2,426,786,571 bytes while WAL directory remains 419,430,400 bytes at both sampled endpoints. Retained relations grow by 1,598,922,752 bytes: canonical 1,047,502,848, raw 548,495,360, and 2,924,544 bytes of coverage/work/recovery/identity metadata. This is explained retained data/index growth, not a claim of indefinitely bounded storage; retention capacity beyond the hour remains operational work.
+
+The shared Linux pre-handshake registry enforces physical 16 market / 24 control / 8 admin slots; server max_connections 48 is additional protection. Soak in-window sampled maxima are 9/5/1; whole-driver maxima, including verification, are 9/5/2. `faults.json` proves all 48 actual connections, rejection of each class overflow, administrator DML at saturation, bounded local admission, and real query cancellation followed by a successful fresh transaction. Unknown outcomes quarantine slots; no automatic clearing was introduced. Earlier setup/verifier quarantines were cleared only through the accepted exclusive Docker operator recovery, with server-stop and resume receipts retained. This is not proof for an arbitrary host or untrusted root bypass.
+
+## Preserved failures and causal evidence
+
+All failed attempts remain evidence, not accepted samples. Setup/import failures and interrupted import are retained; resuming an unfinished month can retain raw duplicates without changing canonical winners. Initial verifier hashing depended on Arrow buffer layout; exact CanonicalHasher fixed it. Review identified submillisecond cast loss; pre-cast rejection and direct database precision proof close it. A verifier OOM during full expected-array materialization was fixed with bounded monthly seven-column preparation. A timezone-alias mismatch was corrected explicitly.
+
+Pilot1 exposed missing mandatory API organization resolution in the harness; corrected wiring uses the real resolver. Pilots2/3 had latency failures. Array profiling identified dictionary/text conversion cost. Pilot4 increased server CPU to four and still failed, so the original two-CPU envelope was restored. Proof-only hashing relocation is an instrumentation correction, not a product speedup claim. Pilot5 passed, but the first repeated matrix stress run failed stream p95 at 102.260 ms. That entire partial matrix remains diagnostic and is not pooled with final results.
+
+Profiling then identified duplicate hash/COPY work; stage reuse removes it while preserving ordering and winner semantics. Pilot6 passed, followed by a complete fresh six-run matrix and hour soak on unchanged revision 3. `writer-comparable-full.json` isolates the same full-data changed-value SQL before/after with identical hashes: execution 1733 ms versus 2.913 ms, subject to ordered warm-cache limitations. CPU profiles show 6000→3000 payload-order calls and 9000→6000 COPY writes for three 1000-row writes. These isolate mechanisms, not a universal whole-workload speedup. Representative EXPLAIN ANALYZE/BUFFERS plans are retained.
+
+Contract revisions and failed sample/source snapshots are preserved. The initial contract reconstruction is explicitly labelled as reconstructed, not a contemporaneous original. Diagnostic helper source bytes at execution are archived before formatting under `helper-sources-at-execution/` with a hash manifest.
+
+## Validation and review
+
+Final gates after the measurement window:
+
+- Writer real-PostgreSQL regressions plus exact hash unit tests: 29 passed (`final-writer-hash-tests.log`).
+- Reader real-PostgreSQL regressions: 24 passed, including backend termination after 4096 rows and exact 5000-row retry without duplicate prefix (`final-reader-tests.log`).
+- Whole-project ruff: pass (`final-ruff3.log`); earlier helper-format failures are retained.
+- Whole-project pyright: 0 errors, 0 warnings (`final-pyright.log`).
+
+Independent review by `/root/s09_review` covers production changes, exact hashing, retry faults, workload completeness and final runtime evidence. Earlier findings and their repairs are recorded in `early-review.md`; final review is recorded in `final-review.md`. No browser-visible behavior was changed. These checks establish the local disposable proof boundary, not production deployment or external provider availability.
+
+## S10 handoff and limits
+
+Keep the original 2 CPU / 4 GiB PostgreSQL configuration; no installation minimum/default was raised. The separate 4 CPU / 6 GiB proof client is part of the measured environment, not a new product installation requirement. The narrowest soak latency margin is stream p95 (6.67 ms); no extra capacity/headroom claim is made.
+
+Preserve all benchmark evidence and Docker volumes, including `roehub-s09-data`, `roehub-s09-registry` and anonymous client/regression volumes. Disposable containers `roehub-s09-pg`, `roehub-s09-client`, and `roehub-s03-s09-regression` are not the installed runtime. Keep physical budget enforcement required; unknown slots require the accepted exclusive operator recovery, never manual registry truncation or speculative reuse. S10 may consume the canonical acceptance receipt only after its own entry checks and orchestrator authorization. This executor stops after S09 acceptance.

@@ -32,21 +32,42 @@ class StoredSourceObservation:
     instrument: InstrumentId
     first: UtcTimestamp | None
     last: UtcTimestamp | None
+    generation: UUID | None = None
+    content_revision: int | None = None
+    funding_revision: int | None = None
+    actual_count: int | None = None
+    index_state: str = "legacy"
 
 
 class StoredCoordinates(Protocol):
     def page(self, *, after: tuple[int, str] | None, limit: int) -> Sequence[InstrumentId]: ...
 
     def observation_page(
-        self, *, after: tuple[int, str] | None, limit: int, before: UtcTimestamp,
+        self,
+        *,
+        after: tuple[int, str] | None,
+        limit: int,
+        before: UtcTimestamp,
     ) -> Sequence[StoredSourceObservation]: ...
 
     def observation(
-        self, *, instrument: InstrumentId, before: UtcTimestamp,
+        self,
+        *,
+        instrument: InstrumentId,
+        before: UtcTimestamp,
     ) -> StoredSourceObservation: ...
 
 
 class BaseObligations(Protocol):
+    def observe_unavailable(
+        self,
+        *,
+        installation_id: UUID,
+        observation: StoredSourceObservation,
+        coordinate: Coordinate,
+        observed_at: datetime,
+    ) -> None: ...
+
     def observe_source(
         self,
         *,
@@ -79,11 +100,24 @@ class BaseSourceReconciler:
 
     def _observe(self, row: StoredSourceObservation, *, now: datetime) -> UUID | None:
         instrument, first, last = row.instrument, row.first, row.last
-        if first is None or last is None:
-            return None  # Missing index visibility: bounded verification repairs it.
+        if row.content_revision is None or row.funding_revision is None:
+            return None
         coordinates = artifact_coordinates_from_market_id_v2(
             market_id=instrument.market_id.value, symbol=str(instrument.symbol)
         )
+        if row.index_state != "ready" or row.generation is None or first is None or last is None:
+            if row.generation is not None:
+                self.obligations.observe_unavailable(
+                    installation_id=self.installation_id,
+                    observation=row,
+                    coordinate=Coordinate(
+                        exchange=coordinates.exchange,
+                        market_type=coordinates.market_type,
+                        symbol=coordinates.symbol,
+                    ),
+                    observed_at=now.astimezone(UTC),
+                )
+            return None
         end = last.value + timedelta(minutes=1)
         return self.obligations.observe_source(
             installation_id=self.installation_id,
@@ -95,7 +129,10 @@ class BaseSourceReconciler:
             source=SourceTarget(
                 history=History(kind="range", start_utc=first.value, end_utc=end),
                 watermark=end,
-                revision="content_unverified",
+                revision=f"v2:{row.generation}:{row.content_revision}:{row.funding_revision}",
+                source_generation=row.generation,
+                content_revision=row.content_revision,
+                funding_revision=row.funding_revision,
                 compute_identity="native-base-v2",
                 funding_identity=coordinates.market_type,
             ),

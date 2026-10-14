@@ -11,10 +11,7 @@ from pathlib import Path
 from typing import Sequence
 from uuid import uuid4
 
-from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
-    ClickHouseSettingsLoader,
-    _clickhouse_client,
-)
+from apps.cli.wiring.db.postgres import market_gateway
 from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
 from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_source import (
     RestCandleIngestSource,
@@ -22,14 +19,11 @@ from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_s
 from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
     load_market_data_runtime_config,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.canonical_candle_index_reader import (  # noqa: E501
-    ClickHouseCanonicalCandleIndexReader,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_index_reader import (  # noqa: E501
+    PostgresCanonicalCandleIndexReader,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
-    ClickHouseConnectGateway,
-)
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer import (
-    ClickHouseRawKlineWriter,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (
+    PostgresRawKlineWriter,
 )
 from trading.contexts.market_data.application.dto import RestFillTask
 from trading.contexts.market_data.application.use_cases.rest_catchup_1m import (
@@ -64,7 +58,7 @@ class RestCatchUp1mCli:
         - Process exit code (`0` on success, `2` when at least one instrument failed).
 
         Assumptions/Invariants:
-        - Runtime config contains valid ClickHouse and ingestion settings.
+        - Runtime config contains valid PostgreSQL and ingestion settings.
         - Inter-instrument delay is read from `ingestion.rest_inter_instrument_delay_s`.
 
         Errors/Exceptions:
@@ -81,14 +75,11 @@ class RestCatchUp1mCli:
         clock = SystemClock()
         http = RequestsHttpClient.from_config(cfg, os.environ)
         try:
+            # PostgreSQL
+            gw = market_gateway(os.environ, workload="backfill")
 
-            # ClickHouse
-            settings = ClickHouseSettingsLoader(os.environ).load(workload="backfill")
-            client = _clickhouse_client(settings)
-            gw = ClickHouseConnectGateway(client)
-
-            index = ClickHouseCanonicalCandleIndexReader(gateway=gw, database=settings.database)
-            writer = ClickHouseRawKlineWriter(gateway=gw, database=settings.database)
+            index = PostgresCanonicalCandleIndexReader(gateway=gw)
+            writer = PostgresRawKlineWriter(gateway=gw)
 
             ingest_id = uuid4()
 
@@ -135,7 +126,7 @@ class RestCatchUp1mCli:
                 return 0
 
             if ns.all_from_ref_instruments:
-                instruments = _load_enabled_instruments(gw, settings.database)
+                instruments = _load_enabled_instruments(gw)
                 ok = 0
                 fail = 0
                 for idx, inst in enumerate(instruments):
@@ -168,7 +159,10 @@ class RestCatchUp1mCli:
                 return 0 if fail == 0 else 2
 
             if ns.market_id is None or ns.symbol is None:
-                raise SystemExit("Either --all-from-ref-instruments or (--market-id and --symbol) must be provided")  # noqa: E501
+                raise SystemExit(
+                    "Either --all-from-ref-instruments or "
+                    "(--market-id and --symbol) must be provided"
+                )  # noqa: E501
 
             inst = InstrumentId(MarketId(int(ns.market_id)), Symbol(str(ns.symbol)))
             rep = uc.run(inst)
@@ -204,17 +198,12 @@ def _sleep_between_instruments(*, delay_s: float, has_next: bool) -> None:
     time.sleep(delay_s)
 
 
-def _load_enabled_instruments(gw, database: str) -> list[InstrumentId]:
-    q = f"""
-    SELECT market_id, symbol
-    FROM {database}.ref_instruments
-    WHERE is_tradable = 1
-    """
-    rows = gw.select(q, {})
-    out: list[InstrumentId] = []
-    for r in rows:
-        out.append(InstrumentId(MarketId(int(r["market_id"])), Symbol(str(r["symbol"]))))
-    return out
+def _load_enabled_instruments(gw) -> list[InstrumentId]:
+    from trading.contexts.market_data.adapters.outbound.persistence.postgres.reference_readers import (  # noqa: E501
+        PostgresEnabledInstrumentReader,
+    )
+
+    return list(PostgresEnabledInstrumentReader(gw).list_enabled_tradable())
 
 
 def _print_report(rep: RestCatchUp1mReport, *, fmt: str, instrument_id: InstrumentId) -> None:
@@ -312,15 +301,23 @@ def _build_parser() -> argparse.ArgumentParser:
         default="configs/dev/market_data.yaml",
         help="Path to market_data.yaml (default: configs/dev/market_data.yaml)",
     )
-    p.add_argument("--market-id", type=int, default=None, help="MarketId (when running single instrument)")  # noqa: E501
-    p.add_argument("--symbol", type=str, default=None, help="Symbol (when running single instrument)")  # noqa: E501
+    p.add_argument(
+        "--market-id", type=int, default=None, help="MarketId (when running single instrument)"
+    )  # noqa: E501
+    p.add_argument(
+        "--symbol", type=str, default=None, help="Symbol (when running single instrument)"
+    )  # noqa: E501
     p.add_argument("--start", type=str, default=None, help="UTC ISO start for one bounded fill")
     p.add_argument("--end", type=str, default=None, help="UTC ISO end for one bounded fill")
     p.add_argument(
         "--all-from-ref-instruments",
         action="store_true",
-        help="Run rest-catchup for all enabled instruments in ClickHouse ref_instruments",
+        help="Run rest-catchup for all enabled instruments in PostgreSQL ref_instruments",
     )
-    p.add_argument("--batch-size", type=int, default=10000, help="Raw insert batch size (default: 10000)")  # noqa: E501
-    p.add_argument("--report-format", choices=("text", "json"), default="text", help="Output format")  # noqa: E501
+    p.add_argument(
+        "--batch-size", type=int, default=8192, help="Raw insert batch size (maximum/default: 8192)"
+    )  # noqa: E501
+    p.add_argument(
+        "--report-format", choices=("text", "json"), default="text", help="Output format"
+    )  # noqa: E501
     return p

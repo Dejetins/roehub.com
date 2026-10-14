@@ -1,5 +1,9 @@
 # Roehub Web UI v2.1 — промышленный контракт переноса
 
+> Уточнение 2026-10-13: приведённые ниже Keycloak/OIDC и paid-tier описания —
+> история прежнего UI. Текущий вход локальный, публичных тарифных полей и плагинов
+> нет. Действующий перечень поверхностей: [surface inventory](roehub-ui-surface-inventory-v1.md).
+
 **Статус:** историческое доказательство совместимости развёрнутого контура до
 будущей смены маршрутов. Базовые требования к следующему Web UI зафиксированы в
 [`roehub-product-transformation-requirements-v1.md`](../../platform/roehub-product-transformation-requirements-v1.md),

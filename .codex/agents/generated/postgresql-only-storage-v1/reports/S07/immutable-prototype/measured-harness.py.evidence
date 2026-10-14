@@ -1,0 +1,577 @@
+"""Isolated PG/CH comparison over an exported real candle snapshot.
+
+Never connects to the installation. Mutations require labeled disposable targets.
+Run as a module. Raw retains normalized full candle observations on both engines;
+this is a storage prototype, not a production migration or whole-application test.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import io
+import json
+import multiprocessing as mp
+import os
+import resource
+import subprocess
+import threading
+import time
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+import clickhouse_connect
+import numpy as np
+import psycopg
+import pyarrow as pa
+import pyarrow.csv as pacsv
+import pyarrow.parquet as pq
+
+ROOT = Path('.local_artifacts/pg-comparison-20261013')
+CONTAINERS = {'ch': 'roehub-pgcmp-ch', 'pg': 'roehub-pgcmp-pg'}
+COLUMNS = ('market_id,symbol,instrument_key,ts_open,ts_close,open,high,low,close,'
+           'volume_base,volume_quote,trades_count,taker_buy_volume_base,'
+           'taker_buy_volume_quote,source,ingested_at,ingest_id').split(',')
+PG_COLUMNS = '''market_id smallint NOT NULL, symbol text NOT NULL,
+ instrument_key text NOT NULL, ts_open timestamptz NOT NULL,ts_close timestamptz NOT NULL,
+ open double precision NOT NULL,high double precision NOT NULL,
+ low double precision NOT NULL,close double precision NOT NULL,
+ volume_base double precision NOT NULL,volume_quote double precision,
+ trades_count bigint,taker_buy_volume_base double precision,
+ taker_buy_volume_quote double precision,source text NOT NULL,
+ ingested_at timestamptz NOT NULL,ingest_id uuid'''
+ZERO = "B'0'::bit(1440)"
+REPLAY_START = datetime(2030, 1, 1, tzinfo=UTC)
+
+
+def guard(engine):
+    info = json.loads(subprocess.check_output(['docker', 'inspect', CONTAINERS[engine]]))[0]
+    assert info['Config']['Labels'].get('roehub.storage-comparison') == '20261013'
+    port, host = ('8123/tcp', '39223') if engine == 'ch' else ('5432/tcp', '36543')
+    assert info['NetworkSettings']['Ports'][port] == [{'HostIp': '127.0.0.1', 'HostPort': host}]
+    assert all(m.get('Name', '').startswith('roehub-pgcmp-') for m in info['Mounts']
+               if m['Type'] == 'volume')
+
+
+def connection(engine) -> Any:
+    if engine == 'ch':
+        return clickhouse_connect.get_client(host='127.0.0.1', port=39223,
+                                            username='default', password='')
+    return psycopg.connect('host=127.0.0.1 port=36543 user=postgres dbname=prototype',
+                           autocommit=True)
+
+
+def records(c, engine, query, params=None):
+    if engine == 'ch':
+        return c.query(query, parameters=params).result_rows
+    with c.cursor(binary=True) as cursor:
+        return cursor.execute(query, params).fetchall()
+
+
+def command(c, engine, query):
+    if engine == 'ch':
+        c.command(query)
+    else:
+        c.execute(query)
+
+
+def copy_arrow(c, table, batches):
+    with c.cursor().copy(f'COPY {table} FROM STDIN WITH (FORMAT CSV)') as copy:
+        for batch in batches:
+            sink = pa.BufferOutputStream()
+            pacsv.write_csv(batch, sink, write_options=pacsv.WriteOptions(include_header=False))
+            copy.write(sink.getvalue().to_pybytes())
+
+
+def setup_ch(c):
+    c.command('CREATE DATABASE prototype')
+    ddl = Path('migrations/clickhouse/market_data_ddl.sql').read_text()
+    start = ddl.index('CREATE TABLE IF NOT EXISTS market_data.canonical_candles_1m\n')
+    table = ddl[start:ddl.index(';', start) + 1].replace('market_data.', 'prototype.')
+    c.command(table)
+    raw = table.replace('canonical_candles_1m', 'raw_candles').replace(
+        'ReplacingMergeTree(ingested_at)', 'MergeTree')
+    c.command(raw)
+    c.command('CREATE MATERIALIZED VIEW prototype.raw_to_canonical TO '
+              'prototype.canonical_candles_1m AS SELECT * FROM prototype.raw_candles')
+    c.command('CREATE TABLE prototype.canonical_candles_1m_stats '
+              '(market_id UInt16,symbol String,minute_bitmap_state '
+              'AggregateFunction(groupBitmap,UInt32)) ENGINE=AggregatingMergeTree '
+              'ORDER BY (market_id,symbol)')
+    c.command('CREATE MATERIALIZED VIEW prototype.to_stats TO '
+              'prototype.canonical_candles_1m_stats AS SELECT market_id,symbol,'
+              'groupBitmapState(toUInt32(toUnixTimestamp(ts_open)/60)) AS minute_bitmap_state '
+              'FROM prototype.canonical_candles_1m GROUP BY market_id,symbol')
+    c.command('CREATE TABLE prototype.source_absent_candles_1m '
+              '(market_id UInt16,symbol String,minute_key UInt32,'
+              'observed_at DateTime64(3,\'UTC\')) '
+              'ENGINE=ReplacingMergeTree(observed_at) ORDER BY (market_id,symbol,minute_key)')
+    # Both sides acknowledge durable storage. Current installation CH defaults differ;
+    # this conservative comparison explicitly enables part fsync in the replica.
+    for table in ['raw_candles', 'canonical_candles_1m', 'canonical_candles_1m_stats']:
+        c.command(f'ALTER TABLE prototype.{table} MODIFY SETTING '
+                  'fsync_after_insert=1,fsync_part_directory=1')
+
+
+def setup_pg(c):
+    c.execute('CREATE TABLE canonical_candles_1m (' + PG_COLUMNS +
+              ',PRIMARY KEY(market_id,symbol,ts_open)) PARTITION BY RANGE(ts_open)')
+    c.execute('CREATE TABLE raw_candles (' + PG_COLUMNS + ') PARTITION BY RANGE(ts_open)')
+    for p in sorted((ROOT / 'candles').glob('*.parquet')) + [Path('203001.parquet')]:
+        month = p.stem
+        a = datetime(int(month[:4]), int(month[4:]), 1, tzinfo=UTC)
+        b = datetime(a.year + (a.month == 12), a.month % 12 + 1, 1, tzinfo=UTC)
+        for table in ['canonical_candles_1m', 'raw_candles']:
+            c.execute(f"CREATE TABLE {table}_{month} PARTITION OF {table} "
+                      f"FOR VALUES FROM ('{a.isoformat()}') TO ('{b.isoformat()}')")
+    c.execute('CREATE TABLE coverage (market_id smallint,symbol text,day integer,'
+              f'actual bit(1440) NOT NULL DEFAULT {ZERO},'
+              f'absent bit(1440) NOT NULL DEFAULT {ZERO},PRIMARY KEY(market_id,symbol,day))')
+    c.execute('CREATE TABLE source_absent_candles_1m (market_id smallint,symbol text,'
+              'minute_key bigint,observed_at timestamptz,PRIMARY KEY(market_id,symbol,minute_key))')
+
+
+def load(engine):
+    guard(engine)
+    c = connection(engine)
+    t = time.monotonic()
+    (setup_ch if engine == 'ch' else setup_pg)(c)
+    rows = 0
+    for i, p in enumerate(sorted((ROOT / 'candles').glob('*.parquet'))):
+        rows += pq.read_metadata(p).num_rows
+        if engine == 'ch':
+            # file() restricted to /var/lib/clickhouse/user_files, stream via client instead.
+            with p.open('rb') as stream:
+                proc = subprocess.run(['docker', 'exec', '-i', CONTAINERS['ch'],
+                    'clickhouse-client', '--query', 'INSERT INTO prototype.raw_candles '
+                    'SETTINGS input_format_parquet_allow_missing_columns=0 FORMAT Parquet'],
+                    stdin=stream, capture_output=True)
+            if proc.returncode:
+                raise RuntimeError(proc.stderr.decode()[:1000])
+        else:
+            copy_arrow(c, 'raw_candles', pq.ParquetFile(p).iter_batches(batch_size=10000))
+            a = p.stem[:4] + '-' + p.stem[4:] + '-01'
+            c.execute('INSERT INTO canonical_candles_1m SELECT * FROM raw_candles '
+                      "WHERE ts_open>=%s::timestamptz "
+                      "AND ts_open<%s::timestamptz+interval '1 month'",
+                      (a, a))
+        if i % 12 == 0:
+            print(engine, 'loaded months', i + 1, 'rows', rows, flush=True)
+    if engine == 'ch':
+        with (ROOT / 'absences.parquet').open('rb') as stream:
+            subprocess.run(['docker', 'exec', '-i', CONTAINERS['ch'], 'clickhouse-client',
+                '--query', 'INSERT INTO prototype.source_absent_candles_1m FORMAT Parquet'],
+                stdin=stream, check=True, stdout=subprocess.DEVNULL)
+    else:
+        copy_arrow(c, 'source_absent_candles_1m', pq.ParquetFile(
+            ROOT / 'absences.parquet').iter_batches())
+        c.execute('INSERT INTO coverage(market_id,symbol,day,actual) SELECT market_id,symbol,'
+                  '(extract(epoch FROM ts_open)::bigint/86400)::int,'
+                  f'bit_or(set_bit({ZERO},(extract(epoch FROM ts_open)::bigint/60%1440)::int,1)) '
+                  'FROM canonical_candles_1m GROUP BY 1,2,3')
+        c.execute('INSERT INTO coverage(market_id,symbol,day,absent) SELECT market_id,symbol,'
+                  '(minute_key/1440)::int,'
+                  f'bit_or(set_bit({ZERO},(minute_key%1440)::int,1)) '
+                  'FROM source_absent_candles_1m GROUP BY 1,2,3 '
+                  'ON CONFLICT(market_id,symbol,day) DO UPDATE SET absent=excluded.absent')
+        c.execute('VACUUM ANALYZE')
+        c.execute('CHECKPOINT')
+    result = {'engine': engine, 'rows': rows, 'seconds': time.monotonic() - t,
+              'size': size(c, engine)}
+    (ROOT / f'load-{engine}.json').write_text(json.dumps(result, indent=2))
+    print(result, flush=True)
+    c.close()
+
+
+def size(c, engine):
+    if engine == 'ch':
+        return records(c, engine, 'SELECT table,sum(rows),sum(bytes_on_disk),count() '
+                       "FROM system.parts WHERE active AND database='prototype' GROUP BY table")
+    return records(c, engine, "SELECT CASE WHEN relname LIKE 'canonical_candles_1m_%' THEN "
+                   "'canonical_candles_1m' WHEN relname LIKE 'raw_candles_%' THEN 'raw_candles' "
+                   "ELSE relname END AS family,sum(pg_total_relation_size(relid))::bigint "
+                   'FROM pg_stat_user_tables GROUP BY 1')
+
+
+def catalog(c, engine):
+    if engine == 'ch':
+        return records(c, engine, 'SELECT market_id,symbol,bitmapCardinality('
+                       'groupBitmapMergeState(minute_bitmap_state)) FROM '
+                       'prototype.canonical_candles_1m_stats GROUP BY market_id,symbol '
+                       'ORDER BY market_id,symbol')
+    return records(c, engine, 'SELECT market_id,symbol,sum(bit_count(actual))::bigint '
+                   'FROM coverage GROUP BY market_id,symbol ORDER BY market_id,symbol')
+
+
+def candles(c, engine, market, symbol, a, b, latest=False):
+    prefix = 'prototype.' if engine == 'ch' else ''
+    final = ' FINAL' if engine == 'ch' else ''
+    epoch = 'toUnixTimestamp(ts_open)' if engine == 'ch' else 'extract(epoch FROM ts_open)::bigint'
+    q = f'SELECT {epoch},open,high,low,close,volume_base FROM '
+    q += prefix + 'canonical_candles_1m' + final
+    q += (' WHERE market_id=%(m)s AND symbol=%(s)s AND ts_open>=%(a)s AND ts_open<%(b)s '
+          'ORDER BY ts_open ' + ('DESC LIMIT 500' if latest else ''))
+    rows = records(c, engine, q, dict(m=market, s=symbol, a=a, b=b))
+    arr = np.asarray(rows, dtype=np.float64)
+    return len(rows), hashlib.sha256(arr.tobytes()).hexdigest()
+
+
+def gap(c, engine, market, symbol, a, b):
+    if engine == 'ch':
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway import (
+            ClickHouseConnectGateway,
+        )
+        from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_coverage_reader import (  # noqa: E501
+            ClickHouseHistoryCoverageReader,
+        )
+        from trading.shared_kernel.primitives import (
+            InstrumentId,
+            MarketId,
+            Symbol,
+            TimeRange,
+            UtcTimestamp,
+        )
+        r = ClickHouseHistoryCoverageReader(ClickHouseConnectGateway(c), 'prototype').first_gap(
+            instrument_id=InstrumentId(MarketId(market), Symbol(symbol)),
+            time_range=TimeRange(UtcTimestamp(a), UtcTimestamp(b)))
+        return None if r is None else int(r.start.value.timestamp() // 60)
+    aa, bb = int(a.timestamp() // 60), int(b.timestamp() // 60)
+    rows = c.execute(f'''WITH days AS (
+      SELECT d, greatest(%(a)s-d*1440,0)::int AS lo,
+        least(%(b)s-d*1440,1440)::int AS hi
+      FROM generate_series(%(a)s/1440,(%(b)s-1)/1440) AS d
+    ), masks AS (
+      SELECT d,lo,hi,coalesce(actual|absent,{ZERO}) AS mask
+      FROM days LEFT JOIN coverage ON day=d AND market_id=%(m)s AND symbol=%(s)s
+    ) SELECT d,lo,hi,mask::text FROM masks
+      WHERE bit_count(substring(mask FROM lo+1 FOR hi-lo))<hi-lo ORDER BY d LIMIT 1''',
+      dict(a=aa, b=bb, m=market, s=symbol)).fetchall()
+    if not rows:
+        return None
+    day, lo, hi, mask = rows[0]
+    return day * 1440 + mask.index('0', lo, hi)
+
+
+def insert(c, engine, rows):
+    if engine == 'ch':
+        c.insert('prototype.raw_candles', rows, column_names=COLUMNS)
+        return
+    with c.transaction():
+        with c.cursor().copy('COPY incoming FROM STDIN') as writer:
+            for row in rows:
+                writer.write_row(row)
+        c.execute('INSERT INTO raw_candles SELECT * FROM incoming')
+        updates = ','.join(f'{col}=excluded.{col}' for col in COLUMNS[2:] if col != 'ts_open')
+        c.execute('INSERT INTO canonical_candles_1m SELECT * FROM incoming '
+                  'ON CONFLICT(market_id,symbol,ts_open) DO UPDATE SET ' + updates +
+                  ' WHERE excluded.ingested_at>canonical_candles_1m.ingested_at')
+        c.execute('INSERT INTO coverage(market_id,symbol,day,actual) SELECT market_id,symbol,'
+                  '(extract(epoch FROM ts_open)::bigint/86400)::int,'
+                  f'bit_or(set_bit({ZERO},(extract(epoch FROM ts_open)::bigint/60%1440)::int,1)) '
+                  'FROM incoming GROUP BY 1,2,3 ON CONFLICT(market_id,symbol,day) DO UPDATE '
+                  'SET actual=coverage.actual|excluded.actual')
+        c.execute('TRUNCATE incoming')
+
+
+def reset(c, engine):
+    if engine == 'ch':
+        # Only the synthetic replay month is removed, never copied source partitions.
+        for table in ['raw_candles', 'canonical_candles_1m']:
+            parts = records(c, engine, "SELECT DISTINCT partition FROM system.parts "
+                "WHERE active AND database='prototype' AND table=%(t)s "
+                "AND partition LIKE '203001%%'",
+                dict(t=table))
+            for (part,) in parts:
+                c.command(f"ALTER TABLE prototype.{table} DROP PARTITION '{part}'")
+        c.command("ALTER TABLE prototype.canonical_candles_1m_stats DELETE WHERE "
+                  "symbol LIKE 'REPLAY%' SETTINGS mutations_sync=2")
+        c.command("ALTER TABLE prototype.source_absent_candles_1m DELETE WHERE "
+                  "symbol LIKE 'REPLAY%' SETTINGS mutations_sync=2")
+    else:
+        c.execute('TRUNCATE raw_candles_203001,canonical_candles_1m_203001')
+        c.execute("DELETE FROM coverage WHERE symbol LIKE 'REPLAY%'")
+        c.execute("DELETE FROM source_absent_candles_1m WHERE symbol LIKE 'REPLAY%'")
+        c.execute('VACUUM ANALYZE coverage')
+        c.execute('CHECKPOINT')
+
+
+def sample(container):
+    code = ('cat /sys/fs/cgroup/memory.current; '
+            "awk '/^(anon|file|shmem|inactive_file) /{print}' /sys/fs/cgroup/memory.stat; "
+            "awk '/^usage_usec /{print}' /sys/fs/cgroup/cpu.stat; "
+            "cat /sys/fs/cgroup/memory.events")
+    raw = subprocess.check_output(['docker', 'exec', container, 'sh', '-c', code], text=True)
+    lines = raw.splitlines()
+    d = {'current': int(lines[0])}
+    d.update({p[0]: int(p[1]) for line in lines[1:] if len(p := line.split()) == 2})
+    d['working_set'] = d['current'] - d['inactive_file']
+    return d
+
+
+def volume_size(engine):
+    path = '/var/lib/clickhouse' if engine == 'ch' else '/var/lib/postgresql/data'
+    return int(subprocess.check_output(['docker', 'exec', CONTAINERS[engine],
+                                       'du', '-sb', path], text=True).split()[0])
+
+
+def quantiles(values):
+    return {'n': len(values), 'max_ms': max(values) * 1000,
+            **{f'p{n}_ms': float(np.percentile(values, n)) * 1000 for n in [50, 95, 99]}}
+
+
+def validate(engine):
+    """Exact equality of every value, independent of timing, plus receipt semantics."""
+    guard(engine)
+    c = connection(engine)
+    proof = []
+    for i, p in enumerate(sorted((ROOT / 'candles').glob('*.parquet'))):
+        expected = pq.read_table(p).sort_by(
+            [('market_id', 'ascending'), ('symbol', 'ascending'), ('ts_open', 'ascending')])
+        a = datetime(int(p.stem[:4]), int(p.stem[4:]), 1, tzinfo=UTC)
+        b = datetime(a.year + (a.month == 12), a.month % 12 + 1, 1, tzinfo=UTC)
+        if engine == 'ch':
+            q = ('SELECT * EXCEPT(ingest_id),toString(ingest_id) AS ingest_id '
+                 'FROM prototype.canonical_candles_1m FINAL '
+                 f"WHERE ts_open>=toDateTime('{a:%Y-%m-%d}','UTC') "
+                 f"AND ts_open<toDateTime('{b:%Y-%m-%d}','UTC') "
+                 'ORDER BY market_id,symbol,ts_open SETTINGS '
+                 'output_format_parquet_row_group_size=10000 FORMAT Parquet')
+            data = subprocess.check_output(['docker', 'exec', CONTAINERS['ch'],
+                                           'clickhouse-client', '--query', q])
+            actual = pq.read_table(pa.BufferReader(data))
+        else:
+            q = ('COPY (SELECT * FROM canonical_candles_1m '
+                 f"WHERE ts_open>='{a.isoformat()}' AND ts_open<'{b.isoformat()}' "
+                 'ORDER BY market_id,symbol,ts_open) TO STDOUT WITH (FORMAT CSV)')
+            data = io.BytesIO()
+            with c.cursor().copy(q) as reader:
+                for chunk in reader:
+                    data.write(chunk)
+            data.seek(0)
+            actual = pacsv.read_csv(data,
+                read_options=pacsv.ReadOptions(column_names=COLUMNS),
+                convert_options=pacsv.ConvertOptions(
+                    column_types={f.name: f.type for f in expected.schema},
+                    strings_can_be_null=True))
+        actual = actual.cast(expected.schema).sort_by(
+            [('market_id', 'ascending'), ('symbol', 'ascending'), ('ts_open', 'ascending')])
+        assert expected.equals(actual), f'{engine}: snapshot mismatch in {p.stem}'
+        proof.append({'month': p.stem, 'rows': len(actual), 'all_17_fields_equal': True})
+        if i % 12 == 0:
+            print(engine, 'validated months', i + 1, flush=True)
+    (ROOT / f'validation-{engine}.json').write_text(json.dumps(proof, indent=2))
+    print(engine, 'all snapshot fields equal:', sum(p['rows'] for p in proof), flush=True)
+    c.close()
+
+
+def correctness(engine):
+    guard(engine)
+    c = connection(engine)
+    reset(c, engine)
+    if engine == 'pg':
+        c.execute('CREATE TEMP TABLE incoming (' + PG_COLUMNS + ')')
+    t = REPLAY_START
+    row = [1, 'REPLAYCHECK', 'binance:spot:REPLAYCHECK', t, t + timedelta(minutes=1),
+           100., 102., 99., 101., 10., 1010., 20, 3., 303., 'ws', t, None]
+    newest = list(row)
+    newest[9], newest[15] = 11., t + timedelta(seconds=2)
+    # Full duplicate and older version must not undo the newest canonical value.
+    for item in [row, newest, row, newest]:
+        insert(c, engine, [item])
+    prefix, final = ('prototype.', ' FINAL') if engine == 'ch' else ('', '')
+    got = records(c, engine, 'SELECT ' + ','.join(COLUMNS) + ' FROM ' + prefix +
+                  "canonical_candles_1m" + final + " WHERE symbol='REPLAYCHECK'")
+    normalized = [v.replace(tzinfo=UTC) if isinstance(v, datetime) and v.tzinfo is None
+                  else v for v in got[0]] if got else []
+    assert len(got) == 1 and normalized == newest, 'latest-version parity failed'
+    assert gap(c, engine, 1, 'REPLAYCHECK', t, t + timedelta(minutes=3)) == int(
+        t.timestamp() // 60) + 1
+    minute = int(t.timestamp() // 60) + 1
+    if engine == 'ch':
+        c.insert('prototype.source_absent_candles_1m', [(1, 'REPLAYCHECK', minute, t)],
+                 column_names=['market_id', 'symbol', 'minute_key', 'observed_at'])
+    else:
+        with c.transaction():
+            c.execute('INSERT INTO source_absent_candles_1m VALUES(%s,%s,%s,%s)',
+                      (1, 'REPLAYCHECK', minute, t))
+            c.execute('UPDATE coverage SET absent=set_bit(absent,1,1) '
+                      "WHERE market_id=1 AND symbol='REPLAYCHECK'")
+    assert gap(c, engine, 1, 'REPLAYCHECK', t, t + timedelta(minutes=2)) is None
+    assert gap(c, engine, 1, 'REPLAYCHECK', t, t + timedelta(minutes=3)) == minute + 1
+    assert [r[2] for r in catalog(c, engine) if r[1] == 'REPLAYCHECK'] == [1]
+    raw_count = records(c, engine, 'SELECT count(*) FROM ' + prefix +
+                        "raw_candles WHERE symbol='REPLAYCHECK'")[0][0]
+    assert raw_count == 4
+    reset(c, engine)
+    (ROOT / f'correctness-{engine}.json').write_text(json.dumps({
+        'full_latest_row_equal': True, 'duplicate_and_stale_version': True,
+        'gap_and_source_absence': True, 'actual_count_excludes_source_absence': True,
+        'raw_observations_retained': raw_count}, indent=2))
+    c.close()
+    print(engine, 'correctness passed', flush=True)
+
+
+def run_lane(engine, kind, period, start, duration, profile, selected, seed, output):
+    outcomes, errors = [], []
+    end = datetime(2026, 10, 12, tzinfo=UTC)
+    client = connection(engine)
+    if engine == 'pg' and kind in ['stream', 'backfill']:
+        client.execute('CREATE TEMP TABLE incoming (' + PG_COLUMNS + ')')
+    count = int(duration / period)
+    for n in range(count):
+        scheduled = start + n * period
+        time.sleep(max(0, scheduled - time.monotonic()))
+        began = time.monotonic()
+        try:
+            m, s, first = selected[n % len(selected)]
+            if kind in ['stream', 'backfill']:
+                number = (100 if profile == 'stress' else 5) if kind == 'stream' else 1000
+                rows = []
+                for i in range(number):
+                    row = list(seed[i % len(seed)])
+                    minute = n if kind == 'stream' else n * number + i
+                    stamp = REPLAY_START + timedelta(minutes=minute,
+                        days=0 if kind == 'stream' else 5)
+                    row[0], row[1] = 1, 'REPLAY' + (f'{i:03d}' if kind == 'stream' else 'BACK')
+                    row[2] = 'binance:spot:' + row[1]
+                    row[3], row[4] = stamp, stamp + timedelta(minutes=1)
+                    row[14] = 'ws' if kind == 'stream' else 'rest'
+                    row[15], row[16] = stamp, None
+                    rows.append(row)
+                insert(client, engine, rows)
+                value = number
+            elif kind == 'hot_latest':
+                value = candles(client, engine, 1, 'REPLAY000', REPLAY_START,
+                                REPLAY_START + timedelta(days=1), latest=True)
+            elif kind.startswith('latest'):
+                value = candles(client, engine, m, s,
+                                end - timedelta(days=30), end, latest=True)
+            elif kind == 'catalog':
+                value = len(catalog(client, engine))
+            elif kind == 'gap':
+                value = gap(client, engine, m, s, first, end)
+            else:
+                read_start = first if profile == 'stress' else end - timedelta(days=365)
+                value = candles(client, engine, m, s,
+                                read_start, end)
+            finished = time.monotonic()
+            outcomes.append({'lane': kind, 'index': n, 'service_s': finished - began,
+                    'latency_s': finished - scheduled, 'value': value})
+        except Exception as exc:
+            errors.append({'lane': kind, 'index': n, 'type': type(exc).__name__,
+                    'message': str(exc)[:400]})
+    client.close()
+    Path(output).write_text(json.dumps({'operations': outcomes, 'errors': errors,
+        'maxrss': resource.getrusage(resource.RUSAGE_SELF).ru_maxrss}))
+
+
+def run(engine, label, duration, profile='normal'):
+    if not 1 <= duration <= 60:
+        raise ValueError('finite replay partition supports only durations from 1 to 60 seconds')
+    guard(engine)
+    c = connection(engine)
+    reset(c, engine)
+    # Same immutable real source candle values for every run; timestamps/symbols are replay keys.
+    table = pq.read_table(sorted((ROOT / 'candles').glob('*.parquet'))[-1])
+    seed = list(zip(*(table[col].to_pylist() for col in COLUMNS)))[:1000]
+    inventory = json.loads((ROOT / 'inventory.json').read_text())
+    selected = [(v['market'], v['symbol'], datetime.fromisoformat(v['first']))
+                for v in inventory[:5]]
+    assert selected
+    end = datetime(2026, 10, 12, tzinfo=UTC)
+    # Explicit warmup uses identical calls. This is warm-cache, not cold-disk proof.
+    catalog(c, engine)
+    for market, symbol, first in selected:
+        candles(c, engine, market, symbol, end - timedelta(days=30), end, latest=True)
+        gap(c, engine, market, symbol, first, end)
+    samples, outcomes, errors = [], [], []
+    done = threading.Event()
+    children = []
+    def monitor():
+        while not done.is_set():
+            pids = ','.join(str(p.pid) for p in children if p.pid) + ',' + str(os.getpid())
+            rss = subprocess.check_output(['ps', '-o', 'rss=', '-p', pids.strip(',')], text=True)
+            samples.append({'at': time.monotonic(), 'client_rss_bytes':
+                sum(int(v) for v in rss.split()) * 1024, **sample(CONTAINERS[engine])})
+            done.wait(1)
+    watcher = threading.Thread(target=monitor)
+    watcher.start()
+    start = time.monotonic() + 5
+    lanes = [('stream', 1.0), ('backfill', 2.0), ('latest', 1.0),
+             ('catalog', 2.0), ('gap', 2.0), ('artifact', 10.0), ('hot_latest', 1.0)]
+    if profile == 'stress':
+        lanes += [('artifact_parallel', 10.0), ('latest_parallel', 0.5)]
+    try:
+        ctx = mp.get_context('spawn')
+        outputs = []
+        for kind, period in lanes:
+            output = ROOT / f'lane-{label}-{engine}-{kind}.json'
+            outputs.append(output)
+            process = ctx.Process(target=run_lane, args=(engine, kind, period, start, duration,
+                                                       profile, selected, seed, str(output)))
+            process.start()
+            children.append(process)
+        for process in children:
+            process.join()
+            if process.exitcode != 0:
+                raise RuntimeError(f'load generator failed with {process.exitcode}')
+        for output in outputs:
+            lane_result = json.loads(output.read_text())
+            outcomes.extend(lane_result['operations'])
+            errors.extend(lane_result['errors'])
+    finally:
+        done.set()
+        watcher.join()
+        samples.append({'at': time.monotonic(), **sample(CONTAINERS[engine])})
+    summary = {}
+    for kind, _ in lanes:
+        vals = [x for x in outcomes if x['lane'] == kind]
+        summary[kind] = {'completed': len(vals),
+            'service': quantiles([x['service_s'] for x in vals]) if vals else {},
+            'scheduled_latency': quantiles([x['latency_s'] for x in vals]) if vals else {}}
+    end_replay = REPLAY_START + timedelta(days=31)
+    check = candles(c, engine, 1, 'REPLAYBACK', REPLAY_START, end_replay)
+    stream_check = [candles(c, engine, 1, f'REPLAY{i:03d}', REPLAY_START, end_replay)
+                    for i in range(100 if profile == 'stress' else 5)]
+    assert check[0] == int(duration / 2) * 1000, 'backfill receipt count differs'
+    assert all(v[0] == duration for v in stream_check), 'stream receipt count differs'
+    replay_coverage = [r for r in catalog(c, engine) if r[1].startswith('REPLAY')]
+    assert sum(r[2] for r in replay_coverage) == check[0] + sum(v[0] for v in stream_check)
+    result = {'engine': engine, 'label': label, 'profile': profile, 'duration_s': duration,
+        'harness_sha256': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        'lanes': summary, 'operations': outcomes, 'errors': errors, 'samples': samples,
+        'wall_s': time.monotonic() - start, 'replay_backfill': check,
+        'replay_streams': stream_check,
+        'replay_coverage': replay_coverage,
+        'client_maxrss_bytes_macos': max(v.get('client_rss_bytes', 0) for v in samples),
+        'server_volume_bytes': volume_size(engine),
+        'size': size(c, engine), 'memory': {key: {'min': min(s[key] for s in samples),
+            'max': max(s[key] for s in samples)}
+            for key in ['current', 'anon', 'file', 'shmem', 'working_set']},
+        'cpu_seconds': (samples[-1]['usage_usec'] - samples[0]['usage_usec']) / 1e6}
+    (ROOT / f'run-{label}-{engine}.json').write_text(json.dumps(result, indent=2))
+    print(json.dumps({k: v for k, v in result.items() if k not in
+                     ['operations', 'samples', 'size']}, indent=2), flush=True)
+    c.close()
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('action', choices=['load', 'run', 'validate', 'correctness'])
+    parser.add_argument('engine', choices=['pg', 'ch'])
+    parser.add_argument('--label', default='smoke')
+    parser.add_argument('--duration', type=int, default=60)
+    parser.add_argument('--profile', choices=['normal', 'stress'], default='normal')
+    args = parser.parse_args()
+    if args.action == 'load':
+        load(args.engine)
+    elif args.action == 'validate':
+        validate(args.engine)
+    elif args.action == 'correctness':
+        correctness(args.engine)
+    else:
+        run(args.engine, args.label, args.duration, args.profile)
+
+
+if __name__ == '__main__':
+    main()

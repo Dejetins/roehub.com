@@ -1,0 +1,58 @@
+{
+  "capture_plans.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/capture_plans.py.evidence",
+    "sha256": "4fc575b49bedf6cb6876f1b82d4df08033a70e1973ef5f0f9ffc901fb7716a35"
+  },
+  "operator_recovery.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/operator_recovery.py.evidence",
+    "sha256": "ea9c2556e1bdf71a4ead09bdf01ba9beb15eaa4e8a8177cb5c0624a04db6e17f"
+  },
+  "profile_arrays.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/profile_arrays.py.evidence",
+    "sha256": "2f1fbbe37a5f864b92bef41de2236e1a5c38375626193fd97a40b21e84c25025"
+  },
+  "profile_comparable.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/profile_comparable.py.evidence",
+    "sha256": "67a4f03cf5a8209c661294211c2dc8f11d6b780e01fb99bf4da97f023483141f"
+  },
+  "profile_mixed.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/profile_mixed.py.evidence",
+    "sha256": "4ce1f2c8f39bb19486c77b50898230eb81086e83ed99414d4f893da0a9fc6229"
+  },
+  "profile_plan_cache.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/profile_plan_cache.py.evidence",
+    "sha256": "3f5627cdd17641e17b804e18e861ca994a04e20c921befae2b1aad19d27c2a5d"
+  },
+  "profile_writer.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/profile_writer.py.evidence",
+    "sha256": "4f0c71a65a2e5940dfafcddd0deb9c9cb149b50074a188ed7710acc545627640"
+  },
+  "profile_writer_after.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/profile_writer_after.py.evidence",
+    "sha256": "39dda46bab07043fc0dc70407f03f676cbb75a021da68695551a6891d6e27f77"
+  },
+  "profile_writer_cpu.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/profile_writer_cpu.py.evidence",
+    "sha256": "bdc9df31e6b1814efe99333d4dff0c36a8fe65da18059a0cd3b192f442130f3b"
+  },
+  "prove_faults.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/prove_faults.py.evidence",
+    "sha256": "66481e4ff8c65c73661e9b84b73d50e9b54a79ef822e72cfa76a9919f9cdc973"
+  },
+  "run_matrix.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/run_matrix.py.evidence",
+    "sha256": "2c1e99b0bbebe5c41bed13cba21189e11ce74155a8e7cc1579b869fc13a774a5"
+  },
+  "run_matrix2.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/run_matrix2.py.evidence",
+    "sha256": "59beb92b05c0072888c4ea81aa9e8fe3fc1c8dfadd398786d59d6db1136712a7"
+  },
+  "summarize_final.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/summarize_final.py.evidence",
+    "sha256": "b47a05041c4b1e2e10ee4b46b13c3648c245a4104630bed3fe062de7aac6417e"
+  },
+  "verify_timestamp_precision.py": {
+    "archived": ".codex/agents/generated/postgresql-only-storage-v1/reports/S09/helper-sources-at-execution/verify_timestamp_precision.py.evidence",
+    "sha256": "369bf5c3c7f9cf5adcbee218f4e83d580040f05545afced330bedc801d5c0832"
+  }
+}

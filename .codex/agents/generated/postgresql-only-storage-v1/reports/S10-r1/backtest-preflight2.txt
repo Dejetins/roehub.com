@@ -1,0 +1,533 @@
+### Page
+- Page URL: http://127.0.0.1:20121/backtests/new
+- Page Title: Backtests · RoeHub
+### Snapshot
+```yaml
+- generic [ref=f13e8]:
+  - link "Skip to content" [ref=f13e9] [cursor=pointer]:
+    - /url: "#workspace-heading"
+  - banner [ref=f13e10]:
+    - generic [ref=f13e11]: RoeHub
+    - navigation "Language" [ref=f13e12]:
+      - link "Русский" [ref=f13e13] [cursor=pointer]:
+        - /url: /locale?locale=ru&next=%2Fbacktests%2Fnew
+      - link "English" [ref=f13e14] [cursor=pointer]:
+        - /url: /locale?locale=en&next=%2Fbacktests%2Fnew
+  - complementary [ref=f13e15]:
+    - navigation "Navigation" [ref=f13e16]:
+      - link "Overview" [ref=f13e17] [cursor=pointer]:
+        - /url: /dashboard
+      - link "Backtests" [ref=f13e23] [cursor=pointer]:
+        - /url: /backtests
+      - link "Strategies" [ref=f13e26] [cursor=pointer]:
+        - /url: /strategies
+      - generic "The Data page is not available yet." [ref=f13e29]:
+        - text: Data
+        - generic [ref=f13e34]: Unavailable
+      - link "Settings" [ref=f13e35] [cursor=pointer]:
+        - /url: /settings
+    - link "Sign out" [ref=f13e39] [cursor=pointer]:
+      - /url: /logout
+  - main [ref=f13e43]:
+    - generic [ref=f13e44]:
+      - heading "Backtests" [level=1] [ref=f13e45]
+      - generic [ref=f13e47]:
+        - region [ref=f13e48]:
+          - generic [ref=f13e49]:
+            - heading "Jobs" [level=2] [ref=f13e50]
+            - generic "Jobs on this page" [ref=f13e51]: "4"
+            - link "New backtest" [ref=f13e52] [cursor=pointer]:
+              - /url: /backtests/new
+          - tablist "Jobs" [ref=f13e54]:
+            - tab "New backtest" [selected] [ref=f13e55] [cursor=pointer]
+            - tab "History" [ref=f13e56] [cursor=pointer]
+          - tabpanel "New backtest" [ref=f13e57]:
+            - region "New backtest" [ref=f13e58]:
+              - paragraph [ref=f13e60]:
+                - text: 0GUSDT · 1h
+                - generic [ref=f13e61]: Oct 12, 2026 — Oct 13, 2026
+                - generic [ref=f13e62]: Configuration checked
+              - generic [ref=f13e65]:
+                - region [ref=f13e66]:
+                  - heading "Calculation console" [level=2] [ref=f13e68]
+                  - generic [ref=f13e69]:
+                    - group "Calculation console" [ref=f13e70]:
+                      - generic [ref=f13e73]:
+                        - generic [ref=f13e74] [cursor=pointer]: Job label (optional)
+                        - textbox "Job label (optional)" [ref=f13e75]:
+                          - /placeholder: Name
+                          - text: S10-r1 live futures PostgreSQL
+                      - region [ref=f13e76]:
+                        - heading "Market" [level=3] [ref=f13e77]
+                        - generic [ref=f13e79]:
+                          - generic [ref=f13e80]:
+                            - generic [ref=f13e81] [cursor=pointer]: Exchange
+                            - combobox "Exchange" [ref=f13e82]:
+                              - option "Binance" [selected]
+                              - option "Bybit"
+                          - generic [ref=f13e83]:
+                            - generic [ref=f13e84] [cursor=pointer]: Market type
+                            - combobox "Market type" [ref=f13e85]:
+                              - option "Spot"
+                              - option "Futures" [selected]
+                          - generic [ref=f13e86]:
+                            - generic [ref=f13e87] [cursor=pointer]: Symbol
+                            - combobox "Symbol" [ref=f13e88]:
+                              - option "0GUSDT" [selected]
+                              - option "1000000MOGUSDT"
+                              - option "1000BONKUSDC"
+                              - option "1000BONKUSDT"
+                              - option "1000CATUSDT"
+                              - option "1000CHEEMSUSDT"
+                              - option "1000FLOKIUSDT"
+                              - option "1000LUNCUSDT"
+                              - option "1000PEPEUSDC"
+                              - option "1000PEPEUSDT"
+                              - option "1000RATSUSDT"
+                              - option "1000SATSUSDT"
+                              - option "1000SHIBUSDC"
+                              - option "1000SHIBUSDT"
+                              - option "1000XECUSDT"
+                              - option "1INCHUSDT"
+                              - option "1MBABYDOGEUSDT"
+                              - option "2ZUSDT"
+                              - option "4USDT"
+                              - option "AAOIUSDT"
+                              - option "AAPLUSDT"
+                              - option "AAVEUSDC"
+                              - option "AAVEUSDT"
+                              - option "ACEUSDT"
+                              - option "ACHUSDT"
+                              - option "ACNUSDT"
+                              - option "ACTUSDT"
+                              - option "ACUUSDT"
+                              - option "ADAUSDC"
+                              - option "ADAUSDT"
+                              - option "ADBEUSDT"
+                              - option "AEROUSDT"
+                              - option "AEVOUSDT"
+                              - option "AGLDUSDT"
+                              - option "AGPUUSDT"
+                              - option "AGTUSDT"
+                              - option "AIAUSDT"
+                              - option "AIGENSYNUSDT"
+                              - option "AINUSDT"
+                              - option "AIOTUSDT"
+                              - option "AIOUSDT"
+                              - option "AIXBTUSDT"
+                              - option "AKAMUSDT"
+                              - option "AKEUSDT"
+                              - option "AKTUSDT"
+                              - option "ALABUSDT"
+                              - option "ALCHUSDT"
+                              - option "ALGOUSDT"
+                              - option "ALICEUSDT"
+                              - option "ALLOUSDT"
+                              - option "ALLUSDT"
+                              - option "ALPINEUSDT"
+                              - option "ALTUSDT"
+                              - option "AMATUSDT"
+                              - option "AMCUSDT"
+                              - option "AMDUSDT"
+                              - option "AMZNUSDT"
+                              - option "ANETUSDT"
+                              - option "ANIMEUSDT"
+                              - option "ANKRUSDT"
+                              - option "ANTHROPICUSDT"
+                              - option "APEUSDT"
+                              - option "API3USDT"
+                              - option "APLDUSDT"
+                              - option "APPUSDT"
+                              - option "APRUSDT"
+                              - option "APTUSDT"
+                              - option "ARBUSDC"
+                              - option "ARBUSDT"
+                              - option "ARCUSDT"
+                              - option "ARIAUSDT"
+                              - option "ARKMUSDT"
+                              - option "ARKUSDT"
+                              - option "ARMUSDT"
+                              - option "ARPAUSDT"
+                              - option "ARUSDT"
+                              - option "ARXUSDT"
+                              - option "ASMLUSDT"
+                              - option "ASRUSDT"
+                              - option "ASTERUSDT"
+                              - option "ASTRUSDT"
+                              - option "ASTSUSDT"
+                              - option "ATHUSDT"
+                              - option "ATOMUSDT"
+                              - option "ATUSDT"
+                              - option "AUCTIONUSDT"
+                              - option "AUSDT"
+                              - option "AVAAIUSDT"
+                              - option "AVAUSDT"
+                              - option "AVAXUSDC"
+                              - option "AVAXUSDT"
+                              - option "AVGOUSDT"
+                              - option "AVNTUSDT"
+                              - option "AWEUSDT"
+                              - option "AXLUSDT"
+                              - option "AXSUSDT"
+                              - option "AXTIUSDT"
+                              - option "AZTECUSDT"
+                              - option "B2USDT"
+                              - option "BABAUSDT"
+                              - option "BABYUSDT"
+                              - option "BANANAS31USDT"
+                              - option "BANANAUSDT"
+                              - option "BANDUSDT"
+                              - option "BANKUSDT"
+                              - option "BANUSDT"
+                              - option "BARDUSDT"
+                              - option "BASEDUSDT"
+                              - option "BASUSDT"
+                              - option "BATUSDT"
+                              - option "BBUSDT"
+                              - option "BBXUSDT"
+                              - option "BCHUSDC"
+                              - option "BCHUSDT"
+                              - option "BEAMXUSDT"
+                              - option "BEATUSDT"
+                              - option "BELUSDT"
+                              - option "BERAUSDT"
+                              - option "BEUSDT"
+                              - option "BICOUSDT"
+                              - option "BIGTIMEUSDT"
+                              - option "BILLUSDT"
+                              - option "BIOUSDC"
+                              - option "BIOUSDT"
+                              - option "BIRBUSDT"
+                              - option "BITOUSDT"
+                              - option "BLESSUSDT"
+                              - option "BLUAIUSDT"
+                              - option "BLURUSDT"
+                              - option "BMNRUSDT"
+                              - option "BMTUSDT"
+                              - option "BNBUSDC"
+                              - option "BNBUSDT"
+                              - option "BNCUSDT"
+                              - option "BNTUSDT"
+                              - option "BOMEUSDC"
+                              - option "BOMEUSDT"
+                              - option "BOTUSDT"
+                              - option "BRETTUSDT"
+                              - option "BREVUSDT"
+                              - option "BRKBUSDT"
+                              - option "BROCCOLI714USDT"
+                              - option "BROCCOLIF3BUSDT"
+                              - option "BRUSDT"
+                              - option "BSBUSDT"
+                              - option "BSPUSDT"
+                              - option "BSVUSDT"
+                              - option "BTCDOMUSDT"
+                              - option "BTCU"
+                              - option "BTCUSD1"
+                              - option "BTCUSDC"
+                              - option "BTCUSDT"
+                              - option "BTCUSDT_261225"
+                              - option "BTCUSDT_270326"
+                              - option "BTRUSDT"
+                              - option "BTWUSDT"
+                              - option "BULLAUSDT"
+                              - option "BUSDT"
+                              - option "BWETUSDT"
+                              - option "BXUSDT"
+                              - option "BYDUSDT"
+                              - option "BZUSDT"
+                              - option "C98USDT"
+                              - option "CAKEUSDT"
+                              - option "CAPUSDT"
+                              - option "CARVUSDT"
+                              - option "CATIUSDT"
+                              - option "CATUSDT"
+                              - option "CBRSUSDT"
+                              - option "CCUSDT"
+                              - option "CELOUSDT"
+                              - option "CELRUSDT"
+                              - option "CETUSUSDT"
+                              - option "CFGUSDT"
+                              - option "CFXUSDT"
+                              - option "CGPTUSDT"
+                              - option "CHILLGUYUSDT"
+                              - option "CHIPUSDT"
+                              - option "CHRUSDT"
+                              - option "CHZUSDT"
+                              - option "CIENUSDT"
+                              - option "CKBUSDT"
+                              - option "CLANKERUSDT"
+                              - option "CLOUSDT"
+                              - option "CLUSDT"
+                              - option "COAIUSDT"
+                              - option "COHRUSDT"
+                              - option "COINUSDT"
+                              - option "COLLECTUSDT"
+                              - option "COMPUSDT"
+                              - option "COOKIEUSDT"
+                              - option "COPPERUSDT"
+                              - option "COSTUSDT"
+                              - option "COTIUSDT"
+                              - option "COWUSDT"
+                              - option "CRCLUSDT"
+                              - option "CRDOUSDT"
+                              - option "CRMLUSDT"
+                              - option "CRMUSDT"
+                              - option "CROSSUSDT"
+                          - generic [ref=f13e89]:
+                            - generic [ref=f13e90] [cursor=pointer]: Timeframe
+                            - combobox "Timeframe" [ref=f13e91]:
+                              - option "15m"
+                              - option "30m"
+                              - option "1h" [selected]
+                              - option "2h"
+                              - option "4h"
+                              - option "6h"
+                              - option "8h"
+                              - option "1d"
+                              - option "2d"
+                              - option "3d"
+                          - generic [ref=f13e92]:
+                            - generic [ref=f13e93] [cursor=pointer]: Start date
+                            - textbox "Start date" [ref=f13e94]: 2026-10-12
+                          - generic [ref=f13e95]:
+                            - generic [ref=f13e96] [cursor=pointer]: End date
+                            - textbox "End date" [ref=f13e97]: 2026-10-13
+                      - region [ref=f13e98]:
+                        - heading "Signal" [level=3] [ref=f13e99]
+                        - generic [ref=f13e100]:
+                          - region "Indicator 1" [ref=f13e101]:
+                            - generic [ref=f13e102]:
+                              - generic [ref=f13e103]: "1"
+                              - button "Move up" [disabled] [ref=f13e104]
+                              - button "Move down" [disabled] [ref=f13e107]
+                              - button "Remove indicator" [ref=f13e110] [cursor=pointer]
+                            - generic [ref=f13e114]:
+                              - generic [ref=f13e115]:
+                                - generic [ref=f13e116] [cursor=pointer]: Indicator
+                                - combobox "Indicator" [ref=f13e117]:
+                                  - option "ma.dema"
+                                  - option "ma.ema" [selected]
+                                  - option "ma.hma"
+                                  - option "ma.lwma"
+                                  - option "ma.rma"
+                                  - option "ma.sma"
+                                  - option "ma.tema"
+                                  - option "ma.vwma"
+                                  - option "ma.wma"
+                                  - option "ma.zlema"
+                                  - option "momentum.cci"
+                                  - option "momentum.fisher"
+                                  - option "momentum.roc"
+                                  - option "momentum.rsi"
+                                  - 'option "momentum.stoch — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "momentum.trix"
+                                  - option "momentum.williams_r"
+                                  - 'option "structure.candle_stats — Unavailable: this API requires a window axis." [disabled]'
+                                  - 'option "structure.candle_stats_atr_norm — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "structure.distance_to_ma_norm"
+                                  - option "structure.percent_rank"
+                                  - 'option "structure.pivots — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "structure.zscore"
+                                  - option "trend.adx"
+                                  - option "trend.aroon"
+                                  - option "trend.donchian"
+                                  - option "trend.linreg_slope"
+                                  - 'option "trend.psar — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "trend.vortex"
+                                  - option "volatility.atr"
+                                  - option "volatility.hv"
+                                  - option "volatility.stddev"
+                                  - 'option "volatility.tr — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "volatility.variance"
+                                  - 'option "volume.ad_line — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "volume.cmf"
+                                  - option "volume.mfi"
+                                  - 'option "volume.obv — Unavailable: this API requires a window axis." [disabled]'
+                                  - option "volume.volume_sma"
+                                  - option "volume.vwap"
+                              - generic [ref=f13e118]:
+                                - generic [ref=f13e119]: Price sources
+                                - group [ref=f13e120]:
+                                  - generic "Price sources close" [ref=f13e121] [cursor=pointer]:
+                                    - generic [ref=f13e122]: close
+                                    - text: ⌄
+                              - generic [ref=f13e123]:
+                                - generic [ref=f13e124] [cursor=pointer]: Window start
+                                - spinbutton "Window start" [ref=f13e125]: "10"
+                              - generic [ref=f13e126]:
+                                - generic [ref=f13e127] [cursor=pointer]: Window stop
+                                - spinbutton "Window stop" [ref=f13e128]: "10"
+                              - generic [ref=f13e129]:
+                                - generic [ref=f13e130] [cursor=pointer]: Window step
+                                - spinbutton "Window step" [ref=f13e131]: "1"
+                            - group [ref=f13e132]:
+                              - generic "Materialized window values" [ref=f13e133] [cursor=pointer]
+                          - button "Add indicator" [ref=f13e134] [cursor=pointer]
+                      - region [ref=f13e136]:
+                        - heading "Trade" [level=3] [ref=f13e137]
+                        - generic [ref=f13e139]:
+                          - generic [ref=f13e140]:
+                            - generic [ref=f13e141] [cursor=pointer]: Direction
+                            - combobox "Direction" [ref=f13e142]:
+                              - option "Long only" [selected]
+                              - option "Short"
+                              - option "Long/short reversal"
+                          - generic [ref=f13e143]:
+                            - generic [ref=f13e144] [cursor=pointer]: Initial cash (quote)
+                            - spinbutton "Initial cash (quote)" [ref=f13e145]: "10000"
+                          - generic [ref=f13e146]:
+                            - generic [ref=f13e147] [cursor=pointer]: Fee (%)
+                            - spinbutton "Fee (%)" [ref=f13e148]: "0.075"
+                          - generic [ref=f13e149]:
+                            - generic [ref=f13e150] [cursor=pointer]: Slippage (%)
+                            - spinbutton "Slippage (%)" [ref=f13e151]: "0.01"
+                          - generic [ref=f13e152]:
+                            - generic [ref=f13e153] [cursor=pointer]: Position sizing
+                            - combobox "Position sizing" [ref=f13e154]:
+                              - option "All available capital" [selected]
+                              - option "Fixed quote amount"
+                              - option "Fixed equity share"
+                              - option "Equity share with minimum amount"
+                              - option "Equity share with maximum amount"
+                      - region [ref=f13e155]:
+                        - heading "Risk" [level=3] [ref=f13e156]
+                        - generic [ref=f13e158] [cursor=pointer]:
+                          - switch "Take profit / Stop loss" [ref=f13e159]
+                          - text: Take profit / Stop loss
+                      - region [ref=f13e160]:
+                        - heading "Ranking" [level=3] [ref=f13e161]
+                        - generic [ref=f13e162]:
+                          - generic [ref=f13e163]:
+                            - generic [ref=f13e164]:
+                              - generic [ref=f13e165] [cursor=pointer]: Primary metric
+                              - combobox "Primary metric" [ref=f13e166]:
+                                - option "Total return (%)" [selected]
+                                - option "Return after funding (%)"
+                                - option "Maximum drawdown (%)"
+                                - option "Return / maximum drawdown"
+                                - option "Profit factor"
+                                - option "Trade Sharpe ratio"
+                                - option "Winning trades (%)"
+                            - generic [ref=f13e167]:
+                              - generic [ref=f13e168] [cursor=pointer]: Ranking direction
+                              - combobox "Ranking direction" [ref=f13e169]:
+                                - option "Ascending"
+                                - option "Descending" [selected]
+                            - generic [ref=f13e170]:
+                              - generic [ref=f13e171] [cursor=pointer]: Top N
+                              - spinbutton "Top N" [ref=f13e172]: "10"
+                          - group [ref=f13e173]:
+                            - generic "Server policies" [ref=f13e174] [cursor=pointer]
+                    - generic [ref=f13e175]:
+                      - status [ref=f13e176]: Configuration checked
+                      - button "Reset form" [ref=f13e177] [cursor=pointer]
+                      - button "Check configuration" [ref=f13e178] [cursor=pointer]
+                      - button "Submit backtest" [ref=f13e179] [cursor=pointer]
+                - group [ref=f13e180]:
+                  - generic "Preflight review Data coverage, cost and effective settings" [ref=f13e181] [cursor=pointer]:
+                    - text: Preflight review
+                    - generic [ref=f13e182]: Data coverage, cost and effective settings
+                  - generic [ref=f13e183]:
+                    - paragraph [ref=f13e184]: Preflight is advisory. Submission checks data availability and admission again.
+                    - generic [ref=f13e185]:
+                      - term [ref=f13e186]: Catalog read · UTC
+                      - definition [ref=f13e187]: 2026-10-14T08:58:45.753591Z
+                      - term [ref=f13e188]: Maximum end · UTC
+                      - definition [ref=f13e189]: 2026-10-14
+                      - term [ref=f13e190]: As-of date
+                      - definition [ref=f13e191]: 2026-10-14
+                      - term [ref=f13e192]: Published · UTC
+                      - definition [ref=f13e193]: 2026-10-14T08:56:23Z
+                    - heading "Server cost estimate" [level=3] [ref=f13e194]
+                    - generic [ref=f13e195]:
+                      - generic [ref=f13e196]:
+                        - term [ref=f13e197]: Indicator rows
+                        - definition [ref=f13e198]: "1"
+                      - generic [ref=f13e199]:
+                        - term [ref=f13e200]: Candidate combinations
+                        - definition [ref=f13e201]: "1"
+                      - generic [ref=f13e202]:
+                        - term [ref=f13e203]: TP/SL cells
+                        - definition [ref=f13e204]: "0"
+                      - generic [ref=f13e205]:
+                        - term [ref=f13e206]: Cost class
+                        - definition [ref=f13e207]: Small
+                      - generic [ref=f13e208]:
+                        - term [ref=f13e209]: Scheduling class
+                        - definition [ref=f13e210]: Heavy
+                    - heading "Funding coverage" [level=3] [ref=f13e211]
+                    - generic [ref=f13e212]:
+                      - generic [ref=f13e213]:
+                        - term [ref=f13e214]: Status
+                        - definition [ref=f13e215]: Incomplete
+                      - generic [ref=f13e216]:
+                        - term [ref=f13e217]: Coverage policy
+                        - definition [ref=f13e218]: Warn on incomplete coverage
+                      - generic [ref=f13e219]:
+                        - term [ref=f13e220]: Coverage (%)
+                        - definition [ref=f13e221]: "99.973"
+                      - generic [ref=f13e222]:
+                        - term [ref=f13e223]: Funding rows
+                        - definition [ref=f13e224]: "3702"
+                      - generic [ref=f13e225]:
+                        - term [ref=f13e226]: Expected funding events
+                        - definition [ref=f13e227]: "3703"
+                      - generic [ref=f13e228]:
+                        - term [ref=f13e229]: Missing funding events
+                        - definition [ref=f13e230]: "1"
+                      - generic [ref=f13e231]:
+                        - term [ref=f13e232]: Coverage warnings
+                        - definition [ref=f13e233]: missing_trailing_coverage
+                    - generic [ref=f13e234]:
+                      - heading "Server warnings" [level=3] [ref=f13e235]
+                      - list [ref=f13e236]:
+                        - listitem [ref=f13e237]: Funding readiness is degraded; creation proceeds under degraded_with_warning policy · funding_readiness_degraded
+                    - heading "Effective settings" [level=3] [ref=f13e238]
+                    - group [ref=f13e239]:
+                      - generic "Server policies" [ref=f13e240] [cursor=pointer]
+                      - paragraph [ref=f13e241]: These policies come from server defaults. Effective settings are shown after checking.
+                      - generic [ref=f13e242]:
+                        - generic [ref=f13e243]:
+                          - term [ref=f13e244]: Funding
+                          - definition [ref=f13e245]: "Mode: Include for futures · Coverage policy: Warn on incomplete coverage"
+                        - generic [ref=f13e246]:
+                          - term [ref=f13e247]: Profit lock
+                          - definition [ref=f13e248]: "Enabled: Disabled"
+                        - generic [ref=f13e249]:
+                          - term [ref=f13e250]: Close on end
+                          - definition [ref=f13e251]: Enabled
+                        - generic [ref=f13e252]:
+                          - term [ref=f13e253]: Minimum-trade policy
+                          - definition [ref=f13e254]: "Minimum closed trades: 1"
+                    - generic [ref=f13e255]:
+                      - term [ref=f13e256]: Direction
+                      - definition [ref=f13e257]: Long only
+                      - term [ref=f13e258]: Fee (%)
+                      - definition [ref=f13e259]: "0.075"
+                      - term [ref=f13e260]: Slippage (%)
+                      - definition [ref=f13e261]: "0.01"
+                      - term [ref=f13e262]: Ranking
+                      - definition [ref=f13e263]: Return after funding (%)
+                      - term [ref=f13e264]: Initial cash (quote)
+                      - definition [ref=f13e265]: "10000"
+                      - term [ref=f13e266]: Position sizing
+                      - definition [ref=f13e267]: "Mode: All available capital"
+                      - term [ref=f13e268]: Top N
+                      - definition [ref=f13e269]: "10"
+                      - term [ref=f13e270]: Start date
+                      - definition [ref=f13e271]: 2026-10-12
+                      - term [ref=f13e272]: End date
+                      - definition [ref=f13e273]: 2026-10-13
+                      - term [ref=f13e274]: As-of date
+                      - definition [ref=f13e275]: 2026-10-14
+                      - term [ref=f13e276]: Published · UTC
+                      - definition [ref=f13e277]: 2026-10-14T08:56:23Z
+        - region "Select a backtest" [ref=f13e278]:
+          - generic [ref=f13e279]:
+            - heading "Select a backtest" [level=2] [ref=f13e280]
+            - paragraph [ref=f13e281]: Open a job to read its identity, state and research inputs.
+            - paragraph [ref=f13e282]: Open a job to observe execution. Result views and exports are not available yet.
+  - contentinfo [ref=f13e283]:
+    - text: Artifact-backed backtests
+    - generic [ref=f13e284]: Library snapshots · live selected job
+```

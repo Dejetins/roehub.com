@@ -1,0 +1,4 @@
+FROM roehub/s06-native-proof:local
+RUN python -c "import importlib.metadata, pathlib, shutil; d=importlib.metadata.distribution('clickhouse-connect'); [p.unlink() for f in d.files or [] if (p:=pathlib.Path(d.locate_file(f))).is_file()]; shutil.rmtree(pathlib.Path(d.locate_file('clickhouse_connect')), ignore_errors=True)"
+ENV PYTHONPATH=/workspace/src:/workspace
+WORKDIR /workspace

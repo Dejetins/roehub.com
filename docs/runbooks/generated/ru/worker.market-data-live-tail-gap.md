@@ -16,7 +16,7 @@
 ## Симптомы
 
 - Закрытый интервал остаётся пропущенным после окна политики восстановления.
-- Контур восстановления ClickHouse остаётся разомкнутым или растут ошибки REST-резерва.
+- Контур восстановления PostgreSQL остаётся разомкнутым или растут ошибки REST-резерва.
 
 ## Предварительные условия
 
@@ -86,7 +86,7 @@
 
 Команда-владелец: `market-data.operations`; роль эскалации: `operator`.
 
-Связанные alerts: `MarketDataClickHouseRepairCircuitOpenTooLong`, `MarketDataLiveTailUnrepairedGapBeyondPolicy`, `MarketDataRestTailRepairErrors`.
+Связанные alerts: `MarketDataCanonicalStoreRepairCircuitOpenTooLong`, `MarketDataLiveTailUnrepairedGapBeyondPolicy`, `MarketDataRestTailRepairErrors`.
 
 Исходная инструкция: `docs/runbooks/market-data-live-tail-repair.md`.
 

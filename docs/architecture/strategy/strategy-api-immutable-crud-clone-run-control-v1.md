@@ -422,7 +422,7 @@ Contract:
 * supported modes are `monitor_only`, `paper` and `live`;
 * supported sizing methods are `fixed_quote` and `fixed_equity_pct`;
 * `paper` remains non-money-moving in this stage;
-* `live` readiness fails closed unless the request has recent Keycloak
+* `live` readiness fails closed unless the request has recent local Roehub
   authentication and the configured `exchange_connection_id` is eligible for
   trading through the non-secret exchange-control readiness projection;
 * Strategy API does not decrypt exchange credentials, call exchange SDKs or

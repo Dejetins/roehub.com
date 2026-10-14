@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://schemas.roehub.io/release/offline-release-manifest.v1alpha1.schema.json",
-  "title": "Roehub signed offline release bundle manifest v1alpha1",
+  "$id": "https://schemas.roehub.io/release/offline-release-manifest.v1alpha2.schema.json",
+  "title": "Roehub signed offline release bundle manifest v1alpha2",
   "type": "object",
   "required": [
     "schema",
@@ -17,14 +17,17 @@
   ],
   "properties": {
     "schema": {
-      "const": "io.roehub.offline-release-bundle/v1alpha1"
+      "const": "io.roehub.offline-release-bundle/v1alpha2"
     },
     "product": {
       "const": "roehub"
     },
     "release": {
       "type": "object",
-      "required": ["version", "manifest"],
+      "required": [
+        "version",
+        "manifest"
+      ],
       "properties": {
         "version": {
           "type": "string",
@@ -38,10 +41,14 @@
     },
     "compatibility": {
       "type": "object",
-      "required": ["bundle_schema", "release_manifest_schema", "minimum_docker_api"],
+      "required": [
+        "bundle_schema",
+        "release_manifest_schema",
+        "minimum_docker_api"
+      ],
       "properties": {
         "bundle_schema": {
-          "const": "io.roehub.offline-release-bundle/v1alpha1"
+          "const": "io.roehub.offline-release-bundle/v1alpha2"
         },
         "release_manifest_schema": {
           "const": "io.roehub.release/v1alpha1"
@@ -55,7 +62,11 @@
     },
     "signing": {
       "type": "object",
-      "required": ["algorithm", "key_id", "public_key"],
+      "required": [
+        "algorithm",
+        "key_id",
+        "public_key"
+      ],
       "properties": {
         "algorithm": {
           "const": "SSHSIG-Ed25519"
@@ -71,7 +82,12 @@
     },
     "network_policy": {
       "type": "object",
-      "required": ["default_egress", "telemetry", "update_checks", "catalog_requests"],
+      "required": [
+        "default_egress",
+        "telemetry",
+        "update_checks",
+        "catalog_requests"
+      ],
       "properties": {
         "default_egress": {
           "const": "denied"
@@ -135,14 +151,10 @@
     },
     "corresponding_sources": {
       "type": "object",
-      "required": ["grafana", "loki", "openbao"],
+      "required": [
+        "openbao"
+      ],
       "properties": {
-        "grafana": {
-          "$ref": "#/$defs/source"
-        },
-        "loki": {
-          "$ref": "#/$defs/source"
-        },
         "openbao": {
           "$ref": "#/$defs/source"
         }
@@ -168,7 +180,10 @@
       "pattern": "^sha256:[a-f0-9]{64}$"
     },
     "platform": {
-      "enum": ["linux/amd64", "linux/arm64"]
+      "enum": [
+        "linux/amd64",
+        "linux/arm64"
+      ]
     },
     "source": {
       "type": "object",
@@ -195,7 +210,9 @@
           "pattern": "^[a-f0-9]{64}$"
         },
         "image": {
-          "enum": ["grafana", "loki", "openbao"]
+          "enum": [
+            "openbao"
+          ]
         },
         "image_index_digest": {
           "$ref": "#/$defs/digest"
@@ -280,7 +297,10 @@
         },
         "child_digests": {
           "type": "object",
-          "required": ["linux/amd64", "linux/arm64"],
+          "required": [
+            "linux/amd64",
+            "linux/arm64"
+          ],
           "properties": {
             "linux/amd64": {
               "$ref": "#/$defs/digest"
@@ -298,7 +318,10 @@
         },
         "sboms": {
           "type": "object",
-          "required": ["linux/amd64", "linux/arm64"],
+          "required": [
+            "linux/amd64",
+            "linux/arm64"
+          ],
           "properties": {
             "linux/amd64": {
               "$ref": "#/$defs/path"
@@ -314,7 +337,13 @@
     },
     "asset": {
       "type": "object",
-      "required": ["path", "sha256", "size_bytes", "media_type", "executable"],
+      "required": [
+        "path",
+        "sha256",
+        "size_bytes",
+        "media_type",
+        "executable"
+      ],
       "properties": {
         "path": {
           "$ref": "#/$defs/path"

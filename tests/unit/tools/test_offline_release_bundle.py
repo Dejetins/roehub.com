@@ -30,8 +30,6 @@ IMAGE_NAMES = (
     "blackbox",
     "clickhouse",
     "config_consumer",
-    "grafana",
-    "loki",
     "ml_runtime",
     "openbao",
     "postgresql",
@@ -175,29 +173,9 @@ def _source_archive(path: Path, *, root: str, license_files: tuple[str, ...]) ->
 
 
 def _source_metadata(
-    *, grafana_source: Path, loki_source: Path, openbao_source: Path
+    *, openbao_source: Path
 ) -> dict[str, dict[str, object]]:
     return {
-        "grafana": {
-            "archive_root": "grafana-12.0.2",
-            "expected_sha256": hashlib.sha256(grafana_source.read_bytes()).hexdigest(),
-            "filename": grafana_source.name,
-            "image": "grafana",
-            "license_files": ["LICENSE", "LICENSING.md", "NOTICE.md"],
-            "revision": "a" * 40,
-            "tag": "v12.0.2",
-            "url": "https://github.com/grafana/grafana/archive/refs/tags/v12.0.2.tar.gz",
-        },
-        "loki": {
-            "archive_root": "loki-3.5.1",
-            "expected_sha256": hashlib.sha256(loki_source.read_bytes()).hexdigest(),
-            "filename": loki_source.name,
-            "image": "loki",
-            "license_files": ["LICENSE", "LICENSING.md"],
-            "revision": "b" * 40,
-            "tag": "v3.5.1",
-            "url": "https://github.com/grafana/loki/archive/refs/tags/v3.5.1.tar.gz",
-        },
         "openbao": {
             "archive_root": "openbao-2.5.4-roehub-licensed-qr.1",
             "expected_sha256": hashlib.sha256(openbao_source.read_bytes()).hexdigest(),
@@ -367,19 +345,7 @@ def test_signed_bundle_verifies_exact_inventory_and_rejects_tampering(tmp_path: 
     wheel.write_bytes(b"fixture-wheel")
     provenance = tmp_path / "provenance.json"
     provenance.write_text('{"status":"passed"}\n', encoding="utf-8")
-    grafana_source = tmp_path / "grafana-12.0.2.tar.gz"
-    loki_source = tmp_path / "loki-3.5.1.tar.gz"
     openbao_source = tmp_path / "openbao-2.5.4-roehub-licensed-qr.1.tar.gz"
-    _source_archive(
-        grafana_source,
-        root="grafana-12.0.2",
-        license_files=("LICENSE", "LICENSING.md", "NOTICE.md"),
-    )
-    _source_archive(
-        loki_source,
-        root="loki-3.5.1",
-        license_files=("LICENSE", "LICENSING.md"),
-    )
     _source_archive(
         openbao_source,
         root="openbao-2.5.4-roehub-licensed-qr.1",
@@ -399,13 +365,9 @@ def test_signed_bundle_verifies_exact_inventory_and_rejects_tampering(tmp_path: 
         wheel=wheel,
         image_inputs={name: archive for name in IMAGE_NAMES},
         source_inputs={
-            "grafana": grafana_source,
-            "loki": loki_source,
             "openbao": openbao_source,
         },
         source_metadata=_source_metadata(
-            grafana_source=grafana_source,
-            loki_source=loki_source,
             openbao_source=openbao_source,
         ),
         provenance=provenance,
@@ -458,19 +420,7 @@ def test_create_bundle_rejects_incomplete_image_inventory(tmp_path: Path) -> Non
     wheel.write_bytes(b"wheel")
     provenance = tmp_path / "provenance.json"
     provenance.write_text("{}\n", encoding="utf-8")
-    grafana_source = tmp_path / "grafana-12.0.2.tar.gz"
-    loki_source = tmp_path / "loki-3.5.1.tar.gz"
     openbao_source = tmp_path / "openbao-2.5.4-roehub-licensed-qr.1.tar.gz"
-    _source_archive(
-        grafana_source,
-        root="grafana-12.0.2",
-        license_files=("LICENSE", "LICENSING.md", "NOTICE.md"),
-    )
-    _source_archive(
-        loki_source,
-        root="loki-3.5.1",
-        license_files=("LICENSE", "LICENSING.md"),
-    )
     _source_archive(
         openbao_source,
         root="openbao-2.5.4-roehub-licensed-qr.1",
@@ -490,13 +440,9 @@ def test_create_bundle_rejects_incomplete_image_inventory(tmp_path: Path) -> Non
             wheel=wheel,
             image_inputs={"runtime": archive},
             source_inputs={
-                "grafana": grafana_source,
-                "loki": loki_source,
                 "openbao": openbao_source,
             },
             source_metadata=_source_metadata(
-                grafana_source=grafana_source,
-                loki_source=loki_source,
                 openbao_source=openbao_source,
             ),
             provenance=provenance,

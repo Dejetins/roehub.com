@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from typing import Any, Mapping, cast
 from uuid import UUID
 
-import psycopg
 from psycopg import errors
 from psycopg.rows import dict_row
 
@@ -19,6 +18,7 @@ from trading.contexts.exchange_control.application.connections import (
 from trading.contexts.exchange_control.application.validation import (
     ExchangeCredentialValidationResult,
 )
+from trading.platform.postgres_budget import connect as budget_connect
 from trading.shared_kernel.primitives import OrganizationId, UserId
 
 
@@ -36,7 +36,7 @@ class PostgresExchangeConnectionUsageGuard(ExchangeConnectionUsageGuard):
         owner_user_id: UserId,
         connection_id: UUID,
     ) -> int:
-        with psycopg.connect(
+        with budget_connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
         ) as postgres_connection:
@@ -80,7 +80,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
         credential_version: ExchangeCredentialVersionRecord,
     ) -> ExchangeConnectionRecord | None:
         try:
-            with psycopg.connect(
+            with budget_connect(
                 self._dsn,
                 row_factory=cast(Any, dict_row),
             ) as postgres_connection:
@@ -251,7 +251,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
     def list_for_user(
         self, *, organization_id: OrganizationId, owner_user_id: UserId
     ) -> tuple[ExchangeConnectionRecord, ...]:
-        with psycopg.connect(
+        with budget_connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
         ) as postgres_connection:
@@ -301,7 +301,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
     def get_active_credential(
         self, *, connection_id: UUID
     ) -> ExchangeCredentialVersionRecord | None:
-        with psycopg.connect(
+        with budget_connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
         ) as postgres_connection:
@@ -331,7 +331,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
         credential_version: ExchangeCredentialVersionRecord,
         updated_at: datetime,
     ) -> ExchangeConnectionRecord | None:
-        with psycopg.connect(
+        with budget_connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
         ) as postgres_connection:
@@ -369,9 +369,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                     ),
                     {
                         "rotated_at": updated_at,
-                        "credential_version_id": str(
-                            current_row["active_credential_version_id"]
-                        ),
+                        "credential_version_id": str(current_row["active_credential_version_id"]),
                     },
                 )
                 cursor.execute(
@@ -460,9 +458,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                         """,
                     ),
                     {
-                        "credential_version_id": str(
-                            credential_version.credential_version_id
-                        ),
+                        "credential_version_id": str(credential_version.credential_version_id),
                         "updated_at": updated_at,
                         "permission_summary_json": json.dumps(
                             {
@@ -495,7 +491,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
         disabled_at: datetime,
         status_reason: str = "user_disabled",
     ) -> ExchangeConnectionRecord | None:
-        with psycopg.connect(
+        with budget_connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
         ) as postgres_connection:
@@ -544,9 +540,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                     ),
                     {
                         "disabled_at": disabled_at,
-                        "credential_version_id": str(
-                            current_row["active_credential_version_id"]
-                        ),
+                        "credential_version_id": str(current_row["active_credential_version_id"]),
                     },
                 )
                 cursor.execute(
@@ -606,8 +600,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                     else None
                                 ),
                                 ip_restriction_status=str(
-                                    current_row.get("ip_restriction_status")
-                                    or "unknown"
+                                    current_row.get("ip_restriction_status") or "unknown"
                                 ),
                                 exchange_permissions=str(
                                     current_row.get("exchange_permissions") or "unknown"
@@ -629,7 +622,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
         owner_user_id: UserId,
         archived_at: datetime,
     ) -> ExchangeConnectionRecord | None:
-        with psycopg.connect(
+        with budget_connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
         ) as postgres_connection:
@@ -726,8 +719,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                                     else None
                                 ),
                                 ip_restriction_status=str(
-                                    current_row.get("ip_restriction_status")
-                                    or "unknown"
+                                    current_row.get("ip_restriction_status") or "unknown"
                                 ),
                                 exchange_permissions=str(
                                     current_row.get("exchange_permissions") or "unknown"
@@ -757,12 +749,10 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                 validation_status=result.status,
                 validation_reason=result.reason,
                 ip_restriction_status=result.ip_restriction_status,
-                exchange_permissions=str(
-                    result_summary.get("exchange_permissions") or "unknown"
-                ),
+                exchange_permissions=str(result_summary.get("exchange_permissions") or "unknown"),
             )
         )
-        with psycopg.connect(
+        with budget_connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
         ) as postgres_connection:
@@ -812,9 +802,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
                         """,
                     ),
                     {
-                        "permission_summary_json": json.dumps(
-                            result_summary
-                        ),
+                        "permission_summary_json": json.dumps(result_summary),
                         "validation_status": result.status,
                         "validation_reason": result.reason,
                         "ip_restriction_status": result.ip_restriction_status,
@@ -833,7 +821,7 @@ class PostgresExchangeConnectionRepository(ExchangeConnectionRepository):
         where: str,
         parameters: Mapping[str, object],
     ) -> Mapping[str, Any] | None:
-        with psycopg.connect(
+        with budget_connect(
             self._dsn,
             row_factory=cast(Any, dict_row),
         ) as postgres_connection:
@@ -927,9 +915,7 @@ def _credential_parameters(
         "api_secret_ciphertext": credential_version.api_secret_ciphertext,
         "passphrase_ciphertext": credential_version.passphrase_ciphertext,
         "api_key_last4": credential_version.api_key_last4,
-        "api_key_fingerprint_hmac": _fingerprint_bytes(
-            credential_version.api_key_fingerprint_hmac
-        ),
+        "api_key_fingerprint_hmac": _fingerprint_bytes(credential_version.api_key_fingerprint_hmac),
         "secret_cipher": credential_version.secret_cipher,
         "transit_key_id": credential_version.transit_key_id,
         "credential_scheme": credential_version.credential_scheme,
@@ -954,21 +940,15 @@ def _map_connection(*, row: Mapping[str, Any]) -> ExchangeConnectionRecord:
         permissions=str(permissions) if permissions is not None else "read",
         active_credential_version_id=UUID(str(row["active_credential_version_id"])),
         status=str(row["status"]),
-        status_reason=(
-            str(row["status_reason"]) if row["status_reason"] is not None else None
-        ),
-        validation_status=str(
-            row.get("validation_status") or "skipped_external_validation"
-        ),
+        status_reason=(str(row["status_reason"]) if row["status_reason"] is not None else None),
+        validation_status=str(row.get("validation_status") or "skipped_external_validation"),
         validation_reason=(
             str(row.get("validation_reason"))
             if row.get("validation_reason") is not None
             else "not_validated"
         ),
         ip_restriction_status=str(row.get("ip_restriction_status") or "unknown"),
-        last_validated_at=_normalize_optional_utc_datetime(
-            value=row.get("last_validated_at")
-        ),
+        last_validated_at=_normalize_optional_utc_datetime(value=row.get("last_validated_at")),
         created_at=_normalize_utc_datetime(value=row["created_at"]),
         updated_at=_normalize_utc_datetime(value=row["updated_at"]),
         disabled_at=_normalize_optional_utc_datetime(value=row["disabled_at"]),
@@ -998,9 +978,7 @@ def _map_credential(*, row: Mapping[str, Any]) -> ExchangeCredentialVersionRecor
         api_key_ciphertext=str(row["api_key_ciphertext"]),
         api_secret_ciphertext=str(row["api_secret_ciphertext"]),
         passphrase_ciphertext=(
-            str(row["passphrase_ciphertext"])
-            if row["passphrase_ciphertext"] is not None
-            else None
+            str(row["passphrase_ciphertext"]) if row["passphrase_ciphertext"] is not None else None
         ),
         api_key_last4=str(row["api_key_last4"]),
         api_key_fingerprint_hmac=_fingerprint_text(row["api_key_fingerprint_hmac"]),

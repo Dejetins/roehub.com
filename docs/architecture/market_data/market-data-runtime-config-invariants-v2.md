@@ -1,5 +1,22 @@
 # Market Data — Runtime Config & Invariants (v2)
 
+## Consumer wiring — S05, 2026-10-14
+
+Запись raw/canonical/coverage выполняется транзакционно в PostgreSQL. REST/Parquet batches ограничены 8192 строками, metadata/funding — 1000. Месячные партиции заранее создаёт maintenance; application DDL не разрешён.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Используются месячные PostgreSQL partitions. Ограничение verification <=7 дней и существующие row/byte/flush/provider budgets сохраняются; соединения и concurrency считаются на всю установку, включая lease sessions.
+
+
 > Исторический документ: с `roehub-market-data-activation-and-instrument-selection-v1`
 > CSV whitelist не определяет runtime-набор подписок, REST-догонки или публикации.
 > Набор collector строится из organization-owned selections и pin активных
@@ -13,7 +30,7 @@
 Цель:
 - один YAML описывает 4 рынка (binance/bybit × spot/futures), endpoints REST/WS, параметры reconnect/ping, flush policy;
 - whitelist тикеров задаётся CSV файлом;
-- REST backfill режется на чанки так, чтобы один insert не пересекал >7 дневных партиций ClickHouse;
+- REST backfill режется на чанки так, чтобы один insert не пересекал >7 дневных партиций PostgreSQL;
 - rate limits берутся **онлайн** у биржи (autodetect), поэтому численные лимиты не хранятся в YAML.
 
 Scope:
@@ -52,9 +69,7 @@ CSV — операторский формат, легко редактирует
 - иметь консервативный режим до получения первых заголовков/metadata.
 
 ### 4) REST backfill использует time-slicing по UTC дням: максимум 7 дней на insert
-ClickHouse raw таблицы партиционированы по дню (`toYYYYMMDD` по времени открытия свечи).
-Чтобы избегать ошибок и лимитов на количество партиций/parts в одной вставке,
-любой диапазон backfill режется на чанки так, чтобы один insert затрагивал не более 7 дневных партиций.
+PostgreSQL raw/canonical таблицы используют месячные UTC partitions. Backfill режется на окна до семи UTC-дней для ограничения транзакций, памяти и проверки; это не лимит количества физических partitions.
 
 
 ## YAML Schema (market_data.yaml)
@@ -103,7 +118,7 @@ WS operational notes:
 
 ### market_data.ingestion
 Flush/maintenance policy для WS worker и scheduler:
-- `flush_interval_ms: int` — максимальная задержка удержания данных в буфере перед вставкой в ClickHouse.
+- `flush_interval_ms: int` — максимальная задержка удержания данных в буфере перед вставкой в PostgreSQL.
   Даже если буфер не достиг `max_buffer_rows`, по таймеру выполняется flush.
   Меньше `flush_interval_ms` → ниже latency до raw, но больше insert-операций.
 - `max_buffer_rows: int` — предохранитель на всплески: flush при достижении размера буфера.
@@ -168,7 +183,7 @@ Input:
 - `TimeRange [start, end)` в UTC
 
 Rule:
-- диапазон режется по границам UTC-дней так, чтобы каждый чанк затрагивал не более 7 дневных партиций CH.
+- диапазон режется по границам UTC-дней так, чтобы каждый чанк охватывал не более 7 UTC-дней.
 
 Algorithm (conceptual):
 - cursor = start
@@ -180,7 +195,7 @@ Algorithm (conceptual):
   - cursor = slice_end
 
 Guarantee:
-- один чанк не пересекает >7 партиций `toYYYYMMDD(ts_open)`.
+- один чанк ограничен семью UTC-днями; месячные partitions подготавливает gateway.
 
 
 ## Notes
@@ -188,7 +203,6 @@ Guarantee:
 - Валидируем YAML/CSV строго и падаем быстро, чтобы не получать “тихие” частичные запуски.
 - `rest.earliest_available_ts_utc` — обязательный ключ, используется как coarse market-wide fallback lower bound.
 - Scheduler MAY использовать более поздний symbol-specific history start, если exchange его подтвердил.
-- Для конкурентных `asyncio.to_thread(...)` путей worker/scheduler используют thread-local CH gateway
-  (один ClickHouse client на поток), чтобы избежать session-конфликта concurrent queries.
+- Конкурентные worker/scheduler вызовы используют bounded PostgreSQL gateway pools и installation-wide registry; connection admission происходит до handshake.
 - Adapters могут логировать “observed rate limits” (из заголовков/metadata) для диагностики,
   но не используют захардкоженные численные лимиты из конфига.

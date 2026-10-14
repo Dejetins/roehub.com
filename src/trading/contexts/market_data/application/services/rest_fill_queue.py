@@ -318,12 +318,15 @@ class AsyncRestFillQueue:
                 if self._store:
                     self._store.retry(entry, next_retry_at=next_at, code=code)
                 self._pending[key] = replace(entry, next_retry_at=next_at, error_code=code)
-                log.warning(
-                    "rest fill waiting code=%s attempt=%s next_retry_at=%s",
-                    code,
-                    entry.attempt,
-                    next_at.isoformat(),
-                )
+                if entry.error_code != code or entry.attempt & (entry.attempt - 1) == 0:
+                    log.warning(
+                        "stream_recovery_waiting market_id=%s symbol=%s reason=%s "
+                        "start=%s end=%s code=%s attempt=%s next_retry_at=%s",
+                        task.instrument_id.market_id.value, str(task.instrument_id.symbol),
+                        task.reason, task.time_range.start.value.isoformat(),
+                        task.time_range.end.value.isoformat(), code, entry.attempt,
+                        next_at.isoformat(),
+                    )
             else:
                 terminal_code = (
                     "source_history_incomplete"
@@ -364,6 +367,13 @@ class AsyncRestFillQueue:
                 if self._store:
                     self._store.complete(entry)
                 self._pending.pop(key, None)
+            log.info(
+                "stream_recovery_window_completed market_id=%s symbol=%s reason=%s "
+                "start=%s end=%s rows_read=%s rows_written=%s",
+                work.instrument_id.market_id.value, str(work.instrument_id.symbol),
+                work.reason, work.time_range.start.value.isoformat(),
+                work.time_range.end.value.isoformat(), result.rows_read, result.rows_written,
+            )
             _emit_succeeded(
                 self._hooks.on_task_succeeded,
                 task,

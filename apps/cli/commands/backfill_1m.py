@@ -14,18 +14,15 @@ logger = logging.getLogger(__name__)
 
 
 class UtcTimestampParser(Protocol):
-    def parse(self, value: str) -> UtcTimestamp:
-        ...
+    def parse(self, value: str) -> UtcTimestamp: ...
 
 
 class BatchSizeParser(Protocol):
-    def parse(self, value: str | None) -> int | None:
-        ...
+    def parse(self, value: str | None) -> int | None: ...
 
 
 class ReportPresenter(Protocol):
-    def render(self, report: object) -> str:
-        ...
+    def render(self, report: object) -> str: ...
 
 
 class IsoUtcTimestampParser(UtcTimestampParser):
@@ -125,7 +122,9 @@ class Backfill1mCli:
     ) -> None:
         self._environ = dict(environ) if environ is not None else None
         self._ts_parser = ts_parser if ts_parser is not None else IsoUtcTimestampParser()
-        self._batch_parser = batch_parser if batch_parser is not None else OptionalIntBatchSizeParser()  # noqa: E501
+        self._batch_parser = (
+            batch_parser if batch_parser is not None else OptionalIntBatchSizeParser()
+        )  # noqa: E501
 
     def run(self, argv: Sequence[str]) -> int:
         """
@@ -139,14 +138,14 @@ class Backfill1mCli:
 
         Assumptions/Invariants:
         - runtime market-data config file is available on disk.
-        - ClickHouse connection settings come from environment.
+        - PostgreSQL connection settings come from environment.
 
         Errors/Exceptions:
         - Validation errors are converted into exit code `2`.
         - Runtime execution errors are logged and converted into exit code `1`.
 
         Side effects:
-        - Reads config from filesystem and writes data to ClickHouse through use-case wiring.
+        - Reads config from filesystem and writes data to PostgreSQL through use-case wiring.
         """
         ns = self._build_arg_parser().parse_args(list(argv))
         try:
@@ -238,7 +237,12 @@ class Backfill1mCli:
             help="Path to parquet file or directory. Can be passed multiple times.",
         )
 
-        p.add_argument("--batch-size", default='10000', type=str, help="Positive int or None (default 10_000)") # noqa: E501
+        p.add_argument(
+            "--batch-size",
+            default="8192",
+            type=str,
+            help="Positive int or None; capped at 8192 rows",
+        )  # noqa: E501
         p.add_argument(
             "--report-format",
             default="text",

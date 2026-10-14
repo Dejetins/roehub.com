@@ -36,26 +36,6 @@ DEFAULT_EVIDENCE = (
 )
 CACHE_ROOT = Path.home() / ".cache/roehub/stage22-offline-release"
 SOURCE_RECORDS: dict[str, dict[str, Any]] = {
-    "grafana": {
-        "archive_root": "grafana-12.0.2",
-        "expected_sha256": "8524498289e7d1900626ea7c0763fd923cf7bd1effa48cda476e63b299acfe2d",
-        "filename": "grafana-v12.0.2.tar.gz",
-        "image": "grafana",
-        "license_files": ["LICENSE", "LICENSING.md", "NOTICE.md"],
-        "revision": "5bda17e7c1cb313eb96266f2fdda73a6b35c3977",
-        "tag": "v12.0.2",
-        "url": "https://github.com/grafana/grafana/archive/refs/tags/v12.0.2.tar.gz",
-    },
-    "loki": {
-        "archive_root": "loki-3.5.1",
-        "expected_sha256": "d360561de7ac97d05a6fc1dc0ca73d93c11a86234783dfd9ae92033300caabd7",
-        "filename": "loki-v3.5.1.tar.gz",
-        "image": "loki",
-        "license_files": ["LICENSE", "LICENSING.md"],
-        "revision": "d4e637cebb842a933b21f0753c028821b1ad5c26",
-        "tag": "v3.5.1",
-        "url": "https://github.com/grafana/loki/archive/refs/tags/v3.5.1.tar.gz",
-    },
     "openbao": {
         "archive_root": "openbao-2.5.4-roehub-licensed-qr.1",
         "expected_sha256": "e1cc071b4666312de84e4bdf32e7e25be04f95738a7dbc5adff4c357c3a24f07",
@@ -700,25 +680,6 @@ def _compose_airgap_proof(
             and not service.get("profiles")
             and service.get("restart") != "no"
         }
-        grafana_environment = services.get("grafana", {}).get("environment", {})
-        required_grafana = {
-            "GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES": "false",
-            "GF_ANALYTICS_CHECK_FOR_UPDATES": "false",
-            "GF_ANALYTICS_REPORTING_ENABLED": "false",
-            "GF_PLUGINS_PREINSTALL_DISABLED": "true",
-            "GF_PLUGINS_PUBLIC_KEY_RETRIEVAL_DISABLED": "true",
-        }
-        if not isinstance(grafana_environment, dict) or any(
-            grafana_environment.get(key) != value for key, value in required_grafana.items()
-        ):
-            raise RuntimeProofError("Grafana phone-home defaults are not disabled")
-        loki_config = (
-            bundle
-            / "configs/installation/generated/base/observability/loki.yml"
-        ).read_text(encoding="utf-8")
-        if "analytics:\n  reporting_enabled: false\n" not in loki_config:
-            raise RuntimeProofError("Loki usage reporting is not disabled")
-
         _run([*command, "create"], label="retained candidate Compose create", timeout=300)
         network_names = _run(
             [
@@ -870,9 +831,6 @@ def _compose_airgap_proof(
             timeout=120,
         ).stdout.lower()
         forbidden_log_markers = (
-            "stats.grafana.org",
-            "grafana.com/api/plugins",
-            "loki-usage-report",
         )
         observed_markers = [item for item in forbidden_log_markers if item in logs]
         if observed_markers:
@@ -964,8 +922,6 @@ def _compose_airgap_proof(
         "bridge_gateway_control_traffic_excluded": True,
         "capture_sha256": _sha256(capture_path),
         "external_packet_count": len(external_packets),
-        "grafana_phone_home_disabled": True,
-        "loki_usage_reporting_disabled": True,
         "network_internal": True,
         "permanent_services_observed": sorted(running),
         "service_count": len(running),

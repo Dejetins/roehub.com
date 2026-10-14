@@ -1,0 +1,59 @@
+{
+  "stage": "S06",
+  "executor": "s06-20261014-installation",
+  "result": "passed",
+  "runtime_matrix": {
+    "embedded-base": {
+      "status": "passed",
+      "services": 6,
+      "path": "run-embedded-base-1.json"
+    },
+    "embedded-ml": {
+      "status": "passed",
+      "services": 14,
+      "path": "run-embedded-ml-1.json"
+    },
+    "embedded-trading": {
+      "status": "passed",
+      "services": 13,
+      "path": "run-embedded-trading-1.json"
+    },
+    "external-base": {
+      "status": "passed",
+      "services": 6,
+      "path": "run-external-base-1.json"
+    },
+    "external-ml": {
+      "status": "passed",
+      "services": 14,
+      "path": "run-external-ml-1.json"
+    },
+    "external-trading": {
+      "status": "passed",
+      "services": 13,
+      "path": "run-external-trading-1.json"
+    }
+  },
+  "backup": "backup-runtime7.json",
+  "storage_bootstrap": "storage-runtime5.log",
+  "budget": "budget-runtime8.log",
+  "recovery": "operator-recovery3.log",
+  "native_cli": "native-cli-runtime1.log",
+  "tls_negative": "tls-endpoint-negative1.log",
+  "cancellation": "async-cancellation2.log",
+  "maintenance": "maintenance-runtime5.log",
+  "unit": {
+    "passed": 70,
+    "evidence": "unit-final2.log"
+  },
+  "static": [
+    "ruff-final2.log",
+    "pyright-final1.log",
+    "generated-final.log"
+  ],
+  "review": "connection-recovery-review.md",
+  "immutability": "immutability-final.json",
+  "release_published": false,
+  "current_installation_mutated": false,
+  "s07_executed": false
+}

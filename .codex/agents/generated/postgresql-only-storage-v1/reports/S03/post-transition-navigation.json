@@ -1,0 +1,12 @@
+[
+  {
+    "path": "docs/architecture/project-map/PROJECT_MAP.md",
+    "sha256": "a1a5ea9398d96055048f539d3c2fc9533303646deade4ea237ea817ef2dd418c",
+    "reason": "register S03 receipt and post-transition validation note"
+  },
+  {
+    "path": "docs/architecture/project-map/project-map.json",
+    "sha256": "58844b1833f8a9e89d757ccb1587949484c3ec63e53dc466036ed14851433666",
+    "reason": "register S03 receipt and post-transition validation note"
+  }
+]

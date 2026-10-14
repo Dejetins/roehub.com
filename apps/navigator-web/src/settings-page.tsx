@@ -6,6 +6,7 @@ import {Bell, HardDrive, Settings2, Shield, User} from 'lucide-react';
 import {z} from 'zod';
 import {ApiError} from './api';
 import {StorageSettings} from './storage-settings';
+import {LibraryHeader} from './library-header';
 import {SessionDevices} from './session-devices';
 import {ChartDisplayMenu} from './chart-display-menu';
 import {accountRead, accountSave, auditSchema, notificationDraft, notificationsSchema, preferencesDraft, preferencesSchema, profileDraft, profileSchema, sessionsSchema,
@@ -20,7 +21,7 @@ export function SettingsPage({subject}: {subject:string}) {
   const category=pathname.split('/')[2]??'profile';
   const categories=[{id:'profile',label:w('Profile','Профиль'),icon:User},{id:'preferences',label:w('Interface','Интерфейс'),icon:Settings2},
     {id:'notifications',label:w('Notifications','Уведомления'),icon:Bell},{id:'security',label:w('Security','Безопасность'),icon:Shield},{id:'storage',label:w('Data and storage','Данные и хранение'),icon:HardDrive}];
-  return <><aside className="navigator-library"><header className="panel-head"><h2>{w('Settings','Настройки')}</h2></header>
+  return <><aside className="navigator-library"><LibraryHeader title={w('Settings','Настройки')}/>
     <nav className="work-categories" aria-label={w('Settings categories','Разделы настроек')}>{categories.map(c=><Link key={c.id} to={`/settings/${c.id}`} aria-current={c.id===category?'page':undefined}><c.icon aria-hidden="true" />{c.label}</Link>)}</nav></aside>
     <h1 className="sr-only" id="workspace-heading" tabIndex={-1}>{categories.find(c=>c.id===category)?.label??w('Settings','Настройки')}</h1>
     <div className="work-content work-content-no-heading" key={category}>{category==='profile'?<ProfileSettings subject={subject}/>:category==='preferences'?<PreferenceSettings subject={subject}/>:category==='notifications'?<NotificationSettings subject={subject}/>:category==='storage'?<StorageSettings key={subject} subject={subject}/>:<SecuritySettings subject={subject}/>}</div></>;

@@ -18,7 +18,7 @@ spec:
     - id: unrepaired_gap
       text: A closed interval remains missing after the repair policy window.
     - id: repair_circuit_open
-      text: The ClickHouse repair circuit remains open or REST fallback errors grow.
+      text: The PostgreSQL repair circuit remains open or REST fallback errors grow.
   diagnostics:
     - id: inspect_freshness
       capability: observe.metrics.query
@@ -72,7 +72,7 @@ spec:
     team: market-data.operations
     escalation_role: operator
   related_alerts:
-    - MarketDataClickHouseRepairCircuitOpenTooLong
+    - MarketDataCanonicalStoreRepairCircuitOpenTooLong
     - MarketDataLiveTailUnrepairedGapBeyondPolicy
     - MarketDataRestTailRepairErrors
   monitoring_gaps: []

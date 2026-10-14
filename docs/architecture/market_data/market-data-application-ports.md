@@ -1,30 +1,44 @@
 # Market Data — Application Ports (Walking Skeleton v1)
 
+## Consumer wiring — S05, 2026-10-14
+
+`SourceTarget` требует generation UUID и content/funding revisions. Legacy targets отклоняются; equal bounds не означают одинаковое содержимое. REST verification получает lease до provider I/O и подтверждает результат тем же fence; отсутствие известного origin не создаёт frontier.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+RawKlineWriter сохраняет application-порт; успешное завершение означает commit raw/canonical/coverage/revision в одной PG-транзакции. StoredSourceObservation и persisted SourceTarget получают generation/content revision; одного first/last и content_unverified недостаточно.
+
+
 Этот документ фиксирует минимальные контракты (ports) application-слоя для bounded context `market_data`
 в рамках первого вертикального среза (walking skeleton).
 
 Цель:
 - определить порты для ingestion/backfill 1m свечей из источников `ws/rest/file`;
-- записывать данные в ClickHouse через `raw_*` таблицы;
+- записывать данные в PostgreSQL через `raw_*` таблицы;
 - получать канонические 1m свечи из `market_data.canonical_candles_1m` (источник правды) детерминированно для offline/precompute чтения.
 
-Источник правды по хранению данных рынка: ClickHouse DDL, в частности:
+Источник правды по хранению данных рынка: PostgreSQL DDL, в частности:
 - `market_data.raw_binance_klines_1m`
 - `market_data.raw_bybit_klines_1m`
 - `market_data.canonical_candles_1m`
-- MV `mv_raw_*_to_canonical_1m` (raw -> canonical)
+- generation-bound coverage day masks, summary and content revisions
 
 
 ## Ключевые решения
 
-### 1) Canonical формируется автоматически (через MV), прямых записей в canonical нет
-Application-слой ingestion пишет только в `raw_*` (через порт `RawKlineWriter`).
-Таблица `canonical_candles_1m` заполняется Materialized View автоматически.
-
-Следствие:
-- порта `CanonicalCandleWriter` **не существует**;
-- “источник правды” для чтения — `canonical_candles_1m`.
-
+### 1) Одна транзакция raw/canonical/coverage/revision
+Application вызывает `RawKlineWriter`; PostgreSQL адаптер пишет raw observations,
+выбирает canonical winner по версии и стабильному tie-break, обновляет masks,
+summary и content revision в одной транзакции. Успешный возврат означает COMMIT.
+Отдельного application-порта `CanonicalCandleWriter` нет.
 
 ### 2) Источники данных — `ws/rest/file`, но порты не зависят от конкретной биржи
 `CandleMeta.source` фиксирует происхождение: `ws | rest | file`.
@@ -33,16 +47,10 @@ Application-слой ingestion пишет только в `raw_*` (через п
 Конкретная биржа и формат данных — детали адаптеров и wiring (composition root).
 
 ### 3) Canonical reader возвращает детерминированное duplicate-free чтение на всём диапазоне
-Таблица `canonical_candles_1m` использует `ReplacingMergeTree(ingested_at)`, что означает eventual dedup
-(дубликаты возможны до фоновых merge).
-
-Контракт чтения фиксирует не механизм, а результат:
-- consumer получает duplicate-free canonical rows на всём запрошенном диапазоне;
-- порядок строк детерминирован (`ts_open ASC`);
-- реализация дедупа остаётся implementation detail ClickHouse-адаптера.
-
-Текущая реализация использует один `SELECT ... FINAL` по всему диапазону. Это дороже, чем selective tail dedup,
-поэтому reader остаётся ориентированным на offline/precompute workloads, а не на hot path runtime.
+Primary key `(market_id, symbol, ts_open)` исключает canonical-дубликаты уже
+при COMMIT. Reader возвращает `[start,end)` в `ts_open ASC` с UTC timestamps.
+Потоковое DTO/массивное чтение ограничивает память; hot-path strategy использует
+Redis/NPY согласно своему контракту. Source absence не становится свечой.
 
 ### 4) Clock — обязательная зависимость application-слоя
 Clock нужен для:
@@ -108,8 +116,8 @@ DTO в application-слое — не Pydantic, не зависит от transpor
 ### RawKlineWriter
 
 **Purpose**  
-`RawKlineWriter` — порт записи 1m свечей в ClickHouse raw-таблицы (`raw_*_klines_1m`).
-Canonical формируется автоматически через MV.
+`RawKlineWriter` — порт записи 1m свечей в PostgreSQL raw-таблицы (`raw_*_klines_1m`).
+Raw и canonical сохраняются в одной PostgreSQL транзакции.
 
 **Contract**
 - `write_1m(rows: Iterable[CandleWithMeta]) -> None`
@@ -117,7 +125,7 @@ Canonical формируется автоматически через MV.
 **Semantics**
 - адаптер записывает данные в соответствующую raw-таблицу (маршрутизация — implementation detail)
 - запись должна быть устойчивой к повторным вставкам (re-ingestion/backfill):
-  дубликаты возможны на raw/каноническом уровне до merge, но не должны “ломать” downstream чтения/пайплайны
+  raw сохраняет наблюдения/retry; canonical unique key и version-aware upsert предотвращают дубликаты
 
 
 ---
@@ -136,7 +144,7 @@ Canonical формируется автоматически через MV.
 
 **Reader contract**
 - порт гарантирует duplicate-free canonical rows на всём диапазоне
-- конкретная техника дедупа (`FINAL` или эквивалент) скрыта внутри адаптера
+- версионная precedence реализована внутри writer; reader читает уникальные canonical rows
 - reader ориентирован на deterministic offline/precompute reads, а не на hot-path live ingestion
 
 
@@ -160,13 +168,13 @@ Backtest Artifacts owns `StoredCoordinates` in its application reconciliation
 service. Its `StoredSourceObservation` contains an instrument and nullable first/last
 actual minute; `observation_page` is a bounded ordered keyset page at one exclusive
 cutoff. Empty observations retain coordinate traversal. `observation` serves the
-existing optional post-write hint. The ClickHouse composition adapter reads the
-Market Data exact bitmap; the application imports no concrete persistence adapter.
+existing optional post-write hint. The PostgreSQL composition adapter reads the
+Market Data generation-bound exact day masks; the application imports no concrete persistence adapter.
 The previous coordinate-only `page` and reconciler constructor remain supported.
 
 This does not replace the Market Data canonical index port used by ingestion:
 its scalar bounds still read canonical data, with null rather than epoch defaults
-for empty input. Existing bounded history verification owns index repair. Exchange
+for empty input. Unknown/drifted index fails closed; explicit bounded rebuild owns repair. Exchange
 absence markers are never candle observations. See the reference API's “Artifact
 source observations” and “Verified source availability and index repair” sections.
 
@@ -199,7 +207,7 @@ application-owner в синхронный HTTP вызов, не связывая
 должны реализовать admission/defer, а HTTP composition требует common PG и explicit
 scope (`breaking-change` для старой конфигурации без scope). Координированный
 upgrade/rollback и cleanup только после подтверждённого drain описаны в local
-Market Data recovery runbook, раздел S03.
+Market Data recovery runbook.
 
 ## Async recovery admission (S04, 2026-10-11)
 
@@ -213,10 +221,10 @@ receipts в порядке входных ключей только после c
 
 Collector использует одну async PG session для advisory lease, admission,
 pending/retry/fail/advance/completion и socket health. Операции сериализованы;
-транзакция не охватывает CH/REST. Deadline 3 s закрывает session перед отменой
+транзакция не охватывает REST и отдельную candle-транзакцию. Deadline 3 s закрывает session перед отменой
 ожидания, включая потерянный сетевой ответ. Неизвестный commit не считается
 откатом: lifecycle прекращается, restart получает lease и сверяет прежние ключи.
-Неизвестная receipt сохраняется; exactly-once между PG и CH не обещается.
+Неизвестная receipt сохраняется; exactly-once между journal и candle-транзакциями не обещается.
 
 Buffer резервирует capacity до persistence. В общий row budget входят buffer,
 DB admissions и ожидающие producers: максимум `2 * max_buffer_rows`, из них

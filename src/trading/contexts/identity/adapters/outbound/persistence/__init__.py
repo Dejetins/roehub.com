@@ -4,7 +4,6 @@ from .in_memory import (
     InMemoryIdentitySessionRepository,
     InMemoryIdentityUserRepository,
     InMemoryLocalAuthRepository,
-    InMemoryOidcIdentityRepository,
     InMemoryOrganizationRepository,
 )
 from .postgres import (
@@ -14,7 +13,6 @@ from .postgres import (
     PostgresIdentitySessionRepository,
     PostgresIdentityUserRepository,
     PostgresLocalAuthRepository,
-    PostgresOidcIdentityRepository,
     PostgresOrganizationRepository,
     PsycopgIdentityPostgresGateway,
 )
@@ -27,13 +25,11 @@ __all__ = [
     "InMemoryIdentityUserRepository",
     "InMemoryLocalAuthRepository",
     "InMemoryOrganizationRepository",
-    "InMemoryOidcIdentityRepository",
     "PostgresAccountSettingsRepository",
     "PostgresIdentityExchangeKeysRepository",
     "PostgresIdentitySessionRepository",
     "PostgresIdentityUserRepository",
     "PostgresLocalAuthRepository",
     "PostgresOrganizationRepository",
-    "PostgresOidcIdentityRepository",
     "PsycopgIdentityPostgresGateway",
 ]

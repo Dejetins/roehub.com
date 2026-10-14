@@ -22,13 +22,6 @@ def _service_config(*, mode: str = "embedded") -> dict[str, object]:
                 "database": "roehub",
                 "tls": False,
             },
-            "clickhouse": {
-                "mode": mode,
-                "host": "clickhouse",
-                "port": 8123,
-                "database": "roehub",
-                "tls": False,
-            },
             "redis": {
                 "mode": mode,
                 "host": "redis",
@@ -47,7 +40,6 @@ def _write_json(path: Path, payload: object) -> None:
 def _endpoints() -> storage.StorageEndpoints:
     return storage.StorageEndpoints(
         postgresql_dsn="host=postgresql dbname=roehub user=roehub",
-        clickhouse_dsn="http://clickhouse:8123/default",
         redis_url="redis://redis:6379/0",
         redis_auth=None,
     )
@@ -85,7 +77,6 @@ def test_load_storage_endpoints_requires_configured_service_hosts(tmp_path: Path
         config=config,
         environ={
             "ROEHUB_STORAGE_POSTGRES_DSN": "host=postgresql dbname=roehub user=roehub",
-            "ROEHUB_STORAGE_CLICKHOUSE_DSN": "http://clickhouse:8123/default",
             "ROEHUB_STORAGE_REDIS_URL": "redis://redis:6379/0",
         },
     )
@@ -96,26 +87,11 @@ def test_load_storage_endpoints_requires_configured_service_hosts(tmp_path: Path
             config=config,
             environ={
                 "ROEHUB_STORAGE_POSTGRES_DSN": "host=wrong dbname=roehub user=roehub",
-                "ROEHUB_STORAGE_CLICKHOUSE_DSN": "http://clickhouse:8123/default",
                 "ROEHUB_STORAGE_REDIS_URL": "redis://redis:6379/0",
             },
         )
 
 
-def test_split_clickhouse_sql_preserves_quoted_semicolons_and_removes_comments() -> None:
-    statements = storage.split_clickhouse_sql(
-        """
-        -- first statement
-        CREATE TABLE sample (value String) ENGINE = Memory;
-        /* semicolon ; in a comment */
-        INSERT INTO sample VALUES ('a;b');
-        """
-    )
-
-    assert statements == (
-        "CREATE TABLE sample (value String) ENGINE = Memory",
-        "INSERT INTO sample VALUES ('a;b')",
-    )
 
 
 def test_migration_manifests_match_immutable_sources() -> None:
@@ -123,10 +99,6 @@ def test_migration_manifests_match_immutable_sources() -> None:
     phases = storage._load_postgres_phases(  # noqa: SLF001
         repo_root / "migrations" / "postgres" / "manifest.json"
     )
-    token, clickhouse = storage._load_clickhouse_migrations(  # noqa: SLF001
-        repo_root / "migrations" / "clickhouse" / "manifest.json"
-    )
-
     assert tuple(phases) == (
         "identity-0001-0009",
         "strategy-0010",
@@ -154,39 +126,17 @@ def test_migration_manifests_match_immutable_sources() -> None:
         "identity-browser-devices-0032",
         "market-data-stream-connections-0033",
         "market-data-provider-admission-0034",
+        "market-data-stream-events-0035",
+        "market-data-storage-0036",
+        "market-data-reference-0037",
+        "market-data-verification-0038",
+        "market-data-consumers-0039",
+        "market-data-append-fence-0040",
     )
-    assert token == "market_data"
-    assert [migration.version for migration in clickhouse] == ["0001", "0002", "0003"]
 
 
-def test_clickhouse_render_targets_configured_database_and_rejects_destructive_ddl() -> None:
-    rendered = storage._render_clickhouse_sql(  # noqa: SLF001
-        b"CREATE DATABASE market_data; CREATE TABLE market_data.sample (value UInt8);",
-        database_token="market_data",
-        database="roehub",
-    )
-    assert b"CREATE DATABASE roehub" in rendered
-    assert b"roehub.sample" in rendered
-
-    with pytest.raises(storage.StorageLifecycleError, match="destructive"):
-        storage._render_clickhouse_sql(  # noqa: SLF001
-            b"DROP TABLE market_data.sample;",
-            database_token="market_data",
-            database="roehub",
-        )
 
 
-def test_clickhouse_state_decodes_fixed_string_checksums() -> None:
-    class _Result:
-        result_rows = [("0001", b"a" * 64)]
-
-    class _Client:
-        def query(self, query: str) -> _Result:
-            return _Result()
-
-    assert storage._read_clickhouse_markers(_Client(), database="roehub") == {  # noqa: SLF001
-        "0001": "a" * 64
-    }
 
 
 def test_bootstrap_runs_capabilities_before_ordered_durable_migrations(
@@ -200,22 +150,17 @@ def test_bootstrap_runs_capabilities_before_ordered_durable_migrations(
                 name=name,
                 mode="embedded",
                 host=name,
-                port={"postgresql": 5432, "clickhouse": 8123, "redis": 6379}[name],
+                port={"postgresql": 5432, "redis": 6379}[name],
                 database="roehub",
                 tls=False,
             )
-            for name in ("postgresql", "clickhouse", "redis")
+            for name in ("postgresql", "redis")
         },
     )
     monkeypatch.setattr(
         storage,
         "check_postgres_capabilities",
         lambda dsn: calls.append("check-postgresql") or {},
-    )
-    monkeypatch.setattr(
-        storage,
-        "check_clickhouse_capabilities",
-        lambda dsn, database, auth=None: calls.append("check-clickhouse") or {},
     )
     monkeypatch.setattr(
         storage,
@@ -229,30 +174,25 @@ def test_bootstrap_runs_capabilities_before_ordered_durable_migrations(
     )
     monkeypatch.setattr(
         storage,
-        "apply_clickhouse_migrations",
-        lambda dsn, database, manifest_path, auth=None: calls.append("migrate-clickhouse"),
-    )
-    monkeypatch.setattr(
-        storage,
         "build_storage_status",
         lambda **kwargs: {"ready": True},
     )
+
+    monkeypatch.setattr(storage, "provision_runtime_roles", lambda dsn: calls.append("grant-roles"))
 
     result = storage.bootstrap_storage(
         config=config,
         endpoints=_endpoints(),
         repo_root=Path("."),
         postgres_manifest=Path("postgres.json"),
-        clickhouse_manifest=Path("clickhouse.json"),
     )
 
     assert result == {"ready": True}
     assert calls == [
         "check-postgresql",
         "check-redis",
-        "check-clickhouse",
         "migrate-postgresql",
-        "migrate-clickhouse",
+        "grant-roles",
     ]
 
 
@@ -264,11 +204,11 @@ def test_storage_status_is_secret_free_and_schema_valid(monkeypatch: Any) -> Non
                 name=name,
                 mode="external",
                 host=name,
-                port={"postgresql": 5432, "clickhouse": 8123, "redis": 6379}[name],
+                port={"postgresql": 5432, "redis": 6379}[name],
                 database="roehub",
                 tls=False,
             )
-            for name in ("postgresql", "clickhouse", "redis")
+            for name in ("postgresql", "redis")
         },
     )
     monkeypatch.setattr(
@@ -278,15 +218,6 @@ def test_storage_status_is_secret_free_and_schema_valid(monkeypatch: Any) -> Non
             "engine": "PostgreSQL",
             "version": "16.0",
             "capabilities": ["schema-create"],
-        },
-    )
-    monkeypatch.setattr(
-        storage,
-        "check_clickhouse_capabilities",
-        lambda dsn, database, auth=None: {
-            "engine": "ClickHouse",
-            "version": "24.8.1",
-            "capabilities": ["merge-tree"],
         },
     )
     monkeypatch.setattr(
@@ -303,18 +234,12 @@ def test_storage_status_is_secret_free_and_schema_valid(monkeypatch: Any) -> Non
         "_postgres_schema_status",
         lambda dsn, repo_root, manifest_path: ["alembic:head"],
     )
-    monkeypatch.setattr(
-        storage,
-        "_clickhouse_schema_status",
-        lambda dsn, database, manifest_path, auth=None: ["0001", "0002"],
-    )
 
     result = storage.build_storage_status(
         config=config,
         endpoints=_endpoints(),
         repo_root=Path("."),
         postgres_manifest=Path("postgres.json"),
-        clickhouse_manifest=Path("clickhouse.json"),
         require_schema=True,
     )
     schema_path = Path(__file__).resolve().parents[4] / "schemas/config/storage-status.schema.json"
@@ -331,7 +256,7 @@ def test_installation_schema_rejects_localhost_store_host() -> None:
     config = json.loads(json.dumps(_service_config()))
     config.update(
         {
-            "schema": "io.roehub.installation/v1alpha1",
+            "schema": "io.roehub.installation/v2alpha1",
             "installation_id": "test-installation",
             "domain": "localhost",
             "architecture": "linux/arm64",
@@ -359,7 +284,6 @@ def test_installation_schema_rejects_localhost_store_host() -> None:
     )
     stores = config["stores"]
     stores["postgresql"]["credentials_ref"] = "openbao://kv/roehub/storage/postgresql"
-    stores["clickhouse"]["credentials_ref"] = "openbao://kv/roehub/storage/clickhouse"
     stores["redis"]["credentials_ref"] = "openbao://kv/roehub/storage/redis"
     stores["postgresql"]["host"] = "localhost"
 

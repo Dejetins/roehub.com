@@ -1,0 +1,47 @@
+### Result
+4. [GET] http://127.0.0.1:20120/api/auth/current-user => [200] OK
+5. [GET] http://127.0.0.1:20120/api/ui/account/preferences => [200] OK
+6. [GET] http://127.0.0.1:20120/api/market-data/markets => [200] OK
+7. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [200] OK
+9. [GET] http://127.0.0.1:20120/api/market-data/work-requests/e0d9c808-ed42-462a-a58c-edf465650c7e => [200] OK
+10. [GET] http://127.0.0.1:20120/api/market-data/work-requests/08d53510-1442-4403-b7bd-0ae6ae25cb15 => [200] OK
+11. [GET] http://127.0.0.1:20120/api/market-data/work-requests/da2cca68-b685-55d6-9dbf-5711de8c923b => [200] OK
+12. [GET] http://127.0.0.1:20120/api/market-data/work-requests/57dfc8fd-344f-5366-bd20-8795ca48970b => [200] OK
+13. [GET] http://127.0.0.1:20120/api/market-data/work-requests/b53e8184-0164-52d4-87e0-d8aeb76f6acc => [200] OK
+14. [GET] http://127.0.0.1:20120/api/market-data/work-requests/e75e5ed7-8e5a-5fe2-bf5b-c9afcdb90e3e => [200] OK
+15. [GET] http://127.0.0.1:20120/api/market-data/work-requests/eb5eaf74-cd7e-5988-8658-c348da7e76d8 => [200] OK
+16. [GET] http://127.0.0.1:20120/api/market-data/work-requests/f059c74a-5669-55bc-8701-603644774e4a => [200] OK
+17. [GET] http://127.0.0.1:20120/api/market-data/work-requests/9aec19a1-44b0-545c-af69-03658fd1c8b3 => [200] OK
+18. [GET] http://127.0.0.1:20120/api/market-data/work-requests/e22d900f-d315-4a90-b370-1419d0293669 => [200] OK
+19. [GET] http://127.0.0.1:20120/api/market-data/work-requests/b16ed406-2279-4b6f-8f96-e8193fb930e7 => [200] OK
+20. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [FAILED] net::ERR_ABORTED
+21. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [FAILED] net::ERR_ABORTED
+22. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [FAILED] net::ERR_ABORTED
+23. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [FAILED] net::ERR_ABORTED
+24. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [FAILED] net::ERR_ABORTED
+25. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [FAILED] net::ERR_ABORTED
+26. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [FAILED] net::ERR_ABORTED
+27. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [FAILED] net::ERR_ABORTED
+28. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [FAILED] net::ERR_ABORTED
+29. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [FAILED] net::ERR_ABORTED
+30. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [200] OK
+31. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [200] OK
+32. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [200] OK
+33. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [200] OK
+34. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [200] OK
+35. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [200] OK
+36. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [200] OK
+37. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [200] OK
+38. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z => [200] OK
+39. [GET] http://127.0.0.1:20120/api/market-data/workspace/catalog?market_id=2&q=0GUSDT&limit=1 => [200] OK
+40. [GET] http://127.0.0.1:20120/api/market-data/workspace/collection?market_id=2&symbol=0GUSDT&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z&timeframe=1m => [200] OK
+41. [GET] http://127.0.0.1:20120/api/market-data/workspace/history?market_id=2&symbol=0GUSDT&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z&timeframe=1m => [200] OK
+42. [GET] http://127.0.0.1:20120/api/auth/current-user => [200] OK
+43. [GET] http://127.0.0.1:20120/api/market-data/workspace/history-bounds?market_id=2&symbol=0GUSDT => [200] OK
+44. [GET] http://127.0.0.1:20120/api/market-data/work-requests/08d53510-1442-4403-b7bd-0ae6ae25cb15 => [200] OK
+45. [GET] http://127.0.0.1:20120/api/market-data/workspace/instruments?history_scope=full&exchange=binance&q=&history=all&stream=all&sort=symbol&descending=false&offset=0&limit=50&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z
+46. [GET] http://127.0.0.1:20120/api/market-data/workspace/catalog?market_id=2&q=0GUSDT&limit=1
+47. [GET] http://127.0.0.1:20120/api/market-data/workspace/collection?market_id=2&symbol=0GUSDT&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z&timeframe=1m
+48. [GET] http://127.0.0.1:20120/api/market-data/workspace/history?market_id=2&symbol=0GUSDT&start_at=2026-10-13T09%3A10%3A00.000Z&end_at=2026-10-14T09%3A10%3A00.000Z&timeframe=1m
+
+Note: 4 static requests not shown, run with --static option to see them.

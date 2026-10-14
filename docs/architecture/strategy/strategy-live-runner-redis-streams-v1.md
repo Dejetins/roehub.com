@@ -1,5 +1,15 @@
 Все вопросы закрыты. Документ фиксируем как новый архитектурный контракт для STR-EPIC-03.
 
+## Consumer wiring — S05, 2026-10-14
+
+Активная цепочка repair: Redis hot cache → canonical PostgreSQL → REST. Source enum, circuit hooks и метрика используют `canonical_store` (`market_data_canonical_store_repair_circuit_state`). Миграция 0039 сохраняет audit IDs/timestamps и заменяет прежние source/error labels; ACK ordering и provider admission сохранены.
+
+Текущий source-контракт: [PostgreSQL consumer composition](../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/CONSUMERS.md).
+Используется `STRATEGY_PG_DSN`, общий с control-plane fencing. Эта поправка
+заменяет storage-specific wiring/команды прежнего baseline ниже; остальные
+контракты сохраняются. Проверен disposable PG-контур; установленная среда
+не переключалась. Установка/backup покрыты S06; полный runtime regression и installed cutover остаются S08/S10.
+
 **Название файла:** `strategy-live-runner-redis-streams-v1.md`
 **Куда кладём:** `docs/architecture/strategy/strategy-live-runner-redis-streams-v1.md`
 
@@ -7,6 +17,13 @@
 
 ````md
 # Strategy — Live Runner via Redis Streams (v1)
+
+## PostgreSQL storage contract
+
+Текущий source-контракт: [PostgreSQL storage](../market_data/market-data-real-adapters-postgresql-parquet-v1.md). Реализация использует PostgreSQL; установленный runtime переключается отдельно в S10.
+
+Целевая repair chain: Redis hot cache → canonical PG → REST; source enum/config/circuit/metrics согласованно переходят на canonical_store в S05. Durable audit, ACK ordering, provider admission и действующие права сохраняются.
+
 
 Фиксирует контракт STR-EPIC-03: как один live-runner обслуживает множество пользователей/стратегий, читая 1m свечи из Redis Streams, делая rollup, warmup, checkpointing и repair(read).
 
@@ -16,12 +33,12 @@
 - один процесс live-runner обслуживает множество активных run’ов (разных пользователей/стратегий);
 - вход — WS closed 1m candles через Redis Streams;
 - первичная истина прогресса — checkpoint в Postgres (`strategy_runs.checkpoint_ts_open`);
-- gaps закрываются через `ClosedCandleTailProvider` из Market Data: Redis hot cache -> ClickHouse canonical -> REST tail -> repair audit;
+- gaps закрываются через `ClosedCandleTailProvider` из Market Data: Redis hot cache -> PostgreSQL canonical -> REST tail -> repair audit;
 - warmup вычисляется из `spec.indicators` и фиксируется в `run.metadata_json`.
 
 ## Контекст
 
-Market Data WS worker публикует закрытые 1m свечи в Redis Streams по схеме `md.candles.1m.<instrument_key>` (best-effort), при этом ClickHouse canonical остаётся историческим источником истины.
+Market Data WS worker публикует закрытые 1m свечи в Redis Streams по схеме `md.candles.1m.<instrument_key>` (best-effort), при этом PostgreSQL canonical остаётся историческим источником истины.
 
 В Strategy v1 уже зафиксированы:
 - неизменяемое хранение run’ов/событий в Postgres;
@@ -31,7 +48,7 @@ Market Data WS worker публикует закрытые 1m свечи в Redis
 Нужно зафиксировать поведение live-runner так, чтобы:
 - не требовалась отдельная инфраструктура очередей для run’ов (в v1 — polling PG);
 - обеспечивалась идемпотентность и устойчивость к дублям/out-of-order;
-- gaps восстанавливались через Market Data boundary без прямого REST/ClickHouse ownership в Strategy.
+- gaps восстанавливались через Market Data boundary без прямого REST/PostgreSQL ownership в Strategy.
 
 ## Scope
 
@@ -51,7 +68,7 @@ Market Data WS worker публикует закрытые 1m свечи в Redis
 - Горизонтальное масштабирование live-runner (в v1 **только 1 инстанс**).
 - Гарантия “в Redis значит уже в canonical”: публикация best-effort и может опережать durable-хранилище.
 - UI-стримы/пейлоады для фронта (это STR-EPIC-04).
-- Прямой REST/ClickHouse repair из Strategy; восстановлением live tail владеет Market Data.
+- Прямой REST/PostgreSQL repair из Strategy; восстановлением live tail владеет Market Data.
 
 ## Ключевые решения
 
@@ -127,9 +144,9 @@ Primary truth о прогрессе обработки 1m:
 
 ### 7) Repair(read): Market Data `ClosedCandleTailProvider`, derived bucket закрываем строго
 
-При gap по 1m live-runner запрашивает недостающий half-open range `[checkpoint+1m,current)` через Strategy-side порт `ClosedCandleTailProvider`. Реализация порта принадлежит Market Data и использует порядок источников Redis hot cache -> ClickHouse canonical -> REST tail -> repair audit.
+При gap по 1m live-runner запрашивает недостающий half-open range `[checkpoint+1m,current)` через Strategy-side порт `ClosedCandleTailProvider`. Реализация порта принадлежит Market Data и использует порядок источников Redis hot cache -> PostgreSQL canonical -> REST tail -> repair audit.
 
-Strategy не вызывает Binance/Bybit REST adapters напрямую и не владеет provider secrets. `ClickHouse` остается historical truth, но не является единственным live repair source.
+Strategy не вызывает Binance/Bybit REST adapters напрямую и не владеет provider secrets. `PostgreSQL` остается historical truth, но не является единственным live repair source.
 
 ACK policy v1:
 - `ts_open <= checkpoint_ts_open` считается stale/idempotent; ACK разрешен;
@@ -194,7 +211,7 @@ runner не создает `ExecutionIntent`, не пишет execution Redis st
 Live-runner:
 - использует payload из Redis для live-обработки;
 - использует `ClosedCandleTailProvider` для repair(read) при gap;
-- при repair(read) допускает, что Redis hot cache, ClickHouse или REST tail могут временно не дать непрерывность; в этом случае message остается pending без checkpoint advance.
+- при repair(read) допускает, что Redis hot cache, PostgreSQL или REST tail могут временно не дать непрерывность; в этом случае message остается pending без checkpoint advance.
 
 ## Контракты и инварианты
 
@@ -223,9 +240,9 @@ Live-runner:
 - `apps/worker/market_data_ws/wiring/modules/market_data_ws.py` — WS worker: enqueue raw insert, best-effort Redis publish, gap tracking.
 - `docs/architecture/market_data/market-data-live-feed-redis-streams-v1.md` — контракт live feed (stream name, schema, best-effort, ID).
 - `src/trading/contexts/market_data/adapters/outbound/messaging/redis/redis_streams_live_candle_publisher.py` — publisher (детерминированный XADD id, дубли/out-of-order как no-op).
-- `src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py` — чтение canonical 1m (read-only, дедуп хвоста 24h).
-- `src/trading/contexts/market_data/application/services/closed_candle_tail_provider.py` — Market Data source chain для Redis hot cache -> ClickHouse -> REST -> audit.
-- `src/trading/contexts/strategy/application/ports/closed_candle_tail_provider.py` — Strategy-side порт без прямого REST/ClickHouse ownership.
+- `src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_reader.py` — чтение canonical 1m (read-only, дедуп хвоста 24h).
+- `src/trading/contexts/market_data/application/services/closed_candle_tail_provider.py` — Market Data source chain для Redis hot cache -> PostgreSQL -> REST -> audit.
+- `src/trading/contexts/strategy/application/ports/closed_candle_tail_provider.py` — Strategy-side порт без прямого REST/PostgreSQL ownership.
 - `src/trading/contexts/strategy/domain/entities/strategy_spec_v1.py` — `instrument_id`/`instrument_key`/`timeframe`, валидации spec.
 - `src/trading/contexts/strategy/adapters/outbound/persistence/postgres/strategy_run_repository.py` — хранение run’ов, инвариант “один активный run”.
 - `docs/architecture/strategy/strategy-domain-spec-immutable-storage-runs-events-v1.md` — доменная спецификация runs/events/checkpoint.

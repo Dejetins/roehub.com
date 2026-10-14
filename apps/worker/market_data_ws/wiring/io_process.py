@@ -18,7 +18,7 @@ from uuid import uuid4
 
 import psycopg
 
-from apps.cli.wiring.db.clickhouse import ClickHouseSettingsLoader, _clickhouse_client
+from apps.cli.wiring.db.postgres import close_market_gateways, market_gateway
 from trading.contexts.market_data.adapters.outbound.clients.common_http import RequestsHttpClient
 from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_source import (
     RestCandleIngestSource,
@@ -26,13 +26,14 @@ from trading.contexts.market_data.adapters.outbound.clients.rest_candle_ingest_s
 from trading.contexts.market_data.adapters.outbound.config.runtime_config import (
     load_market_data_runtime_config,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseCanonicalCandleIndexReader,
-    ClickHouseRawKlineWriter,
-    ThreadLocalClickHouseConnectGateway,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_index_reader import (  # noqa: E501
+    PostgresCanonicalCandleIndexReader,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors import (
-    transient_clickhouse_error,
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.raw_kline_writer import (
+    PostgresRawKlineWriter,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.work_errors import (
+    transient_postgres_error,
 )
 from trading.contexts.market_data.application.dto import (
     CandleWithMeta,
@@ -51,18 +52,20 @@ from trading.platform.time.system_clock import SystemClock
 
 
 def classify_io_error(error: Exception) -> str | None:
-    if isinstance(error, (psycopg.OperationalError, psycopg.InterfaceError)):
+    if getattr(error, "sqlstate", None) is None and isinstance(
+        error, (psycopg.OperationalError, psycopg.InterfaceError)
+    ):
         return "recovery_store_unavailable"
-    return transient_ingestion_error(error) or transient_clickhouse_error(error)
+    return transient_ingestion_error(error) or transient_postgres_error(error)
 
 
 def verify_received_range(task: RestFillTask, index) -> None:
     """A successful empty REST response cannot acknowledge a received WS minute."""
     if task.reason == "ws_recovery":
-        keys = index.distinct_ts_opens(instrument_id=task.instrument_id,
-                                      time_range=task.time_range)
-        expected = int((task.time_range.end.value - task.time_range.start.value)
-                       / timedelta(minutes=1))
+        keys = index.distinct_ts_opens(instrument_id=task.instrument_id, time_range=task.time_range)
+        expected = int(
+            (task.time_range.end.value - task.time_range.start.value) / timedelta(minutes=1)
+        )
         if len(set(keys)) != expected:
             raise TemporaryIngestionError("source_incomplete")
 
@@ -85,12 +88,10 @@ def _child(connection, mode: str, payload, config_path: str, environ: dict[str, 
     http = None
     try:
         cfg = load_market_data_runtime_config(Path(config_path))
-        settings = ClickHouseSettingsLoader(environ).load(workload="stream")
-        gateway = ThreadLocalClickHouseConnectGateway(
-            client_factory=lambda: _clickhouse_client(settings)
-        )
-        writer = ClickHouseRawKlineWriter(gateway=gateway, database=settings.database)
-        index = ClickHouseCanonicalCandleIndexReader(gateway=gateway, database=settings.database)
+        settings = market_gateway(environ, workload="stream")
+        gateway = settings
+        writer = PostgresRawKlineWriter(gateway=gateway)
+        index = PostgresCanonicalCandleIndexReader(gateway=gateway)
         clock = SystemClock()
         if mode in {"selected", "prepare"}:
             from types import SimpleNamespace
@@ -99,11 +100,11 @@ def _child(connection, mode: str, payload, config_path: str, environ: dict[str, 
             from trading.contexts.backtest.adapters.outbound.persistence.postgres.gateway import (
                 PsycopgBacktestPostgresGateway,
             )
-            from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_coverage_reader import (  # noqa: E501
-                ClickHouseHistoryCoverageReader,
-            )
             from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_bounds_repository import (  # noqa: E501
                 PostgresHistoryBoundsRepository,
+            )
+            from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_coverage_reader import (  # noqa: E501
+                PostgresHistoryCoverageReader,
             )
             from trading.contexts.market_data.adapters.outbound.persistence.postgres.instrument_selection_repository import (  # noqa: E501
                 PostgresInstrumentSelectionRepository,
@@ -120,19 +121,25 @@ def _child(connection, mode: str, payload, config_path: str, environ: dict[str, 
             from trading.contexts.market_data.application.services.history_stream_gate import (
                 HistoryReadyInstrumentReader,
             )
+
             pg = PsycopgBacktestPostgresGateway(dsn=environ["STRATEGY_PG_DSN"])
             if mode == "selected":
                 result = PostgresInstrumentSelectionRepository(
-                    gateway=pg, reference_fallback=False).list_global_effective()
+                    gateway=pg, reference_fallback=False
+                ).list_global_effective()
             else:
                 gate = HistoryReadyInstrumentReader(
-                    source=cast(EnabledInstrumentReader, SimpleNamespace(
-                        list_enabled_tradable=lambda: payload)),
+                    source=cast(
+                        EnabledInstrumentReader,
+                        SimpleNamespace(list_enabled_tradable=lambda: payload),
+                    ),
                     readiness=HistoryReadiness(
                         origins=PostgresHistoryBoundsRepository(gateway=pg),
-                        coverage=ClickHouseHistoryCoverageReader(gateway, settings.database)),
+                        coverage=PostgresHistoryCoverageReader(gateway),
+                    ),
                     on_ready=PostgresStreamRecoveryStore(
-                        environ["STRATEGY_PG_DSN"]).clear_history_failures,
+                        environ["STRATEGY_PG_DSN"]
+                    ).clear_history_failures,
                 )
                 result = (gate.list_enabled_tradable(), gate.repairs)
         elif mode == "write":
@@ -148,51 +155,58 @@ def _child(connection, mode: str, payload, config_path: str, environ: dict[str, 
                 tail_lookback_minutes=cfg.ingestion.tail_lookback_minutes,
             ).plan(payload)
         elif mode == "fill":
-            from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_range_verifier import (  # noqa: E501
-                ClickHouseHistoryRangeVerifier,
+            from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_range_verifier import (  # noqa: E501
+                PostgresHistoryRangeVerifier,
             )
+
             http = RequestsHttpClient.from_config(cfg, environ)
-            source = RestCandleIngestSource(
-                cfg=cfg, clock=clock, http=http, ingest_id=uuid4()
-            )
+            source = RestCandleIngestSource(cfg=cfg, clock=clock, http=http, ingest_id=uuid4())
             result = RestFillRange1mUseCase(
                 source=source,
                 writer=writer,
                 clock=clock,
                 index_reader=index,
-                history_verifier=ClickHouseHistoryRangeVerifier(gateway, settings.database),
+                history_verifier=PostgresHistoryRangeVerifier(gateway),
                 max_days_per_insert=cfg.backfill.max_days_per_insert,
                 batch_size=500,
             ).run(payload)
             verify_received_range(payload, index)
             if payload.reason == "stream_history_repair":
-                from trading.contexts.market_data.adapters.outbound.persistence.clickhouse.history_coverage_reader import (  # noqa: E501
-                    ClickHouseHistoryCoverageReader,
+                from trading.contexts.market_data.adapters.outbound.persistence.postgres.history_coverage_reader import (  # noqa: E501
+                    PostgresHistoryCoverageReader,
                 )
                 from trading.contexts.market_data.application.services.source_retry import (
                     IncompleteHistoryError,
                 )
-                if ClickHouseHistoryCoverageReader(gateway, settings.database).first_gap(
-                    instrument_id=payload.instrument_id, time_range=payload.time_range
-                ) is not None:
+
+                if (
+                    PostgresHistoryCoverageReader(gateway).first_gap(
+                        instrument_id=payload.instrument_id, time_range=payload.time_range
+                    )
+                    is not None
+                ):
                     raise IncompleteHistoryError()
         else:
             raise ValueError("unknown market data I/O mode")
-        connection.send({"ok": True, "result": result})
+        reply = {"ok": True, "result": result}
     except Exception as exc:
         code = classify_io_error(exc)
-        connection.send(
-            {
-                "ok": False,
-                "temporary": code is not None,
-                "code": code or "non_retryable_ingestion_error",
-                "retry_after_s": float(getattr(exc, "retry_after_s", 0)),
-            }
-        )
+        reply = {
+            "ok": False,
+            "temporary": code is not None,
+            "code": code or "non_retryable_ingestion_error",
+            "retry_after_s": float(getattr(exc, "retry_after_s", 0)),
+        }
     finally:
-        if http is not None:
-            http.close()
-        connection.close()
+        # Finish all database protocols before acknowledging to a parent that may
+        # immediately reap us. Spawn exit does not guarantee Python atexit hooks.
+        try:
+            if http is not None:
+                http.close()
+        finally:
+            close_market_gateways()
+    connection.send(reply)
+    connection.close()
 
 
 class MarketDataIoProcess:
@@ -212,8 +226,14 @@ class MarketDataIoProcess:
         self._target = child_target or _child
         self.active_pids: set[int] = set()
         self._plan_lock = asyncio.Lock()
+        # One auxiliary lane leaves the second stream slot for the persistent writer.
+        self._io_lock = asyncio.Lock()
 
     async def run(self, mode: str, payload) -> Any:
+        async with self._io_lock:
+            return await self._run_owned(mode, payload)
+
+    async def _run_owned(self, mode: str, payload) -> Any:
         ctx = multiprocessing.get_context("spawn")
         receiver, sender = ctx.Pipe(duplex=True)
         child = ctx.Process(

@@ -25,10 +25,7 @@ from prometheus_client import (
     generate_latest,
 )
 
-from apps.cli.wiring.db.clickhouse import (  # noqa: PLC2701
-    ClickHouseSettingsLoader,
-    _clickhouse_client,
-)
+from apps.cli.wiring.db.postgres import market_gateway
 from trading.contexts.live_execution.adapters.outbound import (
     PostgresExchangeAccountProjectionRepository,
     PostgresExecutionIntentRepository,
@@ -48,13 +45,12 @@ from trading.contexts.market_data.adapters.outbound.messaging.redis import (
     RedisCandleHotCache,
     RedisCandleHotCacheHooks,
 )
-from trading.contexts.market_data.adapters.outbound.persistence.clickhouse import (
-    ClickHouseCanonicalCandleReader,
-    ThreadLocalClickHouseConnectGateway,
-)
 from trading.contexts.market_data.adapters.outbound.persistence.postgres import (
     PostgresCandleRepairAuditRepository,
     PsycopgMarketDataPostgresGateway,
+)
+from trading.contexts.market_data.adapters.outbound.persistence.postgres.canonical_candle_reader import (  # noqa: E501
+    PostgresCanonicalCandleReader,
 )
 from trading.contexts.market_data.application.dto import ClosedCandleTailRepairPolicy
 from trading.contexts.market_data.application.services import (
@@ -115,7 +111,7 @@ _PRODUCER_BLOCKED_REASONS = (
     "producer_mode_not_allowed",
     "producer_allowlist_missing",
 )
-_LIVE_TAIL_REPAIR_SOURCES = ("redis_hot_cache", "clickhouse", "rest")
+_LIVE_TAIL_REPAIR_SOURCES = ("redis_hot_cache", "canonical_store", "rest")
 _LIVE_TAIL_REPAIR_STATUSES = (
     "attempted",
     "succeeded",
@@ -374,9 +370,9 @@ class StrategyLiveRunnerMetrics:
             "Market Data live-tail hot-cache read/write errors.",
             registry=self.registry,
         )
-        self.clickhouse_repair_circuit_state = Gauge(
-            "market_data_clickhouse_repair_circuit_state",
-            "Market Data live-tail ClickHouse repair circuit state, 1=open and 0=closed.",
+        self.canonical_store_repair_circuit_state = Gauge(
+            "market_data_canonical_store_repair_circuit_state",
+            "Market Data live-tail canonical store repair circuit state, 1=open and 0=closed.",
             registry=self.registry,
         )
         self.checkpoint_stall_total = Counter(
@@ -596,7 +592,7 @@ class StrategyLiveRunnerMetrics:
         return ClosedCandleTailProviderHooks(
             on_repair_attempt=self.observe_live_tail_repair_attempt,
             on_repair_latency=self.observe_live_tail_repair_latency,
-            on_clickhouse_circuit_state=self.observe_clickhouse_repair_circuit_state,
+            on_canonical_store_circuit_state=self.observe_canonical_store_repair_circuit_state,
         )
 
     def hot_cache_hooks(self) -> RedisCandleHotCacheHooks:
@@ -636,8 +632,8 @@ class StrategyLiveRunnerMetrics:
             status=_bounded_live_tail_status(status),
         ).observe(max(duration_seconds, 0.0))
 
-    def observe_clickhouse_repair_circuit_state(self, state: int) -> None:
-        self.clickhouse_repair_circuit_state.set(1 if state else 0)
+    def observe_canonical_store_repair_circuit_state(self, state: int) -> None:
+        self.canonical_store_repair_circuit_state.set(1 if state else 0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -747,7 +743,7 @@ def build_strategy_live_runner_app(
     Returns:
         StrategyLiveRunnerApp: Ready-to-run app instance.
     Assumptions:
-        Postgres DSN and ClickHouse settings are provided via environment.
+        Postgres DSN and canonical store settings are provided via environment.
     Raises:
         ValueError: If required runtime configuration/env variables are missing.
     Side Effects:
@@ -764,9 +760,7 @@ def build_strategy_live_runner_app(
 
     strategy_pg_dsn = environ.get(_STRATEGY_PG_DSN_KEY, "").strip()
     if not strategy_pg_dsn:
-        raise ValueError(
-            f"{_STRATEGY_PG_DSN_KEY} is required for strategy live-runner worker"
-        )
+        raise ValueError(f"{_STRATEGY_PG_DSN_KEY} is required for strategy live-runner worker")
 
     postgres_gateway = PsycopgStrategyPostgresGateway(dsn=strategy_pg_dsn)
     strategy_repository = PostgresStrategyRepository(gateway=postgres_gateway)
@@ -788,13 +782,9 @@ def build_strategy_live_runner_app(
         on_paper_accounting=metrics.observe_strategy_paper_accounting,
     )
 
-    clickhouse_settings = ClickHouseSettingsLoader(environ).load(workload="stream")
-    clickhouse_gateway = ThreadLocalClickHouseConnectGateway(
-        client_factory=lambda: _clickhouse_client(clickhouse_settings)
-    )
-    canonical_reader = ClickHouseCanonicalCandleReader(
-        gateway=clickhouse_gateway,
-        database=clickhouse_settings.database,
+    canonical_gateway = market_gateway(environ, workload="interactive")
+    canonical_reader = PostgresCanonicalCandleReader(
+        gateway=canonical_gateway,
     )
     market_data_config = load_market_data_runtime_config(
         _resolve_market_data_config_path(strategy_config_path=Path(config_path))

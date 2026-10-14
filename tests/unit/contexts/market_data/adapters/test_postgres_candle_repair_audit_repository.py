@@ -48,9 +48,7 @@ class _StatefulGateway:
         if "WHERE correlation_id = %(correlation_id)s" not in query:
             raise AssertionError(f"unexpected query: {query}")
         correlation_id = str(parameters["correlation_id"])
-        return tuple(
-            row for row in self.rows.values() if row["correlation_id"] == correlation_id
-        )
+        return tuple(row for row in self.rows.values() if row["correlation_id"] == correlation_id)
 
     def execute(self, *, query: str, parameters: Mapping[str, Any]) -> None:
         raise AssertionError("audit repository should not call execute")
@@ -71,15 +69,11 @@ def test_postgres_candle_repair_audit_repository_inserts_and_reads_without_click
     assert persisted.status == "failed"
     assert tuple(attempt.source for attempt in persisted.sources_attempted) == (
         "redis_hot_cache",
-        "clickhouse",
+        "canonical_store",
         "rest",
     )
-    assert tuple(str(ts) for ts in persisted.restored_ts_opens) == (
-        "2026-06-29T12:00:00.000Z",
-    )
-    assert tuple(str(ts) for ts in persisted.missing_ts_opens) == (
-        "2026-06-29T12:01:00.000Z",
-    )
+    assert tuple(str(ts) for ts in persisted.restored_ts_opens) == ("2026-06-29T12:00:00.000Z",)
+    assert tuple(str(ts) for ts in persisted.missing_ts_opens) == ("2026-06-29T12:01:00.000Z",)
     joined_queries = "\n".join(gateway.queries)
     assert "canonical_candles" not in joined_queries
     assert "ClickHouse" not in joined_queries
@@ -87,7 +81,7 @@ def test_postgres_candle_repair_audit_repository_inserts_and_reads_without_click
     assert gateway.insert_parameters is not None
     assert json.loads(str(gateway.insert_parameters["sources_attempted_json"])) == [
         {"error_code": None, "source": "redis_hot_cache", "status": "miss"},
-        {"error_code": "http_connection_reset", "source": "clickhouse", "status": "failed"},
+        {"error_code": "http_connection_reset", "source": "canonical_store", "status": "failed"},
         {"error_code": None, "source": "rest", "status": "miss"},
     ]
 
@@ -103,7 +97,7 @@ def _event() -> MarketDataCandleRepairAuditEvent:
         sources_attempted=(
             CandleRepairSourceAttempt(source="redis_hot_cache", status="miss"),
             CandleRepairSourceAttempt(
-                source="clickhouse",
+                source="canonical_store",
                 status="failed",
                 error_code="http_connection_reset",
             ),

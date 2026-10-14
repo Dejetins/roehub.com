@@ -1,0 +1,185 @@
+{
+  "backup_progress": "completed",
+  "cleanup": {
+    "down_exit_status": {
+      "roehub-s08-backup-monitoring": 0,
+      "roehub-s08-backup-rollback": 0,
+      "roehub-s08-backup-source": 0,
+      "roehub-s08-backup-target": 0,
+      "roehub-s08-backup-update": 0
+    },
+    "residual_resources": {
+      "roehub-s08-backup-monitoring": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s08-backup-rollback": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s08-backup-source": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s08-backup-target": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      },
+      "roehub-s08-backup-update": {
+        "containers": [],
+        "networks": [],
+        "volumes": []
+      }
+    },
+    "status": "completed"
+  },
+  "encrypted_entries": 7,
+  "external_provider_writes": false,
+  "manifest_signature": "verified",
+  "monitoring_during_recovery": {
+    "operational_health_ready": true,
+    "running": [
+      "alertmanager",
+      "blackbox",
+      "operational-health",
+      "prometheus"
+    ],
+    "web_api_running": false
+  },
+  "monitoring_project": "roehub-s08-backup-monitoring",
+  "observed_rpo_seconds": 36.70746,
+  "observed_rto_seconds": 8.606521458015777,
+  "openbao": {
+    "cleanup": "passed",
+    "encrypted_raft_snapshot": true,
+    "forbidden_output_scan": "passed",
+    "fresh_storage_guard": "passed",
+    "fresh_volume_force_restore": "passed"
+  },
+  "production_mutation": false,
+  "proof_boundary": "N/A: disposable local Docker projects, generated fixture data, operator-generated temporary keys, no production restore",
+  "real_order_effects": false,
+  "release_lifecycle": {
+    "failed_update_detail": "upgrade.injected_failure_before_commit",
+    "failed_update_state": "failed",
+    "fixture": "versioned-unpublished-n-minus-one",
+    "from_release": "0.0.0",
+    "injected_failure": "failed_before_atomic_release_commit",
+    "irreversible_migration_guard": "upgrade.forward_recovery_plan_required",
+    "irreversible_update_state": "failed",
+    "observed_rollback_seconds": 10.465493416995741,
+    "observed_upgrade_seconds": 0.0323441670043394,
+    "preupgrade_backup_verified": true,
+    "resume_after_failure": "passed",
+    "resumed_update_state": "succeeded",
+    "rollback_release": "0.0.0",
+    "rollback_state": "succeeded",
+    "rollback_state_owner_count": 7,
+    "to_release": "0.1.0"
+  },
+  "restore_comparison": {
+    "all_plaintext_digests": 7,
+    "artifacts": {
+      "digest": "sha256:15078be2718eaaea75b0f3f4a377be221b6da93bcb049758d6d8453f807ed043",
+      "match": true
+    },
+    "market_data": {
+      "post_restore_semantics": {
+        "late_actual_removes_absence_and_invalidates_frontier": true,
+        "same_bounds_correction_changes_revision": true
+      },
+      "snapshot": {
+        "absent_count": 8,
+        "actual_count": 2,
+        "content_revision": 2,
+        "frontier": "2026-02-01T00:10:00+00:00",
+        "funding_revision": 0,
+        "generation": "537d6b52-1bf1-451a-8de8-8faf3ee93a23",
+        "index_sha256": "9fefb85253a73c285ac3f6d374ce7cf757662f56b1225f15b9c4c59c3d1b7c85",
+        "index_state": "ready",
+        "table_sha256": {
+          "candle_coverage_days": "5ed1024dee0644194e56adfe1808cbef424ab09b3ec18a4995482153269e2729",
+          "candle_coverage_summary": "85edb821a2e7189e377bc34451a74c55a350a8fd014ba3329ac88b4bfbf5ea21",
+          "candle_history_verification": "34c9ec6ec6544de3aa0167e32a7a9657b2fbadc443fc4bcba4feb69e3a367bb3",
+          "canonical_candles_1m": "b92fa82a90dadb2420eebce098cba6519bd9905a8a9a94a30534d6fd708e12ee",
+          "instrument_generations": "30b446b03859ca0ce240c1b813869aa82f5676612d9e49910521698312e05506",
+          "raw_binance_klines_1m": "a7aad838d45e752ad0970ad8b6a38cc5d0452d4243ca87a3f0418cfd9fde6ae0",
+          "source_absent_candles_1m": "2074540a88f86c3f5174edc46f60749a63b1d83110b3fcae3c7aa561cef1be82",
+          "verification_leases": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+        }
+      }
+    },
+    "observability_bounded_history": "matched",
+    "openbao_encrypted_snapshot": {
+      "ciphertext_sha256": "sha256:862b7a6ca434b077c10ea324f7e0ebb393cc3b4245bad1061232312d84d27412",
+      "decryptable_by_operator_key": true,
+      "same_snapshot_fresh_volume_restore": "passed"
+    },
+    "plugin_operation_audit": "matched",
+    "postgresql": {
+      "kinds": [
+        "audit",
+        "config",
+        "operation",
+        "plugin",
+        "user"
+      ],
+      "rows": 5,
+      "users_config_plugin_operation_audit": "matched"
+    },
+    "postgresql_timeseries": {
+      "digest_match": true,
+      "rows": 3,
+      "time_range": [
+        "2026-07-14 09:00:00.000",
+        "2026-07-14 09:02:00.000"
+      ]
+    },
+    "redis_checkpoint": {
+      "source_of_truth": false,
+      "value_match": true
+    },
+    "release_config": {
+      "exact_files": 3,
+      "match": true
+    }
+  },
+  "restore_progress": "completed",
+  "roehubctl_without_web_api": {
+    "backup": "succeeded",
+    "backup_cancellation": {
+      "request": "succeeded",
+      "resume": "succeeded",
+      "target": "failed"
+    },
+    "control_socket": "unix",
+    "restore": "succeeded",
+    "restore_cancellation": {
+      "request": "succeeded",
+      "resume": "succeeded",
+      "target": "failed"
+    },
+    "web_api_running": false
+  },
+  "schema": "io.roehub.installation-recovery-runtime-proof/v1alpha1",
+  "sensitive_data_present": false,
+  "sla_claimed": false,
+  "source_project": "roehub-s08-backup-source",
+  "source_target_separation": "passed",
+  "stage": "21",
+  "state_owner_coverage": [
+    "artifacts",
+    "observability",
+    "openbao",
+    "plugin_operation_audit",
+    "postgresql",
+    "redis_checkpoint",
+    "release_config"
+  ],
+  "status": "passed",
+  "target_project": "roehub-s08-backup-target"
+}

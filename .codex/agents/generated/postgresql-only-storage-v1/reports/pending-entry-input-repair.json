@@ -1,0 +1,273 @@
+{
+  "created_at": "2026-10-14T01:30:27.564837Z",
+  "authority": "User-authorized goal-driven execution and routine technical correction; staged-plan-runner migration procedure",
+  "reason": "Bundled entry validator requires files; five pending entry locators incorrectly named directories",
+  "mapping": {
+    "S08": {
+      "../../../../tests/real_infra/market_data": "../../../../tests/real_infra/market_data/test_transactional_ingestion_postgres.py",
+      "../../../../tests/real_infra/backtest": "../../../../tests/real_infra/backtest/test_artifact_dispatch.py"
+    },
+    "S09": {
+      "../../../../tools/qa": "../../../../tools/qa/postgres_storage_prototype.py",
+      "../../../../tests/perf_smoke": "../../../../tests/perf_smoke/contexts/indicators/test_compute_numba_perf_smoke.py",
+      "../../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres": "../../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_reader.py"
+    }
+  },
+  "before_contracts": {
+    "S08": {
+      "id": "S08",
+      "title": "Full correctness, recovery and browser regression suite",
+      "prompt_path": "08-functional-recovery-verification.md",
+      "report_path": "reports/S08.md",
+      "receipt_dir": "receipts/S08",
+      "depends_on": [
+        "S07"
+      ],
+      "expected_touches": [
+        "../../../../tests",
+        "../../../../tools/qa",
+        "../../../../tools/release",
+        "../../../../tools/backup",
+        "../../../../apps/platform-web/e2e",
+        "zone: focused fixes for demonstrated migration defects"
+      ],
+      "acceptance_criteria": [
+        "Real PG semantics, all consumers and supported UI/API journeys pass with CH absent; expected results are not replaced by mocks.",
+        "Failure drills prove truthful receipts/cursors/events and bounded recovery after DB restart/disconnect/contention.",
+        "Backup/restore, bootstrap, reset invalidation and artifact/backtest parity pass; independent reviewer finds no unresolved material migration issue.",
+        "A process crash after committing an old-minute value correction but before publishing its hint is recovered by bounded reconciliation and rebuilds the affected artifact."
+      ],
+      "proof_boundary": "Functional/failure integration on isolated targets; no long-soak or current-installation delivery claim.",
+      "validation": {
+        "profile": "prompt-manager/bundled-v1 plus repository boundary-specific gates",
+        "checks": [
+          "Follow the stage work/acceptance and section6 proof matrix; record actual commands and output paths.",
+          "Reread current repository CI routing/package scripts; run only relevant checks, plus changed-boundary real infrastructure/browser/performance evidence.",
+          "Run bundled draft/entry and receipt checks for transitions; artifact structure alone is not implementation proof."
+        ],
+        "requires_user_acceptance": false
+      },
+      "entry_inputs": [
+        {
+          "path": "../../../../tests/real_infra/market_data",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../tests/real_infra/backtest",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../apps/migrations/verify_storage_runtime.py",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../tools/release/verify_greenfield_lifecycle.py",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../apps/platform-web/package.json",
+          "producer_stage": null
+        },
+        {
+          "path": "implementation-plan.md",
+          "producer_stage": null
+        },
+        {
+          "path": "reports/S07.md",
+          "producer_stage": "S07"
+        }
+      ]
+    },
+    "S09": {
+      "id": "S09",
+      "title": "Production-query performance, memory and long mixed-load proof",
+      "prompt_path": "09-performance-and-soak.md",
+      "report_path": "reports/S09.md",
+      "receipt_dir": "receipts/S09",
+      "depends_on": [
+        "S08"
+      ],
+      "expected_touches": [
+        "../../../../tools/qa",
+        "../../../../tests/perf_smoke",
+        "zone: SQL and resource tuning within migrated adapters and configuration"
+      ],
+      "acceptance_criteria": [
+        "Full-size production-adapter mixed runs meet documented S01 guardrails or have explicit unresolved blockers; no tiny-data substitute.",
+        "Three repeated \u22655-minute normal/stress runs and \u226560-minute soak include existing PG application control traffic and \u226530 large-read samples per regime.",
+        "Plans, all result hashes/receipts, row counts, CPU, DB+client memory, pool waits, WAL/checkpoints/autovacuum, disk and failure counts are retained with reproducible inputs."
+      ],
+      "proof_boundary": "Measured capacity for the stated hardware/dataset/mix only; not universal capacity or provider uptime.",
+      "validation": {
+        "profile": "prompt-manager/bundled-v1 plus repository boundary-specific gates",
+        "checks": [
+          "Follow the stage work/acceptance and section6 proof matrix; record actual commands and output paths.",
+          "Reread current repository CI routing/package scripts; run only relevant checks, plus changed-boundary real infrastructure/browser/performance evidence.",
+          "Run bundled draft/entry and receipt checks for transitions; artifact structure alone is not implementation proof."
+        ],
+        "requires_user_acceptance": false
+      },
+      "entry_inputs": [
+        {
+          "path": "../../../../tools/qa",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../tests/perf_smoke",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres",
+          "producer_stage": null
+        },
+        {
+          "path": "implementation-plan.md",
+          "producer_stage": null
+        },
+        {
+          "path": "reports/S08.md",
+          "producer_stage": "S08"
+        }
+      ]
+    }
+  },
+  "after_contracts": {
+    "S08": {
+      "id": "S08",
+      "title": "Full correctness, recovery and browser regression suite",
+      "prompt_path": "08-functional-recovery-verification.md",
+      "report_path": "reports/S08.md",
+      "receipt_dir": "receipts/S08",
+      "depends_on": [
+        "S07"
+      ],
+      "expected_touches": [
+        "../../../../tests",
+        "../../../../tools/qa",
+        "../../../../tools/release",
+        "../../../../tools/backup",
+        "../../../../apps/platform-web/e2e",
+        "zone: focused fixes for demonstrated migration defects"
+      ],
+      "acceptance_criteria": [
+        "Real PG semantics, all consumers and supported UI/API journeys pass with CH absent; expected results are not replaced by mocks.",
+        "Failure drills prove truthful receipts/cursors/events and bounded recovery after DB restart/disconnect/contention.",
+        "Backup/restore, bootstrap, reset invalidation and artifact/backtest parity pass; independent reviewer finds no unresolved material migration issue.",
+        "A process crash after committing an old-minute value correction but before publishing its hint is recovered by bounded reconciliation and rebuilds the affected artifact."
+      ],
+      "proof_boundary": "Functional/failure integration on isolated targets; no long-soak or current-installation delivery claim.",
+      "validation": {
+        "profile": "prompt-manager/bundled-v1 plus repository boundary-specific gates",
+        "checks": [
+          "Follow the stage work/acceptance and section6 proof matrix; record actual commands and output paths.",
+          "Reread current repository CI routing/package scripts; run only relevant checks, plus changed-boundary real infrastructure/browser/performance evidence.",
+          "Run bundled draft/entry and receipt checks for transitions; artifact structure alone is not implementation proof."
+        ],
+        "requires_user_acceptance": false
+      },
+      "entry_inputs": [
+        {
+          "path": "../../../../tests/real_infra/market_data/test_transactional_ingestion_postgres.py",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../tests/real_infra/backtest/test_artifact_dispatch.py",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../apps/migrations/verify_storage_runtime.py",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../tools/release/verify_greenfield_lifecycle.py",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../apps/platform-web/package.json",
+          "producer_stage": null
+        },
+        {
+          "path": "implementation-plan.md",
+          "producer_stage": null
+        },
+        {
+          "path": "reports/S07.md",
+          "producer_stage": "S07"
+        }
+      ]
+    },
+    "S09": {
+      "id": "S09",
+      "title": "Production-query performance, memory and long mixed-load proof",
+      "prompt_path": "09-performance-and-soak.md",
+      "report_path": "reports/S09.md",
+      "receipt_dir": "receipts/S09",
+      "depends_on": [
+        "S08"
+      ],
+      "expected_touches": [
+        "../../../../tools/qa",
+        "../../../../tests/perf_smoke",
+        "zone: SQL and resource tuning within migrated adapters and configuration"
+      ],
+      "acceptance_criteria": [
+        "Full-size production-adapter mixed runs meet documented S01 guardrails or have explicit unresolved blockers; no tiny-data substitute.",
+        "Three repeated \u22655-minute normal/stress runs and \u226560-minute soak include existing PG application control traffic and \u226530 large-read samples per regime.",
+        "Plans, all result hashes/receipts, row counts, CPU, DB+client memory, pool waits, WAL/checkpoints/autovacuum, disk and failure counts are retained with reproducible inputs."
+      ],
+      "proof_boundary": "Measured capacity for the stated hardware/dataset/mix only; not universal capacity or provider uptime.",
+      "validation": {
+        "profile": "prompt-manager/bundled-v1 plus repository boundary-specific gates",
+        "checks": [
+          "Follow the stage work/acceptance and section6 proof matrix; record actual commands and output paths.",
+          "Reread current repository CI routing/package scripts; run only relevant checks, plus changed-boundary real infrastructure/browser/performance evidence.",
+          "Run bundled draft/entry and receipt checks for transitions; artifact structure alone is not implementation proof."
+        ],
+        "requires_user_acceptance": false
+      },
+      "entry_inputs": [
+        {
+          "path": "../../../../tools/qa/postgres_storage_prototype.py",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../tests/perf_smoke/contexts/indicators/test_compute_numba_perf_smoke.py",
+          "producer_stage": null
+        },
+        {
+          "path": "../../../../src/trading/contexts/market_data/adapters/outbound/persistence/postgres/canonical_candle_reader.py",
+          "producer_stage": null
+        },
+        {
+          "path": "implementation-plan.md",
+          "producer_stage": null
+        },
+        {
+          "path": "reports/S08.md",
+          "producer_stage": "S08"
+        }
+      ]
+    }
+  },
+  "preserved_sha256": {
+    "ledger_update.py": "dbae4cb40c4b69572bd275e2350fa1af79489b1d7a7df4fe3654d40429130550",
+    "implementation-plan.md": "b0c409ed4b6d19882034c00a35a8d78b180f29d5e15550c986b807cc64bd806a",
+    "10-local-cutover-and-final-audit.md": "eaf6c7ea53b2b9a8d5d06b1fd79012159521fdde283979d6c060ec9887efdcfa",
+    "06-installation-backup-observability.md": "3c8564a12f146f350f42d70b30cd1f9cf9610124619f372d3e5927a05d13b7ff",
+    "08-functional-recovery-verification.md": "428809e07193b69ae1648a020e5442e76f036e176186104d9b4385e61da84514",
+    "05-all-consumers-and-wiring.md": "ef2ee50062330f709b199432e55ef545e582e8cb8d1530999f9c22a9d819cbbe",
+    "04-queries-coverage-frontier.md": "b6045f0c42a697ad7b4361bbacefb5f10cbee9b0088f4c8b315c2eaf4d3888c7",
+    "01-documentation-and-contracts.md": "af92d82ea5a390573e5a0bb8afaa17931301fab8029f80046675552fac369516",
+    "02-schema-and-migrations.md": "f40b6911bc446ae484cc2aa89b2b42d76cf4b85b29447a32bd7f288912097a3a",
+    "09-performance-and-soak.md": "d203979b9d62c6fa40efc6f8570e88749758866b64a8a0dffb9a80f499e66283",
+    "07-remove-clickhouse-and-docs-audit.md": "05e3abf4bbca5ab239a0325985af7f1debba1c840121b9892e75a7ce7b1acf68",
+    "03-transactional-ingestion.md": "3de3cb16ae22a045f005cf87aaeff13bbecbf55050bdecf4240b22843c084ddc",
+    "receipts/S05/receipt-aa42a38497f048d194b183c6be6eed95.md": "07c2f0fce00d3c93d0296963e620730a8d83daa5ba8ccab56d2369a9f5dbb74f",
+    "receipts/S02/receipt-50a61577ff324ec38501e65bef918355.md": "b27f87c89bbfa872f61b47c9cf2c954e61989704216e13cfd3bbdddebddfc14c",
+    "receipts/S03/receipt-7c6b7401707e4f629df7b763be16f0b4.md": "cb42a7e1feabe70c43cc560b41755ca5d7ae6a3328368c578a85c368a9315aa5",
+    "receipts/S04/receipt-29b327ca5daa497b96a1f3bcc5e9f214.md": "58141e4b678d58b9dab1266ddb3cf8061d31b04f26b3221f0d4077f4aa1cdd80",
+    "receipts/S01/receipt-f36956a29b8a413095d7be563259edda.md": "52c431f34c9d6a05dc040d1066e07a36b50a5e8f920a1f5464ebd6a015b20a5b",
+    "receipts/S06/receipt-2c11b063466c43ad996e088015fe1685.md": "e14d0f79f48d197d3c2af2c2396bd9f345dea0f0f86048cf49e41405906982e3"
+  },
+  "proof_boundary": "Mechanical authoring repair only; full stage scope and acceptance unchanged; no stage claimed or accepted"
+}

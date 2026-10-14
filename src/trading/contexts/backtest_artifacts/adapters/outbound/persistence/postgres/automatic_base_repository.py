@@ -47,6 +47,13 @@ class PostgresAutomaticBaseRepository(PostgresArtifactManagementRepository):
         source = SourceTarget.model_validate(source.model_dump())
         with self.db.transaction():
             self._lock(installation_id)
+            if not self._current_revision(
+                coordinate,
+                source.source_generation,
+                source.content_revision,
+                source.funding_revision,
+            ):
+                return None
             previous = self._one(
                 """SELECT desired_target FROM backtest_artifact_source_state
                 WHERE exchange=%(exchange)s AND market_type=%(market_type)s AND symbol=%(symbol)s
@@ -84,14 +91,63 @@ class PostgresAutomaticBaseRepository(PostgresArtifactManagementRepository):
             }
             self._exec(
                 """INSERT INTO backtest_artifact_source_state
-                (exchange,market_type,symbol,desired_target) VALUES
-                (%(exchange)s,%(market_type)s,%(symbol)s,%(target)s)
+                (exchange,market_type,symbol,desired_target,source_generation,content_revision,
+                 funding_revision,source_contract_version) VALUES
+                (%(exchange)s,%(market_type)s,%(symbol)s,%(target)s,%(generation)s,
+                 %(content)s,%(funding)s,%(version)s)
                 ON CONFLICT (exchange,market_type,symbol) DO UPDATE
-                SET desired_target=EXCLUDED.desired_target""",
+                SET desired_target=EXCLUDED.desired_target,
+                    source_generation=EXCLUDED.source_generation,
+                    content_revision=EXCLUDED.content_revision,
+                    funding_revision=EXCLUDED.funding_revision,
+                    source_contract_version=EXCLUDED.source_contract_version
+                WHERE backtest_artifact_source_state.desired_target->>'observed_at' IS NULL
+                   OR backtest_artifact_source_state.desired_target->>'observed_at'
+                        <=EXCLUDED.desired_target->>'observed_at'""",
                 **coordinate.model_dump(),
                 target=Jsonb(target),
+                generation=source.source_generation,
+                content=source.content_revision,
+                funding=source.funding_revision,
+                version=2 if source.source_generation else None,
             )
             return result
+
+    def observe_unavailable(self, *, installation_id, observation, coordinate, observed_at):
+        """Persist an explicit empty/unknown watermark; never reuse the former desired source."""
+        with self.db.transaction():
+            self._lock(installation_id)
+            if not self._current_revision(
+                coordinate,
+                observation.generation,
+                observation.content_revision,
+                observation.funding_revision,
+                ready=observation.index_state == "ready",
+            ):
+                return
+            target = {
+                "source": None,
+                "state": observation.index_state,
+                "observed_at": observed_at.isoformat(),
+            }
+            self._exec(
+                """INSERT INTO backtest_artifact_source_state
+                (exchange,market_type,symbol,desired_target,source_generation,content_revision,
+                 funding_revision,source_contract_version) VALUES
+                (%(exchange)s,%(market_type)s,%(symbol)s,%(target)s,%(g)s,%(c)s,%(f)s,2)
+                ON CONFLICT(exchange,market_type,symbol) DO UPDATE SET
+                desired_target=EXCLUDED.desired_target,source_generation=EXCLUDED.source_generation,
+                content_revision=EXCLUDED.content_revision,funding_revision=EXCLUDED.funding_revision,
+                source_contract_version=2,published='{}'::jsonb
+                WHERE backtest_artifact_source_state.desired_target->>'observed_at' IS NULL
+                   OR backtest_artifact_source_state.desired_target->>'observed_at'
+                        <=EXCLUDED.desired_target->>'observed_at'""",
+                **coordinate.model_dump(),
+                target=Jsonb(target),
+                g=observation.generation,
+                c=observation.content_revision,
+                f=observation.funding_revision,
+            )
 
     def finish_base(
         self,

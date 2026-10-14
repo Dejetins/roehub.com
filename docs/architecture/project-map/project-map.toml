@@ -171,7 +171,7 @@ paths = ["src/trading/contexts/market_data/adapters/outbound/clients/binance/", 
 
 [[runtime_nodes]]
 id = "observability"
-title = "Prometheus / Grafana / Loki"
+title = "Prometheus / Alertmanager / Blackbox / operational-health"
 kind = "operations"
 paths = ["infra/monitoring/", "apps/monitoring/"]
 

@@ -13,12 +13,12 @@ it('shows devices and one legacy group, revokes once and reconciles without hidi
  let finish!:(r:Response)=>void,writes=0,ended=false;
  vi.stubGlobal('fetch',vi.fn((_url,options)=>options.method==='POST'?(writes++,new Promise<Response>(r=>{finish=r;})):Promise.resolve(Response.json({...devices,items:devices.items.map(d=>d.device_id==='other'?{...d,active:!ended}:d)}))));
  mount();await screen.findByText('This device');expect(screen.getByText('Earlier sign-ins · 12')).toBeVisible();
- const button=screen.getByRole('button',{name:'End sign-in: Firefox · Windows'});fireEvent.click(button);fireEvent.click(button);expect(writes).toBe(1);expect(button).toBeDisabled();expect(screen.getByText('Chrome · macOS')).toBeVisible();
- ended=true;await act(async()=>finish(Response.json({revoked:true,current:false})));await screen.findByText('Ended');expect(screen.queryByRole('button',{name:'End sign-in: Firefox · Windows'})).not.toBeInTheDocument();
+ const button=screen.getByRole('button',{name:'End session: Firefox · Windows'});fireEvent.click(button);fireEvent.click(button);expect(writes).toBe(1);expect(button).toBeDisabled();expect(screen.getByText('Chrome · macOS')).toBeVisible();
+ ended=true;await act(async()=>finish(Response.json({revoked:true,current:false})));await screen.findByText('Ended');expect(screen.queryByRole('button',{name:'End session: Firefox · Windows'})).not.toBeInTheDocument();
 });
 it('hides private rows immediately on a denied mutation',async()=>{
  vi.stubGlobal('fetch',vi.fn((_url,options)=>Promise.resolve(options.method==='POST'?Response.json({error:{code:'denied'}},{status:403}):Response.json(devices))));
- mount();fireEvent.click(await screen.findByRole('button',{name:'End sign-in: Firefox · Windows'}));
+ mount();fireEvent.click(await screen.findByRole('button',{name:'End session: Firefox · Windows'}));
  await screen.findByText('Access denied.');expect(screen.queryByText('Chrome · macOS')).not.toBeInTheDocument();expect(screen.queryByText('Earlier sign-ins · 12')).not.toBeInTheDocument();
 });
 it('keeps an unknown command outcome locked until an explicit successful read',async()=>{

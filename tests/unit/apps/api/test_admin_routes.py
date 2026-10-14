@@ -9,7 +9,6 @@ from fastapi.testclient import TestClient
 from apps.api.common import register_api_error_handlers
 from apps.api.routes.admin import build_admin_router
 from apps.monitoring.operational_health import OperationalSnapshot, OperationalStatus
-from trading.contexts.extensions.domain import PluginEvent
 from trading.contexts.identity.adapters.outbound.persistence.in_memory import (
     InMemoryOrganizationRepository,
 )
@@ -22,7 +21,6 @@ from trading.contexts.operations import (
     OperationState,
 )
 from trading.shared_kernel.primitives import (
-    InstallationId,
     OrganizationId,
     PaidLevel,
     UserId,
@@ -36,23 +34,6 @@ class _Clock:
         return NOW
 
 
-class _PluginService:
-    def list_inventory(self, **kwargs: object) -> tuple[tuple[object, ...], ...]:
-        organization_id = kwargs["organization_id"]
-        assert isinstance(organization_id, OrganizationId)
-        event = PluginEvent(
-            event_id=uuid4(),
-            installation_id=InstallationId(uuid4()),
-            organization_id=organization_id,
-            actor_user_id=UserId(uuid4()),
-            event_type="plugin.update.requested",
-            target_type="plugin",
-            target_id="fixture.plugin",
-            outcome="succeeded",
-            metadata={},
-            created_at=NOW,
-        )
-        return (), (), (), (event,)
 
 
 class _ControlClient:
@@ -169,7 +150,6 @@ def _build_client() -> tuple[
     app.include_router(
         build_admin_router(
             organization_service=service,
-            plugin_service=_PluginService(),  # type: ignore[arg-type]
             current_user_dependency=current_user,  # type: ignore[arg-type]
             clock=_Clock(),
             control_agent_client=control,  # type: ignore[arg-type]

@@ -1,0 +1,15 @@
+{
+  "id": "96232769f63125ec4111f4e0c6df454f13f082a0abec0f0c95f4255e98b66042",
+  "image": "postgres:16",
+  "label": "S03",
+  "nanocpus": 2000000000,
+  "memory_bytes": 4294967296,
+  "ports": {
+    "5432/tcp": [
+      {
+        "HostIp": "127.0.0.1",
+        "HostPort": "59119"
+      }
+    ]
+  }
+}

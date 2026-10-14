@@ -185,7 +185,6 @@ def test_access_contract_is_deny_by_default_and_covers_mutations() -> None:
         "connections.manage",
         "connections.secret.reveal",
         "admin.members.manage",
-        "admin.plugins.manage",
         "installation.resources.manage",
         "installation.recovery.execute",
     }

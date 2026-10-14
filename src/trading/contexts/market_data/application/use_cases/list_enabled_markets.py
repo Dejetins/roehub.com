@@ -17,7 +17,7 @@ class ListEnabledMarketsUseCase:
       - docs/architecture/market_data/market-data-reference-api-v1.md
     Related:
       - src/trading/contexts/market_data/application/ports/stores/enabled_market_reader.py
-      - src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/
+      - src/trading/contexts/market_data/adapters/outbound/persistence/postgres/
         enabled_market_reader.py
       - apps/api/routes/market_data_reference.py
     """

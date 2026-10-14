@@ -444,49 +444,6 @@ def test_scheduler_wiring_uses_explicit_artifact_config_for_indicators_resolutio
             """
             return object()
 
-    class _FakeClickHouseSettingsLoader:
-        """
-        Minimal ClickHouse settings loader stub for scheduler wiring tests.
-
-        Docs:
-          - docs/runbooks/backtest-artifacts-rebuild.md
-        Related:
-          - apps/scheduler/backtest_artifact_publisher/wiring/modules/backtest_artifact_publisher.py
-        """
-
-        def __init__(self, environ: dict[str, str]) -> None:
-            """
-            Store the provided environment mapping for parity with production signature.
-
-            Args:
-                environ: Environment mapping forwarded by scheduler wiring.
-            Returns:
-                None.
-            Assumptions:
-                The fake loader only needs to preserve constructor compatibility.
-            Raises:
-                None.
-            Side Effects:
-                Stores the environment mapping in memory.
-            """
-            self._environ = dict(environ)
-
-        def load(self, *, workload=None) -> object:
-            """
-            Return a deterministic settings object with a database attribute.
-
-            Args:
-                None.
-            Returns:
-                object: Simple namespace-like settings object.
-            Assumptions:
-                Downstream fake dependencies only read the `database` attribute.
-            Raises:
-                None.
-            Side Effects:
-                None.
-            """
-            return type("Settings", (), {"database": "test_db"})()
 
     def _capture_defaults_provider(_cls, *, environ, artifact_config_path=None):
         """
@@ -568,17 +525,7 @@ def test_scheduler_wiring_uses_explicit_artifact_config_for_indicators_resolutio
         "AtomicArtifactCurrentPointerWriterV2",
         lambda path_resolver: object(),
     )
-    monkeypatch.setattr(
-        publisher_module,
-        "ClickHouseSettingsLoader",
-        _FakeClickHouseSettingsLoader,
-    )
-    monkeypatch.setattr(publisher_module, "_clickhouse_client", lambda settings: object())
-    monkeypatch.setattr(
-        publisher_module,
-        "ThreadLocalClickHouseConnectGateway",
-        lambda client_factory: object(),
-    )
+    monkeypatch.setattr(publisher_module, "market_gateway", lambda environ, **kwargs: object())
     monkeypatch.setattr(publisher_module, "SystemClock", lambda: object())
     monkeypatch.setattr(
         publisher_module.YamlBacktestGridDefaultsProvider,
@@ -598,7 +545,7 @@ def test_scheduler_wiring_uses_explicit_artifact_config_for_indicators_resolutio
     )
     monkeypatch.setattr(
         publisher_module,
-        "ClickHouseCanonicalCandleReader",
+        "PostgresCanonicalCandleReader",
         lambda **kwargs: object(),
     )
     monkeypatch.setattr(
@@ -629,7 +576,7 @@ def test_scheduler_wiring_uses_explicit_artifact_config_for_indicators_resolutio
     )
     monkeypatch.setattr(
         publisher_module,
-        "ClickHouseCanonicalCandleIndexReader",
+        "PostgresCanonicalCandleIndexReader",
         lambda **kwargs: object(),
     )
     monkeypatch.setattr(

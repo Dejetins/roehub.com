@@ -17,7 +17,6 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 class BackupStateOwner(StrEnum):
     RELEASE_CONFIG = "release_config"
     POSTGRESQL = "postgresql"
-    CLICKHOUSE = "clickhouse"
     REDIS_CHECKPOINT = "redis_checkpoint"
     OPENBAO = "openbao"
     ARTIFACTS = "artifacts"
@@ -39,7 +38,6 @@ ConsistencyMode = Literal[
 REQUIRED_CONSISTENCY_MODES: dict[BackupStateOwner, ConsistencyMode] = {
     BackupStateOwner.RELEASE_CONFIG: "application_quiesced",
     BackupStateOwner.POSTGRESQL: "database_snapshot",
-    BackupStateOwner.CLICKHOUSE: "database_snapshot",
     BackupStateOwner.REDIS_CHECKPOINT: "durable_checkpoint",
     BackupStateOwner.OPENBAO: "encrypted_raft_snapshot",
     BackupStateOwner.ARTIFACTS: "content_addressed_snapshot",
@@ -76,8 +74,8 @@ class InstallationCaptureRecord(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_id: Literal["io.roehub.installation-capture/v1alpha1"] = Field(
-        default="io.roehub.installation-capture/v1alpha1",
+    schema_id: Literal["io.roehub.installation-capture/v2alpha1"] = Field(
+        default="io.roehub.installation-capture/v2alpha1",
         alias="schema",
     )
     installation_fingerprint: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
@@ -85,8 +83,8 @@ class InstallationCaptureRecord(BaseModel):
     quiesce_started_at: datetime
     quiesce_completed_at: datetime
     entries: tuple[BackupCaptureEntry, ...] = Field(
-        min_length=8,
-        max_length=8,
+        min_length=7,
+        max_length=7,
         json_schema_extra={"uniqueItems": True},
     )
 
@@ -146,8 +144,7 @@ class InstallationReleasePolicy(BaseModel):
     @model_validator(mode="after")
     def _validate_transitions(self) -> InstallationReleasePolicy:
         identities = {
-            (transition.from_release, transition.to_release)
-            for transition in self.transitions
+            (transition.from_release, transition.to_release) for transition in self.transitions
         }
         if len(identities) != len(self.transitions):
             raise ValueError("release transitions must be unique")
@@ -160,10 +157,7 @@ class InstallationReleasePolicy(BaseModel):
         to_release: str,
     ) -> ReleaseTransitionRule:
         for transition in self.transitions:
-            if (
-                transition.from_release == from_release
-                and transition.to_release == to_release
-            ):
+            if transition.from_release == from_release and transition.to_release == to_release:
                 return transition
         raise ValueError("release transition is not trusted")
 
@@ -173,8 +167,8 @@ class InstallationBackupPolicy(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_id: Literal["io.roehub.installation-backup-policy/v1alpha1"] = Field(
-        default="io.roehub.installation-backup-policy/v1alpha1",
+    schema_id: Literal["io.roehub.installation-backup-policy/v2alpha1"] = Field(
+        default="io.roehub.installation-backup-policy/v2alpha1",
         alias="schema",
     )
     profile: Literal["base", "trading", "ml"]
@@ -192,8 +186,8 @@ class InstallationBackupPolicy(BaseModel):
     release_policy_file: Path
     cleanup_plaintext_sources: Literal[True] = True
     sources: tuple[BackupPolicySource, ...] = Field(
-        min_length=8,
-        max_length=8,
+        min_length=7,
+        max_length=7,
         json_schema_extra={"uniqueItems": True},
     )
 
@@ -260,22 +254,22 @@ class InstallationBackupManifest(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    schema_id: Literal["io.roehub.installation-backup/v1alpha1"] = Field(
-        default="io.roehub.installation-backup/v1alpha1",
+    schema_id: Literal["io.roehub.installation-backup/v2alpha1"] = Field(
+        default="io.roehub.installation-backup/v2alpha1",
         alias="schema",
     )
     backup_id: str = Field(pattern=r"^[a-z0-9][a-z0-9._-]{0,127}$")
     installation_fingerprint: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     source_release_version: str = Field(pattern=r"^[a-z0-9][a-z0-9._+-]{0,63}$")
-    compatibility: Literal["greenfield-self-hosted-v1"] = "greenfield-self-hosted-v1"
+    compatibility: Literal["postgresql-only-v2"] = "postgresql-only-v2"
     created_at: datetime
     quiesce_started_at: datetime
     quiesce_completed_at: datetime
     observed_rpo_seconds: float = Field(ge=0)
     signing_key_id: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     entries: tuple[BackupManifestEntry, ...] = Field(
-        min_length=8,
-        max_length=8,
+        min_length=7,
+        max_length=7,
         json_schema_extra={"uniqueItems": True},
     )
 

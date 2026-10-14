@@ -79,8 +79,6 @@ DEFAULT_EVIDENCE = (
 MONITORING_SERVICES = (
     "alertmanager",
     "blackbox",
-    "grafana",
-    "loki",
     "operational-health",
     "prometheus",
 )
@@ -168,9 +166,7 @@ class RuntimeStateCoordinator:
                 BackupCaptureEntry(
                     owner=source.owner,
                     captured_at=capture_times[source.owner],
-                    plaintext_sha256=_file_sha256(
-                        policy.source_root / source.filename
-                    ),
+                    plaintext_sha256=_file_sha256(policy.source_root / source.filename),
                 )
                 for source in source_rows
             ),
@@ -234,9 +230,7 @@ class RuntimeStateCoordinator:
                     "forward_recovery_plan_required"
                 )
             else:
-                self.release_lifecycle["injected_failure"] = (
-                    "failed_before_atomic_release_commit"
-                )
+                self.release_lifecycle["injected_failure"] = "failed_before_atomic_release_commit"
             raise
         self.current_release = request.release_version
         self.release_lifecycle.update(
@@ -579,13 +573,11 @@ def verify_runtime(
                 raise RecoveryRuntimeProofError("roehubctl recovery operation failed")
             if (
                 failed_update_cli.get("state") != "failed"
-                or failed_update_cli.get("detail_code")
-                != "upgrade.injected_failure_before_commit"
+                or failed_update_cli.get("detail_code") != "upgrade.injected_failure_before_commit"
                 or resumed_update_cli.get("state") != "succeeded"
                 or rollback_cli.get("state") != "succeeded"
                 or irreversible_cli.get("state") != "failed"
-                or irreversible_cli.get("detail_code")
-                != "upgrade.forward_recovery_plan_required"
+                or irreversible_cli.get("detail_code") != "upgrade.forward_recovery_plan_required"
             ):
                 raise RecoveryRuntimeProofError("roehubctl release lifecycle failed")
             safe_result = {
@@ -631,9 +623,9 @@ def verify_runtime(
                     "cleanup": coordinator.openbao_proof.get("cleanup"),
                 },
                 "backup_progress": backup_progress.get("state"),
-                "restore_progress": _read_json(
-                    restored_root / "restore-progress.json"
-                ).get("state"),
+                "restore_progress": _read_json(restored_root / "restore-progress.json").get(
+                    "state"
+                ),
                 "observed_rpo_seconds": manifest.observed_rpo_seconds,
                 "observed_rto_seconds": restore_result.get("observed_rto_seconds"),
                 "sla_claimed": False,
@@ -682,17 +674,10 @@ def _capture_sources(
             "--format=custom",
             "--no-owner",
             "--no-privileges",
-            "--table=stage21_state",
         ],
         environ=environ,
     )
     (source_root / "postgresql.snapshot").write_bytes(postgresql_dump)
-    clickhouse_dump = _clickhouse_query(
-        project,
-        "SELECT ts, value FROM stage21_timeseries ORDER BY ts FORMAT JSONEachRow",
-        environ=environ,
-    )
-    (source_root / "clickhouse.snapshot").write_bytes(clickhouse_dump)
     checkpoint = _redis_command(project, ["GET", "stage21:checkpoint"], environ=environ)
     _write_json(
         source_root / "redis_checkpoint.snapshot",
@@ -735,9 +720,7 @@ def _capture_sources(
             else None
         ),
     )
-    openbao_metadata = openbao_ciphertext.with_suffix(
-        openbao_ciphertext.suffix + ".metadata.json"
-    )
+    openbao_metadata = openbao_ciphertext.with_suffix(openbao_ciphertext.suffix + ".metadata.json")
     if (
         openbao_proof.get("status") != "passed"
         or not openbao_ciphertext.is_file()
@@ -792,7 +775,53 @@ def _capture_release_config(source_root: Path) -> None:
     shutil.rmtree(staging)
 
 
+def _market_fixture(project: str, mode: str, *, environ: dict[str, str]) -> dict[str, Any]:
+    override = environ.get(_RUNTIME_IMAGE_OVERRIDE_ENV)
+    if not override:
+        raise RecoveryRuntimeProofError(
+            "source runtime image override required for market backup proof"
+        )
+    payload = _read_json(Path(override))
+    runtime_image = payload["services"]["operational-health"]["image"]
+    proof_environment = dict(environ)
+    proof_environment["ROEHUB_DISPOSABLE_STORAGE_PROOF"] = "1"
+    result = _run(
+        [
+            "docker",
+            "run",
+            "--rm",
+            "--network",
+            f"{project}_storage",
+            "--entrypoint",
+            "python",
+            "-e",
+            "ROEHUB_DISPOSABLE_STORAGE_PROOF",
+            "-e",
+            "ROEHUB_STORAGE_POSTGRES_DSN",
+            "-e",
+            "PYTHONPATH=/workspace/src:/workspace",
+            "-v",
+            f"{ROOT}:/workspace:ro",
+            "-w",
+            "/workspace",
+            runtime_image,
+            "-m",
+            "tools.backup.market_fixture",
+            mode,
+        ],
+        environ=proof_environment,
+    )
+    if result.returncode:
+        # Print only traceback locations, never credentials, SQL values or raw payloads.
+        import re
+
+        locations = re.findall(rb'File "([^"\n]+)", line ([0-9]+)', result.stderr)
+        raise RecoveryRuntimeProofError(f"market backup fixture {mode} failed at {locations!r}")
+    return json.loads(result.stdout.splitlines()[-1])
+
+
 def _seed_storage(project: str, *, environ: dict[str, str]) -> None:
+    _market_fixture(project, "seed", environ=environ)
     sql = (
         "CREATE TABLE stage21_state ("
         "kind text NOT NULL, item_id text PRIMARY KEY, payload text NOT NULL, "
@@ -810,16 +839,12 @@ def _seed_storage(project: str, *, environ: dict[str, str]) -> None:
         ["psql", "-U", "roehub", "-d", "roehub", "-v", "ON_ERROR_STOP=1", "-c", sql],
         environ=environ,
     )
-    _clickhouse_query(
+    _postgres_timeseries_query(
         project,
-        (
-            "CREATE TABLE stage21_timeseries "
-            "(ts DateTime64(3, 'UTC'), value Float64) "
-            "ENGINE=MergeTree ORDER BY ts"
-        ),
+        ("CREATE TABLE stage21_timeseries " "(ts timestamptz, value double precision)"),
         environ=environ,
     )
-    _clickhouse_query(
+    _postgres_timeseries_query(
         project,
         (
             "INSERT INTO stage21_timeseries VALUES "
@@ -855,21 +880,10 @@ def _restore_and_compare_storage(
         environ=environ,
         input_bytes=(restored_root / "postgresql.snapshot").read_bytes(),
     )
-    _clickhouse_query(
-        target_project,
-        (
-            "CREATE TABLE stage21_timeseries "
-            "(ts DateTime64(3, 'UTC'), value Float64) "
-            "ENGINE=MergeTree ORDER BY ts"
-        ),
-        environ=environ,
-    )
-    _clickhouse_query(
-        target_project,
-        "INSERT INTO stage21_timeseries FORMAT JSONEachRow",
-        environ=environ,
-        input_bytes=(restored_root / "clickhouse.snapshot").read_bytes(),
-    )
+    source_market = _market_fixture(source_project, "observe", environ=environ)
+    target_market = _market_fixture(target_project, "verify", environ=environ)
+    if source_market["snapshot"] != target_market["snapshot"]:
+        raise RecoveryRuntimeProofError("market schema/index/frontier restore mismatch")
     redis_payload = _read_json(restored_root / "redis_checkpoint.snapshot")
     checkpoint = redis_payload.get("checkpoint")
     if not isinstance(checkpoint, str):
@@ -881,14 +895,14 @@ def _restore_and_compare_storage(
     )
     source_rows = _postgres_rows(source_project, environ=environ)
     target_rows = _postgres_rows(target_project, environ=environ)
-    source_timeseries = _clickhouse_query(
+    source_timeseries = _postgres_timeseries_query(
         source_project,
-        "SELECT ts, value FROM stage21_timeseries ORDER BY ts FORMAT JSONEachRow",
+        "SELECT ts, value FROM stage21_timeseries ORDER BY ts",
         environ=environ,
     )
-    target_timeseries = _clickhouse_query(
+    target_timeseries = _postgres_timeseries_query(
         target_project,
-        "SELECT ts, value FROM stage21_timeseries ORDER BY ts FORMAT JSONEachRow",
+        "SELECT ts, value FROM stage21_timeseries ORDER BY ts",
         environ=environ,
     )
     target_checkpoint = _redis_command(
@@ -946,12 +960,13 @@ def _restore_and_compare_storage(
             raise RecoveryRuntimeProofError("restored digest does not match manifest")
         digest_matches += 1
     return {
+        "market_data": target_market,
         "postgresql": {
             "rows": len(target_rows),
             "kinds": sorted(row.split("|", 1)[0] for row in target_rows),
             "users_config_plugin_operation_audit": "matched",
         },
-        "clickhouse": {
+        "postgresql_timeseries": {
             "rows": len(target_timeseries.decode().strip().splitlines()),
             "time_range": ["2026-07-14 09:00:00.000", "2026-07-14 09:02:00.000"],
             "digest_match": True,
@@ -980,8 +995,7 @@ def _verify_release_config_archive(path: Path, target: Path) -> dict[str, object
         "generation-manifest.json": PROFILE_ROOT / "generation-manifest.json",
     }
     if (
-        manifest.get("schema")
-        != "io.roehub.stage21-release-config-snapshot/v1alpha1"
+        manifest.get("schema") != "io.roehub.stage21-release-config-snapshot/v1alpha1"
         or manifest.get("profile") != "base"
         or manifest.get("source_release_version") != "0.0.0"
         or not isinstance(files, dict)
@@ -1055,9 +1069,7 @@ def _exercise_release_lifecycle(
             consistency_mode=source.consistency_mode,
             source_schema_version="fixture-n-minus-one",
             captured_at=now,
-            expected_plaintext_sha256=_file_sha256(
-                source_root / source.filename
-            ),
+            expected_plaintext_sha256=_file_sha256(source_root / source.filename),
             limitations=source.limitations,
         )
         for source in _policy_sources()
@@ -1246,13 +1258,6 @@ def _policy_sources() -> tuple[BackupPolicySource, ...]:
             source_schema_version="postgresql-16-custom",
         ),
         BackupPolicySource(
-            owner=BackupStateOwner.CLICKHOUSE,
-            filename="clickhouse.snapshot",
-            media_type="application/x-ndjson",
-            consistency_mode="database_snapshot",
-            source_schema_version="clickhouse-24-json-each-row",
-        ),
-        BackupPolicySource(
             owner=BackupStateOwner.REDIS_CHECKPOINT,
             filename="redis_checkpoint.snapshot",
             media_type="application/json",
@@ -1407,11 +1412,11 @@ def _roehubctl_arguments(
     command_args = [
         "--socket",
         str(socket_path),
-            "--identity-file",
-            str(owner_identity_file),
-            command,
-            "--profile",
-            "base",
+        "--identity-file",
+        str(owner_identity_file),
+        command,
+        "--profile",
+        "base",
     ]
     if subject_id is not None:
         command_args.extend(["--subject-id", subject_id])
@@ -1464,9 +1469,7 @@ def _wait_for_progress(path: Path, *, timeout_seconds: float = 180.0) -> None:
     while time.monotonic() < deadline:
         if path.is_file():
             progress = _read_json(path)
-            if progress.get("state") == "running" and isinstance(
-                progress.get("completed"), dict
-            ):
+            if progress.get("state") == "running" and isinstance(progress.get("completed"), dict):
                 return
             if progress.get("state") in {"completed", "cancelled"}:
                 raise RecoveryRuntimeProofError(
@@ -1494,17 +1497,11 @@ def _storage_environment() -> dict[str, str]:
     environ.update(
         {
             "ROEHUB_STORAGE_POSTGRES_PASSWORD": values[0],
-            "ROEHUB_STORAGE_CLICKHOUSE_PASSWORD": values[1],
             "ROEHUB_STORAGE_REDIS_PASSWORD": values[2],
             "ROEHUB_STORAGE_POSTGRES_DSN": (
                 "host=postgresql port=5432 dbname=roehub user=roehub password=" + values[0]
             ),
-            "ROEHUB_STORAGE_CLICKHOUSE_DSN": (
-                "http://roehub:" + values[1] + "@clickhouse:8123/default"
-            ),
-            "ROEHUB_STORAGE_REDIS_URL": (
-                "redis://:" + values[2] + "@redis:6379/0"
-            ),
+            "ROEHUB_STORAGE_REDIS_URL": ("redis://:" + values[2] + "@redis:6379/0"),
             "ROEHUB_STORAGE_SERVICE_CONFIG": str(SERVICE_CONFIG),
         }
     )
@@ -1523,7 +1520,6 @@ def _storage_up(project: str, *, environ: dict[str, str]) -> None:
             "-d",
             "--wait",
             "postgresql",
-            "clickhouse",
             "redis",
         ],
         environ=environ,
@@ -1562,7 +1558,7 @@ def _storage_exec(
     return completed.stdout
 
 
-def _clickhouse_query(
+def _postgres_timeseries_query(
     project: str,
     query: str,
     *,
@@ -1571,14 +1567,8 @@ def _clickhouse_query(
 ) -> bytes:
     return _storage_exec(
         project,
-        "clickhouse",
-        [
-            "/bin/sh",
-            "-ec",
-            'clickhouse-client --user roehub --password "$CLICKHOUSE_PASSWORD" --query "$1"',
-            "stage21-clickhouse",
-            query,
-        ],
+        "postgresql",
+        ["psql", "-U", "roehub", "-d", "roehub", "-At", "-v", "ON_ERROR_STOP=1", "-c", query],
         environ=environ,
         input_bytes=input_bytes,
     )
@@ -1597,12 +1587,16 @@ def _redis_command(
         "stage21-redis",
         *args,
     ]
-    return _storage_exec(
-        project,
-        "redis",
-        command,
-        environ=environ,
-    ).decode("utf-8").strip()
+    return (
+        _storage_exec(
+            project,
+            "redis",
+            command,
+            environ=environ,
+        )
+        .decode("utf-8")
+        .strip()
+    )
 
 
 def _postgres_rows(project: str, *, environ: dict[str, str]) -> list[str]:

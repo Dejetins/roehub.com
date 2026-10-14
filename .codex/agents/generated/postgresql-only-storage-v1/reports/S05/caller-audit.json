@@ -1,0 +1,156 @@
+{
+  "scope": [
+    "apps",
+    "src/trading",
+    "scripts"
+  ],
+  "method": "Python AST Import/ImportFrom inventory",
+  "limits": "Dynamic imports/HTTP and generated installation config require S07 residual audit; source-only, no package-absence claim.",
+  "rows": [
+    {
+      "path": "apps/cli/wiring/db/clickhouse.py",
+      "line": 9,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "apps/cli/wiring/db/clickhouse.py",
+      "line": 12,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.raw_kline_writer",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "apps/cli/wiring/db/clickhouse.py",
+      "line": 147,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.work_errors",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "apps/cli/wiring/db/clickhouse.py",
+      "line": 143,
+      "imported": "clickhouse_connect",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "apps/migrations/research_runtime_probe.py",
+      "line": 16,
+      "imported": "clickhouse_connect",
+      "disposition": "S06/S07: operational migration/probe/exporter replacement"
+    },
+    {
+      "path": "apps/migrations/research_runtime_probe.py",
+      "line": 34,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse",
+      "disposition": "S06/S07: operational migration/probe/exporter replacement"
+    },
+    {
+      "path": "apps/migrations/storage.py",
+      "line": 14,
+      "imported": "clickhouse_connect",
+      "disposition": "S06/S07: operational migration/probe/exporter replacement"
+    },
+    {
+      "path": "apps/monitoring/__init__.py",
+      "line": 9,
+      "imported": "clickhouse_exporter",
+      "disposition": "S06/S07: operational migration/probe/exporter replacement"
+    },
+    {
+      "path": "src/trading/contexts/backtest_artifacts/adapters/outbound/persistence/clickhouse/stored_coordinates.py",
+      "line": 21,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/btcusdt_market_readiness_reader.py",
+      "line": 6,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_index_reader.py",
+      "line": 7,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/canonical_candle_reader.py",
+      "line": 8,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/catalog_coverage_reader.py",
+      "line": 6,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_instrument_reader.py",
+      "line": 6,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_market_reader.py",
+      "line": 6,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/enabled_tradable_instrument_search_reader.py",
+      "line": 6,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/funding_rate_store.py",
+      "line": 6,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_coverage_reader.py",
+      "line": 7,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/history_range_verifier.py",
+      "line": 7,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/instrument_coverage_reader.py",
+      "line": 6,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/raw_kline_writer.py",
+      "line": 6,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_instruments_writer.py",
+      "line": 5,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/ref_market_writer.py",
+      "line": 5,
+      "imported": "trading.contexts.market_data.adapters.outbound.persistence.clickhouse.gateway",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    },
+    {
+      "path": "src/trading/contexts/market_data/adapters/outbound/persistence/clickhouse/work_errors.py",
+      "line": 5,
+      "imported": "clickhouse_connect.driver.exceptions",
+      "disposition": "S07: disconnected legacy adapter/module removal"
+    }
+  ],
+  "unexpected": 0
+}

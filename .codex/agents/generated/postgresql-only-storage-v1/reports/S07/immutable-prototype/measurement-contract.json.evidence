@@ -1,0 +1,47 @@
+{
+  "scope": "Storage prototype only; complete real canonical snapshot before 2026-10-12, normalized raw mirror retains full observations; not a whole-app migration.",
+  "comparison": "PG native monthly partitioning, PK + batched COPY/upsert + transactional daily bitsets; CH current daily MergeTree architecture + real first_gap adapter.",
+  "resources": {
+    "cpu_each": 2,
+    "container_memory_bytes": 4294967296,
+    "ch_server_memory_bytes": 3221225472,
+    "ch_default_query_memory_bytes": 1610612736,
+    "pg_shared_buffers_bytes": 268435456,
+    "pg_work_mem_bytes": 4194304
+  },
+  "durability": "PG fsync/synchronous_commit/full_page_writes enabled; CH synchronous insertion plus fsync_after_insert/fsync_part_directory enabled on raw/canonical/stats replica tables. No source changes.",
+  "metrics": [
+    "end-to-end service p50/p95/p99",
+    "scheduled latency including backlog",
+    "completed/failed work",
+    "cgroup anon/file/total memory and CPU time",
+    "on-disk tables/indexes and server volume",
+    "result parity"
+  ],
+  "repetitions": 3,
+  "cache": "identical warmup, sequential engines with alternating run order; host OS caches not dropped; no cold disk claim",
+  "acceptance": "not assessed; owner latency/memory thresholds not specified",
+  "replay": "Real observed candle values; isolated REPLAY symbols and Jan-2030 timestamps; 5-row stream bursts, 1000-row history batches. Backfill rate is offered load, not exchange throughput.",
+  "source_state": "Immutable monthly FINAL exports; query failures at 128MiB retained; copied source data unchanged during tests.",
+  "duration_seconds": 60,
+  "normal_lanes": {
+    "stream": "5 rows / second",
+    "backfill": "1000 rows / 2 seconds",
+    "latest": "1/s",
+    "hot_latest": "1/s concurrent on replay stream",
+    "catalog": "1/2s",
+    "first_gap": "1/2s",
+    "artifact": "1-year read every10s"
+  },
+  "stress": "100 stream rows/s, extra latest reader2/s, 2 full-instrument-history readers every10s; same backfill.",
+  "validation": "All17snapshotcolumns exact Arrow equality outside timed runs; replay counts/checksums bothengines; gap/out-of-order correctness separate.",
+  "client": "Each lane in an independent spawned host process; binary psycopg result cursors and clickhouse-connect; identical NumPy materialization and hash. Sample aggregate RSS of parent+lane processes separately.",
+  "known_limits": [
+    "Not a whole-application HTTP test or complete production adapter migration.",
+    "Normalized raw mirror preserves canonical observation fields, not every provider-specific raw field or prior duplicate versions.",
+    "Compressed-time replay, not provider throughput or a maximum-capacity search.",
+    "Sampled cgroup memory peaks at1s; clientRSS separately; no forced cold OS cache.",
+    "CHfsync configuration is more conservative than the installed baseline.",
+    "Rare operation p99 has few samples; report n/max and variation."
+  ]
+}

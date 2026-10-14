@@ -1,0 +1,11 @@
+{
+  "changed_existing": [
+    "apps/migrations/storage.py",
+    "docs/architecture/project-map/PROJECT_MAP.md",
+    "docs/architecture/project-map/project-map.json",
+    "migrations/postgres/manifest.json",
+    "tests/unit/apps/migrations/test_storage_lifecycle.py"
+  ],
+  "existing_postgres_sql_unchanged": 35,
+  "S01_report_evidence_receipts_unchanged": true
+}
